@@ -72,14 +72,17 @@ export function createCustomerIoEvaluationSyncReactor(
 
         const now = new Date(event.occurredAt).toISOString();
 
-        const existingCount = await deps.evaluationCountFn(organizationId);
-        if (existingCount === null) {
+        const rawCount = await deps.evaluationCountFn(organizationId);
+        if (rawCount === null) {
           logger.warn(
             { projectId },
             "Could not determine evaluation count — skipping CIO evaluation sync",
           );
           return;
         }
+        // The fold projection persists before reactors fire, so the current
+        // evaluation is already counted — subtract 1 to get prior count.
+        const existingCount = Math.max(0, rawCount - 1);
         const isFirstEvaluation = existingCount === 0;
 
         if (isFirstEvaluation) {
@@ -115,17 +118,19 @@ export function createCustomerIoEvaluationSyncReactor(
               logger.error({ projectId, error }, "Failed to identify user for evaluation update");
               captureException(error);
             });
-          void deps.nurturing
-            .trackEvent({ userId, event: "evaluation_ran", properties: {
-              evaluation_id: foldState.evaluationId,
-              score: foldState.score,
-              passed: foldState.passed,
-            }})
-            .catch((error) => {
-              logger.error({ projectId, error }, "Failed to track evaluation_ran event");
-              captureException(error);
-            });
         }
+
+        // Track evaluation_ran for every evaluation (first and subsequent)
+        void deps.nurturing
+          .trackEvent({ userId, event: "evaluation_ran", properties: {
+            evaluation_id: foldState.evaluationId,
+            score: foldState.score,
+            passed: foldState.passed,
+          }})
+          .catch((error) => {
+            logger.error({ projectId, error }, "Failed to track evaluation_ran event");
+            captureException(error);
+          });
       } catch (error) {
         logger.error(
           { projectId, error },

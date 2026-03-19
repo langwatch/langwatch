@@ -115,7 +115,7 @@ function createDeps(
   return {
     projects: createMockProjectService(),
     nurturing: createMockNurturing(),
-    simulationCountFn: vi.fn().mockResolvedValue(0),
+    simulationCountFn: vi.fn().mockResolvedValue(1),
     ...overrides,
   };
 }
@@ -149,7 +149,7 @@ describe("customerIoSimulationSync reactor", () => {
     describe("when the first simulation is processed", () => {
       it("identifies user with has_simulations true and org-wide simulation_count 1", async () => {
         const deps = createDeps({
-          simulationCountFn: vi.fn().mockResolvedValue(0),
+          simulationCountFn: vi.fn().mockResolvedValue(1),
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
@@ -170,7 +170,7 @@ describe("customerIoSimulationSync reactor", () => {
 
       it("tracks first_simulation_ran event with project_id", async () => {
         const deps = createDeps({
-          simulationCountFn: vi.fn().mockResolvedValue(0),
+          simulationCountFn: vi.fn().mockResolvedValue(1),
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
@@ -194,7 +194,7 @@ describe("customerIoSimulationSync reactor", () => {
     describe("when a new simulation is processed", () => {
       it("identifies user with updated org-wide simulation_count and last_simulation_at", async () => {
         const deps = createDeps({
-          simulationCountFn: vi.fn().mockResolvedValue(5),
+          simulationCountFn: vi.fn().mockResolvedValue(6),
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
@@ -214,7 +214,7 @@ describe("customerIoSimulationSync reactor", () => {
 
       it("does not track first_simulation_ran event", async () => {
         const deps = createDeps({
-          simulationCountFn: vi.fn().mockResolvedValue(5),
+          simulationCountFn: vi.fn().mockResolvedValue(6),
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 

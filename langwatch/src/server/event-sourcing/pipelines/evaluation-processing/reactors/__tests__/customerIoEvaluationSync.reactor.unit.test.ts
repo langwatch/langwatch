@@ -147,7 +147,7 @@ describe("customerIoEvaluationSync reactor", () => {
     describe("when the first evaluation is processed", () => {
       it("identifies user with has_evaluations true and evaluation_count 1", async () => {
         const deps = createDeps({
-          evaluationCountFn: vi.fn().mockResolvedValue(0),
+          evaluationCountFn: vi.fn().mockResolvedValue(1),
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
@@ -168,7 +168,7 @@ describe("customerIoEvaluationSync reactor", () => {
 
       it("tracks first_evaluation_created event", async () => {
         const deps = createDeps({
-          evaluationCountFn: vi.fn().mockResolvedValue(0),
+          evaluationCountFn: vi.fn().mockResolvedValue(1),
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
@@ -193,7 +193,7 @@ describe("customerIoEvaluationSync reactor", () => {
     describe("when a new evaluation is processed", () => {
       it("identifies user with updated evaluation_count and last_evaluation_at", async () => {
         const deps = createDeps({
-          evaluationCountFn: vi.fn().mockResolvedValue(5),
+          evaluationCountFn: vi.fn().mockResolvedValue(6),
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
@@ -213,7 +213,7 @@ describe("customerIoEvaluationSync reactor", () => {
 
       it("tracks evaluation_ran event", async () => {
         const deps = createDeps({
-          evaluationCountFn: vi.fn().mockResolvedValue(5),
+          evaluationCountFn: vi.fn().mockResolvedValue(6),
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
         const foldState = createFoldState({

@@ -71,14 +71,17 @@ export function createCustomerIoSimulationSyncReactor(
 
         const now = new Date(event.occurredAt).toISOString();
 
-        const existingCount = await deps.simulationCountFn(organizationId);
-        if (existingCount === null) {
+        const rawCount = await deps.simulationCountFn(organizationId);
+        if (rawCount === null) {
           logger.warn(
             { projectId },
             "Could not determine simulation count — skipping CIO simulation sync",
           );
           return;
         }
+        // The fold projection persists before reactors fire, so the current
+        // simulation is already counted — subtract 1 to get prior count.
+        const existingCount = Math.max(0, rawCount - 1);
         const isFirstSimulation = existingCount === 0;
 
         if (isFirstSimulation) {
