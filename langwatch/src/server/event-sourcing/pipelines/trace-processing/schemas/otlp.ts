@@ -16,7 +16,7 @@ export type OtlpAnyValue = {
   doubleValue?: number | string | null;
   arrayValue?: OtlpArrayValue | null;
   kvlistValue?: OtlpKeyValueList | null;
-  bytesValue?: Uint8Array | Record<string, number> | null;
+  bytesValue?: Uint8Array | null;
 };
 
 export type OtlpKeyValue = {
@@ -57,7 +57,8 @@ export const idSchema = z.union([
  * OTLP AnyValue is effectively "oneof". This schema accepts any object that matches at
  * least one of the optional fields, but does NOT enforce exclusivity.
  */
-export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type widened to accept JSON-serialized bytesValue
+export const anyValueSchema: z.ZodType<OtlpAnyValue, z.ZodTypeDef, any> = z.object({
   stringValue: z.string().nullable().optional(),
   boolValue: z.union([z.boolean(), z.string()]).nullable().optional(),
   intValue: z
@@ -73,28 +74,32 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
     .lazy(() => keyValueListSchema)
     .optional()
     .nullable(),
-  bytesValue: z.union([
-    bytesSchema,
-    // JSON.stringify converts Uint8Array to {"0":1,"1":2,...} — reconstruct it
-    z.record(z.string(), z.number()).transform((obj) => {
+  // JSON.stringify converts Uint8Array to {"0":1,"1":2,...} — reconstruct before validating
+  bytesValue: z.preprocess((val) => {
+    if (val != null && typeof val === "object" && !(val instanceof Uint8Array)) {
+      const obj = val as Record<string, number>;
       const values = Object.entries(obj)
         .sort(([a], [b]) => Number(a) - Number(b))
         .map(([, v]) => v);
       return new Uint8Array(values);
-    }),
-  ]).optional().nullable(),
+    }
+    return val;
+  }, bytesSchema).optional().nullable(),
 });
 
-export const keyValueSchema: z.ZodType<OtlpKeyValue> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> = z.object({
   key: z.string(),
   value: anyValueSchema,
 });
 
-export const arrayValueSchema: z.ZodType<OtlpArrayValue> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> = z.object({
   values: z.array(anyValueSchema),
 });
 
-export const keyValueListSchema: z.ZodType<OtlpKeyValueList> = z.object({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const keyValueListSchema: z.ZodType<OtlpKeyValueList, z.ZodTypeDef, any> = z.object({
   values: z.array(keyValueSchema),
 });
 
