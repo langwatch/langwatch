@@ -36,17 +36,32 @@ export const fixed64Schema = z.union([longBitsSchema, z.string(), z.number()]);
 
 export const bytesSchema = z.instanceof(Uint8Array);
 
+const NUMERIC_KEY = /^\d+$/;
+
+/** Checks whether an object looks like a JSON-serialized Uint8Array ({"0":1,"1":2,...}). */
+function isSerializedUint8Array(obj: Record<string, unknown>): obj is Record<string, number> {
+  return Object.entries(obj).every(
+    ([k, v]) => NUMERIC_KEY.test(k) && typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 255,
+  );
+}
+
+/** Sorts a validated serialized-Uint8Array object by numeric key and returns the byte values. */
+function sortedByteValues(obj: Record<string, number>): number[] {
+  return Object.entries(obj)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([, v]) => v);
+}
+
 // Normalize Uint8Array / JSON-serialized Uint8Array to hex string before validating
 export const idSchema = z.preprocess((val) => {
   if (val instanceof Uint8Array) {
     return Buffer.from(val).toString("hex");
   }
   if (val != null && typeof val === "object") {
-    const obj = val as Record<string, number>;
-    const values = Object.entries(obj)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([, v]) => v);
-    return Buffer.from(new Uint8Array(values)).toString("hex");
+    const obj = val as Record<string, unknown>;
+    if (isSerializedUint8Array(obj)) {
+      return Buffer.from(new Uint8Array(sortedByteValues(obj))).toString("hex");
+    }
   }
   return val;
 }, z.string());
@@ -77,11 +92,10 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue, z.ZodTypeDef, any> = z.obje
   // JSON.stringify converts Uint8Array to {"0":1,"1":2,...} — reconstruct before validating
   bytesValue: z.preprocess((val) => {
     if (val != null && typeof val === "object" && !(val instanceof Uint8Array)) {
-      const obj = val as Record<string, number>;
-      const values = Object.entries(obj)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([, v]) => v);
-      return new Uint8Array(values);
+      const obj = val as Record<string, unknown>;
+      if (isSerializedUint8Array(obj)) {
+        return new Uint8Array(sortedByteValues(obj));
+      }
     }
     return val;
   }, bytesSchema).optional().nullable(),
