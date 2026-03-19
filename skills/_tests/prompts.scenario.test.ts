@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -84,11 +85,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             // Verify the agent modified main.py to use langwatch prompts
             const mainPy = fs.readFileSync(
@@ -147,11 +149,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -207,11 +210,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             const mainPy = fs.readFileSync(
               path.join(tempFolder, "main.py"),
@@ -270,11 +274,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
@@ -337,6 +342,7 @@ describe("Prompts Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             // Either the code was updated to use langwatch prompts, or prompt files were created
             const hasPromptsJson = fs.existsSync(
