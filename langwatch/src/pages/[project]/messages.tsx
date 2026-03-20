@@ -18,7 +18,7 @@ function MessagesOrIntegrationGuideContent() {
   // Preload field redaction status to avoid cascading loading states
   useFieldRedaction("input");
 
-  if (project && !hasFirstMessage) {
+  if (project && integrationChecks.isFetched && !hasFirstMessage) {
     return (
       <DashboardLayout>
         <WelcomeLayout />
