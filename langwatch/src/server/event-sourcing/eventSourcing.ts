@@ -20,6 +20,8 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
+import type { ReactorDefinition } from "./reactors/reactor.types";
+import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
@@ -129,6 +131,34 @@ export class EventSourcing {
 
   get isEnabled(): boolean {
     return this._enabled;
+  }
+
+  /**
+   * Register a reactor on a global fold projection.
+   *
+   * Must be called before the projection registry is initialized
+   * (i.e., before the first pipeline is registered).
+   *
+   * Silently skips registration when the fold projection does not exist
+   * (e.g. `projectDailySdkUsage` is only registered in SaaS mode).
+   */
+  registerGlobalFoldReactor(
+    foldName: string,
+    reactor: ReactorDefinition<Event>,
+  ): void {
+    try {
+      this.projectionRegistry.registerReactor(foldName, reactor);
+    } catch (error) {
+      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
+      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+        logger.debug(
+          { foldName, reactorName: reactor.name },
+          "Skipping global fold reactor — fold not registered",
+        );
+        return;
+      }
+      throw error;
+    }
   }
 
   get eventStore(): EventStore | undefined {
