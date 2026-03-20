@@ -29,11 +29,10 @@ export function mapProductSelectionToTrait(
     "agent-simulations": "agent_simulations",
   };
 
-  const mapped = mapping[selection];
-  if (!mapped) {
+  if (!Object.hasOwn(mapping, selection)) {
     throw new Error(`Unknown product selection: ${selection}`);
   }
-  return mapped;
+  return mapping[selection]!;
 }
 
 /**

@@ -8,13 +8,13 @@ const logger = createLogger("ee:nurturing:prompt-creation");
 /**
  * Fires nurturing calls when a prompt is created.
  *
- * On the first prompt (orgPromptCount === 1):
- *   - Identifies user with has_prompts: true and prompt_count: 1
- *   - Tracks "first_prompt_created" event with project_id
+ * Always sends has_prompts: true + prompt_count on every call (idempotent).
+ * This ensures recovery if a previous CIO call failed during an outage.
  *
- * On subsequent prompts (orgPromptCount > 1):
- *   - Identifies user with updated prompt_count only
- *   - No event tracked (first_prompt_created only fires once)
+ * Also always sends first_prompt_created event — Customer.io Journey
+ * entry conditions fire once per person, so duplicates are harmless.
+ * This avoids race conditions when prompts are created concurrently
+ * (e.g., via CLI push scripts).
  *
  * All calls are fire-and-forget.
  *
@@ -34,31 +34,22 @@ export function firePromptCreatedNurturing({
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
 
-  const isFirstPrompt = orgPromptCount === 1;
+  // Always send has_prompts: true — idempotent, recovers from prior failures
+  void nurturing
+    .identifyUser({
+      userId,
+      traits: { has_prompts: true, prompt_count: orgPromptCount },
+    })
+    .catch(captureException);
 
-  if (isFirstPrompt) {
-    void nurturing
-      .identifyUser({
-        userId,
-        traits: { has_prompts: true, prompt_count: 1 },
-      })
-      .catch(captureException);
-
-    void nurturing
-      .trackEvent({
-        userId,
-        event: "first_prompt_created",
-        properties: { project_id: projectId },
-      })
-      .catch(captureException);
-  } else {
-    void nurturing
-      .identifyUser({
-        userId,
-        traits: { prompt_count: orgPromptCount },
-      })
-      .catch(captureException);
-  }
+  // Always send event — CIO Journey entry deduplicates per person
+  void nurturing
+    .trackEvent({
+      userId,
+      event: "first_prompt_created",
+      properties: { project_id: projectId },
+    })
+    .catch(captureException);
 }
 
 /**

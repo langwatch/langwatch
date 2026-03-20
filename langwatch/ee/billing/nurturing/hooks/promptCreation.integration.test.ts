@@ -117,12 +117,12 @@ describe("afterPromptCreated()", () => {
         await vi.waitFor(() => {
           expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
             userId: "user-1",
-            traits: { prompt_count: 5 },
+            traits: { has_prompts: true, prompt_count: 5 },
           });
         });
       });
 
-      it("does not fire first_prompt_created event", async () => {
+      it("sends first_prompt_created event (CIO Journey deduplicates per person)", async () => {
         const prisma = createMockPrisma({ promptCount: 5 });
 
         afterPromptCreated({
@@ -132,10 +132,12 @@ describe("afterPromptCreated()", () => {
         });
 
         await vi.waitFor(() => {
-          expect(mockNurturing.identifyUser).toHaveBeenCalled();
+          expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+            userId: "user-1",
+            event: "first_prompt_created",
+            properties: { project_id: "proj-1" },
+          });
         });
-
-        expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
       });
     });
   });

@@ -69,7 +69,7 @@ describe("firePromptCreatedNurturing()", () => {
 
   describe("given an organization that already has prompts", () => {
     describe("when a user creates another prompt", () => {
-      it("identifies user with updated org-wide prompt_count", async () => {
+      it("identifies user with has_prompts true and updated prompt_count", async () => {
         firePromptCreatedNurturing({
           userId: "user-1",
           projectId: "proj-1",
@@ -78,18 +78,22 @@ describe("firePromptCreatedNurturing()", () => {
 
         expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
-          traits: { prompt_count: 5 },
+          traits: { has_prompts: true, prompt_count: 5 },
         });
       });
 
-      it("does not fire first_prompt_created event", async () => {
+      it("sends first_prompt_created event (CIO Journey deduplicates per person)", async () => {
         firePromptCreatedNurturing({
           userId: "user-1",
           projectId: "proj-1",
           orgPromptCount: 5,
         });
 
-        expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
+        expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+          userId: "user-1",
+          event: "first_prompt_created",
+          properties: { project_id: "proj-1" },
+        });
       });
     });
   });
