@@ -4,10 +4,8 @@ import type { MaybeStoredModelProvider } from "../server/modelProviders/registry
 import { useCredentialKeys } from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
-import { useExtraHeaders } from "./useExtraHeaders";
+import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
 import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmit";
-
-export type ExtraHeader = { key: string; value: string; concealed?: boolean };
 
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
