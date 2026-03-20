@@ -191,18 +191,3 @@ def convert_typed_values(
         return TypedValueJson(type="json", value=json.loads(json_))
     except:
         return TypedValueRaw(type="raw", value=str(value_))
-
-def truncate_object_recursively(
-    obj: T,
-    max_string_length: Optional[int] = None,
-    max_list_dict_length: int = 50000,
-    depth: int = 0,
-) -> T:
-    """No-op kept for backwards compatibility with callers.
-
-    This function previously truncated large objects, silently replacing
-    dict keys and list items with truncation markers. That caused data
-    loss (e.g. workflow end-node outputs being dropped). It now returns
-    *obj* unchanged. All parameters beyond *obj* are ignored.
-    """
-    return obj

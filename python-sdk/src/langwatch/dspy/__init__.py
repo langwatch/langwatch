@@ -6,7 +6,7 @@ import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
 from langwatch.utils.exceptions import better_raise_for_status
-from langwatch.utils.transformation import SerializableWithStringFallback, truncate_object_recursively
+from langwatch.utils.transformation import SerializableWithStringFallback
 from langwatch.utils.utils import safe_get
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
@@ -371,10 +371,7 @@ class LangWatchDSPy:
         data_list = json.loads(
             json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
         )
-        data = [
-            truncate_object_recursively(item)
-            for item in data_list
-        ]
+        data = data_list
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/dspy/log_steps",
             headers={
