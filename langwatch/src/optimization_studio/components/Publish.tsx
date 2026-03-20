@@ -457,6 +457,7 @@ function PublishModalContent({
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
+    checkCanCommitNewVersion,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -465,6 +466,7 @@ function PublishModalContent({
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
+      checkCanCommitNewVersion,
     }) => ({
       workflowId,
       getWorkflow,
@@ -472,6 +474,7 @@ function PublishModalContent({
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -529,7 +532,7 @@ function PublishModalContent({
 
       let versionId: string | undefined;
 
-      if (canSave) {
+      if (checkCanCommitNewVersion()) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -602,7 +605,7 @@ function PublishModalContent({
       );
     },
     [
-      canSave,
+      checkCanCommitNewVersion,
       commitVersion,
       currentVersionId,
       getWorkflow,

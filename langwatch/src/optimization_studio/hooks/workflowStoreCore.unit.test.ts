@@ -61,6 +61,45 @@ function makeEdge({
 }
 
 describe("workflowStoreCore", () => {
+  describe("checkCanCommitNewVersion()", () => {
+    let testStore: StoreApi<WorkflowStore>;
+
+    beforeEach(() => {
+      testStore = createStore<WorkflowStore>(storeCreator as any);
+    });
+
+    describe("when lastCommittedWorkflow is undefined", () => {
+      it("returns false", () => {
+        testStore.setState({ lastCommittedWorkflow: undefined });
+        expect(testStore.getState().checkCanCommitNewVersion()).toBe(false);
+      });
+    });
+
+    describe("when the current workflow matches the last committed workflow", () => {
+      it("returns false even when the API-level latestVersion.autoSaved would be true", () => {
+        // This is the regression case for the publish-hang bug:
+        // useVersionState.canSaveNewVersion is true when latestVersion.autoSaved is set,
+        // but checkCanCommitNewVersion() must return false when no DSL changes exist,
+        // so onSubmit can skip committing and publish the existing version directly.
+        const workflow = testStore.getState().getWorkflow();
+        testStore.getState().setLastCommittedWorkflow(workflow);
+
+        expect(testStore.getState().checkCanCommitNewVersion()).toBe(false);
+      });
+    });
+
+    describe("when the current workflow differs from the last committed workflow", () => {
+      it("returns true", () => {
+        const initial = testStore.getState().getWorkflow();
+        testStore.getState().setLastCommittedWorkflow(initial);
+
+        testStore.getState().setWorkflow({ name: "Changed Name" });
+
+        expect(testStore.getState().checkCanCommitNewVersion()).toBe(true);
+      });
+    });
+  });
+
   describe("removeInvalidEdges", () => {
     describe("when edges reference valid nodes and handles", () => {
       it("keeps the edges", () => {
