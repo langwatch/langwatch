@@ -57,7 +57,7 @@ const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
     // Google DLP doesn't support batch natively, fall back to individual calls
     return Promise.all(
       texts.map(async (text) => {
-        const wrapper: Record<string, string> = { value: text };
+        const wrapper = { value: text };
         await googleDLPClearPII(wrapper, "value", piiRedactionLevel);
         return wrapper.value !== text ? wrapper.value : null;
       }),
