@@ -758,7 +758,7 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
  * array (objects with role/content), extract only the text content to avoid
  * leaking verbose tool_call JSON into evaluator inputs.
  */
-const serializeValueForDataset = (value: unknown): string => {
+export const serializeValueForDataset = (value: unknown): string => {
   if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
     const first = value[0] as Record<string, unknown>;
     if ("role" in first && "content" in first) {

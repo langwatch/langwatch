@@ -249,18 +249,8 @@ const processBatchEvaluation = async (
     experiment_id: experiment.id,
     project_id: project.id,
     targets: processedTargets,
-    dataset:
-      param.dataset?.map((entry) => ({
-        ...entry,
-        ...(entry.entry ? { entry: entry.entry } : {}),
-        ...(entry.predicted ? { predicted: entry.predicted } : {}),
-      })) ?? [],
-    evaluations:
-      param.evaluations?.map((evaluation) => ({
-        ...evaluation,
-        ...(evaluation.inputs ? { inputs: evaluation.inputs } : {}),
-        ...(evaluation.details ? { details: evaluation.details } : {}),
-      })) ?? [],
+    dataset: param.dataset ?? [],
+    evaluations: param.evaluations ?? [],
     timestamps: {
       ...param.timestamps,
       created_at: param.timestamps?.created_at ?? new Date().getTime(),
