@@ -9,6 +9,14 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { toaster } from "../../../../components/ui/toaster";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import {
+  PROMPT_ANALYTICS,
+  PROMPT_EVALUATIONS,
+  PROMPT_LEVEL_UP,
+  PROMPT_PROMPTS,
+  PROMPT_SCENARIOS,
+  PROMPT_TRACING,
+} from "./code-prompts";
 
 const CLOUD_ENDPOINT = "https://app.langwatch.ai";
 
@@ -23,15 +31,11 @@ interface SkillItem {
   highlight?: boolean;
 }
 
-const PROMPT_PREAMBLE =
-  "You are using LangWatch for your AI agent project. Follow these instructions.\n\nIMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.\nFirst, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.\n\n";
-
 const SKILLS: SkillItem[] = [
   {
     id: "level-up",
     label: "Level up with everything LangWatch",
-    prompt:
-      `Add LangWatch Tracing to Your Code\n\n${PROMPT_PREAMBLE}Set up everything: add tracing to instrument all LLM call sites, version my prompts with the LangWatch Prompts CLI, create evaluations with experiments and online monitoring, and add scenario tests with the @langwatch/scenario SDK. Read the full codebase first to understand the architecture, then deliver each capability incrementally.`,
+    prompt: PROMPT_LEVEL_UP,
     installCommand: "npx skills add langwatch/skills/level-up",
     slashCommand: "/level-up",
     highlight: true,
@@ -39,40 +43,35 @@ const SKILLS: SkillItem[] = [
   {
     id: "evaluations",
     label: "Set up evaluations for your agent",
-    prompt:
-      `Set Up Evaluations for Your Agent\n\n${PROMPT_PREAMBLE}Set up evaluations for my agent. Determine whether I need experiments (batch testing with datasets), online evaluation (production monitoring), evaluators (quality and safety scoring), or datasets. Create 1-2 high-quality experiments with domain-realistic data, configure online evaluation for production, and set up appropriate evaluators.`,
+    prompt: PROMPT_EVALUATIONS,
     installCommand: "npx skills add langwatch/skills/evaluations",
     slashCommand: "/evaluations",
   },
   {
     id: "scenarios",
     label: "Test your agent with scenarios",
-    prompt:
-      `Test Your Agent with Scenarios\n\n${PROMPT_PREAMBLE}Add scenario tests using the @langwatch/scenario SDK. Read the full codebase to understand the agent's architecture, then write comprehensive scenario coverage including happy path, edge cases, and error handling. Set up a CI pipeline to run them automatically. Include red teaming with RedTeamAgent for safety testing.`,
+    prompt: PROMPT_SCENARIOS,
     installCommand: "npx skills add langwatch/skills/scenarios",
     slashCommand: "/scenarios",
   },
   {
     id: "tracing",
     label: "Add LangWatch tracing to your code",
-    prompt:
-      `Add LangWatch Tracing to Your Code\n\n${PROMPT_PREAMBLE}Add LangWatch tracing to instrument my code. Read the full codebase to understand the agent's architecture, install the LangWatch SDK, add comprehensive tracing across all LLM call sites following the docs for my specific framework, and verify traces appear in the dashboard. Do not guess instrumentation patterns, always read the docs first.`,
+    prompt: PROMPT_TRACING,
     installCommand: "npx skills add langwatch/skills/tracing",
     slashCommand: "/tracing",
   },
   {
     id: "prompts",
     label: "Version your prompts with LangWatch",
-    prompt:
-      `Version Your Prompts with LangWatch Prompts CLI\n\n${PROMPT_PREAMBLE}Version my prompts using the LangWatch Prompts CLI. Scan the codebase for hardcoded prompt strings, install the CLI, initialize it, create managed prompts on the platform, and update the code to use langwatch.prompts.get() to fetch managed prompts. Do not duplicate prompt text as a fallback.`,
+    prompt: PROMPT_PROMPTS,
     installCommand: "npx skills add langwatch/skills/prompts",
     slashCommand: "/prompts",
   },
   {
     id: "analytics",
     label: "Analyze agent performance with LangWatch",
-    prompt:
-      `Analyze Agent Performance with LangWatch\n\n${PROMPT_PREAMBLE}Analyze my agent's performance using LangWatch MCP tools. Call discover_schema first to see available metrics, then run trend analyses and aggregations. Search traces to investigate specific issues. Present performance findings clearly with actionable insights.`,
+    prompt: PROMPT_ANALYTICS,
     installCommand: "npx skills add langwatch/skills/analytics",
     slashCommand: "/analytics",
   },
