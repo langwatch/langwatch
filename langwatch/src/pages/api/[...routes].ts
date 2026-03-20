@@ -32,7 +32,7 @@ export default async function handler(
       );
       req.query = { ...req.query, ...params };
       // @ts-ignore
-      req.rawBody = await buffer(req);
+      req.rawBody = await buffer(req, { limit: "10mb" });
       // @ts-ignore
       const body = req.rawBody.toString();
       if (body) {

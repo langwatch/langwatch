@@ -25,7 +25,6 @@ import {
 } from "../../../../server/experiments/types.generated";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
 import { createLogger } from "../../../../utils/logger/server";
-import { safeTruncate } from "../../../../utils/truncate";
 import { findOrCreateExperiment } from "../../experiment/init";
 
 /** Valid target types for validation */
@@ -253,20 +252,14 @@ const processBatchEvaluation = async (
     dataset:
       param.dataset?.map((entry) => ({
         ...entry,
-        ...(entry.entry ? { entry: safeTruncate(entry.entry, 32 * 1024) } : {}),
-        ...(entry.predicted
-          ? { predicted: safeTruncate(entry.predicted, 32 * 1024) }
-          : {}),
+        ...(entry.entry ? { entry: entry.entry } : {}),
+        ...(entry.predicted ? { predicted: entry.predicted } : {}),
       })) ?? [],
     evaluations:
       param.evaluations?.map((evaluation) => ({
         ...evaluation,
-        ...(evaluation.inputs
-          ? { inputs: safeTruncate(evaluation.inputs, 32 * 1024) }
-          : {}),
-        ...(evaluation.details
-          ? { details: safeTruncate(evaluation.details, 32 * 1024) }
-          : {}),
+        ...(evaluation.inputs ? { inputs: evaluation.inputs } : {}),
+        ...(evaluation.details ? { details: evaluation.details } : {}),
       })) ?? [],
     timestamps: {
       ...param.timestamps,
