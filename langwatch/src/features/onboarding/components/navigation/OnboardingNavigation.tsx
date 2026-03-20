@@ -63,6 +63,7 @@ export const OnboardingNavigation = <T extends number = number>({
             fontWeight="semibold"
             fontSize="14px"
             borderRadius="8px"
+            disabled={isSubmitting}
             _hover={{ color: "fg.DEFAULT", bg: "blackAlpha.50" }}
             onClick={() => {
               emit("clicked", "previous", { currentScreenIndex });

@@ -385,12 +385,18 @@ function McpTab({
   displayConfigJson,
   apiKey,
   maskedKey,
+  endpoint,
 }: {
   mcpJson: string;
   displayConfigJson: string;
   apiKey: string;
   maskedKey: string;
+  endpoint: string | undefined;
 }): React.ReactElement {
+  const isSelfHosted = endpoint && endpoint !== CLOUD_ENDPOINT;
+  const endpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
+  const maskedEndpointFlag = isSelfHosted ? ` --endpoint ${endpoint}` : "";
+
   return (
     <VStack align="stretch" gap={4}>
       {/* Quick shortcuts */}
@@ -400,13 +406,13 @@ function McpTab({
         </Text>
         <QuickCommand
           label="Claude Code"
-          displayCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${maskedKey}`}
-          copyCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${apiKey}`}
+          displayCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}`}
+          copyCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}`}
         />
         <QuickCommand
           label="OpenAI Codex"
-          displayCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${maskedKey}"`}
-          copyCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${apiKey}"`}
+          displayCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}"`}
+          copyCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}"`}
         />
       </VStack>
 
@@ -481,10 +487,12 @@ function McpTab({
                 });
               }}
             >
-              <Text fontSize="2xs" fontWeight="medium" color="fg.DEFAULT">
-                {ep.editor}
-              </Text>
-              <Clipboard size={9} color="var(--chakra-colors-gray-400)" />
+              <button type="button" aria-label={`Copy ${ep.editor} config path`}>
+                <Text fontSize="2xs" fontWeight="medium" color="fg.DEFAULT">
+                  {ep.editor}
+                </Text>
+                <Clipboard size={9} color="var(--chakra-colors-gray-400)" />
+              </button>
             </HStack>
           </Tooltip>
         ))}
@@ -611,7 +619,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
                 <SkillRow key={skill.id} skill={skill} />
               ))}
             {activeTab === "mcp" && (
-              <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} />
+              <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} endpoint={effectiveEndpoint} />
             )}
           </MotionVStack>
         </AnimatePresence>
