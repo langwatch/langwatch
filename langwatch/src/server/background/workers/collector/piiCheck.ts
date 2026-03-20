@@ -394,14 +394,19 @@ export const batchPresidioClearPII = async (
     throw new Error(await response.text());
   }
 
-  const results = (await response.json()) as BatchEvaluationResult;
+  const rawResults = await response.json();
+  if (!Array.isArray(rawResults) || rawResults.length !== truncated.length) {
+    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
+    throw new Error(
+      `Unexpected batch response: expected ${truncated.length} results, got ${
+        Array.isArray(rawResults) ? rawResults.length : "non-array"
+      }`,
+    );
+  }
+  const results = rawResults as BatchEvaluationResult;
 
   return truncated.map((entry, i) => {
-    const result = results[i];
-    if (!result) {
-      getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
-      return null;
-    }
+    const result = results[i]!;
     getEvaluationStatusCounter("presidio/pii_detection", result.status).inc();
 
     if (result.status === "error") {

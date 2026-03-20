@@ -50,21 +50,30 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
 /**
  * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
  */
+const runGoogleDlpBatch = (
+  texts: string[],
+  piiRedactionLevel: PIIRedactionLevel,
+): Promise<(string | null)[]> =>
+  Promise.all(
+    texts.map(async (text) => {
+      const wrapper = { value: text };
+      await googleDLPClearPII(wrapper, "value", piiRedactionLevel);
+      return wrapper.value !== text ? wrapper.value : null;
+    }),
+  );
+
 const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
   const { piiRedactionLevel, mainMethod } = options;
 
   if (mainMethod === "google_dlp") {
-    // Google DLP doesn't support batch natively, fall back to individual calls
-    return Promise.all(
-      texts.map(async (text) => {
-        const wrapper = { value: text };
-        await googleDLPClearPII(wrapper, "value", piiRedactionLevel);
-        return wrapper.value !== text ? wrapper.value : null;
-      }),
-    );
+    return runGoogleDlpBatch(texts, piiRedactionLevel);
   }
 
-  return defaultBatchPresidioClearPII(texts, piiRedactionLevel);
+  try {
+    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel);
+  } catch {
+    return await runGoogleDlpBatch(texts, piiRedactionLevel);
+  }
 };
 
 /**
@@ -201,7 +210,6 @@ export class OtlpSpanPiiRedactionService {
       );
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
-      totalLength = result.totalLength;
     }
 
     // Mark span with pii_redaction_status when any attributes were skipped
@@ -229,6 +237,12 @@ export class OtlpSpanPiiRedactionService {
       entries.map((e) => e.text),
       options,
     );
+
+    if (results.length !== entries.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${entries.length} inputs`,
+      );
+    }
 
     // Apply redacted values back to their original locations
     for (let i = 0; i < entries.length; i++) {
