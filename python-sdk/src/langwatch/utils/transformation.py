@@ -11,7 +11,6 @@ from langwatch.domain import (
 )
 import json
 import math
-import warnings
 from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 from pydantic import BaseModel, ValidationError
 import pydantic
@@ -193,54 +192,17 @@ def convert_typed_values(
     except:
         return TypedValueRaw(type="raw", value=str(value_))
 
-
-_DEFAULT_MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
-
-
 def truncate_object_recursively(
     obj: T,
     max_string_length: Optional[int] = None,
     max_list_dict_length: int = 50000,
     depth: int = 0,
 ) -> T:
-    """Validate that the serialized size of *obj* is within limits.
+    """No-op kept for backwards compatibility with callers.
 
-    Despite the legacy name, this function no longer truncates. It either
-    returns *obj* unchanged or emits a warning when the payload is too large.
-
-    Parameters
-    ----------
-    obj:
-        The object to validate.
-    max_string_length:
-        Maximum allowed serialized size **in bytes**.  When ``None`` the
-        object is passed through without any validation.  Kept as
-        ``max_string_length`` for backwards compatibility with callers.
-    max_list_dict_length:
-        Ignored (kept for call-site compatibility).
-    depth:
-        Ignored (kept for call-site compatibility).
+    This function previously truncated large objects, silently replacing
+    dict keys and list items with truncation markers. That caused data
+    loss (e.g. workflow end-node outputs being dropped). It now returns
+    *obj* unchanged. All parameters beyond *obj* are ignored.
     """
-    if max_string_length is None:
-        return obj
-
-    try:
-        serialized = json.dumps(obj, cls=SerializableWithStringFallback)
-    except (TypeError, ValueError, OverflowError, RecursionError):
-        # If we cannot even serialize, let the caller deal with it downstream.
-        return obj
-
-    size_bytes = len(serialized.encode("utf-8", errors="replace"))
-
-    if size_bytes > max_string_length:
-        size_mb = size_bytes / (1024 * 1024)
-        max_mb = max_string_length / (1024 * 1024)
-        warnings.warn(
-            f"Span input/output too large ({size_mb:.1f}MB). "
-            f"Maximum allowed is {max_mb:.1f}MB. "
-            f"Consider reducing the payload size before tracing.",
-            UserWarning,
-            stacklevel=2,
-        )
-
     return obj

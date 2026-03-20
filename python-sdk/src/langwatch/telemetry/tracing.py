@@ -9,7 +9,6 @@ from langwatch.attributes import AttributeKey
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
-    _DEFAULT_MAX_PAYLOAD_BYTES,
     convert_typed_values,
 )
 from opentelemetry import trace as trace_api
@@ -80,7 +79,7 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        max_string_length: Optional[int] = _DEFAULT_MAX_PAYLOAD_BYTES,
+        max_string_length: Optional[int] = 5000,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -722,7 +721,7 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    max_string_length: Optional[int] = _DEFAULT_MAX_PAYLOAD_BYTES,
+    max_string_length: Optional[int] = 5000,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,
