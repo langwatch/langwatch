@@ -156,12 +156,18 @@ export class OtlpSpanPiiRedactionService {
     const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
+    let totalLength = 0;
 
     // Collect all string values from span attributes, events, and links
     for (const attrs of this.collectAllAttributeSets(span)) {
-      const result = this.collectStringEntries(attrs, entries);
+      const result = this.collectStringEntries(
+        attrs,
+        entries,
+        totalLength,
+      );
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
+      totalLength = result.totalLength;
     }
 
     // Collect status.message
@@ -171,7 +177,8 @@ export class OtlpSpanPiiRedactionService {
       span.status.message.length > 0
     ) {
       if (
-        span.status.message.length > this.deps.piiRedactionMaxAttributeLength
+        totalLength + span.status.message.length >
+        this.deps.piiRedactionMaxAttributeLength
       ) {
         anySkipped = true;
       } else {
@@ -180,15 +187,21 @@ export class OtlpSpanPiiRedactionService {
           field: "message",
           text: span.status.message,
         });
+        totalLength += span.status.message.length;
         anyRedacted = true;
       }
     }
 
     // Collect resource attributes
     if (resource?.attributes) {
-      const result = this.collectStringEntries(resource.attributes, entries);
+      const result = this.collectStringEntries(
+        resource.attributes,
+        entries,
+        totalLength,
+      );
       anySkipped ||= result.skipped;
       anyRedacted ||= result.collected;
+      totalLength = result.totalLength;
     }
 
     // Mark span with pii_redaction_status when any attributes were skipped
@@ -379,14 +392,17 @@ export class OtlpSpanPiiRedactionService {
 
   /**
    * Collects string attribute values into the entries array.
-   * Returns whether any attributes were skipped (oversized) or collected.
+   * Enforces a cumulative character budget — once adding a value would
+   * exceed piiRedactionMaxAttributeLength the value is skipped.
    */
   private collectStringEntries(
     attributes: OtlpKeyValue[],
     entries: StringEntry[],
-  ): { skipped: boolean; collected: boolean } {
+    currentTotalLength: number,
+  ): { skipped: boolean; collected: boolean; totalLength: number } {
     let skipped = false;
     let collected = false;
+    let totalLength = currentTotalLength;
 
     for (const attr of attributes) {
       if (
@@ -394,16 +410,17 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== null
       ) {
         if (
-          attr.value.stringValue.length >
+          totalLength + attr.value.stringValue.length >
           this.deps.piiRedactionMaxAttributeLength
         ) {
           this.logger.warn(
             {
               attributeKey: attr.key,
               valueLength: attr.value.stringValue.length,
+              totalLength,
               maxLength: this.deps.piiRedactionMaxAttributeLength,
             },
-            "Skipping PII redaction for oversized attribute value",
+            "Skipping PII redaction — cumulative batch size would exceed limit",
           );
           skipped = true;
           continue;
@@ -413,9 +430,10 @@ export class OtlpSpanPiiRedactionService {
           field: "stringValue",
           text: attr.value.stringValue,
         });
+        totalLength += attr.value.stringValue.length;
         collected = true;
       }
     }
-    return { skipped, collected };
+    return { skipped, collected, totalLength };
   }
 }
