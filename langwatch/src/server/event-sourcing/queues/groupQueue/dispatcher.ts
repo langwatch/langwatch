@@ -41,6 +41,11 @@ export class GroupQueueDispatcher {
           do {
             dispatched = await this.dispatchBatch();
           } while (dispatched > 0 && !this.shutdownRequested);
+
+          // Drain signals that arrived during dispatch to prevent
+          // immediate re-wake from stale notifications
+          const signalKey = this.params.scripts.getSignalKey();
+          await this.params.blockingConnection.del(signalKey);
         } catch (error) {
           if (this.shutdownRequested) break;
 
@@ -98,6 +103,9 @@ export class GroupQueueDispatcher {
       signalKey,
       this.params.signalTimeoutSec,
     );
+    // Drain remaining buffered signals — the upcoming dispatchBatch
+    // handles multiple jobs in one Lua call, so N signals = 1 cycle.
+    await this.params.blockingConnection.del(signalKey);
   }
 
   private async dispatchBatch(): Promise<number> {
