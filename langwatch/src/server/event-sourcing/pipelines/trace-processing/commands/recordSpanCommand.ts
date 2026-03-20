@@ -19,7 +19,7 @@ import {
 	SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpSpan } from "../schemas/otlp";
+import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
 import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
@@ -35,7 +35,7 @@ export interface RecordSpanCommandDependencies {
   piiRedactionService: {
     redactSpan: (
       span: OtlpSpan,
-      resource: import("../schemas/otlp").OtlpResource | null,
+      resource: OtlpResource | null,
       piiRedactionLevel: PIIRedactionLevel,
     ) => Promise<void>;
   };
