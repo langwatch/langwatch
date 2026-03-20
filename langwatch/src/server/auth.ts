@@ -117,6 +117,9 @@ export const authOptions = (
         },
       });
 
+      // SSO flow for orgs with ssoDomain configured:
+      // - Existing user + correct SSO provider → auto-link account (replaces old auth method)
+      // - Existing user + wrong provider → block with SSO_PROVIDER_NOT_ALLOWED
       if (existingUser && account && orgWithSsoDomain) {
         if (isSsoProviderMatch(orgWithSsoDomain, account)) {
           await linkExistingUserToOAuthProvider(existingUser, account);
@@ -125,10 +128,12 @@ export const authOptions = (
         throw new Error("SSO_PROVIDER_NOT_ALLOWED");
       }
 
+      // Block non-SSO sign-in attempts for users whose domain has SSO enforced
       if (orgWithSsoDomain && account) {
         await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
       }
 
+      // New user with matching SSO domain → auto-create and add to org
       if (domain && account && orgWithSsoDomain && !existingUser) {
         await createUserAndAddToOrganization(
           user,
@@ -347,6 +352,12 @@ const createUserAndAddToOrganization = async (
   return newUser;
 };
 
+/**
+ * Links (or re-links) an existing user to their SSO OAuth account.
+ * Uses upsert so it's idempotent: first login creates the link,
+ * subsequent logins just refresh tokens. Old auth methods for the
+ * same provider are removed in the same transaction.
+ */
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
   account: NextAuthAccount,
@@ -392,12 +403,16 @@ const linkExistingUserToOAuthProvider = async (
   ]);
 };
 
+/**
+ * Checks if the incoming account matches the org's configured SSO provider.
+ * For Auth0: matches via providerAccountId prefix (e.g. "waad|connection-name")
+ * For direct NextAuth providers: matches via provider name (e.g. "google", "okta")
+ */
 const isSsoProviderMatch = (
   org: Organization,
   account: NextAuthAccount,
 ): boolean => {
   if (!org.ssoProvider) return false;
-  console.log("org.ssoProvider", account);
   return (
     account.providerAccountId.startsWith(org.ssoProvider) ||
     account.provider === org.ssoProvider
