@@ -1,6 +1,6 @@
 import { Button, createListCollection, Field } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type {
   FieldErrors,
   Path,
@@ -34,7 +34,13 @@ export function DatasetSelector<T extends { datasetId: string }>({
       })) ?? [],
   });
 
-  const selectedValue = localStorageDatasetId ? [localStorageDatasetId] : [];
+  const [selectedValue, setSelectedValue] = useState<string[]>(
+    localStorageDatasetId ? [localStorageDatasetId] : []
+  );
+
+  useEffect(() => {
+    setSelectedValue(localStorageDatasetId ? [localStorageDatasetId] : []);
+  }, [localStorageDatasetId]);
 
   return (
     <HorizontalFormControl
@@ -47,6 +53,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
         value={selectedValue}
         onValueChange={(e) => {
           const value = e.value[0] ?? "";
+          setSelectedValue(e.value);
           setValue("datasetId" as Path<T>, value as PathValue<T, Path<T>>);
         }}
       >
@@ -69,6 +76,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
       <Button
         colorPalette="blue"
         onClick={() => {
+          setSelectedValue([]);
           setValue("datasetId" as Path<T>, "" as PathValue<T, Path<T>>);
           onCreateNew();
         }}
