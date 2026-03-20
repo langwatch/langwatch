@@ -1,3 +1,4 @@
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
@@ -155,15 +156,6 @@ function stringAttr(
 ): string | undefined {
   const v = attrs[key];
   return typeof v === "string" ? v : undefined;
-}
-
-function coerceToNumber(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
 }
 
 // ─── Span extractors ────────────────────────────────────────────────

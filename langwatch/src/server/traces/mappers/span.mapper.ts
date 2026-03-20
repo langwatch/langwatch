@@ -3,6 +3,7 @@ import type {
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
 import {
   estimateCost,
@@ -29,18 +30,6 @@ type JsonSerializable =
   | Record<string, unknown>
   | unknown[];
 
-/**
- * Coerces a value to a number or returns null.
- * Handles historical data where numbers may be stored as strings.
- */
-function asNumberOrNull(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -286,8 +275,8 @@ function computeSpanCost({
   completionTokens: number | null;
 }): number | null {
   // Priority 1: Custom cost rates
-  const inputRate = asNumberOrNull(spanAttributes["langwatch.model.inputCostPerToken"]);
-  const outputRate = asNumberOrNull(spanAttributes["langwatch.model.outputCostPerToken"]);
+  const inputRate = coerceToNumber(spanAttributes["langwatch.model.inputCostPerToken"]);
+  const outputRate = coerceToNumber(spanAttributes["langwatch.model.outputCostPerToken"]);
   if (inputRate !== null || outputRate !== null) {
     return (promptTokens ?? 0) * (inputRate ?? 0) + (completionTokens ?? 0) * (outputRate ?? 0);
   }
@@ -303,7 +292,7 @@ function computeSpanCost({
   }
 
   // Priority 3: SDK-provided cost fallback
-  const sdkCost = asNumberOrNull(spanAttributes["langwatch.span.cost"]);
+  const sdkCost = coerceToNumber(spanAttributes["langwatch.span.cost"]);
   if (sdkCost !== null && sdkCost > 0) return sdkCost;
 
   return null;
@@ -317,27 +306,27 @@ function computeSpanCost({
 function extractMetrics(
   spanAttributes: NormalizedAttributes,
 ): SpanMetrics | null {
-  const promptTokens = asNumberOrNull(
+  const promptTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.input_tokens"] ??
       spanAttributes["gen_ai.usage.prompt_tokens"],
   );
 
-  const completionTokens = asNumberOrNull(
+  const completionTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.output_tokens"] ??
       spanAttributes["gen_ai.usage.completion_tokens"],
   );
 
-  const reasoningTokens = asNumberOrNull(
+  const reasoningTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.reasoning_tokens"],
   );
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
-  const cacheReadInputTokens = asNumberOrNull(
+  const cacheReadInputTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
       spanAttributes["gen_ai.usage.cached_input_tokens"],
   );
-  const cacheCreationInputTokens = asNumberOrNull(
+  const cacheCreationInputTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 
