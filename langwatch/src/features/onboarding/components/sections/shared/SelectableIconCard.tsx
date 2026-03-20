@@ -42,7 +42,6 @@ export function SelectableIconCard(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
     actualIcon?.type === "themed" ? actualIcon.darkSrc : "",
   );
-  const borderColor = "border.muted";
   const selectedBorderColor = useColorModeValue("orange.400", "orange.300");
   const selectedBg = useColorModeValue("orange.50", "orange.950/30");
 
