@@ -253,7 +253,7 @@ function Page() {
                 onSyncFromSource={() => handleSyncFromSource(agent.id)}
                 onViewHistory={() =>
                   openDrawer("agentHistory", {
-                    urlParams: { agentId: agent.id },
+                    urlParams: { agentId: agent.id, agentName: agent.name },
                   })
                 }
                 hasEvaluationsManagePermission={hasEvaluationsManagePermission}

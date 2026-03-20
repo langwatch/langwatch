@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -67,7 +69,22 @@ export function useRunHistoryPagination({
     prevCursorRef.current = cursor;
   }, [runDataResult, cursor]);
 
-  const allRuns = useMemo(() => pages.flatMap((p) => p.runs), [pages]);
+  // Client-side stall detection safety net: the server computes stall status
+  // at query time, but if the ClickHouse UpdatedAt was inflated by a
+  // re-projection, the server may return IN_PROGRESS for runs that are
+  // actually stalled. Re-check using the run's timestamp (= UpdatedAt).
+  const allRuns = useMemo(() => {
+    const now = Date.now();
+    return pages.flatMap((p) => p.runs).map((run) => {
+      if (
+        run.status === ScenarioRunStatus.IN_PROGRESS &&
+        now - run.timestamp >= STALL_THRESHOLD_MS
+      ) {
+        return { ...run, status: ScenarioRunStatus.STALLED };
+      }
+      return run;
+    });
+  }, [pages]);
 
   const allScenarioSetIds = useMemo(() => {
     const merged: Record<string, string> = {};

@@ -12,6 +12,7 @@ import type {
 import { isInternalSetId } from "./internal-set-id";
 import { resolveRunStatus } from "./stall-detection";
 
+
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");
 
@@ -46,6 +47,7 @@ export class ScenarioEventService {
 
   /**
    * Saves a scenario event to the repository.
+   *
    * @param {Object} params - The parameters for saving the event
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.type - The type of event
@@ -73,6 +75,7 @@ export class ScenarioEventService {
           { projectId, scenarioId: event.scenarioId, scenarioRunId: event.scenarioRunId, type: event.type },
           "Saving scenario event",
         );
+
         await this.eventRepository.saveEvent({
           projectId,
           ...event,
@@ -80,6 +83,7 @@ export class ScenarioEventService {
       },
     );
   }
+
 
   /**
    * Retrieves the complete run data for a specific scenario run.

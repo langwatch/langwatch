@@ -74,7 +74,7 @@ export function ScenarioRunDetailDrawer({
     },
     {
       enabled: !!project?.id && !!scenarioRunId && !!open,
-      refetchInterval: 30_000,
+      refetchInterval: 3000,
     },
   );
 
@@ -208,11 +208,19 @@ export function ScenarioRunDetailDrawer({
           {!scenarioState && open && (
             <Drawer.Body>
               {runStateError ? (
-                <VStack gap={2} align="start" w="100%" pt={4}>
-                  <Drawer.CloseTrigger />
-                  <Heading size="md" color="red.500">Failed to load run</Heading>
-                  <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
-                </VStack>
+                runStateError.data?.code === "NOT_FOUND" ? (
+                  <VStack gap={2} align="start" w="100%" pt={4}>
+                    <Drawer.CloseTrigger />
+                    <Heading size="md">Run details not available yet</Heading>
+                    <Text color="fg.muted" fontSize="sm">This run may be queued, in progress, or recently cancelled. Details will appear once available.</Text>
+                  </VStack>
+                ) : (
+                  <VStack gap={2} align="start" w="100%" pt={4}>
+                    <Drawer.CloseTrigger />
+                    <Heading size="md" color="red.500">Failed to load run</Heading>
+                    <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
+                  </VStack>
+                )
               ) : (
                 <VStack gap={4} align="start" w="100%" pt={4}>
                   <Skeleton height="32px" width="60%" />

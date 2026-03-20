@@ -8,13 +8,33 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "chore", "section": "Miscellaneous", "hidden": false },
-        { "type": "docs", "section": "Documentation", "hidden": false },
-        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
       ],
-      "extra-files": ["version.go"]
+      "extra-files": [
+        "version.go"
+      ]
     },
     "typescript-sdk": {
       "release-type": "node",
@@ -24,11 +44,29 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "chore", "section": "Miscellaneous", "hidden": false },
-        { "type": "docs", "section": "Documentation", "hidden": false },
-        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
       ],
       "extra-files": [
         {
@@ -46,11 +84,29 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "chore", "section": "Miscellaneous", "hidden": false },
-        { "type": "docs", "section": "Documentation", "hidden": false },
-        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
       ],
       "extra-files": [
         "src/langwatch/__version__.py"
@@ -64,11 +120,29 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "chore", "section": "Miscellaneous", "hidden": false },
-        { "type": "docs", "section": "Documentation", "hidden": false },
-        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
       ],
       "extra-files": [
         {
@@ -86,11 +160,29 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "chore", "section": "Miscellaneous", "hidden": false },
-        { "type": "docs", "section": "Documentation", "hidden": false },
-        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
       ],
       "extra-files": [
         {
@@ -152,11 +244,29 @@
         "assets"
       ],
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "chore", "section": "Miscellaneous", "hidden": false },
-        { "type": "docs", "section": "Documentation", "hidden": false },
-        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
       ],
       "extra-files": [
         {
@@ -175,6 +285,42 @@
           "jsonpath": "$.appVersion"
         },
         "charts/langwatch/values.yaml"
+      ]
+    },
+    "skills": {
+      "release-type": "simple",
+      "package-name": "@langwatch/skills",
+      "prerelease": false,
+      "component": "skills",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
+      ],
+      "extra-files": [
+        "skills/version.txt"
       ]
     }
   },

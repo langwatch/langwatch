@@ -54,3 +54,6 @@ seed.spec.ts
 
 !.worktrees/.gitkeep
 .worktrees/**
+
+# Skills test artifacts
+skills/_tests/helpers/.mcp-config.json

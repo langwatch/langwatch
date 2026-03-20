@@ -50,6 +50,7 @@ export const targetResultEventDataSchema = z.object({
   duration: z.number().nullable().optional(),
   error: z.string().nullable().optional(),
   traceId: z.string().nullable().optional(),
+  targets: z.array(targetSchema).optional(),
 });
 
 export const targetResultEventSchema = EventSchema.extend({

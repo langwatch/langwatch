@@ -118,7 +118,7 @@ function apply(
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       QueuedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -134,7 +134,7 @@ function apply(
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -163,7 +163,7 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -198,7 +198,7 @@ function apply(
       Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -252,7 +252,7 @@ function apply(
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: updatedMessages,
       TraceIds: traceIds,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -283,7 +283,7 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -291,8 +291,8 @@ function apply(
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      ArchivedAt: Date.now(),
-      UpdatedAt: Date.now(),
+      ArchivedAt: event.occurredAt,
+      UpdatedAt: event.occurredAt,
     };
   }
 

@@ -1,0 +1,46 @@
+name: Publish Skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/*/SKILL.md'
+      - 'skills/recipes/*/SKILL.md'
+      - 'skills/version.txt'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat skills/version.txt)" >> $GITHUB_OUTPUT
+
+      - name: Checkout skills repo
+        uses: actions/checkout@v4
+        with:
+          repository: langwatch/skills
+          path: _skills-publish
+          token: ${{ secrets.SKILLS_PUBLISH_TOKEN }}
+
+      - name: Sync skills
+        run: bash skills/_publish/sync.sh _skills-publish
+
+      - name: Commit and push
+        run: |
+          cd _skills-publish
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+            exit 0
+          fi
+          VERSION="${{ steps.version.outputs.version }}"
+          git commit -m "chore: sync skills v${VERSION} from langwatch/langwatch"
+          git tag "v${VERSION}" || true
+          git push
+          git push --tags || true

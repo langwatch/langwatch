@@ -9,11 +9,15 @@ import { api } from "~/utils/api";
 
 export function SdkRadarBanner() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { openDrawer } = useDrawer();
   const { isSnoozed } = useSdkRadarUpdateSnooze(project?.id);
   const { enabled: sdkRadarEnabled } = useFeatureFlag(
     "release_ui_sdk_radar_banner_card_enabled",
+    { organizationId: organization?.id },
   );
 
   const stats = api.sdkRadar.getVersionStats.useQuery(

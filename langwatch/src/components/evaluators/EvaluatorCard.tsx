@@ -1,6 +1,6 @@
 import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { Evaluator } from "@prisma/client";
-import { ArrowUp, CheckSquare, Code, Copy, MoreVertical, RefreshCw, Workflow } from "lucide-react";
+import { ArrowUp, CheckSquare, Clock, Code, Copy, MoreVertical, RefreshCw, Workflow } from "lucide-react";
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -31,6 +31,7 @@ export type EvaluatorCardProps = {
   onReplicate?: () => void;
   onPushToCopies?: () => void;
   onSyncFromSource?: () => void;
+  onViewHistory?: () => void;
   hasEvaluationsManagePermission?: boolean;
 };
 
@@ -43,6 +44,7 @@ export function EvaluatorCard({
   onReplicate,
   onPushToCopies,
   onSyncFromSource,
+  onViewHistory,
   hasEvaluationsManagePermission = false,
 }: EvaluatorCardProps) {
   const Icon = evaluatorTypeIcons[evaluator.type] ?? CheckSquare;
@@ -195,6 +197,18 @@ export function EvaluatorCard({
                         <Copy size={16} /> Replicate to another project
                       </Menu.Item>
                     </Tooltip>
+                  )}
+                  {onViewHistory && (
+                    <Menu.Item
+                      value="history"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewHistory();
+                      }}
+                    >
+                      <Clock size={14} />
+                      View history
+                    </Menu.Item>
                   )}
                   {onDelete && (
                     <Menu.Item

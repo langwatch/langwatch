@@ -31,6 +31,7 @@ export default async function handler(
     projects = await prisma.project.findMany({
       where: {
         firstMessage: true,
+        archivedAt: null,
       },
     });
 
