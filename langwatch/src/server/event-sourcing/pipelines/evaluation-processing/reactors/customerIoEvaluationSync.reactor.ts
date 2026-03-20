@@ -32,8 +32,10 @@ export interface CustomerIoEvaluationSyncReactorDeps {
  *
  * Subsequent evaluations:
  *   - Identifies user with evaluation_count, last_evaluation_at
- *   - Tracks "evaluation_ran" event
  *   - Debounced via makeJobId with 5-minute TTL
+ *
+ * Every evaluation (first and subsequent):
+ *   - Tracks "evaluation_ran" event
  *
  * All nurturing calls are fire-and-forget with captureException.
  */

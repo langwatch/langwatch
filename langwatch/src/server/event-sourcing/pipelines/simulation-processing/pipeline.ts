@@ -15,7 +15,6 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
-  customerIoSimulationSyncReactor?: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
 }
 
 /**
@@ -36,24 +35,14 @@ export interface SimulationProcessingPipelineDeps {
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  */
 export function createSimulationProcessingPipeline(deps: SimulationProcessingPipelineDeps) {
-  let builder = definePipeline<SimulationProcessingEvent>()
+  return definePipeline<SimulationProcessingEvent>()
     .withName("simulation_processing")
     .withAggregateType("simulation_run")
     .withFoldProjection("simulationRunState", createSimulationRunStateFoldProjection({
       store: deps.simulationRunStore,
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
-    .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor);
-
-  if (deps.customerIoSimulationSyncReactor) {
-    builder = builder.withReactor(
-      "simulationRunState",
-      "customerIoSimulationSync",
-      deps.customerIoSimulationSyncReactor,
-    );
-  }
-
-  return builder
+    .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)

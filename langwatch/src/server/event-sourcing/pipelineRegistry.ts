@@ -4,7 +4,6 @@ import { prepareLitellmParams } from "~/server/api/routers/modelProviders.utils"
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
-import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 
@@ -61,12 +60,8 @@ import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/l
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { createCustomerIoEvaluationSyncReactor } from "./pipelines/evaluation-processing/reactors/customerIoEvaluationSync.reactor";
-import { createCustomerIoSimulationSyncReactor } from "./pipelines/simulation-processing/reactors/customerIoSimulationSync.reactor";
-import { createCustomerIoTraceSyncReactor } from "./pipelines/trace-processing/reactors/customerIoTraceSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
-import { createCustomerIoDailyUsageSyncReactor } from "./projections/global/customerIoDailyUsageSync.reactor";
 import {
   createEvaluationTriggerReactor,
   createDeferredEvaluationHandler,
@@ -96,7 +91,6 @@ export interface PipelineRegistryDeps {
   };
   esSync: EvaluationEsSyncReactorDeps;
   usageReportingService?: UsageReportingService;
-  nurturing?: NurturingService;
 }
 
 /**
@@ -110,17 +104,11 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   registerAll() {
-    // Register global fold reactors before any pipelines (must be before initialize)
-    if (this.deps.nurturing) {
-      this.deps.eventSourcing.registerGlobalFoldReactor(
-        "projectDailySdkUsage",
-        createCustomerIoDailyUsageSyncReactor({
-          projects: this.deps.projects,
-          prisma: this.deps.prisma,
-          nurturing: this.deps.nurturing,
-        }),
-      );
-    }
+    // TODO: Customer.io reactors are implemented but not yet registered.
+    // Counting strategy needs to be finalised (extend R5 daily sync pattern
+    // vs per-event ClickHouse queries) before enabling.
+    // See: customerIoDailyUsageSyncReactor, customerIoTraceSyncReactor,
+    //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
     const evalPipeline = this.registerEvaluationPipeline();
     const tracePipeline = this.registerTracePipeline(evalPipeline);
@@ -151,14 +139,6 @@ export class PipelineRegistry {
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
 
-    const customerIoEvaluationSyncReactor = this.deps.nurturing
-      ? createCustomerIoEvaluationSyncReactor({
-          projects: this.deps.projects,
-          nurturing: this.deps.nurturing,
-          evaluationCountFn: this.createEvaluationCountFn(),
-        })
-      : undefined;
-
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
@@ -166,7 +146,6 @@ export class PipelineRegistry {
         ),
         ExecuteEvaluationCommand,
         esSyncReactor,
-        customerIoEvaluationSyncReactor,
       }),
     );
   }
@@ -240,13 +219,6 @@ export class PipelineRegistry {
       ? new MetricRecordStorageClickHouseRepository(this.deps.clickhouse)
       : new NullMetricRecordStorageRepository();
 
-    const customerIoTraceSyncReactor = this.deps.nurturing
-      ? createCustomerIoTraceSyncReactor({
-          projects: this.deps.projects,
-          nurturing: this.deps.nurturing,
-        })
-      : undefined;
-
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -258,7 +230,6 @@ export class PipelineRegistry {
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         spanStorageBroadcastReactor,
-        customerIoTraceSyncReactor,
       }),
     );
 
@@ -343,20 +314,11 @@ export class PipelineRegistry {
       completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
     });
 
-    const customerIoSimulationSyncReactor = this.deps.nurturing
-      ? createCustomerIoSimulationSyncReactor({
-          projects: this.deps.projects,
-          nurturing: this.deps.nurturing,
-          simulationCountFn: this.createSimulationCountFn(),
-        })
-      : undefined;
-
     return this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
         suiteRunSyncReactor,
-        customerIoSimulationSyncReactor,
       }),
     );
   }
@@ -379,88 +341,6 @@ export class PipelineRegistry {
         ReportUsageForMonthCommand,
       }),
     );
-  }
-
-  /**
-   * Creates a function that counts completed evaluations for an organization
-   * by querying evaluation_runs in ClickHouse. Returns null when ClickHouse
-   * is unavailable or on query failure so callers can distinguish "no data"
-   * from "zero evaluations".
-   */
-  private createEvaluationCountFn(): (organizationId: string) => Promise<number | null> {
-    const clickhouse = this.deps.clickhouse;
-    const prisma = this.deps.prisma;
-
-    return async (organizationId: string): Promise<number | null> => {
-      if (!clickhouse) return null;
-
-      try {
-        // Get all project IDs for this org
-        const teams = await prisma.team.findMany({
-          where: { organizationId },
-          select: { projects: { select: { id: true } } },
-        });
-        const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
-        if (projectIds.length === 0) return 0;
-
-        const result = await clickhouse.query({
-          query: `
-            SELECT count(DISTINCT EvaluationId) as cnt
-            FROM evaluation_runs
-            WHERE TenantId IN ({projectIds:Array(String)})
-              AND Status = 'processed'
-          `,
-          query_params: { projectIds },
-          format: "JSONEachRow",
-        });
-        const rows = await result.json<{ cnt: string }>();
-        return Number(rows[0]?.cnt ?? 0);
-      } catch (error) {
-        logger.warn({ error }, "ClickHouse evaluation count query failed — skipping milestone check");
-        return null;
-      }
-    };
-  }
-
-  /**
-   * Creates a function that counts finished simulation runs for an organization
-   * by querying simulation_runs in ClickHouse. Returns null when ClickHouse
-   * is unavailable or on query failure so callers can distinguish "no data"
-   * from "zero simulations".
-   */
-  private createSimulationCountFn(): (organizationId: string) => Promise<number | null> {
-    const clickhouse = this.deps.clickhouse;
-    const prisma = this.deps.prisma;
-
-    return async (organizationId: string): Promise<number | null> => {
-      if (!clickhouse) return null;
-
-      try {
-        // Get all project IDs for this org
-        const teams = await prisma.team.findMany({
-          where: { organizationId },
-          select: { projects: { select: { id: true } } },
-        });
-        const projectIds = teams.flatMap((t) => t.projects.map((p) => p.id));
-        if (projectIds.length === 0) return 0;
-
-        const result = await clickhouse.query({
-          query: `
-            SELECT count(DISTINCT ScenarioRunId) as cnt
-            FROM simulation_runs
-            WHERE TenantId IN ({projectIds:Array(String)})
-              AND Status IN ('SUCCESS', 'FAILURE')
-          `,
-          query_params: { projectIds },
-          format: "JSONEachRow",
-        });
-        const rows = await result.json<{ cnt: string }>();
-        return Number(rows[0]?.cnt ?? 0);
-      } catch (error) {
-        logger.warn({ error }, "ClickHouse simulation count query failed — skipping milestone check");
-        return null;
-      }
-    };
   }
 
   private registerExperimentRunPipeline() {
