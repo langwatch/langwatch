@@ -100,7 +100,6 @@ class QueryResolutionEvaluator(
 
         response = litellm.completion(
             model=litellm_model,
-            max_tokens=1024,
             messages=messages,
             tools=[
                 {
@@ -113,7 +112,7 @@ class QueryResolutionEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "A concise reasoning in 1-3 sentences. Do not repeat or echo the input content.",
+                                    "description": "Reasoning for the answer",
                                 },
                                 "queries_total": {
                                     "type": "number",
@@ -147,8 +146,6 @@ class QueryResolutionEvaluator(
         cost = completion_cost(completion_response=response, prompt=prompt)
 
         reasoning: str = arguments["reasoning"]
-        if len(reasoning) > 2000:
-            reasoning = reasoning[:2000] + "..."
         passed: bool = arguments["queries_answered"] == arguments["queries_total"]
         total_queries: int = arguments["queries_total"]
         resolved_queries: int = arguments["queries_answered"]

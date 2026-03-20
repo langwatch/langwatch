@@ -110,7 +110,6 @@ class OffTopicEvaluator(BaseEvaluator[OffTopicEntry, OffTopicSettings, OffTopicR
 
         response = litellm.completion(
             model=litellm_model,
-            max_tokens=1024,
             messages=messages,
             tools=[
                 {

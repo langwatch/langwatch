@@ -11,6 +11,7 @@ from langwatch.domain import (
 )
 import json
 import math
+import warnings
 from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 from pydantic import BaseModel, ValidationError
 import pydantic
@@ -193,84 +194,53 @@ def convert_typed_values(
         return TypedValueRaw(type="raw", value=str(value_))
 
 
+_DEFAULT_MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
 def truncate_object_recursively(
     obj: T,
     max_string_length: Optional[int] = None,
     max_list_dict_length: int = 50000,
     depth: int = 0,
 ) -> T:
-    """Truncate strings and lists/dicts in an object recursively."""
+    """Validate that the serialized size of *obj* is within limits.
 
+    Despite the legacy name, this function no longer truncates. It either
+    returns *obj* unchanged or emits a warning when the payload is too large.
+
+    Parameters
+    ----------
+    obj:
+        The object to validate.
+    max_string_length:
+        Maximum allowed serialized size **in bytes**.  When ``None`` the
+        object is passed through without any validation.  Kept as
+        ``max_string_length`` for backwards compatibility with callers.
+    max_list_dict_length:
+        Ignored (kept for call-site compatibility).
+    depth:
+        Ignored (kept for call-site compatibility).
+    """
     if max_string_length is None:
         return obj
 
-    if max_string_length < 100:
-        raise ValueError("max_string_length must be at least 100")
-
-    if type(obj) == list and all(
-        validate_safe(ChatMessage, item, ["role"]) for item in obj
-    ):
+    try:
+        serialized = json.dumps(obj, cls=SerializableWithStringFallback)
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        # If we cannot even serialize, let the caller deal with it downstream.
         return obj
 
-    def truncate_string(s: str):
-        # Always use errors='replace' to handle any malformed Unicode gracefully
-        if len(s.encode('utf-8', errors='replace')) <= max_string_length:
-            return s
+    size_bytes = len(serialized.encode("utf-8", errors="replace"))
 
-        # Binary search to find the right truncation point
-        left, right = 0, len(s)
-        while left < right:
-            mid = (left + right + 1) // 2
-            byte_length = len(s[:mid].encode('utf-8', errors='replace'))
+    if size_bytes > max_string_length:
+        size_mb = size_bytes / (1024 * 1024)
+        max_mb = max_string_length / (1024 * 1024)
+        warnings.warn(
+            f"Span input/output too large ({size_mb:.1f}MB). "
+            f"Maximum allowed is {max_mb:.1f}MB. "
+            f"Consider reducing the payload size before tracing.",
+            UserWarning,
+            stacklevel=2,
+        )
 
-            if byte_length <= max_string_length - 25:  # Reserve space for suffix
-                left = mid
-            else:
-                right = mid - 1
-
-        return s[:left] + "... (truncated string)"
-
-    def process_item(item: Any):
-        if isinstance(item, str):
-            return truncate_string(item)
-        elif isinstance(item, (list, dict)):
-            return truncate_object_recursively(
-                item, max_string_length, max_list_dict_length, depth=depth + 1
-            )
-        else:
-            return item
-
-    if isinstance(obj, str):
-        return truncate_string(obj)
-
-    elif isinstance(obj, list):
-        result = []
-        for item in obj:
-            result.append(process_item(item))
-            if (
-                max_list_dict_length != -1
-                and len(json.dumps(result, cls=SerializableWithStringFallback))
-                > max_list_dict_length
-            ):
-                result.pop()
-                result.append("... (truncated list)")
-                break
-        return cast(T, result)
-
-    elif isinstance(obj, dict):
-        result = {}
-        for key, value in obj.items():
-            result[key] = process_item(value)
-            if (
-                depth > 0
-                and max_list_dict_length != -1
-                and len(json.dumps(result, cls=SerializableWithStringFallback))
-                > max_list_dict_length
-            ):
-                del result[key]
-                result["..."] = "(truncated object)"
-                break
-        return cast(T, result)
-
-    else:
-        return obj
+    return obj
