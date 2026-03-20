@@ -407,7 +407,7 @@ function messagesToText(
   if (messageText) return messageText;
 
   // Fall back to common JSON wrapper keys (input, question, query, etc.)
-  if (typeof messages === "object" && messages !== null) {
+  if (typeof messages === "object") {
     return extractTextFromPlainJson(messages as Record<string, unknown>);
   }
 
