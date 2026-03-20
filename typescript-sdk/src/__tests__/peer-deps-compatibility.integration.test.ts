@@ -54,7 +54,9 @@ describe("peer dependency compatibility", () => {
       for (const pkg of packages) {
         it(`accepts latest ${pkg}`, () => {
           const range = peerDeps[pkg];
-          expect(range, `${pkg} is not in peerDependencies`).toBeDefined();
+          if (!range) {
+            throw new Error(`${pkg} is not in peerDependencies`);
+          }
 
           const latestVersion = getLatestVersion(pkg);
           const satisfies = semverSatisfies(latestVersion, range);
