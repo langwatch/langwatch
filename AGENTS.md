@@ -86,6 +86,7 @@ specs/               # BDD feature specs
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
+| Importing or using Prisma directly in command handlers or services | Never use Prisma directly (`require("~/server/db")`, `import { prisma }`). Always go through services from `src/server/app-layer/` via dependency injection |
 
 ## TypeScript
 
@@ -95,6 +96,7 @@ specs/               # BDD feature specs
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
+| Using inline `import()` type expressions or `require()` | Never use async/dynamic imports — always use static `import type { X } from "path"` at the top of the file. No `import("../path").Type`, no `require("~/path")` |
 
 ## Database
 
