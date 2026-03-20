@@ -18,7 +18,7 @@ import type {
   EventSourcedQueueProcessor,
   QueueSendOptions,
 } from "../../queues";
-import { ConfigurationError, QueueError } from "../../services/errorHandling";
+import { categorizeError, ConfigurationError, ErrorCategory, QueueError } from "../../services/errorHandling";
 import { JOB_RETRY_CONFIG, getBackoffMs } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import {
@@ -27,6 +27,7 @@ import {
   gqJobsDedupedTotal,
   gqJobsExhaustedTotal,
   gqJobsRetriedTotal,
+  gqJobsNonRetryableTotal,
   gqJobsStagedTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
@@ -451,8 +452,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               );
             } catch (err) {
               const error = err instanceof Error ? err : new Error(String(err));
+              const category = categorizeError(err);
+              const isRetryable = category !== ErrorCategory.CRITICAL;
 
-              if (attempt < JOB_RETRY_CONFIG.maxAttempts) {
+              if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
                 // Re-stage with backoff — frees the worker slot immediately
                 gqJobsRetriedTotal.inc({ queue_name: this.queueName });
 
@@ -486,9 +489,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   "Job attempt failed, re-staged with backoff",
                 );
               } else {
-                // All retries exhausted
                 span.setAttribute("error", true);
                 span.setAttribute("error.message", error.message);
+
+                if (!isRetryable) {
+                  gqJobsNonRetryableTotal.inc({ queue_name: this.queueName });
+                  this.logger.error(
+                    {
+                      queueName: this.queueName,
+                      groupId,
+                      stagedJobId,
+                      attempt,
+                      errorCategory: category,
+                      error: error.message,
+                    },
+                    "Job failed with non-retryable error, skipping retries",
+                  );
+                }
+
                 await this.handleExhaustedRetries({
                   groupId,
                   stagedJobId,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bytesSchema, idSchema, spanSchema } from "../otlp";
+import { anyValueSchema, bytesSchema, idSchema, spanSchema } from "../otlp";
 
 describe("otlp schemas", () => {
   describe("idSchema", () => {
@@ -178,6 +178,51 @@ describe("otlp schemas", () => {
         expect(result.success).toBe(true);
         if (result.success) {
           expect(result.data.status).toEqual({});
+        }
+      });
+    });
+  });
+
+  describe("anyValueSchema bytesValue", () => {
+    describe("when value has a Uint8Array bytesValue", () => {
+      it("validates successfully", () => {
+        const value = { bytesValue: new Uint8Array([1, 2, 3]) };
+
+        const result = anyValueSchema.safeParse(value);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.bytesValue).toBeInstanceOf(Uint8Array);
+          expect(result.data.bytesValue).toEqual(new Uint8Array([1, 2, 3]));
+        }
+      });
+    });
+
+    describe("when bytesValue goes through JSON round-trip", () => {
+      it("reconstructs Uint8Array from serialized object", () => {
+        const original = { bytesValue: new Uint8Array([10, 20, 30]) };
+        // JSON.stringify converts Uint8Array to {"0":10,"1":20,"2":30}
+        const roundTripped = JSON.parse(JSON.stringify(original));
+
+        const result = anyValueSchema.safeParse(roundTripped);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.bytesValue).toBeInstanceOf(Uint8Array);
+          expect(result.data.bytesValue).toEqual(new Uint8Array([10, 20, 30]));
+        }
+      });
+    });
+
+    describe("when bytesValue is null", () => {
+      it("accepts null bytesValue", () => {
+        const value = { bytesValue: null };
+
+        const result = anyValueSchema.safeParse(value);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.bytesValue).toBeNull();
         }
       });
     });

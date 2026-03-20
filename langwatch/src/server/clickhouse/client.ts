@@ -1,4 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:clickhouse:client");
@@ -38,12 +39,14 @@ export function getClickHouseClient(): ClickHouseClient | null {
       );
     }
 
-    clickHouseClient = createClient({
+    const raw = createClient({
       url,
       clickhouse_settings: {
         date_time_input_format: "best_effort",
       },
     });
+
+    clickHouseClient = createResilientClickHouseClient({ client: raw });
   }
 
   return clickHouseClient;
