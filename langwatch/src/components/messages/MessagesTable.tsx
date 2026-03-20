@@ -1300,11 +1300,12 @@ export function MessagesTable({
           left="50%"
           transform="translateX(-50%)"
           zIndex={20}
-          backgroundColor="#ffffff"
+          backgroundColor="bg.emphasized"
           padding="8px"
           paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+          border="1px solid"
+          borderColor="border.muted"
+          boxShadow="lg"
           borderRadius="md"
         >
           <HStack gap={3}>

@@ -1,57 +1,66 @@
-import { Button, Field, NativeSelect } from "@chakra-ui/react";
+import { Button, createListCollection, Field } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
 import type { ReactNode } from "react";
 import type {
   FieldErrors,
   Path,
   PathValue,
-  UseFormRegister,
   UseFormSetValue,
 } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { Select } from "../ui/select";
 
 interface DatasetSelectorProps<T extends { datasetId: string }> {
   datasets: Dataset[] | undefined;
   localStorageDatasetId: string;
-  register: UseFormRegister<T>;
   errors: FieldErrors<T>;
   setValue: UseFormSetValue<T>;
   onCreateNew: () => void;
+  register?: never;
 }
 
 export function DatasetSelector<T extends { datasetId: string }>({
   datasets,
   localStorageDatasetId,
-  register,
   errors,
   setValue,
   onCreateNew,
 }: DatasetSelectorProps<T>) {
+  const datasetCollection = createListCollection({
+    items:
+      datasets?.map((dataset) => ({
+        label: dataset.name,
+        value: dataset.id,
+      })) ?? [],
+  });
+
+  const selectedValue = localStorageDatasetId ? [localStorageDatasetId] : [];
+
   return (
     <HorizontalFormControl
       label="Dataset"
       helper="Add to an existing dataset or create a new one"
       invalid={!!errors.datasetId}
     >
-      <NativeSelect.Root>
-        <NativeSelect.Field
-          {...register("datasetId" as Path<T>, {
-            required: "Dataset is required",
-          })}
-        >
-          <option value="">Select Dataset</option>
-          {datasets?.map((dataset, index) => (
-            <option
-              key={index}
-              value={dataset.id}
-              selected={dataset.id === localStorageDatasetId}
-            >
-              {dataset.name}
-            </option>
+      <Select.Root
+        collection={datasetCollection}
+        value={selectedValue}
+        onValueChange={(e) => {
+          const value = e.value[0] ?? "";
+          setValue("datasetId" as Path<T>, value as PathValue<T, Path<T>>);
+        }}
+      >
+        <Select.Trigger>
+          <Select.ValueText placeholder="Select Dataset" />
+        </Select.Trigger>
+        <Select.Content portalled={false}>
+          {datasetCollection.items.map((dataset) => (
+            <Select.Item key={dataset.value} item={dataset} marginY={3}>
+              {dataset.label}
+            </Select.Item>
           ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+        </Select.Content>
+      </Select.Root>
       {errors.datasetId && (
         <Field.ErrorText>
           {errors.datasetId.message as ReactNode}
