@@ -327,15 +327,24 @@ async function spawnScenarioChildProcess(
     // Resolve spawn command: pre-compiled bundle in production, tsx in development
     // Use __dirname to resolve package root reliably (works from source and built output paths)
     const packageRoot = path.resolve(__dirname, "../../..");
+    const spawnStart = Date.now();
     const { command, args } = resolveChildProcessSpawn({
       packageRoot,
       nodeEnv: process.env.NODE_ENV,
     });
+    logger.info(
+      { command, args, jobId: job.id },
+      "Spawning scenario child process",
+    );
     const child: ChildProcess = spawn(command, args, {
       env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
       cwd: packageRoot,
     });
+    logger.info(
+      { pid: child.pid, jobId: job.id, spawnMs: Date.now() - spawnStart },
+      "Child process spawned",
+    );
 
     let stderr = "";
     let resolved = false;

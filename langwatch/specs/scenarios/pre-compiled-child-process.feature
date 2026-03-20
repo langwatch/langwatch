@@ -77,9 +77,9 @@ Feature: Pre-compiled Scenario Child Process
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Processor reports clear error when compiled bundle is missing in production
+  Scenario: Processor falls back to tsx with loud logging when bundle is missing in production
     Given the pre-compiled bundle file does not exist at the expected path
     And NODE_ENV is "production"
-    When the scenario processor attempts to spawn a child process
-    Then it fails with a descriptive error indicating the bundle is missing
-    And it does not silently fall back to tsx
+    When the scenario processor resolves the child process spawn
+    Then it falls back to tsx instead of crashing
+    And it logs an error with the missing bundle path and remediation steps

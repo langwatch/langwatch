@@ -9,11 +9,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "path";
 import { resolveChildProcessSpawn } from "../child-process-spawn";
 
+// vi.hoisted runs before vi.mock hoisting, so mockLogger is available in the factory
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn(),
+}));
+
 // Mock fs.existsSync to control bundle presence
 vi.mock("fs", () => ({
   default: {
     existsSync: vi.fn(),
   },
+}));
+
+// Mock the logger so we can assert on log calls
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: vi.fn(() => mockLogger),
 }));
 
 import fs from "fs";
@@ -23,6 +39,9 @@ const PACKAGE_ROOT = "/app/langwatch";
 describe("resolveChildProcessSpawn", () => {
   beforeEach(() => {
     vi.mocked(fs.existsSync).mockReset();
+    mockLogger.info.mockReset();
+    mockLogger.debug.mockReset();
+    mockLogger.error.mockReset();
   });
 
   afterEach(() => {
@@ -56,6 +75,20 @@ describe("resolveChildProcessSpawn", () => {
         expect(result.command).not.toBe("pnpm");
         expect(result.args).not.toContain("tsx");
       });
+
+      it("logs the bundle path at info level", () => {
+        resolveChildProcessSpawn({
+          packageRoot: PACKAGE_ROOT,
+          nodeEnv: "production",
+        });
+
+        expect(mockLogger.info).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bundlePath: expect.stringContaining("dist/scenario-child-process.js"),
+          }),
+          expect.stringContaining("pre-compiled bundle"),
+        );
+      });
     });
 
     describe("when pre-compiled bundle does not exist", () => {
@@ -63,23 +96,42 @@ describe("resolveChildProcessSpawn", () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
       });
 
-      it("fails with a descriptive error indicating the bundle is missing", () => {
-        expect(() =>
-          resolveChildProcessSpawn({
-            packageRoot: PACKAGE_ROOT,
-            nodeEnv: "production",
-          }),
-        ).toThrow(/Pre-compiled scenario child process bundle not found/);
+      it("falls back to tsx instead of crashing", () => {
+        const result = resolveChildProcessSpawn({
+          packageRoot: PACKAGE_ROOT,
+          nodeEnv: "production",
+        });
+
+        expect(result.command).toBe("pnpm");
+        expect(result.args[0]).toBe("exec");
+        expect(result.args[1]).toBe("tsx");
       });
 
-      it("includes the expected bundle path in the error message", () => {
-        expect(() =>
-          resolveChildProcessSpawn({
-            packageRoot: PACKAGE_ROOT,
-            nodeEnv: "production",
+      it("logs an error with the missing bundle path", () => {
+        resolveChildProcessSpawn({
+          packageRoot: PACKAGE_ROOT,
+          nodeEnv: "production",
+        });
+
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bundlePath: expect.stringContaining(
+              path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js"),
+            ),
           }),
-        ).toThrow(
-          path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js"),
+          expect.stringContaining("NOT FOUND"),
+        );
+      });
+
+      it("logs a remediation hint in the error message", () => {
+        resolveChildProcessSpawn({
+          packageRoot: PACKAGE_ROOT,
+          nodeEnv: "production",
+        });
+
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.stringContaining("build:scenario-child-process"),
         );
       });
     });
@@ -105,6 +157,18 @@ describe("resolveChildProcessSpawn", () => {
           "scenario-child-process.ts",
         ),
       ]);
+    });
+
+    it("logs the environment at debug level", () => {
+      resolveChildProcessSpawn({
+        packageRoot: PACKAGE_ROOT,
+        nodeEnv: "development",
+      });
+
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ nodeEnv: "development" }),
+        expect.stringContaining("tsx"),
+      );
     });
   });
 
