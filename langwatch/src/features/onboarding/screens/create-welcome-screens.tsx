@@ -44,6 +44,7 @@ const OrganizationScreen: React.FC = () => {
       <Field.Root colorPalette="orange" w="full">
         <Input
           autoFocus
+          aria-label="Organization name"
           size="lg"
           variant="outline"
           placeholder="Company or your name"
