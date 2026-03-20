@@ -126,7 +126,7 @@ export function createDspyStepMigrationDefinition(
       const summary = computeLlmSummary(llmCalls);
 
       const projectionWrites: Array<() => Promise<void>> = [
-        () => deps.dspyStepRepository.upsertStep(stepData),
+        () => deps.dspyStepRepository.insertStepDirect(stepData),
       ];
 
       return {

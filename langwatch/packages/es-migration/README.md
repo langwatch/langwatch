@@ -68,6 +68,27 @@ Options:
 | `LOG_LEVEL` | No | info | `debug\|info\|warn\|error` |
 | `ES_PORT_FORWARD` | No | false | Enable kubectl port-forward for ES |
 
+### Recommended values
+
+#### Traces & Evaluations
+
+```
+BATCH_SIZE=5000
+SUB_BATCH_SIZE=2000
+CH_BATCH_SIZE=5000
+CONCURRENCY=1000
+CURSOR_REWIND_MS=21600000
+```
+
+#### DSpy Steps
+
+```
+BATCH_SIZE=100
+CH_BATCH_SIZE=100
+CONCURRENCY=10
+CURSOR_REWIND_MS=21600000
+```
+
 ## Dry-run output
 
 When using `--dry-run`, the output is a JSON array file (`./dry-run-{target}.json`). Each entry contains the ES source data, the commands that would be dispatched, and the events that `processCommand` would produce:
