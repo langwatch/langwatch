@@ -35,6 +35,7 @@ export interface RecordSpanCommandDependencies {
   piiRedactionService: {
     redactSpan: (
       span: OtlpSpan,
+      resource: import("../schemas/otlp").OtlpResource | null,
       piiRedactionLevel: PIIRedactionLevel,
     ) => Promise<void>;
   };
@@ -121,8 +122,11 @@ export class RecordSpanCommand implements CommandHandler<
           "Handling record span command",
         );
 
-        // Clone span before mutation to preserve command immutability
+        // Clone span and resource before mutation to preserve command immutability
         const spanToProcess = structuredClone(commandData.span);
+        const resourceToProcess = commandData.resource
+          ? structuredClone(commandData.resource)
+          : null;
 
         // Strip any user-submitted langwatch.reserved.* attributes — this domain
         // is reserved for system-generated attributes only.
@@ -139,6 +143,7 @@ export class RecordSpanCommand implements CommandHandler<
         const [piiResult, costResult, tokenResult] = await Promise.allSettled([
           this.deps.piiRedactionService.redactSpan(
             spanToProcess,
+            resourceToProcess,
             piiRedactionLevel,
           ),
           this.deps.costEnrichmentService.enrichSpan(
@@ -186,7 +191,7 @@ export class RecordSpanCommand implements CommandHandler<
           version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
           data: {
             span: spanToProcess,
-            resource: commandData.resource,
+            resource: resourceToProcess,
             instrumentationScope: commandData.instrumentationScope,
             piiRedactionLevel,
           },
