@@ -83,7 +83,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   );
 
   return (
-    <Box w="full" minH="100dvh" bg="#FAFAFA" position="relative">
+    <Box w="full" minH="100dvh" bg="#FAFAFA" position="relative" style={{ scrollbarGutter: "stable" }} overflowY="auto">
       <OnboardingMeshBackground />
 
       {showBackButton && onBack && (
@@ -146,28 +146,38 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.6 }}
         >
-          <a
-            href={skipHref}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              fontSize: "13px",
-              fontWeight: 500,
-              color: "#6B7280",
-              background: "white",
-              border: "1px solid rgba(0,0,0,0.08)",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              textDecoration: "none",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
+          <Box
+            asChild
+            display="inline-flex"
+            alignItems="center"
+            gap="6px"
+            px="16px"
+            py="8px"
+            borderRadius="10px"
+            fontSize="13px"
+            fontWeight="500"
+            color="#6B7280"
+            bg="rgba(255,255,255,0.7)"
+            backdropFilter="blur(12px)"
+            WebkitBackdropFilter="blur(12px)"
+            border="1px solid rgba(0,0,0,0.06)"
+            boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+            textDecoration="none"
+            cursor="pointer"
+            transition="all 0.25s ease"
+            _hover={{
+              bg: "rgba(255,255,255,0.95)",
+              color: "#374151",
+              boxShadow: "0 3px 12px rgba(0,0,0,0.08)",
+              transform: "translateY(-2px)",
+              borderColor: "rgba(0,0,0,0.10)",
             }}
           >
-            Continue to LangWatch
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          </a>
+            <a href={skipHref}>
+              Continue to LangWatch
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </Box>
         </MotionBox>
       )}
 
@@ -198,10 +208,29 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         {...(isFullWidth ? { fluid: true } : {})}
       >
         {isFullWidth ? (
-          <VStack gap={8} align="stretch">
-            {titleBlock}
-            {loading ? <SpookyScarySkeleton loading /> : children}
-          </VStack>
+          <MotionBox
+            bg="rgba(255,255,255,0.7)"
+            backdropFilter="blur(12px)"
+            WebkitBackdropFilter="blur(12px)"
+            borderRadius="16px"
+            border="1px solid"
+            borderColor="rgba(0,0,0,0.06)"
+            boxShadow="0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.02)"
+            px={{ base: 5, md: 8 }}
+            py={{ base: 6, md: 8 }}
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+              duration: 0.5,
+              ease: [0.16, 1, 0.3, 1],
+              delay: 0.1,
+            }}
+          >
+            <VStack gap={8} align="stretch">
+              {titleBlock}
+              {loading ? <SpookyScarySkeleton loading /> : children}
+            </VStack>
+          </MotionBox>
         ) : (
           <MotionBox
             bg="white"

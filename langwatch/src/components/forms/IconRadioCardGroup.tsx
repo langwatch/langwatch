@@ -38,13 +38,21 @@ export const IconRadioCardGroup = <T extends string = string>({
         onClick={() => onChange(isSelected ? undefined : item.value)}
         cursor="pointer"
         borderWidth="1px"
-        borderColor={isSelected ? "orange.400" : "rgba(0,0,0,0.08)"}
-        borderRadius="10px"
-        bg={isSelected ? "orange.subtle" : "white"}
+        borderColor={isSelected ? "orange.400" : "rgba(0,0,0,0.06)"}
+        borderRadius="12px"
+        bg={isSelected ? "orange.subtle" : "rgba(255,255,255,0.6)"}
+        backdropFilter="blur(12px)"
+        WebkitBackdropFilter="blur(12px)"
         p="3"
-        transition="border-color 0.15s ease, background 0.15s ease"
+        transition="all 0.2s ease"
+        boxShadow={isSelected ? "0 0 0 1px rgba(237,137,38,0.15)" : "none"}
         _hover={{
-          borderColor: isSelected ? "orange.400" : "rgba(0,0,0,0.14)",
+          borderColor: isSelected ? "orange.400" : "rgba(0,0,0,0.10)",
+          bg: isSelected ? "orange.subtle" : "rgba(255,255,255,0.85)",
+          boxShadow: isSelected
+            ? "0 0 0 1px rgba(237,137,38,0.15)"
+            : "0 2px 8px rgba(0,0,0,0.04)",
+          transform: "translateY(-1px)",
         }}
         w="full"
         minW="0"

@@ -1,6 +1,6 @@
-import { CheckboxCard, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Check } from "lucide-react";
 import type React from "react";
-import { CheckboxGroup } from "../ui/checkbox";
 
 type IconListItem<T> = {
   title: string;
@@ -21,48 +21,100 @@ export const IconCheckboxCardGroup = <T extends string = string>({
   value,
   onChange,
   label,
-  size = "sm",
-}: IconCheckboxCardGroupProps<T>) => (
-  <CheckboxGroup
-    colorPalette="orange"
-    w={"full"}
-    value={value}
-    onValueChange={(value) => {
-      onChange(value as T[]);
-    }}
-  >
-    {label && (
-      <Text textStyle={size} fontWeight="medium">
-        {label}
-      </Text>
-    )}
+}: IconCheckboxCardGroupProps<T>) => {
+  const toggle = (item: T) => {
+    onChange(
+      value.includes(item) ? value.filter((v) => v !== item) : [...value, item],
+    );
+  };
+
+  return (
     <VStack gap="2" w="full">
-      {items.map((item) => (
-        <CheckboxCard.Root
-          key={item.value}
-          value={item.value}
-          size={size}
-          w="full"
-          colorPalette="orange"
-        >
-          <CheckboxCard.HiddenInput />
-          <CheckboxCard.Control>
-            <HStack align="center" justify="space-between" w="full">
-              <CheckboxCard.Content>
-                <HStack>
-                  <Icon size="sm" color="fg.muted">
+      {label && (
+        <Text textStyle="sm" fontWeight="medium">
+          {label}
+        </Text>
+      )}
+      {items.map((item) => {
+        const isSelected = value.includes(item.value);
+        return (
+          <Box
+            key={item.value}
+            asChild
+            role="checkbox"
+            aria-checked={isSelected}
+            onClick={() => toggle(item.value)}
+            cursor="pointer"
+            borderWidth="1px"
+            borderColor={isSelected ? "orange.400" : "rgba(0,0,0,0.06)"}
+            borderRadius="12px"
+            bg={isSelected ? "orange.subtle" : "rgba(255,255,255,0.6)"}
+            backdropFilter="blur(12px)"
+            WebkitBackdropFilter="blur(12px)"
+            p="3"
+            transition="all 0.2s ease"
+            boxShadow={
+              isSelected ? "0 0 0 1px rgba(237,137,38,0.15)" : "none"
+            }
+            _hover={{
+              borderColor: isSelected
+                ? "orange.400"
+                : "rgba(0,0,0,0.10)",
+              bg: isSelected ? "orange.subtle" : "rgba(255,255,255,0.85)",
+              boxShadow: isSelected
+                ? "0 0 0 1px rgba(237,137,38,0.15)"
+                : "0 2px 8px rgba(0,0,0,0.04)",
+              transform: "translateY(-1px)",
+            }}
+            w="full"
+            minW="0"
+            textAlign="start"
+          >
+            <button type="button">
+              <HStack align="center" justify="space-between" w="full" minW="0">
+                <HStack align="center" gap="2" minW="0" flex="1">
+                  <Icon
+                    size="sm"
+                    color={isSelected ? "orange.fg" : "fg.muted"}
+                    transition="color 0.15s ease"
+                    flexShrink={0}
+                  >
                     <item.icon />
                   </Icon>
-                  <CheckboxCard.Label>{item.title}</CheckboxCard.Label>
+                  <Text
+                    textStyle="sm"
+                    fontWeight="medium"
+                    color="fg.DEFAULT"
+                    truncate
+                  >
+                    {item.title}
+                  </Text>
                 </HStack>
-              </CheckboxCard.Content>
-              <CheckboxCard.Indicator />
-            </HStack>
-          </CheckboxCard.Control>
-        </CheckboxCard.Root>
-      ))}
+
+                <Box
+                  w="4"
+                  h="4"
+                  borderRadius="4px"
+                  borderWidth="1px"
+                  borderColor={
+                    isSelected ? "orange.solid" : "border.emphasized"
+                  }
+                  bg={isSelected ? "orange.solid" : "bg.surface"}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  transition="all 0.15s ease"
+                  flexShrink={0}
+                >
+                  {isSelected && <Check size={10} color="white" strokeWidth={3} />}
+                </Box>
+              </HStack>
+            </button>
+          </Box>
+        );
+      })}
     </VStack>
-  </CheckboxGroup>
-);
+  );
+};
 
 export default IconCheckboxCardGroup;

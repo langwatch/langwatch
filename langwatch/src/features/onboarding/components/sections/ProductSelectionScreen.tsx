@@ -19,7 +19,7 @@ const productOptions: ProductOption[] = [
     key: "via-claude-code",
     title: "Via Coding Agent",
     description:
-      "Set up with prompts, skills, or MCP — works with Claude Code, Cursor, Windsurf, and more",
+      "Set up with prompts, skills, or MCP. Works with Claude Code, Cursor, Windsurf, and more",
     icon: Terminal,
     gradient:
       "linear-gradient(135deg, rgba(237,137,38,0.06) 0%, transparent 50%)",
@@ -34,8 +34,8 @@ const productOptions: ProductOption[] = [
   },
   {
     key: "via-claude-desktop",
-    title: "Via Desktop App",
-    description: "Connect via MCP — works with Claude Desktop, ChatGPT, and more",
+    title: "Via MCP",
+    description: "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
     icon: MessageSquare,
     gradient:
       "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
@@ -81,7 +81,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           textAlign="left"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: i * 0.08, ease: "easeOut" }}
+          transition={{ duration: 0.32, delay: i * 0.064, ease: "easeOut" }}
           whileHover={{
             y: -3,
             boxShadow:

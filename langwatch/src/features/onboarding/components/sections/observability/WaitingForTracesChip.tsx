@@ -137,7 +137,7 @@ export function WaitingForTracesChip(): React.ReactElement {
                 <CheckCircle size={16} />
               </Box>
               <Text fontWeight="medium" fontSize="sm">
-                Traces detected —
+                Traces detected.
                 {secondsLeft !== null &&
                   secondsLeft > 0 &&
                   ` redirecting in ${secondsLeft}..`}

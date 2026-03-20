@@ -65,23 +65,25 @@ export function SelectableIconCard(
         cursor="pointer"
         borderWidth={selected ? "2px" : "1px"}
         borderColor={
-          selected ? selectedBorderColor : "rgba(0,0,0,0.08)"
+          selected ? selectedBorderColor : "rgba(0,0,0,0.06)"
         }
-        bg={selected ? selectedBg : "rgba(0,0,0,0.03)"}
-        backdropFilter="blur(16px) saturate(1.3)"
+        bg={selected ? selectedBg : "rgba(255,255,255,0.6)"}
+        backdropFilter="blur(12px)"
+        WebkitBackdropFilter="blur(12px)"
         boxShadow={
           selected
-            ? undefined
-            : "0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 white"
+            ? "0 0 0 1px rgba(237,137,38,0.15)"
+            : "none"
         }
         transition="all 0.2s ease"
         _hover={{
           borderColor: selected
             ? selectedBorderColor
-            : "rgba(0,0,0,0.14)",
+            : "rgba(0,0,0,0.10)",
+          bg: selected ? selectedBg : "rgba(255,255,255,0.85)",
           boxShadow: selected
-            ? undefined
-            : "0 4px 20px rgba(0,0,0,0.06), inset 0 1px 0 white",
+            ? "0 0 0 1px rgba(237,137,38,0.15)"
+            : "0 2px 8px rgba(0,0,0,0.04)",
           transform: "translateY(-1px)",
         }}
         aspectRatio="1 / 1"
