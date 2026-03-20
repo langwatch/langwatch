@@ -182,6 +182,9 @@ async function handleMetricsRequest(req: NextRequest) {
           piiRedactionLevel: project.piiRedactionLevel,
         });
       }
+      if (project.disableElasticSearchTraceWriting) {
+        return NextResponse.json({ message: "OK" });
+      }
 
       const tracesGeneratedFromMetrics =
         await openTelemetryMetricsRequestToTracesForCollection(metricsRequest);
