@@ -193,6 +193,7 @@ export const NewWorkflowForm = ({
 
     const newWorkflow: Workflow = {
       ...template,
+      version: "1",
       name: data.name,
       description: data.description,
       icon: data.icon ?? defaultIcon,
