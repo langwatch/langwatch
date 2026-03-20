@@ -21,6 +21,11 @@ export function createClickHouseClientFromConfig(
   const raw = createClient({
     url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
+    max_open_connections: 50,
+    keep_alive: {
+      enabled: true,
+      idle_socket_ttl: 1500,
+    },
   });
 
   return createResilientClickHouseClient({ client: raw });
