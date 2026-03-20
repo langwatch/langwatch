@@ -210,7 +210,7 @@ describe("applySpanToSummary cost computation", () => {
     it("coerces string tokens and computes cost from static registry", () => {
       const span = createTestSpan({
         spanAttributes: {
-          "gen_ai.request.model": "gpt-4o-mini",
+          "gen_ai.request.model": "gpt-5-mini",
           "gen_ai.usage.input_tokens": "100",
           "gen_ai.usage.output_tokens": "50",
         },

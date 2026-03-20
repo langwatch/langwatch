@@ -214,7 +214,7 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "llm",
-          "gen_ai.request.model": "gpt-4o-mini",
+          "gen_ai.request.model": "gpt-5-mini",
           "gen_ai.usage.input_tokens": 100,
           "gen_ai.usage.output_tokens": 50,
         },
@@ -233,7 +233,7 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "llm",
-          "gen_ai.request.model": "gpt-4o-mini",
+          "gen_ai.request.model": "gpt-5-mini",
           "gen_ai.usage.input_tokens": "100",
           "gen_ai.usage.output_tokens": "50",
         },
