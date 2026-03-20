@@ -104,6 +104,12 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   registerAll() {
+    // TODO: Customer.io reactors are implemented but not yet registered.
+    // Counting strategy needs to be finalised (extend R5 daily sync pattern
+    // vs per-event ClickHouse queries) before enabling.
+    // See: customerIoDailyUsageSyncReactor, customerIoTraceSyncReactor,
+    //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
+
     const evalPipeline = this.registerEvaluationPipeline();
     const tracePipeline = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
