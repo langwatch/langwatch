@@ -105,6 +105,7 @@ class CustomLLMBooleanEvaluator(
         else:
             response = litellm.completion(
                 model=self.settings.model,
+                max_tokens=self.settings.max_output_tokens,
                 messages=[
                     {
                         "role": "system",
@@ -126,7 +127,7 @@ class CustomLLMBooleanEvaluator(
                                 "properties": {
                                     "reasoning": {
                                         "type": "string",
-                                        "description": "use this field to ponder and write a short reasoning behind the decision written before a result is actually given",
+                                        "description": "A concise reasoning for your decision in 1-2 sentences. Do not repeat or echo the input content.",
                                     },
                                     "passed": {
                                         "type": "boolean",
@@ -144,6 +145,11 @@ class CustomLLMBooleanEvaluator(
 
             response = cast(ModelResponse, response)
             choice = cast(Choices, response.choices[0])
+            if choice.finish_reason == "length":
+                raise ValueError(
+                    f"Evaluator response was cut off (hit {self.settings.max_output_tokens} token output limit). "
+                    f"Consider increasing max_output_tokens in the evaluator settings."
+                )
             arguments = json.loads(
                 cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
             )

@@ -100,6 +100,7 @@ class CustomLLMScoreEvaluator(
         else:
             response = litellm.completion(
                 model=self.settings.model,
+                max_tokens=self.settings.max_output_tokens,
                 messages=[
                     {
                         "role": "system",
@@ -121,7 +122,7 @@ class CustomLLMScoreEvaluator(
                                 "properties": {
                                     "reasoning": {
                                         "type": "string",
-                                        "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                                        "description": "A concise reasoning for your score in 1-3 sentences. Break down sub-scores briefly. Do not repeat or echo the input content.",
                                     },
                                     "final_score": {
                                         "type": "number",
@@ -139,6 +140,11 @@ class CustomLLMScoreEvaluator(
 
             response = cast(ModelResponse, response)
             choice = cast(Choices, response.choices[0])
+            if choice.finish_reason == "length":
+                raise ValueError(
+                    f"Evaluator response was cut off (hit {self.settings.max_output_tokens} token output limit). "
+                    f"Consider increasing max_output_tokens in the evaluator settings."
+                )
             arguments = json.loads(
                 cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
             )

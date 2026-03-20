@@ -110,6 +110,7 @@ class CompetitorLLMEvaluator(
         )
         response = litellm.completion(
             model=litellm_model,
+            max_tokens=self.settings.max_output_tokens,
             messages=messages,
             tools=[
                 {
@@ -122,7 +123,7 @@ class CompetitorLLMEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Use this field to ponder and write the reasoning behind the decision written before a result is actually given",
+                                    "description": "A concise explanation in 1-2 sentences. Do not repeat or echo the input content.",
                                 },
                                 "competitor_mentioned": {
                                     "type": "boolean",
@@ -146,6 +147,11 @@ class CompetitorLLMEvaluator(
         )
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
+        if choice.finish_reason == "length":
+            raise ValueError(
+                f"Evaluator response was cut off (hit {self.settings.max_output_tokens} token output limit). "
+                f"Consider increasing max_output_tokens in the evaluator settings."
+            )
         arguments = json.loads(
             cast(Message, choice.message).tool_calls[0].function.arguments
         )

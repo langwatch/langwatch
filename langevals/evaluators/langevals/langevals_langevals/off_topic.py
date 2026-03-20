@@ -110,6 +110,7 @@ class OffTopicEvaluator(BaseEvaluator[OffTopicEntry, OffTopicSettings, OffTopicR
 
         response = litellm.completion(
             model=litellm_model,
+            max_tokens=self.settings.max_output_tokens,
             messages=messages,
             tools=[
                 {
@@ -145,6 +146,11 @@ class OffTopicEvaluator(BaseEvaluator[OffTopicEntry, OffTopicSettings, OffTopicR
         )
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
+        if choice.finish_reason == "length":
+            raise ValueError(
+                f"Evaluator response was cut off (hit {self.settings.max_output_tokens} token output limit). "
+                f"Consider increasing max_output_tokens in the evaluator settings."
+            )
         arguments = json.loads(
             cast(Message, choice.message).tool_calls[0].function.arguments
         )

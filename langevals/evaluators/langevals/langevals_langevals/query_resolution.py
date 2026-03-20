@@ -100,6 +100,7 @@ class QueryResolutionEvaluator(
 
         response = litellm.completion(
             model=litellm_model,
+            max_tokens=self.settings.max_output_tokens,
             messages=messages,
             tools=[
                 {
@@ -112,7 +113,7 @@ class QueryResolutionEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Reasoning for the answer",
+                                    "description": "A concise reasoning in 1-3 sentences. Do not repeat or echo the input content.",
                                 },
                                 "queries_total": {
                                     "type": "number",
@@ -139,6 +140,11 @@ class QueryResolutionEvaluator(
         )
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
+        if choice.finish_reason == "length":
+            raise ValueError(
+                f"Evaluator response was cut off (hit {self.settings.max_output_tokens} token output limit). "
+                f"Consider increasing max_output_tokens in the evaluator settings."
+            )
         arguments = json.loads(
             cast(Message, choice.message).tool_calls[0].function.arguments
         )
