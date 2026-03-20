@@ -404,6 +404,60 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         });
       }
 
+    } else if (promptId && !promptQuery.data && !promptQuery.isLoading && modelMetadata && props.initialLocalConfig) {
+      // Prompt referenced by ID but not found in DB (e.g. after importing a
+      // workflow from another project). Fall back to initialLocalConfig which
+      // the bridge extracted from the node's inline parameters.
+      const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+      const defaultModelMetadata = modelMetadata[defaultModel];
+      const maxTokens = getMaxTokenLimit(defaultModelMetadata);
+
+      const defaults = buildDefaultFormValues({
+        version: {
+          configData: {
+            llm: {
+              model: defaultModel,
+              maxTokens,
+            },
+          },
+        },
+      });
+
+      const formValues = {
+        ...defaults,
+        version: {
+          ...defaults.version,
+          configData: {
+            ...defaults.version.configData,
+            llm: {
+              ...defaults.version.configData.llm,
+              ...props.initialLocalConfig.llm,
+            },
+            messages:
+              props.initialLocalConfig.messages.length > 0
+                ? (props.initialLocalConfig
+                    .messages as typeof defaults.version.configData.messages)
+                : defaults.version.configData.messages,
+            inputs:
+              props.initialLocalConfig.inputs.length > 0
+                ? (props.initialLocalConfig
+                    .inputs as typeof defaults.version.configData.inputs)
+                : defaults.version.configData.inputs,
+            outputs:
+              props.initialLocalConfig.outputs.length > 0
+                ? (props.initialLocalConfig
+                    .outputs as typeof defaults.version.configData.outputs)
+                : defaults.version.configData.outputs,
+          },
+        },
+      };
+
+      setConfigValues(formValues);
+      isFormInitializedRef.current = true;
+      methods.reset(formValues);
+      initializedTargetIdRef.current = targetId;
+      setIsFormInitialized(true);
+
     } else if (!promptId && modelMetadata) {
       // New prompt - use defaults with model's max tokens
       // Wait for modelMetadata to be loaded before initializing
@@ -497,6 +551,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   }, [
     isOpen,
     promptQuery.data,
+    promptQuery.isLoading,
     promptId,
     props.initialLocalConfig,
     methods,

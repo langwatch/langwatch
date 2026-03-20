@@ -128,12 +128,37 @@ describe("SignaturePromptEditorBridge", () => {
       expect(mockNodeDataToLocalPromptConfig).not.toHaveBeenCalled();
     });
 
-    it("returns undefined when node has promptId", () => {
+    it("falls back to nodeDataToLocalPromptConfig when node has promptId but no localPromptConfig", () => {
+      const fallbackConfig: LocalPromptConfig = {
+        llm: { model: "gpt-4" },
+        messages: [{ role: "system", content: "You are helpful" }],
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+      };
+      mockNodeDataToLocalPromptConfig.mockReturnValue(fallbackConfig);
+
+      const node = createSignatureNode({
+        promptId: "prompt-from-other-project",
+        parameters: [
+          { identifier: "llm", type: "llm", value: { model: "gpt-4" } },
+          { identifier: "instructions", type: "str", value: "You are helpful" },
+        ],
+      });
+      render(<SignaturePromptEditorBridge node={node} />);
+
+      // Bridge should provide fallback so the drawer can use it when DB query returns null
+      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
+      expect(capturedProps.initialLocalConfig).toBe(fallbackConfig);
+    });
+
+    it("returns undefined when node has promptId but no inline parameters", () => {
+      mockNodeDataToLocalPromptConfig.mockReturnValue(undefined);
+
       const node = createSignatureNode({ promptId: "prompt-123" });
       render(<SignaturePromptEditorBridge node={node} />);
 
+      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
       expect(capturedProps.initialLocalConfig).toBeUndefined();
-      expect(mockNodeDataToLocalPromptConfig).not.toHaveBeenCalled();
     });
 
     it("falls back to nodeDataToLocalPromptConfig when no promptId and no localPromptConfig", () => {
