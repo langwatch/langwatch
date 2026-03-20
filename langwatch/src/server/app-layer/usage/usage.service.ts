@@ -10,10 +10,12 @@ import {
   type UsageUnit,
 } from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
-import { getClickHouseClient } from "../../clickhouse/client";
 import { env } from "~/env.mjs";
+import { ScenarioSetLimitExceededError } from "./errors";
+import type { SimulationRunService } from "../simulations/simulation-run.service";
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
+const MAX_FREE_SCENARIO_SETS = 3;
 
 export interface UsageLimitResult {
   exceeded: boolean;
@@ -34,6 +36,7 @@ export interface UsageLimitResult {
 export class UsageService {
   private readonly cache: TtlCache<number>;
   private readonly decisionCache: TtlCache<MeterDecision>;
+  private readonly scenarioSetCache: TtlCache<Set<string>>;
 
   constructor(
     private readonly organizationService: OrganizationService,
@@ -41,9 +44,12 @@ export class UsageService {
     private readonly eventUsageService: EventUsageService,
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
+    private readonly simulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds">,
+    private readonly clickhouseAvailable: boolean,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
     this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
+    this.scenarioSetCache = new TtlCache<Set<string>>(CACHE_TTL_MS);
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
@@ -74,6 +80,68 @@ export class UsageService {
       };
     }
     return { exceeded: false };
+  }
+
+  /**
+   * Checks whether the organization may use the given scenario set ID.
+   *
+   * Known sets (cached) are allowed immediately. Unknown sets trigger a
+   * query via the simulation service to count distinct external scenario
+   * sets across all org projects. If the count is at or above the plan
+   * limit and the set is new, throws ScenarioSetLimitExceededError.
+   */
+  async checkScenarioSetLimit({
+    organizationId,
+    scenarioSetId,
+  }: {
+    organizationId: string;
+    scenarioSetId: string;
+  }): Promise<void> {
+    // Fast path: set is already known from a recent check
+    const cached = this.scenarioSetCache.get(organizationId);
+    if (cached?.has(scenarioSetId)) {
+      return;
+    }
+
+    const plan = await this.planResolver(organizationId);
+    const maxScenarioSets =
+      plan.free && !plan.overrideAddingLimitations
+        ? MAX_FREE_SCENARIO_SETS
+        : Infinity;
+
+    // Use cached set for counting if available; only query ClickHouse on cold start.
+    // This prevents the async event-sourcing delay from resetting the count:
+    // events are written to ClickHouse asynchronously, so a fresh query may
+    // return stale data and overwrite sets we already know about.
+    let knownSets: Set<string>;
+    if (cached) {
+      knownSets = cached;
+    } else {
+      const projectIds =
+        await this.organizationService.getProjectIds(organizationId);
+      if (projectIds.length === 0) {
+        const newSet = new Set([scenarioSetId]);
+        this.scenarioSetCache.set(organizationId, newSet);
+        return;
+      }
+
+      knownSets =
+        await this.simulationRunService.getDistinctExternalSetIds({ projectIds });
+      this.scenarioSetCache.set(organizationId, knownSets);
+    }
+
+    // If this set already exists, allow
+    if (knownSets.has(scenarioSetId)) {
+      return;
+    }
+
+    // This is a new set -- check against limit
+    if (knownSets.size >= maxScenarioSets) {
+      throw new ScenarioSetLimitExceededError(knownSets.size, maxScenarioSets);
+    }
+
+    // Allowed: record the new set in the cache
+    knownSets.add(scenarioSetId);
   }
 
   /**
@@ -181,7 +249,7 @@ export class UsageService {
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
       isFree: plan.free,
-      clickhouseAvailable: !!getClickHouseClient(),
+      clickhouseAvailable: this.clickhouseAvailable,
     });
 
     return decision;
@@ -191,6 +259,7 @@ export class UsageService {
   clearCache(): void {
     this.cache.clear();
     this.decisionCache.clear();
+    this.scenarioSetCache.clear();
   }
 }
 

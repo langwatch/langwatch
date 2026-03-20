@@ -18,6 +18,7 @@ import {
   Collapsible,
   HStack,
   Input,
+  Skeleton,
   Text,
   Textarea,
   VStack,
@@ -25,7 +26,7 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   useDrawer,
   useDrawerParams,
@@ -38,7 +39,8 @@ import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
-import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
+import { useArchivedItemsResolution } from "./useArchivedItemsResolution";
+import { useSuiteRunMutation } from "./useSuiteRunMutation";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { TargetPicker } from "./TargetPicker";
 
@@ -63,9 +65,10 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
 
 export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, drawerOpen } = useDrawer();
+  const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const params = useDrawerParams();
   const utils = api.useContext();
 
@@ -78,7 +81,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const onRunRequested = callbacks?.onRunRequested;
 
   // Fetch suite data when editing
-  const { data: suite } = api.suites.getById.useQuery(
+  const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
     { projectId: project?.id ?? "", id: suiteId ?? "" },
     { enabled: !!project && !!suiteId && isOpen },
   );
@@ -100,7 +103,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   );
 
   const isEditMode = !!suiteId;
-  const title = isEditMode ? "Edit Suite" : "New Suite";
+  const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
 
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
@@ -111,39 +114,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     prompts,
   });
 
-  const hasArchived =
-    suiteForm.archivedScenarioIds.length > 0 ||
-    suiteForm.archivedTargets.length > 0;
-
-  const { data: archivedNames } = api.suites.resolveArchivedNames.useQuery(
-    {
-      projectId: project?.id ?? "",
-      scenarioIds: suiteForm.archivedScenarioIds.map((s) => s.id),
-      targets: suiteForm.archivedTargets.map((t) => ({
-        type: t.type,
-        referenceId: t.referenceId,
-      })),
-    },
-    { enabled: !!project && hasArchived },
-  );
-
-  const archivedScenariosWithNames = useMemo(
-    () =>
-      suiteForm.archivedScenarioIds.map((s) => ({
-        id: s.id,
-        name: archivedNames?.scenarios[s.id] ?? s.id,
-      })),
-    [suiteForm.archivedScenarioIds, archivedNames],
-  );
-
-  const archivedTargetsWithNames = useMemo(
-    () =>
-      suiteForm.archivedTargets.map((t) => ({
-        ...t,
-        name: archivedNames?.targets[t.referenceId] ?? t.referenceId,
-      })),
-    [suiteForm.archivedTargets, archivedNames],
-  );
+  const { archivedScenariosWithNames, archivedTargetsWithNames } =
+    useArchivedItemsResolution({
+      archivedScenarioIds: suiteForm.archivedScenarioIds,
+      archivedTargets: suiteForm.archivedTargets,
+      projectId: project?.id,
+    });
 
   const { form } = suiteForm;
   const errors = form.formState.errors;
@@ -156,14 +132,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onSaved?.(data);
       closeDrawer();
       toaster.create({
-        title: "Suite created",
+        title: "Run plan created",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to create suite",
+        title: "Failed to create run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -181,18 +157,24 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onSaved?.(data);
       closeDrawer();
       toaster.create({
-        title: "Suite updated",
+        title: "Run plan updated",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to update suite",
+        title: "Failed to update run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
       });
+    },
+  });
+
+  const { runMutation } = useSuiteRunMutation({
+    onEditSuite: (suiteId) => {
+      openDrawer("suiteEditor", { urlParams: { suiteId } });
     },
   });
 
@@ -217,10 +199,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
 
       const onSuccess = (saved: SimulationSuite) => {
         closeDrawer();
-        // Defer opening the confirmation dialog so the drawer close
-        // animation and focus management complete first — otherwise the
-        // drawer's close event cascades and immediately dismisses the dialog.
-        setTimeout(() => onRunRequested?.(saved), 150);
+        if (onRunRequested) {
+          onRunRequested(saved);
+        } else {
+          runMutation.mutate({ projectId: payload.projectId, id: saved.id, idempotencyKey });
+        }
       };
 
       if (isEditMode && suite) {
@@ -267,6 +250,18 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         </Drawer.Header>
 
         <Drawer.Body>
+          {isEditMode && isSuiteLoading ? (
+            <VStack gap={4} align="stretch">
+              <Skeleton height="20px" width="60px" />
+              <Skeleton height="40px" />
+              <Skeleton height="20px" width="80px" />
+              <Skeleton height="80px" />
+              <Skeleton height="20px" width="70px" />
+              <Skeleton height="120px" />
+              <Skeleton height="20px" width="60px" />
+              <Skeleton height="120px" />
+            </VStack>
+          ) : (
           <VStack gap={4} align="stretch">
             {/* Name */}
             <VStack align="start" gap={1}>
@@ -274,12 +269,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 Name *
               </Text>
               <Input
-                placeholder="e.g., Critical Path Suite"
+                placeholder="e.g., Critical Path Run Plan"
                 {...form.register("name")}
                 borderColor={errors.name ? "red.500" : undefined}
               />
               {errors.name && (
-                <Text fontSize="xs" color="red.500">
+                <Text fontSize="xs" color="red.fg">
                   {errors.name.message}
                 </Text>
               )}
@@ -294,18 +289,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 placeholder="Core journeys that must pass before deploy"
                 {...form.register("description")}
                 rows={2}
-              />
-            </VStack>
-
-            {/* Labels */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Labels
-              </Text>
-              <InlineTagsInput
-                value={suiteForm.labels}
-                onChange={(newLabels) => form.setValue("labels", newLabels)}
-                placeholder="Add label..."
               />
             </VStack>
 
@@ -332,7 +315,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 onRemoveArchived={suiteForm.removeArchivedScenario}
               />
               {errors.selectedScenarioIds && (
-                <Text fontSize="xs" color="red.500">
+                <Text fontSize="xs" color="red.fg">
                   {errors.selectedScenarioIds.message}
                 </Text>
               )}
@@ -359,7 +342,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 onRemoveArchived={suiteForm.removeArchivedTarget}
               />
               {errors.selectedTargets && (
-                <Text fontSize="xs" color="red.500">
+                <Text fontSize="xs" color="red.fg">
                   {errors.selectedTargets.message}
                 </Text>
               )}
@@ -411,7 +394,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                       </Text>
                     </HStack>
                     {errors.repeatCount && (
-                      <Text fontSize="xs" color="red.500">
+                      <Text fontSize="xs" color="red.fg">
                         {errors.repeatCount.message}
                       </Text>
                     )}
@@ -420,6 +403,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               </Collapsible.Content>
             </Collapsible.Root>
           </VStack>
+          )}
         </Drawer.Body>
 
         <Drawer.Footer>

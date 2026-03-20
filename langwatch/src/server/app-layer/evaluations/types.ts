@@ -16,6 +16,7 @@ export const evaluationRunDataSchema = z.object({
   passed: z.boolean().nullable(),
   label: z.string().nullable(),
   details: z.string().nullable(),
+  inputs: z.record(z.unknown()).nullable(),
   error: z.string().nullable(),
   errorDetails: z.string().nullable(),
   createdAt: z.number(),

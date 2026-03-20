@@ -366,6 +366,156 @@ describe("BatchEvaluationRepository Integration", () => {
       expect(target2Eval?.passed).toBe(false);
     });
 
+    it("merges new targets without replacing existing ones", async () => {
+      const runId = `run_${nanoid()}`;
+      createdRunIds.push(runId);
+
+      await repository.create({
+        projectId: project.id,
+        experimentId,
+        runId,
+        total: 2,
+        targets: [{ id: "target-1", name: "Target 1", type: "prompt" }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Upsert with a new target-2
+      await repository.upsertResults({
+        projectId: project.id,
+        experimentId,
+        runId,
+        dataset: [
+          {
+            index: 0,
+            target_id: "target-2",
+            entry: { question: "Hello" },
+          },
+        ],
+        progress: 1,
+        targets: [{ id: "target-2", name: "Target 2", type: "prompt" }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const result = await repository.getByRunId({
+        projectId: project.id,
+        experimentId,
+        runId,
+      });
+
+      // Both target-1 (from create) and target-2 (from upsertResults) must exist
+      expect(result?.targets).toHaveLength(2);
+      expect(result?.targets?.find((t) => t.id === "target-1")).toBeDefined();
+      expect(result?.targets?.find((t) => t.id === "target-2")).toBeDefined();
+    });
+
+    it("deduplicates targets by id", async () => {
+      const runId = `run_${nanoid()}`;
+      createdRunIds.push(runId);
+
+      await repository.create({
+        projectId: project.id,
+        experimentId,
+        runId,
+        total: 2,
+        targets: [{ id: "target-1", name: "Target 1", type: "prompt" }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Upsert target-2 once
+      await repository.upsertResults({
+        projectId: project.id,
+        experimentId,
+        runId,
+        dataset: [
+          {
+            index: 0,
+            target_id: "target-2",
+            entry: { question: "Hello" },
+          },
+        ],
+        progress: 1,
+        targets: [{ id: "target-2", name: "Target 2", type: "prompt" }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Upsert target-2 again (duplicate)
+      await repository.upsertResults({
+        projectId: project.id,
+        experimentId,
+        runId,
+        dataset: [
+          {
+            index: 1,
+            target_id: "target-2",
+            entry: { question: "World" },
+          },
+        ],
+        progress: 2,
+        targets: [{ id: "target-2", name: "Target 2", type: "prompt" }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const result = await repository.getByRunId({
+        projectId: project.id,
+        experimentId,
+        runId,
+      });
+
+      // target-2 must not be duplicated — still 2 targets total
+      expect(result?.targets).toHaveLength(2);
+    });
+
+    it("preserves existing targets when upsertResults called without targets", async () => {
+      const runId = `run_${nanoid()}`;
+      createdRunIds.push(runId);
+
+      await repository.create({
+        projectId: project.id,
+        experimentId,
+        runId,
+        total: 2,
+        targets: [
+          { id: "target-1", name: "Target 1", type: "prompt" },
+          { id: "target-2", name: "Target 2", type: "prompt" },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Upsert without providing targets
+      await repository.upsertResults({
+        projectId: project.id,
+        experimentId,
+        runId,
+        dataset: [
+          {
+            index: 0,
+            target_id: "target-1",
+            entry: { question: "Hello" },
+          },
+        ],
+        progress: 1,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const result = await repository.getByRunId({
+        projectId: project.id,
+        experimentId,
+        runId,
+      });
+
+      // Existing targets must not be cleared when upsertResults is called without targets
+      expect(result?.targets).toHaveLength(2);
+      expect(result?.targets?.find((t) => t.id === "target-1")).toBeDefined();
+      expect(result?.targets?.find((t) => t.id === "target-2")).toBeDefined();
+    });
+
     it("does not duplicate entries on re-upsert", async () => {
       const runId = `run_${nanoid()}`;
       createdRunIds.push(runId);

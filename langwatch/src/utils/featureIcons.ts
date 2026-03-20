@@ -6,6 +6,7 @@ import {
   BookText,
   Bot,
   CheckSquare,
+  Drama,
   FileText,
   FolderOpen,
   Home,
@@ -70,28 +71,28 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     label: "Simulations",
   },
   scenarios: {
-    icon: FileText,
+    icon: Drama,
     color: "pink.500",
     label: "Scenarios",
   },
   simulation_runs: {
     icon: PlayCircle,
     color: "pink.500",
-    label: "Runs",
+    label: "Run History",
   },
   suites: {
     icon: FolderOpen,
     color: "pink.500",
-    label: "Suites",
+    label: "Run Plans",
   },
   evaluations: {
     icon: CheckSquare,
-    color: "orange.500",
+    color: "green.500",
     label: "Evaluations",
   },
   workflows: {
     icon: Workflow,
-    color: "green.500",
+    color: "blue.500",
     label: "Workflows",
   },
   prompts: {
@@ -121,7 +122,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   },
   evaluators: {
     icon: Percent,
-    color: "orange.500",
+    color: "green.500",
     label: "Evaluators",
   },
 };

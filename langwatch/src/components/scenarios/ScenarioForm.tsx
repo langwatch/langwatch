@@ -14,7 +14,6 @@ import { useEffect, useRef } from "react";
 import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { CriteriaInput } from "./ui/CriteriaInput";
-import { InlineTagsInput } from "./ui/InlineTagsInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
 /**
@@ -101,35 +100,14 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     <VStack align="stretch" gap={6}>
       {/* SCENARIO Section */}
       <VStack align="stretch" gap={3}>
-        <SectionHeader>Scenario</SectionHeader>
-
         {/* Name */}
         <Field.Root invalid={!!errors.name}>
-          <Field.Label fontWeight="medium">Name</Field.Label>
+          <SectionHeader>Name</SectionHeader>
           <Input
             {...register("name")}
             placeholder="e.g., Angry refund request"
           />
           <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
-        </Field.Root>
-
-        {/* Labels */}
-        <Field.Root>
-          <Field.Label fontWeight="medium">Labels</Field.Label>
-          <Field.HelperText margin={0} marginBottom={2} fontSize="13px">
-            Use labels for filtering, e.g. critical, billing, edge-case
-          </Field.HelperText>
-          <Controller
-            name="labels"
-            control={control}
-            render={({ field }) => (
-              <InlineTagsInput
-                value={field.value}
-                onChange={field.onChange}
-                placeholder="Add label..."
-              />
-            )}
-          />
         </Field.Root>
       </VStack>
 
@@ -174,6 +152,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
+
     </VStack>
   );
 }

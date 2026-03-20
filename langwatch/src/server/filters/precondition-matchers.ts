@@ -26,7 +26,6 @@ export interface PreconditionTraceData {
   spanTypes?: string[] | null;
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
-  satisfactionScore?: number | null;
   hasAnnotation?: boolean | null;
   events?: Array<{
     event_type: string;
@@ -80,7 +79,7 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   output: (data) => data.output,
 
   // Trace fields
-  "traces.origin": (data) => data.origin || "application",
+  "traces.origin": (data) => data.origin ?? null,
   "traces.error": (data) =>
     data.hasError != null ? (data.hasError ? "true" : "false") : "false",
 

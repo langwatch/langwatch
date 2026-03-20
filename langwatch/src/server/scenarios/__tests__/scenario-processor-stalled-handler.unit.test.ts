@@ -33,7 +33,11 @@ vi.mock("bullmq", () => ({
 
 // Mock redis connection
 vi.mock("../../redis", () => ({
-  connection: { host: "localhost", port: 6379 },
+  connection: {
+    host: "localhost",
+    port: 6379,
+    duplicate: vi.fn(() => ({ on: vi.fn(), subscribe: vi.fn().mockResolvedValue(undefined), disconnect: vi.fn() })),
+  },
 }));
 
 vi.mock("~/utils/logger/server", () => ({

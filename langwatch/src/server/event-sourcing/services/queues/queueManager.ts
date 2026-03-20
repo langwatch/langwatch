@@ -105,7 +105,7 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   private key(
-    type: "handler" | "projection" | "command" | "reactor",
+    type: "handler" | "projection" | "command" | "reactor" | "job",
     name: string,
   ): string {
     return `${type}:${name}`;
@@ -631,5 +631,61 @@ export class QueueManager<EventType extends Event = Event> {
       [...this.queues.values()].map((q) => q.close()),
     );
     this.logger.debug({ queueCount: this.queues.size }, "All queues closed");
+  }
+
+  /**
+   * Registers a standalone job in the global queue.
+   *
+   * Unlike handler/projection/reactor queues that are tied to event processing,
+   * standalone jobs are independent work items (e.g. deferred evaluation checks).
+   *
+   * Returns `null` when the global queue is not available (event sourcing disabled).
+   */
+  registerJob<P extends Record<string, unknown>>({
+    name,
+    process,
+    delay,
+    deduplication,
+    groupKeyFn,
+    scoreFn,
+    spanAttributes,
+  }: {
+    name: string;
+    process: (payload: P) => Promise<void>;
+    delay?: number;
+    deduplication?: DeduplicationConfig<P>;
+    groupKeyFn?: (payload: P) => string;
+    scoreFn?: (payload: P) => number;
+    spanAttributes?: (payload: P) => Record<string, string | number | boolean>;
+  }): EventSourcedQueueProcessor<P> | null {
+    if (!this.globalQueue || !this.globalJobRegistry) {
+      return null;
+    }
+
+    const entry: JobRegistryEntry = {
+      groupKeyFn: groupKeyFn
+        ? this.buildGroupKey({
+            jobPath: `job/${name}`,
+            getTenantId: (payload: any) => String(payload.tenantId),
+            domainKeyFn: groupKeyFn as any,
+          })
+        : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
+      scoreFn: scoreFn
+        ? (scoreFn as any)
+        : (payload: any) => (payload.occurredAt as number) ?? 0,
+      process: process as any,
+      delay,
+      deduplication: deduplication
+        ? resolveDeduplicationStrategy(
+            deduplication as any,
+            (payload: any) => `${String(payload.tenantId)}:${name}`,
+          )
+        : undefined,
+      spanAttributes: spanAttributes as any,
+    };
+
+    const facade = this.createFacade<P>("job", name, entry);
+    this.queues.set(this.key("job", name), facade);
+    return facade;
   }
 }

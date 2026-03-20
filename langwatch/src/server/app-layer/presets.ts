@@ -25,6 +25,11 @@ import { NullOrganizationRepository } from "./organizations/repositories/organiz
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
+import { DspyStepService } from "./dspy-steps/dspy-step.service";
+import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
+import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
+import { SimulationRunService } from "./simulations/simulation-run.service";
+import { SuiteRunService } from "./suites/suite-run.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-record-storage.clickhouse.repository";
@@ -59,6 +64,7 @@ import { OrganizationRepository } from "../repositories/organization.repository"
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import { traced } from "./tracing";
@@ -149,6 +155,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationExecutionService",
   );
 
+  const dspySteps = traced(
+    new DspyStepService(
+      clickhouse ? new DspyStepClickHouseRepository(clickhouse) : new NullDspyStepRepository(),
+    ),
+    "DspyStepService",
+  );
+  const simulationReads = SimulationRunService.create(clickhouse);
+  // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
+
   const evaluations = {
     runs: evaluationRuns,
     execution: evaluationExecution,
@@ -165,6 +180,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     eventUsageService,
     planResolver,
     orgRepo,
+    simulationReads,
+    !!clickhouse,
   );
 
   const planProvider = config.isSaas
@@ -209,6 +226,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
 
+  const nurturing = config.customerIoApiKey
+    ? NurturingService.create({
+        config: {
+          customerIoApiKey: config.customerIoApiKey,
+          customerIoRegion: config.customerIoRegion,
+        },
+      })
+    : undefined;
+
   const es = new EventSourcing({
     clickhouse: clickhouse ?? void 0,
     redis,
@@ -230,6 +256,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usageReportingService,
   });
   const commands = registry.registerAll();
+
+  const suiteRunService = SuiteRunService.create({
+    clickhouse,
+    startSuiteRun: commands.suiteRuns.startSuiteRun,
+    queueSimulationRun: commands.simulations.queueRun,
+  });
 
   const traceCollection = traced(
     new TraceRequestCollectionService({
@@ -318,6 +350,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     traces,
     evaluations,
+    dspySteps: { steps: dspySteps },
+    simulations: { runs: simulationReads },
+    suiteRuns: { runs: suiteRunService },
     organizations,
     projects,
     tokenizer,
@@ -325,6 +360,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     planProvider,
     subscription,
     notifications,
+    nurturing,
     usageLimits,
     commands,
     _eventSourcing: es,
@@ -382,6 +418,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       runs: traced(new EvaluationRunService(new NullEvaluationRunRepository()), "EvaluationRunService"),
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
+    dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
+    simulations: { runs: SimulationRunService.create(null) },
+    suiteRuns: { runs: SuiteRunService.create({ clickhouse: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
@@ -391,15 +430,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new EventUsageService(),
       async () => FREE_PLAN,
       null,
+      SimulationRunService.create(null),
+      false,
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,
     }),
     subscription: undefined,
     notifications: NotificationService.createNull(),
+    nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop } satisfies AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
@@ -413,6 +455,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         completeExperimentRun: noop,
       } as AppCommands["experimentRuns"],
       simulations: {
+        queueRun: noop,
         startRun: noop,
         messageSnapshot: noop,
         textMessageStart: noop,
@@ -420,6 +463,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         finishRun: noop,
         deleteRun: noop,
       } as AppCommands["simulations"],
+      suiteRuns: {
+        startSuiteRun: noop,
+        recordSuiteRunItemStarted: noop,
+        completeSuiteRunItem: noop,
+      } as AppCommands["suiteRuns"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],

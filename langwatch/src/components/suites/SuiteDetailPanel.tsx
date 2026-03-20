@@ -26,7 +26,7 @@ import {
   Repeat2,
   Target,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -55,7 +55,11 @@ export function SuiteDetailPanel({
       return [];
     }
   })();
-  const jobCount =
+  // Active job count excludes archived scenarios/targets.
+  // We don't know which are archived without a query, so we use the suite's
+  // raw counts only for the header stats. The RunHistoryPanel gets the actual
+  // per-batch count from the data (via event-sourcing queueRun projections).
+  const headerJobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
 
   const [liveStats, setLiveStats] = useState<RunHistoryStats | null>(null);
@@ -66,23 +70,9 @@ export function SuiteDetailPanel({
       <Box paddingX={6} paddingY={4}>
         <HStack justify="space-between" align="start">
           <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Text fontSize="xl" fontWeight="bold">
-                {suite.name}
-              </Text>
-              {suite.labels.map((label) => (
-                <Text
-                  key={label}
-                  fontSize="xs"
-                  bg="bg.muted"
-                  px={2}
-                  py={0.5}
-                  borderRadius="md"
-                >
-                  #{label}
-                </Text>
-              ))}
-            </HStack>
+            <Text fontSize="xl" fontWeight="bold">
+              {suite.name}
+            </Text>
             {suite.description && (
               <Text fontSize="sm" color="fg.muted">
                 {suite.description}
@@ -132,7 +122,7 @@ export function SuiteDetailPanel({
               />
               <StatPill
                 icon={<Layers size={14} />}
-                value={jobCount}
+                value={headerJobCount}
                 label="executions"
                 colorScheme="gray"
               />
@@ -162,7 +152,7 @@ export function SuiteDetailPanel({
               />
               <StatPill
                 icon={<Layers size={14} />}
-                value={jobCount}
+                value={headerJobCount}
                 label="executions"
                 colorScheme="gray"
               />
@@ -178,17 +168,17 @@ export function SuiteDetailPanel({
         scenarioSetId={getSuiteSetId(suite.id)}
         onStatsReady={setLiveStats}
         period={period}
-        expectedJobCount={jobCount}
+        isRunStarting={isRunning}
       />
     </VStack>
   );
 }
 
 const pillColors: Record<string, { bg: string; color: string }> = {
-  gray: { bg: "gray.50", color: "fg.muted" },
-  purple: { bg: "purple.50", color: "purple.600" },
-  blue: { bg: "blue.50", color: "blue.600" },
-  orange: { bg: "orange.50", color: "orange.600" },
+  gray: { bg: "bg.muted", color: "fg.muted" },
+  purple: { bg: "bg.muted", color: "purple.fg" },
+  blue: { bg: "bg.muted", color: "blue.fg" },
+  orange: { bg: "bg.muted", color: "orange.fg" },
 };
 
 function StatPill({
@@ -202,16 +192,16 @@ function StatPill({
   label: string;
   colorScheme?: string;
 }) {
-  const colors = pillColors[colorScheme] ?? pillColors.gray;
+  const colors = pillColors[colorScheme] ?? pillColors["gray"]!;
   return (
     <HStack
       gap={1.5}
       paddingX={3}
       paddingY={1.5}
       borderRadius="full"
-      bg={colors!.bg}
+      bg={colors.bg}
     >
-      <Box color={colors!.color}>{icon}</Box>
+      <Box color={colors.color}>{icon}</Box>
       <Text fontSize="sm" fontWeight="semibold">
         {value}
       </Text>
@@ -256,12 +246,12 @@ export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
           <EmptyState.Indicator>
             <FolderOpen size={32} />
           </EmptyState.Indicator>
-          <EmptyState.Title>No suite selected</EmptyState.Title>
+          <EmptyState.Title>No run plan selected</EmptyState.Title>
           <EmptyState.Description>
-            Select a suite from the sidebar or create a new one
+            Select a run plan from the sidebar or create a new one
           </EmptyState.Description>
           <Button colorPalette="blue" onClick={onNewSuite}>
-            <Plus size={16} /> New Suite
+            <Plus size={16} /> New Run Plan
           </Button>
         </EmptyState.Content>
       </EmptyState.Root>

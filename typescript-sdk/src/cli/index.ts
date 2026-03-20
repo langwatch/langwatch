@@ -45,9 +45,9 @@ const pullCommand = async (): Promise<void> => {
   return pullCommandImpl();
 };
 
-const pushCommand = async (): Promise<void> => {
+const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
   const { pushCommand: pushCommandImpl } = await import("./commands/push.js");
-  return pushCommandImpl();
+  return pushCommandImpl(options);
 };
 
 const createCommand = async (name: string, options: Record<string, unknown>): Promise<void> => {
@@ -177,9 +177,11 @@ promptCmd
 promptCmd
   .command("push")
   .description("Push local prompts to the server")
-  .action(async () => {
+  .option("--force-local", "Auto-resolve conflicts by keeping local version")
+  .option("--force-remote", "Auto-resolve conflicts by keeping remote version")
+  .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
     try {
-      await pushCommand();
+      await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);

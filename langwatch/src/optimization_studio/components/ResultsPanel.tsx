@@ -45,6 +45,7 @@ import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
+import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OptimizationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
@@ -151,12 +152,6 @@ export function EvaluationResults({
 
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const hasEvaluationActivity =
-    !!experimentId ||
-    (!!evaluationState &&
-      evaluationState.status !== "idle" &&
-      evaluationState.status !== undefined);
-
   const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
@@ -164,7 +159,10 @@ export function EvaluationResults({
       experimentSlug: experimentId ? undefined : slugify(workflowId ?? ""),
     },
     {
-      enabled: !!project && !!workflowId && hasEvaluationActivity,
+      enabled: isExperimentQueryEnabled({
+        hasProject: !!project,
+        workflowId,
+      }),
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
     },

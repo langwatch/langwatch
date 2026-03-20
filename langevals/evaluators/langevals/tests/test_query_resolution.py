@@ -18,7 +18,7 @@ def test_query_resolution_conversation_evaluator_pass_for_simple_greetings():
         output="Hello, I am an assistant and I don't have feelings",
     )
     conversation = QueryResolutionEntry(conversation=[response1])
-    settings = QueryResolutionSettings(model="openai/gpt-5", max_tokens=10000)
+    settings = QueryResolutionSettings(model="openai/gpt-5-mini", max_tokens=10000)
     evaluator = QueryResolutionEvaluator(settings=settings)
     result = evaluator.evaluate(conversation)
 
@@ -37,7 +37,7 @@ def test_query_resolution_conversation_evaluator_pass():
         output="There is no president in the Netherlands. The system of government is constitutional monarchy.",
     )
     conversation = QueryResolutionEntry(conversation=[response1, response2])
-    settings = QueryResolutionSettings(model="openai/gpt-5", max_tokens=10000)
+    settings = QueryResolutionSettings(model="openai/gpt-5-mini", max_tokens=10000)
     evaluator = QueryResolutionEvaluator(settings=settings)
     result = evaluator.evaluate(conversation)
 
@@ -57,7 +57,7 @@ def test_query_resolution_conversation_evaluator_fail():
         output="There is no president in the Netherlands.",
     )
     conversation = QueryResolutionEntry(conversation=[response1, response2])
-    settings = QueryResolutionSettings(model="openai/gpt-5", max_tokens=10000)
+    settings = QueryResolutionSettings(model="openai/gpt-5-mini", max_tokens=10000)
     evaluator = QueryResolutionEvaluator(settings=settings)
     result = evaluator.evaluate(conversation)
 
@@ -73,7 +73,7 @@ def test_query_resolution_conversation_evaluator_fails_with_i_dont_know():
         output="Sorry, I don't have any information about the current time",
     )
     conversation = QueryResolutionEntry(conversation=[response1])
-    settings = QueryResolutionSettings(model="openai/gpt-5", max_tokens=10000)
+    settings = QueryResolutionSettings(model="openai/gpt-5-mini", max_tokens=10000)
     evaluator = QueryResolutionEvaluator(settings=settings)
     result = evaluator.evaluate(conversation)
 
@@ -87,7 +87,7 @@ def test_product_sentiment_polarity_evaluator_skipped_for_non_product_related_ou
     response1 = ConversationEntry(input="", output="")
     response2 = ConversationEntry(input="", output="")
     conversation = QueryResolutionEntry(conversation=[response1, response2])
-    settings = QueryResolutionSettings(model="openai/gpt-5", max_tokens=10000)
+    settings = QueryResolutionSettings(model="openai/gpt-5-mini", max_tokens=10000)
     evaluator = QueryResolutionEvaluator(settings=settings)
     result = evaluator.evaluate(conversation)
 

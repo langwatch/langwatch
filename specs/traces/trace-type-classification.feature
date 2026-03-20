@@ -9,13 +9,18 @@ Feature: Trace origin classification
   # =========================================================================
   #
   # Canonical attribute: "langwatch.origin"
-  # Values: "evaluation", "simulation", "workflow", "playground"
-  #   - Absence-based: SDKs do NOT set "application" explicitly
-  #   - Only special contexts (evaluation, simulation, workflow, playground)
-  #     set the attribute; regular application traces leave it unset
-  #   - At query time, traces without langwatch.origin are treated as "application"
-  #   - This is safer: if user code wraps an experiment call, the user's root
-  #     span has no opinion, so the child experiment span's "evaluation" is kept
+  # Values: "application", "evaluation", "simulation", "workflow", "playground"
+  #   - Explicit: SDKs set "application" on root spans for regular traces
+  #   - Special contexts (evaluation, simulation, workflow, playground)
+  #     set their respective value on the root span
+  #   - Empty/absent origin means "pending" (not yet determined), NOT "application"
+  #   - This was changed from an absence-based design because of a race condition:
+  #     when child spans arrive before the root span (which carries the origin),
+  #     the trace has no origin for up to a minute. The evaluation trigger reactor
+  #     fires after 30s and the precondition matcher was defaulting empty to
+  #     "application", causing evaluations to incorrectly fire on evaluation and
+  #     simulation traces.
+  #   - Root-span-wins-if-set semantics still apply for hoisting.
   #
   # Hoisting: Root-span-wins-if-set semantics. The root span
   #   (parentSpanId=null) overrides any previously hoisted value, but ONLY
@@ -186,18 +191,23 @@ Feature: Trace origin classification
     Then the root span contains attribute "langwatch.origin" = "simulation"
 
   @unit
-  Scenario: Regular application trace does not set langwatch.origin
-    Given a user application instrumented with the LangWatch Python or TypeScript SDK
+  Scenario: Python SDK regular trace sets origin "application"
+    Given a user application instrumented with the LangWatch Python SDK
+    When the application sends a trace to LangWatch via langwatch.trace()
+    Then the root span contains attribute "langwatch.origin" = "application"
+
+  @unit
+  Scenario: TypeScript SDK regular trace sets origin "application"
+    Given a user application instrumented with the LangWatch TypeScript SDK
     When the application sends a trace to LangWatch
-    Then no "langwatch.origin" attribute is set on the spans
-    And the trace is treated as "application" at query time
+    Then the root span contains attribute "langwatch.origin" = "application"
 
   @unit
   Scenario: Third-party OTEL instrumentation with no LangWatch SDK
     Given a user sends traces via a generic OTEL exporter without the LangWatch SDK
     When the trace arrives at LangWatch
     Then no "langwatch.origin" attribute is set on the spans
-    And the trace is treated as "application" at query time
+    And the trace origin remains empty until the deferred evaluation trigger resolves it
 
   # ===========================================================================
   # Step 1c: Cleanup of legacy tagging mechanisms
@@ -446,9 +456,17 @@ Feature: Trace origin classification
   @unit
   Scenario: Online evaluations run on application traces
     Given an online evaluation monitor is enabled for the project
-    And a trace arrives without "langwatch.origin" set
+    And a trace arrives with "langwatch.origin" = "application"
     When the evaluation trigger reactor processes the trace
     Then evaluations are triggered normally
+
+  @unit
+  Scenario: Online evaluations skip traces with empty origin
+    Given an online evaluation monitor is enabled for the project
+    And a trace arrives without "langwatch.origin" set
+    When the evaluation trigger reactor processes the trace
+    Then no evaluation is triggered for this trace
+    And the trace is deferred for later evaluation
 
   @unit
   Scenario: Online evaluations skip simulation traces

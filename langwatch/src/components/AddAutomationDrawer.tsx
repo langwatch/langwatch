@@ -458,7 +458,6 @@ export function AutomationDrawer() {
                 <DatasetSelector
                   datasets={datasets.data}
                   localStorageDatasetId={localStorageDatasetId}
-                  register={register}
                   errors={errors}
                   setValue={setValue}
                   onCreateNew={editDataset.onOpen}

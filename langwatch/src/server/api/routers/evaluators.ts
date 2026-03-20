@@ -72,6 +72,8 @@ export const evaluatorsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
+        // Generated server-side so it's present in audit log args for history lookup
+        id: z.string().default(() => `evaluator_${nanoid()}`),
         projectId: z.string(),
         name: z.string().min(1).max(255),
         type: evaluatorTypeSchema,
@@ -104,7 +106,7 @@ export const evaluatorsRouter = createTRPCRouter({
 
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       return await evaluatorService.create({
-        id: `evaluator_${nanoid()}`,
+        id: input.id,
         projectId: input.projectId,
         name: input.name,
         type: input.type,
@@ -398,6 +400,8 @@ export const evaluatorsRouter = createTRPCRouter({
         evaluatorId: z.string(),
         projectId: z.string(),
         sourceProjectId: z.string(),
+        // Generated server-side so it's present in audit log args for history lookup
+        newEvaluatorId: z.string().default(() => `evaluator_${nanoid()}`),
       }),
     )
     .use(checkProjectPermission("evaluations:manage"))
@@ -477,7 +481,7 @@ export const evaluatorsRouter = createTRPCRouter({
       const evaluatorService = EvaluatorService.create(ctx.prisma);
       try {
         const copied = await evaluatorService.create({
-          id: `evaluator_${nanoid()}`,
+          id: input.newEvaluatorId,
           projectId: input.projectId,
           name: source.name,
           type: source.type,
@@ -640,5 +644,17 @@ export const evaluatorsRouter = createTRPCRouter({
       });
 
       return { ok: true };
+    }),
+
+  /**
+   * Returns recent audit log history for a specific evaluator.
+   * Used by the "View History" drawer on the evaluators page.
+   */
+  getHistory: protectedProcedure
+    .input(z.object({ evaluatorId: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      const service = EvaluatorService.create(ctx.prisma);
+      return service.getHistory(input.evaluatorId, input.projectId);
     }),
 });

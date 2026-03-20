@@ -4,7 +4,7 @@
  * Integration tests for RunRow component.
  *
  * Tests the collapsible run row behavior: expand/collapse,
- * display of pass rate, timestamp, and scenario x target rows.
+ * display of status counts, timestamp, and scenario x target rows.
  *
  * @see specs/suites/suite-workflow.feature - "Run History List"
  */
@@ -25,7 +25,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when collapsed", () => {
-    it("displays compact status counts with icons", () => {
+    it("displays status counts as word labels", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -38,7 +38,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("2 ✓")).toBeInTheDocument();
+      expect(screen.getByText("2 passed")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
@@ -182,14 +182,14 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
-      expect(screen.getByText("2 ✓")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("2 passed")).toBeInTheDocument();
     });
   });
 
   describe("when expectedJobCount is provided", () => {
     describe("when not all jobs are done", () => {
-      it("displays progress indicator next to pass rate", () => {
+      it("displays progress indicator next to status counts", () => {
         render(
           <RunRow
             batchRun={makeBatchRun()}
@@ -329,7 +329,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when viewing summary counts in header", () => {
-    it("displays compact counts with icons and no redundant label", () => {
+    it("displays word-label counts with no redundant standalone text", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -342,8 +342,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("8 ✓")).toBeInTheDocument();
-      expect(screen.getByText("2 ✗")).toBeInTheDocument();
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.getByText("2 failed")).toBeInTheDocument();
       // No redundant standalone "passed" or "failed" text
       expect(screen.queryByText("passed")).not.toBeInTheDocument();
       expect(screen.queryByText("failed")).not.toBeInTheDocument();

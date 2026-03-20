@@ -129,7 +129,7 @@ const ORG_WITH_ADMIN = {
       user: {
         id: "user_1",
         name: "Jane Admin",
-        email: "jane@acme.com",
+        email: "jane@example.com",
       },
     },
   ],
@@ -220,7 +220,7 @@ describe("UsageLimitService", () => {
             organizationId: "org_1",
             organizationName: "Acme Corp",
             adminName: "Jane Admin",
-            adminEmail: "jane@acme.com",
+            adminEmail: "jane@example.com",
             planName: "free",
           }),
         );
@@ -358,7 +358,7 @@ describe("UsageLimitService", () => {
           organizationId: "org_1",
           organizationName: "Acme Corp",
           adminName: "Jane Admin",
-          adminEmail: "jane@acme.com",
+          adminEmail: "jane@example.com",
           planName: "Launch",
           limitType: "Workflows",
           current: 5,
@@ -503,7 +503,7 @@ describe("UsageLimitService", () => {
 
         expect(notificationService.sendUsageLimitEmail).toHaveBeenCalledWith(
           expect.objectContaining({
-            to: "jane@acme.com",
+            to: "jane@example.com",
             orgName: "Acme Corp",
             usageData: expect.objectContaining({
               crossedThreshold: 50,

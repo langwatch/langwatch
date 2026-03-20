@@ -174,15 +174,233 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
+      const pausedKeys = await service.listPausedKeys({ queueName });
+      res.json({ pausedKeys });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "paused error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/drain-all-blocked", async (req, res) => {
+    try {
+      const { queueName, queueNames, pipelineFilter, errorFilter } = req.body as {
+        queueName?: string; queueNames?: string[]; pipelineFilter?: string; errorFilter?: string;
+      };
+      const names = queueNames ?? (queueName ? [queueName] : []);
+      if (names.length === 0) {
+        res.status(400).json({ error: "queueName or queueNames is required" });
+        return;
+      }
+      for (const name of names) {
+        if (!service.isKnownQueue(name)) {
+          res.status(404).json({ error: `Unknown queue name: ${name}` });
+          return;
+        }
+      }
+
+      let totalDrained = 0;
+      let totalJobsRemoved = 0;
+      for (const name of names) {
+        const result = await service.drainAllBlocked({ queueName: name, pipelineFilter, errorFilter });
+        totalDrained += result.drainedCount;
+        totalJobsRemoved += result.jobsRemoved;
+      }
+      res.json({ ok: true, drainedCount: totalDrained, jobsRemoved: totalJobsRemoved });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "drain-all-blocked error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.get("/api/actions/drain-all-blocked/preview", async (req, res) => {
+    try {
+      const queueName = req.query.queueName as string | undefined;
+      const pipelineFilter = req.query.pipelineFilter as string | undefined;
+      const errorFilter = req.query.errorFilter as string | undefined;
+      if (!queueName) {
+        res.status(400).json({ error: "queueName query param is required" });
+        return;
+      }
       if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const pausedKeys = await service.listPausedKeys({ queueName });
-      res.json({ pausedKeys });
+      const result = await service.drainAllBlockedPreview({ queueName, pipelineFilter, errorFilter });
+      res.json(result);
     } catch (err) {
-      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "paused error" });
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "drain-preview error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/canary-unblock", async (req, res) => {
+    try {
+      const { queueName, count, pipelineFilter } = req.body as { queueName?: string; count?: number; pipelineFilter?: string };
+      if (!queueName) {
+        res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const parsedCount = count ?? 5;
+      if (!Number.isInteger(parsedCount) || parsedCount < 1) {
+        res.status(400).json({ error: "count must be a positive integer" });
+        return;
+      }
+      const result = await service.canaryUnblock({ queueName, count: parsedCount, pipelineFilter });
+      res.json({ ok: true, unblockedCount: result.unblockedCount, groupIds: result.groupIds });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "canary-unblock error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/unblock-all-batched", async (req, res) => {
+    try {
+      const { queueName, batchSize, delayMs } = req.body as { queueName?: string; batchSize?: number; delayMs?: number };
+      if (!queueName) {
+        res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      if (batchSize !== undefined && (!Number.isInteger(batchSize) || batchSize < 1)) {
+        res.status(400).json({ error: "batchSize must be a positive integer" });
+        return;
+      }
+      if (delayMs !== undefined && (!Number.isInteger(delayMs) || delayMs < 0)) {
+        res.status(400).json({ error: "delayMs must be a non-negative integer" });
+        return;
+      }
+      const result = await service.unblockAllBatched({ queueName, batchSize, delayMs });
+      res.json({ ok: true, unblockedCount: result.unblockedCount });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock-all-batched error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/canary-redrive", async (req, res) => {
+    try {
+      const { queueName, count } = req.body as { queueName?: string; count?: number };
+      if (!queueName) {
+        res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const parsedRedriveCount = count ?? 5;
+      if (!Number.isInteger(parsedRedriveCount) || parsedRedriveCount < 1) {
+        res.status(400).json({ error: "count must be a positive integer" });
+        return;
+      }
+      const result = await service.canaryRedrive({ queueName, count: parsedRedriveCount });
+      res.json({ ok: true, redrivenCount: result.redrivenCount, groupIds: result.groupIds });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "canary-redrive error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/move-to-dlq", async (req, res) => {
+    try {
+      const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
+      if (!queueName || !groupId) {
+        res.status(400).json({ error: "queueName and groupId are required" });
+        return;
+      }
+      if (!isValidGroupId(groupId)) {
+        res.status(400).json({ error: "Invalid groupId format" });
+        return;
+      }
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const result = await service.moveToDlq({ queueName, groupId });
+      res.json({ ok: true, jobsMoved: result.jobsMoved });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "move-to-dlq error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/move-all-blocked-to-dlq", async (req, res) => {
+    try {
+      const { queueName, queueNames, pipelineFilter, errorFilter } = req.body as {
+        queueName?: string; queueNames?: string[]; pipelineFilter?: string; errorFilter?: string;
+      };
+      const names = queueNames ?? (queueName ? [queueName] : []);
+      if (names.length === 0) {
+        res.status(400).json({ error: "queueName or queueNames is required" });
+        return;
+      }
+      for (const name of names) {
+        if (!service.isKnownQueue(name)) {
+          res.status(404).json({ error: `Unknown queue name: ${name}` });
+          return;
+        }
+      }
+
+      let totalMoved = 0;
+      let totalJobsMoved = 0;
+      for (const name of names) {
+        const result = await service.moveAllBlockedToDlq({ queueName: name, pipelineFilter, errorFilter });
+        totalMoved += result.movedCount;
+        totalJobsMoved += result.jobsMoved;
+      }
+      res.json({ ok: true, movedCount: totalMoved, jobsMoved: totalJobsMoved });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "move-all-blocked-to-dlq error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/replay-from-dlq", async (req, res) => {
+    try {
+      const { queueName, groupId, all } = req.body as { queueName?: string; groupId?: string; all?: unknown };
+      if (!queueName) {
+        res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+      if (all !== undefined && typeof all !== "boolean") {
+        res.status(400).json({ error: "`all` must be a boolean" });
+        return;
+      }
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      if (all === true) {
+        const result = await service.replayAllFromDlq({ queueName });
+        res.json({ ok: true, replayedCount: result.replayedCount, jobsReplayed: result.jobsReplayed });
+      } else {
+        if (!groupId) {
+          res.status(400).json({ error: "groupId is required when all is not set" });
+          return;
+        }
+        if (!isValidGroupId(groupId)) {
+          res.status(400).json({ error: "Invalid groupId format" });
+          return;
+        }
+        const result = await service.replayFromDlq({ queueName, groupId });
+        res.json({ ok: true, jobsReplayed: result.jobsReplayed });
+      }
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "replay-from-dlq error" });
       res.status(500).json({ error: "Internal error" });
     }
   });

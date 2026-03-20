@@ -25,7 +25,7 @@ import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
-import { captureException } from "../utils/posthogErrorCapture";
+import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
 
 const logger = createLogger("langwatch:auth");
 
@@ -77,6 +77,8 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
+        fireActivityTrackingNurturing({ userId: user_.id });
+
         return {
           ...session,
           user: {
@@ -86,6 +88,8 @@ export const authOptions = (
           },
         };
       }
+
+      fireActivityTrackingNurturing({ userId: user.id });
 
       return {
         ...session,
@@ -106,6 +110,10 @@ export const authOptions = (
         where: { email: user.email },
       });
 
+      if (existingUser?.deactivatedAt) {
+        return false;
+      }
+
       const domain = user.email.split("@")[1];
       const orgWithSsoDomain = await prisma.organization.findFirst({
         where: {
@@ -113,16 +121,23 @@ export const authOptions = (
         },
       });
 
-      if (existingUser?.pendingSsoSetup && account?.provider) {
-        await linkExistingUserToOAuthProvider(existingUser, account);
-
-        return true;
+      // SSO flow for orgs with ssoDomain configured:
+      // - Existing user + correct SSO provider → auto-link account (replaces old auth method)
+      // - Existing user + wrong provider → block with SSO_PROVIDER_NOT_ALLOWED
+      if (existingUser && account && orgWithSsoDomain) {
+        if (isSsoProviderMatch(orgWithSsoDomain, account)) {
+          await linkExistingUserToOAuthProvider(existingUser, account);
+          return true;
+        }
+        throw new Error("SSO_PROVIDER_NOT_ALLOWED");
       }
-      // If the user is trying to sign in without their SSO provider, throw an error
+
+      // Block non-SSO sign-in attempts for users whose domain has SSO enforced
       if (orgWithSsoDomain && account) {
         await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
       }
 
+      // New user with matching SSO domain → auto-create and add to org
       if (domain && account && orgWithSsoDomain && !existingUser) {
         await createUserAndAddToOrganization(
           user,
@@ -341,68 +356,78 @@ const createUserAndAddToOrganization = async (
   return newUser;
 };
 
+/**
+ * Links (or re-links) an existing user to their SSO OAuth account.
+ * Uses upsert so it's idempotent: first login creates the link,
+ * subsequent logins just refresh tokens. Old auth methods for the
+ * same provider are removed in the same transaction.
+ */
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
   account: NextAuthAccount,
 ) => {
-  // Wrap operations in a transaction
-  try {
-    await prisma.$transaction([
-      // Create the account link first
-      prisma.account.create({
-        data: {
-          userId: existingUser.id,
-          type: account.type ?? "oauth",
+  const accountData = {
+    userId: existingUser.id,
+    type: account.type ?? "oauth",
+    provider: account.provider,
+    providerAccountId: account.providerAccountId,
+    access_token: account.access_token,
+    refresh_token: account.refresh_token,
+    expires_at: account.expires_at,
+    token_type: account.token_type,
+    scope: account.scope,
+    id_token: account.id_token,
+  };
+
+  await prisma.$transaction([
+    prisma.account.upsert({
+      where: {
+        provider_providerAccountId: {
           provider: account.provider,
           providerAccountId: account.providerAccountId,
-          access_token: account.access_token,
-          refresh_token: account.refresh_token,
-          expires_at: account.expires_at,
-          token_type: account.token_type,
-          scope: account.scope,
-          id_token: account.id_token,
         },
-      }),
+      },
+      create: accountData,
+      update: {
+        access_token: account.access_token,
+        refresh_token: account.refresh_token,
+        expires_at: account.expires_at,
+        token_type: account.token_type,
+        scope: account.scope,
+        id_token: account.id_token,
+      },
+    }),
+    prisma.account.deleteMany({
+      where: {
+        userId: existingUser.id,
+        provider: account.provider,
+        providerAccountId: { not: account.providerAccountId },
+      },
+    }),
+  ]);
+};
 
-      // Delete old accounts with the same provider (except the one we just created)
-      prisma.account.deleteMany({
-        where: {
-          userId: existingUser.id,
-          provider: account.provider,
-          providerAccountId: { not: account.providerAccountId },
-        },
-      }),
-      prisma.user.update({
-        where: { id: existingUser.id },
-        data: { pendingSsoSetup: false },
-      }),
-    ]);
-  } catch (error: any) {
-    // Tying to link an account that already exists will throw a P2002 error, let's ignore it
-    if (error.code === "P2002") {
-      captureException(error);
-      return;
-    } else {
-      throw error;
-    }
-  }
+/**
+ * Checks if the incoming account matches the org's configured SSO provider.
+ * For Auth0: matches via providerAccountId prefix (e.g. "waad|connection-name")
+ * For direct NextAuth providers: matches via provider name (e.g. "google", "okta")
+ */
+const isSsoProviderMatch = (
+  org: Organization,
+  account: NextAuthAccount,
+): boolean => {
+  if (!org.ssoProvider) return false;
+  return (
+    account.providerAccountId.startsWith(org.ssoProvider) ||
+    account.provider === org.ssoProvider
+  );
 };
 
 const checkIfSsoProviderIsAllowed = async (
   org: Organization,
   provider: NextAuthAccount,
 ) => {
-  if (
-    org?.ssoProvider &&
-    !(
-      // Auth0
-      (
-        provider.providerAccountId.startsWith(org.ssoProvider) ||
-        // NextAuth
-        provider.provider === org.ssoProvider
-      )
-    )
-  ) {
+  if (org?.ssoProvider && !isSsoProviderMatch(org, provider)) {
     throw new Error("SSO_PROVIDER_NOT_ALLOWED");
   }
 

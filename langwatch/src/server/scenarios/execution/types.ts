@@ -202,6 +202,8 @@ export const ScenarioExecutionResultSchema = z.object({
   runId: z.string().optional(),
   reasoning: z.string().optional(),
   error: z.string().optional(),
+  /** When true, the job was cancelled by user (not a crash/error). */
+  cancelled: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema
@@ -218,6 +220,8 @@ export type ScenarioExecutionResult = z.infer<
 export const ChildProcessJobDataSchema = z.object({
   context: ExecutionContextSchema,
   scenario: ScenarioConfigSchema,
+  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+  scenarioRunId: z.string().optional(),
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),

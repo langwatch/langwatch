@@ -2,14 +2,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   CloseButton,
-  Container,
   Heading,
   HStack,
   Icon,
   Portal,
-  Progress,
   Skeleton,
   Spacer,
   Spinner,
@@ -21,7 +18,6 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
 import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
@@ -55,13 +51,15 @@ import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { RedactedField } from "../ui/RedactedField";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { ExportConfigDialog } from "./ExportConfigDialog";
+import { ExportProgress } from "./ExportProgress";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
+import { useExportTraces } from "./useExportTraces";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -92,6 +90,29 @@ export function MessagesTable({
   } = usePeriodSelector();
 
   const navigationFooter = useNavigationFooter();
+
+  const {
+    isDialogOpen: isExportDialogOpen,
+    openExportDialog: openExportDialogRaw,
+    closeExportDialog,
+    isExporting,
+    progress: exportProgress,
+    startExport,
+    cancelExport,
+  } = useExportTraces({
+    projectId: project?.id,
+    filters: filterParams.filters,
+    startDate: filterParams.startDate,
+    endDate: filterParams.endDate,
+    query: getSingleQueryParam(router.query.query),
+  });
+
+  // Track whether the export dialog was opened for selected traces or all
+  const isSelectedExportRef = useRef(false);
+  const openExportDialog = (options: { selectedTraceIds?: string[] }) => {
+    isSelectedExportRef.current = (options.selectedTraceIds ?? []).length > 0;
+    openExportDialogRaw(options);
+  };
 
   // Live endDate that gets bumped to "now" on SSE events so the query
   // window extends to include newly-arrived traces.
@@ -220,8 +241,6 @@ export function MessagesTable({
       refetchOnMount: false,
     },
   );
-
-  const downloadTraces = api.traces.getAllForDownload.useMutation();
 
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
     Record<string, ElasticSearchEvaluation[]>
@@ -560,8 +579,7 @@ export function MessagesTable({
               const displayOrigin =
                 typeof rawOrigin === "string" && rawOrigin !== ""
                   ? rawOrigin
-                  : "application";
-              const colors = getOriginColor(displayOrigin);
+                  : null;
 
               return (
                 <Table.Cell
@@ -572,15 +590,20 @@ export function MessagesTable({
                     })
                   }
                 >
-                  <Badge
-                    size="sm"
-                    paddingX={2}
-                    background={colors.background}
-                    color={colors.color}
-                    fontSize="12px"
-                  >
-                    {getOriginLabel(displayOrigin)}
-                  </Badge>
+                  {displayOrigin && (() => {
+                    const colors = getOriginColor(displayOrigin);
+                    return (
+                      <Badge
+                        size="sm"
+                        paddingX={2}
+                        background={colors.background}
+                        color={colors.color}
+                        fontSize="12px"
+                      >
+                        {getOriginLabel(displayOrigin)}
+                      </Badge>
+                    );
+                  })()}
                 </Table.Cell>
               );
             },
@@ -588,7 +611,7 @@ export function MessagesTable({
               const rawOrigin = trace.metadata["langwatch.origin"];
               return typeof rawOrigin === "string" && rawOrigin !== ""
                 ? rawOrigin
-                : "application";
+                : "";
             },
           } satisfies HeaderColumn,
         }
@@ -947,83 +970,6 @@ export function MessagesTable({
     selectedHeaderColumns,
   ).filter(([_, { enabled }]) => enabled);
 
-  const [downloadProgress, setDownloadProgress] = useState(0);
-
-  const fetchAllTraces = async () => {
-    const allGroups = [];
-    const allChecks = {};
-    let currentOffset = 0;
-    const batchSize = 5000;
-
-    setDownloadProgress(10);
-
-    const initialBatch = await downloadTraces.mutateAsync({
-      ...filterParams,
-      query: getSingleQueryParam(router.query.query),
-      groupBy: "none",
-      pageOffset: navigationFooter.pageOffset,
-      pageSize: navigationFooter.pageSize,
-      sortBy: getSingleQueryParam(router.query.sortBy),
-      sortDirection: getSingleQueryParam(router.query.orderBy),
-      includeSpans: true,
-    });
-
-    let scrollId = initialBatch.scrollId;
-    allGroups.push(...initialBatch.groups);
-    Object.assign(allChecks, initialBatch.traceChecks);
-
-    const totalHits = initialBatch.totalHits;
-    let processedItems = initialBatch.groups.length;
-    setDownloadProgress((processedItems / totalHits) * 100);
-
-    while (scrollId) {
-      const batch = await downloadTraces.mutateAsync({
-        ...filterParams,
-        query: getSingleQueryParam(router.query.query),
-        groupBy: "none",
-        pageOffset: currentOffset,
-        pageSize: batchSize,
-        sortBy: getSingleQueryParam(router.query.sortBy),
-        sortDirection: getSingleQueryParam(router.query.orderBy),
-        includeSpans: true,
-        scrollId: scrollId,
-      });
-      processedItems += batch.groups.length;
-
-      setDownloadProgress((processedItems / totalHits) * 100);
-
-      scrollId = batch.scrollId;
-
-      if (!batch.groups.length) break;
-
-      allGroups.push(...batch.groups);
-      Object.assign(allChecks, batch.traceChecks);
-      currentOffset += batchSize;
-    }
-
-    setDownloadProgress(0);
-
-    return {
-      groups: allGroups,
-      traceChecks: allChecks,
-    };
-  };
-
-  const downloadCSV = async (selection = false) => {
-    try {
-      await downloadCSV_(selection);
-    } catch (error) {
-      toaster.create({
-        title: "Error Downloading CSV",
-        description: (error as any).toString(),
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
-      console.error(error);
-    }
-  };
   const queueItem = api.annotation.createQueueItem.useMutation();
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
     [],
@@ -1064,87 +1010,6 @@ export function MessagesTable({
         },
       },
     );
-  };
-
-  const downloadCSV_ = async (selection = false) => {
-    const traceGroups_ = selection
-      ? (displayData ?? {
-          groups: [],
-          traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
-        })
-      : await fetchAllTraces();
-
-    const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
-      ([column, _]) => column !== "checked",
-    );
-
-    const evaluations: Record<string, ElasticSearchEvaluation[]> =
-      traceGroups_.traceChecks;
-
-    const getValueForColumn = (
-      trace: TraceWithGuardrail,
-      column: string,
-      name: string,
-    ) => {
-      return (
-        headerColumns[column]?.value?.(
-          trace,
-          evaluations[trace.trace_id] ?? [],
-        ) ??
-        headerColumnForEvaluation({
-          columnKey: column,
-          checkName: name,
-        }).value(trace, evaluations[trace.trace_id] ?? [])
-      );
-    };
-
-    let csv;
-    if (selection) {
-      csv = traceGroups_.groups
-        .flatMap((traceGroup) =>
-          traceGroup
-            .filter((trace) => selectedTraceIds.includes(trace.trace_id))
-            .map((trace) =>
-              checkedHeaderColumnsEntries_.map(([column, { name }]) =>
-                getValueForColumn(trace, column, name),
-              ),
-            ),
-        )
-        .filter((row) => row.some((cell) => cell !== ""));
-    } else {
-      csv = traceGroups_.groups.flatMap((traceGroup) =>
-        traceGroup.map((trace) =>
-          checkedHeaderColumnsEntries_
-            .filter(([column, _]) => column !== "checked")
-            .map(([column, { name }]) =>
-              getValueForColumn(trace, column, name),
-            ),
-        ),
-      );
-    }
-
-    const fields = checkedHeaderColumnsEntries_
-      .map(([_, { name }]) => {
-        return name;
-      })
-      .filter((field) => field !== undefined);
-
-    const csvBlob = Parse.unparse({
-      fields: fields,
-      data: csv ?? [],
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csvBlob]));
-
-    const link = document.createElement("a");
-    link.href = url;
-    const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Traces - ${formattedDate}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   };
 
   const toggleAllTraces = () => {
@@ -1193,14 +1058,12 @@ export function MessagesTable({
           <Tooltip
             disabled={navigationFooter.totalHits < 10_000}
             content={
-              navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
+              navigationFooter.totalHits >= 10_000 ? "Up to 10,000 traces" : ""
             }
           >
             <PageLayout.HeaderButton
-              variant={downloadTraces.isPending ? "ghost" : "outline"}
-              onClick={() => void downloadCSV()}
-              loading={downloadTraces.isPending}
-              loadingText="Downloading..."
+              variant="outline"
+              onClick={() => openExportDialog({})}
             >
               <Download size={16} />
               Export all
@@ -1296,19 +1159,6 @@ export function MessagesTable({
               showFilters ? "calc(100vw - 550px)" : "calc(100vw - 200px)"
             }
           >
-            {downloadProgress > 0 && (
-              <Progress.Root
-                colorPalette="orange"
-                value={downloadProgress}
-                size="xs"
-                width="full"
-                boxShadow="none"
-              >
-                <Progress.Track boxShadow="none" background="none">
-                  <Progress.Range />
-                </Progress.Track>
-              </Progress.Root>
-            )}
             {checkedHeaderColumnsEntries.length === 0 && (
               <Text>No columns selected</Text>
             )}
@@ -1446,14 +1296,16 @@ export function MessagesTable({
       {selectedTraceIds.length > 0 && (
         <Box
           position="fixed"
-          bottom={10}
+          bottom={16}
           left="50%"
           transform="translateX(-50%)"
-          backgroundColor="#ffffff"
+          zIndex={20}
+          backgroundColor="bg.emphasized"
           padding="8px"
           paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+          border="1px solid"
+          borderColor="border.muted"
+          boxShadow="lg"
           borderRadius="md"
         >
           <HStack gap={3}>
@@ -1467,7 +1319,9 @@ export function MessagesTable({
                   colorPalette="black"
                   minWidth="fit-content"
                   variant="outline"
-                  onClick={() => void downloadCSV(true)}
+                  onClick={() =>
+                    openExportDialog({ selectedTraceIds })
+                  }
                 >
                   Export <Download size={16} style={{ marginLeft: 8 }} />
                 </Button>
@@ -1536,6 +1390,25 @@ export function MessagesTable({
           </HStack>
         </Box>
       )}
+      <ExportConfigDialog
+        isOpen={isExportDialogOpen}
+        onClose={closeExportDialog}
+        onExport={startExport}
+        traceCount={
+          isSelectedExportRef.current
+            ? selectedTraceIds.length
+            : Math.min(navigationFooter.totalHits, 10_000)
+        }
+        isSelectedExport={isSelectedExportRef.current}
+      />
+      <Box position="fixed" bottom={4} right={4} zIndex={30}>
+        <ExportProgress
+          exported={exportProgress.exported}
+          total={exportProgress.total}
+          isExporting={isExporting}
+          onCancel={cancelExport}
+        />
+      </Box>
     </>
   );
 }

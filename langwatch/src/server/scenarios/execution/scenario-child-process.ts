@@ -152,7 +152,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
     {
       batchRunId: context.batchRunId,
-      runId: context.scenarioRunId,
+      runId: jobData.scenarioRunId,
       langwatch: {
         endpoint: langwatchEndpoint,
         apiKey: langwatchApiKey,

@@ -523,16 +523,33 @@ export class ScenarioEventRepository {
     nextCursor?: string;
     hasMore: boolean;
   }> {
-    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getBatchRunIdsForScenarioSet",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+        },
+      },
+      async (span) => {
+        const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
 
-    return this.queryBatchRunIds({
-      projectId,
-      limit,
-      cursor,
-      setFilter: { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
-      startDate,
-      endDate,
-    });
+        const result = await this.queryBatchRunIds({
+          projectId,
+          limit,
+          cursor,
+          setFilter: { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+          startDate,
+          endDate,
+        });
+
+        span.setAttribute("result.count", result.batchRunIds.length);
+        return result;
+      },
+    );
   }
 
   /**
@@ -558,16 +575,30 @@ export class ScenarioEventRepository {
     nextCursor?: string;
     hasMore: boolean;
   }> {
-    const result = await this.queryBatchRunIds({
-      projectId,
-      limit,
-      cursor,
-      startDate,
-      endDate,
-      trackScenarioSetIds: true,
-    });
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getBatchRunIdsForAllSuites",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+        },
+      },
+      async (span) => {
+        const result = await this.queryBatchRunIds({
+          projectId,
+          limit,
+          cursor,
+          startDate,
+          endDate,
+          trackScenarioSetIds: true,
+        });
 
-    return result;
+        span.setAttribute("result.count", result.batchRunIds.length);
+        return result;
+      },
+    );
   }
 
   /**
@@ -737,36 +768,51 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<number> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
-              { exists: { field: ES_FIELDS.batchRunId } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getBatchRunCountForScenarioSet",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
         },
-        aggs: {
-          unique_batch_run_count: {
-            cardinality: {
-              field: ES_FIELDS.batchRunId,
-            },
-          },
-        },
-        size: 0,
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+        const client = await this.getClient();
 
-    const count =
-      (response.aggregations as any)?.unique_batch_run_count?.value ?? 0;
-    return count;
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+                  { exists: { field: ES_FIELDS.batchRunId } },
+                ],
+              },
+            },
+            aggs: {
+              unique_batch_run_count: {
+                cardinality: {
+                  field: ES_FIELDS.batchRunId,
+                },
+              },
+            },
+            size: 0,
+          },
+        });
+
+        const count =
+          (response.aggregations as any)?.unique_batch_run_count?.value ?? 0;
+        span.setAttribute("result.count", count);
+        return count;
+      },
+    );
   }
 
   /**
@@ -788,35 +834,53 @@ export class ScenarioEventRepository {
     scenarioSetId: string;
     batchRunId: string;
   }): Promise<string[]> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
-    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
-              { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getScenarioRunIdsForBatchRun",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+          "batch.run.id": batchRunId,
         },
-        size: 10000, // Large size to get all scenario runs for this batch
-        sort: [{ timestamp: { order: "desc" } }],
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+        const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
+        const client = await this.getClient();
 
-    const hits = response.hits?.hits ?? [];
-    return hits
-      .map((hit) => {
-        const source = hit._source as Record<string, any>;
-        return source?.scenario_run_id as string;
-      })
-      .filter(Boolean);
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+                  { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
+                ],
+              },
+            },
+            size: 10000, // Large size to get all scenario runs for this batch
+            sort: [{ timestamp: { order: "desc" } }],
+          },
+        });
+
+        const hits = response.hits?.hits ?? [];
+        const result = hits
+          .map((hit) => {
+            const source = hit._source as Record<string, any>;
+            return source?.scenario_run_id as string;
+          })
+          .filter(Boolean);
+
+        span.setAttribute("result.count", result.length);
+        return result;
+      },
+    );
   }
 
   /**
@@ -835,58 +899,78 @@ export class ScenarioEventRepository {
     projectId: string;
     batchRunIds: string[];
   }): Promise<string[]> {
-    if (batchRunIds.length === 0) {
-      return [];
-    }
-
-    // Validate that all batchRunIds are valid strings
-    const validBatchRunIds = batchRunIds.filter(
-      (id) => typeof id === "string" && id.length > 0,
-    );
-    if (validBatchRunIds.length !== batchRunIds.length) {
-      captureException({
-        message: "Invalid batchRunIds",
-        batchRunIds,
-      });
-    }
-
-    if (validBatchRunIds.length === 0) {
-      return [];
-    }
-
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            must: [
-              { term: { [ES_FIELDS.projectId]: projectId } },
-              { terms: { [ES_FIELDS.batchRunId]: validBatchRunIds } },
-              { exists: { field: ES_FIELDS.scenarioRunId } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getScenarioRunIdsForBatchRuns",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "batch.run.ids.count": batchRunIds.length,
         },
-        aggs: {
-          unique_scenario_runs: {
-            terms: {
-              field: ES_FIELDS.scenarioRunId,
-              size: 10000,
-            },
-          },
-        },
-        size: 0,
       },
-    });
-
-    return (
-      (
-        response.aggregations?.unique_scenario_runs as {
-          buckets: Array<{ key: string }>;
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        if (batchRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return [];
         }
-      )?.buckets ?? []
-    ).map((bucket) => bucket.key);
+
+        // Validate that all batchRunIds are valid strings
+        const validBatchRunIds = batchRunIds.filter(
+          (id) => typeof id === "string" && id.length > 0,
+        );
+        if (validBatchRunIds.length !== batchRunIds.length) {
+          captureException({
+            message: "Invalid batchRunIds",
+            batchRunIds,
+          });
+        }
+
+        if (validBatchRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return [];
+        }
+
+        const client = await this.getClient();
+
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { terms: { [ES_FIELDS.batchRunId]: validBatchRunIds } },
+                  { exists: { field: ES_FIELDS.scenarioRunId } },
+                ],
+              },
+            },
+            aggs: {
+              unique_scenario_runs: {
+                terms: {
+                  field: ES_FIELDS.scenarioRunId,
+                  size: 10000,
+                },
+              },
+            },
+            size: 0,
+          },
+        });
+
+        const result = (
+          (
+            response.aggregations?.unique_scenario_runs as {
+              buckets: Array<{ key: string }>;
+            }
+          )?.buckets ?? []
+        ).map((bucket) => bucket.key);
+
+        span.setAttribute("result.count", result.length);
+        return result;
+      },
+    );
   }
 
   /**
@@ -1281,31 +1365,47 @@ export class ScenarioEventRepository {
     projectId: string;
     batchRunId: string;
   }): Promise<number> {
-    const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
-    const client = await this.getClient();
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
-            ],
-          },
+    return tracer.withActiveSpan(
+      "ScenarioEventRepository.getMaxTimestampForBatchRun",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "elasticsearch",
+          "db.operation": "SEARCH",
+          "tenant.id": projectId,
+          "batch.run.id": batchRunId,
         },
-        aggs: {
-          max_timestamp: {
-            max: { field: "timestamp" },
-          },
-        },
-        size: 0,
       },
-    });
+      async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
+        const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
+        const client = await this.getClient();
 
-    return (response.aggregations as any)?.max_timestamp?.value ?? 0;
+        const response = await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
+                ],
+              },
+            },
+            aggs: {
+              max_timestamp: {
+                max: { field: "timestamp" },
+              },
+            },
+            size: 0,
+          },
+        });
+
+        const timestamp = (response.aggregations as any)?.max_timestamp?.value ?? 0;
+        span.setAttribute("result.timestamp", timestamp);
+        return timestamp;
+      },
+    );
   }
 
   /**

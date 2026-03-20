@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "0.15.0" # remember to also update it in src/langwatch/__version__.py
+version = "0.17.0" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
@@ -40,10 +40,10 @@ dependencies = [
     "attrs>=24",
     "pksuid>=1.1.2",
     "pyyaml>=6.0.2",
-    "langchain-core>=1.0.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
+langchain = ["langchain-core>=0.3.0,<2.0.0"]
 dspy = ["dspy-ai>=3.0.3,<4"]
 litellm = ["litellm>=1.52.1"]
 dev = ["ruff>=0.11.1"]

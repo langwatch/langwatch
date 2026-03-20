@@ -22,6 +22,8 @@ export interface SimulationCommandConfig<TCommandData, TEventData> {
   mapToEventData: (commandData: TCommandData) => TEventData;
   /** Extracts additional log context from command data */
   getLogContext: (commandData: TCommandData) => Record<string, unknown>;
+  /** Builds idempotency key for event-store deduplication */
+  makeIdempotencyKey: (commandData: TCommandData) => string;
 }
 
 /**
@@ -52,7 +54,7 @@ export function createSimulationCommandHandler<
     const tenantId = createTenantId(tenantIdStr);
     const { scenarioRunId } = commandData;
 
-    logger.info(
+    logger.debug(
       {
         tenantId,
         scenarioRunId,
@@ -69,6 +71,7 @@ export function createSimulationCommandHandler<
       version: config.eventVersion as TEvent["version"],
       data: config.mapToEventData(commandData) as TEvent["data"],
       occurredAt: commandData.occurredAt,
+      idempotencyKey: config.makeIdempotencyKey(commandData),
     });
 
     logger.debug(

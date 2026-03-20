@@ -7,6 +7,7 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { createLogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { createMetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -24,6 +25,7 @@ export interface TraceProcessingPipelineDeps {
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
 }
 
@@ -53,10 +55,12 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
+    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
+    .withCommand("resolveOrigin", ResolveOriginCommand)
     .build();
 }

@@ -7,7 +7,7 @@ export interface DrainingGroup extends GroupInfo {
   _drainingUntil?: number;
 }
 
-export type SortColumn = "pendingJobs" | "groupId" | "pipelineName" | "oldestJobMs" | "newestJobMs" | null;
+export type SortColumn = "pendingJobs" | "groupId" | "pipelineName" | "oldestJobMs" | "newestJobMs" | "retryCount" | null;
 export type SortDir = "asc" | "desc";
 
 // Three-state sort cycle: null → desc → asc → null

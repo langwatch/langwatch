@@ -71,6 +71,7 @@ export class ReportEvaluationCommand
         passed: data.passed ?? null,
         label: data.label ?? null,
         details: data.details ?? null,
+        inputs: data.inputs ?? null,
         error: data.error ?? null,
         errorDetails: data.errorDetails ?? null,
         costId: data.costId ?? null,

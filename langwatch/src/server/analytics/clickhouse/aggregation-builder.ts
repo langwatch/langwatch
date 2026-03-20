@@ -184,8 +184,13 @@ const groupByExpressions: Partial<
   }),
 
   "evaluations.evaluation_passed": (groupByKey) => ({
-    column: `${tableAliases.evaluation_runs}.Passed`,
+    column: `CASE
+      WHEN ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
+      WHEN ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
+      ELSE 'unknown'
+    END`,
     requiredJoins: ["evaluation_runs"],
+    handlesUnknown: true,
     additionalWhere: groupByKey
       ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String}`
       : undefined,

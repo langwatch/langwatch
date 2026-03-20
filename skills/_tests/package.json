@@ -1,0 +1,29 @@
+{
+  "name": "@langwatch/skills-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@ai-sdk/anthropic": "^3.0.44",
+    "@langwatch/scenario": "^0.4.6",
+    "@types/node": "^22.0.0",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.2.2",
+    "node-pty": "^1.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "node-pty",
+      "esbuild",
+      "protobufjs"
+    ]
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.41"
+  }
+}

@@ -205,7 +205,7 @@ def create_openai_chat_completion_mock(n):
         "id": "chatcmpl-86zIvz53Wa4qTc1ksUt3coF5yTvm7",
         "object": "chat.completion",
         "created": 1696676313,
-        "model": "gpt-5",
+        "model": "gpt-5-mini",
         "choices": [
             {
                 "index": 0,

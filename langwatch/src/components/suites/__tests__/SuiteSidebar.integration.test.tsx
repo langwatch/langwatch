@@ -63,7 +63,7 @@ describe("<SuiteSidebar/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("No suites yet")).toBeInTheDocument();
+      expect(screen.getByText("No run plans yet")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
@@ -211,8 +211,29 @@ describe("<SuiteSidebar/>", () => {
         const searchInput = screen.getByPlaceholderText("Search...");
         await user.type(searchInput, "nonexistent");
 
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given suites with labels", () => {
+    const suitesWithLabels = [
+      makeSuite({
+        id: "suite_1",
+        name: "Nightly Suite",
+        slug: "nightly-suite",
+        labels: ["nightly", "regression"],
+      }),
+    ];
+
+    it("does not display suite labels as tag pills", () => {
+      render(
+        <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByText("nightly")).not.toBeInTheDocument();
+      expect(screen.queryByText("regression")).not.toBeInTheDocument();
     });
   });
 

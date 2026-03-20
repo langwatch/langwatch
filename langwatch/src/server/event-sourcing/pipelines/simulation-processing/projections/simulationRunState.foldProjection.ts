@@ -1,3 +1,4 @@
+import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import type { Projection } from "../../../";
 import type {
   FoldProjectionDefinition,
@@ -12,8 +13,17 @@ import {
   isSimulationMessageSnapshotEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
+  isSimulationTextMessageEndEvent,
+  isSimulationTextMessageStartEvent,
 } from "../schemas/typeGuards";
+import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
+
+function buildMessageRestJson(messageFields: Record<string, unknown>): string {
+  const { id, role, content, trace_id, ...restFields } = messageFields;
+  return Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
+}
 
 /**
  * A single message row stored in the Messages parallel arrays.
@@ -42,6 +52,7 @@ export interface SimulationRunStateData {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   Messages: SimulationMessageRow[];
   TraceIds: string[];
   Verdict: string | null;
@@ -51,6 +62,7 @@ export interface SimulationRunStateData {
   Error: string | null;
   DurationMs: number | null;
   StartedAt: number | null;
+  QueuedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
@@ -71,6 +83,7 @@ function init(): SimulationRunStateData {
     Status: "PENDING",
     Name: null,
     Description: null,
+    Metadata: null,
     Messages: [],
     TraceIds: [],
     Verdict: null,
@@ -80,6 +93,7 @@ function init(): SimulationRunStateData {
     Error: null,
     DurationMs: null,
     StartedAt: null,
+    QueuedAt: null,
     CreatedAt: Date.now(),
     UpdatedAt: Date.now(),
     FinishedAt: null,
@@ -92,7 +106,7 @@ function apply(
   state: SimulationRunStateData,
   event: SimulationProcessingEvent,
 ): SimulationRunStateData {
-  if (isSimulationRunStartedEvent(event)) {
+  if (isSimulationRunQueuedEvent(event)) {
     return {
       ...state,
       ScenarioRunId: event.data.scenarioRunId,
@@ -100,10 +114,27 @@ function apply(
       BatchRunId: event.data.batchRunId,
       ScenarioSetId: event.data.scenarioSetId,
       Name: event.data.name ?? null,
+      Status: "QUEUED",
       Description: event.data.description ?? null,
+      Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
+      QueuedAt: event.occurredAt,
+      UpdatedAt: event.occurredAt,
+    };
+  }
+
+  if (isSimulationRunStartedEvent(event)) {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      ScenarioId: state.ScenarioId || event.data.scenarioId,
+      BatchRunId: state.BatchRunId || event.data.batchRunId,
+      ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
+      Name: state.Name ?? event.data.name ?? null,
+      Description: state.Description ?? event.data.description ?? null,
+      Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -117,25 +148,111 @@ function apply(
       // Default StartedAt from event.occurredAt if snapshot arrives before started event
       StartedAt: state.StartedAt ?? event.occurredAt,
       LastSnapshotOccurredAt: event.occurredAt,
-      Messages: event.data.messages.map((m) => {
-        const { id, role, content, trace_id, ...restFields } = m;
-
-        const rest =
-          Object.keys(restFields).length > 0
-            ? JSON.stringify(restFields)
-            : "";
+      Messages: event.data.messages.map((m, i) => {
+        if (!isRecord(m)) {
+          throw new ValidationError(`Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`);
+        }
 
         return {
-          Id: typeof id === "string" ? id : "",
-          Role: typeof role === "string" ? role : "",
-          Content: typeof content === "string" ? content : "",
-          TraceId: typeof trace_id === "string" ? trace_id : "",
-          Rest: rest,
+          Id: typeof m.id === "string" ? m.id : "",
+          Role: typeof m.role === "string" ? m.role : "",
+          Content: typeof m.content === "string" ? m.content : "",
+          TraceId: typeof m.trace_id === "string" ? m.trace_id : "",
+          Rest: buildMessageRestJson(m),
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
+    };
+  }
+
+  if (isSimulationTextMessageStartEvent(event)) {
+    // Idempotency: skip if message already exists
+    if (state.Messages.some((m) => m.Id === event.data.messageId)) return state;
+
+    const newRow: SimulationMessageRow = {
+      Id: event.data.messageId,
+      Role: event.data.role,
+      Content: "",
+      TraceId: "",
+      Rest: "",
+    };
+
+    const messages = [...state.Messages];
+    const idx = event.data.messageIndex;
+
+    if (idx != null) {
+      // Pad with placeholder rows if needed
+      while (messages.length < idx) {
+        messages.push({ Id: "", Role: "", Content: "", TraceId: "", Rest: "" });
+      }
+      messages.splice(idx, 0, newRow);
+    } else {
+      messages.push(newRow);
+    }
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      Messages: messages,
+      UpdatedAt: event.occurredAt,
+    };
+  }
+
+  if (isSimulationTextMessageEndEvent(event)) {
+    const existingIndex = state.Messages.findIndex(
+      (m) => m.Id === event.data.messageId,
+    );
+
+    const row: SimulationMessageRow = {
+      Id: event.data.messageId,
+      Role: event.data.role,
+      Content: event.data.content,
+      TraceId: event.data.traceId ?? "",
+      Rest: buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+    };
+
+    let updatedMessages: SimulationMessageRow[];
+    if (existingIndex >= 0) {
+      updatedMessages = state.Messages.map((m, i) =>
+        i === existingIndex ? row : m,
+      );
+    } else if (event.data.messageIndex != null) {
+      updatedMessages = [...state.Messages];
+      while (updatedMessages.length < event.data.messageIndex) {
+        updatedMessages.push({
+          Id: "",
+          Role: "",
+          Content: "",
+          TraceId: "",
+          Rest: "",
+        });
+      }
+      if (updatedMessages.length === event.data.messageIndex) {
+        updatedMessages.push(row);
+      } else {
+        updatedMessages[event.data.messageIndex] = row;
+      }
+    } else {
+      updatedMessages = [...state.Messages, row];
+    }
+
+    // Accumulate traceId if present and not duplicate
+    const traceIds =
+      event.data.traceId && !state.TraceIds.includes(event.data.traceId)
+        ? [...state.TraceIds, event.data.traceId]
+        : state.TraceIds;
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      Messages: updatedMessages,
+      TraceIds: traceIds,
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -166,7 +283,7 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -174,8 +291,8 @@ function apply(
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      ArchivedAt: Date.now(),
-      UpdatedAt: Date.now(),
+      ArchivedAt: event.occurredAt,
+      UpdatedAt: event.occurredAt,
     };
   }
 

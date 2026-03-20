@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
-
+import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
@@ -89,6 +89,15 @@ export const onboardingRouter = createTRPCRouter({
         } catch (error) {
           captureException(error);
         }
+
+        fireSignupNurturingCalls({
+          userId: ctx.session.user.id,
+          email: ctx.session.user.email,
+          name: ctx.session.user.name,
+          organizationId: orgResult.organization.id,
+          organizationName: orgResult.organization.name,
+          signUpData: input.signUpData,
+        });
 
         // Return success response with team and project slugs
         return {

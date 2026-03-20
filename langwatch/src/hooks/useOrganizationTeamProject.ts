@@ -1,7 +1,9 @@
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { OrganizationUserRole } from "@prisma/client";
 import {
+  EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
   type Permission,
@@ -281,6 +283,7 @@ export const useOrganizationTeamProject = (
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
       isDemo,
+      organizationRole: undefined,
     };
   }
 
@@ -341,6 +344,11 @@ export const useOrganizationTeamProject = (
       return hasPermissionWithHierarchy(userPermissions, permission);
     }
 
+    // EXTERNAL users get restricted defaults instead of full team role permissions
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
+    }
+
     // Only fall back to built-in team role if NO custom role exists
     return teamRoleHasPermission(teamMember.role, permission);
   };
@@ -392,5 +400,6 @@ export const useOrganizationTeamProject = (
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,
     isDemo,
+    organizationRole,
   };
 };

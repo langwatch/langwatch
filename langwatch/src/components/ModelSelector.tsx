@@ -202,13 +202,17 @@ export const ModelSelector = React.memo(function ModelSelector({
   );
 
   useEffect(() => {
-    const highlightedItem = modelCollection.items.find(
+    const highlightedItem = allFilteredModels.find(
       (item) => item.value === highlightedValue,
     );
     if (!highlightedItem) {
-      setHighlightedValue(modelCollection.items[0]?.value ?? null);
+      const firstValue = allFilteredModels[0]?.value ?? null;
+      if (firstValue !== highlightedValue) {
+        setHighlightedValue(firstValue);
+      }
     }
-  }, [highlightedValue, modelCollection.items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelSearch]);
 
   return (
     <Select.Root

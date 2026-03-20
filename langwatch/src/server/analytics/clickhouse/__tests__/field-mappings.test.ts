@@ -192,7 +192,8 @@ describe("field-mappings", () => {
 
     it("builds correct JOIN for evaluation_runs", () => {
       const join = buildJoinClause("evaluation_runs");
-      expect(join).toContain("JOIN evaluation_runs es");
+      expect(join).toContain("FROM evaluation_runs");
+      expect(join).toContain("LIMIT 1 BY TenantId, EvaluationId");
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
     });

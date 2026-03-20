@@ -209,6 +209,105 @@ describe("mapNormalizedSpanToSpan", () => {
     });
   });
 
+  describe("when langwatch.input is a deserialized {type, value} wrapper", () => {
+    it("unwraps text wrapper to plain text type", () => {
+      // After ClickHouse round-trip: canonicalization unwraps text wrapper to just the value string,
+      // but deserializeAttributes may parse it back to an object if it looks like JSON.
+      // If the wrapper survives, the mapper should unwrap it.
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "span",
+          "langwatch.input": { type: "text", value: "hello world" },
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "text", value: "hello world" });
+    });
+
+    it("unwraps chat_messages wrapper to chat_messages type", () => {
+      const messages = [{ role: "user", content: "hi" }];
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "langwatch.input": { type: "chat_messages", value: messages },
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "chat_messages", value: messages });
+    });
+
+    it("unwraps json wrapper to json type with inner value", () => {
+      const data = { question: "what is AI?" };
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "span",
+          "langwatch.input": { type: "json", value: data },
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "json", value: data });
+    });
+  });
+
+  describe("when annotated type is 'text' but deserialization parsed value to array", () => {
+    it("re-stringifies to avoid [object Object]", () => {
+      // This is the exact bug scenario: REST collector sends {type: "text", value: "[{...}]"},
+      // canonicalization unwraps to just the string "[{...}]", ClickHouse stores it,
+      // deserializeAttributes parses the JSON-like string "[{...}]" back to an array.
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "langwatch.input": [{ role: "user", content: "hello" }],
+          "langwatch.reserved.value_types": ["langwatch.input=text"],
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input?.type).toBe("text");
+      // Must NOT be "[object Object]"
+      expect(result.input?.value).not.toContain("[object Object]");
+      expect(typeof result.input?.value).toBe("string");
+    });
+  });
+
+  describe("when langwatch.output is a deserialized {type, value} wrapper", () => {
+    it("unwraps text wrapper to plain text type", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "span",
+          "langwatch.output": { type: "text", value: "response here" },
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({ type: "text", value: "response here" });
+    });
+
+    it("unwraps evaluation_result wrapper", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "evaluation",
+          "langwatch.output": { type: "evaluation_result", value: { passed: true, score: 0.9 } },
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({
+        type: "evaluation_result",
+        value: { passed: true, score: 0.9 },
+      });
+    });
+  });
+
   describe("when output has evaluation_result annotated type", () => {
     it("preserves the evaluation_result type wrapper from native objects", () => {
       const span = makeSpan({
