@@ -338,6 +338,14 @@ describe("opentelemetry traces receiver", () => {
     );
 
     expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      message: expect.any(String),
+      partialSuccess: {
+        rejectedSpans: expect.any(Number),
+        errorMessage: expect.any(String),
+      },
+    });
   });
 
   describe("when compression is enabled", () => {

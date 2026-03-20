@@ -456,7 +456,10 @@ async function handleCollectorRequest(
       "trace already indexed",
     );
 
-    return res.status(200).json({ message: "No changes" });
+    return res.status(200).json({
+      message: "No changes",
+      partialSuccess: { rejectedSpans: 0, errorMessage: "" },
+    });
   }
 
   if (existingTrace?.version && existingTrace.version > 256) {
@@ -477,6 +480,8 @@ async function handleCollectorRequest(
     };
   }
 
+  let rejectedSpans = 0;
+  let rejectionErrors: string[] = [];
   if (project.featureEventSourcingTraceIngestion) {
     try {
       const resource = CollectorSpanUtils.buildResource({
@@ -500,6 +505,10 @@ async function handleCollectorRequest(
 
       const failures = results.filter(
         (r): r is PromiseRejectedResult => r.status === "rejected",
+      );
+      rejectedSpans = failures.length;
+      rejectionErrors = failures.map((f) =>
+        f.reason instanceof Error ? f.reason.message : String(f.reason),
       );
       if (failures.length > 0) {
         logger.error(
@@ -592,7 +601,13 @@ async function handleCollectorRequest(
     contentLength ? parseInt(contentLength as string, 10) : undefined,
   );
 
-  return res.status(200).json({ message: "Trace received successfully." });
+  return res.status(200).json({
+    message: "Trace received successfully.",
+    partialSuccess: {
+      rejectedSpans,
+      errorMessage: rejectionErrors.join("; "),
+    },
+  });
 }
 
 // Export the handler wrapped with logging middleware
