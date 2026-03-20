@@ -51,6 +51,7 @@ function createMockPrisma({
   };
 
   return {
+    $transaction: vi.fn(),
     annotation: {
       create: vi.fn().mockResolvedValue(createResult ?? defaultAnnotation),
       delete: vi.fn().mockResolvedValue(deleteResult ?? defaultAnnotation),
@@ -151,8 +152,7 @@ describe("annotationRouter", () => {
         });
 
         expect(prisma.annotation.create).toHaveBeenCalledOnce();
-        // No $transaction exists on our mock, confirming it is not called
-        expect(prisma.$transaction).toBeUndefined();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
       });
     });
 
@@ -173,6 +173,11 @@ describe("annotationRouter", () => {
         expect(result).toMatchObject({ id: "ann-1" });
         expect(prisma.annotation.create).toHaveBeenCalledOnce();
         expect(mockEsClient).not.toHaveBeenCalled();
+        expect(mockIsElasticSearchWriteDisabled).toHaveBeenCalledWith(
+          prisma,
+          "proj-1",
+          "traces"
+        );
       });
     });
 
@@ -228,6 +233,27 @@ describe("annotationRouter", () => {
         expect(result).toMatchObject({ id: "ann-1" });
         expect(prisma.annotation.delete).toHaveBeenCalledOnce();
         expect(mockEsClient).not.toHaveBeenCalled();
+        expect(mockIsElasticSearchWriteDisabled).toHaveBeenCalledWith(
+          prisma,
+          "proj-1",
+          "traces"
+        );
+      });
+    });
+
+    describe("when ES update succeeds", () => {
+      it("deletes the annotation and updates ES", async () => {
+        const prisma = createMockPrisma();
+        const caller = createCaller(prisma);
+
+        const result = await caller.deleteById({
+          annotationId: "ann-1",
+          projectId: "proj-1",
+        });
+
+        expect(result).toMatchObject({ id: "ann-1" });
+        expect(prisma.annotation.delete).toHaveBeenCalledOnce();
+        expect(mockEsClient).toHaveBeenCalled();
       });
     });
   });
