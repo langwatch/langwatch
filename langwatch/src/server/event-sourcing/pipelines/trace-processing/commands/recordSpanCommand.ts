@@ -132,6 +132,7 @@ export class RecordSpanCommand implements CommandHandler<
         // is reserved for system-generated attributes only.
         RecordSpanCommand.stripReservedAttributes(
           spanToProcess,
+          resourceToProcess,
           this.logger,
         );
 
@@ -238,6 +239,7 @@ export class RecordSpanCommand implements CommandHandler<
    */
   private static stripReservedAttributes(
     span: OtlpSpan,
+    resource: OtlpResource | null,
     logger: ReturnType<typeof createLogger>,
   ): void {
     const RESERVED_PREFIX = "langwatch.reserved.";
@@ -262,6 +264,9 @@ export class RecordSpanCommand implements CommandHandler<
     }
     for (const link of span.links) {
       link.attributes = strip(link.attributes);
+    }
+    if (resource) {
+      resource.attributes = strip(resource.attributes);
     }
   }
 
