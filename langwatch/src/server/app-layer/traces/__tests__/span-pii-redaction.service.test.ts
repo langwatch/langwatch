@@ -523,6 +523,48 @@ describe("OtlpSpanPiiRedactionService", () => {
       expect(statusAttr!.value.stringValue).toBe("none");
     });
 
+    it("skips later values when cumulative batch size exceeds limit", async () => {
+      // MAX_LENGTH = 10; two values of 6 chars each = 12 total > 10
+      const span = createMockOtlpSpan([
+        { key: "attr.a", value: { stringValue: "aaaaaa" } }, // 6 chars, cumulative = 6 (fits)
+        { key: "attr.b", value: { stringValue: "bbbbbb" } }, // 6 chars, cumulative would be 12 (skipped)
+      ]);
+
+      await maxLengthService.redactSpan(span, null, "STRICT");
+
+      // First fits within budget, second is skipped
+      expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(span.attributes[1]!.value.stringValue).toBe("bbbbbb");
+      expect(maxLengthBatchSpy).toHaveBeenCalledTimes(1);
+      expect(maxLengthBatchSpy.mock.calls[0]![0]).toEqual(["aaaaaa"]);
+      // Should mark as partial since some were redacted and some skipped
+      const statusAttr = span.attributes.find(
+        (a) => a.key === "langwatch.reserved.pii_redaction_status",
+      );
+      expect(statusAttr).toBeDefined();
+      expect(statusAttr!.value.stringValue).toBe("partial");
+    });
+
+    it("applies cumulative budget across span and resource attributes", async () => {
+      // MAX_LENGTH = 10; span attr 6 chars + resource attr 6 chars = 12 > 10
+      const span = createMockOtlpSpan([
+        { key: "span.attr", value: { stringValue: "aaaaaa" } }, // 6 chars
+      ]);
+      const resource = createMockResource([
+        { key: "resource.attr", value: { stringValue: "bbbbbb" } }, // 6 chars, would exceed
+      ]);
+
+      await maxLengthService.redactSpan(span, resource, "STRICT");
+
+      expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(resource.attributes[0]!.value.stringValue).toBe("bbbbbb");
+      const statusAttr = span.attributes.find(
+        (a) => a.key === "langwatch.reserved.pii_redaction_status",
+      );
+      expect(statusAttr).toBeDefined();
+      expect(statusAttr!.value.stringValue).toBe("partial");
+    });
+
     it("exports the default max attribute length constant", () => {
       expect(DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH).toBe(250_000);
     });
