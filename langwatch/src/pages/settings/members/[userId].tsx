@@ -352,7 +352,7 @@ export default function UserDetailsPage() {
         </Card.Root>
 
         <Heading size="md">Teams</Heading>
-        <Card.Root width="full" overflow="hidden">
+        <Card.Root width="full">
           <Card.Body paddingY={0} paddingX={0}>
             <Table.Root variant="line" width="full">
               <Table.Header>
