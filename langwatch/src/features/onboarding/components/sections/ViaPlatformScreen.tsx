@@ -68,44 +68,42 @@ function CapabilityCard({
   href,
 }: CapabilityProps & { href: string }): React.ReactElement {
   return (
-    <HStack
+    <VStack
       asChild
       align="start"
       gap={3}
-      p={4}
+      p={5}
       flex={1}
       borderRadius="xl"
       border="1px solid"
       borderColor="gray.200"
       bg="white/70"
       backdropFilter="blur(20px) saturate(1.3)"
-      boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
+      boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
       transition="all 0.2s ease"
       cursor="pointer"
       _hover={{
-        borderColor: "gray.300",
+        borderColor: "rgba(237,137,38,0.25)",
         boxShadow:
-          "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
-        transform: "translateY(-1px)",
+          "0 6px 28px rgba(237,137,38,0.06), inset 0 1px 0 white",
+        transform: "translateY(-2px)",
         textDecoration: "none",
       }}
     >
     <a href={href} style={{ textDecoration: "none", color: "inherit" }}>
       <Box
         flexShrink={0}
-        p={2}
-        borderRadius="lg"
-        bg="rgba(237,137,38,0.10)"
+        p={2.5}
+        borderRadius="xl"
+        bg="rgba(237,137,38,0.08)"
         color="orange.500"
         display="flex"
         alignItems="center"
         justifyContent="center"
-        border="1px solid"
-        borderColor="rgba(237,137,38,0.15)"
       >
-        <Icon size={16} strokeWidth={1.75} />
+        <Icon size={20} strokeWidth={1.5} />
       </Box>
-      <VStack align="stretch" gap={0.5}>
+      <VStack align="stretch" gap={1}>
         <Text
           fontSize="sm"
           fontWeight="semibold"
@@ -119,7 +117,7 @@ function CapabilityCard({
         </Text>
       </VStack>
     </a>
-    </HStack>
+    </VStack>
   );
 }
 
@@ -128,14 +126,9 @@ export function ViaPlatformScreen(): React.ReactElement {
 
   return (
     <>
-      <VStack align="stretch" gap={6} mb={20} maxW="720px" mx="auto">
-        <Text fontSize="sm" color="fg.muted" lineHeight="tall">
-          Configure everything directly from the LangWatch dashboard — no code
-          changes required to get started.
-        </Text>
-
+      <VStack align="stretch" gap={6} mb={20} w="full">
         <Grid
-          templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }}
+          templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }}
           gap={3}
         >
           {capabilities.map((cap) => (
