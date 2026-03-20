@@ -56,7 +56,7 @@ class LLMEvaluatorSettings(EvaluatorSettings):
         description="Max tokens allowed for evaluation",
     )
     max_output_tokens: int = Field(
-        default=8192,
+        default=4096,
         description="Maximum number of tokens the evaluator LLM can generate in its response",
     )
 
