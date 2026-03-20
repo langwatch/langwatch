@@ -30,6 +30,7 @@ import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
+import type { OrganizationUserRole } from "@prisma/client";
 import type { PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -48,6 +49,7 @@ interface CreateContextOptions {
   session: Session | null;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
+  organizationRole?: OrganizationUserRole | null;
 }
 
 /**
@@ -68,6 +70,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     prisma,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
+    organizationRole: opts.organizationRole ?? undefined,
   };
 };
 

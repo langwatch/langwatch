@@ -252,19 +252,6 @@ function LiteMemberRestrictionContent({
   variant: Extract<UpgradeModalVariant, { mode: "liteMemberRestriction" }>;
   onClose: () => void;
 }) {
-  const router = useRouter();
-  const { project } = useOrganizationTeamProject();
-  const { url: planManagementUrl, buttonLabel } = usePlanManagementUrl();
-
-  const handleUpgrade = () => {
-    trackEvent("subscription_hook_click", {
-      project_id: project?.id,
-      hook: "lite_member_restriction",
-    });
-    void router.push(planManagementUrl);
-    onClose();
-  };
-
   return (
     <>
       <Dialog.Header>
@@ -274,17 +261,14 @@ function LiteMemberRestrictionContent({
       <Dialog.Body>
         <VStack gap={4} align="start">
           <Text>
-            This feature is not available for your current role. Upgrade your
-            plan to unlock full access.
+            This feature is not available for your current role. Contact your
+            organization admin for access.
           </Text>
         </VStack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button colorPalette="blue" onClick={handleUpgrade}>
-          {buttonLabel}
+        <Button colorPalette="blue" onClick={onClose}>
+          Dismiss
         </Button>
       </Dialog.Footer>
     </>
