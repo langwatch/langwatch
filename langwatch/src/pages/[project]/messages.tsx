@@ -1,24 +1,28 @@
 import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { useIntegrationChecks } from "../../components/IntegrationChecks";
 import { useTableView } from "../../components/messages/HeaderButtons";
 import { MessagesList } from "../../components/messages/MessagesList";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 
 function MessagesOrIntegrationGuideContent() {
   const { project } = useOrganizationTeamProject();
-  const integrationChecks = useIntegrationChecks();
-  const hasFirstMessage = Boolean(integrationChecks.data?.firstMessage);
+
+  const firstMessageCheck = api.project.getHasFirstMessage.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, staleTime: 0 },
+  );
+  const hasFirstMessage = Boolean(firstMessageCheck.data?.firstMessage);
 
   const { isTableView } = useTableView();
 
   // Preload field redaction status to avoid cascading loading states
   useFieldRedaction("input");
 
-  if (project && integrationChecks.isFetched && !hasFirstMessage) {
+  if (project && firstMessageCheck.isFetched && !hasFirstMessage) {
     return (
       <DashboardLayout>
         <WelcomeLayout />
