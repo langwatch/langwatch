@@ -38,6 +38,8 @@ export const useCreateProductScreens = ({
         id: "via-claude-code",
         required: false,
         heading: "Via Coding Agent",
+        subHeading:
+          "Pick how you want to work with LangWatch in your coding agent",
         widthVariant: "full",
         component: ViaClaudeCodeScreen,
       },
@@ -45,15 +47,18 @@ export const useCreateProductScreens = ({
         id: "via-platform",
         required: false,
         heading: "Via the Platform",
-        subHeading: "Explore everything LangWatch has to offer",
+        subHeading: "Configure everything from the dashboard, no code changes needed",
         widthVariant: "full",
         component: ViaPlatformScreen,
       },
       [ProductScreenIndex.VIA_CLAUDE_DESKTOP]: {
         id: "via-claude-desktop",
         required: false,
-        heading: "Via Desktop App",
+        heading: "Connect via MCP",
+        subHeading:
+          "Add LangWatch to any MCP-compatible app in under a minute",
         widthVariant: "full",
+        compressedHeader: true,
         component: ViaClaudeDesktopScreen,
       },
       [ProductScreenIndex.MANUALLY]: {

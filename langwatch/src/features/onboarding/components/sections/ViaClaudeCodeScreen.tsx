@@ -1,9 +1,10 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Clipboard, Terminal } from "lucide-react";
-import { useRouter } from "next/router";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
+
+const MotionVStack = motion(VStack);
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { toaster } from "../../../../components/ui/toaster";
@@ -24,12 +25,13 @@ interface SkillItem {
 
 const SKILLS: SkillItem[] = [
   {
-    id: "tracing",
-    label: "Instrument my agent with open telemetry",
+    id: "level-up",
+    label: "Level up with everything LangWatch",
     prompt:
-      "Instrument my code with LangWatch tracing. Read the codebase to understand the agent's architecture, install the LangWatch SDK, add comprehensive tracing across all LLM call sites, and verify traces appear in the dashboard.",
-    installCommand: "npx skills add langwatch/skills/tracing",
-    slashCommand: "/langwatch-tracing",
+      "Take my agent to the next level with LangWatch. Set up tracing, version my prompts, create evaluations, and add scenario tests, all in one go. Read the codebase first, then deliver each capability incrementally.",
+    installCommand: "npx skills add langwatch/skills/level-up",
+    slashCommand: "/level-up",
+    highlight: true,
   },
   {
     id: "evaluations",
@@ -37,7 +39,7 @@ const SKILLS: SkillItem[] = [
     prompt:
       "Set up evaluations for my agent with LangWatch. Create 1-2 high-quality experiments with domain-realistic data, configure online evaluation for production monitoring, and set up evaluators for quality and safety scoring.",
     installCommand: "npx skills add langwatch/skills/evaluations",
-    slashCommand: "/langwatch-evaluations",
+    slashCommand: "/evaluations",
   },
   {
     id: "scenarios",
@@ -45,7 +47,15 @@ const SKILLS: SkillItem[] = [
     prompt:
       "Add scenario tests for my agent using the @langwatch/scenario SDK. Read the codebase, write simulation tests covering key user journeys, set up a CI pipeline to run them automatically, and include red teaming with RedTeamAgent.",
     installCommand: "npx skills add langwatch/skills/scenarios",
-    slashCommand: "/langwatch-scenarios",
+    slashCommand: "/scenarios",
+  },
+  {
+    id: "tracing",
+    label: "Instrument my agent with open telemetry",
+    prompt:
+      "Instrument my code with LangWatch tracing. Read the codebase to understand the agent's architecture, install the LangWatch SDK, add comprehensive tracing across all LLM call sites, and verify traces appear in the dashboard.",
+    installCommand: "npx skills add langwatch/skills/tracing",
+    slashCommand: "/tracing",
   },
   {
     id: "prompts",
@@ -53,16 +63,7 @@ const SKILLS: SkillItem[] = [
     prompt:
       "Version my prompts with LangWatch. Use langwatch.prompts.get() to fetch managed prompts, initialize with CLI, create managed prompts, and sync to the platform. Do not duplicate prompt text as a fallback.",
     installCommand: "npx skills add langwatch/skills/prompts",
-    slashCommand: "/langwatch-prompts",
-  },
-  {
-    id: "level-up",
-    label: "Do all of the above",
-    prompt:
-      "Take my agent to the next level with LangWatch. Set up tracing, version my prompts, create evaluations, and add scenario tests — all in one go. Read the codebase first, then deliver each capability incrementally.",
-    installCommand: "npx skills add langwatch/skills/level-up",
-    slashCommand: "/langwatch-level-up",
-    highlight: true,
+    slashCommand: "/prompts",
   },
 ];
 
@@ -74,6 +75,7 @@ interface EditorPath {
 const EDITOR_PATHS: EditorPath[] = [
   { editor: "Claude Code", path: ".claude/settings.json" },
   { editor: "Cursor", path: ".cursor/mcp.json" },
+  { editor: "Copilot", path: ".vscode/mcp.json" },
   { editor: "Windsurf", path: "~/.codeium/windsurf/mcp_config.json" },
   {
     editor: "Claude Desktop",
@@ -220,7 +222,7 @@ function glassCard({
     boxShadow: highlight
       ? "0 0 0 1px rgba(237,137,38,0.08), 0 4px 24px rgba(237,137,38,0.12), inset 0 1px 0 white"
       : "0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white",
-    transition: "all 0.2s ease",
+    transition: "all 0.17s ease",
     _hover: {
       borderColor: highlight ? "orange.300" : "gray.300",
       boxShadow: highlight
@@ -271,22 +273,20 @@ function SkillRow({
       gap={3}
       {...glassCard({ highlight: skill.highlight })}
     >
-      <HStack justify="space-between" align="center" gap={4}>
-        <Text
-          fontSize="sm"
-          color="fg.DEFAULT"
-          fontWeight={skill.highlight ? "semibold" : "medium"}
-          letterSpacing="-0.01em"
-        >
-          {skill.label}
-        </Text>
-        <InlineCopyButton text={skill.installCommand} label="Command" />
-      </HStack>
+      <Text
+        fontSize="sm"
+        color="fg.DEFAULT"
+        fontWeight={skill.highlight ? "semibold" : "medium"}
+        letterSpacing="-0.01em"
+      >
+        {skill.label}
+      </Text>
       <HStack gap={2} align="center">
         <Terminal size={12} color="var(--chakra-colors-fg-muted)" />
-        <Text fontSize="xs" fontFamily="mono" color="fg.muted">
+        <Text fontSize="xs" fontFamily="mono" color="fg.muted" flex={1}>
           {skill.installCommand}
         </Text>
+        <InlineCopyButton text={skill.installCommand} label="Command" />
       </HStack>
       <HStack
         gap={2}
@@ -301,14 +301,32 @@ function SkillRow({
         <Text fontSize="xs" color="fg.muted">
           Then use
         </Text>
-        <Text
-          fontSize="xs"
-          fontFamily="mono"
-          fontWeight="semibold"
-          color="orange.400"
+        <HStack
+          gap={0.5}
+          align="center"
+          cursor="pointer"
+          onClick={() => {
+            void navigator.clipboard.writeText(skill.slashCommand);
+            toaster.create({
+              title: "Copied",
+              description: `${skill.slashCommand} copied to clipboard`,
+              type: "success",
+              meta: { closable: true },
+            });
+          }}
+          _hover={{ opacity: 0.7 }}
+          transition="opacity 0.15s ease"
         >
-          {skill.slashCommand}
-        </Text>
+          <Text
+            fontSize="xs"
+            fontFamily="mono"
+            fontWeight="semibold"
+            color="orange.400"
+          >
+            {skill.slashCommand}
+          </Text>
+          <Clipboard size={10} color="var(--chakra-colors-orange-300)" />
+        </HStack>
         <Text fontSize="xs" color="fg.muted">
           in your coding agent
         </Text>
@@ -317,86 +335,151 @@ function SkillRow({
   );
 }
 
+function QuickCommand({
+  label,
+  displayCommand,
+  copyCommand,
+}: {
+  label: string;
+  displayCommand: string;
+  copyCommand: string;
+}): React.ReactElement {
+  return (
+    <HStack
+      justify="space-between"
+      align="center"
+      px={4}
+      py={3}
+      {...glassCard({ highlight: false })}
+    >
+      <HStack gap={2.5} align="center" minW={0}>
+        <Terminal size={13} color="var(--chakra-colors-fg-muted)" flexShrink={0} />
+        <VStack align="start" gap={0} minW={0}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+            {label}
+          </Text>
+          <Text fontSize="xs" fontFamily="mono" color="fg.muted" wordBreak="break-all">
+            {displayCommand}
+          </Text>
+        </VStack>
+      </HStack>
+      <InlineCopyButton text={copyCommand} label="Command" />
+    </HStack>
+  );
+}
+
 function McpTab({
   mcpJson,
+  displayConfigJson,
+  apiKey,
+  maskedKey,
 }: {
   mcpJson: string;
+  displayConfigJson: string;
+  apiKey: string;
+  maskedKey: string;
 }): React.ReactElement {
   return (
     <VStack align="stretch" gap={4}>
-      <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
-        <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
-          Live connection.
-        </Text>{" "}
-        Give your agent direct access to your LangWatch dashboard — search
-        traces, manage prompts, and more.
-      </Text>
+      {/* Quick shortcuts */}
+      <VStack align="stretch" gap={2}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+          Quick setup
+        </Text>
+        <QuickCommand
+          label="Claude Code"
+          displayCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${maskedKey}`}
+          copyCommand={`claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key ${apiKey}`}
+        />
+        <QuickCommand
+          label="OpenAI Codex"
+          displayCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${maskedKey}"`}
+          copyCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${apiKey}"`}
+        />
+      </VStack>
 
       {/* JSON config */}
+      <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+        Or paste into your config file
+      </Text>
       <Box
         position="relative"
+        borderRadius="xl"
         overflow="hidden"
-        {...glassCard({ highlight: false })}
+        border="1px solid"
+        borderColor="gray.200"
+        bg="white/70"
+        backdropFilter="blur(20px) saturate(1.3)"
+        boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
+        transition="all 0.17s ease"
+        _hover={{
+          borderColor: "rgba(237,137,38,0.25)",
+          boxShadow: "0 6px 28px rgba(237,137,38,0.06), inset 0 1px 0 white",
+        }}
       >
         <Box
           as="pre"
           px={5}
           py={4}
-          pr={14}
-          fontSize="xs"
-          fontFamily="mono"
-          color="fg.DEFAULT"
-          lineHeight="tall"
-          overflowX="auto"
-          whiteSpace="pre"
+          pr={12}
+          fontSize="12.5px"
+          fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
+          color="gray.800"
+          lineHeight="1.8"
+          overflowX="hidden"
+          whiteSpace="pre-wrap"
+          wordBreak="break-all"
+          letterSpacing="0.01em"
+          fontWeight="500"
         >
-          {mcpJson}
+          {displayConfigJson}
         </Box>
-        <Box position="absolute" top={3} right={3}>
+        <Box position="absolute" top={2.5} right={2.5}>
           <InlineCopyButton text={mcpJson} label="Config" />
         </Box>
       </Box>
 
-      {/* Where to paste */}
-      <VStack
-        align="stretch"
-        gap={0}
-        borderRadius="xl"
-        border="1px solid"
-        borderColor="gray.200"
-        bg="white/70"
-        boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
-        overflow="hidden"
-      >
-        <Box px={4} py={3} borderBottom="1px solid" borderColor="gray.100">
-          <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
-            Add this to your editor&apos;s MCP config
-          </Text>
-        </Box>
-        {EDITOR_PATHS.map((ep, i) => (
-          <HStack
-            key={ep.editor}
-            px={4}
-            py={2.5}
-            justify="space-between"
-            borderBottom={i < EDITOR_PATHS.length - 1 ? "1px solid" : undefined}
-            borderColor="gray.100"
-          >
-            <Text fontSize="xs" color="fg.muted" fontWeight="medium">
-              {ep.editor}
-            </Text>
-            <Text fontSize="xs" fontFamily="mono" color="fg.DEFAULT">
-              {ep.path}
-            </Text>
-          </HStack>
+      {/* Where to paste — compact inline chips */}
+      <HStack gap={2} flexWrap="wrap" align="center">
+        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+          Config path:
+        </Text>
+        {EDITOR_PATHS.map((ep) => (
+          <Tooltip key={ep.editor} content={`Click to copy: ${ep.path}`} showArrow openDelay={0}>
+            <HStack
+              gap={1}
+              px={2.5}
+              py={1}
+              borderRadius="md"
+              bg="white/60"
+              border="1px solid"
+              borderColor="gray.200"
+              cursor="pointer"
+              transition="all 0.15s ease"
+              _hover={{ borderColor: "rgba(237,137,38,0.25)", bg: "white" }}
+              onClick={() => {
+                void navigator.clipboard.writeText(ep.path);
+                toaster.create({
+                  title: "Copied",
+                  description: `${ep.editor} config path copied`,
+                  type: "success",
+                  meta: { closable: true },
+                });
+              }}
+            >
+              <Text fontSize="2xs" fontWeight="medium" color="fg.DEFAULT">
+                {ep.editor}
+              </Text>
+              <Clipboard size={9} color="var(--chakra-colors-gray-400)" />
+            </HStack>
+          </Tooltip>
         ))}
-      </VStack>
+      </HStack>
     </VStack>
   );
 }
 
 export function ViaClaudeCodeScreen(): React.ReactElement {
-  const router = useRouter();
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
   const [activeTab, setActiveTab] = useState<TabKey>("prompt");
@@ -404,19 +487,25 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
 
+  const maskedApiKey = effectiveApiKey
+    ? `${effectiveApiKey.slice(0, 6)}•••${effectiveApiKey.slice(-4)}`
+    : "";
+
   const mcpJson = useMemo(
     () =>
       buildMcpJson({ apiKey: effectiveApiKey, endpoint: effectiveEndpoint }),
     [effectiveApiKey, effectiveEndpoint],
   );
 
+  const displayConfigJson = useMemo(
+    () =>
+      buildMcpJson({ apiKey: maskedApiKey, endpoint: effectiveEndpoint }),
+    [maskedApiKey, effectiveEndpoint],
+  );
+
   return (
     <>
-      <VStack align="stretch" gap={6} mb={20} maxW="640px" mx="auto">
-        <Text fontSize="xs" color="fg.muted" lineHeight="tall" textAlign="center">
-          Pick how you want to work with LangWatch in your coding agent.
-        </Text>
-
+      <VStack align="stretch" gap={4} mb={20} w="640px" maxW="100%" mx="auto">
         <HStack
           justify="center"
           gap={1}
@@ -447,40 +536,71 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
           />
         </HStack>
 
-        {activeTab === "prompt" && (
-          <VStack align="stretch" gap={4}>
-            <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
-              <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
-                Zero setup.
-              </Text>{" "}
-              Copy a prompt, paste it into your coding agent, and it handles
-              everything from there.
-            </Text>
-            {SKILLS.map((skill) => (
-              <PromptRow key={skill.id} skill={skill} />
-            ))}
-          </VStack>
-        )}
+        {/* Description — stays fixed, only text swaps */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+          >
+            {activeTab === "prompt" && (
+              <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
+                <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
+                  Zero setup.
+                </Text>{" "}
+                Copy a prompt, paste it into your coding agent, and it handles
+                everything from there.
+              </Text>
+            )}
+            {activeTab === "skill" && (
+              <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
+                <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
+                  Install once, reuse anytime.
+                </Text>{" "}
+                Run the install command, then type{" "}
+                <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.400">
+                  /command
+                </Text>{" "}
+                in your coding agent whenever you need it.
+              </Text>
+            )}
+            {activeTab === "mcp" && (
+              <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
+                <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
+                  Live connection.
+                </Text>{" "}
+                Give your agent direct access to your LangWatch dashboard.
+              </Text>
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-        {activeTab === "skill" && (
-          <VStack align="stretch" gap={4}>
-            <Text fontSize="sm" color="fg.DEFAULT/70" lineHeight="tall">
-              <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
-                Install once, reuse anytime.
-              </Text>{" "}
-              Run the install command, then type{" "}
-              <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.400">
-                /command
-              </Text>{" "}
-              in your coding agent whenever you need it.
-            </Text>
-            {SKILLS.map((skill) => (
-              <SkillRow key={skill.id} skill={skill} />
-            ))}
-          </VStack>
-        )}
-
-        {activeTab === "mcp" && <McpTab mcpJson={mcpJson} />}
+        {/* Tab content — only the items animate, no y movement to avoid container resize */}
+        <AnimatePresence mode="wait" initial={false}>
+          <MotionVStack
+            key={activeTab}
+            align="stretch"
+            gap={activeTab === "mcp" ? 0 : 4}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+          >
+            {activeTab === "prompt" &&
+              SKILLS.map((skill) => (
+                <PromptRow key={skill.id} skill={skill} />
+              ))}
+            {activeTab === "skill" &&
+              SKILLS.map((skill) => (
+                <SkillRow key={skill.id} skill={skill} />
+              ))}
+            {activeTab === "mcp" && (
+              <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} />
+            )}
+          </MotionVStack>
+        </AnimatePresence>
       </VStack>
 
     </>

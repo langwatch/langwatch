@@ -1,9 +1,6 @@
-import { Box, Button, Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { Box, Grid, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
-import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { getRegistryEntry } from "../../regions/observability/codegen/registry";
 import type {
@@ -23,7 +20,6 @@ import { PlatformGrid } from "./observability/PlatformGrid";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 
 export function ObservabilityScreen(): React.ReactElement {
-  const router = useRouter();
   const { project } = useActiveProject();
   const [selectedPlatform, setSelectedPlatform] =
     useState<PlatformKey>("typescript");
@@ -36,7 +32,6 @@ export function ObservabilityScreen(): React.ReactElement {
     if (firstFramework) {
       setSelectedFramework(firstFramework);
     } else {
-      // Platform has no frameworks, clear framework selection
       setSelectedFramework(null as any);
     }
   }
@@ -56,7 +51,7 @@ export function ObservabilityScreen(): React.ReactElement {
     <>
       <Grid
         templateColumns={{ base: "1fr", xl: "1fr 1fr" }}
-        gap={{ base: 6, xl: 32 }}
+        gap={{ base: 6, xl: 10 }}
         alignItems="start"
         mb={20}
       >
@@ -109,7 +104,6 @@ export function ObservabilityScreen(): React.ReactElement {
       </Grid>
 
       <WaitingForTracesChip />
-
     </>
   );
 }
