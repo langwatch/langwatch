@@ -38,18 +38,18 @@ export function useSuiteRunMutation({
         }
 
         toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          title: `Run scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
           type: "warning",
           meta: { closable: true },
           action: {
-            label: "Edit Suite",
+            label: "Edit Run Plan",
             onClick: () => onEditSuite(variables.id),
           },
         });
       } else {
         toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          title: `Run scheduled (${result.jobCount} jobs)`,
           type: "success",
           meta: { closable: true },
         });
@@ -62,14 +62,14 @@ export function useSuiteRunMutation({
           err.message.includes("All targets"));
 
       toaster.create({
-        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
+        title: isAllArchived ? "Cannot execute run plan" : "Failed to execute run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
         ...(isAllArchived
           ? {
               action: {
-                label: "Edit Suite",
+                label: "Edit Run Plan",
                 onClick: () => onEditSuite(variables.id),
               },
             }

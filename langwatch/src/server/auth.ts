@@ -143,6 +143,7 @@ export const authOptions = (
         await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
       }
 
+      // New user with matching SSO domain → auto-create and add to org
       if (domain && account && orgWithSsoDomain && !existingUser) {
         await createUserAndAddToOrganization(
           user,
@@ -416,6 +417,11 @@ const linkExistingUserToOAuthProvider = async (
   ]);
 };
 
+/**
+ * Checks if the incoming account matches the org's configured SSO provider.
+ * For Auth0: matches via providerAccountId prefix (e.g. "waad|connection-name")
+ * For direct NextAuth providers: matches via provider name (e.g. "google", "okta")
+ */
 const isSsoProviderMatch = (
   org: Organization,
   account: NextAuthAccount,

@@ -41,6 +41,7 @@ export const generateTracesPivotQueryConditions = ({
   filters,
   query,
   negateFilters,
+  traceIds,
 }: z.infer<typeof sharedFiltersInputSchema> & {
   filterForAnnotatedTraces?: boolean;
 }): {
@@ -70,6 +71,9 @@ export const generateTracesPivotQueryConditions = ({
               },
             },
           },
+          ...(traceIds && traceIds.length > 0
+            ? [{ terms: { trace_id: traceIds } }]
+            : []),
           ...(negateFilters ? [] : [...filterConditions]),
         ],
         ...(negateFilters

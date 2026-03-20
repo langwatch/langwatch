@@ -470,6 +470,7 @@ export class ClickHouseTraceService {
               input.endDate,
               filterConditions,
               filterParams,
+              input.traceIds,
             );
 
           // When includeSpans is requested, fetch and attach actual spans
@@ -1209,6 +1210,7 @@ export class ClickHouseTraceService {
     endDate?: number,
     filterConditions?: string[],
     filterParams?: Record<string, unknown>,
+    traceIds?: string[],
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1224,6 +1226,12 @@ export class ClickHouseTraceService {
         const extraFilters =
           filterConditions && filterConditions.length > 0
             ? " AND " + filterConditions.join(" AND ")
+            : "";
+
+        // Explicit trace ID filter — when callers provide specific trace IDs
+        const traceIdFilter =
+          traceIds && traceIds.length > 0
+            ? " AND ts.TraceId IN ({traceIds:Array(String)})"
             : "";
 
         // Keyset cursor condition — only for the data query
@@ -1242,6 +1250,7 @@ export class ClickHouseTraceService {
           startDate: startDate ?? 0,
           endDate: endDate ?? Date.now(),
           ...filterParams,
+          ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
         };
 
         // Run count + data queries in parallel.
@@ -1258,6 +1267,7 @@ export class ClickHouseTraceService {
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                 ${extraFilters}
+                ${traceIdFilter}
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
@@ -1298,6 +1308,7 @@ export class ClickHouseTraceService {
                     AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                     AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                     ${extraFilters}
+                    ${traceIdFilter}
                     ${cursorCondition}
                   ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
                   LIMIT 1 BY ts.TraceId

@@ -28,9 +28,10 @@ import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
-  DSPY_STEPS_INDEX,
   esClient,
 } from "../../elasticsearch";
+import { getApp } from "../../app-layer/app";
+import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { ExperimentRunService } from "../../evaluations-v3/services/experiment-run.service";
 import { getVersionMap } from "../../evaluations-v3/services/getVersionMap";
 import type {
@@ -612,104 +613,54 @@ export const experimentsRouter = createTRPCRouter({
         input.projectId,
         input.experimentSlug,
       );
-      const client = await esClient({ projectId: input.projectId });
 
-      const dspySteps = await client.search<DSPyStep>({
-        index: DSPY_STEPS_INDEX.alias,
-        size: 10_000,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { experiment_id: experiment.id } },
-                { term: { project_id: input.projectId } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
-          },
-          _source: [
-            "run_id",
-            "index",
-            "score",
-            "label",
-            "workflow_version_id",
-            "optimizer.name",
-            "llm_calls.completion_tokens",
-            "llm_calls.prompt_tokens",
-            "llm_calls.cost",
-            "timestamps.created_at",
-          ],
-          aggs: {
-            runs: {
-              terms: { field: "run_id", size: 1_000 },
-            },
-          },
-        },
+      const steps = await getApp().dspySteps.steps.getStepsByExperiment({
+        tenantId: input.projectId,
+        experimentId: experiment.id,
       });
 
-      const versionIds = dspySteps.hits.hits
-        .map((hit) => hit._source?.workflow_version_id)
+      const versionIds = steps
+        .map((s) => s.workflowVersionId)
         .filter((id): id is string => Boolean(id));
 
       const versionsMap = await getVersionMap({ prisma, projectId: input.projectId, versionIds });
 
-      const result: DSPyRunsSummary[] = (
-        dspySteps.aggregations?.runs as any
-      ).buckets
-        .map((bucket: any) => {
-          const steps = dspySteps.hits.hits.filter(
-            (hit) => hit._source?.run_id === bucket.key,
-          );
-          const versionId = steps.filter(
-            (step) => step._source?.workflow_version_id,
-          )[0]?._source?.workflow_version_id;
+      // Group by runId
+      const runMap = new Map<string, typeof steps>();
+      for (const step of steps) {
+        let group = runMap.get(step.runId);
+        if (!group) {
+          group = [];
+          runMap.set(step.runId, group);
+        }
+        group.push(step);
+      }
 
+      const result: DSPyRunsSummary[] = Array.from(runMap.entries())
+        .map(([runId, runSteps]) => {
+          const versionId = runSteps.find((s) => s.workflowVersionId)?.workflowVersionId;
           return {
-            runId: bucket.key,
-            workflow_version: versionId ? versionsMap[versionId] : null,
-            steps: steps
-              .map((hit) => {
-                const source = hit._source!;
-                const llmCalls = source.llm_calls ?? [];
-
-                return {
-                  run_id: source.run_id,
-                  index: source.index,
-                  score: source.score,
-                  label: source.label,
-                  optimizer: {
-                    name: source.optimizer.name,
-                  },
-                  llm_calls_summary: {
-                    total: llmCalls.length,
-                    total_tokens: llmCalls.reduce(
-                      (acc, curr) =>
-                        acc +
-                        (curr.completion_tokens ?? 0) +
-                        (curr.prompt_tokens ?? 0),
-                      0,
-                    ),
-                    total_cost: llmCalls.reduce(
-                      (acc, curr) => acc + (curr?.cost ?? 0),
-                      0,
-                    ),
-                  },
-                  timestamps: {
-                    created_at: source.timestamps.created_at,
-                  },
-                } as DSPyStepSummary;
-              })
-              .sort(
-                (a, b) => a.timestamps.created_at - b.timestamps.created_at,
-              ),
-            created_at: Math.min(
-              ...steps.map((hit) => hit._source?.timestamps.created_at ?? 0),
-            ),
+            runId,
+            workflow_version: (versionId ? versionsMap[versionId] : undefined) as DSPyRunsSummary["workflow_version"],
+            steps: runSteps
+              .map((s) => ({
+                run_id: s.runId,
+                index: s.stepIndex,
+                score: s.score,
+                label: s.label,
+                optimizer: { name: s.optimizerName },
+                llm_calls_summary: {
+                  total: s.llmCallsTotal,
+                  total_tokens: s.llmCallsTotalTokens,
+                  total_cost: s.llmCallsTotalCost,
+                },
+                timestamps: { created_at: s.createdAt },
+              } as DSPyStepSummary))
+              .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
+            created_at: Math.min(...runSteps.map((s) => s.createdAt)),
           };
         })
-        .sort(
-          (a: DSPyRunsSummary, b: DSPyRunsSummary) =>
-            b.created_at - a.created_at,
-        );
+        .sort((a, b) => b.created_at - a.created_at);
 
       return result;
     }),
@@ -730,33 +681,47 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentSlug,
       );
 
-      const client = await esClient({ projectId: input.projectId });
-      const dspyStep = await client.search<DSPyStep>({
-        index: DSPY_STEPS_INDEX.alias,
-        size: 10_000,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { experiment_id: experiment.id } },
-                { term: { project_id: input.projectId } },
-                { term: { run_id: input.runId } },
-                { term: { index: input.index } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
-          },
-        },
-      });
-
-      const result = dspyStep.hits.hits[0];
-      if (!result?._source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "DSPy step not found",
+      try {
+        const step = await getApp().dspySteps.steps.getStep({
+          tenantId: input.projectId,
+          experimentId: experiment.id,
+          runId: input.runId,
+          stepIndex: input.index,
         });
-      }
 
-      return result._source;
+        // Map camelCase domain type to snake_case DSPyStep for frontend
+        const result: DSPyStep = {
+          project_id: step.tenantId,
+          run_id: step.runId,
+          workflow_version_id: step.workflowVersionId,
+          experiment_id: step.experimentId,
+          index: step.stepIndex,
+          score: step.score,
+          label: step.label,
+          optimizer: {
+            name: step.optimizerName,
+            parameters: step.optimizerParameters as Record<string, any>,
+          },
+          predictors: step.predictors as DSPyStep["predictors"],
+          examples: step.examples as DSPyStep["examples"],
+          llm_calls: step.llmCalls as DSPyStep["llm_calls"],
+          timestamps: {
+            created_at: step.createdAt,
+            inserted_at: step.insertedAt,
+            updated_at: step.updatedAt,
+          },
+        };
+
+        return result;
+      } catch (error) {
+        if (error instanceof DspyStepNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "DSPy step not found",
+          });
+        }
+        throw error;
+      }
     }),
 
   getExperimentBatchEvaluationRuns: protectedProcedure
@@ -910,20 +875,6 @@ export const experimentsRouter = createTRPCRouter({
             },
           },
         });
-
-        await client.deleteByQuery({
-          index: DSPY_STEPS_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { experiment_id: input.experimentId } },
-                  { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
-            },
-          },
-        });
       }).catch((err) => {
         console.error("Best-effort ES cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
       });
@@ -951,7 +902,13 @@ export const experimentsRouter = createTRPCRouter({
         console.error("Best-effort CH cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
       });
 
-      await Promise.allSettled([esCleanup, chCleanup]);
+      const dspyCleanup = getApp().dspySteps.steps
+        .deleteByExperiment({ tenantId: input.projectId, experimentId: input.experimentId })
+        .catch((err) => {
+          console.error("Best-effort DSPy step cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
+        });
+
+      await Promise.allSettled([esCleanup, chCleanup, dspyCleanup]);
 
       return { success: true };
     }),
