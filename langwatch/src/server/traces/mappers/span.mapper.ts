@@ -4,6 +4,11 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { safeUnflatten } from "~/utils/safeUnflatten";
+import {
+  estimateCost,
+  matchingLLMModelCost,
+} from "~/server/background/workers/collector/cost";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import type {
   BaseSpan,
   ChatMessage,
@@ -266,6 +271,45 @@ function extractOutput(
 }
 
 /**
+ * Computes per-span cost using the same priority as the fold projection:
+ * 1. Custom cost rates from attributes
+ * 2. Static model registry lookup
+ * 3. SDK-provided cost fallback
+ */
+function computeSpanCost({
+  spanAttributes,
+  promptTokens,
+  completionTokens,
+}: {
+  spanAttributes: NormalizedAttributes;
+  promptTokens: number | null;
+  completionTokens: number | null;
+}): number | null {
+  // Priority 1: Custom cost rates
+  const inputRate = asNumberOrNull(spanAttributes["langwatch.model.inputCostPerToken"]);
+  const outputRate = asNumberOrNull(spanAttributes["langwatch.model.outputCostPerToken"]);
+  if (inputRate !== null || outputRate !== null) {
+    return (promptTokens ?? 0) * (inputRate ?? 0) + (completionTokens ?? 0) * (outputRate ?? 0);
+  }
+
+  // Priority 2: Static model registry
+  const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
+  if (typeof model === "string" && ((promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0)) {
+    const matched = matchingLLMModelCost(model, getStaticModelCosts());
+    if (matched) {
+      const computed = estimateCost({ llmModelCost: matched, inputTokens: promptTokens ?? 0, outputTokens: completionTokens ?? 0 });
+      if (computed !== undefined && computed > 0) return computed;
+    }
+  }
+
+  // Priority 3: SDK-provided cost fallback
+  const sdkCost = asNumberOrNull(spanAttributes["langwatch.span.cost"]);
+  if (sdkCost !== null && sdkCost > 0) return sdkCost;
+
+  return null;
+}
+
+/**
  * Extracts metrics from canonical span attributes only.
  * After canonicalization, tokens are at gen_ai.usage.input_tokens/output_tokens.
  * Falls back to gen_ai.usage.prompt_tokens/completion_tokens for compat.
@@ -286,7 +330,6 @@ function extractMetrics(
   const reasoningTokens = asNumberOrNull(
     spanAttributes["gen_ai.usage.reasoning_tokens"],
   );
-  const cost = asNumberOrNull(spanAttributes["langwatch.span.cost"]);
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
@@ -297,6 +340,8 @@ function extractMetrics(
   const cacheCreationInputTokens = asNumberOrNull(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
+
+  const cost = computeSpanCost({ spanAttributes, promptTokens, completionTokens });
 
   if (
     promptTokens === null &&

@@ -157,6 +157,15 @@ function stringAttr(
   return typeof v === "string" ? v : undefined;
 }
 
+function coerceToNumber(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 // ─── Span extractors ────────────────────────────────────────────────
 
 function extractModelsFromSpan(span: NormalizedSpan): string[] {
@@ -177,12 +186,12 @@ function computeSpanCost({
   promptTokens: number;
   completionTokens: number;
 }): number {
-  const inputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
-  const outputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
-  if (typeof inputRate === "number" || typeof outputRate === "number") {
+  const numInputRate = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]);
+  const numOutputRate = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]);
+  if (numInputRate !== null || numOutputRate !== null) {
     return (
-      promptTokens * (typeof inputRate === "number" ? inputRate : 0) +
-      completionTokens * (typeof outputRate === "number" ? outputRate : 0)
+      promptTokens * (numInputRate ?? 0) +
+      completionTokens * (numOutputRate ?? 0)
     );
   }
 
@@ -198,8 +207,8 @@ function computeSpanCost({
     }
   }
 
-  const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
-  if (typeof spanCost === "number" && spanCost > 0) return spanCost;
+  const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
+  if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
   if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {
     const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
@@ -224,10 +233,8 @@ function extractTokenMetrics(span: NormalizedSpan) {
   const attrs = span.spanAttributes;
   const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
   const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-  const promptTokens =
-    typeof inputTokens === "number" && inputTokens > 0 ? inputTokens : 0;
-  const completionTokens =
-    typeof outputTokens === "number" && outputTokens > 0 ? outputTokens : 0;
+  const promptTokens = Math.max(0, coerceToNumber(inputTokens) ?? 0);
+  const completionTokens = Math.max(0, coerceToNumber(outputTokens) ?? 0);
 
   return {
     promptTokens,
@@ -238,7 +245,7 @@ function extractTokenMetrics(span: NormalizedSpan) {
       promptTokens,
       completionTokens,
     }),
-    estimated: attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true,
+    estimated: attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true || attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === "true",
   };
 }
 
