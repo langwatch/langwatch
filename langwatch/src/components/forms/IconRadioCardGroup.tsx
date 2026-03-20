@@ -42,7 +42,6 @@ export const IconRadioCardGroup = <T extends string = string>({
         borderRadius="12px"
         bg={isSelected ? "orange.subtle" : "rgba(255,255,255,0.6)"}
         backdropFilter="blur(12px)"
-        WebkitBackdropFilter="blur(12px)"
         p="3"
         transition="all 0.2s ease"
         boxShadow={isSelected ? "0 0 0 1px rgba(237,137,38,0.15)" : "none"}
