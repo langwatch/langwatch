@@ -363,7 +363,9 @@ function QuickCommand({
       {...glassCard({ highlight: false })}
     >
       <HStack gap={2.5} align="center" minW={0}>
-        <Terminal size={13} color="var(--chakra-colors-fg-muted)" flexShrink={0} />
+        <Box flexShrink={0} display="flex" alignItems="center">
+          <Terminal size={13} color="var(--chakra-colors-fg-muted)" />
+        </Box>
         <VStack align="start" gap={0} minW={0}>
           <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
             {label}
@@ -457,6 +459,7 @@ function McpTab({
         {EDITOR_PATHS.map((ep) => (
           <Tooltip key={ep.editor} content={`Click to copy: ${ep.path}`} showArrow openDelay={0}>
             <HStack
+              asChild
               gap={1}
               px={2.5}
               py={1}
@@ -468,12 +471,13 @@ function McpTab({
               transition="all 0.15s ease"
               _hover={{ borderColor: "rgba(237,137,38,0.25)", bg: "white" }}
               onClick={() => {
-                void navigator.clipboard.writeText(ep.path);
-                toaster.create({
-                  title: "Copied",
-                  description: `${ep.editor} config path copied`,
-                  type: "success",
-                  meta: { closable: true },
+                void navigator.clipboard.writeText(ep.path).then(() => {
+                  toaster.create({
+                    title: "Copied",
+                    description: `${ep.editor} config path copied`,
+                    type: "success",
+                    meta: { closable: true },
+                  });
                 });
               }}
             >

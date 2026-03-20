@@ -101,6 +101,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
               variant="ghost"
               size="sm"
               borderRadius="full"
+              aria-label="Go back"
               _hover={{ bg: "blackAlpha.50" }}
               onClick={onBack}
             >
@@ -124,6 +125,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             variant="ghost"
             size="sm"
             borderRadius="full"
+            aria-label="Sign out"
             color="fg.subtle"
             _hover={{ bg: "blackAlpha.50", color: "fg.DEFAULT" }}
             onClick={() => {
@@ -159,7 +161,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             color="#6B7280"
             bg="rgba(255,255,255,0.7)"
             backdropFilter="blur(12px)"
-            WebkitBackdropFilter="blur(12px)"
+
             border="1px solid rgba(0,0,0,0.06)"
             boxShadow="0 1px 3px rgba(0,0,0,0.04)"
             textDecoration="none"
@@ -211,7 +213,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           <MotionBox
             bg="rgba(255,255,255,0.7)"
             backdropFilter="blur(12px)"
-            WebkitBackdropFilter="blur(12px)"
+
             borderRadius="16px"
             border="1px solid"
             borderColor="rgba(0,0,0,0.06)"

@@ -68,7 +68,6 @@ export function SelectableIconCard(
         }
         bg={selected ? selectedBg : "rgba(255,255,255,0.6)"}
         backdropFilter="blur(12px)"
-        WebkitBackdropFilter="blur(12px)"
         boxShadow={
           selected
             ? "0 0 0 1px rgba(237,137,38,0.15)"

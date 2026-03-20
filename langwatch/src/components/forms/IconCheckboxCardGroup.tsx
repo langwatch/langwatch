@@ -50,7 +50,6 @@ export const IconCheckboxCardGroup = <T extends string = string>({
             borderRadius="12px"
             bg={isSelected ? "orange.subtle" : "rgba(255,255,255,0.6)"}
             backdropFilter="blur(12px)"
-            WebkitBackdropFilter="blur(12px)"
             p="3"
             transition="all 0.2s ease"
             boxShadow={
