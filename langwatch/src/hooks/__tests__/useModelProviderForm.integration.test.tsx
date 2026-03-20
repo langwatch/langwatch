@@ -107,7 +107,7 @@ describe("useModelProviderForm()", () => {
       );
     });
 
-    it("resets form when project object reference changes (unmemoized)", () => {
+    it("preserves user input when project object reference changes but values are identical", () => {
       const provider = createOpenAIProvider();
       const project1 = { defaultModel: "openai/gpt-4o" };
       const project2 = { defaultModel: "openai/gpt-4o" }; // Same value, different object
@@ -132,12 +132,12 @@ describe("useModelProviderForm()", () => {
         "sk-user-typing",
       );
 
-      // Re-render with NEW reference (unmemoized project - the bug scenario)
+      // Re-render with NEW reference but same values — should NOT reset
       rerender({ project: project2 });
 
-      // This demonstrates WHY memoization is needed - new reference resets state
-      // This is the expected behavior of the hook; the fix is in the caller
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("");
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
+        "sk-user-typing",
+      );
     });
 
     it("resets form when provider actually changes", () => {

@@ -160,7 +160,9 @@ export function useModelProviderForm(
     provider.customModels,
     provider.customEmbeddingsModels,
     provider.extraHeaders,
-    project,
+    project?.defaultModel,
+    project?.topicClusteringModel,
+    project?.embeddingsModel,
     enabledProvidersCount,
   ]);
 
