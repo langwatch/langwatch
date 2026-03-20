@@ -26,7 +26,7 @@ describe("serializeValueForDataset", () => {
           role: "user",
           content: [
             { type: "text", text: "What is this?" },
-            { type: "image_url", url: "http://example.com/img.png" },
+            { type: "image_url", image_url: { url: "http://example.com/img.png" } },
           ],
         },
       ];

@@ -99,8 +99,7 @@ class TestSerializableWithStringFallbackNan:
         """Sets containing NaN are serialized (sets become lists)."""
         data = {float("nan"), 1.0, 2.0}
         result = json.loads(json.dumps(data, cls=SerializableWithStringFallback))
-        assert None in result
-        assert 1.0 in result
+        assert sorted(result, key=lambda x: (x is None, x)) == [1.0, 2.0, None]
 
     def test_json_dump_file_also_sanitizes_nan(self):
         """json.dump to file also sanitizes NaN values."""
