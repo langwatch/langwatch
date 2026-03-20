@@ -125,7 +125,6 @@ describe("NextAuth signIn callback – SSO flow", () => {
         account: ssoAccount,
       });
 
-      const transactionArgs = prismaMock.$transaction.mock.calls[0]![0];
       expect(prismaMock.account.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
