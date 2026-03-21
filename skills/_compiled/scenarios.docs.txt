@@ -232,7 +232,7 @@ scenario.configure(default_model="openai/gpt-5-mini")
 For TypeScript, create a `scenario.config.mjs` file:
 ```typescript
 // scenario.config.mjs
-import { defineConfig } from "@langwatch/scenario/integrations/vitest/config";
+import { defineConfig } from "@langwatch/scenario";
 import { openai } from "@ai-sdk/openai";
 
 export default defineConfig({
