@@ -16,8 +16,8 @@ export const suiteTargetSchema = z.object({
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
 /** Agent types that are valid suite targets (all suite target types except "prompt"). */
-export const suiteAgentTargetTypes = new Set(
-  suiteTargetSchema.shape.type.options.filter((t: string) => t !== "prompt"),
+export const suiteAgentTargetTypes: Set<string> = new Set(
+  suiteTargetSchema.shape.type.options.filter((t) => t !== "prompt"),
 );
 
 /** Parse and validate suite targets from Prisma's Json field */
