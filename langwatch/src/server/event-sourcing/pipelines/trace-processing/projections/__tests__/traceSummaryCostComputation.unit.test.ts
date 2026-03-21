@@ -206,6 +206,25 @@ describe("applySpanToSummary cost computation", () => {
     });
   });
 
+  describe("when token counts are strings", () => {
+    it("coerces string tokens and computes cost from static registry", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "gpt-5-mini",
+          "gen_ai.usage.input_tokens": "100",
+          "gen_ai.usage.output_tokens": "50",
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span: span });
+
+      expect(result.totalPromptTokenCount).toBe(100);
+      expect(result.totalCompletionTokenCount).toBe(50);
+      expect(result.totalCost).not.toBeNull();
+      expect(result.totalCost).toBeGreaterThan(0);
+    });
+  });
+
   describe("when custom rates have only inputCostPerToken", () => {
     it("computes cost using only input rate", () => {
       const span = createTestSpan({

@@ -49,7 +49,7 @@ vi.mock("../../components/ui/toaster", () => ({
 // Import the hook after mocking
 import { useModelProviderForm } from "../useModelProviderForm";
 
-describe("useModelProviderForm", () => {
+describe("useModelProviderForm()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -84,6 +84,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project,
+            enabledProvidersCount: 2,
           }),
         { initialProps: { project: stableProject } },
       );
@@ -117,6 +118,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project,
+            enabledProvidersCount: 2,
           }),
         { initialProps: { project: project1 } },
       );
@@ -157,6 +159,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         { initialProps: { provider: openaiProvider } },
       );
@@ -186,6 +189,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -207,6 +211,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -230,6 +235,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -251,6 +257,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -271,6 +278,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -299,6 +307,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -314,6 +323,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -329,6 +339,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -353,6 +364,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -369,6 +381,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -396,6 +409,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -434,6 +448,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -454,6 +469,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -473,6 +489,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -492,6 +509,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -521,6 +539,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -543,6 +562,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -564,6 +584,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -587,6 +608,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -616,6 +638,7 @@ describe("useModelProviderForm", () => {
             provider,
             projectId: "test-project-id",
             project: null,
+            enabledProvidersCount: 2,
           }),
         );
 
@@ -656,6 +679,7 @@ describe("useModelProviderForm", () => {
               provider,
               projectId: "test-project-id",
               project: null,
+              enabledProvidersCount: 2,
             }),
           { initialProps: { provider: initialProvider } },
         );
@@ -690,6 +714,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -713,6 +738,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -751,6 +777,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -765,6 +792,125 @@ describe("useModelProviderForm", () => {
     });
   });
 
+  describe("when enabledProvidersCount is 1", () => {
+    it("auto-enables useAsDefaultProvider", () => {
+      const provider = createOpenAIProvider({ enabled: false });
+      // Project default model is anthropic, NOT openai -- yet toggle should auto-enable
+      const project = { defaultModel: "anthropic/claude-sonnet-4" };
+
+      const { result } = renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          project,
+          enabledProvidersCount: 1,
+        }),
+      );
+
+      expect(result.current[0].useAsDefaultProvider).toBe(true);
+    });
+
+    it("resolves projectDefaultModel to provider model", () => {
+      const provider: MaybeStoredModelProvider = {
+        provider: "azure",
+        enabled: false,
+        customKeys: null,
+        models: ["gpt-4o"],
+        embeddingsModels: null,
+        disabledByDefault: true,
+        deploymentMapping: null,
+        extraHeaders: [],
+      };
+      // Project default is openai, which does not match azure
+      const project = { defaultModel: "openai/gpt-5.2" };
+
+      const { result } = renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          project,
+          enabledProvidersCount: 1,
+        }),
+      );
+
+      // Should resolve to first stored model from the azure provider
+      expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4o");
+    });
+
+    it("keeps existing default model when it already matches provider", () => {
+      const provider: MaybeStoredModelProvider = {
+        provider: "azure",
+        enabled: false,
+        customKeys: null,
+        models: ["gpt-4o", "gpt-4-turbo"],
+        embeddingsModels: null,
+        disabledByDefault: true,
+        deploymentMapping: null,
+        extraHeaders: [],
+      };
+      // Project default already starts with azure/
+      const project = { defaultModel: "azure/gpt-4-turbo" };
+
+      const { result } = renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          project,
+          enabledProvidersCount: 1,
+        }),
+      );
+
+      // Should keep the existing azure model, not override with first stored model
+      expect(result.current[0].projectDefaultModel).toBe("azure/gpt-4-turbo");
+    });
+  });
+
+  describe("when enabledProvidersCount is greater than 1", () => {
+    it("does not auto-enable useAsDefaultProvider", () => {
+      const provider = createOpenAIProvider({ enabled: false });
+      // Project default model is anthropic, NOT openai
+      const project = { defaultModel: "anthropic/claude-sonnet-4" };
+
+      const { result } = renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          project,
+          enabledProvidersCount: 2,
+        }),
+      );
+
+      expect(result.current[0].useAsDefaultProvider).toBe(false);
+    });
+
+    it("does not resolve models to provider", () => {
+      const provider: MaybeStoredModelProvider = {
+        provider: "azure",
+        enabled: false,
+        customKeys: null,
+        models: ["gpt-4o"],
+        embeddingsModels: null,
+        disabledByDefault: true,
+        deploymentMapping: null,
+        extraHeaders: [],
+      };
+      // Project default is openai, which does not match azure
+      const project = { defaultModel: "openai/gpt-5.2" };
+
+      const { result } = renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          project,
+          enabledProvidersCount: 2,
+        }),
+      );
+
+      // Should stay as-is since enabledProvidersCount > 1
+      expect(result.current[0].projectDefaultModel).toBe("openai/gpt-5.2");
+    });
+  });
+
   describe("Managed Provider", () => {
     it("sets MANAGED key when setManaged(true) is called", () => {
       const provider = createOpenAIProvider();
@@ -774,6 +920,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
@@ -792,6 +939,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
+          enabledProvidersCount: 2,
         }),
       );
 
