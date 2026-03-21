@@ -15,7 +15,7 @@ import { toaster } from "../../../components/ui/toaster";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
-import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
+import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { trackEvent } from "../../../utils/tracking";
 import type { Workflow } from "../../types/dsl";
@@ -219,7 +219,7 @@ export const NewWorkflowForm = ({
           },
           onError: (error) => {
             // Skip toast if the global license handler already showed the upgrade modal
-            if (isHandledByGlobalLicenseHandler(error)) return;
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Error creating workflow",
               description: error.message,

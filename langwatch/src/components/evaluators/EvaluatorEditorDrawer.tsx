@@ -51,6 +51,7 @@ import {
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 /**
@@ -374,6 +375,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       }
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating evaluator",
         description: error.message,

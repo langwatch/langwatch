@@ -54,7 +54,8 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 export type PromptEditorDrawerProps = {
@@ -161,7 +162,7 @@ const extractLocalConfig = (
  * - Supports local tinkering in evaluations context (close without save persists locally)
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
@@ -171,6 +172,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // License enforcement for prompt creation
   const { checkAndProceed } = useLicenseEnforcement("prompts");
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (state) => state.openLiteMemberRestriction,
+  );
 
   // Check if we're in evaluations context (targetId in URL params)
   const targetId = drawerParams.targetId as string | undefined;
@@ -632,7 +636,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating prompt",
         description: error.message,
@@ -683,6 +687,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Don't close - let user continue editing or close manually
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating prompt",
         description: error.message,
@@ -705,6 +710,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error renaming prompt",
         description: error.message,
@@ -759,7 +765,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       const saveData = pendingSaveDataRef.current;
 
       if (promptId && promptQuery.data?.id) {
-        // Update existing prompt - no limit check needed
+        // Update existing prompt - check RBAC first
+        if (!hasPermission("prompts:update")) {
+          openLiteMemberRestriction({ resource: "prompts" });
+          return;
+        }
         updateMutation.mutate({
           projectId: project.id,
           id: promptQuery.data.id,
@@ -769,7 +779,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         });
       } else if (newPromptData) {
-        // Create new prompt - check limit first
+        // Create new prompt - check RBAC first, then license limit
+        if (!hasPermission("prompts:create")) {
+          openLiteMemberRestriction({ resource: "prompts" });
+          return;
+        }
         checkAndProceed(() => {
           createMutation.mutate({
             projectId: project.id,
@@ -790,6 +804,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       createMutation,
       updateMutation,
       checkAndProceed,
+      hasPermission,
+      openLiteMemberRestriction,
     ],
   );
 
