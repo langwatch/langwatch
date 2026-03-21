@@ -1,10 +1,10 @@
 Feature: Simulation Run Cost and Latency Metrics
 
   Scenario runs need pre-computed cost and latency metrics so the suites page
-  can display them without joining traces at query time. Metrics are extracted
-  from traces via dual-trigger event sourcing reactors: one on the trace pipeline
-  (fires when spans are stored) and one on the simulation pipeline (fires
-  when a scenario message with trace_id arrives or run finishes).
+  can display them without joining traces at query time. Per-role cost and
+  latency are accumulated in the traceSummary fold projection as spans arrive
+  (using the langwatch.scenario.role attribute). Dual-trigger reactors then
+  propagate these metrics to the simulation run state.
 
   Metrics are stored as Maps: RoleCosts Map(String, Float64) and
   RoleLatencies Map(String, Float64) — extensible for new roles/metrics
@@ -29,29 +29,45 @@ Feature: Simulation Run Cost and Latency Metrics
     And the JudgeAgent span has role "Judge"
 
   # ---------------------------------------------------------------------------
-  # Trace-side reactor: trace arrives, finds matching simulation run
+  # Trace summary fold: per-role accumulation
   # ---------------------------------------------------------------------------
 
-  @integration
-  Scenario: Trace-side reactor computes metrics when trace matches a simulation run
-    Given a simulation run with TraceIds ["trace-abc"]
-    And a trace "trace-abc" with spans:
+  @unit
+  Scenario: Trace summary fold accumulates per-role cost and latency from spans
+    Given a trace with spans:
       | role  | durationMs | cost  |
       | Agent | 1200       | 0.003 |
       | User  | 800        | 0.001 |
       | Judge | 500        | 0.002 |
-    When spans for "trace-abc" are stored
+    When all spans are folded into the trace summary
+    Then the fold state has totalCost 0.006
+    And roleCosts is {"Agent": 0.003, "User": 0.001, "Judge": 0.002}
+    And roleLatencies is {"Agent": 1200, "User": 800, "Judge": 500}
+
+  @unit
+  Scenario: Trace summary fold ignores spans without role attribute
+    Given a trace with spans that have no "langwatch.scenario.role" attribute
+    When all spans are folded into the trace summary
+    Then roleCosts is empty
+    And roleLatencies is empty
+    And totalCost is computed normally from all spans
+
+  # ---------------------------------------------------------------------------
+  # Trace-side reactor: propagate metrics to simulation run
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Trace-side reactor propagates fold metrics to matching simulation run
+    Given a simulation run with TraceIds ["trace-abc"]
+    And the traceSummary fold for "trace-abc" has roleCosts and roleLatencies
+    When the traceSummary fold is updated for "trace-abc"
     Then the reactor queries simulation_runs for trace "trace-abc"
-    And dispatches an updateRunMetrics command with:
-      | field          | value                                      |
-      | totalCost      | 0.006                                      |
-      | roleCosts      | {"Agent": 0.003, "User": 0.001, "Judge": 0.002} |
-      | roleLatencies  | {"Agent": 1200, "User": 800, "Judge": 500} |
+    And dispatches an updateRunMetrics command with the fold state's metrics
 
   @integration
   Scenario: Trace-side reactor ignores traces not linked to simulation runs
     Given no simulation run references trace "trace-xyz"
-    When spans for "trace-xyz" are stored
+    When the traceSummary fold is updated for "trace-xyz"
     Then no updateRunMetrics command is dispatched
 
   # ---------------------------------------------------------------------------
@@ -59,17 +75,17 @@ Feature: Simulation Run Cost and Latency Metrics
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Simulation-side reactor computes metrics when trace data exists
+  Scenario: Simulation-side reactor reads trace summary when trace data exists
     Given a simulation run that received a TextMessageEnd with traceId "trace-abc"
-    And trace "trace-abc" has been processed with spans containing role attributes
+    And traceSummary for "trace-abc" has been computed with roleCosts and roleLatencies
     When the simulation fold processes the TextMessageEnd event
-    Then the reactor queries stored_spans for trace "trace-abc"
-    And dispatches an updateRunMetrics command with roleCosts and roleLatencies maps
+    Then the reactor reads the traceSummary fold state for "trace-abc"
+    And dispatches an updateRunMetrics command with the trace's role metrics
 
   @integration
   Scenario: Simulation-side reactor succeeds silently when trace not yet available
     Given a simulation run that received a TextMessageEnd with traceId "trace-abc"
-    And trace "trace-abc" has NOT been processed yet
+    And traceSummary for "trace-abc" does not exist yet
     When the simulation fold processes the TextMessageEnd event
     Then the reactor does not dispatch any command
     And does not raise an error
@@ -79,11 +95,11 @@ Feature: Simulation Run Cost and Latency Metrics
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Fold projection applies metrics_updated event
+  Scenario: Simulation fold applies metrics_updated event
     Given a simulation run state with empty metric fields
     When a metrics_updated event is applied with totalCost 0.006 and roleCosts {"Agent": 0.003}
-    Then the state has totalCost 0.006
-    And roleCosts contains "Agent" with value 0.003
+    Then the state has TotalCost 0.006
+    And RoleCosts contains "Agent" with value 0.003
 
   # ---------------------------------------------------------------------------
   # Dual-trigger convergence

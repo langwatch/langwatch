@@ -805,6 +805,17 @@ export function applySpanToSummary({
       ? [...new Set([...state.models, ...newModels])].sort()
       : state.models;
 
+  // Accumulate per-role cost/latency when langwatch.scenario.role is present
+  const scenarioRole = span.spanAttributes["langwatch.scenario.role"];
+  let roleCosts = state.roleCosts ?? {};
+  let roleLatencies = state.roleLatencies ?? {};
+  if (typeof scenarioRole === "string" && scenarioRole !== "") {
+    const spanCost = extractTokenMetrics(span).cost;
+    const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
+    roleCosts = { ...roleCosts, [scenarioRole]: (roleCosts[scenarioRole] ?? 0) + spanCost };
+    roleLatencies = { ...roleLatencies, [scenarioRole]: (roleLatencies[scenarioRole] ?? 0) + spanDurationMs };
+  }
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -821,6 +832,8 @@ export function applySpanToSummary({
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
     attributes,
+    roleCosts,
+    roleLatencies,
   };
 }
 
@@ -860,6 +873,8 @@ export function createTraceSummaryFoldProjection({
         subTopicId: null,
         hasAnnotation: null,
         attributes: {},
+        roleCosts: {},
+        roleLatencies: {},
         occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),

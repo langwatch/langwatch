@@ -76,6 +76,8 @@ export const traceSummaryDataSchema = z.object({
   subTopicId: z.string().nullable(),
   hasAnnotation: z.boolean().nullable(),
   attributes: z.record(z.string()),
+  roleCosts: z.record(z.string(), z.number()).optional(),
+  roleLatencies: z.record(z.string(), z.number()).optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
