@@ -474,48 +474,6 @@ export const system = createSystem(defaultConfig, {
           },
         },
       },
-      shadows: {
-        "2xs": {
-          value: {
-            _light:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
-            _dark:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.15)",
-          },
-        },
-        xs: {
-          value: {
-            _light:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
-            _dark:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.25)",
-          },
-        },
-        sm: {
-          value: {
-            _light:
-              "1px 1px 2px color-mix(in srgb, var(--chakra-colors-gray-900) 15%, transparent), 0px 0px 1px color-mix(in srgb, var(--chakra-colors-gray-900) 30%, transparent)",
-            _dark:
-              "1px 1px 3px rgba(0, 0, 0, 0.4), 0px 0px 1px rgba(0, 0, 0, 0.6)",
-          },
-        },
-        md: {
-          value: {
-            _light:
-              "0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1)",
-            _dark:
-              "0px 4px 6px -1px rgba(0, 0, 0, 0.4), 0px 2px 4px -2px rgba(0, 0, 0, 0.3)",
-          },
-        },
-        lg: {
-          value: {
-            _light:
-              "0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -4px rgba(0, 0, 0, 0.1)",
-            _dark:
-              "0px 10px 15px -3px rgba(0, 0, 0, 0.4), 0px 4px 6px -4px rgba(0, 0, 0, 0.3)",
-          },
-        },
-      },
     },
     recipes: {
       heading: defineRecipe({
