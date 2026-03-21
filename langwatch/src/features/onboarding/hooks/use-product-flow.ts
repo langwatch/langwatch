@@ -137,8 +137,9 @@ export function useProductFlow() {
     (product: ProductSelection) => {
       setSelectedProduct(product);
 
-      // Update URL with product parameter
+      // Update URL with product parameter, dropping stale product param
       const currentQuery = { ...router.query };
+      delete currentQuery.product;
       currentQuery.step = product; // Use product name as step ID
 
       void router.push(

@@ -137,8 +137,7 @@ export const WelcomeScreen: React.FC = () => {
       <OnboardingContainer
         title={currentScreen?.heading ?? "Welcome aboard"}
         subTitle={currentScreen?.subHeading}
-        showBackButton={!isFirstScreen}
-        onBack={navigation.prevScreen}
+        showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
           <Box position="relative" overflow="hidden">
