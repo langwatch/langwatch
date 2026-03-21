@@ -15,11 +15,11 @@ export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseC
 /**
  * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
  *
- * The <label> is a human-readable customer name (e.g., "backbase"), ignored by code.
+ * The <label> is a human-readable customer name (e.g., "acme"), ignored by code.
  * The <orgId> is the organization ID used for routing.
  *
  * Example:
- *   CLICKHOUSE_URL__backbase__dv0uZFgPfenFvzg2qKNQa=http://default:pass@backbase-ch:8123/langwatch
+ *   CLICKHOUSE_URL__acme__dv0uZFgPfenFvzg2qKNQa=http://default:pass@acme-ch:8123/langwatch
  */
 const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
 

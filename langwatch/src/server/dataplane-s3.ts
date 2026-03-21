@@ -4,7 +4,7 @@
  * Env var format:
  *   DATAPLANE_S3__<label>__<orgId>={"endpoint":"...","bucket":"...","accessKeyId":"...","secretAccessKey":"..."}
  *
- * The <label> is a human-readable customer name (e.g., "backbase"), ignored by code.
+ * The <label> is a human-readable customer name (e.g., "acme"), ignored by code.
  * The <orgId> is the organization ID used for routing.
  *
  * When no private config exists for an organization, callers fall back to the
