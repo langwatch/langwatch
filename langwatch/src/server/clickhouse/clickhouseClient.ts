@@ -1,97 +1,103 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { decrypt } from "~/utils/encryption";
+import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
+
+const logger = createLogger("langwatch:clickhouse:routing");
 
 /**
  * Resolver function that returns the appropriate ClickHouseClient for a given
  * tenant (projectId). Repositories use this instead of holding a fixed client,
- * enabling per-tenant routing to custom ClickHouse instances.
+ * enabling per-tenant routing to private ClickHouse instances.
  */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
 
 /**
- * Configuration for a custom ClickHouse instance, stored encrypted
- * as JSON in the Organization.customClickhouse field.
+ * Env var format: CLICKHOUSE_URL__<label>__org__<orgId>=<connectionUrl>
+ *
+ * The <label> is a human-readable customer name (e.g., "backbase"), ignored by code.
+ * The <orgId> is the organization ID used for routing.
+ *
+ * Example:
+ *   CLICKHOUSE_URL__backbase__org__dv0uZFgPfenFvzg2qKNQa=http://default:pass@backbase-ch:8123/langwatch
  */
-export interface CustomClickhouseConfig {
-  url: string;
-  user: string;
-  password: string;
-}
+const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
+const PRIVATE_CH_ORG_SEPARATOR = "__org__";
 
 /**
- * Cache of custom ClickHouse clients keyed by organizationId.
- * Prevents creating a new client on every request for the same org.
+ * Map of orgId → connectionUrl, parsed from env vars at module load.
+ * Zero runtime overhead — no DB queries, no decryption.
  */
+const privateClickHouseUrls = parsePrivateClickHouseEnvVars();
+
+function parsePrivateClickHouseEnvVars(): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith(PRIVATE_CH_ENV_PREFIX) && key.includes(PRIVATE_CH_ORG_SEPARATOR) && value) {
+      const orgId = key.split(PRIVATE_CH_ORG_SEPARATOR).pop();
+      if (orgId) {
+        map.set(orgId, value);
+        logger.info({ orgId, envVar: key }, "Loaded private ClickHouse URL from env var");
+      }
+    }
+  }
+  if (map.size > 0) {
+    logger.info({ count: map.size }, "Private ClickHouse instances configured");
+  }
+  return map;
+}
+
+/** Cache of custom ClickHouse clients keyed by organizationId. */
 const customClientCache = new Map<string, ClickHouseClient>();
+
+/** Cache of projectId → organizationId to avoid repeated DB lookups. */
+const projectOrgCache = new Map<string, string>();
 
 /**
  * Returns the appropriate ClickHouse client for a given project.
  *
- * Routing logic:
- * 1. Look up the project's organization (project -> team -> organization)
- * 2. If the organization has a customClickhouse config, decrypt it and
- *    create/return a cached client for that org
- * 3. Otherwise, return the default shared client from env vars
- *
- * @param projectId - The project ID to route for
- * @returns A ClickHouseClient for the appropriate instance, or null if
- *          ClickHouse is not configured
+ * Resolves the project's organization (cached), then checks for a private
+ * ClickHouse env var for that org. Falls back to the shared client.
  */
 export async function getClickHouseClientForProject(
   projectId: string,
 ): Promise<ClickHouseClient | null> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: { team: { include: { organization: true } } },
-  });
+  let orgId = projectOrgCache.get(projectId);
 
-  if (!project) {
-    return _getSharedClickHouseClient();
+  if (!orgId) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    if (!project) {
+      return _getSharedClickHouseClient();
+    }
+    orgId = project.team.organizationId;
+    projectOrgCache.set(projectId, orgId);
   }
 
-  const organization = project.team.organization;
-
-  if (!organization.customClickhouse) {
-    return _getSharedClickHouseClient();
-  }
-
-  return getOrCreateCustomClient(
-    organization.id,
-    organization.customClickhouse,
-  );
+  return getClickHouseClientForOrganization(orgId);
 }
 
 /**
  * Returns the appropriate ClickHouse client for a given organization.
  *
- * Routing logic:
- * 1. Look up the organization's customClickhouse config
- * 2. If configured, decrypt it and create/return a cached client
- * 3. Otherwise, return the default shared client from env vars
- *
- * @param organizationId - The organization ID to route for
- * @returns A ClickHouseClient for the appropriate instance, or null if
- *          ClickHouse is not configured
+ * Checks env vars for a private ClickHouse URL (zero DB query).
+ * Falls back to the shared client from CLICKHOUSE_URL.
  */
 export async function getClickHouseClientForOrganization(
   organizationId: string,
 ): Promise<ClickHouseClient | null> {
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { id: true, customClickhouse: true },
-  });
-
-  if (!organization?.customClickhouse) {
+  const privateUrl = privateClickHouseUrls.get(organizationId);
+  if (!privateUrl) {
     return _getSharedClickHouseClient();
   }
 
-  return getOrCreateCustomClient(organization.id, organization.customClickhouse);
+  return getOrCreateCustomClient(organizationId, privateUrl);
 }
 
 /**
- * Returns all ClickHouse instances: the shared one plus any custom org ones.
+ * Returns all ClickHouse instances: the shared one plus any private ones from env vars.
  * Useful for migrations, schema checks, or broadcasting DDL to all instances.
  */
 export async function getAllClickHouseInstances(): Promise<Array<{
@@ -105,18 +111,11 @@ export async function getAllClickHouseInstances(): Promise<Array<{
     instances.push({ target: "shared", client: shared });
   }
 
-  const orgsWithCustomCH = await prisma.organization.findMany({
-    where: { customClickhouse: { not: null } },
-    select: { id: true, customClickhouse: true },
-  });
-
-  for (const org of orgsWithCustomCH) {
-    if (org.customClickhouse) {
-      instances.push({
-        target: org.id,
-        client: getOrCreateCustomClient(org.id, org.customClickhouse),
-      });
-    }
+  for (const [orgId, url] of privateClickHouseUrls) {
+    instances.push({
+      target: orgId,
+      client: getOrCreateCustomClient(orgId, url),
+    });
   }
 
   return instances;
@@ -130,31 +129,31 @@ export function isClickHouseEnabled(): boolean {
   return _getSharedClickHouseClient() !== null;
 }
 
-/**
- * Re-export for infrastructure-only use (metrics collection, not tenant data).
- */
+/** Re-export for infrastructure-only use (metrics collection, not tenant data). */
 export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
 
 /**
- * Returns a cached custom ClickHouse client for the given organization,
+ * Returns a cached ClickHouse client for the given org and URL,
  * creating one if it doesn't exist yet.
  */
 function getOrCreateCustomClient(
   organizationId: string,
-  encryptedConfig: string,
+  url: string,
 ): ClickHouseClient {
   const cached = customClientCache.get(organizationId);
   if (cached) {
     return cached;
   }
 
-  const decryptedJson = decrypt(encryptedConfig);
-  const config: CustomClickhouseConfig = JSON.parse(decryptedJson);
+  let parsedUrl: URL | string = url;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    // If not a valid URL, pass raw — ClickHouse client may still accept it
+  }
 
   const client = createClient({
-    url: config.url,
-    username: config.user,
-    password: config.password,
+    url: parsedUrl,
     clickhouse_settings: {
       date_time_input_format: "best_effort",
     },
@@ -183,4 +182,18 @@ export async function clearCustomClientCache(): Promise<void> {
  */
 export function getCustomClientCacheSize(): number {
   return customClientCache.size;
+}
+
+/**
+ * Clears the project → org cache. Useful for testing.
+ */
+export function clearProjectOrgCache(): void {
+  projectOrgCache.clear();
+}
+
+/**
+ * Returns the parsed private ClickHouse URLs map. Exposed for testing.
+ */
+export function getPrivateClickHouseUrls(): ReadonlyMap<string, string> {
+  return privateClickHouseUrls;
 }

@@ -168,7 +168,6 @@ model Organization {
     s3SecretAccessKey      String?
     s3Bucket               String?
     useCustomS3            Boolean              @default(false)
-    customClickhouse       String?              @db.Text
     sentPlanLimitAlert     DateTime?
     ssoDomain              String?
     ssoProvider            String?
