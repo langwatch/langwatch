@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "../../../../utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
@@ -59,7 +60,14 @@ export class EventRepositoryClickHouse implements EventRepository {
     "langwatch:trace-processing:event-repository:clickhouse",
   );
 
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly clickHouseClientOrResolver: ClickHouseClient | ClickHouseClientResolver) {}
+
+  private async getClient(tenantId: string): Promise<ClickHouseClient> {
+    if (typeof this.clickHouseClientOrResolver === "function") {
+      return this.clickHouseClientOrResolver(tenantId);
+    }
+    return this.clickHouseClientOrResolver;
+  }
 
   async getEventRecords(
     tenantId: string,
@@ -67,7 +75,8 @@ export class EventRepositoryClickHouse implements EventRepository {
     aggregateId: string,
   ): Promise<EventRecord[]> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.getClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             EventId,
@@ -141,7 +150,8 @@ export class EventRepositoryClickHouse implements EventRepository {
     upToEventId: string,
   ): Promise<EventRecord[]> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.getClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             EventId,
@@ -227,7 +237,8 @@ export class EventRepositoryClickHouse implements EventRepository {
     beforeEventId: string,
   ): Promise<number> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.getClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT COUNT(DISTINCT EventId) as count
           FROM event_log
@@ -276,7 +287,9 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
 
     try {
-      await this.clickHouseClient.insert({
+      const tenantId = records[0]!.TenantId;
+      const client = await this.getClient(tenantId);
+      await client.insert({
         table: "event_log",
         values: records,
         format: "JSONEachRow",

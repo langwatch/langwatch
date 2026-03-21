@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
@@ -16,9 +16,9 @@ import {
 export class SimulationRunService {
   constructor(readonly repository: SimulationRepository) {}
 
-  static create(clickhouse: ClickHouseClient | null): SimulationRunService {
-    const repo = clickhouse
-      ? new SimulationClickHouseRepository(clickhouse)
+  static create(resolveClient: ClickHouseClientResolver | null): SimulationRunService {
+    const repo = resolveClient
+      ? new SimulationClickHouseRepository(resolveClient)
       : new NullSimulationRepository();
     return traced(new SimulationRunService(repo), "SimulationRunService");
   }

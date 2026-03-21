@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type {
   BatchHistoryItem,
   ExternalSetSummary,
@@ -124,13 +125,22 @@ interface CursorPayload {
 }
 
 export class SimulationClickHouseRepository implements SimulationRepository {
-  constructor(private readonly clickhouse: ClickHouseClient) {}
+  constructor(private readonly clickhouseOrResolver: ClickHouseClient | ClickHouseClientResolver) {}
+
+  private async getClient(tenantId: string): Promise<ClickHouseClient> {
+    if (typeof this.clickhouseOrResolver === "function") {
+      return this.clickhouseOrResolver(tenantId);
+    }
+    return this.clickhouseOrResolver;
+  }
 
   private async queryRows<T>(
     query: string,
     params: Record<string, string | string[]>,
   ): Promise<T[]> {
-    const result = await this.clickhouse.query({
+    const tenantId = typeof params.tenantId === "string" ? params.tenantId : params.tenantId?.[0] ?? "unknown";
+    const client = await this.getClient(tenantId);
+    const result = await client.query({
       query,
       query_params: params,
       format: "JSONEachRow",
@@ -800,7 +810,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }: {
     projectId: string;
   }): Promise<string[]> {
-    const result = await this.clickhouse.query({
+    const client = await this.getClient(projectId);
+    const result = await client.query({
       query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL`,
       query_params: { tenantId: projectId },
       format: "JSONEachRow",

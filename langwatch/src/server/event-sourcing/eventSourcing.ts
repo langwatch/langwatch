@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -42,7 +43,7 @@ const logger = createLogger("langwatch:event-sourcing");
  * Options for constructing an EventSourcing instance.
  */
 export interface EventSourcingOptions {
-  clickhouse?: ClickHouseClient;
+  clickhouse?: ClickHouseClientResolver;
   redis?: IORedis | Cluster | null;
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
@@ -98,7 +99,7 @@ export class EventSourcing {
 
   // Options
   private readonly _enabled: boolean;
-  private readonly _clickhouse?: ClickHouseClient | null;
+  private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
 
@@ -493,7 +494,7 @@ export class EventSourcing {
   static createWithStores(options: {
     eventStore: EventStore;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
-    clickhouse?: ClickHouseClient;
+    clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
   }): EventSourcing {
     const es = new EventSourcing({

@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { createLogger } from "~/utils/logger/server";
 import type {
@@ -87,7 +87,7 @@ function mergeByHash<T extends { hash: string }>(
 }
 
 export class DspyStepClickHouseRepository implements DspyStepRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsertStep(data: DspyStepData): Promise<void> {
     try {
@@ -134,7 +134,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         UpdatedAt: new Date(data.updatedAt),
       };
 
-      await this.clickHouseClient.insert({
+      const client = await this.resolveClient(data.tenantId);
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -161,7 +162,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     experimentId: string,
   ): Promise<DspyStepSummaryData[]> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             TenantId,
@@ -218,7 +220,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     stepIndex: string,
   ): Promise<DspyStepData | null> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             Id,
@@ -289,7 +292,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     experimentId: string,
   ): Promise<void> {
     try {
-      await this.clickHouseClient.command({
+      const client = await this.resolveClient(tenantId);
+      await client.command({
         query: `DELETE FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
         query_params: { tenantId, experimentId },
       });

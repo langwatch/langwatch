@@ -1,15 +1,24 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunReadRepository } from "./suite-run.repository";
 
 export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
-  constructor(private readonly clickhouse: ClickHouseClient) {}
+  constructor(private readonly clickhouseOrResolver: ClickHouseClient | ClickHouseClientResolver) {}
+
+  private async getClient(tenantId: string): Promise<ClickHouseClient> {
+    if (typeof this.clickhouseOrResolver === "function") {
+      return this.clickhouseOrResolver(tenantId);
+    }
+    return this.clickhouseOrResolver;
+  }
 
   async getSuiteRunState(params: {
     projectId: string;
     batchRunId: string;
   }): Promise<SuiteRunStateData | null> {
-    const result = await this.clickhouse.query({
+    const client = await this.getClient(params.projectId);
+    const result = await client.query({
       query: `
         SELECT
           SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,
@@ -42,7 +51,8 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
     limit?: number;
   }): Promise<SuiteRunStateData[]> {
     const limit = Math.min(params.limit ?? 50, 100);
-    const result = await this.clickhouse.query({
+    const client = await this.getClient(params.projectId);
+    const result = await client.query({
       query: `
         SELECT
           SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,

@@ -4,6 +4,13 @@ import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
 
 /**
+ * Resolver function that returns the appropriate ClickHouseClient for a given
+ * tenant (projectId). Repositories use this instead of holding a fixed client,
+ * enabling per-tenant routing to custom ClickHouse instances.
+ */
+export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
+
+/**
  * Configuration for a custom ClickHouse instance, stored encrypted
  * as JSON in the Organization.customClickhouse field.
  */
