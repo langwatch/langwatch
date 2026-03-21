@@ -312,30 +312,37 @@ function SkillRow({
           Then use
         </Text>
         <HStack
+          asChild
           gap={0.5}
           align="center"
           cursor="pointer"
-          onClick={() => {
-            void navigator.clipboard.writeText(skill.slashCommand);
-            toaster.create({
-              title: "Copied",
-              description: `${skill.slashCommand} copied to clipboard`,
-              type: "success",
-              meta: { closable: true },
-            });
-          }}
           _hover={{ opacity: 0.7 }}
           transition="opacity 0.15s ease"
         >
-          <Text
-            fontSize="xs"
-            fontFamily="mono"
-            fontWeight="semibold"
-            color="orange.400"
+          <button
+            type="button"
+            aria-label={`Copy ${skill.slashCommand}`}
+            onClick={() => {
+              void navigator.clipboard.writeText(skill.slashCommand).then(() => {
+                toaster.create({
+                  title: "Copied",
+                  description: `${skill.slashCommand} copied to clipboard`,
+                  type: "success",
+                  meta: { closable: true },
+                });
+              });
+            }}
           >
-            {skill.slashCommand}
-          </Text>
-          <Clipboard size={10} color="var(--chakra-colors-orange-300)" />
+            <Text
+              fontSize="xs"
+              fontFamily="mono"
+              fontWeight="semibold"
+              color="orange.400"
+            >
+              {skill.slashCommand}
+            </Text>
+            <Clipboard size={10} color="var(--chakra-colors-orange-300)" />
+          </button>
         </HStack>
         <Text fontSize="xs" color="fg.muted">
           in your coding agent

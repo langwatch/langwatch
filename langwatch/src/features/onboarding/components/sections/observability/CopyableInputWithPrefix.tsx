@@ -27,7 +27,7 @@ export function CopyableInputWithPrefix({
 
   function getMaskedValue(): string {
     if (!showVisibilityToggle || isVisible) return value;
-    if (value.length <= 8) return "••••••••";
+    if (value.length <= 16) return "••••••••";
     return `${value.slice(0, 4)}••••••••${value.slice(-4)}`;
   }
 

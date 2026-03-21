@@ -211,9 +211,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
       >
         {isFullWidth ? (
           <MotionBox
-            bg="rgba(255,255,255,0.7)"
-            backdropFilter="blur(12px)"
-
+            bg="white"
             borderRadius="16px"
             border="1px solid"
             borderColor="rgba(0,0,0,0.06)"
