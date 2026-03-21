@@ -4,6 +4,7 @@ import type {
     SimulationProcessingEvent,
     SimulationRunDeletedEvent,
     SimulationRunFinishedEvent,
+    SimulationRunMetricsUpdatedEvent,
     SimulationRunQueuedEvent,
     SimulationRunStartedEvent,
     SimulationTextMessageEndEvent,
@@ -44,6 +45,12 @@ export function isSimulationTextMessageEndEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationTextMessageEndEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END;
+}
+
+export function isSimulationRunMetricsUpdatedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunMetricsUpdatedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.METRICS_UPDATED;
 }
 
 export function isSimulationRunDeletedEvent(

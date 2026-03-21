@@ -13,6 +13,7 @@ import {
   isSimulationMessageSnapshotEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunMetricsUpdatedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
   isSimulationTextMessageEndEvent,
@@ -61,6 +62,9 @@ export interface SimulationRunStateData {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: number | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number>;
+  RoleLatencies: Record<string, number>;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -92,6 +96,9 @@ function init(): SimulationRunStateData {
     UnmetCriteria: [],
     Error: null,
     DurationMs: null,
+    TotalCost: null,
+    RoleCosts: {},
+    RoleLatencies: {},
     StartedAt: null,
     QueuedAt: null,
     CreatedAt: Date.now(),
@@ -283,6 +290,16 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
+      UpdatedAt: event.occurredAt,
+    };
+  }
+
+  if (isSimulationRunMetricsUpdatedEvent(event)) {
+    return {
+      ...state,
+      TotalCost: event.data.totalCost,
+      RoleCosts: event.data.roleCosts,
+      RoleLatencies: event.data.roleLatencies,
       UpdatedAt: event.occurredAt,
     };
   }
