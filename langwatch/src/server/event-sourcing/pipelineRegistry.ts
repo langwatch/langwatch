@@ -7,7 +7,9 @@ import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 
+import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
@@ -26,6 +28,8 @@ import { createSimulationProcessingPipeline } from "./pipelines/simulation-proce
 import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
+import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
+import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
@@ -111,9 +115,13 @@ export class PipelineRegistry {
     //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
     const evalPipeline = this.registerEvaluationPipeline();
-    const tracePipeline = this.registerTracePipeline(evalPipeline);
+    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationMetricsDispatcher } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline(suiteRunPipeline);
+    const simulationPipeline = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore });
+
+    // Wire late-bound dispatcher: trace-side reactor → simulation pipeline's updateRunMetrics
+    const simulationCommands = mapCommands(simulationPipeline.commands);
+    wireSimulationMetricsDispatcher(simulationCommands.updateRunMetrics);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
@@ -167,6 +175,20 @@ export class PipelineRegistry {
     // Late-bound reference to the deferred evaluation queue.
     // Set after pipeline registration, same pattern as resolveOriginDispatcher.
     let scheduleDeferredDispatcher: ((payload: DeferredEvaluationPayload) => Promise<void>) | null = null;
+
+    // Late-bound reference to the simulation pipeline's updateRunMetrics command.
+    // Set after simulation pipeline registration.
+    let updateRunMetricsDispatcher: ((data: any) => Promise<void>) | null = null;
+
+    const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
+      updateRunMetrics: async (data: any) => {
+        if (!updateRunMetricsDispatcher) {
+          logger.warn("updateRunMetrics dispatcher not yet initialized, skipping");
+          return;
+        }
+        return updateRunMetricsDispatcher(data);
+      },
+    });
 
     const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
@@ -230,6 +252,7 @@ export class PipelineRegistry {
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         spanStorageBroadcastReactor,
+        simulationMetricsSyncReactor,
       }),
     );
 
@@ -281,7 +304,13 @@ export class PipelineRegistry {
       };
     }
 
-    return tracePipeline;
+    return {
+      pipeline: tracePipeline,
+      traceSummaryStore,
+      wireSimulationMetricsDispatcher: (dispatcher: (data: any) => Promise<void>) => {
+        updateRunMetricsDispatcher = dispatcher;
+      },
+    };
   }
 
   private registerSuiteRunPipeline() {
@@ -296,7 +325,10 @@ export class PipelineRegistry {
     );
   }
 
-  private registerSimulationPipeline(suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>) {
+  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore }: {
+    suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  }) {
     const repository = this.deps.resolveClickHouseClient
       ? new SimulationRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory();
@@ -314,13 +346,34 @@ export class PipelineRegistry {
       completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
     });
 
-    return this.deps.eventSourcing.register(
+    // Late-bound: updateRunMetrics dispatches back to self (same pipeline)
+    let selfUpdateRunMetrics: ((data: any) => Promise<void>) | null = null;
+
+    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
+      traceSummaryStore,
+      updateRunMetrics: async (data: any) => {
+        if (!selfUpdateRunMetrics) {
+          logger.warn("updateRunMetrics self-dispatcher not yet initialized, skipping");
+          return;
+        }
+        return selfUpdateRunMetrics(data);
+      },
+    });
+
+    const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
         suiteRunSyncReactor,
+        traceMetricsSyncReactor,
       }),
     );
+
+    // Wire late-bound self-dispatcher
+    const simCommands = mapCommands(simulationPipeline.commands);
+    selfUpdateRunMetrics = simCommands.updateRunMetrics;
+
+    return simulationPipeline;
   }
 
   private registerBillingReportingPipeline() {

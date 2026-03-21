@@ -16,6 +16,7 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
 }
 
 /**
@@ -44,6 +45,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
     .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
+    .withReactor("simulationRunState", "traceMetricsSync", deps.traceMetricsSyncReactor)
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
