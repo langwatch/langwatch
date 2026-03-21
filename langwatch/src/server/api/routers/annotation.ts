@@ -13,6 +13,7 @@ import {
   TRACE_INDEX,
   traceIndexId,
 } from "~/server/elasticsearch";
+import { isElasticSearchWriteDisabled } from "~/server/elasticsearch/isElasticSearchWriteDisabled";
 import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
@@ -120,20 +121,26 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       logger.info({ input }, "create annotation");
 
-      const createdAnnotation = await ctx.prisma.$transaction(async (tx) => {
-        const annotation = await tx.annotation.create({
-          data: {
-            id: nanoid(),
-            projectId: input.projectId,
-            comment: input.comment ?? "",
-            isThumbsUp: input.isThumbsUp ?? null,
-            traceId: input.traceId,
-            userId: ctx.session.user.id,
-            scoreOptions: input.scoreOptions ?? {},
-            expectedOutput: input.expectedOutput ?? null,
-          },
-        });
+      const annotation = await ctx.prisma.annotation.create({
+        data: {
+          id: nanoid(),
+          projectId: input.projectId,
+          comment: input.comment ?? "",
+          isThumbsUp: input.isThumbsUp ?? null,
+          traceId: input.traceId,
+          userId: ctx.session.user.id,
+          scoreOptions: input.scoreOptions ?? {},
+          expectedOutput: input.expectedOutput ?? null,
+        },
+      });
 
+      if (
+        !(await isElasticSearchWriteDisabled(
+          ctx.prisma,
+          input.projectId,
+          "traces",
+        ))
+      ) {
         try {
           await updateTraceWithAnnotation(input.traceId, input.projectId);
         } catch (error) {
@@ -141,17 +148,10 @@ export const annotationRouter = createTRPCRouter({
             { error, traceId: input.traceId, projectId: input.projectId },
             "Failed to update Elasticsearch after annotation creation",
           );
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to add annotation to trace.",
-            cause: error,
-          });
         }
+      }
 
-        return annotation;
-      });
-
-      return createdAnnotation;
+      return annotation;
     }),
   updateByTraceId: protectedProcedure
     .input(
@@ -250,37 +250,34 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("annotations:delete"))
     .mutation(async ({ ctx, input }) => {
-      const deletedAnnotation = await ctx.prisma.$transaction(async (tx) => {
-        const annotation = await tx.annotation.delete({
-          where: {
-            id: input.annotationId,
-            projectId: input.projectId,
-          },
-        });
+      const annotation = await ctx.prisma.annotation.delete({
+        where: {
+          id: input.annotationId,
+          projectId: input.projectId,
+        },
+      });
 
+      if (
+        !(await isElasticSearchWriteDisabled(
+          ctx.prisma,
+          input.projectId,
+          "traces",
+        ))
+      ) {
         try {
           await updateTraceRemoveAnnotation(
             annotation.traceId,
             input.projectId,
           );
         } catch (error) {
-          // If Elasticsearch update fails, we should fail the transaction
-          // to maintain consistency between database and Elasticsearch
           logger.error(
             { error, traceId: annotation.traceId, projectId: input.projectId },
             "Failed to update Elasticsearch after annotation deletion",
           );
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to delete annotation from trace.",
-            cause: error,
-          });
         }
+      }
 
-        return annotation;
-      });
-
-      return deletedAnnotation;
+      return annotation;
     }),
   getAll: protectedProcedure
     .input(
