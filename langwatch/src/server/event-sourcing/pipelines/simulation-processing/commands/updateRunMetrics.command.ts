@@ -33,11 +33,13 @@ const config: SimulationCommandConfig<
   emitLogMessage: "Emitting simulation run metrics updated event",
   mapToEventData: (commandData) => ({
     scenarioRunId: commandData.scenarioRunId,
+    traceId: commandData.traceId,
     totalCost: commandData.totalCost,
     roleCosts: commandData.roleCosts,
     roleLatencies: commandData.roleLatencies,
   }),
   getLogContext: (commandData) => ({
+    traceId: commandData.traceId,
     totalCost: commandData.totalCost,
     roleCount: Object.keys(commandData.roleCosts).length,
   }),
@@ -83,7 +85,8 @@ export class UpdateRunMetricsCommand
   ): Record<string, string | number | boolean> {
     return {
       "payload.scenarioRun.id": payload.scenarioRunId,
-      "payload.totalCost": payload.totalCost ?? 0,
+      "payload.traceId": payload.traceId,
+      "payload.totalCost": payload.totalCost,
       "payload.roleCount": Object.keys(payload.roleCosts).length,
     };
   }

@@ -126,7 +126,8 @@ export type SimulationTextMessageEndEvent = z.infer<typeof SimulationTextMessage
  */
 const simulationRunMetricsUpdatedEventDataSchema = z.object({
   scenarioRunId: z.string(),
-  totalCost: z.number().nullable(),
+  traceId: z.string(),
+  totalCost: z.number(),
   roleCosts: z.record(z.string(), z.number()),
   roleLatencies: z.record(z.string(), z.number()),
 });

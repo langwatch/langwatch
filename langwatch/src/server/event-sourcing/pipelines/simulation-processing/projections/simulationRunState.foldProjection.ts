@@ -65,6 +65,7 @@ export interface SimulationRunStateData {
   TotalCost: number | null;
   RoleCosts: Record<string, number>;
   RoleLatencies: Record<string, number>;
+  TraceMetrics: Record<string, { totalCost: number; roleCosts: Record<string, number>; roleLatencies: Record<string, number> }>;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -99,6 +100,7 @@ function init(): SimulationRunStateData {
     TotalCost: null,
     RoleCosts: {},
     RoleLatencies: {},
+    TraceMetrics: {},
     StartedAt: null,
     QueuedAt: null,
     CreatedAt: Date.now(),
@@ -295,11 +297,37 @@ function apply(
   }
 
   if (isSimulationRunMetricsUpdatedEvent(event)) {
+    // Store per-trace breakdown, then recompute aggregates
+    const traceMetrics = {
+      ...state.TraceMetrics,
+      [event.data.traceId]: {
+        totalCost: event.data.totalCost,
+        roleCosts: event.data.roleCosts,
+        roleLatencies: event.data.roleLatencies,
+      },
+    };
+
+    // Aggregate across all traces
+    let totalCost = 0;
+    const roleCosts: Record<string, number> = {};
+    const roleLatencies: Record<string, number> = {};
+
+    for (const entry of Object.values(traceMetrics)) {
+      totalCost += entry.totalCost;
+      for (const [role, cost] of Object.entries(entry.roleCosts)) {
+        roleCosts[role] = (roleCosts[role] ?? 0) + cost;
+      }
+      for (const [role, latency] of Object.entries(entry.roleLatencies)) {
+        roleLatencies[role] = (roleLatencies[role] ?? 0) + latency;
+      }
+    }
+
     return {
       ...state,
-      TotalCost: event.data.totalCost,
-      RoleCosts: event.data.roleCosts,
-      RoleLatencies: event.data.roleLatencies,
+      TraceMetrics: traceMetrics,
+      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+      RoleCosts: roleCosts,
+      RoleLatencies: roleLatencies,
       UpdatedAt: event.occurredAt,
     };
   }
