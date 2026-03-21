@@ -1,27 +1,23 @@
-/**
- * Unit tests for hasNoResults — the guard that hides UI elements
- * (metrics summary, "Open Thread" button) when a scenario run
- * has not yet produced results.
- *
- * Regression: #2295 — "Open Thread" button was shown for unprocessed runs.
- */
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { hasNoResults } from "../scenario-run-status.utils";
 
-describe("hasNoResults", () => {
-  describe("when the run is still in-flight", () => {
+// Regression: #2295
+describe("hasNoResults()", () => {
+  describe("when the run is still in-flight or cancelled", () => {
     it.each([
       ScenarioRunStatus.IN_PROGRESS,
       ScenarioRunStatus.PENDING,
       ScenarioRunStatus.STALLED,
       ScenarioRunStatus.CANCELLED,
+      ScenarioRunStatus.QUEUED,
+      ScenarioRunStatus.RUNNING,
     ])("returns true for %s", (status) => {
       expect(hasNoResults(status)).toBe(true);
     });
   });
 
-  describe("when the run has reached a terminal state", () => {
+  describe("when the run has reached a terminal state with results", () => {
     it.each([
       ScenarioRunStatus.SUCCESS,
       ScenarioRunStatus.FAILED,
@@ -32,8 +28,8 @@ describe("hasNoResults", () => {
   });
 
   describe("when status is undefined", () => {
-    it("returns false", () => {
-      expect(hasNoResults(undefined)).toBe(false);
+    it("returns true", () => {
+      expect(hasNoResults(undefined)).toBe(true);
     });
   });
 });

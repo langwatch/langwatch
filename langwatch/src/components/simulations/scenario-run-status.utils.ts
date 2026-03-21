@@ -1,11 +1,12 @@
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
-/** Returns true when the run is in a non-terminal state that has no results yet. */
+const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+  ScenarioRunStatus.ERROR,
+]);
+
+/** Returns true when the run has no displayable results (non-terminal or unknown status). */
 export function hasNoResults(status?: ScenarioRunStatus): boolean {
-  return (
-    status === ScenarioRunStatus.IN_PROGRESS ||
-    status === ScenarioRunStatus.PENDING ||
-    status === ScenarioRunStatus.STALLED ||
-    status === ScenarioRunStatus.CANCELLED
-  );
+  return status === undefined || !TERMINAL_STATUSES.has(status);
 }
