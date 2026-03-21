@@ -45,6 +45,7 @@ function createFoldState(overrides: Partial<SimulationRunStateData> = {}): Simul
     TotalCost: null,
     RoleCosts: {},
     RoleLatencies: {},
+    TraceMetrics: {},
     StartedAt: 1000,
     QueuedAt: null,
     CreatedAt: 1000,

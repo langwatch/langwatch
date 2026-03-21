@@ -95,11 +95,22 @@ Feature: Simulation Run Cost and Latency Metrics
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Simulation fold applies metrics_updated event
-    Given a simulation run state with empty metric fields
-    When a metrics_updated event is applied with totalCost 0.006 and roleCosts {"Agent": 0.003}
-    Then the state has TotalCost 0.006
+  Scenario: Simulation fold stores per-trace metrics and recomputes aggregates
+    Given a simulation run state with empty TraceMetrics
+    When a metrics_updated event is applied for traceId "trace-1" with totalCost 0.003 and roleCosts {"Agent": 0.003}
+    Then TraceMetrics contains an entry for "trace-1"
+    And TotalCost is 0.003
     And RoleCosts contains "Agent" with value 0.003
+    When a second metrics_updated event is applied for traceId "trace-2" with totalCost 0.002 and roleCosts {"Judge": 0.002}
+    Then TotalCost is 0.005
+    And RoleCosts contains "Agent" with 0.003 and "Judge" with 0.002
+
+  @unit
+  Scenario: Reprocessing a trace replaces its entry (idempotent)
+    Given a simulation run with TraceMetrics containing "trace-1" with totalCost 0.003
+    When a metrics_updated event is applied for "trace-1" with totalCost 0.004
+    Then TraceMetrics["trace-1"].totalCost is 0.004
+    And TotalCost reflects the updated value
 
   # ---------------------------------------------------------------------------
   # Dual-trigger convergence

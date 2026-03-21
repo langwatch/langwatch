@@ -73,7 +73,8 @@ export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandData
 export const updateRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
-  totalCost: z.number().nullable(),
+  traceId: z.string(),
+  totalCost: z.number(),
   roleCosts: z.record(z.string(), z.number()),
   roleLatencies: z.record(z.string(), z.number()),
   occurredAt: z.number(),

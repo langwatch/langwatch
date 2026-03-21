@@ -52,6 +52,7 @@ interface ClickHouseSimulationRunRecord {
   TotalCost: number | null;
   RoleCosts: Record<string, number>;
   RoleLatencies: Record<string, number>;
+  TraceMetricsJson: string;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -102,6 +103,7 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: record.TotalCost ?? null,
       RoleCosts: record.RoleCosts ?? {},
       RoleLatencies: record.RoleLatencies ?? {},
+      TraceMetrics: record.TraceMetricsJson ? JSON.parse(record.TraceMetricsJson) : {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
@@ -146,6 +148,7 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: data.TotalCost,
       RoleCosts: data.RoleCosts,
       RoleLatencies: data.RoleLatencies,
+      TraceMetricsJson: Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -179,7 +182,7 @@ export class SimulationRunStateRepositoryClickHouse<
             TraceIds,
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
-            TotalCost, RoleCosts, RoleLatencies,
+            TotalCost, RoleCosts, RoleLatencies, TraceMetricsJson,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,

@@ -46,6 +46,7 @@ function createFoldState(
     TotalCost: null,
     RoleCosts: {},
     RoleLatencies: {},
+    TraceMetrics: {},
     StartedAt: Date.now() - 1500,
     QueuedAt: null,
     CreatedAt: Date.now() - 2000,
