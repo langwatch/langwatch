@@ -7,7 +7,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "../../clickhouse/client";
+import { getClickHouseClientForProject, isClickHouseEnabled } from "../../clickhouse/clickhouseClient";
 import type { FilterField } from "../../filters/types";
 import type { TimeseriesInputType, SeriesInputType } from "../registry";
 import { currentVsPreviousDates } from "../../api/routers/analytics/common";
@@ -49,21 +49,23 @@ export type {
  * Provides analytics queries using ClickHouse.
  */
 export class ClickHouseAnalyticsService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:analytics:clickhouse");
   private readonly tracer = getLangWatchTracer(
     "langwatch.analytics.clickhouse",
   );
 
-  constructor() {
-    this.clickHouseClient = getClickHouseClient();
+  /**
+   * Resolve the ClickHouse client for a given project.
+   */
+  private async resolveClient(projectId: string): Promise<ClickHouseClient | null> {
+    return getClickHouseClientForProject(projectId);
   }
 
   /**
-   * Check if ClickHouse client is available
+   * Check if the shared ClickHouse instance is configured (sync, for AnalyticsBackend interface).
    */
   isAvailable(): boolean {
-    return this.clickHouseClient !== null;
+    return isClickHouseEnabled();
   }
 
   /**
@@ -74,7 +76,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getTimeseries",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -115,7 +118,7 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing timeseries query");
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sql,
             query_params: params,
             format: "JSONEachRow",
@@ -408,7 +411,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getDataForFilter",
       { attributes: { "tenant.id": projectId, "filter.field": field } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -426,7 +430,7 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing dataForFilter query");
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sql,
             query_params: params,
             format: "JSONEachRow",
@@ -481,7 +485,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getTopUsedDocuments",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -507,12 +512,12 @@ export class ClickHouseAnalyticsService {
 
           // Execute both queries
           const [topDocsResult, totalResult] = await Promise.all([
-            this.clickHouseClient.query({
+            clickHouseClient.query({
               query: topDocsSql,
               query_params: params,
               format: "JSONEachRow",
             }),
-            this.clickHouseClient.query({
+            clickHouseClient.query({
               query: totalSql,
               query_params: params,
               format: "JSONEachRow",
@@ -578,7 +583,8 @@ export class ClickHouseAnalyticsService {
       "ClickHouseAnalyticsService.getFeedbacks",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -592,7 +598,7 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing feedbacks query");
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sql,
             query_params: params,
             format: "JSONEachRow",

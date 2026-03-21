@@ -24,6 +24,7 @@ export const organizationFactory = Factory.define<
   s3SecretAccessKey: null,
   s3Bucket: null,
   useCustomS3: false,
+  customClickhouse: null,
   sentPlanLimitAlert: null,
   pricingModel: PricingModel.SEAT_EVENT,
   promoCode: null,
