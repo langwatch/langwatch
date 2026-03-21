@@ -9,7 +9,6 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 import { TargetConfigSchema, WorkflowAgentDataSchema, TargetAdapterDataSchema } from "../types";
 
 describe("workflow schema validation", () => {
