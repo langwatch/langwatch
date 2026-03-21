@@ -49,6 +49,9 @@ interface ClickHouseSimulationRunRecord {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: string | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number>;
+  RoleLatencies: Record<string, number>;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -96,6 +99,9 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: record.UnmetCriteria ?? [],
       Error: record.Error,
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
+      TotalCost: record.TotalCost ?? null,
+      RoleCosts: record.RoleCosts ?? {},
+      RoleLatencies: record.RoleLatencies ?? {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
@@ -137,6 +143,9 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: data.UnmetCriteria,
       Error: data.Error,
       DurationMs: data.DurationMs?.toString() ?? null,
+      TotalCost: data.TotalCost,
+      RoleCosts: data.RoleCosts,
+      RoleLatencies: data.RoleLatencies,
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -170,6 +179,7 @@ export class SimulationRunStateRepositoryClickHouse<
             TraceIds,
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
+            TotalCost, RoleCosts, RoleLatencies,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,

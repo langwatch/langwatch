@@ -8,6 +8,7 @@ import { QueueRunCommand } from "./commands/queueRun.command";
 import { StartRunCommand } from "./commands/startRun.command";
 import { TextMessageStartCommand } from "./commands/textMessageStart.command";
 import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
+import { UpdateRunMetricsCommand } from "./commands/updateRunMetrics.command";
 import { createSimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
@@ -50,5 +51,6 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
+    .withCommand("updateRunMetrics", UpdateRunMetricsCommand)
     .build();
 }
