@@ -12,6 +12,7 @@ import {
 vi.mock("dns/promises", () => ({
   default: {
     resolve: vi.fn(),
+    lookup: vi.fn(),
   },
 }));
 
@@ -26,6 +27,7 @@ vi.mock("undici", async () => {
 const mockedFetch = vi.mocked(undiciFetch);
 
 const mockedDnsResolve = vi.mocked(dns.resolve);
+const mockedDnsLookup = vi.mocked(dns.lookup);
 
 function stubDnsResolve(ipv4: string[], ipv6: string[] = []) {
   mockedDnsResolve.mockImplementation((hostname: string, type: string) => {
@@ -220,6 +222,62 @@ describe("fetchWithResolvedIp()", () => {
       const callArgs = mockedFetch.mock.calls[0]!;
       const options = callArgs[1] as Record<string, unknown>;
       expect(options.dispatcher).toBeInstanceOf(Agent);
+    });
+  });
+});
+
+describe("resolveHostname dns.lookup fallback", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  const validate = createSSRFValidator({
+    isDevelopment: false,
+    allowedDevHosts: [],
+    isSaaS: false,
+  });
+
+  describe("when dns.resolve returns no records", () => {
+    it("falls back to dns.lookup and resolves the hostname", async () => {
+      // dns.resolve returns empty for both A and AAAA
+      mockedDnsResolve.mockResolvedValue([] as never);
+      // dns.lookup returns a valid IP (simulating Docker DNS, /etc/hosts, etc.)
+      mockedDnsLookup.mockResolvedValue({ address: "172.18.0.5", family: 4 } as never);
+
+      const result = await validate("http://my-docker-service:3000/api");
+
+      expect(result.type).toBe("resolved");
+      if (result.type === "resolved") {
+        expect(result.resolvedIp).toBe("172.18.0.5");
+      }
+      expect(mockedDnsLookup).toHaveBeenCalledWith("my-docker-service");
+    });
+  });
+
+  describe("when both dns.resolve and dns.lookup fail", () => {
+    it("throws unable to resolve in production mode", async () => {
+      const prodSaasValidate = createSSRFValidator({
+        isDevelopment: false,
+        allowedDevHosts: [],
+        isSaaS: true,
+      });
+
+      mockedDnsResolve.mockResolvedValue([] as never);
+      mockedDnsLookup.mockRejectedValue(new Error("getaddrinfo ENOTFOUND"));
+
+      await expect(
+        prodSaasValidate("http://nonexistent-host.invalid/api")
+      ).rejects.toThrow("Unable to resolve hostname");
+    });
+  });
+
+  describe("when dns.resolve succeeds", () => {
+    it("does not call dns.lookup", async () => {
+      stubDnsResolve(["93.184.216.34"]);
+
+      await validate("http://example.com/api");
+
+      expect(mockedDnsLookup).not.toHaveBeenCalled();
     });
   });
 });
