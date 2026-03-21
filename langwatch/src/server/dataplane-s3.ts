@@ -2,7 +2,7 @@
  * DATAPLANE S3 routing — resolves per-organization S3 configs from env vars.
  *
  * Env var format:
- *   DATAPLANE_S3__<label>__org__<orgId>={"endpoint":"...","bucket":"...","accessKeyId":"...","secretAccessKey":"..."}
+ *   DATAPLANE_S3__<label>__<orgId>={"endpoint":"...","bucket":"...","accessKeyId":"...","secretAccessKey":"..."}
  *
  * The <label> is a human-readable customer name (e.g., "backbase"), ignored by code.
  * The <orgId> is the organization ID used for routing.
@@ -24,7 +24,6 @@ export interface DataplaneS3Config {
 }
 
 const PRIVATE_S3_ENV_PREFIX = "DATAPLANE_S3__";
-const PRIVATE_S3_ORG_SEPARATOR = "__org__";
 
 /**
  * Map of orgId -> DataplaneS3Config, parsed from env vars at module load.
@@ -36,15 +35,15 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
   const map = new Map<string, DataplaneS3Config>();
 
   for (const [key, value] of Object.entries(process.env)) {
-    if (
-      !key.startsWith(PRIVATE_S3_ENV_PREFIX) ||
-      !key.includes(PRIVATE_S3_ORG_SEPARATOR) ||
-      !value
-    ) {
+    if (!key.startsWith(PRIVATE_S3_ENV_PREFIX) || !value) {
       continue;
     }
 
-    const orgId = key.split(PRIVATE_S3_ORG_SEPARATOR).pop();
+    // Format: DATAPLANE_S3__<label>__<orgId>
+    // Strip prefix, then take the last segment after "__" as orgId
+    const suffix = key.slice(PRIVATE_S3_ENV_PREFIX.length);
+    const lastSep = suffix.lastIndexOf("__");
+    const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
     if (!orgId) {
       continue;
     }

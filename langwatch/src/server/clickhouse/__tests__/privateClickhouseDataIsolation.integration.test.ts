@@ -318,7 +318,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     const privateUrl = privateContainer.getConnectionUrl();
 
     // Set the private CH env var so the clickhouseClient module resolves it
-    process.env[`CLICKHOUSE_URL__testcustomer__org__${PRIVATE_ORG_ID}`] =
+    process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] =
       privateUrl;
 
     sharedClient = createClient({
@@ -380,7 +380,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
     await Promise.all([sharedClient?.close(), privateClient?.close()]);
 
-    delete process.env[`CLICKHOUSE_URL__testcustomer__org__${PRIVATE_ORG_ID}`];
+    delete process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`];
   }, 60_000);
 
   /**

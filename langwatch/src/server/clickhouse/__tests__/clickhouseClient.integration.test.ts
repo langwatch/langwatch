@@ -5,7 +5,7 @@
  * Spins up two ClickHouse containers to verify that data is routed
  * to the correct instance based on env var configuration.
  *
- * Env var format: CLICKHOUSE_URL__<label>__org__<orgId>=<connectionUrl>
+ * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
  */
 import {
   ClickHouseContainer,
@@ -145,7 +145,7 @@ describe("ClickHouse routing via env vars", () => {
     privateUrl = privateContainer.getConnectionUrl();
 
     // Set the private CH env var BEFORE importing clickhouseClient
-    process.env[`CLICKHOUSE_URL__testcustomer__org__${PRIVATE_ORG_ID}`] = privateUrl;
+    process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
 
     sharedClient = createClient({
       url: sharedUrl,
@@ -181,7 +181,7 @@ describe("ClickHouse routing via env vars", () => {
     await Promise.all([sharedClient?.close(), privateClient?.close()]);
 
     // Clean up env var
-    delete process.env[`CLICKHOUSE_URL__testcustomer__org__${PRIVATE_ORG_ID}`];
+    delete process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`];
   }, 60_000);
 
   describe("when org has no private ClickHouse env var", () => {

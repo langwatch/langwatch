@@ -13,16 +13,15 @@ const logger = createLogger("langwatch:clickhouse:routing");
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
 
 /**
- * Env var format: CLICKHOUSE_URL__<label>__org__<orgId>=<connectionUrl>
+ * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
  *
  * The <label> is a human-readable customer name (e.g., "backbase"), ignored by code.
  * The <orgId> is the organization ID used for routing.
  *
  * Example:
- *   CLICKHOUSE_URL__backbase__org__dv0uZFgPfenFvzg2qKNQa=http://default:pass@backbase-ch:8123/langwatch
+ *   CLICKHOUSE_URL__backbase__dv0uZFgPfenFvzg2qKNQa=http://default:pass@backbase-ch:8123/langwatch
  */
 const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
-const PRIVATE_CH_ORG_SEPARATOR = "__org__";
 
 /**
  * Map of orgId → connectionUrl, parsed from env vars at module load.
@@ -33,12 +32,17 @@ const privateClickHouseUrls = parsePrivateClickHouseEnvVars();
 function parsePrivateClickHouseEnvVars(): Map<string, string> {
   const map = new Map<string, string>();
   for (const [key, value] of Object.entries(process.env)) {
-    if (key.startsWith(PRIVATE_CH_ENV_PREFIX) && key.includes(PRIVATE_CH_ORG_SEPARATOR) && value) {
-      const orgId = key.split(PRIVATE_CH_ORG_SEPARATOR).pop();
-      if (orgId) {
-        map.set(orgId, value);
-        logger.info({ orgId, envVar: key }, "Loaded private ClickHouse URL from env var");
-      }
+    if (!key.startsWith(PRIVATE_CH_ENV_PREFIX) || !value) continue;
+
+    // Format: CLICKHOUSE_URL__<label>__<orgId>
+    // Strip prefix, then take the last segment after "__" as orgId
+    const suffix = key.slice(PRIVATE_CH_ENV_PREFIX.length);
+    const lastSep = suffix.lastIndexOf("__");
+    const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
+
+    if (orgId) {
+      map.set(orgId, value);
+      logger.info({ orgId, envVar: key }, "Loaded private ClickHouse URL from env var");
     }
   }
   if (map.size > 0) {

@@ -3,7 +3,7 @@
  *
  * Unit tests for DATAPLANE_S3 env var parsing and routing.
  *
- * Env var format: DATAPLANE_S3__<label>__org__<orgId>=<jsonConfig>
+ * Env var format: DATAPLANE_S3__<label>__<orgId>=<jsonConfig>
  * JSON: { endpoint, bucket, accessKeyId, secretAccessKey }
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
@@ -56,7 +56,7 @@ describe("dataplane-s3", () => {
   describe("parsePrivateS3EnvVars", () => {
     describe("when valid JSON env vars are set", () => {
       it("parses a single org config", async () => {
-        process.env["DATAPLANE_S3__acme__org__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
 
         const { getS3ConfigForOrganization } = await import(
           "../dataplane-s3"
@@ -72,8 +72,8 @@ describe("dataplane-s3", () => {
       });
 
       it("parses multiple org configs", async () => {
-        process.env["DATAPLANE_S3__acme__org__org123"] = VALID_CONFIG;
-        process.env["DATAPLANE_S3__beta__org__org456"] = VALID_CONFIG_2;
+        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__beta__org456"] = VALID_CONFIG_2;
 
         const { getS3ConfigForOrganization } = await import(
           "../dataplane-s3"
@@ -97,7 +97,7 @@ describe("dataplane-s3", () => {
       });
 
       it("ignores the label portion of the env var name", async () => {
-        process.env["DATAPLANE_S3__any-label-here__org__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__any-label-here__org123"] = VALID_CONFIG;
 
         const { getS3ConfigForOrganization } = await import(
           "../dataplane-s3"
@@ -109,7 +109,7 @@ describe("dataplane-s3", () => {
       });
 
       it("logs info about loaded configs", async () => {
-        process.env["DATAPLANE_S3__acme__org__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
 
         await import("../dataplane-s3");
 
@@ -122,7 +122,7 @@ describe("dataplane-s3", () => {
 
     describe("when invalid JSON env var is set", () => {
       it("skips the invalid entry and logs a warning", async () => {
-        process.env["DATAPLANE_S3__bad__org__org999"] = "not-json";
+        process.env["DATAPLANE_S3__bad__org999"] = "not-json";
 
         const { getS3ConfigForOrganization } = await import(
           "../dataplane-s3"
@@ -139,7 +139,7 @@ describe("dataplane-s3", () => {
 
     describe("when env var has missing required fields", () => {
       it("skips the entry and logs a warning", async () => {
-        process.env["DATAPLANE_S3__partial__org__org888"] = JSON.stringify({
+        process.env["DATAPLANE_S3__partial__org888"] = JSON.stringify({
           endpoint: "https://s3.amazonaws.com",
           // missing bucket, accessKeyId, secretAccessKey
         });
@@ -169,7 +169,7 @@ describe("dataplane-s3", () => {
   describe("getS3ConfigForOrganization", () => {
     describe("when org has a private S3 configured", () => {
       it("returns the private config", async () => {
-        process.env["DATAPLANE_S3__acme__org__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
 
         const { getS3ConfigForOrganization } = await import(
           "../dataplane-s3"
@@ -198,7 +198,7 @@ describe("dataplane-s3", () => {
   describe("getS3ConfigForProject", () => {
     describe("when project belongs to org with private S3", () => {
       it("returns the private S3 config", async () => {
-        process.env["DATAPLANE_S3__acme__org__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
 
         const { prisma } = await import("../db");
         vi.mocked(prisma.project.findUnique).mockResolvedValue({
@@ -241,7 +241,7 @@ describe("dataplane-s3", () => {
 
     describe("when called twice for the same project", () => {
       it("caches the org lookup and does not query DB again", async () => {
-        process.env["DATAPLANE_S3__acme__org__org123"] = VALID_CONFIG;
+        process.env["DATAPLANE_S3__acme__org123"] = VALID_CONFIG;
 
         const { prisma } = await import("../db");
         vi.mocked(prisma.project.findUnique).mockResolvedValue({

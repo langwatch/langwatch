@@ -5,13 +5,13 @@ Feature: Private ClickHouse Routing
   on the organization that owns the project.
 
   Credentials come from environment variables, not the database. The env var
-  format is: CLICKHOUSE_URL__<label>__org__<orgId>=<connectionUrl>
+  format is: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
   where <label> is a human-readable customer name (ignored by code) and
   <orgId> is the organization ID used for routing.
 
   Background:
     Given a shared ClickHouse instance configured via CLICKHOUSE_URL
-    And a private ClickHouse instance configured via CLICKHOUSE_URL__acme__org__org123
+    And a private ClickHouse instance configured via CLICKHOUSE_URL__acme__org123
 
   # ---------------------------------------------------------------------------
   # Env var parsing
@@ -19,22 +19,22 @@ Feature: Private ClickHouse Routing
 
   @unit
   Scenario: Parse private ClickHouse URL from env var
-    Given env var "CLICKHOUSE_URL__acme__org__org123" is set to "http://private-ch:8123/langwatch"
+    Given env var "CLICKHOUSE_URL__acme__org123" is set to "http://private-ch:8123/langwatch"
     When the private ClickHouse config is loaded at startup
     Then org "org123" maps to connection URL "http://private-ch:8123/langwatch"
     And the label "acme" is ignored by the routing logic
 
   @unit
   Scenario: Multiple private ClickHouse env vars are parsed
-    Given env var "CLICKHOUSE_URL__acme__org__org1" is set to "http://ch1:8123/langwatch"
-    And env var "CLICKHOUSE_URL__beta__org__org2" is set to "http://ch2:8123/langwatch"
+    Given env var "CLICKHOUSE_URL__acme__org1" is set to "http://ch1:8123/langwatch"
+    And env var "CLICKHOUSE_URL__beta__org2" is set to "http://ch2:8123/langwatch"
     When the private ClickHouse config is loaded at startup
     Then org "org1" maps to "http://ch1:8123/langwatch"
     And org "org2" maps to "http://ch2:8123/langwatch"
 
   @unit
   Scenario: No private ClickHouse env vars results in empty map
-    Given no env vars matching "CLICKHOUSE_URL__*__org__*" are set
+    Given no env vars matching "CLICKHOUSE_URL__*__*" are set
     When the private ClickHouse config is loaded at startup
     Then the private ClickHouse map is empty
 
