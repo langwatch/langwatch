@@ -1,15 +1,19 @@
 /**
  * Compact metrics pill for run/group row headers.
  *
- * Shows pass rate circle + percentage, average agent latency, and total cost
- * inline. When a run is in progress, replaces pass rate with a Zap progress
- * indicator. Hover tooltip shows detailed breakdown.
+ * Shows pass rate, total duration, and total cost inline.
+ * Hover tooltip shows detailed breakdown with expandable
+ * percentile distributions for agent latency and cost.
  *
  * Design follows TargetSummary.tsx from the evaluations page.
  */
 
 import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { LuClock, LuZap } from "react-icons/lu";
+import { LuChevronRight, LuClock, LuZap } from "react-icons/lu";
+import {
+  LatencyStatsTooltip,
+  CostStatsTooltip,
+} from "~/components/shared/MetricStatsTooltip";
 import {
   getPassRateGradientColor,
   PassRateCircle,
@@ -43,7 +47,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
       align="stretch"
       gap={0}
       fontSize="12px"
-      minWidth="200px"
+      minWidth="220px"
       color="white"
     >
       <VStack align="stretch" gap={2} padding={2}>
@@ -74,8 +78,34 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
           </Text>
         </HStack>
 
-        {/* Average Agent Latency */}
-        {summary.averageAgentLatencyMs !== null && (
+        {/* Avg Agent Latency — expandable with percentile stats */}
+        {summary.agentLatencyStats ? (
+          <Tooltip
+            content={<LatencyStatsTooltip stats={summary.agentLatencyStats} />}
+            positioning={{ placement: "right" }}
+            openDelay={100}
+            interactive
+          >
+            <HStack
+              justify="space-between"
+              cursor="pointer"
+              _hover={{ bg: "white/10" }}
+              marginX={-2}
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="md"
+            >
+              <Text color="white/75">Avg Agent Latency</Text>
+              <HStack gap={1}>
+                <Icon as={LuClock} color="white/60" boxSize={3} />
+                <Text fontWeight="medium">
+                  {formatLatency(summary.averageAgentLatencyMs)}
+                </Text>
+                <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+              </HStack>
+            </HStack>
+          </Tooltip>
+        ) : summary.averageAgentLatencyMs !== null ? (
           <HStack justify="space-between">
             <Text color="white/75">Avg Agent Latency</Text>
             <HStack gap={1}>
@@ -84,6 +114,42 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
                 {formatLatency(summary.averageAgentLatencyMs)}
               </Text>
             </HStack>
+          </HStack>
+        ) : null}
+
+        {/* Avg Agent Cost — expandable with percentile stats */}
+        {summary.agentCostStats ? (
+          <Tooltip
+            content={<CostStatsTooltip stats={summary.agentCostStats} />}
+            positioning={{ placement: "right" }}
+            openDelay={100}
+            interactive
+          >
+            <HStack
+              justify="space-between"
+              cursor="pointer"
+              _hover={{ bg: "white/10" }}
+              marginX={-2}
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="md"
+            >
+              <Text color="white/75">Avg Agent Cost</Text>
+              <HStack gap={1}>
+                <Text fontWeight="medium">
+                  {formatCost(summary.averageAgentCost)}
+                </Text>
+                <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+              </HStack>
+            </HStack>
+          </Tooltip>
+        ) : null}
+
+        {/* Total Duration */}
+        {summary.totalDurationMs !== null && (
+          <HStack justify="space-between">
+            <Text color="white/75">Total Duration</Text>
+            <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
           </HStack>
         )}
 
@@ -173,12 +239,12 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
           </>
         )}
 
-        {/* Average agent latency */}
-        {summary.averageAgentLatencyMs !== null && (
+        {/* Total duration */}
+        {summary.totalDurationMs !== null && (
           <HStack gap={1}>
             <Icon as={LuClock} boxSize={3} />
             <Text fontWeight="medium">
-              {formatLatency(summary.averageAgentLatencyMs)}
+              {formatLatency(summary.totalDurationMs)}
             </Text>
           </HStack>
         )}

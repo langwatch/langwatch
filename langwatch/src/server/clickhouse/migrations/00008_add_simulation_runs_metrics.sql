@@ -3,8 +3,8 @@
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
   ADD COLUMN IF NOT EXISTS TotalCost Nullable(Float64),
-  ADD COLUMN IF NOT EXISTS RoleCosts Map(String, Float64),
-  ADD COLUMN IF NOT EXISTS RoleLatencies Map(String, Float64),
+  ADD COLUMN IF NOT EXISTS RoleCosts Map(String, Array(Float64)),
+  ADD COLUMN IF NOT EXISTS RoleLatencies Map(String, Array(Float64)),
   ADD COLUMN IF NOT EXISTS TraceMetricsJson String DEFAULT '';
 -- +goose StatementEnd
 

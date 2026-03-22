@@ -44,7 +44,12 @@ const STATUS_CIRCLE_COLORS: Record<string, string> = {
 function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const roleCosts = scenarioRun.roleCosts ?? {};
   const roleLatencies = scenarioRun.roleLatencies ?? {};
-  const roles = [...new Set([...Object.keys(roleCosts), ...Object.keys(roleLatencies)])];
+  const latencyRoles = Object.keys(roleLatencies).filter(
+    (role) => roleLatencies[role] && roleLatencies[role]!.length > 0,
+  );
+  const costRoles = Object.keys(roleCosts).filter(
+    (role) => roleCosts[role] && roleCosts[role]!.length > 0,
+  );
 
   return (
     <VStack align="stretch" gap={0} fontSize="12px" minWidth="180px" color="white">
@@ -65,23 +70,41 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
           </HStack>
         )}
 
-        {/* Per-role breakdown */}
-        {roles.length > 0 && (
+        {/* Latency per role */}
+        {latencyRoles.length > 0 && (
           <>
             <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
-            {roles.map((role) => (
-              <HStack key={role} justify="space-between">
-                <Text color="white/75">{role}</Text>
-                <HStack gap={2}>
-                  {roleLatencies[role] != null && (
-                    <Text fontWeight="medium">{formatLatency(roleLatencies[role]!)}</Text>
-                  )}
-                  {roleCosts[role] != null && (
-                    <Text fontWeight="medium">{formatCost(roleCosts[role]!)}</Text>
-                  )}
+            <Text color="white/85" fontWeight="semibold">Latency</Text>
+            {latencyRoles.map((role) => {
+              const latencies = roleLatencies[role]!;
+              const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+              return (
+                <HStack key={`lat-${role}`} justify="space-between" paddingLeft={2}>
+                  <Text color="white/75">{role}</Text>
+                  <Text fontWeight="medium">{formatLatency(avg)}</Text>
                 </HStack>
-              </HStack>
-            ))}
+              );
+            })}
+          </>
+        )}
+
+        {/* Cost per role */}
+        {costRoles.length > 0 && (
+          <>
+            {latencyRoles.length === 0 && (
+              <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
+            )}
+            <Text color="white/85" fontWeight="semibold">Cost</Text>
+            {costRoles.map((role) => {
+              const costs = roleCosts[role]!;
+              const total = costs.reduce((a, b) => a + b, 0);
+              return (
+                <HStack key={`cost-${role}`} justify="space-between" paddingLeft={2}>
+                  <Text color="white/75">{role}</Text>
+                  <Text fontWeight="medium">{formatCost(total)}</Text>
+                </HStack>
+              );
+            })}
           </>
         )}
       </VStack>

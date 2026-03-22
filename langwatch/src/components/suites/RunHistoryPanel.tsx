@@ -358,6 +358,10 @@ export function RunHistoryPanel({
                 totalCount: totals.runCount,
                 totalCost: null,
                 averageAgentLatencyMs: null,
+                totalDurationMs: null,
+                agentLatencyStats: null,
+                agentCostStats: null,
+                averageAgentCost: null,
               }}
             />
           </HStack>

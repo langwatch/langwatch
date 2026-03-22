@@ -365,8 +365,8 @@ describe("computeGroupSummary() metric aggregation", () => {
     it("computes average agent latency", () => {
       const group = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: 1000 } }),
-          makeScenarioRunData({ scenarioRunId: "run_2", roleLatencies: { Agent: 3000 } }),
+          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: [1000] } }),
+          makeScenarioRunData({ scenarioRunId: "run_2", roleLatencies: { Agent: [3000] } }),
         ],
       });
 
@@ -392,9 +392,9 @@ describe("computeGroupSummary() metric aggregation", () => {
     it("averages only runs that have data", () => {
       const group = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: 2000 } }),
+          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: [2000] } }),
           makeScenarioRunData({ scenarioRunId: "run_2" }),
-          makeScenarioRunData({ scenarioRunId: "run_3", roleLatencies: { Agent: 4000 } }),
+          makeScenarioRunData({ scenarioRunId: "run_3", roleLatencies: { Agent: [4000] } }),
         ],
       });
 

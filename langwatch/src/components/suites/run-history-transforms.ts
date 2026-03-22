@@ -8,6 +8,7 @@
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
+import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 export type SuiteRunSummary = {
@@ -73,6 +74,10 @@ export type RunGroupSummary = {
   queuedCount: number;
   totalCost: number | null;
   averageAgentLatencyMs: number | null;
+  totalDurationMs: number | null;
+  agentLatencyStats: MetricStats | null;
+  agentCostStats: MetricStats | null;
+  averageAgentCost: number | null;
 };
 
 /** Backward-compatible alias for RunGroupSummary. */
@@ -328,16 +333,24 @@ export function computeGroupSummary({
     : (totalCount > 0 ? null : 0);
 
   let totalCost = 0;
-  let totalAgentLatency = 0;
-  let agentLatencyCount = 0;
+  let totalDurationMs = 0;
+  const allAgentLatencies: number[] = [];
+  const allAgentCosts: number[] = [];
   for (const run of group.scenarioRuns) {
     if (run.totalCost != null) totalCost += run.totalCost;
-    const agentLatency = run.roleLatencies?.["Agent"];
-    if (agentLatency != null) {
-      totalAgentLatency += agentLatency;
-      agentLatencyCount++;
+    if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
+    const agentLatencies = run.roleLatencies?.["Agent"];
+    if (agentLatencies) {
+      allAgentLatencies.push(...agentLatencies);
+    }
+    const agentCosts = run.roleCosts?.["Agent"];
+    if (agentCosts) {
+      allAgentCosts.push(...agentCosts);
     }
   }
+
+  const agentLatencyStats = computeMetricStats(allAgentLatencies);
+  const agentCostStats = computeMetricStats(allAgentCosts);
 
   return {
     passRate,
@@ -350,7 +363,11 @@ export function computeGroupSummary({
     inProgressCount,
     queuedCount,
     totalCost: totalCost > 0 ? totalCost : null,
-    averageAgentLatencyMs: agentLatencyCount > 0 ? totalAgentLatency / agentLatencyCount : null,
+    averageAgentLatencyMs: agentLatencyStats?.avg ?? null,
+    totalDurationMs: totalDurationMs > 0 ? totalDurationMs : null,
+    agentLatencyStats,
+    agentCostStats,
+    averageAgentCost: agentCostStats?.avg ?? null,
   };
 }
 

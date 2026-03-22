@@ -6,7 +6,7 @@
  * accumulated in the trace summary fold state.
  *
  * This test proves the full path:
- * 1. Span with langwatch.scenario.role arrives
+ * 1. Span with scenario.role arrives
  * 2. traceSummary fold accumulates scenarioRoleCosts via parent-role inheritance
  * 3. Fold state is persisted to ClickHouse trace_summaries table
  * 4. Data can be read back from the store
@@ -202,6 +202,8 @@ describe.skipIf(!hasTestcontainers)(
             name: "Scenario Turn",
             attributes: [
               { key: "langwatch.span.type", value: { stringValue: "span" } },
+              { key: "scenario.run_id", value: { stringValue: "scenariorun_test123" } },
+              { key: "langwatch.origin", value: { stringValue: "simulation" } },
             ],
             durationMs: 5000,
           }),
@@ -221,8 +223,7 @@ describe.skipIf(!hasTestcontainers)(
             name: "WeatherAgent.call",
             attributes: [
               { key: "langwatch.span.type", value: { stringValue: "agent" } },
-              { key: "langwatch.scenario.role", value: { stringValue: "Agent" } },
-              { key: "langwatch.scenario.run_id", value: { stringValue: "scenariorun_test123" } },
+              { key: "scenario.role", value: { stringValue: "Agent" } },
             ],
             durationMs: 4000,
           }),
@@ -335,10 +336,8 @@ describe.skipIf(!hasTestcontainers)(
         expect(row.ScenarioRoleLatencies).toBeDefined();
         expect(row.ScenarioRoleLatencies["Agent"]).toBe(4000);
 
-        // TODO: scenario_run_id is on agent child spans, not root span.
-        // Need to either move it to root span in scenario executor,
-        // or hoist it from child spans in the fold.
-        // expect(row.Attributes["langwatch.scenario.run_id"]).toBe("scenariorun_test123");
+        // scenario.run_id hoisted from root span to attributes
+        expect(row.Attributes["scenario.run_id"]).toBe("scenariorun_test123");
       }, 60_000);
     });
   },

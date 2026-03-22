@@ -329,7 +329,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
           endTimeUnixMs: 5000,
           durationMs: 4000,
           spanAttributes: {
-            "langwatch.scenario.role": "Agent",
+            "scenario.role": "Agent",
           },
         });
 
@@ -382,7 +382,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
           endTimeUnixMs: 5000,
           durationMs: 4000,
           spanAttributes: {
-            "langwatch.scenario.role": "Agent",
+            "scenario.role": "Agent",
           },
         });
 
@@ -420,7 +420,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
           startTimeUnixMs: 1000,
           endTimeUnixMs: 2000,
           durationMs: 1000,
-          spanAttributes: { "langwatch.scenario.role": "User" },
+          spanAttributes: { "scenario.role": "User" },
         });
 
         const userLlm = createTestSpan({
@@ -443,7 +443,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
           startTimeUnixMs: 2000,
           endTimeUnixMs: 6000,
           durationMs: 4000,
-          spanAttributes: { "langwatch.scenario.role": "Agent" },
+          spanAttributes: { "scenario.role": "Agent" },
         });
 
         const agentLlm = createTestSpan({
@@ -466,7 +466,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
           startTimeUnixMs: 6000,
           endTimeUnixMs: 7000,
           durationMs: 1000,
-          spanAttributes: { "langwatch.scenario.role": "Judge" },
+          spanAttributes: { "scenario.role": "Judge" },
         });
 
         const judgeLlm = createTestSpan({
@@ -510,7 +510,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
           startTimeUnixMs: 1000,
           endTimeUnixMs: 5000,
           durationMs: 4000,
-          spanAttributes: { "langwatch.scenario.role": "Agent" },
+          spanAttributes: { "scenario.role": "Agent" },
         });
 
         const toolSpan = createTestSpan({
@@ -548,7 +548,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
   });
 
   describe("given a trace without scenario roles", () => {
-    describe("when spans have no langwatch.scenario.role attribute", () => {
+    describe("when spans have no scenario.role attribute", () => {
       it("leaves scenarioRoleCosts and scenarioRoleLatencies empty", () => {
         const span = createTestSpan({
           spanId: "span-1",

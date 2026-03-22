@@ -334,6 +334,9 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
   const origin = stringAttr(spanAttrs, "langwatch.origin");
   if (origin) result["langwatch.origin"] = origin;
 
+  const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
+  if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
+
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
   if (typeof labels === "string") result["langwatch.labels"] = labels;
   else if (Array.isArray(labels))
@@ -779,7 +782,7 @@ function resolveEffectiveRole({
   span: NormalizedSpan;
   scenarioRoleSpans: Record<string, string>;
 }): string | undefined {
-  const directRole = span.spanAttributes["langwatch.scenario.role"];
+  const directRole = span.spanAttributes["scenario.role"];
   if (typeof directRole === "string" && directRole !== "") return directRole;
 
   // Walk up the parent chain via the scenarioRoleSpans map
@@ -803,7 +806,7 @@ function accumulateRoleCostLatency({
   const scenarioRoleSpans = { ...(state.scenarioRoleSpans ?? {}) };
 
   // Record this span's role if it has one
-  const directRole = span.spanAttributes["langwatch.scenario.role"];
+  const directRole = span.spanAttributes["scenario.role"];
   if (typeof directRole === "string" && directRole !== "") {
     scenarioRoleSpans[span.spanId] = directRole;
   } else if (span.parentSpanId && scenarioRoleSpans[span.parentSpanId]) {

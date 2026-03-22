@@ -78,13 +78,13 @@ function createSpanReceivedEvent(): SpanReceivedEvent {
 }
 
 describe("simulationMetricsSync reactor (trace-side)", () => {
-  describe("when trace has langwatch.scenario.run_id attribute", () => {
+  describe("when trace has scenario.run_id attribute", () => {
     it("dispatches updateRunMetrics with role costs and latencies", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
-        attributes: { "langwatch.scenario.run_id": "run-1" },
+        attributes: { "scenario.run_id": "run-1" },
         scenarioRoleCosts: { Agent: 0.001 },
         scenarioRoleLatencies: { Agent: 500 },
         totalCost: 0.001,
@@ -108,7 +108,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
     });
   });
 
-  describe("when trace has no langwatch.scenario.run_id attribute", () => {
+  describe("when trace has no scenario.run_id attribute", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
@@ -133,7 +133,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
-        attributes: { "langwatch.scenario.run_id": "run-1" },
+        attributes: { "scenario.run_id": "run-1" },
         scenarioRoleCosts: {},
         scenarioRoleLatencies: {},
         totalCost: null,
@@ -156,7 +156,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
-        attributes: { "langwatch.scenario.run_id": "run-1" },
+        attributes: { "scenario.run_id": "run-1" },
         scenarioRoleCosts: { Agent: 0.001 },
         totalCost: 0.001,
       });
@@ -177,7 +177,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
-        attributes: { "langwatch.scenario.run_id": "run-1" },
+        attributes: { "scenario.run_id": "run-1" },
         scenarioRoleCosts: { Agent: 0.0 },
         scenarioRoleLatencies: { Agent: 500 },
         totalCost: 0,

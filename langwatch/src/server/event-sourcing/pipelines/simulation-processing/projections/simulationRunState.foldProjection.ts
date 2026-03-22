@@ -63,8 +63,8 @@ export interface SimulationRunStateData {
   Error: string | null;
   DurationMs: number | null;
   TotalCost: number | null;
-  RoleCosts: Record<string, number>;
-  RoleLatencies: Record<string, number>;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
   TraceMetrics: Record<string, { totalCost: number; roleCosts: Record<string, number>; roleLatencies: Record<string, number> }>;
   StartedAt: number | null;
   QueuedAt: number | null;
@@ -307,18 +307,18 @@ function apply(
       },
     };
 
-    // Aggregate across all traces
+    // Aggregate across all traces: collect individual values into arrays
     let totalCost = 0;
-    const roleCosts: Record<string, number> = {};
-    const roleLatencies: Record<string, number> = {};
+    const roleCosts: Record<string, number[]> = {};
+    const roleLatencies: Record<string, number[]> = {};
 
     for (const entry of Object.values(traceMetrics)) {
       totalCost += entry.totalCost;
       for (const [role, cost] of Object.entries(entry.roleCosts)) {
-        roleCosts[role] = (roleCosts[role] ?? 0) + cost;
+        (roleCosts[role] ??= []).push(cost);
       }
       for (const [role, latency] of Object.entries(entry.roleLatencies)) {
-        roleLatencies[role] = (roleLatencies[role] ?? 0) + latency;
+        (roleLatencies[role] ??= []).push(latency);
       }
     }
 

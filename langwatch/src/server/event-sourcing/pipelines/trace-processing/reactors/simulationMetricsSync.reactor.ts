@@ -16,7 +16,7 @@ export interface SimulationMetricsSyncReactorDeps {
 }
 
 /**
- * Trace-side reactor: when a trace with langwatch.scenario.run_id arrives,
+ * Trace-side reactor: when a trace with scenario.run_id arrives,
  * propagates per-role cost/latency metrics to the simulation run.
  *
  * Zero queries — reads scenario_run_id directly from the trace's hoisted
@@ -43,7 +43,7 @@ export function createSimulationMetricsSyncReactor(
       context: ReactorContext<TraceSummaryData>,
     ): Promise<void> {
       const { tenantId, foldState } = context;
-      const scenarioRunId = foldState.attributes["langwatch.scenario.run_id"];
+      const scenarioRunId = foldState.attributes["scenario.run_id"];
 
       if (!scenarioRunId) return;
 

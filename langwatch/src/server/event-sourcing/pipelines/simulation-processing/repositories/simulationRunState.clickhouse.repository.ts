@@ -50,8 +50,8 @@ interface ClickHouseSimulationRunRecord {
   Error: string | null;
   DurationMs: string | null;
   TotalCost: number | null;
-  RoleCosts: Record<string, number>;
-  RoleLatencies: Record<string, number>;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
   TraceMetricsJson: string;
   StartedAt: number | null;
   QueuedAt: number | null;

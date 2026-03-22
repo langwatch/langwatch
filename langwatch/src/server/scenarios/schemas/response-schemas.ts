@@ -54,8 +54,8 @@ export const runDataSchema = z.object({
   timestamp: z.number(), // Unix timestamp when run was executed
   durationInMs: z.number(), // Execution time in milliseconds
   totalCost: z.number().optional(), // Total cost in USD across all traces
-  roleCosts: z.record(z.string(), z.number()).optional(), // Per-role cost breakdown
-  roleLatencies: z.record(z.string(), z.number()).optional(), // Per-role latency breakdown
+  roleCosts: z.record(z.string(), z.array(z.number())).optional(), // Per-role cost values (one per trace)
+  roleLatencies: z.record(z.string(), z.array(z.number())).optional(), // Per-role latency values (one per trace)
 });
 
 /**

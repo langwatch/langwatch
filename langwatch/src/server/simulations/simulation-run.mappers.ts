@@ -32,8 +32,8 @@ export interface ClickHouseSimulationRunRow {
   Error: string | null;
   DurationMs: string | null;
   TotalCost: number | null;
-  RoleCosts: Record<string, number>;
-  RoleLatencies: Record<string, number>;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
   CreatedAt: string;
   UpdatedAt: string;
   FinishedAt: string | null;

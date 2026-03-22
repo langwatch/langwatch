@@ -69,6 +69,10 @@ export function makeSummary(
     queuedCount: 0,
     totalCost: null,
     averageAgentLatencyMs: null,
+    totalDurationMs: null,
+    agentLatencyStats: null,
+    agentCostStats: null,
+    averageAgentCost: null,
     ...overrides,
   };
 }
