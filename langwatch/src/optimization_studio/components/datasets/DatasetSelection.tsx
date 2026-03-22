@@ -50,13 +50,8 @@ export function DatasetSelection({
                 setIsEditing({ id: datasetId, name });
               };
 
-              openDrawer("uploadCSV", {
+              openDrawer("addOrEditDataset", {
                 onSuccess: handleSuccess,
-                onCreateFromScratch: () => {
-                  openDrawer("addOrEditDataset", {
-                    onSuccess: handleSuccess,
-                  });
-                },
               });
             }}
           >
