@@ -25,7 +25,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when collapsed", () => {
-    it("displays status counts as word labels", () => {
+    it("displays pass rate in metrics summary pill", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -38,8 +38,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("2 passed")).toBeInTheDocument();
-      expect(screen.queryByText("100%")).not.toBeInTheDocument();
+      expect(screen.getByText("Pass")).toBeInTheDocument();
+      expect(screen.getByText("100%")).toBeInTheDocument();
     });
 
     it("does not display scenario x target rows", () => {
@@ -169,11 +169,11 @@ describe("<RunRow/>", () => {
   });
 
   describe("when summary shows failures", () => {
-    it("displays failure count with icon", () => {
+    it("displays pass rate reflecting failures", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 2, failedCount: 1 })}
+          summary={makeSummary({ passedCount: 2, failedCount: 1, passRate: 67 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -182,8 +182,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
-      expect(screen.getByText("2 passed")).toBeInTheDocument();
+      expect(screen.getByText("67%")).toBeInTheDocument();
     });
   });
 
@@ -328,12 +327,12 @@ describe("<RunRow/>", () => {
     });
   });
 
-  describe("when viewing summary counts in header", () => {
-    it("displays word-label counts with no redundant standalone text", () => {
+  describe("when viewing summary metrics in header", () => {
+    it("displays pass rate pill in header", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
+          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -342,18 +341,15 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("8 passed")).toBeInTheDocument();
-      expect(screen.getByText("2 failed")).toBeInTheDocument();
-      // No redundant standalone "passed" or "failed" text
-      expect(screen.queryByText("passed")).not.toBeInTheDocument();
-      expect(screen.queryByText("failed")).not.toBeInTheDocument();
+      expect(screen.getByText("Pass")).toBeInTheDocument();
+      expect(screen.getByText("80%")).toBeInTheDocument();
     });
 
-    it("renders RunSummaryCounts inside the header", () => {
+    it("renders RunMetricsSummary inside the header", () => {
       const { container } = render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
+          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -364,8 +360,8 @@ describe("<RunRow/>", () => {
 
       const header = container.querySelector('[data-testid="run-row-header"]');
       expect(header).toBeInTheDocument();
-      const counts = header?.querySelector('[data-testid="run-summary-counts"]');
-      expect(counts).toBeInTheDocument();
+      const metrics = header?.querySelector('[data-testid="run-metrics-summary"]');
+      expect(metrics).toBeInTheDocument();
     });
   });
 
