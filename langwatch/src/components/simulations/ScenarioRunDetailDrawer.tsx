@@ -23,10 +23,10 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
+import { hasNoResults } from "./scenario-run-status.utils";
 import { Drawer } from "../ui/drawer";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
@@ -39,15 +39,6 @@ export interface ScenarioRunDetailDrawerProps {
 
 function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
-}
-
-function hasNoResults(status?: ScenarioRunStatus): boolean {
-  return (
-    status === ScenarioRunStatus.IN_PROGRESS ||
-    status === ScenarioRunStatus.PENDING ||
-    status === ScenarioRunStatus.STALLED ||
-    status === ScenarioRunStatus.CANCELLED
-  );
 }
 
 function computeSuccessRate(met: number, unmet: number): string {
@@ -262,7 +253,7 @@ export function ScenarioRunDetailDrawer({
                       onRunAgain={handleRunAgainClick}
                       onEditScenario={() => setScenarioEditorOpen(true)}
                     />
-                    {firstTraceId && (
+                    {firstTraceId && !hasNoResults(scenarioState.status) && (
                       <Button
                         colorPalette="gray"
                         size="sm"
