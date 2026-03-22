@@ -3,6 +3,16 @@ import type { PrismaClient } from "@prisma/client";
 import { projectRouter } from "../project";
 import { createInnerTRPCContext } from "../../trpc";
 
+const mockGetById = vi.fn();
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    projects: {
+      getById: mockGetById,
+    },
+  }),
+}));
+
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
   customAlphabet: vi.fn(
@@ -49,20 +59,10 @@ vi.mock("../../../auditLog", () => ({
 }));
 
 describe("project.getHasFirstMessage", () => {
-  let mockPrisma: {
-    project: {
-      findUnique: ReturnType<typeof vi.fn>;
-    };
-  };
   let caller: ReturnType<typeof projectRouter.createCaller>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma = {
-      project: {
-        findUnique: vi.fn(),
-      },
-    };
 
     const ctx = createInnerTRPCContext({
       session: {
@@ -75,33 +75,26 @@ describe("project.getHasFirstMessage", () => {
       publiclyShared: false,
     });
 
-    ctx.prisma = mockPrisma as unknown as PrismaClient;
+    ctx.prisma = {} as unknown as PrismaClient;
     caller = projectRouter.createCaller(ctx);
   });
 
   describe("when project has received traces", () => {
     it("returns firstMessage as true", async () => {
-      mockPrisma.project.findUnique.mockResolvedValueOnce({
-        firstMessage: true,
-      });
+      mockGetById.mockResolvedValueOnce({ firstMessage: true });
 
       const result = await caller.getHasFirstMessage({
         projectId: "project_123",
       });
 
       expect(result).toEqual({ firstMessage: true });
-      expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
-        where: { id: "project_123" },
-        select: { firstMessage: true },
-      });
+      expect(mockGetById).toHaveBeenCalledWith("project_123");
     });
   });
 
   describe("when project has not received traces", () => {
     it("returns firstMessage as false", async () => {
-      mockPrisma.project.findUnique.mockResolvedValueOnce({
-        firstMessage: false,
-      });
+      mockGetById.mockResolvedValueOnce({ firstMessage: false });
 
       const result = await caller.getHasFirstMessage({
         projectId: "project_123",
@@ -113,7 +106,7 @@ describe("project.getHasFirstMessage", () => {
 
   describe("when project does not exist", () => {
     it("returns firstMessage as false", async () => {
-      mockPrisma.project.findUnique.mockResolvedValueOnce(null);
+      mockGetById.mockResolvedValueOnce(null);
 
       const result = await caller.getHasFirstMessage({
         projectId: "nonexistent",

@@ -265,11 +265,8 @@ export const projectRouter = createTRPCRouter({
   getHasFirstMessage: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
-    .query(async ({ input, ctx }) => {
-      const project = await ctx.prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { firstMessage: true },
-      });
+    .query(async ({ input }) => {
+      const project = await getApp().projects.getById(input.projectId);
 
       return { firstMessage: project?.firstMessage ?? false };
     }),
