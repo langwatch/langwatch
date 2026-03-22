@@ -62,3 +62,6 @@ seed.spec.ts
 
 # Skills test artifacts
 skills/_tests/helpers/.mcp-config.json
+preprocessed_configs/
+status
+uuid
