@@ -72,10 +72,6 @@ class AttributeKey:
     LangWatchEventEvaluationCustom = "langwatch.evaluation.custom"
     LangWatchEventEvaluationLog = "langwatch.evaluation.log"
 
-    # LangWatch Scenario attributes
-    LangWatchScenarioRole = "langwatch.scenario.role"
-    LangWatchScenarioRunId = "langwatch.scenario.run_id"
-
     # LangWatch Prompt attributes
     LangWatchPromptId = "langwatch.prompt.id"
     LangWatchPromptHandle = "langwatch.prompt.handle"

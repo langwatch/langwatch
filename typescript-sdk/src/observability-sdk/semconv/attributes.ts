@@ -148,18 +148,6 @@ export const ATTR_LANGWATCH_PROMPT_VERSION_NUMBER =
   "langwatch.prompt.version.number";
 
 /**
- * LangWatch scenario role attribute key
- * Used to identify the role of an agent in a scenario (User, Agent, Judge)
- */
-export const ATTR_LANGWATCH_SCENARIO_ROLE = "langwatch.scenario.role";
-
-/**
- * LangWatch scenario run ID attribute key
- * Used to link traces back to their parent scenario run
- */
-export const ATTR_LANGWATCH_SCENARIO_RUN_ID = "langwatch.scenario.run_id";
-
-/**
  * LangWatch LangChain tags attribute key
  * Used to store tags associated with LangChain operations
  */
