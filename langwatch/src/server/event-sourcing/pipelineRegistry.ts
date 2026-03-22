@@ -40,6 +40,7 @@ import {
   SuiteRunStateRepositoryMemory,
 } from "./pipelines/suite-run-processing/repositories";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import type { EventSourcing } from "./eventSourcing";
@@ -114,9 +115,9 @@ export class PipelineRegistry {
     //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
     const evalPipeline = this.registerEvaluationPipeline();
-    const { pipeline: tracePipeline, traceSummaryStore } = this.registerTracePipeline(evalPipeline);
+    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore });
+    const simulationPipeline = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
@@ -210,6 +211,21 @@ export class PipelineRegistry {
       projects: this.deps.projects,
     });
 
+    // Late-bound reference for simulation metrics sync reactor.
+    // The simulation pipeline is registered after the trace pipeline,
+    // so updateRunMetrics is wired after simulation pipeline registration.
+    let simUpdateRunMetrics: ((data: any) => Promise<void>) | null = null;
+
+    const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
+      updateRunMetrics: async (data) => {
+        if (!simUpdateRunMetrics) {
+          logger.warn("simulation updateRunMetrics not yet initialized, skipping");
+          return;
+        }
+        return simUpdateRunMetrics(data);
+      },
+    });
+
     if (!this.deps.resolveClickHouseClient) {
       logger.warn(
         "ClickHouse client resolver not provided, log and metric record writes will be no-ops using NullRepository implementations",
@@ -233,6 +249,7 @@ export class PipelineRegistry {
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
+        simulationMetricsSyncReactor,
         spanStorageBroadcastReactor,
       }),
     );
@@ -288,6 +305,16 @@ export class PipelineRegistry {
     return {
       pipeline: tracePipeline,
       traceSummaryStore,
+      /**
+       * Wires late-bound simulation updateRunMetrics into the trace-side
+       * simulationMetricsSync reactor. Called after the simulation
+       * pipeline is registered.
+       */
+      wireSimulationDeps: (deps: {
+        updateRunMetrics: (data: any) => Promise<void>;
+      }) => {
+        simUpdateRunMetrics = deps.updateRunMetrics;
+      },
     };
   }
 
@@ -303,9 +330,10 @@ export class PipelineRegistry {
     );
   }
 
-  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore }: {
+  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+    wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
   }) {
     const repository = this.deps.resolveClickHouseClient
       ? new SimulationRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
@@ -350,6 +378,11 @@ export class PipelineRegistry {
     // Wire late-bound self-dispatcher
     const simCommands = mapCommands(simulationPipeline.commands);
     selfUpdateRunMetrics = simCommands.updateRunMetrics;
+
+    // Wire the trace-side simulationMetricsSync reactor's late-bound deps
+    wireSimulationDeps({
+      updateRunMetrics: simCommands.updateRunMetrics,
+    });
 
     return simulationPipeline;
   }
