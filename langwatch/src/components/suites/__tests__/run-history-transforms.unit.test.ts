@@ -4,6 +4,7 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
   computeBatchRunSummary,
+  computeGroupSummary,
   computeRunHistoryTotals,
   computeSuiteRunSummaries,
   getScenarioDisplayNames,
@@ -235,6 +236,93 @@ describe("computeBatchRunSummary()", () => {
       expect(summary.failedCount).toBe(0);
       expect(summary.totalCount).toBe(2);
       expect(summary.inProgressCount).toBe(1);
+    });
+  });
+});
+
+describe("computeGroupSummary() metric aggregation", () => {
+  describe("when runs have totalCost values", () => {
+    it("sums total cost across all runs", () => {
+      const group = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ scenarioRunId: "run_1", totalCost: 0.001 }),
+          makeScenarioRunData({ scenarioRunId: "run_2", totalCost: 0.002 }),
+        ],
+      });
+
+      const summary = computeGroupSummary({ group });
+      expect(summary.totalCost).toBeCloseTo(0.003, 6);
+    });
+  });
+
+  describe("when no runs have cost data", () => {
+    it("returns null for totalCost", () => {
+      const group = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ scenarioRunId: "run_1" }),
+          makeScenarioRunData({ scenarioRunId: "run_2" }),
+        ],
+      });
+
+      const summary = computeGroupSummary({ group });
+      expect(summary.totalCost).toBeNull();
+    });
+  });
+
+  describe("when runs have Agent role latencies", () => {
+    it("computes average agent latency", () => {
+      const group = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: 1000 } }),
+          makeScenarioRunData({ scenarioRunId: "run_2", roleLatencies: { Agent: 3000 } }),
+        ],
+      });
+
+      const summary = computeGroupSummary({ group });
+      expect(summary.averageAgentLatencyMs).toBe(2000);
+    });
+  });
+
+  describe("when no runs have agent latency", () => {
+    it("returns null for averageAgentLatencyMs", () => {
+      const group = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ scenarioRunId: "run_1" }),
+        ],
+      });
+
+      const summary = computeGroupSummary({ group });
+      expect(summary.averageAgentLatencyMs).toBeNull();
+    });
+  });
+
+  describe("when only some runs have agent latency", () => {
+    it("averages only runs that have data", () => {
+      const group = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: 2000 } }),
+          makeScenarioRunData({ scenarioRunId: "run_2" }),
+          makeScenarioRunData({ scenarioRunId: "run_3", roleLatencies: { Agent: 4000 } }),
+        ],
+      });
+
+      const summary = computeGroupSummary({ group });
+      expect(summary.averageAgentLatencyMs).toBe(3000);
+    });
+  });
+
+  describe("when runs have mixed cost data", () => {
+    it("sums only runs with cost values", () => {
+      const group = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ scenarioRunId: "run_1", totalCost: 0.005 }),
+          makeScenarioRunData({ scenarioRunId: "run_2" }),
+          makeScenarioRunData({ scenarioRunId: "run_3", totalCost: 0.010 }),
+        ],
+      });
+
+      const summary = computeGroupSummary({ group });
+      expect(summary.totalCost).toBeCloseTo(0.015, 6);
     });
   });
 });

@@ -45,6 +45,8 @@ function makeGroupSummary(
     totalCount: 1,
     inProgressCount: 0,
     queuedCount: 0,
+    totalCost: null,
+    averageAgentLatencyMs: null,
     ...overrides,
   };
 }

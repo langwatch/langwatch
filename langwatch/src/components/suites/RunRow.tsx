@@ -16,7 +16,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
-import { RunSummaryCounts } from "./RunSummaryCounts";
+import { RunMetricsSummary } from "./RunMetricsSummary";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -164,7 +164,7 @@ export function RunRow({
             <Text fontSize="xs">Cancel All</Text>
           </HStack>
         )}
-        <RunSummaryCounts summary={summary} />
+        <RunMetricsSummary summary={summary} />
       </HStack>
 
       {/* Expanded content - scenario results in list or grid */}
