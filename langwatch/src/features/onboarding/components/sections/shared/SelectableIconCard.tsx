@@ -1,7 +1,6 @@
 import {
   Box,
   Card,
-  type CardRootProps,
   Icon,
   type IconProps,
   Text,
@@ -43,10 +42,6 @@ export function SelectableIconCard(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
     actualIcon?.type === "themed" ? actualIcon.darkSrc : "",
   );
-  const borderColor = useColorModeValue<CardRootProps["borderColor"]>(
-    "border.inverted/10",
-    "border.inverted/30",
-  );
   const selectedBorderColor = useColorModeValue("orange.400", "orange.300");
   const selectedBg = useColorModeValue("orange.50", "orange.950/30");
 
@@ -67,10 +62,28 @@ export function SelectableIconCard(
         aria-pressed={selected}
         onClick={onClick}
         cursor="pointer"
-        borderWidth={selected ? "2px" : size === "sm" ? "1px" : "2px"}
-        borderColor={selected ? selectedBorderColor : borderColor}
-        bg={selected ? selectedBg : "bg.subtle/30"}
+        borderWidth={selected ? "2px" : "1px"}
+        borderColor={
+          selected ? selectedBorderColor : "rgba(0,0,0,0.06)"
+        }
+        bg={selected ? selectedBg : "rgba(255,255,255,0.6)"}
+        backdropFilter="blur(12px)"
+        boxShadow={
+          selected
+            ? "0 0 0 1px rgba(237,137,38,0.15)"
+            : "none"
+        }
         transition="all 0.2s ease"
+        _hover={{
+          borderColor: selected
+            ? selectedBorderColor
+            : "rgba(0,0,0,0.10)",
+          bg: selected ? selectedBg : "rgba(255,255,255,0.85)",
+          boxShadow: selected
+            ? "0 0 0 1px rgba(237,137,38,0.15)"
+            : "0 2px 8px rgba(0,0,0,0.04)",
+          transform: "translateY(-1px)",
+        }}
         aspectRatio="1 / 1"
         display="flex"
         maxW={size === "sm" ? "75px" : "100px"}
@@ -107,7 +120,7 @@ export function SelectableIconCard(
             <Text
               textStyle="sm"
               fontWeight="normal"
-              color="CaptionText"
+              color="fg.muted"
               textAlign="center"
             >
               {label}

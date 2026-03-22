@@ -155,9 +155,9 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
       `}</style>
       <ThemeProvider
         attribute="class"
+        forcedTheme="light"
         defaultTheme="light"
         disableTransitionOnChange={false}
-        enableSystem
         enableColorScheme
         themes={["light", "dark", "system"]}
         {...props}
