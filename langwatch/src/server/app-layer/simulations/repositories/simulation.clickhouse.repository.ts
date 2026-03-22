@@ -607,7 +607,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds, scenarioSetId });
 
     return { runs, nextCursor, hasMore };
   }
@@ -643,7 +643,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId LIKE '__internal__%__suite'
            AND ArchivedAt IS NULL`,
         { tenantId: projectId },
       );
@@ -679,7 +678,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId LIKE '__internal__%__suite'
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -844,11 +842,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   private async getRunsForBatchIds({
     projectId,
     batchRunIds,
+    scenarioSetId,
   }: {
     projectId: string;
     batchRunIds: string[];
+    scenarioSetId?: string;
   }): Promise<ScenarioRunData[]> {
     if (batchRunIds.length === 0) return [];
+
+    const setFilter = scenarioSetId
+      ? "AND ScenarioSetId = {scenarioSetId:String}"
+      : "";
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${LIST_COLUMNS}
@@ -857,13 +861,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
+           ${setFilter}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC
        LIMIT 5000`,
-      { tenantId: projectId, batchRunIds },
+      { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetId } : {}) },
     );
 
     const now = Date.now();

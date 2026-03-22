@@ -52,7 +52,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
       typeof router.query.startDate === "string" &&
       isValidDateString(router.query.startDate)
         ? new Date(router.query.startDate)
-        : addDays(thisHour, -(defaultNDays - 1)),
+        : startOfDay(addDays(thisHour, -(defaultNDays - 1))),
     [defaultNDays, router.query.startDate, thisHour],
   );
   const endDate = useMemo(
