@@ -9,6 +9,7 @@ import {
   scenarioQueue,
 } from "~/server/scenarios/scenario.queue";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import type { SuiteTarget } from "~/server/suites/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { traced } from "../tracing";
@@ -43,7 +44,7 @@ export type SuiteRunResult = {
 
 /** Target reference for scheduling */
 export type SuiteRunTarget = {
-  type: "http" | "prompt";
+  type: SuiteTarget["type"];
   referenceId: string;
 };
 
