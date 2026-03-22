@@ -156,5 +156,23 @@ describe("useNewScenarioFlow()", () => {
 
       expect(result.current.showWelcome).toBe(false);
     });
+
+    it("persists welcomeSeen in localStorage on dismiss", () => {
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      act(() => {
+        result.current.handleNewScenario();
+      });
+
+      act(() => {
+        result.current.handleWelcomeOpenChange(false);
+      });
+
+      expect(localStorage.getItem("langwatch:scenarios:welcomeSeen")).toBe(
+        "true"
+      );
+    });
   });
 });

@@ -51,6 +51,7 @@ export function useNewScenarioFlow({ scenarioCount, isLoading }: UseNewScenarioF
 
   const handleWelcomeOpenChange = useCallback((open: boolean) => {
     if (!open) {
+      setWelcomeSeen();
       setShowWelcome(false);
     }
   }, []);
