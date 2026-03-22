@@ -60,7 +60,7 @@ describe("SimulationClickHouseRepository", () => {
 
   beforeEach(() => {
     clickhouse = createMockClickHouse();
-    repo = new SimulationClickHouseRepository(clickhouse);
+    repo = new SimulationClickHouseRepository(async () => clickhouse);
   });
 
   describe("getBatchRunCountForScenarioSet()", () => {

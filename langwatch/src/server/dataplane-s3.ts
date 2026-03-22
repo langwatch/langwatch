@@ -10,18 +10,21 @@
  * When no private config exists for an organization, callers fall back to the
  * shared S3 env vars (S3_ENDPOINT, S3_BUCKET_NAME, etc.).
  */
+import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "./db";
 
 const logger = createLogger("langwatch:dataplane:s3");
 
+const dataplaneS3ConfigSchema = z.object({
+  endpoint: z.string().min(1, "endpoint must not be empty"),
+  bucket: z.string().min(1, "bucket must not be empty"),
+  accessKeyId: z.string().min(1, "accessKeyId must not be empty"),
+  secretAccessKey: z.string().min(1, "secretAccessKey must not be empty"),
+});
+
 /** Configuration for a private S3 dataplane bucket. */
-export interface DataplaneS3Config {
-  endpoint: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-}
+export type DataplaneS3Config = z.infer<typeof dataplaneS3ConfigSchema>;
 
 const PRIVATE_S3_ENV_PREFIX = "DATAPLANE_S3__";
 
@@ -59,20 +62,22 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
       continue;
     }
 
-    if (!isValidS3Config(parsed)) {
+    const result = dataplaneS3ConfigSchema.safeParse(parsed);
+    if (!result.success) {
       logger.warn(
-        { orgId, envVar: key },
-        "Skipping private S3 config: missing required fields (endpoint, bucket, accessKeyId, secretAccessKey)",
+        { orgId, envVar: key, errors: result.error.flatten().fieldErrors },
+        "Skipping private S3 config: validation failed",
       );
       continue;
     }
 
-    map.set(orgId, {
-      endpoint: parsed.endpoint,
-      bucket: parsed.bucket,
-      accessKeyId: parsed.accessKeyId,
-      secretAccessKey: parsed.secretAccessKey,
-    });
+    if (map.has(orgId)) {
+      throw new Error(
+        `Duplicate private S3 config for orgId "${orgId}": env var "${key}" conflicts with an earlier definition. Each orgId must map to exactly one S3 config.`,
+      );
+    }
+
+    map.set(orgId, result.data);
     logger.info(
       { orgId, envVar: key },
       "Loaded private S3 config from env var",
@@ -87,26 +92,6 @@ function parsePrivateS3EnvVars(): Map<string, DataplaneS3Config> {
   }
 
   return map;
-}
-
-function isValidS3Config(
-  value: unknown,
-): value is {
-  endpoint: string;
-  bucket: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-} {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const obj = value as Record<string, unknown>;
-  return (
-    typeof obj.endpoint === "string" &&
-    typeof obj.bucket === "string" &&
-    typeof obj.accessKeyId === "string" &&
-    typeof obj.secretAccessKey === "string"
-  );
 }
 
 /** Cache of projectId -> organizationId to avoid repeated DB lookups. */

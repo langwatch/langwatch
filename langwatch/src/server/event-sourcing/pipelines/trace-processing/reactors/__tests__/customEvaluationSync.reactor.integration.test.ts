@@ -133,7 +133,7 @@ describe.skipIf(!hasTestcontainers)(
       // instances causes competing global queue consumers where one skips
       // the other's jobs as "unknown pipeline".
       const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(clickHouseClient),
+        new EventRepositoryClickHouse(async () => clickHouseClient),
       );
       const eventSourcing = EventSourcing.createWithStores({
         eventStore,
