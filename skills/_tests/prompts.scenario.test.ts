@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner, isRunnerAvailable } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,22 +16,12 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
+const runner = getRunner();
+const runnerUnavailable = !isRunnerAvailable();
 
 const judgeModel = openai("gpt-5-mini");
 
-function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "prompts");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../prompts/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
-}
+const skillPath = path.resolve(__dirname, "../prompts/SKILL.md");
 
 function findFiles(dir: string, pattern: RegExp): string[] {
   const results: string[] = [];
@@ -55,7 +43,7 @@ function findFiles(dir: string, pattern: RegExp): string[] {
 }
 
 describe("Prompts Skill", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "versions prompts in a Python OpenAI bot with LangWatch Prompts CLI",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -65,14 +53,13 @@ describe("Prompts Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python OpenAI prompt versioning",
         description:
           "Setting up prompt versioning in a Python OpenAI bot project using the LangWatch Prompts CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -119,7 +106,7 @@ describe("Prompts Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "versions prompts in a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -128,14 +115,13 @@ describe("Prompts Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Vercel AI prompt versioning",
         description:
           "Setting up prompt versioning in a TypeScript Vercel AI bot project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -180,7 +166,7 @@ describe("Prompts Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "versions prompts in a Python LangGraph agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -189,14 +175,13 @@ describe("Prompts Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python LangGraph prompt versioning",
         description:
           "Setting up prompt versioning in a Python LangGraph agent project using the LangWatch Prompts CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -243,7 +228,7 @@ describe("Prompts Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "versions prompts in a TypeScript Mastra agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -252,14 +237,13 @@ describe("Prompts Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Mastra prompt versioning",
         description:
           "Setting up prompt versioning in a TypeScript Mastra agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -304,7 +288,7 @@ describe("Prompts Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates a new prompt version for a specific use case",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -313,14 +297,13 @@ describe("Prompts Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Targeted prompt creation",
         description:
           "Adding a new versioned prompt for a specific customer support use case.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

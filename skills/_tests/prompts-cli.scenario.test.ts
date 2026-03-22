@@ -1,16 +1,13 @@
 import scenario, { type ScenarioExecutionStateLike } from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner, isRunnerAvailable } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +15,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
+const runner = getRunner();
+const runnerUnavailable = !isRunnerAvailable();
 const judgeModel = openai("gpt-5-mini");
 
 function assertNoInteractiveWorkarounds(
@@ -37,15 +36,17 @@ function assertNoInteractiveWorkarounds(
 }
 
 describe("LangWatch Prompts CLI — Agent Usability", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "agent discovers and uses CLI to version prompts from scratch",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-cli-prompts-version-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/cli-prompts/python-with-prompts")}/* ${tempFolder}/`
+      fs.cpSync(
+        path.resolve(__dirname, "fixtures/cli-prompts/python-with-prompts"),
+        tempFolder,
+        { recursive: true }
       );
 
       fs.writeFileSync(
@@ -58,7 +59,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         description:
           "Developer has a Python project with hardcoded prompts and wants to use the LangWatch Prompts CLI to version them.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -106,7 +107,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "agent creates a specific named prompt via CLI",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -132,7 +133,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         description:
           "Developer wants to create a new prompt called refund-handler for customer refund requests using the CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -179,7 +180,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "agent uses push --force-local to resolve conflicts non-interactively",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -206,7 +207,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         description:
           "Agent creates a prompt and pushes it to the platform. If there are conflicts, it should use --force-local to resolve them automatically.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
