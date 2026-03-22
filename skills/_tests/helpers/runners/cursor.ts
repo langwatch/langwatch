@@ -96,6 +96,8 @@ export class CursorRunner implements AgentRunner {
       "stream-json",
       "--force",
       "--trust",
+      "--model",
+      "auto",
       ...(includeMcpApproval ? ["--approve-mcps"] : []),
       "--workspace",
       workingDirectory,
@@ -106,8 +108,14 @@ export class CursorRunner implements AgentRunner {
   /**
    * Parse cursor-agent stream-json NDJSON output into message objects.
    *
-   * Cursor uses the same stream-json format name as Claude Code.
-   * Extracts objects that contain a `message` property.
+   * Cursor emits lines like:
+   *   {"type":"system","subtype":"init",...}
+   *   {"type":"user","message":{...},...}
+   *   {"type":"thinking","subtype":"delta",...}
+   *   {"type":"assistant","message":{"role":"assistant","content":[...]},...}
+   *   {"type":"result","subtype":"success",...}
+   *
+   * We extract only assistant messages.
    *
    * Exposed for unit testing.
    */
@@ -121,7 +129,12 @@ export class CursorRunner implements AgentRunner {
           return null;
         }
       })
-      .filter((parsed) => parsed !== null && "message" in parsed)
+      .filter(
+        (parsed) =>
+          parsed !== null &&
+          parsed.type === "assistant" &&
+          "message" in parsed
+      )
       .map((parsed) => parsed.message);
   }
 

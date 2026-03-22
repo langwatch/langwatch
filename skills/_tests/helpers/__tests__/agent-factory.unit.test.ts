@@ -238,12 +238,13 @@ describe("Codex Runner", () => {
   });
 
   describe("buildArgs()", () => {
-    it("includes exec --full-auto --json flags", async () => {
+    it("includes exec --full-auto --skip-git-repo-check --json flags", async () => {
       const { CodexRunner } = await import("../runners/codex.js");
       const runner = new CodexRunner();
       const args = runner.buildArgs({ prompt: "test prompt" });
       expect(args).toContain("exec");
       expect(args).toContain("--full-auto");
+      expect(args).toContain("--skip-git-repo-check");
       expect(args).toContain("--json");
     });
 
@@ -409,6 +410,19 @@ describe("Cursor Runner", () => {
       expect(args).toContain("--trust");
     });
 
+    it("includes --model auto for plan compatibility", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: false,
+      });
+      expect(args).toContain("--model");
+      const modelIndex = args.indexOf("--model");
+      expect(args[modelIndex + 1]).toBe("auto");
+    });
+
     it("includes --workspace with the working directory", async () => {
       const { CursorRunner } = await import("../runners/cursor.js");
       const runner = new CursorRunner();
@@ -471,20 +485,22 @@ describe("Cursor Runner", () => {
       expect(messages).toHaveLength(2);
       expect(messages[0]).toEqual({
         role: "assistant",
-        content: "I will help you instrument your code with LangWatch.",
+        content: [{ type: "text", text: "I will help you instrument your code with LangWatch." }],
       });
       expect(messages[1]).toEqual({
         role: "assistant",
-        content: "Done! I added LangWatch tracing to your project.",
+        content: [{ type: "text", text: "Done! I added LangWatch tracing to your project." }],
       });
     });
 
-    it("skips non-message lines", async () => {
+    it("skips non-assistant lines", async () => {
       const { CursorRunner } = await import("../runners/cursor.js");
       const runner = new CursorRunner();
       const output = [
-        JSON.stringify({ type: "status", status: "thinking" }),
-        JSON.stringify({ type: "done", status: "completed" }),
+        JSON.stringify({ type: "system", subtype: "init", model: "Auto" }),
+        JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "hi" }] } }),
+        JSON.stringify({ type: "thinking", subtype: "delta", text: "hmm" }),
+        JSON.stringify({ type: "result", subtype: "success", duration_ms: 100 }),
       ].join("\n");
 
       const messages = runner.parseStreamJsonOutput(output);
@@ -497,7 +513,8 @@ describe("Cursor Runner", () => {
       const output = [
         "not json",
         JSON.stringify({
-          message: { role: "assistant", content: "ok" },
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "text", text: "ok" }] },
         }),
       ].join("\n");
 

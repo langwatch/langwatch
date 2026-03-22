@@ -66,7 +66,7 @@ export class CodexRunner implements AgentRunner {
    * Exposed for unit testing.
    */
   buildArgs({ prompt }: { prompt: string }): string[] {
-    return ["exec", "--full-auto", "--json", prompt];
+    return ["exec", "--full-auto", "--skip-git-repo-check", "--json", prompt];
   }
 
   /**
