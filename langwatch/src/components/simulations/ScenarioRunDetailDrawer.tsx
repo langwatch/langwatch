@@ -231,8 +231,15 @@ export function ScenarioRunDetailDrawer({
             </Drawer.Body>
           )}
           {scenarioState && (
-            <VStack gap={0} h="100%" w="100%">
-              {/* Sticky header — matches trace details pattern */}
+              <Drawer.Body
+                paddingY={0}
+                paddingX={0}
+                overflowY="auto"
+                display="flex"
+                flexDirection="column"
+                width="full"
+              >
+              {/* Sticky header — inside scroll container for correct sticky behavior */}
               <VStack
                 w="100%"
                 gap={0}
@@ -365,14 +372,6 @@ export function ScenarioRunDetailDrawer({
               </VStack>
 
               {/* Body — conversation on top, results on bottom */}
-              <Drawer.Body
-                paddingY={0}
-                paddingX={0}
-                overflowY="auto"
-                display="flex"
-                flexDirection="column"
-                width="full"
-              >
                 {/* Conversation — hidden when empty (e.g. stalled runs) */}
                 {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
                   <Box
@@ -427,7 +426,6 @@ export function ScenarioRunDetailDrawer({
                   )}
                 </Box>
               </Drawer.Body>
-            </VStack>
           )}
         </Drawer.Content>
       </Drawer.Root>
