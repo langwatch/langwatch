@@ -90,6 +90,7 @@ export async function startHttpServer({
   port: number;
 }): Promise<{ server: Server; port: number }> {
   const app = express();
+  app.set("trust proxy", true);
   app.use(express.json());
 
   // CORS middleware for cross-origin requests (ChatGPT/Claude Chat)
@@ -138,8 +139,7 @@ export async function startHttpServer({
     "/oauth/token",
     express.urlencoded({ extended: false }),
     (req: Request, res: Response) => {
-      const grantType =
-        req.body.grant_type ?? req.query["grant_type"];
+      const grantType = req.body.grant_type;
 
       if (grantType !== "client_credentials") {
         res.status(400).json({
@@ -152,10 +152,9 @@ export async function startHttpServer({
 
       // Accept client_secret as the LangWatch API key.
       // client_id is ignored — the API key identifies the project.
-      const clientSecret =
-        req.body.client_secret ?? req.query["client_secret"];
+      const clientSecret = req.body.client_secret;
 
-      if (!clientSecret) {
+      if (!clientSecret || typeof clientSecret !== "string") {
         res.status(400).json({
           error: "invalid_request",
           error_description:
@@ -168,7 +167,7 @@ export async function startHttpServer({
       const accessToken = generateAccessToken();
 
       oauthTokens.set(accessToken, {
-        apiKey: clientSecret as string,
+        apiKey: clientSecret,
         expiresAt: Date.now() + expiresIn * 1000,
       });
 

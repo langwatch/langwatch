@@ -285,7 +285,9 @@ describe("HTTP transport", () => {
             body: `grant_type=client_credentials&client_secret=${BEARER_TOKEN}`,
           }
         );
+        expect(tokenResponse.status).toBe(200);
         const { access_token } = await tokenResponse.json();
+        expect(access_token).toBeTruthy();
 
         // Use OAuth token for MCP initialize
         const response = await fetch(`http://localhost:${port}/mcp`, {
@@ -313,7 +315,9 @@ describe("HTTP transport", () => {
             body: `grant_type=client_credentials&client_secret=${BEARER_TOKEN}`,
           }
         );
+        expect(tokenResponse.status).toBe(200);
         const { access_token } = await tokenResponse.json();
+        expect(access_token).toBeTruthy();
 
         // Use OAuth token for SSE
         const response = await fetch(`http://localhost:${port}/sse`, {
