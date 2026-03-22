@@ -3,18 +3,30 @@
  *
  * Unit tests for the useNewScenarioFlow hook.
  *
- * Covers the @integration scenarios from welcome-screens.feature:
- * - Show welcome screen on first scenario creation (no scenarios)
- * - Proceed from welcome screen to scenario creation
- * - Skip welcome screen when scenarios already exist
+ * Covers:
+ * - Show welcome modal on first scenario creation (no scenarios, not seen before)
+ * - Proceed from welcome modal to scenario creation (persists welcomeSeen)
+ * - Skip welcome modal when scenarios already exist
+ * - Skip welcome modal when already seen (localStorage)
+ * - Dismiss welcome modal via onOpenChange
  */
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useNewScenarioFlow } from "../useNewScenarioFlow";
 
+const WELCOME_SEEN_KEY = "langwatch:scenarios:welcomeSeen";
+
 describe("useNewScenarioFlow()", () => {
-  describe("when no scenarios exist", () => {
-    it("shows welcome screen on handleNewScenario", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  describe("when no scenarios exist and welcome not yet seen", () => {
+    it("shows welcome modal on handleNewScenario", () => {
       const { result } = renderHook(() =>
         useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
       );
@@ -43,6 +55,39 @@ describe("useNewScenarioFlow()", () => {
       expect(result.current.showWelcome).toBe(false);
       expect(result.current.showCreateModal).toBe(true);
     });
+
+    it("persists welcomeSeen in localStorage after proceeding", () => {
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      act(() => {
+        result.current.handleNewScenario();
+      });
+
+      act(() => {
+        result.current.handleWelcomeProceed();
+      });
+
+      expect(localStorage.getItem(WELCOME_SEEN_KEY)).toBe("true");
+    });
+  });
+
+  describe("when no scenarios exist but welcome already seen", () => {
+    it("opens create modal directly on handleNewScenario", () => {
+      localStorage.setItem(WELCOME_SEEN_KEY, "true");
+
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      act(() => {
+        result.current.handleNewScenario();
+      });
+
+      expect(result.current.showCreateModal).toBe(true);
+      expect(result.current.showWelcome).toBe(false);
+    });
   });
 
   describe("when scenarios exist", () => {
@@ -61,7 +106,7 @@ describe("useNewScenarioFlow()", () => {
   });
 
   describe("when data is still loading", () => {
-    it("opens create modal instead of welcome screen", () => {
+    it("opens create modal instead of welcome modal", () => {
       const { result } = renderHook(() =>
         useNewScenarioFlow({ scenarioCount: 0, isLoading: true })
       );
@@ -90,6 +135,26 @@ describe("useNewScenarioFlow()", () => {
       });
 
       expect(result.current.showCreateModal).toBe(false);
+    });
+  });
+
+  describe("when dismissing the welcome modal via onOpenChange", () => {
+    it("closes the welcome modal", () => {
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      act(() => {
+        result.current.handleNewScenario();
+      });
+
+      expect(result.current.showWelcome).toBe(true);
+
+      act(() => {
+        result.current.handleWelcomeOpenChange(false);
+      });
+
+      expect(result.current.showWelcome).toBe(false);
     });
   });
 });

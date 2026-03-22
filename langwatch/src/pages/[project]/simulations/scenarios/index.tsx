@@ -106,6 +106,7 @@ function ScenarioLibraryPage() {
     showCreateModal,
     handleNewScenario,
     handleWelcomeProceed,
+    handleWelcomeOpenChange,
     handleCloseCreateModal,
   } = useNewScenarioFlow({ scenarioCount: scenarios?.length ?? 0, isLoading });
 
@@ -190,12 +191,8 @@ function ScenarioLibraryPage() {
           </VStack>
         )}
 
-        {!isLoading && !error && scenarios?.length === 0 && !showWelcome && (
+        {!isLoading && !error && scenarios?.length === 0 && (
           <ScenarioEmptyState onCreateClick={handleNewScenario} />
-        )}
-
-        {showWelcome && (
-          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
         )}
 
         {scenarios && scenarios.length > 0 && (
@@ -218,6 +215,11 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
+      <ScenarioWelcomeScreen
+        open={showWelcome}
+        onOpenChange={handleWelcomeOpenChange}
+        onProceed={handleWelcomeProceed}
+      />
       <ScenarioCreateModal
         open={showCreateModal}
         onClose={handleCloseCreateModal}
