@@ -303,3 +303,271 @@ describe("applySpanToSummary guardrail blocking detection", () => {
     });
   });
 });
+
+describe("applySpanToSummary per-role cost/latency accumulation", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("given an agent span tagged role 'Agent' with child LLM spans", () => {
+    describe("when the fold processes the agent span then its child LLM spans", () => {
+      it("accumulates LLM costs into scenarioRoleCosts['Agent']", () => {
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: null,
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 5000,
+          durationMs: 4000,
+          spanAttributes: {
+            "scenario.role": "Agent",
+          },
+        });
+
+        const llmSpan1 = createTestSpan({
+          spanId: "llm-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 1100,
+          endTimeUnixMs: 3100,
+          durationMs: 2000,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.usage.input_tokens": 42,
+            "gen_ai.usage.output_tokens": 0,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        const llmSpan2 = createTestSpan({
+          spanId: "llm-2",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 3200,
+          endTimeUnixMs: 5000,
+          durationMs: 1800,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.usage.input_tokens": 79,
+            "gen_ai.usage.output_tokens": 52,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: agentSpan });
+        state = applySpanToSummary({ state, span: llmSpan1 });
+        state = applySpanToSummary({ state, span: llmSpan2 });
+
+        // LLM1 cost: 42 * 0.000005 + 0 * 0.000015 = 0.00021
+        // LLM2 cost: 79 * 0.000005 + 52 * 0.000015 = 0.000395 + 0.00078 = 0.001175
+        const expectedCost = 0.00021 + 0.001175;
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(expectedCost, 6);
+      });
+
+      it("sets scenarioRoleLatencies['Agent'] to the agent span duration", () => {
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: null,
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 5000,
+          durationMs: 4000,
+          spanAttributes: {
+            "scenario.role": "Agent",
+          },
+        });
+
+        const llmSpan = createTestSpan({
+          spanId: "llm-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 1100,
+          endTimeUnixMs: 3100,
+          durationMs: 2000,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 50,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: agentSpan });
+        state = applySpanToSummary({ state, span: llmSpan });
+
+        // Only the agent span (which has the role) contributes to latency
+        expect(state.scenarioRoleLatencies?.["Agent"]).toBe(4000);
+      });
+    });
+  });
+
+  describe("given multiple roles in one trace", () => {
+    describe("when User, Agent, and Judge each have child LLM spans", () => {
+      it("accumulates costs separately per role", () => {
+        const userSpan = createTestSpan({
+          spanId: "user-1",
+          parentSpanId: null,
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 2000,
+          durationMs: 1000,
+          spanAttributes: { "scenario.role": "User" },
+        });
+
+        const userLlm = createTestSpan({
+          spanId: "user-llm-1",
+          parentSpanId: "user-1",
+          startTimeUnixMs: 1050,
+          endTimeUnixMs: 1950,
+          durationMs: 900,
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 10,
+            "langwatch.model.inputCostPerToken": 0.00001,
+            "langwatch.model.outputCostPerToken": 0.00003,
+          },
+        });
+
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: null,
+          startTimeUnixMs: 2000,
+          endTimeUnixMs: 6000,
+          durationMs: 4000,
+          spanAttributes: { "scenario.role": "Agent" },
+        });
+
+        const agentLlm = createTestSpan({
+          spanId: "agent-llm-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 2100,
+          endTimeUnixMs: 4000,
+          durationMs: 1900,
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 200,
+            "gen_ai.usage.output_tokens": 50,
+            "langwatch.model.inputCostPerToken": 0.00001,
+            "langwatch.model.outputCostPerToken": 0.00003,
+          },
+        });
+
+        const judgeSpan = createTestSpan({
+          spanId: "judge-1",
+          parentSpanId: null,
+          startTimeUnixMs: 6000,
+          endTimeUnixMs: 7000,
+          durationMs: 1000,
+          spanAttributes: { "scenario.role": "Judge" },
+        });
+
+        const judgeLlm = createTestSpan({
+          spanId: "judge-llm-1",
+          parentSpanId: "judge-1",
+          startTimeUnixMs: 6050,
+          endTimeUnixMs: 6950,
+          durationMs: 900,
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 300,
+            "gen_ai.usage.output_tokens": 20,
+            "langwatch.model.inputCostPerToken": 0.00001,
+            "langwatch.model.outputCostPerToken": 0.00003,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: userSpan });
+        state = applySpanToSummary({ state, span: userLlm });
+        state = applySpanToSummary({ state, span: agentSpan });
+        state = applySpanToSummary({ state, span: agentLlm });
+        state = applySpanToSummary({ state, span: judgeSpan });
+        state = applySpanToSummary({ state, span: judgeLlm });
+
+        // User: 100*0.00001 + 10*0.00003 = 0.001 + 0.0003 = 0.0013
+        expect(state.scenarioRoleCosts?.["User"]).toBeCloseTo(0.0013, 6);
+        // Agent: 200*0.00001 + 50*0.00003 = 0.002 + 0.0015 = 0.0035
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(0.0035, 6);
+        // Judge: 300*0.00001 + 20*0.00003 = 0.003 + 0.0006 = 0.0036
+        expect(state.scenarioRoleCosts?.["Judge"]).toBeCloseTo(0.0036, 6);
+      });
+    });
+  });
+
+  describe("given deeply nested spans", () => {
+    describe("when an LLM span is a grandchild of an agent span via a tool span", () => {
+      it("attributes the LLM cost to the agent role", () => {
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: null,
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 5000,
+          durationMs: 4000,
+          spanAttributes: { "scenario.role": "Agent" },
+        });
+
+        const toolSpan = createTestSpan({
+          spanId: "tool-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 1500,
+          endTimeUnixMs: 4500,
+          durationMs: 3000,
+          spanAttributes: {},
+        });
+
+        const llmSpan = createTestSpan({
+          spanId: "llm-1",
+          parentSpanId: "tool-1",
+          startTimeUnixMs: 2000,
+          endTimeUnixMs: 4000,
+          durationMs: 2000,
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 50,
+            "langwatch.model.inputCostPerToken": 0.0001,
+            "langwatch.model.outputCostPerToken": 0.0001,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: agentSpan });
+        state = applySpanToSummary({ state, span: toolSpan });
+        state = applySpanToSummary({ state, span: llmSpan });
+
+        // LLM cost: 100*0.0001 + 50*0.0001 = 0.01 + 0.005 = 0.015
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(0.015, 6);
+      });
+    });
+  });
+
+  describe("given a trace without scenario roles", () => {
+    describe("when spans have no scenario.role attribute", () => {
+      it("leaves scenarioRoleCosts and scenarioRoleLatencies empty", () => {
+        const span = createTestSpan({
+          spanId: "span-1",
+          parentSpanId: null,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 50,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span });
+
+        expect(state.scenarioRoleCosts).toEqual({});
+        expect(state.scenarioRoleLatencies).toEqual({});
+      });
+    });
+  });
+});

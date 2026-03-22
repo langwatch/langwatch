@@ -48,29 +48,40 @@ export function useSuiteRouting(): SuiteRouting {
 
       const basePath = `/${projectSlug}/simulations/suites`;
 
+      // Preserve date params so period survives navigation
+      const dateParams: Record<string, string> = {};
+      if (typeof router.query.startDate === "string") dateParams.startDate = router.query.startDate;
+      if (typeof router.query.endDate === "string") dateParams.endDate = router.query.endDate;
+
+      const dateQueryString = Object.entries(dateParams)
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join("&");
+
       if (isExternalSetSelection(slug)) {
         const setId = extractExternalSetId(slug);
+        const qs = `externalSet=${encodeURIComponent(setId)}${dateQueryString ? `&${dateQueryString}` : ""}`;
         void router.push(
           {
             pathname: "/[project]/simulations/suites",
-            query: { project: projectSlug, externalSet: setId },
+            query: { project: projectSlug, externalSet: setId, ...dateParams },
           },
-          `${basePath}?externalSet=${encodeURIComponent(setId)}`,
+          `${basePath}?${qs}`,
           { shallow: true },
         );
         return;
       }
 
-      const asUrl =
-        slug === ALL_RUNS_ID ? basePath : `${basePath}?suite=${slug}`;
+      const selectionQs = slug === ALL_RUNS_ID ? "" : `suite=${slug}`;
+      const qs = [selectionQs, dateQueryString].filter(Boolean).join("&");
+      const asUrl = qs ? `${basePath}?${qs}` : basePath;
 
       void router.push(
         {
           pathname: "/[project]/simulations/suites",
           query:
             slug === ALL_RUNS_ID
-              ? { project: projectSlug }
-              : { project: projectSlug, suite: slug },
+              ? { project: projectSlug, ...dateParams }
+              : { project: projectSlug, suite: slug, ...dateParams },
         },
         asUrl,
         { shallow: true },

@@ -8,7 +8,8 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,8 +42,6 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-const SKELETON_PLACEHOLDER_COUNT = 5;
-
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
@@ -68,7 +67,7 @@ function SuitesPageContent() {
     { enabled: !!project },
   );
 
-  const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
+  const { data: externalSets, isLoading: isExternalSetsLoading } = api.scenarios.getExternalSetSummaries.useQuery(
     {
       projectId: project?.id ?? "",
       startDate: period.startDate.getTime(),
@@ -159,6 +158,25 @@ function SuitesPageContent() {
       return null;
     return extractExternalSetId(selectedSuiteSlug);
   }, [selectedSuiteSlug]);
+
+  // Auto-expand period when selected item's last run is outside current range
+  useEffect(() => {
+    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return;
+
+    let lastRunTs: number | null = null;
+    if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
+      const setId = extractExternalSetId(selectedSuiteSlug);
+      lastRunTs = externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
+    } else if (selectedSuite && runSummaries) {
+      lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
+    }
+
+    if (lastRunTs && lastRunTs < period.startDate.getTime()) {
+      const daysAgo = Math.ceil((Date.now() - lastRunTs) / 86400000);
+      const newDays = daysAgo <= 30 ? 30 : daysAgo <= 90 ? 90 : 365;
+      setPeriod(subDays(new Date(), newDays), new Date());
+    }
+  }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
@@ -332,38 +350,16 @@ function SuitesPageContent() {
         {/* Second row: sidebar + content box */}
         <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
           {/* Sidebar */}
-          {isLoading ? (
-            <VStack
-              width="280px"
-              flexShrink={0}
-              padding={4}
-              gap={3}
-              align="stretch"
-              height="full"
-            >
-              {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
-                <Box key={index} data-testid="suite-sidebar-skeleton">
-                  <Skeleton height="20px" width="70%" borderRadius="md" />
-                  <Skeleton
-                    height="16px"
-                    width="40%"
-                    borderRadius="md"
-                    marginTop={2}
-                  />
-                </Box>
-              ))}
-            </VStack>
-          ) : (
-            <SuiteSidebar
-              suites={suites ?? []}
-              selectedSuiteSlug={selectedSuiteSlug}
-              runSummaries={runSummaries}
-              externalSets={externalSets ?? []}
-              onSelectSuite={navigateToSuite}
-              onRunSuite={handleRunSuite}
-              onContextMenu={handleContextMenu}
-            />
-          )}
+          <SuiteSidebar
+            suites={suites ?? []}
+            selectedSuiteSlug={selectedSuiteSlug}
+            runSummaries={runSummaries}
+            externalSets={externalSets ?? []}
+            onSelectSuite={navigateToSuite}
+            onRunSuite={handleRunSuite}
+            onContextMenu={handleContextMenu}
+            isLoading={isLoading || isExternalSetsLoading}
+          />
 
           {/* Content box */}
           <Box

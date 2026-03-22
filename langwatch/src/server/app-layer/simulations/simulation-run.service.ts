@@ -81,7 +81,7 @@ export class SimulationRunService {
     return this.repository.getBatchRunCountForScenarioSet(params);
   }
 
-  async getExternalSetSummaries(params: { projectId: string }): Promise<ExternalSetSummary[]> {
+  async getExternalSetSummaries(params: { projectId: string; startDate?: number; endDate?: number }): Promise<ExternalSetSummary[]> {
     return this.repository.getExternalSetSummaries(params);
   }
 

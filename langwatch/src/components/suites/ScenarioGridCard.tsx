@@ -8,7 +8,7 @@
  */
 
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Square } from "lucide-react";
 import { SimulationCard } from "~/components/simulations/SimulationCard";
 import { MessagePreview } from "./MessagePreview";
 import { buildDisplayTitle } from "./run-history-transforms";
@@ -36,7 +36,7 @@ export function ScenarioGridCard({
   const title = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   return (
-    <Box position="relative" className="group">
+    <Box position="relative">
       <Box
         as="button"
         onClick={onClick}
@@ -45,8 +45,6 @@ export function ScenarioGridCard({
         textAlign="left"
         width="full"
         aria-label={`View details for ${title}`}
-        transition="transform 0.15s"
-        _hover={{ transform: "translateY(-2px)" }}
       >
         <SimulationCard title={title} status={scenarioRun.status}>
           <MessagePreview messages={scenarioRun.messages} />
@@ -59,15 +57,15 @@ export function ScenarioGridCard({
           gap={1}
           paddingX={2}
           paddingY={0.5}
-          borderRadius="sm"
+          borderRadius="md"
+          border="1px solid"
+          borderColor="red.200"
           fontSize="xs"
-          color="red.500"
+          color="red.600"
+          bg="white"
           cursor={isCancelling ? "default" : "pointer"}
-          opacity={isCancelling ? 0.6 : 0}
-          pointerEvents={isCancelling ? "auto" : "none"}
-          transition="opacity 0.15s"
-          _groupHover={isCancelling ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
-          _hover={isCancelling ? undefined : { bg: "red.50" }}
+          opacity={isCancelling ? 0.6 : 1}
+          _hover={isCancelling ? undefined : { bg: "red.50", borderColor: "red.300" }}
           position="absolute"
           top={2}
           right={2}
@@ -83,12 +81,12 @@ export function ScenarioGridCard({
               onCancel();
             }
           }}
-          aria-label="Cancel run"
+          aria-label="Stop run"
           aria-disabled={isCancelling}
           data-testid="cancel-run-button"
         >
-          {isCancelling ? <Spinner size="xs" /> : <X size={12} />}
-          <Text fontSize="xs">Cancel</Text>
+          {isCancelling ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+          <Text fontSize="xs">Stop</Text>
         </HStack>
       )}
     </Box>

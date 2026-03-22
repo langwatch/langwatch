@@ -13,6 +13,7 @@ import {
   isSimulationMessageSnapshotEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunMetricsUpdatedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
   isSimulationTextMessageEndEvent,
@@ -61,6 +62,10 @@ export interface SimulationRunStateData {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: number | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
+  TraceMetrics: Record<string, { totalCost: number; roleCosts: Record<string, number>; roleLatencies: Record<string, number> }>;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -92,6 +97,10 @@ function init(): SimulationRunStateData {
     UnmetCriteria: [],
     Error: null,
     DurationMs: null,
+    TotalCost: null,
+    RoleCosts: {},
+    RoleLatencies: {},
+    TraceMetrics: {},
     StartedAt: null,
     QueuedAt: null,
     CreatedAt: Date.now(),
@@ -283,6 +292,42 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
+      UpdatedAt: event.occurredAt,
+    };
+  }
+
+  if (isSimulationRunMetricsUpdatedEvent(event)) {
+    // Store per-trace breakdown, then recompute aggregates
+    const traceMetrics = {
+      ...state.TraceMetrics,
+      [event.data.traceId]: {
+        totalCost: event.data.totalCost,
+        roleCosts: event.data.roleCosts,
+        roleLatencies: event.data.roleLatencies,
+      },
+    };
+
+    // Aggregate across all traces: collect individual values into arrays
+    let totalCost = 0;
+    const roleCosts: Record<string, number[]> = {};
+    const roleLatencies: Record<string, number[]> = {};
+
+    for (const entry of Object.values(traceMetrics)) {
+      totalCost += entry.totalCost;
+      for (const [role, cost] of Object.entries(entry.roleCosts)) {
+        (roleCosts[role] ??= []).push(cost);
+      }
+      for (const [role, latency] of Object.entries(entry.roleLatencies)) {
+        (roleLatencies[role] ??= []).push(latency);
+      }
+    }
+
+    return {
+      ...state,
+      TraceMetrics: traceMetrics,
+      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+      RoleCosts: roleCosts,
+      RoleLatencies: roleLatencies,
       UpdatedAt: event.occurredAt,
     };
   }

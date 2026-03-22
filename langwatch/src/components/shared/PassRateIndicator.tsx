@@ -7,9 +7,11 @@ import { Circle, HStack, Text } from "@chakra-ui/react";
 
 /**
  * Get a color that interpolates from red (0%) to orange (50%) to green (100%)
- * based on the pass rate percentage.
+ * based on the pass rate percentage. Returns gray for null (no verdict runs).
  */
-export const getPassRateGradientColor = (passRate: number): string => {
+export const getPassRateGradientColor = (passRate: number | null): string => {
+  if (passRate === null) return "gray.400";
+
   // Clamp to 0-100
   const rate = Math.max(0, Math.min(100, passRate));
 
@@ -33,8 +35,8 @@ export const getPassRateGradientColor = (passRate: number): string => {
 };
 
 type PassRateCircleProps = {
-  /** Pass rate as percentage (0-100) */
-  passRate: number;
+  /** Pass rate as percentage (0-100), or null for gray "no verdict" state. */
+  passRate: number | null;
   /** Size of the circle (default: "10px") */
   size?: string;
 };
@@ -42,6 +44,7 @@ type PassRateCircleProps = {
 /**
  * Colored circle indicator for pass rate.
  * Color interpolates from red (0%) through orange (50%) to green (100%).
+ * Null passRate renders a gray circle (no verdict runs).
  */
 export const PassRateCircle = ({
   passRate,
@@ -51,8 +54,8 @@ export const PassRateCircle = ({
 );
 
 type PassRateDisplayProps = {
-  /** Pass rate as percentage (0-100) */
-  passRate: number;
+  /** Pass rate as percentage (0-100), or null for gray "no verdict" state. */
+  passRate: number | null;
   /** Size of the circle */
   circleSize?: string;
   /** Font size for the text */
@@ -77,7 +80,7 @@ export const PassRateDisplay = ({
       fontWeight="medium"
       color={showColoredText ? getPassRateGradientColor(passRate) : undefined}
     >
-      {Math.round(passRate)}%
+      {passRate === null ? "-" : `${Math.round(passRate)}%`}
     </Text>
   </HStack>
 );

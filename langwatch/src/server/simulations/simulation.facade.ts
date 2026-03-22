@@ -160,6 +160,8 @@ export class SimulationFacade {
 
   async getExternalSetSummaries(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     return this.routeRead({
       projectId: params.projectId,

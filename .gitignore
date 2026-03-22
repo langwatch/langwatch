@@ -65,3 +65,4 @@ skills/_tests/helpers/.mcp-config.json
 preprocessed_configs/
 status
 uuid
+.claude/worktrees/
