@@ -146,7 +146,7 @@ export function ScenarioTargetRow({
       >
         <HStack>
           <StatusCircle status={scenarioRun.status} />
-          <Text fontSize="xs" fontWeight="semibold" color={config.fgColor} width="43px" textAlign="left">
+          <Text fontSize="xs" fontWeight="semibold" color={config.fgColor} width="43px" textAlign="left" whiteSpace="nowrap">
             {formatRunStatusLabel({
               status: scenarioRun.status,
               results: scenarioRun.results ?? undefined,
