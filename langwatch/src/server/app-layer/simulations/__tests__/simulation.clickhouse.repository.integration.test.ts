@@ -263,4 +263,117 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
   });
+
+  describe("getExternalSetSummaries()", () => {
+    const extSetId = `ext-summary-${nanoid()}`;
+    const batch1 = `batch-ext1-${nanoid()}`;
+    const batch2 = `batch-ext2-${nanoid()}`;
+
+    describe("when an external set has multiple batches with mixed results", () => {
+      it("aggregates pass/total across all batches", async () => {
+        // Batch 1: 2 passed, 1 failed → 3 total
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ext-1a-${nanoid()}`,
+          BatchRunId: batch1,
+          ScenarioSetId: extSetId,
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 10000),
+          UpdatedAt: new Date(now - 10000),
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ext-1b-${nanoid()}`,
+          BatchRunId: batch1,
+          ScenarioSetId: extSetId,
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 9000),
+          UpdatedAt: new Date(now - 9000),
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ext-1c-${nanoid()}`,
+          BatchRunId: batch1,
+          ScenarioSetId: extSetId,
+          Status: "FAILED",
+          CreatedAt: new Date(now - 8000),
+          UpdatedAt: new Date(now - 8000),
+        }));
+
+        // Batch 2: 1 passed, 1 stalled → 2 total
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ext-2a-${nanoid()}`,
+          BatchRunId: batch2,
+          ScenarioSetId: extSetId,
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 3000),
+          UpdatedAt: new Date(now - 3000),
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ext-2b-${nanoid()}`,
+          BatchRunId: batch2,
+          ScenarioSetId: extSetId,
+          Status: "STALLED",
+          CreatedAt: new Date(now - 2000),
+          UpdatedAt: new Date(now - 2000),
+        }));
+
+        const summaries = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+
+        const summary = summaries.find((s) => s.scenarioSetId === extSetId);
+        expect(summary).toBeDefined();
+        expect(summary!.totalCount).toBe(5);
+        expect(summary!.passedCount).toBe(3);
+        expect(summary!.lastRunTimestamp).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when an external set has a single batch with all passing", () => {
+      it("returns correct pass rate", async () => {
+        const setId = `ext-allpass-${nanoid()}`;
+        const batchId = `batch-allpass-${nanoid()}`;
+
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ap-1-${nanoid()}`,
+          BatchRunId: batchId,
+          ScenarioSetId: setId,
+          Status: "SUCCESS",
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-ap-2-${nanoid()}`,
+          BatchRunId: batchId,
+          ScenarioSetId: setId,
+          Status: "SUCCESS",
+        }));
+
+        const summaries = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+
+        const summary = summaries.find((s) => s.scenarioSetId === setId);
+        expect(summary).toBeDefined();
+        expect(summary!.passedCount).toBe(2);
+        expect(summary!.totalCount).toBe(2);
+      });
+    });
+
+    describe("when internal suite sets exist", () => {
+      it("excludes them from external set summaries", async () => {
+        const internalSetId = `__internal__suite-excl-${nanoid()}__suite`;
+
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-internal-${nanoid()}`,
+          BatchRunId: `batch-internal-${nanoid()}`,
+          ScenarioSetId: internalSetId,
+          Status: "SUCCESS",
+        }));
+
+        const summaries = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+
+        const internal = summaries.find((s) => s.scenarioSetId === internalSetId);
+        expect(internal).toBeUndefined();
+      });
+    });
+  });
 });

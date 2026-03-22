@@ -728,82 +728,38 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }: {
     projectId: string;
   }): Promise<ExternalSetSummary[]> {
-    // Step 1: Get latest batch per external set
-    const setRows = await this.queryRows<{
+    // Single query: aggregate pass/total across ALL runs per external set
+    const rows = await this.queryRows<{
       ScenarioSetId: string;
-      LatestBatchRunId: string;
+      TotalCount: string;
+      PassCount: string;
       LastRunAt: string;
     }>(
       `SELECT
         ScenarioSetId,
-        argMax(BatchRunId, max_ts) AS LatestBatchRunId,
-        toString(max(max_ts_ms)) AS LastRunAt
+        toString(count()) AS TotalCount,
+        toString(countIf(Status = 'SUCCESS')) AS PassCount,
+        toString(max(toUnixTimestamp64Milli(CreatedAt))) AS LastRunAt
        FROM (
-         SELECT
-           ScenarioSetId,
-           BatchRunId,
-           max(CreatedAt) AS max_ts,
-           toUnixTimestamp64Milli(max(CreatedAt)) AS max_ts_ms
-         FROM (
-           SELECT ${DEDUP_COLUMNS}
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND NOT startsWith(ScenarioSetId, '__internal__')
-           ORDER BY ScenarioRunId, UpdatedAt DESC
-           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-         WHERE ArchivedAt IS NULL
-         GROUP BY ScenarioSetId, BatchRunId
+         SELECT ${DEDUP_COLUMNS}
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND NOT startsWith(ScenarioSetId, '__internal__')
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
+       WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId },
     );
 
-    if (setRows.length === 0) return [];
-
-    // Step 2: For each set's latest batch, compute pass/total
-    const batchRunIds = setRows.map((r) => r.LatestBatchRunId);
-    const batchStats = await this.queryRows<{
-      ScenarioSetId: string;
-      BatchRunId: string;
-      TotalCount: string;
-      PassCount: string;
-    }>(
-      `SELECT
-        ScenarioSetId,
-        BatchRunId,
-        toString(count()) AS TotalCount,
-        toString(countIf(Status = 'SUCCESS')) AS PassCount
-       FROM (
-         SELECT ${DEDUP_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND BatchRunId IN ({batchRunIds:Array(String)})
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE ArchivedAt IS NULL
-       GROUP BY ScenarioSetId, BatchRunId`,
-      { tenantId: projectId, batchRunIds },
-    );
-
-    const statsMap = new Map(
-      batchStats.map((r) => [
-        `${r.ScenarioSetId}:${r.BatchRunId}`,
-        { total: Number(r.TotalCount), passed: Number(r.PassCount) },
-      ]),
-    );
-
-    return setRows.map((row) => {
-      const stats = statsMap.get(`${row.ScenarioSetId}:${row.LatestBatchRunId}`);
-      return {
-        scenarioSetId: row.ScenarioSetId,
-        passedCount: stats?.passed ?? 0,
-        totalCount: stats?.total ?? 0,
-        lastRunTimestamp: Number(row.LastRunAt),
-      };
-    });
+    return rows.map((row) => ({
+      scenarioSetId: row.ScenarioSetId,
+      passedCount: Number(row.PassCount),
+      totalCount: Number(row.TotalCount),
+      lastRunTimestamp: Number(row.LastRunAt),
+    }));
   }
 
   async getAllRunIdsForProject({
