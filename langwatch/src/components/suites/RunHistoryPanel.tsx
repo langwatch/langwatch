@@ -38,6 +38,8 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
 } from "./run-history-transforms";
+import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
+import { isSuiteSetId } from "~/server/suites/suite-set-id";
 
 export type RunHistoryStats = {
   runCount: number;
@@ -252,6 +254,9 @@ export function RunHistoryPanel({
     });
   }, [totals, lastActivityTimestamp, onStatsReady]);
 
+  const isPlatformManaged = (setId: string | undefined) =>
+    !!setId && (isOnPlatformSet(setId) || isSuiteSetId(setId));
+
   const createCancelRunHandler = useCallback(
     (setId: string) => (scenarioRun: ScenarioRunData) => {
       if (!project?.id) return;
@@ -437,8 +442,8 @@ export function RunHistoryPanel({
                     expectedJobCount={expectedJobCount}
                     suiteName={suiteName}
                     viewMode={viewMode}
-                    onCancelRun={createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "")}
-                    onCancelAll={() => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "")}
+                    onCancelRun={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
+                    onCancelAll={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? () => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                   />
@@ -456,7 +461,7 @@ export function RunHistoryPanel({
                     onScenarioRunClick={handleScenarioRunClick}
                     resolveTargetName={resolveTargetName}
                     viewMode={viewMode}
-                    onCancelRun={createCancelRunHandler(scenarioSetId ?? "")}
+                    onCancelRun={isPlatformManaged(scenarioSetId) ? createCancelRunHandler(scenarioSetId ?? "") : undefined}
                     cancellingJobId={cancellingJobId}
                   />
                 );

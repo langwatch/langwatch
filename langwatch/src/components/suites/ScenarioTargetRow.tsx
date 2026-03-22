@@ -10,7 +10,7 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Square, X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { buildDisplayTitle } from "./run-history-transforms";
@@ -158,7 +158,6 @@ export function ScenarioTargetRow({
         width="full"
         paddingX={4}
         paddingY={2}
-        paddingRight={hasCancelButton ? 20 : 4}
         gap={4}
         _hover={{ bg: "bg.muted/80" }}
         borderRadius="lg"
@@ -176,9 +175,46 @@ export function ScenarioTargetRow({
             })}
           </Text>
         </HStack>
-        <Text fontSize="sm" flex={1} textAlign="left" truncate>
+        <Text fontSize="sm" textAlign="left" truncate>
           {displayName}
         </Text>
+        {hasCancelButton && (
+          <HStack
+            as="span"
+            role="button"
+            tabIndex={isCancelling ? -1 : 0}
+            gap={1}
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="red.200"
+            fontSize="xs"
+            color="red.600"
+            cursor={isCancelling ? "default" : "pointer"}
+            opacity={isCancelling ? 0.6 : 1}
+            flexShrink={0}
+            _hover={isCancelling ? undefined : { bg: "red.50", borderColor: "red.300" }}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (!isCancelling) onCancel?.();
+            }}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
+                e.stopPropagation();
+                e.preventDefault();
+                onCancel?.();
+              }
+            }}
+            aria-label="Stop run"
+            aria-disabled={isCancelling}
+            data-testid="cancel-run-button"
+          >
+            {isCancelling ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+            <Text fontSize="xs">Stop</Text>
+          </HStack>
+        )}
+        <Box flex={1} />
         {hasMetrics && (
           <Tooltip
             content={<MetricsTooltipContent scenarioRun={scenarioRun} />}
@@ -204,45 +240,6 @@ export function ScenarioTargetRow({
           </Tooltip>
         )}
       </HStack>
-      {hasCancelButton && (
-        <HStack
-          as="button"
-          tabIndex={isCancelling ? -1 : 0}
-          gap={1}
-          paddingX={2}
-          paddingY={0.5}
-          borderRadius="sm"
-          fontSize="xs"
-          color="red.500"
-          cursor={isCancelling ? "default" : "pointer"}
-          opacity={isCancelling ? 0.6 : 0}
-          pointerEvents={isCancelling ? "auto" : "none"}
-          transition="opacity 0.15s"
-          _groupHover={isCancelling ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
-          _hover={isCancelling ? undefined : { bg: "red.50" }}
-          position="absolute"
-          top="50%"
-          right={4}
-          transform="translateY(-50%)"
-          onClick={(e: React.MouseEvent) => {
-            e.stopPropagation();
-            if (!isCancelling) onCancel?.();
-          }}
-          onKeyDown={(e: React.KeyboardEvent) => {
-            if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
-              e.stopPropagation();
-              e.preventDefault();
-              onCancel?.();
-            }
-          }}
-          aria-label="Cancel run"
-          aria-disabled={isCancelling}
-          data-testid="cancel-run-button"
-        >
-          {isCancelling ? <Spinner size="xs" /> : <X size={12} />}
-          <Text fontSize="xs">Cancel</Text>
-        </HStack>
-      )}
     </Box>
   );
 }

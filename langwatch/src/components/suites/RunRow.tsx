@@ -10,7 +10,7 @@
 
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
@@ -124,7 +124,6 @@ export function RunRow({
               {summary.totalCount} of {expectedJobCount}
             </Text>
           )}
-          <Box flex={1} />
           {onCancelAll && hasCancellableRuns && (
             <HStack
               as="span"
@@ -133,16 +132,15 @@ export function RunRow({
               gap={1}
               paddingX={2}
               paddingY={0.5}
-              borderRadius="sm"
+              borderRadius="md"
+              border="1px solid"
+              borderColor="red.200"
               fontSize="xs"
-              color="red.500"
+              color="red.600"
               cursor={isCancellingBatch ? "default" : "pointer"}
               flexShrink={0}
-              opacity={isCancellingBatch ? 0.6 : 0}
-              pointerEvents={isCancellingBatch ? "auto" : "none"}
-              transition="opacity 0.15s"
-              _groupHover={isCancellingBatch ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
-              _hover={isCancellingBatch ? undefined : { bg: "red.50" }}
+              opacity={isCancellingBatch ? 0.6 : 1}
+              _hover={isCancellingBatch ? undefined : { bg: "red.50", borderColor: "red.300" }}
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
@@ -154,14 +152,15 @@ export function RunRow({
                   setIsCancelAllDialogOpen(true);
                 }
               }}
-              aria-label="Cancel all remaining runs"
+              aria-label="Stop all remaining runs"
               aria-disabled={isCancellingBatch}
               data-testid="cancel-all-button"
             >
-              {isCancellingBatch ? <Spinner size="xs" /> : <X size={12} />}
-              <Text fontSize="xs">Cancel All</Text>
+              {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+              <Text fontSize="xs">Stop All</Text>
             </HStack>
           )}
+          <Box flex={1} />
           <RunMetricsSummary summary={summary} />
         </HStack>
       </Box>
