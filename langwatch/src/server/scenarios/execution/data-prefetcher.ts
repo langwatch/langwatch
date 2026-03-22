@@ -71,6 +71,7 @@ export interface WorkflowFetcher {
   findPublishedVersion(params: {
     workflowId: string;
     publishedId: string;
+    projectId: string;
   }): Promise<{ dsl: unknown } | null>;
   findWorkflow(params: {
     id: string;
@@ -459,6 +460,7 @@ async function fetchWorkflowAgentData(
   const version = await workflowFetcher.findPublishedVersion({
     workflowId,
     publishedId,
+    projectId,
   });
   if (!version) return null;
 
@@ -467,6 +469,7 @@ async function fetchWorkflowAgentData(
 
   const entryNode = dslResult.data.nodes.find((n) => n.type === "entry");
   const endNode = dslResult.data.nodes.find((n) => n.type === "end");
+  if (!entryNode || !endNode) return null;
 
   const entryInputs = (entryNode?.data.outputs ?? []).map((f) => ({
     identifier: f.identifier,
@@ -524,9 +527,9 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         });
         return workflow;
       },
-      findPublishedVersion: async ({ workflowId, publishedId }) => {
+      findPublishedVersion: async ({ workflowId, publishedId, projectId }) => {
         const version = await prisma.workflowVersion.findFirst({
-          where: { id: publishedId, workflowId },
+          where: { id: publishedId, workflowId, projectId },
           select: { dsl: true },
         });
         return version;
