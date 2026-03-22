@@ -289,6 +289,63 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("TenantId = {tenantId:String}");
     });
 
+    it("includes both simple and pipeline metrics in date-bucketed query with numeric timeScale", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Simple metrics CTE
+      expect(result.sql).toContain("simple_metrics AS");
+      expect(result.sql).toContain("uniq(");
+
+      // Pipeline metrics CTE
+      expect(result.sql).toContain("cte_1__metadata_thread_id__cardinality AS");
+
+      // FULL OUTER JOIN combines both
+      expect(result.sql).toContain("FULL OUTER JOIN");
+      expect(result.sql).toContain("simple_metrics.period");
+    });
+
+    it("builds date-bucketed query for multiple pipeline metrics with numeric timeScale", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+          {
+            metric: "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Both pipeline CTEs present
+      expect(result.sql).toContain("cte_0__metadata_thread_id__cardinality AS");
+      expect(result.sql).toContain("cte_1__evaluations_evaluation_runs__cardinality AS");
+
+      // FULL OUTER JOIN between them
+      expect(result.sql).toContain("FULL OUTER JOIN");
+      expect(result.sql).toContain("AS period");
+      expect(result.sql).toContain("AS date");
+      expect(result.params.tenantId).toBe("test-project");
+    });
+
     it("enforces tenant isolation in date-bucketed pipeline queries", () => {
       const input = {
         ...baseInput,
