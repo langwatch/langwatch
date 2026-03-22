@@ -883,6 +883,8 @@ export class ScenarioEventService {
     projectId,
   }: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ExternalSetSummary[]> {
     return tracer.withActiveSpan(
       "ScenarioEventService.getExternalSetSummaries",

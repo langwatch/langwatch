@@ -356,6 +356,63 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
 
+    describe("when date range filters out older batches", () => {
+      it("only counts runs within the date range", async () => {
+        const setId = `ext-datefilter-${nanoid()}`;
+        const oldBatch = `batch-old-${nanoid()}`;
+        const recentBatch = `batch-recent-${nanoid()}`;
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+        // Old batch (40 days ago): 1 passed
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-old-${nanoid()}`,
+          BatchRunId: oldBatch,
+          ScenarioSetId: setId,
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
+          UpdatedAt: new Date(now - 40 * 24 * 60 * 60 * 1000),
+        }));
+
+        // Recent batch (1 day ago): 1 passed, 1 failed
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-new-1-${nanoid()}`,
+          BatchRunId: recentBatch,
+          ScenarioSetId: setId,
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+          UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-new-2-${nanoid()}`,
+          BatchRunId: recentBatch,
+          ScenarioSetId: setId,
+          Status: "FAILED",
+          CreatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+          UpdatedAt: new Date(now - 1 * 24 * 60 * 60 * 1000),
+        }));
+
+        // With 30-day filter: only the recent batch (2 runs, 1 passed)
+        const filtered = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+          startDate: now - thirtyDaysMs,
+          endDate: now,
+        });
+        const filteredSummary = filtered.find((s) => s.scenarioSetId === setId);
+        expect(filteredSummary).toBeDefined();
+        expect(filteredSummary!.totalCount).toBe(2);
+        expect(filteredSummary!.passedCount).toBe(1);
+
+        // Without date filter: all 3 runs, 2 passed
+        const unfiltered = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+        const unfilteredSummary = unfiltered.find((s) => s.scenarioSetId === setId);
+        expect(unfilteredSummary).toBeDefined();
+        expect(unfilteredSummary!.totalCount).toBe(3);
+        expect(unfilteredSummary!.passedCount).toBe(2);
+      });
+    });
+
     describe("when internal suite sets exist", () => {
       it("excludes them from external set summaries", async () => {
         const internalSetId = `__internal__suite-excl-${nanoid()}__suite`;

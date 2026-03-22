@@ -9,6 +9,7 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -66,7 +67,7 @@ function SuitesPageContent() {
     { enabled: !!project },
   );
 
-  const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
+  const { data: externalSets, isLoading: isExternalSetsLoading } = api.scenarios.getExternalSetSummaries.useQuery(
     {
       projectId: project?.id ?? "",
       startDate: period.startDate.getTime(),
@@ -157,6 +158,25 @@ function SuitesPageContent() {
       return null;
     return extractExternalSetId(selectedSuiteSlug);
   }, [selectedSuiteSlug]);
+
+  // Auto-expand period when selected item's last run is outside current range
+  useEffect(() => {
+    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return;
+
+    let lastRunTs: number | null = null;
+    if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
+      const setId = extractExternalSetId(selectedSuiteSlug);
+      lastRunTs = externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
+    } else if (selectedSuite && runSummaries) {
+      lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
+    }
+
+    if (lastRunTs && lastRunTs < period.startDate.getTime()) {
+      const daysAgo = Math.ceil((Date.now() - lastRunTs) / 86400000);
+      const newDays = daysAgo <= 30 ? 30 : daysAgo <= 90 ? 90 : 365;
+      setPeriod(subDays(new Date(), newDays), new Date());
+    }
+  }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
@@ -338,7 +358,7 @@ function SuitesPageContent() {
             onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
-            isLoading={isLoading}
+            isLoading={isLoading || isExternalSetsLoading}
           />
 
           {/* Content box */}

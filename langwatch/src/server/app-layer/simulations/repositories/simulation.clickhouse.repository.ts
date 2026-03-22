@@ -725,10 +725,16 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
   async getExternalSetSummaries({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ExternalSetSummary[]> {
-    // Single query: aggregate pass/total across ALL runs per external set
+    const dateFilter = buildDateHavingFilter({ startDate, endDate });
+    const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
+
     const rows = await this.queryRows<{
       ScenarioSetId: string;
       TotalCount: string;
@@ -737,21 +743,31 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }>(
       `SELECT
         ScenarioSetId,
-        toString(count()) AS TotalCount,
-        toString(countIf(Status = 'SUCCESS')) AS PassCount,
-        toString(max(toUnixTimestamp64Milli(CreatedAt))) AS LastRunAt
+        toString(sum(RunCount)) AS TotalCount,
+        toString(sum(PassCount)) AS PassCount,
+        toString(max(MaxCreatedAtMs)) AS LastRunAt
        FROM (
-         SELECT ${DEDUP_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND NOT startsWith(ScenarioSetId, '__internal__')
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         SELECT
+           ScenarioSetId,
+           BatchRunId,
+           count() AS RunCount,
+           countIf(Status = 'SUCCESS') AS PassCount,
+           toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
+         FROM (
+           SELECT ${DEDUP_COLUMNS}
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+             AND NOT startsWith(ScenarioSetId, '__internal__')
+           ORDER BY ScenarioRunId, UpdatedAt DESC
+           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
+         WHERE ArchivedAt IS NULL
+         GROUP BY ScenarioSetId, BatchRunId
+         ${havingClause}
        )
-       WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId },
+      { tenantId: projectId, ...dateFilter.params },
     );
 
     return rows.map((row) => ({
