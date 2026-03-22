@@ -47,8 +47,8 @@ export function createSimulationMetricsSyncReactor(
 
       if (!scenarioRunId) return;
 
-      const roleCosts = foldState.roleCosts ?? {};
-      const roleLatencies = foldState.roleLatencies ?? {};
+      const roleCosts = foldState.scenarioRoleCosts ?? {};
+      const roleLatencies = foldState.scenarioRoleLatencies ?? {};
 
       // Only dispatch if there's actual metric data
       if (Object.keys(roleCosts).length === 0 && foldState.totalCost === null) {

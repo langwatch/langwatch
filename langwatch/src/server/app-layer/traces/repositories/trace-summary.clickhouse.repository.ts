@@ -49,6 +49,9 @@ interface ClickHouseSummaryRecord {
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
+  ScenarioRoleCosts: Record<string, number>;
+  ScenarioRoleLatencies: Record<string, number>;
+  ScenarioRoleSpans: Record<string, string>;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
@@ -136,7 +139,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
-            HasAnnotation
+            HasAnnotation,
+            ScenarioRoleCosts,
+            ScenarioRoleLatencies,
+            ScenarioRoleSpans
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -193,6 +199,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       hasAnnotation:
         record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
       attributes: record.Attributes ?? {},
+      scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
+      scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
+      scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -237,6 +246,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       SubTopicId: data.subTopicId,
       HasAnnotation:
         data.hasAnnotation != null ? (data.hasAnnotation ? 1 : 0) : null,
+      ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
+      ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
+      ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
     };
   }
 }

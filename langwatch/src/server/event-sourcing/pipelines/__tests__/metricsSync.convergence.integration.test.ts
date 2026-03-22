@@ -2,12 +2,12 @@
  * REAL integration test for per-role cost/latency metrics propagation.
  *
  * Sends actual OTLP spans through the trace processing pipeline with
- * ClickHouse + Redis, then verifies that roleCosts/roleLatencies are
+ * ClickHouse + Redis, then verifies that scenarioRoleCosts/scenarioRoleLatencies are
  * accumulated in the trace summary fold state.
  *
  * This test proves the full path:
  * 1. Span with langwatch.scenario.role arrives
- * 2. traceSummary fold accumulates roleCosts via parent-role inheritance
+ * 2. traceSummary fold accumulates scenarioRoleCosts via parent-role inheritance
  * 3. Fold state is persisted to ClickHouse trace_summaries table
  * 4. Data can be read back from the store
  *
@@ -274,43 +274,48 @@ describe.skipIf(!hasTestcontainers)(
           occurredAt: Date.now(),
         });
 
-        // Poll for the fold state to have all 4 spans processed
+        // Poll ClickHouse directly for the trace summary
+        const clickHouseClient = getTestClickHouseClient()!;
         const deadline = Date.now() + 30_000;
-        let foldState: TraceSummaryData | null = null;
+        let row: any = null;
 
         while (Date.now() < deadline) {
-          try {
-            const projection = await tracePipeline.service.getProjectionByName(
-              "traceSummary",
-              traceId,
-              { tenantId },
-            );
-            if (projection && (projection as any).data?.spanCount >= 4) {
-              foldState = (projection as any).data as TraceSummaryData;
-              break;
-            }
-          } catch {
-            // Not ready yet
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT SpanCount, TotalCost,
+                ScenarioRoleCosts, ScenarioRoleLatencies, ScenarioRoleSpans,
+                Attributes
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              ORDER BY UpdatedAt DESC
+              LIMIT 1
+            `,
+            query_params: { tenantId: tenantIdString, traceId },
+            format: "JSONEachRow",
+            clickhouse_settings: { select_sequential_consistency: "1" },
+          });
+          const rows = await result.json();
+          if (rows.length > 0 && (rows[0] as any).SpanCount >= 4) {
+            row = rows[0];
+            break;
           }
           await new Promise((resolve) => setTimeout(resolve, 500));
         }
 
-        // THE ACTUAL ASSERTIONS — these should FAIL right now
-        // because roleCosts aren't being persisted/accumulated correctly
-        expect(foldState).not.toBeNull();
-        expect(foldState!.spanCount).toBe(4);
+        expect(row).not.toBeNull();
+        expect(row.SpanCount).toBe(4);
 
         // Role costs should have Agent entry with accumulated LLM costs
-        expect(foldState!.roleCosts).toBeDefined();
-        expect(Object.keys(foldState!.roleCosts ?? {})).toContain("Agent");
-        expect(foldState!.roleCosts!["Agent"]).toBeGreaterThan(0);
+        expect(row.ScenarioRoleCosts).toBeDefined();
+        expect(row.ScenarioRoleCosts["Agent"]).toBeGreaterThan(0);
 
         // Role latencies should have Agent entry = agent span duration (4000ms)
-        expect(foldState!.roleLatencies).toBeDefined();
-        expect(foldState!.roleLatencies!["Agent"]).toBe(4000);
+        expect(row.ScenarioRoleLatencies).toBeDefined();
+        expect(row.ScenarioRoleLatencies["Agent"]).toBe(4000);
 
         // scenario_run_id should be hoisted to attributes
-        expect(foldState!.attributes["langwatch.scenario.run_id"]).toBe("scenariorun_test123");
+        expect(row.Attributes["langwatch.scenario.run_id"]).toBe("scenariorun_test123");
       }, 60_000);
     });
   },

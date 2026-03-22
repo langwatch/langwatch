@@ -774,22 +774,19 @@ function accumulateAttributes({
 
 function resolveEffectiveRole({
   span,
-  spanRoles,
+  scenarioRoleSpans,
 }: {
   span: NormalizedSpan;
-  spanRoles: Record<string, string>;
+  scenarioRoleSpans: Record<string, string>;
 }): string | undefined {
   const directRole = span.spanAttributes["langwatch.scenario.role"];
   if (typeof directRole === "string" && directRole !== "") return directRole;
 
-  // Walk up the parent chain via the spanRoles map
+  // Walk up the parent chain via the scenarioRoleSpans map
   let parentId = span.parentSpanId;
   while (parentId) {
-    const parentRole = spanRoles[parentId];
+    const parentRole = scenarioRoleSpans[parentId];
     if (parentRole) return parentRole;
-    // Cannot walk further without the parent span's parentSpanId,
-    // but spanRoles propagates roles down, so grandchild lookup works
-    // because the intermediate span was already recorded.
     break;
   }
 
@@ -802,42 +799,42 @@ function accumulateRoleCostLatency({
 }: {
   state: TraceSummaryData;
   span: NormalizedSpan;
-}): Pick<TraceSummaryData, "roleCosts" | "roleLatencies" | "spanRoles"> {
-  const spanRoles = { ...(state.spanRoles ?? {}) };
+}): Pick<TraceSummaryData, "scenarioRoleCosts" | "scenarioRoleLatencies" | "scenarioRoleSpans"> {
+  const scenarioRoleSpans = { ...(state.scenarioRoleSpans ?? {}) };
 
   // Record this span's role if it has one
   const directRole = span.spanAttributes["langwatch.scenario.role"];
   if (typeof directRole === "string" && directRole !== "") {
-    spanRoles[span.spanId] = directRole;
-  } else if (span.parentSpanId && spanRoles[span.parentSpanId]) {
+    scenarioRoleSpans[span.spanId] = directRole;
+  } else if (span.parentSpanId && scenarioRoleSpans[span.parentSpanId]) {
     // Propagate parent role to this span so grandchildren can look it up
-    spanRoles[span.spanId] = spanRoles[span.parentSpanId]!;
+    scenarioRoleSpans[span.spanId] = scenarioRoleSpans[span.parentSpanId]!;
   }
 
-  const effectiveRole = resolveEffectiveRole({ span, spanRoles });
+  const effectiveRole = resolveEffectiveRole({ span, scenarioRoleSpans });
 
-  let roleCosts = state.roleCosts ?? {};
-  let roleLatencies = state.roleLatencies ?? {};
+  let scenarioRoleCosts = state.scenarioRoleCosts ?? {};
+  let scenarioRoleLatencies = state.scenarioRoleLatencies ?? {};
 
   if (effectiveRole) {
     const spanCost = extractTokenMetrics(span).cost;
-    roleCosts = {
-      ...roleCosts,
-      [effectiveRole]: (roleCosts[effectiveRole] ?? 0) + spanCost,
+    scenarioRoleCosts = {
+      ...scenarioRoleCosts,
+      [effectiveRole]: (scenarioRoleCosts[effectiveRole] ?? 0) + spanCost,
     };
 
     // Only accumulate latency for the span that directly carries the role,
     // not for child spans (which would double-count nested durations)
     if (typeof directRole === "string" && directRole !== "") {
       const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
-      roleLatencies = {
-        ...roleLatencies,
-        [effectiveRole]: (roleLatencies[effectiveRole] ?? 0) + spanDurationMs,
+      scenarioRoleLatencies = {
+        ...scenarioRoleLatencies,
+        [effectiveRole]: (scenarioRoleLatencies[effectiveRole] ?? 0) + spanDurationMs,
       };
     }
   }
 
-  return { roleCosts, roleLatencies, spanRoles };
+  return { scenarioRoleCosts, scenarioRoleLatencies, scenarioRoleSpans };
 }
 
 // ─── Main composition ───────────────────────────────────────────────
@@ -936,9 +933,9 @@ export function createTraceSummaryFoldProjection({
         subTopicId: null,
         hasAnnotation: null,
         attributes: {},
-        roleCosts: {},
-        roleLatencies: {},
-        spanRoles: {},
+        scenarioRoleCosts: {},
+        scenarioRoleLatencies: {},
+        scenarioRoleSpans: {},
         occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),

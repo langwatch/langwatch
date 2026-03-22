@@ -74,8 +74,8 @@ export function createTraceMetricsSyncReactor(
             continue;
           }
 
-          const roleCosts = traceSummary.roleCosts ?? {};
-          const roleLatencies = traceSummary.roleLatencies ?? {};
+          const roleCosts = traceSummary.scenarioRoleCosts ?? {};
+          const roleLatencies = traceSummary.scenarioRoleLatencies ?? {};
 
           // Only dispatch if there's actual metric data
           if (Object.keys(roleCosts).length === 0 && traceSummary.totalCost === null) {

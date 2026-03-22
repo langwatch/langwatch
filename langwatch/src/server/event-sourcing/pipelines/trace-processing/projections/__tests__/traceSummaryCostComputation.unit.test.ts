@@ -321,7 +321,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
 
   describe("given an agent span tagged role 'Agent' with child LLM spans", () => {
     describe("when the fold processes the agent span then its child LLM spans", () => {
-      it("accumulates LLM costs into roleCosts['Agent']", () => {
+      it("accumulates LLM costs into scenarioRoleCosts['Agent']", () => {
         const agentSpan = createTestSpan({
           spanId: "agent-1",
           parentSpanId: null,
@@ -371,10 +371,10 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
         // LLM1 cost: 42 * 0.000005 + 0 * 0.000015 = 0.00021
         // LLM2 cost: 79 * 0.000005 + 52 * 0.000015 = 0.000395 + 0.00078 = 0.001175
         const expectedCost = 0.00021 + 0.001175;
-        expect(state.roleCosts?.["Agent"]).toBeCloseTo(expectedCost, 6);
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(expectedCost, 6);
       });
 
-      it("sets roleLatencies['Agent'] to the agent span duration", () => {
+      it("sets scenarioRoleLatencies['Agent'] to the agent span duration", () => {
         const agentSpan = createTestSpan({
           spanId: "agent-1",
           parentSpanId: null,
@@ -406,7 +406,7 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
         state = applySpanToSummary({ state, span: llmSpan });
 
         // Only the agent span (which has the role) contributes to latency
-        expect(state.roleLatencies?.["Agent"]).toBe(4000);
+        expect(state.scenarioRoleLatencies?.["Agent"]).toBe(4000);
       });
     });
   });
@@ -492,11 +492,11 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
         state = applySpanToSummary({ state, span: judgeLlm });
 
         // User: 100*0.00001 + 10*0.00003 = 0.001 + 0.0003 = 0.0013
-        expect(state.roleCosts?.["User"]).toBeCloseTo(0.0013, 6);
+        expect(state.scenarioRoleCosts?.["User"]).toBeCloseTo(0.0013, 6);
         // Agent: 200*0.00001 + 50*0.00003 = 0.002 + 0.0015 = 0.0035
-        expect(state.roleCosts?.["Agent"]).toBeCloseTo(0.0035, 6);
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(0.0035, 6);
         // Judge: 300*0.00001 + 20*0.00003 = 0.003 + 0.0006 = 0.0036
-        expect(state.roleCosts?.["Judge"]).toBeCloseTo(0.0036, 6);
+        expect(state.scenarioRoleCosts?.["Judge"]).toBeCloseTo(0.0036, 6);
       });
     });
   });
@@ -542,14 +542,14 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
         state = applySpanToSummary({ state, span: llmSpan });
 
         // LLM cost: 100*0.0001 + 50*0.0001 = 0.01 + 0.005 = 0.015
-        expect(state.roleCosts?.["Agent"]).toBeCloseTo(0.015, 6);
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(0.015, 6);
       });
     });
   });
 
   describe("given a trace without scenario roles", () => {
     describe("when spans have no langwatch.scenario.role attribute", () => {
-      it("leaves roleCosts and roleLatencies empty", () => {
+      it("leaves scenarioRoleCosts and scenarioRoleLatencies empty", () => {
         const span = createTestSpan({
           spanId: "span-1",
           parentSpanId: null,
@@ -565,8 +565,8 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
         let state = createInitState();
         state = applySpanToSummary({ state, span });
 
-        expect(state.roleCosts).toEqual({});
-        expect(state.roleLatencies).toEqual({});
+        expect(state.scenarioRoleCosts).toEqual({});
+        expect(state.scenarioRoleLatencies).toEqual({});
       });
     });
   });

@@ -44,9 +44,9 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     subTopicId: null,
     hasAnnotation: null,
     attributes: {},
-    roleCosts: { Agent: 0.001 },
-    roleLatencies: { Agent: 500 },
-    spanRoles: {},
+    scenarioRoleCosts: { Agent: 0.001 },
+    scenarioRoleLatencies: { Agent: 500 },
+    scenarioRoleSpans: {},
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,
@@ -85,8 +85,8 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
 
       const foldState = createTraceSummaryState({
         attributes: { "langwatch.scenario.run_id": "run-1" },
-        roleCosts: { Agent: 0.001 },
-        roleLatencies: { Agent: 500 },
+        scenarioRoleCosts: { Agent: 0.001 },
+        scenarioRoleLatencies: { Agent: 500 },
         totalCost: 0.001,
       });
 
@@ -134,8 +134,8 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
 
       const foldState = createTraceSummaryState({
         attributes: { "langwatch.scenario.run_id": "run-1" },
-        roleCosts: {},
-        roleLatencies: {},
+        scenarioRoleCosts: {},
+        scenarioRoleLatencies: {},
         totalCost: null,
       });
 
@@ -157,7 +157,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
 
       const foldState = createTraceSummaryState({
         attributes: { "langwatch.scenario.run_id": "run-1" },
-        roleCosts: { Agent: 0.001 },
+        scenarioRoleCosts: { Agent: 0.001 },
         totalCost: 0.001,
       });
 
@@ -171,15 +171,15 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
     });
   });
 
-  describe("when totalCost is zero but roleCosts exist", () => {
+  describe("when totalCost is zero but scenarioRoleCosts exist", () => {
     it("dispatches updateRunMetrics", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
         attributes: { "langwatch.scenario.run_id": "run-1" },
-        roleCosts: { Agent: 0.0 },
-        roleLatencies: { Agent: 500 },
+        scenarioRoleCosts: { Agent: 0.0 },
+        scenarioRoleLatencies: { Agent: 500 },
         totalCost: 0,
       });
 
@@ -189,7 +189,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
         foldState,
       });
 
-      // roleCosts has an entry, even though value is 0, so dispatch happens
+      // scenarioRoleCosts has an entry, even though value is 0, so dispatch happens
       expect(deps.updateRunMetrics).toHaveBeenCalledTimes(1);
     });
   });

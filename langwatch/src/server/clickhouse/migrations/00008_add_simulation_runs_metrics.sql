@@ -17,15 +17,15 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
 -- +goose Down
 -- +goose ENVSUB ON
 -- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
-  DROP COLUMN IF EXISTS TotalCost,
-  DROP COLUMN IF EXISTS RoleCosts,
-  DROP COLUMN IF EXISTS RoleLatencies,
-  DROP COLUMN IF EXISTS TraceMetricsJson;
--- +goose StatementEnd
 
--- +goose StatementBegin
-ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
-  DROP INDEX IF EXISTS idx_trace_ids;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
+--   DROP COLUMN IF EXISTS TotalCost,
+--   DROP COLUMN IF EXISTS RoleCosts,
+--   DROP COLUMN IF EXISTS RoleLatencies,
+--   DROP COLUMN IF EXISTS TraceMetricsJson;
+
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
+--   DROP INDEX IF EXISTS idx_trace_ids;
+
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
