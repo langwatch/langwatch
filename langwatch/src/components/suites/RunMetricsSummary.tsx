@@ -215,15 +215,18 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
         ) : (
           /* Pass rate with colored circle */
           finishedCount > 0 && (
-            <HStack gap={1}>
-              <PassRateCircle passRate={summary.passRate} />
-              <Text
-                color={getPassRateGradientColor(summary.passRate)}
-                fontWeight="medium"
-              >
-                {Math.round(summary.passRate)}%
-              </Text>
-            </HStack>
+            <>
+              <Text fontWeight="600">Pass</Text>
+              <HStack gap={1}>
+                <PassRateCircle passRate={summary.passRate} />
+                <Text
+                  color={getPassRateGradientColor(summary.passRate)}
+                  fontWeight="medium"
+                >
+                  {Math.round(summary.passRate)}%
+                </Text>
+              </HStack>
+            </>
           )
         )}
 
