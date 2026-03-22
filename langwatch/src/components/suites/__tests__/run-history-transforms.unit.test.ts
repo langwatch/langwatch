@@ -219,7 +219,7 @@ describe("computeBatchRunSummary()", () => {
   });
 
   describe("when some runs are still in progress", () => {
-    it("only counts finished runs for pass rate", () => {
+    it("counts in-progress runs in total (lowering pass rate)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS }),
@@ -231,11 +231,103 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
-      expect(summary.passRate).toBe(100);
+      expect(summary.passRate).toBe(50);
       expect(summary.passedCount).toBe(1);
       expect(summary.failedCount).toBe(0);
+      expect(summary.completedCount).toBe(1);
       expect(summary.totalCount).toBe(2);
       expect(summary.inProgressCount).toBe(1);
+    });
+  });
+
+  describe("when all runs are stalled", () => {
+    it("returns null pass rate (no verdict runs)", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_1" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_2" }),
+        ],
+      });
+
+      const summary = computeBatchRunSummary({ batchRun });
+      expect(summary.passRate).toBeNull();
+      expect(summary.completedCount).toBe(0);
+      expect(summary.stalledCount).toBe(2);
+      expect(summary.totalCount).toBe(2);
+    });
+  });
+
+  describe("when all runs are cancelled", () => {
+    it("returns null pass rate", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_1" }),
+        ],
+      });
+
+      const summary = computeBatchRunSummary({ batchRun });
+      expect(summary.passRate).toBeNull();
+      expect(summary.completedCount).toBe(0);
+      expect(summary.cancelledCount).toBe(1);
+    });
+  });
+
+  describe("when passed and stalled runs are mixed", () => {
+    it("computes pass rate as passed / total", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_2" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_3" }),
+        ],
+      });
+
+      const summary = computeBatchRunSummary({ batchRun });
+      expect(summary.passRate).toBeCloseTo(66.67, 0);
+      expect(summary.completedCount).toBe(2);
+      expect(summary.passedCount).toBe(2);
+      expect(summary.stalledCount).toBe(1);
+      expect(summary.totalCount).toBe(3);
+    });
+  });
+
+  describe("when all runs failed", () => {
+    it("returns 0% pass rate (not null)", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ status: ScenarioRunStatus.FAILED, scenarioRunId: "run_1" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.FAILED, scenarioRunId: "run_2" }),
+        ],
+      });
+
+      const summary = computeBatchRunSummary({ batchRun });
+      expect(summary.passRate).toBe(0);
+      expect(summary.completedCount).toBe(2);
+      expect(summary.failedCount).toBe(2);
+    });
+  });
+
+  describe("when mix of passed, failed, stalled, cancelled", () => {
+    it("computes pass rate as passed / total with completedCount = passed + failed", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_2" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_3" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.FAILED, scenarioRunId: "run_4" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_5" }),
+          makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_6" }),
+        ],
+      });
+
+      const summary = computeBatchRunSummary({ batchRun });
+      expect(summary.passRate).toBe(50);
+      expect(summary.completedCount).toBe(4);
+      expect(summary.passedCount).toBe(3);
+      expect(summary.failedCount).toBe(1);
+      expect(summary.stalledCount).toBe(1);
+      expect(summary.cancelledCount).toBe(1);
+      expect(summary.totalCount).toBe(6);
     });
   });
 });
@@ -632,6 +724,7 @@ describe("computeSuiteRunSummaries()", () => {
       const summary = result.get("suite_abc");
       expect(summary).toEqual({
         passedCount: 3,
+        failedCount: 0,
         totalCount: 3,
         lastRunTimestamp: now,
       });
@@ -674,6 +767,7 @@ describe("computeSuiteRunSummaries()", () => {
       const summary = result.get("suite_xyz");
       expect(summary).toEqual({
         passedCount: 1,
+        failedCount: 2,
         totalCount: 3,
         lastRunTimestamp: now,
       });

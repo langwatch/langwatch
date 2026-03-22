@@ -186,9 +186,10 @@ export function SuiteSidebar({
             <Skeleton
               key={i}
               data-testid="suite-sidebar-skeleton"
-              height="61px"
+              height="60px"
               width="100%"
               borderRadius="md"
+              marginBottom={1}
             />
           ))
         )}
@@ -381,18 +382,23 @@ function SidebarButton({
 
 function RunSummaryLine({
   passedCount,
+  failedCount,
   totalCount,
 }: {
   passedCount: number;
+  failedCount: number;
   totalCount: number;
 }) {
   if (totalCount === 0) return null;
-  const passRate = (passedCount / totalCount) * 100;
+
+  const completedCount = passedCount + failedCount;
+  const passRate = completedCount > 0 ? (passedCount / totalCount) * 100 : null;
+
   return (
     <HStack gap={1} color="fg.muted">
       <PassRateCircle passRate={passRate} size="8px" />
       <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
-        {Math.round(passRate)}%
+        {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
       <Text fontSize="xs" color="gray.350">·</Text>
       <Text fontSize="xs" color="fg.subtle">
@@ -537,6 +543,7 @@ function SuiteListItem({
         {runSummary && runSummary.totalCount > 0 && (
           <RunSummaryLine
             passedCount={runSummary.passedCount}
+            failedCount={runSummary.failedCount}
             totalCount={runSummary.totalCount}
           />
         )}
@@ -582,6 +589,7 @@ function ExternalSetListItem({
         {externalSet.totalCount > 0 && (
           <RunSummaryLine
             passedCount={externalSet.passedCount}
+            failedCount={externalSet.failedCount}
             totalCount={externalSet.totalCount}
           />
         )}

@@ -250,6 +250,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_1",
           {
             passedCount: 8,
+            failedCount: 0,
             totalCount: 8,
             lastRunTimestamp: Date.now() - 2 * 60 * 60 * 1000,
           },
@@ -302,6 +303,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_2",
           {
             passedCount: 9,
+            failedCount: 3,
             totalCount: 12,
             lastRunTimestamp: Date.now() - 3 * 60 * 60 * 1000,
           },
@@ -369,6 +371,7 @@ describe("<SuiteSidebar/>", () => {
             "suite_1",
             {
               passedCount: 7,
+              failedCount: 1,
               totalCount: 8,
               lastRunTimestamp: Date.now() - 60 * 60 * 1000,
             },
@@ -391,6 +394,7 @@ describe("<SuiteSidebar/>", () => {
             "suite_1",
             {
               passedCount: 8,
+              failedCount: 0,
               totalCount: 8,
               lastRunTimestamp: Date.now(),
             },
@@ -434,6 +438,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_1",
           {
             passedCount: 8,
+            failedCount: 0,
             totalCount: 8,
             lastRunTimestamp: Date.now() - 60 * 60 * 1000,
           },
@@ -719,9 +724,9 @@ describe("<SuiteSidebar/>", () => {
 
   describe("given external sets with different timestamps", () => {
     const externalSets = [
-      { scenarioSetId: "oldest-set", passedCount: 3, totalCount: 5, lastRunTimestamp: 1000 },
-      { scenarioSetId: "newest-set", passedCount: 5, totalCount: 5, lastRunTimestamp: 3000 },
-      { scenarioSetId: "middle-set", passedCount: 4, totalCount: 5, lastRunTimestamp: 2000 },
+      { scenarioSetId: "oldest-set", passedCount: 3, failedCount: 2, totalCount: 5, lastRunTimestamp: 1000 },
+      { scenarioSetId: "newest-set", passedCount: 5, failedCount: 0, totalCount: 5, lastRunTimestamp: 3000 },
+      { scenarioSetId: "middle-set", passedCount: 4, failedCount: 1, totalCount: 5, lastRunTimestamp: 2000 },
     ];
 
     describe("when rendered in the expanded sidebar", () => {

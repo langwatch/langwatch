@@ -737,12 +737,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       ScenarioSetId: string;
       TotalCount: string;
       PassCount: string;
+      FailCount: string;
       LastRunAt: string;
     }>(
       `SELECT
         ScenarioSetId,
-        toString(sum(RunCount)) AS TotalCount,
-        toString(sum(PassCount)) AS PassCount,
+        toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
+        toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
+        toString(argMax(FailCount, MaxCreatedAtMs)) AS FailCount,
         toString(max(MaxCreatedAtMs)) AS LastRunAt
        FROM (
          SELECT
@@ -750,6 +752,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            BatchRunId,
            count() AS RunCount,
            countIf(Status = 'SUCCESS') AS PassCount,
+           countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
            toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
          FROM (
            SELECT ${DEDUP_COLUMNS}
@@ -771,6 +774,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return rows.map((row) => ({
       scenarioSetId: row.ScenarioSetId,
       passedCount: Number(row.PassCount),
+      failedCount: Number(row.FailCount),
       totalCount: Number(row.TotalCount),
       lastRunTimestamp: Number(row.LastRunAt),
     }));

@@ -12,6 +12,7 @@ import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 export type SuiteRunSummary = {
   passedCount: number;
+  failedCount: number;
   totalCount: number;
   lastRunTimestamp: number | null;
 };
@@ -59,11 +60,14 @@ export type BatchRun = RunGroup & {
 
 /** Summary statistics for a run group (batch, scenario, or target). */
 export type RunGroupSummary = {
-  passRate: number;
+  /** Pass rate as percentage (0-100), or null when no runs have a verdict (all stalled/cancelled/in-progress). */
+  passRate: number | null;
   passedCount: number;
   failedCount: number;
   stalledCount: number;
   cancelledCount: number;
+  /** Runs with an actual verdict: passed + failed (SUCCESS + FAILED + ERROR). */
+  completedCount: number;
   totalCount: number;
   inProgressCount: number;
   queuedCount: number;
@@ -278,8 +282,9 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / all finished (SUCCESS, ERROR, FAILED, STALLED, CANCELLED).
- * In-progress and pending runs are tracked separately.
+ * Pass rate = passed / total (all runs count in denominator).
+ * When no runs have an actual verdict (completedCount == 0), passRate is null
+ * to distinguish "nothing evaluated yet" from "everything failed" (0%).
  */
 export function computeGroupSummary({
   group,
@@ -316,8 +321,11 @@ export function computeGroupSummary({
     }
   }
 
-  const finishedCount = passedCount + failedCount + stalledCount + cancelledCount;
-  const passRate = finishedCount > 0 ? (passedCount / finishedCount) * 100 : 0;
+  const completedCount = passedCount + failedCount;
+  const totalCount = group.scenarioRuns.length;
+  const passRate = completedCount > 0
+    ? (passedCount / totalCount) * 100
+    : (totalCount > 0 ? null : 0);
 
   let totalCost = 0;
   let totalAgentLatency = 0;
@@ -337,7 +345,8 @@ export function computeGroupSummary({
     failedCount,
     stalledCount,
     cancelledCount,
-    totalCount: group.scenarioRuns.length,
+    completedCount,
+    totalCount,
     inProgressCount,
     queuedCount,
     totalCost: totalCost > 0 ? totalCost : null,
@@ -528,6 +537,7 @@ export function computeSuiteRunSummaries({
     const summary = computeBatchRunSummary({ batchRun: latestBatch });
     map.set(suiteId, {
       passedCount: summary.passedCount,
+      failedCount: summary.failedCount,
       totalCount: summary.totalCount,
       lastRunTimestamp: latestBatch.timestamp,
     });

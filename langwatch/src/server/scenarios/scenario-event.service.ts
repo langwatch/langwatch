@@ -905,6 +905,7 @@ export class ScenarioEventService {
           .map((s) => ({
             scenarioSetId: s.scenarioSetId,
             passedCount: 0,
+            failedCount: 0,
             totalCount: 0,
             lastRunTimestamp: s.lastRunAt,
           }))

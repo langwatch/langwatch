@@ -24,13 +24,20 @@ type RunMetricsSummaryProps = {
   summary: RunGroupSummary;
 };
 
+/**
+ * Builds a parenthetical detail string for non-success counts.
+ * Example: "(1 failed, 1 stalled, 1 cancelled)"
+ */
+function buildCompletedDetail(summary: RunGroupSummary): string | null {
+  const parts: string[] = [];
+  if (summary.failedCount > 0) parts.push(`${summary.failedCount} failed`);
+  if (summary.stalledCount > 0) parts.push(`${summary.stalledCount} stalled`);
+  if (summary.cancelledCount > 0) parts.push(`${summary.cancelledCount} cancelled`);
+  return parts.length > 0 ? `(${parts.join(", ")})` : null;
+}
+
 function TooltipContent({ summary }: { summary: RunGroupSummary }) {
-  const finishedCount =
-    summary.passedCount +
-    summary.failedCount +
-    summary.stalledCount +
-    summary.cancelledCount;
-  const errorCount = summary.failedCount + summary.stalledCount + summary.cancelledCount;
+  const detail = buildCompletedDetail(summary);
 
   return (
     <VStack
@@ -41,34 +48,32 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
       color="white"
     >
       <VStack align="stretch" gap={2} padding={2}>
-        {/* Progress row */}
+        {/* Pass Rate */}
+        <HStack justify="space-between">
+          <Text color="white/75">Pass</Text>
+          <HStack gap={1.5}>
+            <PassRateCircle passRate={summary.passRate} />
+            <Text
+              fontWeight="medium"
+              color={getPassRateGradientColor(summary.passRate)}
+            >
+              {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+            </Text>
+          </HStack>
+        </HStack>
+
+        {/* Completed row */}
         <HStack justify="space-between">
           <Text color="white/75">Completed</Text>
           <Text fontWeight="medium">
-            {finishedCount}/{summary.totalCount}
-            {errorCount > 0 && (
+            {summary.completedCount}/{summary.totalCount}
+            {detail && (
               <Text as="span" color="red.300" marginLeft={1}>
-                ({errorCount} {errorCount === 1 ? "error" : "errors"})
+                {detail}
               </Text>
             )}
           </Text>
         </HStack>
-
-        {/* Pass Rate */}
-        {finishedCount > 0 && (
-          <HStack justify="space-between">
-            <Text color="white/75">Pass Rate</Text>
-            <HStack gap={1.5}>
-              <PassRateCircle passRate={summary.passRate} />
-              <Text
-                fontWeight="medium"
-                color={getPassRateGradientColor(summary.passRate)}
-              >
-                {Math.round(summary.passRate)}%
-              </Text>
-            </HStack>
-          </HStack>
-        )}
 
         {/* Average Agent Latency */}
         {summary.averageAgentLatencyMs !== null && (
@@ -159,16 +164,11 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
     useInteractiveTooltip(150);
 
   const isRunning = summary.inProgressCount > 0 || summary.queuedCount > 0;
-  const finishedCount =
-    summary.passedCount +
-    summary.failedCount +
-    summary.stalledCount +
-    summary.cancelledCount;
   const hasMetrics =
     summary.totalCost !== null || summary.averageAgentLatencyMs !== null;
 
   // When running and no metrics, fall back to badge-style counts
-  if (isRunning && !hasMetrics && finishedCount === 0) {
+  if (isRunning && !hasMetrics && summary.completedCount === 0) {
     return (
       <HStack gap={1} data-testid="run-metrics-summary">
         <CountBadges summary={summary} />
@@ -209,12 +209,12 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
           <HStack gap={1}>
             <Icon as={LuZap} boxSize={3} color="blue.fg" />
             <Text color="blue.fg" fontWeight="medium">
-              {finishedCount}/{summary.totalCount}
+              {summary.completedCount}/{summary.totalCount}
             </Text>
           </HStack>
         ) : (
-          /* Pass rate with colored circle */
-          finishedCount > 0 && (
+          /* Pass rate with colored circle — shown for all finished states including null (gray "-") */
+          summary.totalCount > 0 && (
             <>
               <Text fontWeight="600">Pass</Text>
               <HStack gap={1}>
@@ -223,7 +223,7 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
                   color={getPassRateGradientColor(summary.passRate)}
                   fontWeight="medium"
                 >
-                  {Math.round(summary.passRate)}%
+                  {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
                 </Text>
               </HStack>
             </>

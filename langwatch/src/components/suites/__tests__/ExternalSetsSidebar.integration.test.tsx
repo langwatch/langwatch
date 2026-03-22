@@ -44,6 +44,7 @@ function makeExternalSet(
   return {
     scenarioSetId: "nightly-regression",
     passedCount: 10,
+    failedCount: 0,
     totalCount: 10,
     lastRunTimestamp: Date.now() - 30 * 60 * 1000,
     ...overrides,
