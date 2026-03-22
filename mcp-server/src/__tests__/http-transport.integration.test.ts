@@ -213,6 +213,124 @@ describe("HTTP transport", () => {
     });
   });
 
+  describe("OAuth 2.0 endpoints", () => {
+    describe("/.well-known/oauth-authorization-server", () => {
+      it("returns OAuth metadata with token endpoint", async () => {
+        const response = await fetch(
+          `http://localhost:${port}/.well-known/oauth-authorization-server`
+        );
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.token_endpoint).toContain("/oauth/token");
+        expect(body.grant_types_supported).toContain("client_credentials");
+      });
+    });
+
+    describe("/oauth/token", () => {
+      it("returns 400 for unsupported grant type", async () => {
+        const response = await fetch(
+          `http://localhost:${port}/oauth/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "grant_type=authorization_code&client_secret=test-key",
+          }
+        );
+        const body = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(body.error).toBe("unsupported_grant_type");
+      });
+
+      it("returns 400 when client_secret is missing", async () => {
+        const response = await fetch(
+          `http://localhost:${port}/oauth/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "grant_type=client_credentials",
+          }
+        );
+        const body = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(body.error).toBe("invalid_request");
+      });
+
+      it("issues an access token for valid client credentials", async () => {
+        const response = await fetch(
+          `http://localhost:${port}/oauth/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "grant_type=client_credentials&client_secret=my-langwatch-api-key",
+          }
+        );
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.access_token).toBeTruthy();
+        expect(body.token_type).toBe("Bearer");
+        expect(body.expires_in).toBe(3600);
+      });
+
+      it("issued token works for MCP initialize request", async () => {
+        // Get OAuth token
+        const tokenResponse = await fetch(
+          `http://localhost:${port}/oauth/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `grant_type=client_credentials&client_secret=${BEARER_TOKEN}`,
+          }
+        );
+        const { access_token } = await tokenResponse.json();
+
+        // Use OAuth token for MCP initialize
+        const response = await fetch(`http://localhost:${port}/mcp`, {
+          method: "POST",
+          headers: {
+            ...MCP_POST_HEADERS,
+            Authorization: `Bearer ${access_token}`,
+          },
+          body: initializeBody(),
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("mcp-session-id")).toBeTruthy();
+      });
+
+      it("issued token works for SSE connection", async () => {
+        const controller = new AbortController();
+
+        // Get OAuth token
+        const tokenResponse = await fetch(
+          `http://localhost:${port}/oauth/token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `grant_type=client_credentials&client_secret=${BEARER_TOKEN}`,
+          }
+        );
+        const { access_token } = await tokenResponse.json();
+
+        // Use OAuth token for SSE
+        const response = await fetch(`http://localhost:${port}/sse`, {
+          signal: controller.signal,
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("content-type")).toContain(
+          "text/event-stream"
+        );
+
+        controller.abort();
+      });
+    });
+  });
+
   describe("/sse endpoint (legacy SSE)", () => {
     it("returns 401 without authorization", async () => {
       const controller = new AbortController();

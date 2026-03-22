@@ -3,20 +3,50 @@ import type { Request, Response, NextFunction } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import type { Server } from "node:http";
 
 import { getConfig, runWithConfig } from "./config.js";
 import { createMcpServer } from "./create-mcp-server.js";
 
 /**
+ * In-memory store for OAuth access tokens.
+ * Maps token → API key so we can resolve Bearer tokens from either
+ * direct API keys or OAuth-issued access tokens.
+ */
+const oauthTokens = new Map<string, { apiKey: string; expiresAt: number }>();
+
+/**
  * Extracts the API key from the request's Authorization header.
+ * Accepts both direct API keys and OAuth-issued access tokens.
  * Expects the format: `Bearer <key>`.
  */
 function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) return null;
-  return authHeader.slice(7) || null;
+  const token = authHeader.slice(7) || null;
+  if (!token) return null;
+
+  // Check if this is an OAuth-issued access token
+  const oauthEntry = oauthTokens.get(token);
+  if (oauthEntry) {
+    if (Date.now() < oauthEntry.expiresAt) {
+      return oauthEntry.apiKey;
+    }
+    // Token expired, clean up
+    oauthTokens.delete(token);
+    return null;
+  }
+
+  // Otherwise treat it as a direct API key
+  return token;
+}
+
+/**
+ * Generates a deterministic but opaque access token from client credentials.
+ */
+function generateAccessToken(): string {
+  return createHash("sha256").update(randomUUID()).digest("hex");
 }
 
 /**
@@ -84,6 +114,72 @@ export async function startHttpServer({
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok" });
   });
+
+  // --- OAuth 2.0 endpoints (for Claude Desktop and other OAuth-only clients) ---
+
+  app.get(
+    "/.well-known/oauth-authorization-server",
+    (_req: Request, res: Response) => {
+      const baseUrl = `${_req.protocol}://${_req.get("host")}`;
+      res.json({
+        issuer: baseUrl,
+        token_endpoint: `${baseUrl}/oauth/token`,
+        token_endpoint_auth_methods_supported: ["client_secret_post"],
+        grant_types_supported: ["client_credentials"],
+        response_types_supported: [],
+        scopes_supported: ["mcp:tools"],
+      });
+    }
+  );
+
+  // URL-encoded body parser for OAuth token endpoint (RFC 6749 requires
+  // application/x-www-form-urlencoded)
+  app.post(
+    "/oauth/token",
+    express.urlencoded({ extended: false }),
+    (req: Request, res: Response) => {
+      const grantType =
+        req.body.grant_type ?? req.query["grant_type"];
+
+      if (grantType !== "client_credentials") {
+        res.status(400).json({
+          error: "unsupported_grant_type",
+          error_description:
+            "Only client_credentials grant type is supported",
+        });
+        return;
+      }
+
+      // Accept client_secret as the LangWatch API key.
+      // client_id is ignored — the API key identifies the project.
+      const clientSecret =
+        req.body.client_secret ?? req.query["client_secret"];
+
+      if (!clientSecret) {
+        res.status(400).json({
+          error: "invalid_request",
+          error_description:
+            "client_secret is required (use your LangWatch API key)",
+        });
+        return;
+      }
+
+      const expiresIn = 3600; // 1 hour
+      const accessToken = generateAccessToken();
+
+      oauthTokens.set(accessToken, {
+        apiKey: clientSecret as string,
+        expiresAt: Date.now() + expiresIn * 1000,
+      });
+
+      res.json({
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: expiresIn,
+        scope: "mcp:tools",
+      });
+    }
+  );
 
   // --- Streamable HTTP transport (modern) ---
 
