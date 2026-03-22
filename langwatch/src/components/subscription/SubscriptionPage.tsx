@@ -413,7 +413,7 @@ export function SubscriptionPage() {
                   <Select.Trigger>
                     <Select.ValueText />
                   </Select.Trigger>
-                  <Select.Content paddingY={2} zIndex="popover">
+                  <Select.Content paddingY={2}>
                     {currencyOptions.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         {option.label}

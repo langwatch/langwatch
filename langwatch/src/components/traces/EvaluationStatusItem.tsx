@@ -319,7 +319,7 @@ export function EvaluationStatusItem({
                 <MoreVertical size={14} />
               </IconButton>
             </Menu.Trigger>
-            <Menu.Content minWidth="160px" zIndex="popover">
+            <Menu.Content minWidth="160px">
               <Menu.Item value="edit" onClick={handleOpenConfig}>
                 <HStack gap={2}>
                   <Pencil size={14} />

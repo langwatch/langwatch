@@ -458,7 +458,7 @@ const DatasetSplitSelect = ({
         <Select.Trigger>
           <Select.ValueText placeholder="Select dataset split" />
         </Select.Trigger>
-        <Select.Content zIndex="1600">
+        <Select.Content>
           {options.map((option) => (
             <Select.Item item={option} key={option.value}>
               <VStack align="start" width="full">

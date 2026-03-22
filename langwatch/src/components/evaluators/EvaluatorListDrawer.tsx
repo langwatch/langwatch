@@ -313,7 +313,7 @@ function EvaluatorCard({
               <LuEllipsisVertical />
             </IconButton>
           </Menu.Trigger>
-          <Menu.Content zIndex="popover">
+          <Menu.Content>
             <Menu.Item
               value="edit"
               onClick={(e) => {

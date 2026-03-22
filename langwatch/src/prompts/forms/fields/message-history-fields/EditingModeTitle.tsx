@@ -77,7 +77,7 @@ export function EditingModeTitle({
           </Box>
         </HStack>
       </Menu.Trigger>
-      <Menu.Content portalled={false} zIndex={10} backgroundColor="bg.panel">
+      <Menu.Content portalled={false} backgroundColor="bg.panel">
         <Menu.Item
           value="prompt"
           onClick={() => onChange("prompt")}

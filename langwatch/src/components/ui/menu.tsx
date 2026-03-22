@@ -3,6 +3,7 @@
 import { AbsoluteCenter, Menu as ChakraMenu, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { LuCheck, LuChevronRight } from "react-icons/lu";
+import { OVERLAY_Z_INDEX } from "./z-index";
 
 interface MenuContentProps extends ChakraMenu.ContentProps {
   portalled?: boolean;
@@ -14,7 +15,15 @@ export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
     const { portalled = true, portalRef, ...rest } = props;
     return (
       <Portal disabled={!portalled} container={portalRef}>
-        <ChakraMenu.Positioner>
+        <ChakraMenu.Positioner
+          ref={(node: HTMLElement | null) => {
+            if (node) {
+              // Zag.js sets --z-index inline based on layer stack order, which
+              // can place menus behind dialogs. Force it higher. See #2519.
+              node.style.setProperty("z-index", OVERLAY_Z_INDEX, "important");
+            }
+          }}
+        >
           <ChakraMenu.Content
             borderRadius="lg"
             background="bg.panel/75"

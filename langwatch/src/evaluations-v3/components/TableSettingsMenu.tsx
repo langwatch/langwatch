@@ -500,7 +500,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
           <ChevronDownIcon />
         </Button>
       </Menu.Trigger>
-      <Menu.Content zIndex="popover">
+      <Menu.Content>
         {languages.map((lang) => (
           <Menu.Item
             key={lang}

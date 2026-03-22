@@ -133,7 +133,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
       <Portal>
         <Box zIndex="popover" padding={0}>
           {open && (
-            <Menu.Content zIndex="popover">
+            <Menu.Content>
               <>
                 {projectGroups
                   .filter((projectGroup) =>
@@ -468,7 +468,7 @@ export const DashboardLayout = ({
             </Menu.Trigger>
             {session && (
               <Portal>
-                <Menu.Content zIndex="popover">
+                <Menu.Content>
                   {dependencies.ExtraMenuItems && (
                     <dependencies.ExtraMenuItems />
                   )}
