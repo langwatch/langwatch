@@ -355,6 +355,8 @@ export function RunHistoryPanel({
                 queuedCount: 0,
                 passRate: 0,
                 totalCount: totals.runCount,
+                totalCost: null,
+                averageAgentLatencyMs: null,
               }}
             />
           </HStack>

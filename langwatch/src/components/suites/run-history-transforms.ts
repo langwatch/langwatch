@@ -67,6 +67,8 @@ export type RunGroupSummary = {
   totalCount: number;
   inProgressCount: number;
   queuedCount: number;
+  totalCost: number | null;
+  averageAgentLatencyMs: number | null;
 };
 
 /** Backward-compatible alias for RunGroupSummary. */
@@ -317,6 +319,18 @@ export function computeGroupSummary({
   const finishedCount = passedCount + failedCount + stalledCount + cancelledCount;
   const passRate = finishedCount > 0 ? (passedCount / finishedCount) * 100 : 0;
 
+  let totalCost = 0;
+  let totalAgentLatency = 0;
+  let agentLatencyCount = 0;
+  for (const run of group.scenarioRuns) {
+    if (run.totalCost != null) totalCost += run.totalCost;
+    const agentLatency = run.roleLatencies?.["Agent"];
+    if (agentLatency != null) {
+      totalAgentLatency += agentLatency;
+      agentLatencyCount++;
+    }
+  }
+
   return {
     passRate,
     passedCount,
@@ -326,6 +340,8 @@ export function computeGroupSummary({
     totalCount: group.scenarioRuns.length,
     inProgressCount,
     queuedCount,
+    totalCost: totalCost > 0 ? totalCost : null,
+    averageAgentLatencyMs: agentLatencyCount > 0 ? totalAgentLatency / agentLatencyCount : null,
   };
 }
 

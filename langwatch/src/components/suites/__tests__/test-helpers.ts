@@ -66,6 +66,8 @@ export function makeSummary(
     totalCount: 2,
     inProgressCount: 0,
     queuedCount: 0,
+    totalCost: null,
+    averageAgentLatencyMs: null,
     ...overrides,
   };
 }
