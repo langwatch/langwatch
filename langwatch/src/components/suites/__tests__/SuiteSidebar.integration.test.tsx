@@ -269,7 +269,7 @@ describe("<SuiteSidebar/>", () => {
         expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
-      it("displays a checkmark status icon", () => {
+      it("displays pass rate with circle", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -279,7 +279,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByTestId("status-icon-pass")).toBeInTheDocument();
+        expect(screen.getByText("100%")).toBeInTheDocument();
       });
 
       it("displays compact recency text", () => {
@@ -321,7 +321,7 @@ describe("<SuiteSidebar/>", () => {
         expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
-      it("displays an error status icon", () => {
+      it("displays pass rate reflecting failures", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -331,7 +331,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByTestId("status-icon-fail")).toBeInTheDocument();
+        expect(screen.getByText("75%")).toBeInTheDocument();
       });
     });
 

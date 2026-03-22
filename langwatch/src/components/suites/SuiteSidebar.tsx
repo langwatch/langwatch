@@ -17,8 +17,6 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import {
-  CircleAlert,
-  CircleCheck,
   List,
   MoreVertical,
   PanelLeftOpen,
@@ -28,6 +26,10 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "~/components/shared/PassRateIndicator";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
@@ -360,47 +362,24 @@ function SidebarButton({
   );
 }
 
-function StatusIcon({ passed, total }: { passed: number; total: number }) {
-  if (total === 0) return null;
-  if (passed === total) {
-    return (
-      <CircleCheck
-        size={12}
-        color="var(--chakra-colors-green-500)"
-        data-testid="status-icon-pass"
-      />
-    );
-  }
-  return (
-    <CircleAlert
-      size={12}
-      color="var(--chakra-colors-red-500)"
-      data-testid="status-icon-fail"
-    />
-  );
-}
-
 function RunSummaryLine({
   passedCount,
   totalCount,
-  lastRunTimestamp,
 }: {
   passedCount: number;
   totalCount: number;
-  lastRunTimestamp: number | null;
 }) {
   if (totalCount === 0) return null;
+  const passRate = (passedCount / totalCount) * 100;
   return (
-    <HStack gap={1}>
-      <StatusIcon passed={passedCount} total={totalCount} />
-      <Text fontSize="xs">
+    <HStack gap={1} color="fg.muted">
+      <PassRateCircle passRate={passRate} size="8px" />
+      <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
+        {Math.round(passRate)}%
+      </Text>
+      <Text fontSize="xs" color="fg.muted">·</Text>
+      <Text fontSize="xs" color="fg.muted">
         {passedCount} passed
-        {lastRunTimestamp && (
-          <Text as="span" color="fg.muted">
-            {" · "}
-            {formatTimeAgoCompact(lastRunTimestamp)}
-          </Text>
-        )}
       </Text>
     </HStack>
   );
@@ -486,10 +465,15 @@ function SuiteListItem({
         textAlign="left"
       >
         <HStack gap={1.5} width="full">
-          <Text fontSize="sm" fontWeight="medium" truncate>
+          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
             {suite.name}
           </Text>
           <Spacer />
+          {runSummary?.lastRunTimestamp && (
+            <Text fontSize="xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+              {formatTimeAgoCompact(runSummary.lastRunTimestamp)}
+            </Text>
+          )}
           <HStack gap={0} flexShrink={0}>
             <Box
               as="button"
@@ -537,7 +521,6 @@ function SuiteListItem({
           <RunSummaryLine
             passedCount={runSummary.passedCount}
             totalCount={runSummary.totalCount}
-            lastRunTimestamp={runSummary.lastRunTimestamp}
           />
         )}
       </VStack>
@@ -568,14 +551,21 @@ function ExternalSetListItem({
         overflow="hidden"
         textAlign="left"
       >
-        <Text fontSize="sm" fontWeight="medium" truncate>
-          {externalSet.scenarioSetId}
-        </Text>
+        <HStack gap={1.5} width="full">
+          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+            {externalSet.scenarioSetId}
+          </Text>
+          <Spacer />
+          {externalSet.lastRunTimestamp && (
+            <Text fontSize="xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+              {formatTimeAgoCompact(externalSet.lastRunTimestamp)}
+            </Text>
+          )}
+        </HStack>
         {externalSet.totalCount > 0 && (
           <RunSummaryLine
             passedCount={externalSet.passedCount}
             totalCount={externalSet.totalCount}
-            lastRunTimestamp={externalSet.lastRunTimestamp}
           />
         )}
       </VStack>
