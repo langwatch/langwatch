@@ -10,6 +10,8 @@ import {
 } from "~/prompts/schemas/field-schemas";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
+import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
@@ -229,6 +231,11 @@ app.post(
         "Successfully created prompt with initial version",
       );
 
+      afterPromptCreated({
+        prisma,
+        projectId: project.id,
+      });
+
       return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
@@ -326,6 +333,13 @@ app.post(
         },
         "Successfully synced prompt",
       );
+
+      if (syncResult.action === "created") {
+        afterPromptCreated({
+          prisma,
+          projectId: project.id,
+        });
+      }
 
       return c.json(response);
     } catch (error: any) {
