@@ -70,7 +70,7 @@ export function RunRow({
   const hasCancellableRuns = cancellableCount > 0;
 
   return (
-    <>
+    <Box>
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
       <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
@@ -226,6 +226,6 @@ export function RunRow({
           </Dialog.Content>
         </Dialog.Root>
       )}
-    </>
+    </Box>
   );
 }
