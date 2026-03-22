@@ -42,7 +42,9 @@ export function createEnvConfig() {
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
-      ELASTICSEARCH_NODE_URL: optionalIfBuildTime(z.string().min(1)),
+      ELASTICSEARCH_NODE_URL: process.env.DISABLE_ELASTIC_SEARCH === "true" || process.env.DISABLE_ELASTIC_SEARCH === "1"
+        ? z.string().min(1).optional()
+        : optionalIfBuildTime(z.string().min(1)),
       ELASTICSEARCH_API_KEY: z.string().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
@@ -107,6 +109,7 @@ export function createEnvConfig() {
 
       // Event Sourcing
       ENABLE_EVENT_SOURCING: z.boolean().optional(),
+      DISABLE_ELASTIC_SEARCH: z.boolean().optional(),
       ENABLE_CLICKHOUSE: z.boolean().optional(),
 
       // ClickHouse Migration Configuration
@@ -229,6 +232,9 @@ export function createEnvConfig() {
       ENABLE_EVENT_SOURCING:
         process.env.ENABLE_EVENT_SOURCING === "true" ||
         process.env.ENABLE_EVENT_SOURCING?.toLowerCase() === "true",
+      DISABLE_ELASTIC_SEARCH:
+        process.env.DISABLE_ELASTIC_SEARCH === "1" ||
+        process.env.DISABLE_ELASTIC_SEARCH?.toLowerCase() === "true",
       ENABLE_CLICKHOUSE:
         process.env.ENABLE_CLICKHOUSE === "true" ||
         process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",

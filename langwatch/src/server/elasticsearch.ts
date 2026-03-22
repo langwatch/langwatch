@@ -64,6 +64,10 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
 export const esClient = async (
   args?: { projectId: string } | { organizationId: string } | { test: true },
 ) => {
+  if (env.DISABLE_ELASTIC_SEARCH) {
+    return new ElasticClient({ node: "http://bogus:9200" });
+  }
+
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
 

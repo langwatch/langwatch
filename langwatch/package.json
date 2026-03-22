@@ -40,7 +40,7 @@
     "prisma:generate:migration": "pnpm prisma migrate dev --create-only",
     "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",
     "prisma:seed": "tsx prisma/seed.ts",
-    "elastic:migrate": "sh -c 'if [ \"$SKIP_ELASTIC_MIGRATE\" != \"true\" ]; then pnpm run task elasticMigrate; else echo \"Skipping Elasticsearch migrations\"; fi'",
+    "elastic:migrate": "sh -c 'if [ \"$SKIP_ELASTIC_MIGRATE\" != \"true\" ] && [ \"$DISABLE_ELASTIC_SEARCH\" != \"true\" ] && [ \"$DISABLE_ELASTIC_SEARCH\" != \"1\" ]; then pnpm run task elasticMigrate; else echo \"Skipping Elasticsearch migrations\"; fi'",
     "clickhouse:migrate": "sh -c 'if [ \"$SKIP_CLICKHOUSE_MIGRATE\" != \"true\" ]; then pnpm run task clickhouseMigrate; else echo \"Skipping ClickHouse migrations\"; fi'",
     "types:zod:generate": "./scripts/generate-zod-types.sh",
     "copy:langevals-types": "cp ../langevals/ts-integration/evaluators.generated.ts src/server/evaluations/evaluators.generated.ts",
