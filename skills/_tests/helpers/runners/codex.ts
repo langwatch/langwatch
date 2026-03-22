@@ -4,7 +4,6 @@ import {
   AgentRole,
 } from "@langwatch/scenario";
 import fs from "fs";
-import path from "path";
 import { spawn, execSync } from "child_process";
 import chalk from "chalk";
 import type {

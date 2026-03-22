@@ -76,9 +76,7 @@ describe("Agent Factory", () => {
     describe("when called without AGENT_UNDER_TEST set", () => {
       it("delegates to the default Claude Code runner", async () => {
         delete process.env.AGENT_UNDER_TEST;
-        const { createAgent, getRunner } = await import(
-          "../agent-factory.js"
-        );
+        const { getRunner } = await import("../agent-factory.js");
         const runner = getRunner();
         expect(runner.name).toBe("claude-code");
       });
@@ -520,7 +518,7 @@ describe("Cursor Runner", () => {
 
   describe("when MCP is configured", () => {
     it("writes .cursor/mcp.json in the working directory", async () => {
-      const { CursorRunner } = await import("../runners/cursor.js");
+      await import("../runners/cursor.js");
       // Use a real temp directory to verify MCP config writing
       const tempDir = fs.mkdtempSync(
         path.join(os.tmpdir(), "cursor-mcp-test-")
