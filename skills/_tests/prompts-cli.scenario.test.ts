@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +56,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         description:
           "Developer has a Python project with hardcoded prompts and wants to use the LangWatch Prompts CLI to version them.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -132,7 +130,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         description:
           "Developer wants to create a new prompt called refund-handler for customer refund requests using the CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -206,7 +204,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         description:
           "Agent creates a prompt and pushes it to the platform. If there are conflicts, it should use --force-local to resolve them automatically.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

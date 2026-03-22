@@ -7,11 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,9 +18,10 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "tracing");
+  const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, "tracing");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
     path.resolve(__dirname, "../tracing/SKILL.md"),
@@ -54,7 +52,7 @@ describe("Tracing Skill", () => {
         description:
           "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -105,7 +103,7 @@ describe("Tracing Skill", () => {
         description:
           "Implementing LangWatch instrumentation in a TypeScript Vercel AI bot project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -155,7 +153,7 @@ describe("Tracing Skill", () => {
         description:
           "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -205,7 +203,7 @@ describe("Tracing Skill", () => {
         description:
           "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -255,7 +253,7 @@ describe("Tracing Skill", () => {
         description:
           "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -311,7 +309,7 @@ describe("Tracing Skill", () => {
         description:
           "Developer instruments code without LANGWATCH_API_KEY in environment. API key is in the project .env file.",
         agents: [
-          createClaudeCodeAgent({
+          createAgent({
             workingDirectory: tempFolder,
             cleanEnv: true,
           }),
@@ -370,7 +368,7 @@ describe("Tracing Skill", () => {
         description:
           "Agent instruments code without MCP access, using direct URL fetching for docs.",
         agents: [
-          createClaudeCodeAgent({
+          createAgent({
             workingDirectory: tempFolder,
             skipMcp: true,
           }),
@@ -421,7 +419,7 @@ describe("Tracing Skill", () => {
         description:
           "Agent instruments code but has no API key available. Must ask the user.",
         agents: [
-          createClaudeCodeAgent({
+          createAgent({
             workingDirectory: tempFolder,
             cleanEnv: true,
           }),
@@ -463,5 +461,62 @@ describe("Tracing Skill", () => {
       expect(result.success).toBe(true);
     },
     900_000 // longer timeout for multi-turn
+  );
+
+  it.skipIf(isCI)(
+    "instruments a Google ADK agent with LangWatch",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-google-adk-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-google-adk")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Google ADK instrumentation",
+        description:
+          "Implementing LangWatch instrumentation in a Google ADK agent project using Gemini models.",
+        agents: [
+          createAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should edit the main.py file to add LangWatch instrumentation",
+              "Agent should use the LangWatch MCP to check documentation for Google ADK integration",
+              "Agent should NOT replace or remove the existing Google ADK code — it should add tracing on top of it",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const resultFile = fs.readFileSync(
+              `${tempFolder}/main.py`,
+              "utf8"
+            );
+            expect(resultFile).toContain("langwatch");
+            expect(resultFile).toContain("trace");
+
+            // Should preserve Google ADK imports and usage
+            expect(
+              resultFile,
+              "Should preserve Google ADK agent code"
+            ).toContain("google");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
   );
 });

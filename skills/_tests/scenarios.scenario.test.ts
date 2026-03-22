@@ -7,11 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,9 +18,10 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "scenarios");
+  const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, "scenarios");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
     path.resolve(__dirname, "../scenarios/SKILL.md"),
@@ -69,7 +67,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding agent simulation tests to a Python OpenAI conversational bot project using the LangWatch Scenario framework.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -151,7 +149,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding agent simulation tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -215,7 +213,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding scenario tests to a Python LangGraph agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -265,7 +263,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding adversarial red team tests to a Python OpenAI bot project using the LangWatch Scenario framework's RedTeamAgent.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -328,7 +326,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding adversarial red team tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework's RedTeamAgent.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -394,7 +392,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding a specific scenario test for the tweet-like bot to verify it uses emojis correctly.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -428,7 +426,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || !runner.capabilities.supportsMcp)(
     "uses platform MCP tools when no codebase is present",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -443,7 +441,7 @@ describe("Scenarios Skill", () => {
         description:
           "Creating scenarios on the LangWatch platform when there is no codebase.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -505,7 +503,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding scenario tests to a TypeScript Mastra agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -553,7 +551,7 @@ describe("Scenarios Skill", () => {
         description:
           "Adding scenario tests to a TerraVerde farm advisory RAG agent that handles irrigation, frost protection, and pest management.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -621,7 +619,7 @@ describe("Scenarios Skill", () => {
         description:
           "Agent sets up scenarios for a farm advisory agent, then suggests domain-specific improvements.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -674,5 +672,79 @@ describe("Scenarios Skill", () => {
       expect(result.success).toBe(true);
     },
     900_000 // longer timeout — agent needs to run tests + generate suggestions
+  );
+
+  it.skipIf(isCI)(
+    "creates scenario tests for a Google ADK agent using Gemini models — not OpenAI",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-google-adk-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-google-adk")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Google ADK scenario tests — model provider detection",
+        description:
+          "Creating scenario tests for a Google ADK agent. The agent uses Gemini models, so the scenario config should use Gemini-compatible model references, NOT hardcode OpenAI models.",
+        agents: [
+          createAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created scenario test files using the LangWatch Scenario framework",
+              "Agent detected that this is a Google ADK project using Gemini models and configured the scenario default_model to use a Gemini-compatible model, NOT openai/gpt-5-mini",
+              "Agent generated scenarios specific to the weather assistant domain",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "add agent simulation tests for my agent, short and sweet, no need to run the tests. IMPORTANT: read my agent code first to understand what framework and model provider it uses."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+
+            const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
+            expect(
+              testFiles.length,
+              `Expected at least one test_*.py file in ${tempFolder}`
+            ).toBeGreaterThan(0);
+
+            const testContent = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+
+            expect(testContent).toContain("import scenario");
+            expect(testContent).toMatch(/scenario\.run\(/);
+
+            // The scenario config should NOT hardcode OpenAI for a Google ADK project
+            const lowerContent = testContent.toLowerCase();
+            expect(
+              lowerContent,
+              "Scenario tests for a Google ADK agent should NOT hardcode openai/gpt-5-mini as default_model"
+            ).not.toMatch(/default_model\s*=\s*["']openai\/gpt/);
+
+            // Should reference Gemini or Google model
+            const usesGeminiModel =
+              lowerContent.includes("gemini") ||
+              lowerContent.includes("vertex_ai") ||
+              lowerContent.includes("google");
+            expect(
+              usesGeminiModel,
+              "Expected scenario config to reference Gemini/Google model, not OpenAI"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
   );
 });

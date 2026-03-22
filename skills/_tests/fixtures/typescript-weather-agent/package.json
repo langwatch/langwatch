@@ -1,0 +1,17 @@
+{
+  "name": "weather-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@mastra/core": "latest",
+    "@ai-sdk/openai": "latest",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.0.0",
+    "tsx": "^4.0.0"
+  }
+}

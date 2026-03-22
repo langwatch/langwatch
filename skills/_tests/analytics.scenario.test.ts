@@ -6,11 +6,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,16 +16,17 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 describe("Analytics Skill", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || !runner.capabilities.supportsMcp)(
     "queries agent performance from an empty directory",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-analytics-")
       );
 
-      const skillDir = path.join(tempFolder, ".skills", "analytics");
+      const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, "analytics");
       fs.mkdirSync(skillDir, { recursive: true });
       fs.copyFileSync(
         path.resolve(__dirname, "../analytics/SKILL.md"),
@@ -44,7 +42,7 @@ describe("Analytics Skill", () => {
         description:
           "User wants to understand how their agent has been performing.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
