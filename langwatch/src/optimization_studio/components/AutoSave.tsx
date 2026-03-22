@@ -24,6 +24,7 @@ export function AutoSave() {
     hasPendingChanges,
     getWorkflow,
     getAutosavedWorkflow,
+    getLastCommittedWorkflow,
     setCurrentVersionId,
   } = useWorkflowStore(
     ({
@@ -32,6 +33,7 @@ export function AutoSave() {
       hasPendingChanges,
       getWorkflow,
       getAutosavedWorkflow,
+      getLastCommittedWorkflow,
       setCurrentVersionId,
     }) => ({
       setWorkflow,
@@ -39,6 +41,7 @@ export function AutoSave() {
       hasPendingChanges,
       getWorkflow,
       getAutosavedWorkflow,
+      getLastCommittedWorkflow,
       setCurrentVersionId,
     }),
   );
@@ -55,10 +58,15 @@ export function AutoSave() {
 
       const stateWorkflow = getWorkflow();
       if (hasPendingChanges()) {
-        const autosavedWorkflow = getAutosavedWorkflow()!;
+        const autosavedWorkflow = getAutosavedWorkflow();
+        const lastCommittedWorkflow = getLastCommittedWorkflow();
+        const baselineWorkflow = autosavedWorkflow ?? lastCommittedWorkflow;
+        if (!baselineWorkflow) {
+          return;
+        }
 
         const setAsLatestVersion = hasDSLChanged(
-          autosavedWorkflow,
+          baselineWorkflow,
           stateWorkflow,
           false,
         );
