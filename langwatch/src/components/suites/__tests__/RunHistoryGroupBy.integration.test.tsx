@@ -187,7 +187,7 @@ describe("<GroupRow/>", () => {
       expect(screen.getByText("Login")).toBeInTheDocument();
     });
 
-    it("displays status counts and run count", () => {
+    it("displays run count and pass rate", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
@@ -203,11 +203,12 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getAllByText("2 runs").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("Pass")).toBeInTheDocument();
+      expect(screen.getByText("50%")).toBeInTheDocument();
     });
 
-    it("displays word-label counts in header", () => {
+    it("displays pass rate in metrics pill", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
@@ -223,8 +224,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 passed")).toBeInTheDocument();
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByTestId("run-metrics-summary")).toBeInTheDocument();
     });
   });
 
@@ -252,7 +252,7 @@ describe("<GroupRow/>", () => {
       expect(screen.getByText("My Agent")).toBeInTheDocument();
     });
 
-    it("displays status counts and run count", () => {
+    it("displays run count and pass rate", () => {
       const group = makeGroup({
         groupKey: "agent-1",
         groupLabel: "My Agent",
@@ -286,7 +286,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("67%")).toBeInTheDocument();
       expect(screen.getAllByText("3 runs").length).toBeGreaterThanOrEqual(1);
     });
   });

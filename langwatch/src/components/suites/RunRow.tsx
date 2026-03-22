@@ -157,7 +157,7 @@ export function RunRow({
               data-testid="cancel-all-button"
             >
               {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
-              <Text fontSize="xs">Stop All</Text>
+              <Text fontSize="xs">Stop</Text>
             </HStack>
           )}
           <Box flex={1} />
