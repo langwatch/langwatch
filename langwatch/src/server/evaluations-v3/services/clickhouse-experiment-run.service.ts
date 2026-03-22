@@ -1,7 +1,6 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import { getVersionMap } from "./getVersionMap";
@@ -27,7 +26,6 @@ import type { ExperimentRun, ExperimentRunWithItems } from "./types";
  * Follows the same pattern as `ClickHouseTraceService`.
  */
 export class ClickHouseExperimentRunService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger(
     "langwatch:experiment-runs:clickhouse-service",
   );
@@ -35,9 +33,7 @@ export class ClickHouseExperimentRunService {
     "langwatch.experiment-runs.clickhouse-service",
   );
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseClient = getClickHouseClient();
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   /**
    * Static factory method for creating the service with default dependencies.
@@ -56,7 +52,8 @@ export class ClickHouseExperimentRunService {
       "ClickHouseExperimentRunService.isClickHouseEnabled",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return false;
         }
 
@@ -94,7 +91,12 @@ export class ClickHouseExperimentRunService {
       },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -109,7 +111,7 @@ export class ClickHouseExperimentRunService {
 
         try {
           // Fetch run summaries
-          const runsResult = await this.clickHouseClient.query({
+          const runsResult = await clickHouseClient.query({
             query: `
               SELECT * FROM (
                 SELECT *
@@ -137,7 +139,7 @@ export class ClickHouseExperimentRunService {
 
           // Fetch per-evaluator breakdown for all runs
           const runIds = runRows.map((r) => r.RunId);
-          const breakdownResult = await this.clickHouseClient.query({
+          const breakdownResult = await clickHouseClient.query({
             query: `
               SELECT
                 RunId,
@@ -185,7 +187,7 @@ export class ClickHouseExperimentRunService {
           }
 
           // Fetch cost/duration summary per run
-          const costResult = await this.clickHouseClient.query({
+          const costResult = await clickHouseClient.query({
             query: `
               SELECT
                 RunId,
@@ -302,7 +304,12 @@ export class ClickHouseExperimentRunService {
       },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -313,7 +320,7 @@ export class ClickHouseExperimentRunService {
 
         try {
           // Fetch run summary
-          const runResult = await this.clickHouseClient.query({
+          const runResult = await clickHouseClient.query({
             query: `
               SELECT *
               FROM experiment_runs
@@ -343,7 +350,7 @@ export class ClickHouseExperimentRunService {
           // Two-level dedup: first by ProjectionId (handles un-merged ReplacingMergeTree parts),
           // then by business key (handles duplicate writes from SDK progress updates that
           // produce different ProjectionIds due to timestamp in the KSUID).
-          const itemsResult = await this.clickHouseClient.query({
+          const itemsResult = await clickHouseClient.query({
             query: `
               SELECT * FROM (
                 SELECT *

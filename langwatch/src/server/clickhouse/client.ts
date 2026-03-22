@@ -23,9 +23,12 @@ function shouldSkipClickHouse(): boolean {
 }
 
 /**
- * Get or create a ClickHouse client instance
+ * Get or create the shared ClickHouse client instance (from env vars).
+ *
+ * NOT exported — all external code must use the org-aware functions
+ * in clickhouseClient.ts to prevent data leaks between tenants.
  */
-export function getClickHouseClient(): ClickHouseClient | null {
+function getClickHouseClient(): ClickHouseClient | null {
   if (!clickHouseClient && !shouldSkipClickHouse()) {
     const clickHouseUrl = process.env.CLICKHOUSE_URL!;
     let url: URL | string = clickHouseUrl;
@@ -63,3 +66,6 @@ export async function closeClickHouseClient(): Promise<void> {
     clickHouseClient = null;
   }
 }
+
+// Internal access for clickhouseClient.ts — the only allowed consumer
+export { getClickHouseClient as _getSharedClickHouseClient };

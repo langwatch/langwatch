@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
@@ -49,7 +49,7 @@ type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
 export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: EvaluationRunData, tenantId: string): Promise<void> {
     EventUtils.validateTenantId(
@@ -66,6 +66,7 @@ export class EvaluationRunClickHouseRepository
       : data.evaluationId;
 
     try {
+      const client = await this.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -73,7 +74,7 @@ export class EvaluationRunClickHouseRepository
         EVALUATION_PROJECTION_VERSIONS.STATE,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -101,7 +102,8 @@ export class EvaluationRunClickHouseRepository
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId,

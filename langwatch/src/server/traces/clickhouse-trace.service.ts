@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import {
@@ -65,13 +65,17 @@ interface ClickHouseScrollCursor {
  * the caller to fall back to Elasticsearch.
  */
 export class ClickHouseTraceService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer(
     "langwatch.traces.clickhouse-service",
   );
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseClient = getClickHouseClient();
+  constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Resolve the ClickHouse client for a given project.
+   */
+  private async resolveClient(projectId: string) {
+    return getClickHouseClientForProject(projectId);
   }
 
   /**
@@ -91,7 +95,8 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId },
       },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return false;
         }
 
@@ -135,7 +140,11 @@ export class ClickHouseTraceService {
       async () => {
         // Check if ClickHouse is enabled
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -216,7 +225,11 @@ export class ClickHouseTraceService {
       async () => {
         // Check if ClickHouse is enabled
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -228,7 +241,7 @@ export class ClickHouseTraceService {
         try {
           // Query trace_summaries for traces with matching thread_id
           // Thread ID can be stored under different attribute keys
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
@@ -299,7 +312,11 @@ export class ClickHouseTraceService {
       async () => {
         // Check if ClickHouse is enabled
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -315,7 +332,7 @@ export class ClickHouseTraceService {
         try {
           // Query trace_summaries for traces with matching thread_ids
           // Thread ID can be stored under different attribute keys
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
@@ -377,7 +394,8 @@ export class ClickHouseTraceService {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
       async (_span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -532,8 +550,8 @@ export class ClickHouseTraceService {
           // Enrich with evaluations — direct ClickHouse query, no extra isClickHouseEnabled roundtrip
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
-          if (traceIds.length > 0 && this.clickHouseClient) {
-            const evalResult = await this.clickHouseClient.query({
+          if (traceIds.length > 0 && clickHouseClient) {
+            const evalResult = await clickHouseClient.query({
               query: `
                 SELECT *
                 FROM evaluation_runs
@@ -606,7 +624,11 @@ export class ClickHouseTraceService {
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -626,7 +648,7 @@ export class ClickHouseTraceService {
 
           const whereClause = conditions.join(" AND ");
 
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT
                 TopicId,
@@ -710,7 +732,11 @@ export class ClickHouseTraceService {
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -731,7 +757,7 @@ export class ClickHouseTraceService {
           const whereClause = conditions.join(" AND ");
 
           // Query for unique customer IDs
-          const customerResult = await this.clickHouseClient.query({
+          const customerResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT Attributes['langwatch.customer_id'] as customer_id
               FROM trace_summaries
@@ -753,7 +779,7 @@ export class ClickHouseTraceService {
 
           // Query for unique labels
           // Labels are stored as JSON array in langwatch.labels attribute
-          const labelsResult = await this.clickHouseClient.query({
+          const labelsResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT Attributes['langwatch.labels'] as labels_json
               FROM trace_summaries
@@ -832,14 +858,18 @@ export class ClickHouseTraceService {
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
         try {
           // Fetch ALL spans in the trace in a single query so we can
           // both extract LLM data and walk ancestors for prompt reference.
-          const queryResult = await this.clickHouseClient.query({
+          const queryResult = await clickHouseClient.query({
             query: `
               SELECT
                 SpanId,
@@ -1121,13 +1151,17 @@ export class ClickHouseTraceService {
       { attributes: { "tenant.id": projectId } },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
         try {
           // Get distinct span names from stored_spans
-          const spanResult = await this.clickHouseClient.query({
+          const spanResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT SpanName
               FROM stored_spans
@@ -1155,7 +1189,7 @@ export class ClickHouseTraceService {
           }));
 
           // Get distinct metadata keys from trace_summaries Attributes
-          const metaResult = await this.clickHouseClient.query({
+          const metaResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
               FROM trace_summaries
@@ -1218,7 +1252,8 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId },
       },
       async (_span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -1259,7 +1294,7 @@ export class ClickHouseTraceService {
         // query fetches full data for just those IDs.
         // uniq() uses HyperLogLog (~2 % error) which is fine for pagination.
         const [countResult, summaryResult] = await Promise.all([
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
               SELECT uniq(ts.TraceId) as total
               FROM trace_summaries ts
@@ -1272,7 +1307,7 @@ export class ClickHouseTraceService {
             query_params: sharedParams,
             format: "JSONEachRow",
           }),
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
               SELECT
                 ts.TraceId AS ts_TraceId,
@@ -1475,13 +1510,14 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId },
       },
       async (_span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
         // Two parallel queries: trace summaries (with I/O) and spans (separate table)
         const [summaryResult, spansResult] = await Promise.all([
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
         SELECT
           TraceId AS ts_TraceId,
@@ -1517,7 +1553,7 @@ export class ClickHouseTraceService {
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
           }),
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
         SELECT
           SpanId,

@@ -132,7 +132,7 @@ describe("Log Steps API Endpoint", () => {
     url: process.env.CLICKHOUSE_URL,
     enabled: true,
   })!;
-  const dspySteps = new DspyStepService(new DspyStepClickHouseRepository(clickhouse));
+  const dspySteps = new DspyStepService(new DspyStepClickHouseRepository(async () => clickhouse!));
 
   beforeAll(async () => {
     project = await getTestProject("dspy-log-steps");

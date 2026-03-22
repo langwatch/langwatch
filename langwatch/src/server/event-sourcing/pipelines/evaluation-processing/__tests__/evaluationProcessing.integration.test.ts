@@ -151,13 +151,13 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
   });
 
   // Build pipeline using static definition with definePipeline + register
   const evalRunStore = new EvaluationRunStore(
-    new EvaluationRunService(new EvaluationRunClickHouseRepository(clickHouseClient)).repository,
+    new EvaluationRunService(new EvaluationRunClickHouseRepository(async () => clickHouseClient)).repository,
   );
 
   const pipelineDefinition = definePipeline<EvaluationProcessingEvent>()

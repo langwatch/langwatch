@@ -12,8 +12,9 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
-vi.mock("../../../clickhouse/client", () => ({
-  getClickHouseClient: () => null,
+vi.mock("../../../clickhouse/clickhouseClient", () => ({
+  isClickHouseEnabled: () => false,
+  getClickHouseClientForProject: () => Promise.resolve(null),
 }));
 
 const { mockEnv } = vi.hoisted(() => {

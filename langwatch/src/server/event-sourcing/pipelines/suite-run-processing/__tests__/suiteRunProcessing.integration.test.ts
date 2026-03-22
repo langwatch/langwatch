@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createLogger } from "~/utils/logger/server";
-import type { AggregateType } from "../../../";
-import { createTenantId, definePipeline } from "../../../";
+import { createTenantId } from "../../../";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -17,15 +16,11 @@ import type { FoldProjectionStore } from "../../../projections/foldProjection.ty
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
-import { CompleteSuiteRunItemCommand } from "../commands/completeSuiteRunItem.command";
-import { RecordSuiteRunItemStartedCommand } from "../commands/recordSuiteRunItemStarted.command";
-import { StartSuiteRunCommand } from "../commands/startSuiteRun.command";
 import {
-  createSuiteRunStateFoldProjection,
   type SuiteRunState,
   type SuiteRunStateData,
 } from "../projections/suiteRunState.foldProjection";
-import type { SuiteRunProcessingEvent } from "../schemas/events";
+import { createSuiteRunProcessingPipeline } from "../pipeline";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:suite-run-processing:integration",
@@ -125,29 +120,18 @@ function createSuiteRunTestPipeline(): PipelineWithCommandHandlers<
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
   });
 
-  // Build pipeline using static definition with definePipeline + register
+  // Use the production pipeline factory to validate real wiring
   const suiteRunStateStore = new InMemorySuiteRunStateStore();
 
-  const pipelineDefinition = definePipeline<SuiteRunProcessingEvent>()
-    .withName(pipelineName)
-    .withAggregateType("suite_run" as AggregateType)
-    .withCommand("startSuiteRun", StartSuiteRunCommand as any)
-    .withCommand(
-      "recordSuiteRunItemStarted",
-      RecordSuiteRunItemStartedCommand as any,
-    )
-    .withCommand("completeSuiteRunItem", CompleteSuiteRunItemCommand as any)
-    .withFoldProjection(
-      "suiteRunState",
-      createSuiteRunStateFoldProjection({ store: suiteRunStateStore }) as any,
-    )
-    .build();
-
-  const pipeline = eventSourcing.register(pipelineDefinition);
+  const pipeline = eventSourcing.register(
+    createSuiteRunProcessingPipeline({
+      suiteRunStateFoldStore: suiteRunStateStore,
+    }),
+  );
 
   return {
     ...pipeline,

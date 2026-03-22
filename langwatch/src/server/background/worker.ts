@@ -36,7 +36,7 @@ import { getWorkerMetricsPort } from "./config";
 import { WorkersRestart } from "./errors";
 
 import { getApp } from "../app-layer/app";
-import { getClickHouseClient } from "../clickhouse/client";
+import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   startStorageStatsCollection,
   stopStorageStatsCollection,
@@ -138,7 +138,7 @@ export const start = async (
   );
 
   // Start ClickHouse storage metrics collection if ClickHouse is enabled
-  const clickHouseClient = getClickHouseClient();
+  const clickHouseClient = getSharedClickHouseClient();
   if (clickHouseClient) {
     startStorageStatsCollection(clickHouseClient);
   }

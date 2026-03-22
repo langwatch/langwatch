@@ -1,5 +1,5 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prepareLitellmParams } from "~/server/api/routers/modelProviders.utils";
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
@@ -77,7 +77,7 @@ const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   prisma: PrismaClient;
-  clickhouse: ClickHouseClient | null;
+  resolveClickHouseClient: ClickHouseClientResolver | null;
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
@@ -206,17 +206,17 @@ export class PipelineRegistry {
       projects: this.deps.projects,
     });
 
-    if (!this.deps.clickhouse) {
+    if (!this.deps.resolveClickHouseClient) {
       logger.warn(
-        "ClickHouse client not provided, log and metric record writes will be no-ops using NullRepository implementations",
+        "ClickHouse client resolver not provided, log and metric record writes will be no-ops using NullRepository implementations",
       );
     }
 
-    const logRecordRepo = this.deps.clickhouse
-      ? new LogRecordStorageClickHouseRepository(this.deps.clickhouse)
+    const logRecordRepo = this.deps.resolveClickHouseClient
+      ? new LogRecordStorageClickHouseRepository(this.deps.resolveClickHouseClient)
       : new NullLogRecordStorageRepository();
-    const metricRecordRepo = this.deps.clickhouse
-      ? new MetricRecordStorageClickHouseRepository(this.deps.clickhouse)
+    const metricRecordRepo = this.deps.resolveClickHouseClient
+      ? new MetricRecordStorageClickHouseRepository(this.deps.resolveClickHouseClient)
       : new NullMetricRecordStorageRepository();
 
     const tracePipeline = this.deps.eventSourcing.register(
@@ -285,8 +285,8 @@ export class PipelineRegistry {
   }
 
   private registerSuiteRunPipeline() {
-    const repository = this.deps.clickhouse
-      ? new SuiteRunStateRepositoryClickHouse(this.deps.clickhouse)
+    const repository = this.deps.resolveClickHouseClient
+      ? new SuiteRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
       : new SuiteRunStateRepositoryMemory();
 
     return this.deps.eventSourcing.register(
@@ -297,8 +297,8 @@ export class PipelineRegistry {
   }
 
   private registerSimulationPipeline(suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>) {
-    const repository = this.deps.clickhouse
-      ? new SimulationRunStateRepositoryClickHouse(this.deps.clickhouse)
+    const repository = this.deps.resolveClickHouseClient
+      ? new SimulationRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory();
     const simulationRunStore = createSimulationRunStateFoldStore(repository);
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
@@ -344,8 +344,8 @@ export class PipelineRegistry {
   }
 
   private registerExperimentRunPipeline() {
-    const repository = this.deps.clickhouse
-      ? new ExperimentRunStateRepositoryClickHouse(this.deps.clickhouse)
+    const repository = this.deps.resolveClickHouseClient
+      ? new ExperimentRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory();
 
     return this.deps.eventSourcing.register(
@@ -353,7 +353,7 @@ export class PipelineRegistry {
         experimentRunStateFoldStore:
           createExperimentRunStateFoldStore(repository),
         experimentRunItemAppendStore: createExperimentRunItemAppendStore(
-          this.deps.clickhouse,
+          this.deps.resolveClickHouseClient,
         ),
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,

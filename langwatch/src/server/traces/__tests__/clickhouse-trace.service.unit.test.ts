@@ -10,8 +10,9 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
   mockPrismaFindUnique: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: () => ({ query: mockClickHouseQuery }),
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForProject: () =>
+    Promise.resolve({ query: mockClickHouseQuery }),
 }));
 
 vi.mock("~/server/db", () => ({

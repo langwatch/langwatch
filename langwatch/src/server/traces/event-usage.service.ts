@@ -1,4 +1,4 @@
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { isClickHouseEnabled } from "~/server/clickhouse/clickhouseClient";
 import {
   queryBillableEventsTotalUniq,
   queryBillableEventsByProjectApprox,
@@ -20,7 +20,7 @@ export class EventUsageService {
   }: {
     organizationId: string;
   }): Promise<number> {
-    if (!getClickHouseClient()) {
+    if (!isClickHouseEnabled()) {
       logger.warn(
         { organizationId },
         "getCurrentMonthCount: ClickHouse unavailable, returning 0 (fail-open)",
@@ -52,7 +52,7 @@ export class EventUsageService {
       return [];
     }
 
-    if (!getClickHouseClient()) {
+    if (!isClickHouseEnabled()) {
       logger.warn(
         { organizationId },
         "getCountByProjects: ClickHouse unavailable, returning zeros (fail-open)",

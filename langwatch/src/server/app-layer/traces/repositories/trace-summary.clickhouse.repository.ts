@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
@@ -52,7 +52,7 @@ interface ClickHouseSummaryRecord {
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
     EventUtils.validateTenantId(
@@ -67,6 +67,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     );
 
     try {
+      const client = await this.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -74,7 +75,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -102,7 +103,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId,
