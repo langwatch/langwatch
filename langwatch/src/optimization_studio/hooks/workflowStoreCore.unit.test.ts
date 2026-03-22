@@ -550,7 +550,7 @@ describe("workflowStoreCore", () => {
           ],
           edges: [],
           default_llm: {
-            model: "openai/gpt-4o-mini",
+            model: "openai/gpt-5-mini",
             max_tokens: 2048,
             temperature: 0,
             litellm_params: {},
@@ -592,7 +592,7 @@ describe("workflowStoreCore", () => {
           nodes: [makeNode({ id: "node1" })],
           edges: [],
           default_llm: {
-            model: "openai/gpt-4o-mini",
+            model: "openai/gpt-5-mini",
             max_tokens: 2048,
             temperature: 0,
             litellm_params: {},
@@ -627,7 +627,7 @@ describe("workflowStoreCore", () => {
           nodes: [makeNode({ id: "node1" })],
           edges: [],
           default_llm: {
-            model: "openai/gpt-4o-mini",
+            model: "openai/gpt-5-mini",
             max_tokens: 2048,
             temperature: 0,
             litellm_params: {},
