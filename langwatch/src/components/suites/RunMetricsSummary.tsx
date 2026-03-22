@@ -9,7 +9,6 @@
  */
 
 import { HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Check, X, AlertTriangle, Ban, Loader, Clock as LuClockLucide } from "lucide-react";
 import { LuClock, LuZap } from "react-icons/lu";
 import {
   getPassRateGradientColor,
@@ -100,81 +99,11 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
   );
 }
 
-/**
- * Inline count badges shown alongside the pill when a run has
- * in-progress or queued items but no metrics data.
- */
-function CountBadges({ summary }: { summary: RunGroupSummary }) {
-  return (
-    <>
-      {summary.passedCount > 0 && (
-        <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg="green.subtle">
-          <Check size={12} style={{ color: "var(--chakra-colors-green-fg)" }} />
-          <Text fontSize="xs" fontWeight="semibold" color="green.fg" whiteSpace="nowrap">
-            {summary.passedCount} passed
-          </Text>
-        </HStack>
-      )}
-      {summary.failedCount > 0 && (
-        <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg="red.subtle">
-          <X size={12} style={{ color: "var(--chakra-colors-red-fg)" }} />
-          <Text fontSize="xs" fontWeight="semibold" color="red.fg" whiteSpace="nowrap">
-            {summary.failedCount} failed
-          </Text>
-        </HStack>
-      )}
-      {summary.stalledCount > 0 && (
-        <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg="yellow.subtle">
-          <AlertTriangle size={12} style={{ color: "var(--chakra-colors-yellow-fg)" }} />
-          <Text fontSize="xs" fontWeight="semibold" color="yellow.fg" whiteSpace="nowrap">
-            {summary.stalledCount} stalled
-          </Text>
-        </HStack>
-      )}
-      {summary.cancelledCount > 0 && (
-        <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg="bg.emphasized">
-          <Ban size={12} style={{ color: "var(--chakra-colors-fg-muted)" }} />
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted" whiteSpace="nowrap">
-            {summary.cancelledCount} cancelled
-          </Text>
-        </HStack>
-      )}
-      {summary.inProgressCount > 0 && (
-        <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg="orange.subtle">
-          <Loader size={12} style={{ color: "var(--chakra-colors-orange-fg)" }} />
-          <Text fontSize="xs" fontWeight="semibold" color="orange.fg" whiteSpace="nowrap">
-            {summary.inProgressCount} running
-          </Text>
-        </HStack>
-      )}
-      {summary.queuedCount > 0 && (
-        <HStack gap="4px" paddingX="8px" paddingY="2px" borderRadius="md" bg="blue.subtle">
-          <LuClockLucide size={12} style={{ color: "var(--chakra-colors-blue-fg)" }} />
-          <Text fontSize="xs" fontWeight="semibold" color="blue.fg" whiteSpace="nowrap">
-            {summary.queuedCount} queued
-          </Text>
-        </HStack>
-      )}
-    </>
-  );
-}
-
 export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
 
   const isRunning = summary.inProgressCount > 0 || summary.queuedCount > 0;
-  const hasMetrics =
-    summary.totalCost !== null || summary.averageAgentLatencyMs !== null;
-
-  // When running and no metrics, fall back to badge-style counts
-  if (isRunning && !hasMetrics && summary.completedCount === 0) {
-    return (
-      <HStack gap={1} data-testid="run-metrics-summary">
-        <CountBadges summary={summary} />
-      </HStack>
-    );
-  }
 
   return (
     <Tooltip
@@ -205,29 +134,43 @@ export function RunMetricsSummary({ summary }: RunMetricsSummaryProps) {
         overflow="hidden"
       >
         {/* Running progress indicator */}
-        {isRunning ? (
+        {isRunning && (
           <HStack gap={1}>
             <Icon as={LuZap} boxSize={3} color="blue.fg" />
             <Text color="blue.fg" fontWeight="medium">
               {summary.completedCount}/{summary.totalCount}
             </Text>
           </HStack>
-        ) : (
-          /* Pass rate with colored circle — shown for all finished states including null (gray "-") */
-          summary.totalCount > 0 && (
-            <>
-              <Text fontWeight="600">Pass</Text>
-              <HStack gap={1}>
-                <PassRateCircle passRate={summary.passRate} />
-                <Text
-                  color={getPassRateGradientColor(summary.passRate)}
-                  fontWeight="medium"
-                >
-                  {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
-                </Text>
-              </HStack>
-            </>
-          )
+        )}
+
+        {/* Pass rate — shown when there are completed runs (even while running for partial results) */}
+        {!isRunning && summary.totalCount > 0 && (
+          <>
+            <Text fontWeight="600">Pass</Text>
+            <HStack gap={1}>
+              <PassRateCircle passRate={summary.passRate} />
+              <Text
+                color={getPassRateGradientColor(summary.passRate)}
+                fontWeight="medium"
+              >
+                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+              </Text>
+            </HStack>
+          </>
+        )}
+        {isRunning && summary.completedCount > 0 && (
+          <>
+            <Text fontWeight="600">Pass</Text>
+            <HStack gap={1}>
+              <PassRateCircle passRate={summary.passRate} />
+              <Text
+                color={getPassRateGradientColor(summary.passRate)}
+                fontWeight="medium"
+              >
+                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+              </Text>
+            </HStack>
+          </>
         )}
 
         {/* Average agent latency */}
