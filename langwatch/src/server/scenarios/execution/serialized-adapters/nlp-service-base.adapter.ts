@@ -53,10 +53,13 @@ export abstract class NlpServiceBaseAdapter extends AgentAdapter {
 
   async call(input: AgentInput): Promise<string> {
     const lastUserMessage = input.messages.findLast((m) => m.role === "user");
+    const content = lastUserMessage?.content;
     const inputValue =
-      typeof lastUserMessage?.content === "string"
-        ? lastUserMessage.content
-        : JSON.stringify(lastUserMessage?.content ?? "");
+      typeof content === "string"
+        ? content
+        : content == null
+          ? ""
+          : JSON.stringify(content);
 
     const inputRecord = this.buildInputRecord(inputValue);
     const workflow = this.buildWorkflowPayload();
