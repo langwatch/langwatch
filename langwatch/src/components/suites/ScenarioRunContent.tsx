@@ -149,6 +149,8 @@ function VirtualizedContent({
   resolveTargetName,
   onScenarioRunClick,
   iterationMap,
+  onCancelRun,
+  cancellingJobId,
 }: ScenarioRunContentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
@@ -254,6 +256,8 @@ function VirtualizedContent({
                   targetName={resolveTargetName(scenarioRun)}
                   onScenarioRunClick={onScenarioRunClick}
                   iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+                  onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+                  isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
                 />
               ))}
             </div>
@@ -295,6 +299,8 @@ function VirtualizedContent({
               targetName={resolveTargetName(scenarioRun)}
               onClick={() => onScenarioRunClick(scenarioRun)}
               iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+              onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+              isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
             />
           </div>
         );
