@@ -9,4 +9,5 @@ export {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
+  SerializedWorkflowAdapter,
 } from "./serialized-adapters";
