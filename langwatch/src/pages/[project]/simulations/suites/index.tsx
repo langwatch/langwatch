@@ -8,7 +8,7 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -40,8 +40,6 @@ import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-const SKELETON_PLACEHOLDER_COUNT = 6;
 
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
@@ -332,36 +330,16 @@ function SuitesPageContent() {
         {/* Second row: sidebar + content box */}
         <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
           {/* Sidebar */}
-          {isLoading ? (
-            <VStack
-              width="280px"
-              flexShrink={0}
-              padding={4}
-              gap={3}
-              align="stretch"
-              height="full"
-            >
-              {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
-                <Skeleton
-                  key={index}
-                  data-testid="suite-sidebar-skeleton"
-                  height="61px"
-                  width="100%"
-                  borderRadius="md"
-                />
-              ))}
-            </VStack>
-          ) : (
-            <SuiteSidebar
-              suites={suites ?? []}
-              selectedSuiteSlug={selectedSuiteSlug}
-              runSummaries={runSummaries}
-              externalSets={externalSets ?? []}
-              onSelectSuite={navigateToSuite}
-              onRunSuite={handleRunSuite}
-              onContextMenu={handleContextMenu}
-            />
-          )}
+          <SuiteSidebar
+            suites={suites ?? []}
+            selectedSuiteSlug={selectedSuiteSlug}
+            runSummaries={runSummaries}
+            externalSets={externalSets ?? []}
+            onSelectSuite={navigateToSuite}
+            onRunSuite={handleRunSuite}
+            onContextMenu={handleContextMenu}
+            isLoading={isLoading}
+          />
 
           {/* Content box */}
           <Box

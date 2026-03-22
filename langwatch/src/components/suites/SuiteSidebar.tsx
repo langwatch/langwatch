@@ -11,6 +11,7 @@ import {
   Center,
   HStack,
   IconButton,
+  Skeleton,
   Spacer,
   Text,
   VStack,
@@ -69,7 +70,10 @@ type SuiteSidebarProps = {
   onSelectSuite: (slug: string | typeof ALL_RUNS_ID) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
+  isLoading?: boolean;
 };
+
+const SKELETON_COUNT = 6;
 
 export function SuiteSidebar({
   suites,
@@ -79,6 +83,7 @@ export function SuiteSidebar({
   onSelectSuite,
   onRunSuite,
   onContextMenu,
+  isLoading = false,
 }: SuiteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -176,7 +181,19 @@ export function SuiteSidebar({
         gap={isCollapsed ? 0 : 1}
         align="stretch"
       >
-        {!isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
+        {isLoading && !isCollapsed && (
+          Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <Skeleton
+              key={i}
+              data-testid="suite-sidebar-skeleton"
+              height="61px"
+              width="100%"
+              borderRadius="md"
+            />
+          ))
+        )}
+
+        {!isLoading && !isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
           <Text
             fontSize="sm"
             color="fg.muted"
@@ -187,7 +204,7 @@ export function SuiteSidebar({
             No run plans yet
           </Text>
         )}
-        {!isCollapsed && hasNoResults &&
+        {!isLoading && !isCollapsed && hasNoResults &&
           (suites.length > 0 || externalSets.length > 0) && (
             <Text
               fontSize="sm"
@@ -200,7 +217,7 @@ export function SuiteSidebar({
             </Text>
           )}
 
-        {filteredSuites.map((suite) =>
+        {!isLoading && filteredSuites.map((suite) =>
           isCollapsed ? (
             <Tooltip
               key={suite.id}
@@ -239,7 +256,7 @@ export function SuiteSidebar({
           ),
         )}
 
-        {filteredExternalSets.length > 0 && (
+        {!isLoading && filteredExternalSets.length > 0 && (
           <>
             {!isCollapsed && (
               <Text
@@ -377,8 +394,8 @@ function RunSummaryLine({
       <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
         {Math.round(passRate)}%
       </Text>
-      <Text fontSize="xs" color="fg.muted">·</Text>
-      <Text fontSize="xs" color="fg.muted">
+      <Text fontSize="xs" color="gray.350">·</Text>
+      <Text fontSize="xs" color="fg.subtle">
         {passedCount} passed
       </Text>
     </HStack>
@@ -466,11 +483,11 @@ function SuiteListItem({
       >
         <HStack gap={1.5} width="full">
           <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
-            {suite.name}
+            {suite.name || "<empty>"}
           </Text>
           <Spacer />
           {runSummary?.lastRunTimestamp && (
-            <Text fontSize="xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
               {formatTimeAgoCompact(runSummary.lastRunTimestamp)}
             </Text>
           )}
@@ -553,11 +570,11 @@ function ExternalSetListItem({
       >
         <HStack gap={1.5} width="full">
           <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
-            {externalSet.scenarioSetId}
+            {externalSet.scenarioSetId || "<empty>"}
           </Text>
           <Spacer />
           {externalSet.lastRunTimestamp && (
-            <Text fontSize="xs" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
               {formatTimeAgoCompact(externalSet.lastRunTimestamp)}
             </Text>
           )}
