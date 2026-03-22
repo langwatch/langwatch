@@ -1,0 +1,59 @@
+import { type NextRequest, NextResponse } from "next/server";
+import { prisma } from "~/server/db";
+import {
+  authenticateScimRequest,
+  isAuthError,
+} from "~/server/scim/scim-auth.middleware";
+import { ScimService } from "~/server/scim/scim.service";
+import type { ScimError } from "~/server/scim/scim.types";
+
+export async function GET(request: NextRequest) {
+  const auth = await authenticateScimRequest(request);
+  if (isAuthError(auth)) return auth;
+
+  const scimService = ScimService.create(prisma);
+
+  const searchParams = request.nextUrl.searchParams;
+  const filter = searchParams.get("filter") ?? undefined;
+  const startIndex = parseInt(searchParams.get("startIndex") ?? "1", 10);
+  const count = parseInt(searchParams.get("count") ?? "100", 10);
+
+  const result = await scimService.listUsers({
+    organizationId: auth.organizationId,
+    filter,
+    startIndex,
+    count,
+  });
+
+  return NextResponse.json(result);
+}
+
+export async function POST(request: NextRequest) {
+  const auth = await authenticateScimRequest(request);
+  if (isAuthError(auth)) return auth;
+
+  const scimService = ScimService.create(prisma);
+  const body = await request.json();
+
+  const result = await scimService.createUser({
+    request: body,
+    organizationId: auth.organizationId,
+  });
+
+  if (isScimError(result)) {
+    return NextResponse.json(result, { status: parseInt(result.status, 10) });
+  }
+
+  return NextResponse.json(result, { status: 201 });
+}
+
+function isScimError(value: unknown): value is ScimError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "schemas" in value &&
+    Array.isArray((value as ScimError).schemas) &&
+    (value as ScimError).schemas[0] ===
+      "urn:ietf:params:scim:api:messages:2.0:Error"
+  );
+}

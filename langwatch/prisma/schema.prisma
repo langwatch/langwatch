@@ -180,6 +180,7 @@ model Organization {
     CustomRoles   CustomRole[]
     notifications Notification[]
     subscriptions Subscription[]
+    scimTokens    ScimToken[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -187,6 +188,19 @@ model Organization {
 
     @@index([ssoDomain])
     @@index([ssoProvider])
+}
+
+model ScimToken {
+    id             String       @id @default(nanoid())
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    hashedToken    String
+    description    String?
+    createdAt      DateTime     @default(now())
+    lastUsedAt     DateTime?
+
+    @@index([organizationId])
+    @@index([hashedToken])
 }
 
 
