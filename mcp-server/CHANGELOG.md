@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.6.1...mcp-server@v0.7.0) (2026-03-22)
+
+
+### Features
+
+* **skills:** agent skills-based onboarding with feature map and scenario tests ([#2377](https://github.com/langwatch/langwatch/issues/2377)) ([6f6abdb](https://github.com/langwatch/langwatch/commit/6f6abdb67b97fcb7c2958dbc193dcde37d4c82a8))
+
 ## [0.6.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.6.0...mcp-server@v0.6.1) (2026-03-13)
 
 
