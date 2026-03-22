@@ -53,6 +53,9 @@ export const runDataSchema = z.object({
   messages: scenarioMessageSnapshotSchema.shape.messages,
   timestamp: z.number(), // Unix timestamp when run was executed
   durationInMs: z.number(), // Execution time in milliseconds
+  totalCost: z.number().optional(), // Total cost in USD across all traces
+  roleCosts: z.record(z.string(), z.number()).optional(), // Per-role cost breakdown
+  roleLatencies: z.record(z.string(), z.number()).optional(), // Per-role latency breakdown
 });
 
 /**

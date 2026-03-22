@@ -9,13 +9,14 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
-import { STATUS_ICON_CONFIG } from "./status-icons";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { formatRunStatusLabel } from "./format-run-status-label";
+import { formatCost, formatLatency } from "~/components/shared/formatters";
+import { Tooltip } from "~/components/ui/tooltip";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
@@ -28,25 +29,78 @@ type ScenarioTargetRowProps = {
   isCancelling?: boolean;
 };
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+const STATUS_CIRCLE_COLORS: Record<string, string> = {
+  [ScenarioRunStatus.SUCCESS]: "green.500",
+  [ScenarioRunStatus.FAILED]: "red.500",
+  [ScenarioRunStatus.ERROR]: "red.500",
+  [ScenarioRunStatus.STALLED]: "yellow.500",
+  [ScenarioRunStatus.CANCELLED]: "gray.400",
+  [ScenarioRunStatus.IN_PROGRESS]: "orange.400",
+  [ScenarioRunStatus.PENDING]: "gray.400",
+  [ScenarioRunStatus.QUEUED]: "blue.400",
+  [ScenarioRunStatus.RUNNING]: "orange.400",
+};
+
+function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+  const roleCosts = scenarioRun.roleCosts ?? {};
+  const roleLatencies = scenarioRun.roleLatencies ?? {};
+  const roles = [...new Set([...Object.keys(roleCosts), ...Object.keys(roleLatencies)])];
+
+  return (
+    <VStack align="stretch" gap={0} fontSize="12px" minWidth="180px" color="white">
+      <VStack align="stretch" gap={2} padding={2}>
+        {/* Total duration */}
+        {scenarioRun.durationInMs > 0 && (
+          <HStack justify="space-between">
+            <Text color="white/75">Duration</Text>
+            <Text fontWeight="medium">{formatLatency(scenarioRun.durationInMs)}</Text>
+          </HStack>
+        )}
+
+        {/* Total cost */}
+        {scenarioRun.totalCost != null && (
+          <HStack justify="space-between">
+            <Text color="white/75">Total Cost</Text>
+            <Text fontWeight="medium">{formatCost(scenarioRun.totalCost)}</Text>
+          </HStack>
+        )}
+
+        {/* Per-role breakdown */}
+        {roles.length > 0 && (
+          <>
+            <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
+            {roles.map((role) => (
+              <HStack key={role} justify="space-between">
+                <Text color="white/75">{role}</Text>
+                <HStack gap={2}>
+                  {roleLatencies[role] != null && (
+                    <Text fontWeight="medium">{formatLatency(roleLatencies[role]!)}</Text>
+                  )}
+                  {roleCosts[role] != null && (
+                    <Text fontWeight="medium">{formatCost(roleCosts[role]!)}</Text>
+                  )}
+                </HStack>
+              </HStack>
+            ))}
+          </>
+        )}
+      </VStack>
+    </VStack>
+  );
 }
 
-function StatusIcon({ status }: { status: ScenarioRunStatus }) {
-  // Queued and running rows show a spinner instead of a pass/fail icon
+function StatusCircle({ status }: { status: ScenarioRunStatus }) {
   if (status === ScenarioRunStatus.QUEUED || status === ScenarioRunStatus.RUNNING) {
     return <Spinner size="xs" data-testid="queued-spinner" />;
   }
 
-  const config = SCENARIO_RUN_STATUS_CONFIG[status];
-  const iconConfig = STATUS_ICON_CONFIG[status];
-  const Icon = iconConfig.icon;
   return (
-    <Icon
-      size={14}
-      color={`var(--chakra-colors-${config.colorPalette}-500)`}
-      style={iconConfig.animate ? { animation: "spin 2s linear infinite" } : undefined}
+    <Box
+      width="10px"
+      height="10px"
+      borderRadius="full"
+      bg={STATUS_CIRCLE_COLORS[status] ?? "gray.400"}
+      flexShrink={0}
     />
   );
 }
@@ -65,39 +119,67 @@ export function ScenarioTargetRow({
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 
   const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
+  const hasMetrics = scenarioRun.durationInMs > 0 || scenarioRun.totalCost != null;
 
   return (
-    <Box position="relative" className="group" borderBottom="1px solid" borderColor="border.subtle">
+    <Box
+      position="relative"
+      className="group"
+      borderBottom="1px solid"
+      _last={{ border: "none" }}
+      borderColor="border.subtle"
+      _hover={{ borderColor: "transparent" }}
+    >
       <HStack
         as="button"
         width="full"
         paddingX={4}
         paddingY={2}
         paddingRight={hasCancelButton ? 20 : 4}
-        gap={3}
-        _hover={{ bg: "bg.muted" }}
+        gap={4}
+        _hover={{ bg: "bg.muted/80" }}
+        borderRadius="lg"
         cursor="pointer"
         onClick={onClick}
         tabIndex={0}
         aria-label={`View details for ${displayName}`}
       >
-        <StatusIcon status={scenarioRun.status} />
-        <Text fontSize="sm" flex={1} textAlign="left" truncate>
-          {displayName}
-        </Text>
-        <HStack gap={2} flexShrink={0}>
-          <Text fontSize="xs" color={config.fgColor}>
+        <HStack>
+          <StatusCircle status={scenarioRun.status} />
+          <Text fontSize="xs" fontWeight="semibold" color={config.fgColor} width="43px" textAlign="left">
             {formatRunStatusLabel({
               status: scenarioRun.status,
               results: scenarioRun.results ?? undefined,
             })}
           </Text>
-          {scenarioRun.durationInMs > 0 && (
-            <Text fontSize="xs" color="fg.muted">
-              {formatDuration(scenarioRun.durationInMs)}
-            </Text>
-          )}
         </HStack>
+        <Text fontSize="sm" flex={1} textAlign="left" truncate>
+          {displayName}
+        </Text>
+        {hasMetrics && (
+          <Tooltip
+            content={<MetricsTooltipContent scenarioRun={scenarioRun} />}
+            contentProps={{ padding: 0 }}
+            positioning={{ placement: "bottom" }}
+            interactive
+          >
+            <HStack gap={2} flexShrink={0} color="fg.subtle">
+              {scenarioRun.durationInMs > 0 && (
+                <Text fontSize="11px">
+                  {formatLatency(scenarioRun.durationInMs)}
+                </Text>
+              )}
+              {scenarioRun.totalCost != null && (
+                <>
+                  <Text color="gray.300">{"⋅"}</Text>
+                  <Text fontSize="xs">
+                    {formatCost(scenarioRun.totalCost)}
+                  </Text>
+                </>
+              )}
+            </HStack>
+          </Tooltip>
+        )}
       </HStack>
       {hasCancelButton && (
         <HStack

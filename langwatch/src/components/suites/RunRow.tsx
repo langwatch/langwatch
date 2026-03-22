@@ -16,7 +16,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
-import { RunSummaryCounts } from "./RunSummaryCounts";
+import { RunMetricsSummary } from "./RunMetricsSummary";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -70,122 +70,123 @@ export function RunRow({
   const hasCancellableRuns = cancellableCount > 0;
 
   return (
-    <>
+    <Box>
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
-      <HStack
-        as="button"
-        width="full"
-        paddingX={4}
-        paddingY={3}
-        gap={3}
-        flexWrap="nowrap"
-        _hover={{ bg: "bg.subtle" }}
-        cursor="pointer"
-        onClick={onToggle}
-        className="group"
-        aria-expanded={isExpanded}
-        aria-label={`Run from ${timeAgo ?? "unknown time"}`}
-        position="sticky"
-        top={0}
-        zIndex={20}
-        bg="bg.muted"
-        borderBottom="1px solid"
-        borderColor="border"
-        data-testid="run-row-header"
-      >
-        {isExpanded ? (
-          <ChevronDown size={14} style={{ flexShrink: 0 }} />
-        ) : (
-          <ChevronRight size={14} style={{ flexShrink: 0 }} />
-        )}
-        {suiteName && (
-          <>
-            <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
-              {suiteName}
-            </Text>
-            <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-              &middot;
-            </Text>
-          </>
-        )}
-        {scenarioNames && (
-          <>
-            <Text fontSize="sm" color="fg.muted" truncate minWidth={0} flexShrink={1}>
-              {scenarioNames}
-            </Text>
-            <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-              &middot;
-            </Text>
-          </>
-        )}
-        <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
-          {timeAgo}
-        </Text>
-        {expectedJobCount != null && summary.totalCount < expectedJobCount && (
-          <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-            {summary.totalCount} of {expectedJobCount}
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
+        <HStack
+          as="button"
+          width="full"
+          paddingX={4}
+          paddingY={3}
+          gap={3}
+          flexWrap="nowrap"
+          cursor="pointer"
+          onClick={onToggle}
+          className="group"
+          aria-expanded={isExpanded}
+          aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+          bg="bg.subtle/50"
+          backdropFilter="blur(4px)"
+          data-testid="run-row-header"
+          borderRadius="lg"
+          boxShadow="xs"
+        >
+          {isExpanded ? (
+            <ChevronDown size={14} style={{ flexShrink: 0 }} />
+          ) : (
+            <ChevronRight size={14} style={{ flexShrink: 0 }} />
+          )}
+          {suiteName && (
+            <>
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
+                {suiteName}
+              </Text>
+              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                &middot;
+              </Text>
+            </>
+          )}
+          {scenarioNames && (
+            <>
+              <Text fontSize="sm" color="fg.muted" truncate minWidth={0} flexShrink={1}>
+                {scenarioNames}
+              </Text>
+              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                &middot;
+              </Text>
+            </>
+          )}
+          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+            {timeAgo}
           </Text>
-        )}
-        <Box flex={1} />
-        {onCancelAll && hasCancellableRuns && (
-          <HStack
-            as="span"
-            role="button"
-            tabIndex={isCancellingBatch ? -1 : 0}
-            gap={1}
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="sm"
-            fontSize="xs"
-            color="red.500"
-            cursor={isCancellingBatch ? "default" : "pointer"}
-            flexShrink={0}
-            opacity={isCancellingBatch ? 0.6 : 0}
-            pointerEvents={isCancellingBatch ? "auto" : "none"}
-            transition="opacity 0.15s"
-            _groupHover={isCancellingBatch ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
-            _hover={isCancellingBatch ? undefined : { bg: "red.50" }}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
-            }}
-            onKeyDown={(e: React.KeyboardEvent) => {
-              if (!isCancellingBatch && (e.key === "Enter" || e.key === " ")) {
-                e.stopPropagation();
-                e.preventDefault();
-                setIsCancelAllDialogOpen(true);
-              }
-            }}
-            aria-label="Cancel all remaining runs"
-            aria-disabled={isCancellingBatch}
-            data-testid="cancel-all-button"
-          >
-            {isCancellingBatch ? <Spinner size="xs" /> : <X size={12} />}
-            <Text fontSize="xs">Cancel All</Text>
-          </HStack>
-        )}
-        <RunSummaryCounts summary={summary} />
-      </HStack>
-
-      {/* Expanded content - scenario results in list or grid */}
-      {isExpanded && (
-        <>
-          <ScenarioRunContent
-            scenarioRuns={batchRun.scenarioRuns}
-            viewMode={viewMode}
-            resolveTargetName={resolveTargetName}
-            onScenarioRunClick={onScenarioRunClick}
-            iterationMap={iterationMap}
-            onCancelRun={onCancelRun}
-            cancellingJobId={cancellingJobId}
-          />
-          {batchRun.scenarioRuns.length === 0 && (
-            <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
-              No scenario runs in this batch.
+          {expectedJobCount != null && summary.totalCount < expectedJobCount && (
+            <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+              {summary.totalCount} of {expectedJobCount}
             </Text>
           )}
-        </>
-      )}
+          <Box flex={1} />
+          {onCancelAll && hasCancellableRuns && (
+            <HStack
+              as="span"
+              role="button"
+              tabIndex={isCancellingBatch ? -1 : 0}
+              gap={1}
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="sm"
+              fontSize="xs"
+              color="red.500"
+              cursor={isCancellingBatch ? "default" : "pointer"}
+              flexShrink={0}
+              opacity={isCancellingBatch ? 0.6 : 0}
+              pointerEvents={isCancellingBatch ? "auto" : "none"}
+              transition="opacity 0.15s"
+              _groupHover={isCancellingBatch ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
+              _hover={isCancellingBatch ? undefined : { bg: "red.50" }}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
+              }}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (!isCancellingBatch && (e.key === "Enter" || e.key === " ")) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setIsCancelAllDialogOpen(true);
+                }
+              }}
+              aria-label="Cancel all remaining runs"
+              aria-disabled={isCancellingBatch}
+              data-testid="cancel-all-button"
+            >
+              {isCancellingBatch ? <Spinner size="xs" /> : <X size={12} />}
+              <Text fontSize="xs">Cancel All</Text>
+            </HStack>
+          )}
+          <RunMetricsSummary summary={summary} />
+        </HStack>
+      </Box>
+
+      <Box padding={2}>
+        {/* Expanded content - scenario results in list or grid */}
+        {isExpanded && (
+          <>
+            <ScenarioRunContent
+              scenarioRuns={batchRun.scenarioRuns}
+              viewMode={viewMode}
+              resolveTargetName={resolveTargetName}
+              onScenarioRunClick={onScenarioRunClick}
+              iterationMap={iterationMap}
+              onCancelRun={onCancelRun}
+              cancellingJobId={cancellingJobId}
+            />
+            {batchRun.scenarioRuns.length === 0 && (
+              <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
+                No scenario runs in this batch.
+              </Text>
+            )}
+          </>
+        )}
+      </Box>
 
       {/* Confirmation dialog for cancelling all remaining jobs */}
       {onCancelAll && (
@@ -225,6 +226,6 @@ export function RunRow({
           </Dialog.Content>
         </Dialog.Root>
       )}
-    </>
+    </Box>
   );
 }

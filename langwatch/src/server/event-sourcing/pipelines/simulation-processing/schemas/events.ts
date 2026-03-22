@@ -122,6 +122,25 @@ export const SimulationTextMessageEndEventSchema = EventSchema.extend({
 export type SimulationTextMessageEndEvent = z.infer<typeof SimulationTextMessageEndEventSchema>;
 
 /**
+ * MetricsUpdated event - emitted when cost/latency metrics are computed from traces.
+ */
+const simulationRunMetricsUpdatedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  traceId: z.string(),
+  totalCost: z.number(),
+  roleCosts: z.record(z.string(), z.number()),
+  roleLatencies: z.record(z.string(), z.number()),
+});
+export type SimulationRunMetricsUpdatedEventData = z.infer<typeof simulationRunMetricsUpdatedEventDataSchema>;
+
+export const SimulationRunMetricsUpdatedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.METRICS_UPDATED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.METRICS_UPDATED),
+  data: simulationRunMetricsUpdatedEventDataSchema,
+});
+export type SimulationRunMetricsUpdatedEvent = z.infer<typeof SimulationRunMetricsUpdatedEventSchema>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 const simulationRunDeletedEventDataSchema = z.object({
@@ -146,6 +165,7 @@ export type SimulationProcessingEvent =
   | SimulationTextMessageStartEvent
   | SimulationTextMessageEndEvent
   | SimulationRunFinishedEvent
+  | SimulationRunMetricsUpdatedEvent
   | SimulationRunDeletedEvent;
 
 export {
@@ -156,5 +176,6 @@ export {
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
   isSimulationRunStartedEvent,
+  isSimulationRunMetricsUpdatedEvent,
 } from "./typeGuards";
 
