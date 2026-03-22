@@ -372,59 +372,59 @@ export function ScenarioRunDetailDrawer({
               </VStack>
 
               {/* Body — conversation on top, results on bottom */}
-                {/* Conversation — hidden when empty (e.g. stalled runs) */}
-                {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
+              {/* Conversation — hidden when empty (e.g. stalled runs) */}
+              {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
+                <Box
+                  paddingX={6}
+                  paddingY={6}
+                  background="bg.muted"
+                >
+                  <Box borderRadius="md" overflow="hidden">
+                    <ScenarioMessageRenderer
+                      messages={scenarioState.messages ?? []}
+                      streamingMessages={streamingMessages}
+                      variant="drawer"
+                    />
+                  </Box>
+                </Box>
+              )}
+
+              {/* Results */}
+              <Box
+                flex={1}
+                width="full"
+                borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
+                borderColor="border.muted"
+                position="relative"
+                className="group"
+                css={{
+                  "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
+                }}
+              >
+                <SimulationConsole
+                  results={scenarioState.results}
+                  scenarioName={scenarioState.name ?? undefined}
+                  status={scenarioState.status}
+                  durationInMs={scenarioState.durationInMs}
+                />
+                {scenarioState.results && (
                   <Box
-                    paddingX={6}
-                    paddingY={6}
-                    background="bg.muted"
+                    position="absolute"
+                    top={2}
+                    right={2}
+                    opacity={0}
+                    _groupHover={{ opacity: 1 }}
+                    transition="opacity 0.2s"
                   >
-                    <Box borderRadius="md" overflow="hidden">
-                      <ScenarioMessageRenderer
-                        messages={scenarioState.messages ?? []}
-                        streamingMessages={streamingMessages}
-                        variant="drawer"
-                      />
-                    </Box>
+                    <CopyButton
+                      value={formatResultsForCopy(
+                        scenarioState.results,
+                      )}
+                      label="Results"
+                    />
                   </Box>
                 )}
-
-                {/* Results */}
-                <Box
-                  flex={1}
-                  width="full"
-                  borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
-                  borderColor="border.muted"
-                  position="relative"
-                  className="group"
-                  css={{
-                    "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
-                  }}
-                >
-                  <SimulationConsole
-                    results={scenarioState.results}
-                    scenarioName={scenarioState.name ?? undefined}
-                    status={scenarioState.status}
-                    durationInMs={scenarioState.durationInMs}
-                  />
-                  {scenarioState.results && (
-                    <Box
-                      position="absolute"
-                      top={2}
-                      right={2}
-                      opacity={0}
-                      _groupHover={{ opacity: 1 }}
-                      transition="opacity 0.2s"
-                    >
-                      <CopyButton
-                        value={formatResultsForCopy(
-                          scenarioState.results,
-                        )}
-                        label="Results"
-                      />
-                    </Box>
-                  )}
-                </Box>
+              </Box>
               </Drawer.Body>
           )}
         </Drawer.Content>
