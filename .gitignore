@@ -6,6 +6,11 @@ node_modules
 
 llm-model-costs.json
 quickwit-*
+
+# ClickHouse local data (created by local dev CH instance)
+store/
+data/
+metadata/
 __pycache__
 dist/
 
