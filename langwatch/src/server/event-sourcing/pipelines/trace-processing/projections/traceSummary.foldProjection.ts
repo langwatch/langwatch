@@ -770,6 +770,76 @@ function accumulateAttributes({
   return merged;
 }
 
+// ─── Per-role cost/latency ────────────────────────────────────────────
+
+function resolveEffectiveRole({
+  span,
+  spanRoles,
+}: {
+  span: NormalizedSpan;
+  spanRoles: Record<string, string>;
+}): string | undefined {
+  const directRole = span.spanAttributes["langwatch.scenario.role"];
+  if (typeof directRole === "string" && directRole !== "") return directRole;
+
+  // Walk up the parent chain via the spanRoles map
+  let parentId = span.parentSpanId;
+  while (parentId) {
+    const parentRole = spanRoles[parentId];
+    if (parentRole) return parentRole;
+    // Cannot walk further without the parent span's parentSpanId,
+    // but spanRoles propagates roles down, so grandchild lookup works
+    // because the intermediate span was already recorded.
+    break;
+  }
+
+  return undefined;
+}
+
+function accumulateRoleCostLatency({
+  state,
+  span,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}): Pick<TraceSummaryData, "roleCosts" | "roleLatencies" | "spanRoles"> {
+  const spanRoles = { ...(state.spanRoles ?? {}) };
+
+  // Record this span's role if it has one
+  const directRole = span.spanAttributes["langwatch.scenario.role"];
+  if (typeof directRole === "string" && directRole !== "") {
+    spanRoles[span.spanId] = directRole;
+  } else if (span.parentSpanId && spanRoles[span.parentSpanId]) {
+    // Propagate parent role to this span so grandchildren can look it up
+    spanRoles[span.spanId] = spanRoles[span.parentSpanId]!;
+  }
+
+  const effectiveRole = resolveEffectiveRole({ span, spanRoles });
+
+  let roleCosts = state.roleCosts ?? {};
+  let roleLatencies = state.roleLatencies ?? {};
+
+  if (effectiveRole) {
+    const spanCost = extractTokenMetrics(span).cost;
+    roleCosts = {
+      ...roleCosts,
+      [effectiveRole]: (roleCosts[effectiveRole] ?? 0) + spanCost,
+    };
+
+    // Only accumulate latency for the span that directly carries the role,
+    // not for child spans (which would double-count nested durations)
+    if (typeof directRole === "string" && directRole !== "") {
+      const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
+      roleLatencies = {
+        ...roleLatencies,
+        [effectiveRole]: (roleLatencies[effectiveRole] ?? 0) + spanDurationMs,
+      };
+    }
+  }
+
+  return { roleCosts, roleLatencies, spanRoles };
+}
+
 // ─── Main composition ───────────────────────────────────────────────
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
@@ -805,16 +875,10 @@ export function applySpanToSummary({
       ? [...new Set([...state.models, ...newModels])].sort()
       : state.models;
 
-  // Accumulate per-role cost/latency when langwatch.scenario.role is present
-  const scenarioRole = span.spanAttributes["langwatch.scenario.role"];
-  let roleCosts = state.roleCosts ?? {};
-  let roleLatencies = state.roleLatencies ?? {};
-  if (typeof scenarioRole === "string" && scenarioRole !== "") {
-    const spanCost = extractTokenMetrics(span).cost;
-    const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
-    roleCosts = { ...roleCosts, [scenarioRole]: (roleCosts[scenarioRole] ?? 0) + spanCost };
-    roleLatencies = { ...roleLatencies, [scenarioRole]: (roleLatencies[scenarioRole] ?? 0) + spanDurationMs };
-  }
+  // Track span-to-role mapping and accumulate per-role cost/latency.
+  // Roles are set on agent spans, but costs live on child LLM spans.
+  // We resolve each span's effective role by walking up the parent chain.
+  const roleAccumulation = accumulateRoleCostLatency({ state, span });
 
   return {
     ...state,
@@ -832,8 +896,7 @@ export function applySpanToSummary({
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
     attributes,
-    roleCosts,
-    roleLatencies,
+    ...roleAccumulation,
   };
 }
 
@@ -875,6 +938,7 @@ export function createTraceSummaryFoldProjection({
         attributes: {},
         roleCosts: {},
         roleLatencies: {},
+        spanRoles: {},
         occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),

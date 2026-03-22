@@ -29,7 +29,6 @@ import { createSimulationRunStateFoldStore } from "./pipelines/simulation-proces
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
-import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
@@ -115,13 +114,10 @@ export class PipelineRegistry {
     //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
     const evalPipeline = this.registerEvaluationPipeline();
-    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationMetricsDispatcher } = this.registerTracePipeline(evalPipeline);
+    const { pipeline: tracePipeline, traceSummaryStore } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const simulationPipeline = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore });
 
-    // Wire late-bound dispatcher: trace-side reactor → simulation pipeline's updateRunMetrics
-    const simulationCommands = mapCommands(simulationPipeline.commands);
-    wireSimulationMetricsDispatcher(simulationCommands.updateRunMetrics);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
@@ -175,20 +171,6 @@ export class PipelineRegistry {
     // Late-bound reference to the deferred evaluation queue.
     // Set after pipeline registration, same pattern as resolveOriginDispatcher.
     let scheduleDeferredDispatcher: ((payload: DeferredEvaluationPayload) => Promise<void>) | null = null;
-
-    // Late-bound reference to the simulation pipeline's updateRunMetrics command.
-    // Set after simulation pipeline registration.
-    let updateRunMetricsDispatcher: ((data: any) => Promise<void>) | null = null;
-
-    const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
-      updateRunMetrics: async (data: any) => {
-        if (!updateRunMetricsDispatcher) {
-          logger.warn("updateRunMetrics dispatcher not yet initialized, skipping");
-          return;
-        }
-        return updateRunMetricsDispatcher(data);
-      },
-    });
 
     const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
@@ -252,7 +234,6 @@ export class PipelineRegistry {
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         spanStorageBroadcastReactor,
-        simulationMetricsSyncReactor,
       }),
     );
 
@@ -307,9 +288,6 @@ export class PipelineRegistry {
     return {
       pipeline: tracePipeline,
       traceSummaryStore,
-      wireSimulationMetricsDispatcher: (dispatcher: (data: any) => Promise<void>) => {
-        updateRunMetricsDispatcher = dispatcher;
-      },
     };
   }
 

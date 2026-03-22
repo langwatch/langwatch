@@ -78,6 +78,7 @@ export const traceSummaryDataSchema = z.object({
   attributes: z.record(z.string()),
   roleCosts: z.record(z.string(), z.number()).optional(),
   roleLatencies: z.record(z.string(), z.number()).optional(),
+  spanRoles: z.record(z.string(), z.string()).optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

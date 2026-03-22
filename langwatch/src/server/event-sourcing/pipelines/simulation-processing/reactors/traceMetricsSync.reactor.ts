@@ -26,10 +26,12 @@ export interface TraceMetricsSyncReactorDeps {
 
 /**
  * Simulation-side reactor: when a scenario message with trace_id arrives,
- * reads the trace summary and propagates metrics to the simulation run.
+ * reads the trace summary and propagates per-role cost/latency metrics
+ * to the simulation run.
  *
- * Fallback path — the trace-side reactor usually fires first (zero queries).
- * This handles the case where traces arrived before the simulation message.
+ * The trace summary fold accumulates roleCosts/roleLatencies by walking the
+ * parent span chain (roles live on agent spans, costs on child LLM spans).
+ * This reactor reads the completed summary and dispatches updateRunMetrics.
  */
 export function createTraceMetricsSyncReactor(
   deps: TraceMetricsSyncReactorDeps,
