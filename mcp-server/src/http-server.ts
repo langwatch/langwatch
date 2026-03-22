@@ -300,7 +300,9 @@ export async function startHttpServer({
     );
   });
 
-  app.post("/messages", async (req: Request, res: Response) => {
+  // Handle POST messages — mount at both /messages and /sse/messages
+  // because some clients resolve the relative /messages URL differently
+  const handleSseMessage = async (req: Request, res: Response) => {
     const sessionId = req.query["sessionId"] as string | undefined;
     if (!sessionId || !sseSessions[sessionId]) {
       res.status(400).json({ error: "Invalid or missing session ID" });
@@ -311,7 +313,10 @@ export async function startHttpServer({
     await handleWithSessionConfig(session.apiKey, () =>
       session.transport.handlePostMessage(req, res, req.body)
     );
-  });
+  };
+
+  app.post("/messages", handleSseMessage);
+  app.post("/sse/messages", handleSseMessage);
 
   // Start the server
   return new Promise((resolve) => {
