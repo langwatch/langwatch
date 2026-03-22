@@ -55,6 +55,10 @@ class LLMEvaluatorSettings(EvaluatorSettings):
         default=DEFAULT_MAX_TOKENS,
         description="Max tokens allowed for evaluation",
     )
+    max_output_tokens: int = Field(
+        default=4096,
+        description="Maximum number of tokens the evaluator LLM can generate in its response",
+    )
 
 
 class ConversationEntry(BaseModel):

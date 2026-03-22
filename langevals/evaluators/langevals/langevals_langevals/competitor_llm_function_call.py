@@ -115,6 +115,7 @@ class CompetitorLLMFunctionCallEvaluator(
         )
         response = litellm.completion(
             model=litellm_model,
+            max_tokens=self.settings.max_output_tokens,
             messages=messages,
             tools=[
                 {
@@ -127,7 +128,7 @@ class CompetitorLLMFunctionCallEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Explain why you think the competitor was or was not mentioned.",
+                                    "description": "A concise explanation in 1-2 sentences. Do not repeat or echo the input content.",
                                 },
                                 "confidence": {
                                     "type": "number",
@@ -150,6 +151,11 @@ class CompetitorLLMFunctionCallEvaluator(
         )
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
+        if choice.finish_reason == "length":
+            raise ValueError(
+                f"Evaluator response was cut off (hit {self.settings.max_output_tokens} token output limit). "
+                f"Consider increasing max_output_tokens in the evaluator settings."
+            )
         arguments = json.loads(
             cast(Message, choice.message).tool_calls[0].function.arguments
         )
