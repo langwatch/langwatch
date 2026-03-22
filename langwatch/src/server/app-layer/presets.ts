@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClientForProject, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
@@ -88,7 +88,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const { prisma } = require("../db") as { prisma: PrismaClient; };
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
-  const clickhouseEnabled = !!(config.enableClickhouse && config.clickhouseUrl);
+  const clickhouseEnabled = !!(config.enableClickhouse && config.clickhouseUrl) || isClickHouseEnabled();
 
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {

@@ -1,4 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
@@ -32,7 +33,12 @@ const privateClickHouseUrls = parsePrivateClickHouseEnvVars();
 function parsePrivateClickHouseEnvVars(): Map<string, string> {
   const map = new Map<string, string>();
   for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith(PRIVATE_CH_ENV_PREFIX) || !value) continue;
+    if (!key.startsWith(PRIVATE_CH_ENV_PREFIX)) continue;
+
+    if (!value || value.trim() === "") {
+      logger.warn({ envVar: key }, "Skipping private ClickHouse env var: empty value");
+      continue;
+    }
 
     // Format: CLICKHOUSE_URL__<label>__<orgId>
     // Strip prefix, then take the last segment after "__" as orgId
@@ -40,10 +46,16 @@ function parsePrivateClickHouseEnvVars(): Map<string, string> {
     const lastSep = suffix.lastIndexOf("__");
     const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
 
-    if (orgId) {
-      map.set(orgId, value);
-      logger.info({ orgId, envVar: key }, "Loaded private ClickHouse URL from env var");
+    if (!orgId) continue;
+
+    if (map.has(orgId)) {
+      throw new Error(
+        `Duplicate private ClickHouse config for orgId "${orgId}": env var "${key}" conflicts with an earlier definition. Each orgId must map to exactly one ClickHouse URL.`,
+      );
     }
+
+    map.set(orgId, value);
+    logger.info({ orgId, envVar: key }, "Loaded private ClickHouse URL from env var");
   }
   if (map.size > 0) {
     logger.info({ count: map.size }, "Private ClickHouse instances configured");
@@ -74,7 +86,9 @@ export async function getClickHouseClientForProject(
       select: { team: { select: { organizationId: true } } },
     });
     if (!project) {
-      return _getSharedClickHouseClient();
+      throw new Error(
+        `Cannot resolve ClickHouse client: project "${projectId}" not found. Refusing to fall back to shared client to prevent data leakage.`,
+      );
     }
     orgId = project.team.organizationId;
     projectOrgCache.set(projectId, orgId);
@@ -115,7 +129,16 @@ export async function getAllClickHouseInstances(): Promise<Array<{
     instances.push({ target: "shared", client: shared });
   }
 
+  const seenUrls = new Set<string>();
   for (const [orgId, url] of privateClickHouseUrls) {
+    if (seenUrls.has(url)) {
+      logger.info(
+        { orgId, url },
+        "Skipping duplicate private ClickHouse URL (already included for another org)",
+      );
+      continue;
+    }
+    seenUrls.add(url);
     instances.push({
       target: orgId,
       client: getOrCreateCustomClient(orgId, url),
@@ -126,11 +149,11 @@ export async function getAllClickHouseInstances(): Promise<Array<{
 }
 
 /**
- * Returns whether the shared ClickHouse instance is configured and available.
- * Use for feature-gating (e.g., deciding Real vs Null repository).
+ * Returns whether any ClickHouse instance is configured and available
+ * (shared or private). Use for feature-gating (e.g., deciding Real vs Null repository).
  */
 export function isClickHouseEnabled(): boolean {
-  return _getSharedClickHouseClient() !== null;
+  return _getSharedClickHouseClient() !== null || privateClickHouseUrls.size > 0;
 }
 
 /** Re-export for infrastructure-only use (metrics collection, not tenant data). */
@@ -156,13 +179,14 @@ function getOrCreateCustomClient(
     // If not a valid URL, pass raw — ClickHouse client may still accept it
   }
 
-  const client = createClient({
+  const raw = createClient({
     url: parsedUrl,
     clickhouse_settings: {
       date_time_input_format: "best_effort",
     },
   });
 
+  const client = createResilientClickHouseClient({ client: raw });
   customClientCache.set(organizationId, client);
   return client;
 }

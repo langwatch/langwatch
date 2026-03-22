@@ -67,7 +67,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
   }
 
   const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(clickHouseClient),
+    new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
   const eventSourcing = EventSourcing.createWithStores({

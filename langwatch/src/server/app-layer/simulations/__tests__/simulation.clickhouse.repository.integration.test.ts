@@ -61,7 +61,7 @@ let repo: SimulationClickHouseRepository;
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new SimulationClickHouseRepository(ch);
+  repo = new SimulationClickHouseRepository(async () => ch);
 }, 60_000);
 
 afterAll(async () => {

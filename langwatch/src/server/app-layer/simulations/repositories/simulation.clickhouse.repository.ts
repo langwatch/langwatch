@@ -125,13 +125,10 @@ interface CursorPayload {
 }
 
 export class SimulationClickHouseRepository implements SimulationRepository {
-  constructor(private readonly clickhouseOrResolver: ClickHouseClient | ClickHouseClientResolver) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private async getClient(tenantId: string): Promise<ClickHouseClient> {
-    if (typeof this.clickhouseOrResolver === "function") {
-      return this.clickhouseOrResolver(tenantId);
-    }
-    return this.clickhouseOrResolver;
+    return this.resolveClient(tenantId);
   }
 
   private async queryRows<T>(

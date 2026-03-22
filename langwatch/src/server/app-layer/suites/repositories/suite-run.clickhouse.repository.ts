@@ -4,13 +4,10 @@ import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-
 import type { SuiteRunReadRepository } from "./suite-run.repository";
 
 export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
-  constructor(private readonly clickhouseOrResolver: ClickHouseClient | ClickHouseClientResolver) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private async getClient(tenantId: string): Promise<ClickHouseClient> {
-    if (typeof this.clickhouseOrResolver === "function") {
-      return this.clickhouseOrResolver(tenantId);
-    }
-    return this.clickhouseOrResolver;
+    return this.resolveClient(tenantId);
   }
 
   async getSuiteRunState(params: {

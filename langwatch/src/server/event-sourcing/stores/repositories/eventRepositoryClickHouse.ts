@@ -60,13 +60,10 @@ export class EventRepositoryClickHouse implements EventRepository {
     "langwatch:trace-processing:event-repository:clickhouse",
   );
 
-  constructor(private readonly clickHouseClientOrResolver: ClickHouseClient | ClickHouseClientResolver) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private async getClient(tenantId: string): Promise<ClickHouseClient> {
-    if (typeof this.clickHouseClientOrResolver === "function") {
-      return this.clickHouseClientOrResolver(tenantId);
-    }
-    return this.clickHouseClientOrResolver;
+    return this.resolveClient(tenantId);
   }
 
   async getEventRecords(
