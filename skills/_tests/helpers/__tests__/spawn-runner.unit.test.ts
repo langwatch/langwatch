@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { stripApiKeys, spawnRunner } from "../spawn-runner";
 
 describe("stripApiKeys()", () => {
