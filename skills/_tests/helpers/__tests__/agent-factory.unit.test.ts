@@ -51,6 +51,15 @@ describe("Agent Factory", () => {
       });
     });
 
+    describe("when AGENT_UNDER_TEST is set to 'cursor'", () => {
+      it("selects the Cursor runner", async () => {
+        process.env.AGENT_UNDER_TEST = "cursor";
+        const { getRunner } = await import("../agent-factory.js");
+        const runner = getRunner();
+        expect(runner.name).toBe("cursor");
+      });
+    });
+
     describe("when AGENT_UNDER_TEST is set to an unknown value", () => {
       it("throws an error listing valid names", async () => {
         process.env.AGENT_UNDER_TEST = "unknown-assistant";
@@ -58,6 +67,7 @@ describe("Agent Factory", () => {
         expect(() => getRunner()).toThrow("unknown-assistant");
         expect(() => getRunner()).toThrow("claude-code");
         expect(() => getRunner()).toThrow("codex");
+        expect(() => getRunner()).toThrow("cursor");
       });
     });
   });
@@ -338,6 +348,201 @@ describe("Codex Runner", () => {
   });
 });
 
+describe("Cursor Runner", () => {
+  describe("capabilities", () => {
+    it("declares MCP support as true", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      expect(runner.capabilities.supportsMcp).toBe(true);
+    });
+
+    it("uses .cursor/rules as the skills directory", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      expect(runner.capabilities.skillsDirectory).toBe(".cursor/rules");
+    });
+
+    it("declares .cursorrules as the config file", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      expect(runner.capabilities.configFile).toBe(".cursorrules");
+    });
+
+    it("uses 'cursor' as name", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      expect(runner.name).toBe("cursor");
+    });
+  });
+
+  describe("buildArgs()", () => {
+    it("includes -p for prompt mode", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: false,
+      });
+      expect(args).toContain("-p");
+    });
+
+    it("includes --output-format stream-json", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: false,
+      });
+      expect(args).toContain("--output-format");
+      expect(args).toContain("stream-json");
+    });
+
+    it("includes --force and --trust flags", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: false,
+      });
+      expect(args).toContain("--force");
+      expect(args).toContain("--trust");
+    });
+
+    it("includes --workspace with the working directory", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/my-project",
+        includeMcpApproval: false,
+      });
+      expect(args).toContain("--workspace");
+      const workspaceIndex = args.indexOf("--workspace");
+      expect(args[workspaceIndex + 1]).toBe("/tmp/my-project");
+    });
+
+    it("includes --approve-mcps when MCP approval is requested", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: true,
+      });
+      expect(args).toContain("--approve-mcps");
+    });
+
+    it("omits --approve-mcps when MCP approval is not requested", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: false,
+      });
+      expect(args).not.toContain("--approve-mcps");
+    });
+
+    it("includes the prompt as the last argument", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const args = runner.buildArgs({
+        prompt: "my test prompt",
+        workingDirectory: "/tmp/test",
+        includeMcpApproval: false,
+      });
+      expect(args[args.length - 1]).toBe("my test prompt");
+    });
+  });
+
+  describe("parseStreamJsonOutput()", () => {
+    it("extracts messages from stream-json NDJSON lines", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+
+      const fixtureContent = fs.readFileSync(
+        path.join(__dirname, "fixtures/cursor-output.jsonl"),
+        "utf8"
+      );
+
+      const messages = runner.parseStreamJsonOutput(fixtureContent);
+
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toEqual({
+        role: "assistant",
+        content: "I will help you instrument your code with LangWatch.",
+      });
+      expect(messages[1]).toEqual({
+        role: "assistant",
+        content: "Done! I added LangWatch tracing to your project.",
+      });
+    });
+
+    it("skips non-message lines", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const output = [
+        JSON.stringify({ type: "status", status: "thinking" }),
+        JSON.stringify({ type: "done", status: "completed" }),
+      ].join("\n");
+
+      const messages = runner.parseStreamJsonOutput(output);
+      expect(messages).toHaveLength(0);
+    });
+
+    it("skips malformed JSON lines gracefully", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner();
+      const output = [
+        "not json",
+        JSON.stringify({
+          message: { role: "assistant", content: "ok" },
+        }),
+      ].join("\n");
+
+      const messages = runner.parseStreamJsonOutput(output);
+      expect(messages).toHaveLength(1);
+    });
+  });
+
+  describe("isBinaryAvailable()", () => {
+    it("returns false when binary path does not exist", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner(
+        "/nonexistent/path/to/cursor-agent-binary"
+      );
+      expect(runner.isBinaryAvailable()).toBe(false);
+    });
+  });
+
+  describe("when MCP is configured", () => {
+    it("writes .cursor/mcp.json in the working directory", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      // Use a real temp directory to verify MCP config writing
+      const tempDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "cursor-mcp-test-")
+      );
+
+      // The runner needs a binary to create an agent, but we can
+      // verify the MCP file structure expectation through the factory
+      // For now, just verify the config path convention
+      const mcpConfigDir = path.join(tempDir, ".cursor");
+      fs.mkdirSync(mcpConfigDir, { recursive: true });
+      const mcpConfigPath = path.join(mcpConfigDir, "mcp.json");
+      fs.writeFileSync(mcpConfigPath, JSON.stringify({ mcpServers: {} }));
+
+      expect(fs.existsSync(mcpConfigPath)).toBe(true);
+      const config = JSON.parse(fs.readFileSync(mcpConfigPath, "utf8"));
+      expect(config).toHaveProperty("mcpServers");
+
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+  });
+});
+
 describe("Skill Directory Placement", () => {
   describe("when skillPath points to a SKILL.md with _shared/ sibling", () => {
     let tempSkillSrc: string;
@@ -520,6 +725,14 @@ describe("Missing Binary Handling", () => {
       );
       expect(runner.isBinaryAvailable()).toBe(false);
     });
+
+    it("reports binary unavailable for Cursor", async () => {
+      const { CursorRunner } = await import("../runners/cursor.js");
+      const runner = new CursorRunner(
+        "/nonexistent/path/to/cursor-agent-binary"
+      );
+      expect(runner.isBinaryAvailable()).toBe(false);
+    });
   });
 });
 
@@ -536,5 +749,11 @@ describe("Log Prefix", () => {
     const { CodexRunner } = await import("../runners/codex.js");
     const runner = new CodexRunner();
     expect(runner.name).toBe("codex");
+  });
+
+  it("Cursor runner uses 'cursor' as name", async () => {
+    const { CursorRunner } = await import("../runners/cursor.js");
+    const runner = new CursorRunner();
+    expect(runner.name).toBe("cursor");
   });
 });

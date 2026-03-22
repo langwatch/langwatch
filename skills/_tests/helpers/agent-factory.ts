@@ -2,13 +2,15 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import type { AgentRunner, RunnerOptions } from "./types.js";
 import { ClaudeCodeRunner } from "./runners/claude-code.js";
 import { CodexRunner } from "./runners/codex.js";
+import { CursorRunner } from "./runners/cursor.js";
 
-const VALID_RUNNERS = ["claude-code", "codex"] as const;
+const VALID_RUNNERS = ["claude-code", "codex", "cursor"] as const;
 type RunnerName = (typeof VALID_RUNNERS)[number];
 
 const runnerFactories: Record<RunnerName, () => AgentRunner> = {
   "claude-code": () => new ClaudeCodeRunner(),
   codex: () => new CodexRunner(),
+  cursor: () => new CursorRunner(),
 };
 
 let cachedRunner: AgentRunner | undefined;

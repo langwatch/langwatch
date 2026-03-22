@@ -1,10 +1,8 @@
 @skills @testing @infrastructure
 Feature: Multi-assistant adapters for skill scenario tests
   As the LangWatch team
-  We want the same scenario tests to run against Claude Code and Codex
+  We want the same scenario tests to run against Claude Code, Codex, and Cursor
   So that we can verify skills work across multiple code assistants without duplicating test files
-
-  # Note: Cursor CLI support is deferred — CLI lacks stable non-interactive mode.
 
   Background:
     Given scenario tests live in skills/_tests/
@@ -27,6 +25,7 @@ Feature: Multi-assistant adapters for skill scenario tests
     Given each runner declares its capabilities at construction time
     Then the Claude Code runner declares MCP support as true
     And the Codex runner declares MCP support as false
+    And the Cursor runner declares MCP support as true
     And each runner declares the correct skills directory for its assistant
 
   # ──────────────────────────────────────────────────
@@ -113,6 +112,55 @@ Feature: Multi-assistant adapters for skill scenario tests
     And the returned response is compatible with @langwatch/scenario
 
   # ──────────────────────────────────────────────────
+  # R3b: Cursor runner
+  # ──────────────────────────────────────────────────
+
+  @unit
+  Scenario: Cursor runner constructs correct CLI arguments
+    Given the Cursor runner is configured
+    When it builds the spawn arguments
+    Then the args include -p for non-interactive print mode
+    And the args include --output-format stream-json
+    And the args include --force and --trust
+    And the args include --approve-mcps when MCP is configured
+    And the args include --workspace pointing to the working directory
+
+  @unit
+  Scenario: Cursor runner parses stream-json output
+    Given Cursor produces stream-json NDJSON output
+    When the runner parses the output
+    Then it extracts message objects from the NDJSON lines
+
+  @unit
+  Scenario: Cursor runner places skills in .cursor/rules directory
+    Given the Cursor runner handles skill placement
+    When a skill is provided via skillPath in RunnerOptions
+    Then the skill file is copied to .cursor/rules/<name>/SKILL.md
+
+  @unit
+  Scenario: Cursor runner writes MCP config to .cursor/mcp.json
+    Given the Cursor runner supports MCP
+    And skipMcp is false
+    When createAgent is called
+    Then a .cursor/mcp.json file is written in the working directory
+    And the config points to the LangWatch MCP server
+
+  @unit
+  Scenario: Cursor runner skips MCP config when skipMcp is true
+    Given the Cursor runner supports MCP
+    And skipMcp is true
+    When createAgent is called
+    Then no .cursor/mcp.json file is written
+
+  @integration
+  Scenario: Cursor runner spawns binary and produces AgentAdapter response
+    Given the Cursor runner is configured
+    And the cursor-agent binary is available on the system path
+    When a test creates an agent via the Cursor runner
+    Then it spawns the cursor-agent binary successfully
+    And the returned response is compatible with @langwatch/scenario
+
+  # ──────────────────────────────────────────────────
   # R4: Agent factory and environment variable selection
   # ──────────────────────────────────────────────────
 
@@ -124,9 +172,9 @@ Feature: Multi-assistant adapters for skill scenario tests
 
   @unit
   Scenario: Factory selects the runner matching the env var
-    Given AGENT_UNDER_TEST is set to "codex"
+    Given AGENT_UNDER_TEST is set to "cursor"
     When createAgent is called
-    Then the factory selects the Codex runner
+    Then the factory selects the Cursor runner
 
   @unit
   Scenario: Factory rejects unknown assistant names
@@ -161,21 +209,28 @@ Feature: Multi-assistant adapters for skill scenario tests
     Then no config file is generated
     And skills are placed in the correct directory without additional config
 
+  @unit
+  Scenario: Cursor runner generates .cursorrules pointing to skills
+    Given the Cursor runner needs a .cursorrules referencing skills
+    When createAgent is called with a skillPath
+    Then a .cursorrules file is generated in the working directory
+    And it points to the .cursor/rules skills directory
+
   # ──────────────────────────────────────────────────
   # R6: Missing binary handling
   # ──────────────────────────────────────────────────
 
   @unit
   Scenario: Runner throws descriptive error when binary is not found
-    Given the codex binary is not installed on the system
-    When a test attempts to create an agent via the Codex runner
+    Given the cursor-agent binary is not installed on the system
+    When a test attempts to create an agent via the Cursor runner
     Then the runner throws a descriptive error identifying the missing binary
     And the error message includes installation instructions or a URL
 
   @unit
   Scenario: Test suite skips gracefully when selected runner is unavailable
-    Given AGENT_UNDER_TEST is set to "codex"
-    And the codex binary is not installed
+    Given AGENT_UNDER_TEST is set to "cursor"
+    And the cursor-agent binary is not installed
     When the test suite starts
     Then all tests report as skipped with a reason
     And no test reports as failed due to the missing binary
@@ -204,7 +259,7 @@ Feature: Multi-assistant adapters for skill scenario tests
   @unit
   Scenario: MCP-dependent tests run on runners with MCP support
     Given a test uses it.skipIf based on runner.capabilities.supportsMcp
-    When tests run against the Claude Code runner
+    When tests run against the Cursor runner
     Then all tests execute including MCP-dependent ones
 
   # ──────────────────────────────────────────────────

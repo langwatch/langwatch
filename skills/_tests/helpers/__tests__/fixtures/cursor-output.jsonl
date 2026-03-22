@@ -1,0 +1,5 @@
+{"type":"status","status":"thinking"}
+{"message":{"role":"assistant","content":"I will help you instrument your code with LangWatch."}}
+{"type":"tool_use","name":"read_file","input":{"path":"main.py"}}
+{"message":{"role":"assistant","content":"Done! I added LangWatch tracing to your project."}}
+{"type":"done","status":"completed"}
