@@ -6,10 +6,13 @@
   "scripts": {
     "test": "vitest",
     "test:static": "vitest run static-validation.test.ts",
-    "test:e2e": "vitest run --exclude static-validation.test.ts",
-    "test:claude": "AGENT_UNDER_TEST=claude-code vitest run --exclude static-validation.test.ts",
-    "test:codex": "AGENT_UNDER_TEST=codex vitest run --exclude static-validation.test.ts",
-    "test:cursor": "AGENT_UNDER_TEST=cursor vitest run --exclude static-validation.test.ts",
+    "test:unit": "vitest run helpers/__tests__/",
+    "test:e2e": "npx tsx scripts/run-selected.ts",
+    "test:e2e:all": "EVALS_ALL=1 npx tsx scripts/run-selected.ts",
+    "test:select": "npx tsx scripts/test-select.ts",
+    "test:claude": "AGENT_UNDER_TEST=claude-code npx tsx scripts/run-selected.ts",
+    "test:codex": "AGENT_UNDER_TEST=codex npx tsx scripts/run-selected.ts",
+    "test:cursor": "AGENT_UNDER_TEST=cursor npx tsx scripts/run-selected.ts",
     "test:all-agents": "pnpm test:claude && pnpm test:codex && pnpm test:cursor"
   },
   "devDependencies": {
