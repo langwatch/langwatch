@@ -41,7 +41,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-const SKELETON_PLACEHOLDER_COUNT = 5;
+const SKELETON_PLACEHOLDER_COUNT = 6;
 
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
@@ -342,15 +342,13 @@ function SuitesPageContent() {
               height="full"
             >
               {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
-                <Box key={index} data-testid="suite-sidebar-skeleton">
-                  <Skeleton height="20px" width="70%" borderRadius="md" />
-                  <Skeleton
-                    height="16px"
-                    width="40%"
-                    borderRadius="md"
-                    marginTop={2}
-                  />
-                </Box>
+                <Skeleton
+                  key={index}
+                  data-testid="suite-sidebar-skeleton"
+                  height="61px"
+                  width="100%"
+                  borderRadius="md"
+                />
               ))}
             </VStack>
           ) : (
