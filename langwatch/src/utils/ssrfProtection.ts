@@ -333,7 +333,18 @@ async function resolveHostname(hostname: string): Promise<string[]> {
   ];
 
   const [ipv4Addresses = [], ipv6Addresses = []] = await Promise.all(promises);
-  return [...ipv4Addresses, ...ipv6Addresses];
+  const allAddresses = [...ipv4Addresses, ...ipv6Addresses];
+
+  if (allAddresses.length > 0) return allAddresses;
+
+  // Fallback to OS resolver (dns.lookup) which respects /etc/hosts,
+  // Docker DNS, mDNS, VPN resolvers, etc.
+  try {
+    const { address } = await dns.lookup(hostname);
+    return [address];
+  } catch {
+    return [];
+  }
 }
 
 // ============================================================================
