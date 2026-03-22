@@ -295,6 +295,10 @@ export const DashboardLayout = ({
   );
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
+  const { data: ssoStatus } = api.user.getSsoStatus.useQuery(
+    {},
+    { enabled: !!session },
+  );
 
   usePostHogIdentify({
     session: session ?? null,
@@ -624,6 +628,35 @@ export const DashboardLayout = ({
               )}
 
             <SdkRadarBanner />
+
+            {ssoStatus?.pendingSsoSetup && (
+              <Alert.Root
+                status="warning"
+                width="full"
+                borderBottom="1px solid"
+                borderBottomColor="yellow.300"
+              >
+                <Alert.Indicator />
+                <Alert.Content>
+                  <HStack width="full">
+                    <Text>
+                      Your organization has switched to SSO login. Please link
+                      your new sign-in method to keep access to your account.
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      colorPalette="orange"
+                      asChild
+                    >
+                      <Link href="/settings/authentication">
+                        Link SSO Account
+                      </Link>
+                    </Button>
+                  </HStack>
+                </Alert.Content>
+              </Alert.Root>
+            )}
 
             {publicEnv.data?.DEMO_PROJECT_SLUG &&
               publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
