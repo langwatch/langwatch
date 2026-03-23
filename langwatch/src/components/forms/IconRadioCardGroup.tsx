@@ -16,6 +16,8 @@ interface IconRadioCardGroupProps<T extends string = string> {
   size?: "sm" | "md" | "lg";
   variant?: "outline";
   maxColumns?: number;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
 }
 
 export const IconRadioCardGroup = <T extends string = string>({
@@ -24,6 +26,8 @@ export const IconRadioCardGroup = <T extends string = string>({
   onChange,
   direction: layout = "horizontal",
   maxColumns,
+  ariaLabel,
+  ariaLabelledBy,
 }: IconRadioCardGroupProps<T>) => {
   const isHorizontal = layout === "horizontal";
   const groupRef = useRef<HTMLDivElement>(null);
@@ -42,11 +46,11 @@ export const IconRadioCardGroup = <T extends string = string>({
         const nextItem = items[nextIndex];
         if (nextItem) {
           onChange(nextItem.value);
-          const buttons =
-            groupRef.current?.querySelectorAll<HTMLButtonElement>(
-              '[role="radio"] button',
+          const radios =
+            groupRef.current?.querySelectorAll<HTMLElement>(
+              '[role="radio"] button, button[role="radio"]',
             );
-          buttons?.[nextIndex]?.focus();
+          radios?.[nextIndex]?.focus();
         }
       }
     },
@@ -55,6 +59,8 @@ export const IconRadioCardGroup = <T extends string = string>({
 
   const renderItem = (item: IconListItem<T>, index: number) => {
     const isSelected = value === item.value;
+    const isTabbable =
+      isSelected || (value === undefined && index === 0);
 
     return (
       <Box
@@ -86,7 +92,7 @@ export const IconRadioCardGroup = <T extends string = string>({
       >
         <button
           type="button"
-          tabIndex={isSelected ? 0 : -1}
+          tabIndex={isTabbable ? 0 : -1}
           onKeyDown={(e) => handleKeyDown(e, index)}
         >
           <HStack align="center" justify="space-between" w="full" minW="0">
@@ -134,6 +140,8 @@ export const IconRadioCardGroup = <T extends string = string>({
       <Grid
         ref={groupRef}
         role="radiogroup"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         templateColumns={{
           base: "1fr",
           md: `repeat(${cols}, minmax(0, 1fr))`,
@@ -147,7 +155,15 @@ export const IconRadioCardGroup = <T extends string = string>({
   }
 
   return (
-    <Stack ref={groupRef} role="radiogroup" direction="column" gap="2" w="full">
+    <Stack
+      ref={groupRef}
+      role="radiogroup"
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
+      direction="column"
+      gap="2"
+      w="full"
+    >
       {items.map(renderItem)}
     </Stack>
   );
