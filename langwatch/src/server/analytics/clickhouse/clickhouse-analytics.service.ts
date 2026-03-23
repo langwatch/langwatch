@@ -35,6 +35,17 @@ const MINUTES_PER_DAY = 24 * 60;
 /** Milliseconds per minute for time calculations */
 const MS_PER_MINUTE = 1000 * 60;
 
+/**
+ * Default ClickHouse settings applied to all analytics queries.
+ *
+ * max_bytes_before_external_group_by: When GROUP BY intermediate state exceeds
+ * this threshold (500 MB), ClickHouse spills to disk instead of failing with OOM.
+ * This acts as a safety net for large GROUP BY operations under concurrent load.
+ */
+export const ANALYTICS_CLICKHOUSE_SETTINGS: Record<string, number> = {
+  max_bytes_before_external_group_by: 500_000_000,
+};
+
 // Re-export types for backward compatibility
 export type {
   TimeseriesResult,
@@ -122,6 +133,7 @@ export class ClickHouseAnalyticsService {
             query: sql,
             query_params: params,
             format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<Record<string, unknown>>;
@@ -434,6 +446,7 @@ export class ClickHouseAnalyticsService {
             query: sql,
             query_params: params,
             format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{
@@ -516,11 +529,13 @@ export class ClickHouseAnalyticsService {
               query: topDocsSql,
               query_params: params,
               format: "JSONEachRow",
+              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
             }),
             clickHouseClient.query({
               query: totalSql,
               query_params: params,
               format: "JSONEachRow",
+              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
             }),
           ]);
 
@@ -602,6 +617,7 @@ export class ClickHouseAnalyticsService {
             query: sql,
             query_params: params,
             format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{
