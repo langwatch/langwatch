@@ -44,7 +44,7 @@ export class UsageService {
     private readonly eventUsageService: EventUsageService,
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
-    private readonly simulationRunService: Pick<SimulationRunService, "getExternalSetIdsForOrganization">,
+    private readonly simulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds">,
     private readonly clickhouseAvailable: boolean,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
@@ -126,7 +126,7 @@ export class UsageService {
       }
 
       knownSets =
-        await this.simulationRunService.getExternalSetIdsForOrganization({ projectIds });
+        await this.simulationRunService.getDistinctExternalSetIds({ projectIds });
       this.scenarioSetCache.set(organizationId, knownSets);
     }
 

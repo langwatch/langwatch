@@ -131,16 +131,19 @@ interface CursorPayload {
 export class SimulationClickHouseRepository implements SimulationRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
+  /** Guards against empty/missing tenantId before delegating to the injected resolver. */
   private async getClient(tenantId: string): Promise<ClickHouseClient> {
+    if (!tenantId) {
+      throw new Error("tenantId is required for ClickHouse client resolution");
+    }
     return this.resolveClient(tenantId);
   }
 
-  private async queryRows<T>({ tenantId, query, params }: {
-    tenantId: string;
-    query: string;
-    params: Record<string, string | string[]>;
-  }): Promise<T[]> {
-    const client = await this.getClient(tenantId);
+  private async queryRows<T>(
+    query: string,
+    params: { tenantId: string } & Record<string, string | string[]>,
+  ): Promise<T[]> {
+    const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
@@ -158,9 +161,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       ScenarioSetId: string;
       ScenarioCount: string;
       LastRunAt: string;
-    }>({
-      tenantId: projectId,
-      query: `SELECT
+    }>(
+      `SELECT
         ScenarioSetId,
         toString(count(*)) AS ScenarioCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
@@ -174,8 +176,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      params: { tenantId: projectId },
-    });
+      { tenantId: projectId },
+    );
 
     return rows.map((row) => ({
       scenarioSetId: row.ScenarioSetId,
@@ -191,9 +193,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioRunData | null> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>({
-      tenantId: projectId,
-      query: `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
+      `SELECT ${RUN_COLUMNS}
        FROM (
          SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
@@ -203,8 +204,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        )
        WHERE ArchivedAt IS NULL
        LIMIT 1`,
-      params: { tenantId: projectId, scenarioRunId },
-    });
+      { tenantId: projectId, scenarioRunId },
+    );
 
     const row = rows[0];
     if (!row) return null;
@@ -237,9 +238,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       : "HAVING 1 = 1";
 
     // Step 0: fetch total distinct batch count (runs in parallel with step 1)
-    const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>({
-      tenantId: projectId,
-      query: `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
+    const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
+      `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
        FROM (
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
@@ -249,8 +249,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      params: { tenantId: projectId, scenarioSetId },
-    });
+      { tenantId: projectId, scenarioSetId },
+    );
 
     // Step 1: fetch batch-level aggregates
     const batchRowsPromise = this.queryRows<{
@@ -263,9 +263,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
       FirstCompletedAt: string;
       AllCompletedAt: string;
-    }>({
-      tenantId: projectId,
-      query: `SELECT
+    }>(
+      `SELECT
         BatchRunId,
         toString(count())                                               AS TotalCount,
         toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
@@ -292,13 +291,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        ${cursorClause}
        ORDER BY LastRunAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
-      params: {
+      {
         tenantId: projectId,
         scenarioSetId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
-    });
+    );
 
     const [totalCountRows, batchRows] = await Promise.all([totalCountPromise, batchRowsPromise]);
     const totalCount = parseInt(totalCountRows[0]?.TotalBatchCount ?? "0", 10);
@@ -329,9 +328,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       FinishedAt: string | null;
       MessagePreviewRoles: string[];
       MessagePreviewContents: string[];
-    }>({
-      tenantId: projectId,
-      query: `SELECT ${PREVIEW_COLUMNS}
+    }>(
+      `SELECT ${PREVIEW_COLUMNS}
        FROM (
          SELECT ${DEDUP_PREVIEW_COLUMNS}
          FROM ${TABLE_NAME}
@@ -343,8 +341,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      params: { tenantId: projectId, scenarioSetId, batchRunIds },
-    });
+      { tenantId: projectId, scenarioSetId, batchRunIds },
+    );
 
     // Group items by batchRunId
     const itemsByBatch = new Map<string, typeof itemRows>();
@@ -423,24 +421,22 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     | { changed: true; lastUpdatedAt: number; runs: ScenarioRunData[] }
   > {
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>({
-        tenantId: projectId,
-        query: `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
+        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId = {batchRunId:String}
            AND ArchivedAt IS NULL`,
-        params: { tenantId: projectId, batchRunId },
-      });
+        { tenantId: projectId, batchRunId },
+      );
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
       if (lastUpdatedAt <= sinceTimestamp) {
         return { changed: false, lastUpdatedAt };
       }
     }
 
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>({
-      tenantId: projectId,
-      query: `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
+      `SELECT ${RUN_COLUMNS}
        FROM (
          SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
@@ -452,8 +448,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      params: { tenantId: projectId, scenarioSetId, batchRunId },
-    });
+      { tenantId: projectId, scenarioSetId, batchRunId },
+    );
 
     const now = Date.now();
     const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
@@ -471,9 +467,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<number> {
-    const rows = await this.queryRows<{ BatchRunCount: string }>({
-      tenantId: projectId,
-      query: `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
+    const rows = await this.queryRows<{ BatchRunCount: string }>(
+      `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
        FROM (
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
@@ -483,8 +478,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      params: { tenantId: projectId, scenarioSetId },
-    });
+      { tenantId: projectId, scenarioSetId },
+    );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
 
@@ -495,9 +490,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioId: string;
   }): Promise<ScenarioRunData[] | null> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>({
-      tenantId: projectId,
-      query: `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
+      `SELECT ${RUN_COLUMNS}
        FROM (
          SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
@@ -509,8 +503,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt DESC
        LIMIT 1000`,
-      params: { tenantId: projectId, scenarioId },
-    });
+      { tenantId: projectId, scenarioId },
+    );
 
     if (rows.length === 0) return null;
 
@@ -525,9 +519,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>({
-      tenantId: projectId,
-      query: `SELECT ${RUN_COLUMNS}
+    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
+      `SELECT ${RUN_COLUMNS}
        FROM (
          SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
@@ -539,8 +532,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE ArchivedAt IS NULL
        ORDER BY BatchRunId ASC, CreatedAt ASC
        LIMIT 10000`,
-      params: { tenantId: projectId, scenarioSetId },
-    });
+      { tenantId: projectId, scenarioSetId },
+    );
 
     const now = Date.now();
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
@@ -577,9 +570,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
-    }>({
-      tenantId: projectId,
-      query: `SELECT
+    }>(
+      `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt
        FROM (
@@ -595,14 +587,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
-      params: {
+      {
         tenantId: projectId,
         scenarioSetId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
-    });
+    );
 
     const hasMore = batchRows.length > validatedLimit;
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
@@ -650,14 +642,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   > {
     // Cheap timestamp check: skip heavy query if nothing changed
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>({
-        tenantId: projectId,
-        query: `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
+        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ArchivedAt IS NULL`,
-        params: { tenantId: projectId },
-      });
+        { tenantId: projectId },
+      );
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
       if (lastUpdatedAt <= sinceTimestamp) {
         return { changed: false, lastUpdatedAt };
@@ -681,9 +672,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       BatchRunId: string;
       MaxCreatedAt: string;
       ScenarioSetId: string;
-    }>({
-      tenantId: projectId,
-      query: `SELECT
+    }>(
+      `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
         any(ScenarioSetId) AS ScenarioSetId
@@ -699,13 +689,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
-      params: {
+      {
         tenantId: projectId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
-    });
+    );
 
     const hasMore = batchRows.length > validatedLimit;
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
@@ -752,9 +742,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       PassCount: string;
       FailCount: string;
       LastRunAt: string;
-    }>({
-      tenantId: projectId,
-      query: `SELECT
+    }>(
+      `SELECT
         ScenarioSetId,
         toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
         toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
@@ -782,8 +771,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        )
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      params: { tenantId: projectId, ...dateFilter.params },
-    });
+      { tenantId: projectId, ...dateFilter.params },
+    );
 
     return rows.map((row) => ({
       scenarioSetId: row.ScenarioSetId,
@@ -809,7 +798,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return rows.map((r) => r.ScenarioRunId);
   }
 
-  async getExternalSetIdsForOrganization({
+  async getDistinctExternalSetIds({
     projectIds,
   }: {
     projectIds: string[];
@@ -819,20 +808,20 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       return new Set();
     }
 
-    const rows = await this.queryRows<{ ScenarioSetId: string }>({
-      tenantId: firstProjectId,
-      query: `SELECT DISTINCT ScenarioSetId
+    const rows = await this.queryRows<{ ScenarioSetId: string }>(
+      `SELECT DISTINCT ScenarioSetId
        FROM (
          SELECT ScenarioSetId, ArchivedAt
          FROM ${TABLE_NAME}
-         WHERE TenantId IN ({tenantIds:Array(String)})
+         WHERE TenantId IN ({projectIds:Array(String)})
            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      params: { tenantIds: projectIds },
-    });
+      { tenantId: firstProjectId, projectIds },
+    );
+
     return new Set(rows.map((r) => r.ScenarioSetId));
   }
 
@@ -873,9 +862,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       ? "AND ScenarioSetId = {scenarioSetId:String}"
       : "";
 
-    const rows = await this.queryRows<ClickHouseSimulationRunRow>({
-      tenantId: projectId,
-      query: `SELECT ${LIST_COLUMNS}
+    const rows = await this.queryRows<ClickHouseSimulationRunRow>(
+      `SELECT ${LIST_COLUMNS}
        FROM (
          SELECT ${DEDUP_LIST_COLUMNS}
          FROM ${TABLE_NAME}
@@ -888,8 +876,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC
        LIMIT 5000`,
-      params: { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetId } : {}) },
-    });
+      { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetId } : {}) },
+    );
 
     const now = Date.now();
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));

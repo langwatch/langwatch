@@ -57,9 +57,9 @@ describe("UsageService.checkScenarioSetLimit", () => {
 
   const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
-  const mockGetExternalSetIdsForOrganization = vi.fn();
-  const mockSimulationRunService: Pick<SimulationRunService, "getExternalSetIdsForOrganization"> = {
-    getExternalSetIdsForOrganization: mockGetExternalSetIdsForOrganization,
+  const mockGetDistinctExternalSetIds = vi.fn();
+  const mockSimulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds"> = {
+    getDistinctExternalSetIds: mockGetDistinctExternalSetIds,
   };
 
   let service: UsageService;
@@ -71,7 +71,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
     }
     mockOrgRepo.getPricingModel.mockResolvedValue(null);
     (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue(FREE_PLAN);
-    mockGetExternalSetIdsForOrganization.mockResolvedValue(new Set<string>());
+    mockGetDistinctExternalSetIds.mockResolvedValue(new Set<string>());
     service = new UsageService(
       mockOrgService,
       mockTraceUsageService as never,
@@ -86,7 +86,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has no existing scenario sets", () => {
     it("allows the first scenario set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(new Set<string>());
+      mockGetDistinctExternalSetIds.mockResolvedValue(new Set<string>());
 
       await expect(
         service.checkScenarioSetLimit({
@@ -100,7 +100,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has 2 existing scenario sets", () => {
     it("allows a third scenario set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b"]),
       );
 
@@ -116,7 +116,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has 3 existing scenario sets (at limit)", () => {
     beforeEach(() => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b", "set-c"]),
       );
     });
@@ -143,7 +143,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has 4 existing sets from before enforcement", () => {
     it("blocks a new fifth set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b", "set-c", "set-d"]),
       );
 
@@ -162,7 +162,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
         PAID_PLAN,
       );
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(Array.from({ length: 10 }, (_, i) => `set-${i}`)),
       );
 
@@ -182,7 +182,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
         overrideAddingLimitations: true,
       });
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(Array.from({ length: 10 }, (_, i) => `set-${i}`)),
       );
 
@@ -209,7 +209,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
           scenarioSetId: "my-set",
         });
 
-        expect(mockGetExternalSetIdsForOrganization).not.toHaveBeenCalled();
+        expect(mockGetDistinctExternalSetIds).not.toHaveBeenCalled();
         expect(mockOrgService.getProjectIds).not.toHaveBeenCalled();
       });
     });
@@ -217,7 +217,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
     describe("when scenario set is not in cache", () => {
       it("queries the database and caches the result", async () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-        mockGetExternalSetIdsForOrganization.mockResolvedValue(
+        mockGetDistinctExternalSetIds.mockResolvedValue(
           new Set(["existing-set"]),
         );
 
@@ -226,7 +226,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
           scenarioSetId: "new-set",
         });
 
-        expect(mockGetExternalSetIdsForOrganization).toHaveBeenCalledTimes(1);
+        expect(mockGetDistinctExternalSetIds).toHaveBeenCalledTimes(1);
 
         // Second call for same org with now-known set should use cache
         await service.checkScenarioSetLimit({
@@ -235,14 +235,14 @@ describe("UsageService.checkScenarioSetLimit", () => {
         });
 
         // Should NOT query again
-        expect(mockGetExternalSetIdsForOrganization).toHaveBeenCalledTimes(1);
+        expect(mockGetDistinctExternalSetIds).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when a new set is allowed", () => {
       it("adds the new set ID to the cached set", async () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-        mockGetExternalSetIdsForOrganization.mockResolvedValue(
+        mockGetDistinctExternalSetIds.mockResolvedValue(
           new Set(["existing-set"]),
         );
 
@@ -273,14 +273,14 @@ describe("UsageService.checkScenarioSetLimit", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(mockGetExternalSetIdsForOrganization).not.toHaveBeenCalled();
+      expect(mockGetDistinctExternalSetIds).not.toHaveBeenCalled();
     });
   });
 
   describe("when limit is exceeded", () => {
     it("throws ScenarioSetLimitExceededError with correct details", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockGetExternalSetIdsForOrganization.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b", "set-c"]),
       );
 

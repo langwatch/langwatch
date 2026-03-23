@@ -9,14 +9,14 @@ function makeMockClient(): ClickHouseClient {
 }
 
 describe("SimulationClickHouseRepository", () => {
-  describe("getExternalSetIdsForOrganization()", () => {
+  describe("getDistinctExternalSetIds()", () => {
     describe("when called with projectIds", () => {
       it("resolves the client via first projectId, not 'unknown'", async () => {
         const mockClient = makeMockClient();
         const resolver = vi.fn().mockResolvedValue(mockClient);
         const repo = new SimulationClickHouseRepository(resolver);
 
-        await repo.getExternalSetIdsForOrganization({
+        await repo.getDistinctExternalSetIds({
           projectIds: ["project-1", "project-2"],
         });
 
@@ -30,7 +30,7 @@ describe("SimulationClickHouseRepository", () => {
         const resolver = vi.fn();
         const repo = new SimulationClickHouseRepository(resolver);
 
-        const result = await repo.getExternalSetIdsForOrganization({
+        const result = await repo.getDistinctExternalSetIds({
           projectIds: [],
         });
 
