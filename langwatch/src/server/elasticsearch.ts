@@ -5,6 +5,7 @@ import { env } from "../env.mjs";
 import { decrypt } from "../utils/encryption";
 import { prisma } from "./db";
 import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearchCompatibility";
+import { patchForFlattenedFieldTruncation } from "./elasticsearch/patchFlattenedFieldTruncation";
 import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
 
 export type IndexSpec = {
@@ -133,6 +134,11 @@ export const esClient = async (
     patchForOpensearchCompatibility(client);
     patchForQuickwitCompatibility(client);
   }
+
+  // Truncate leaf strings in all write operations to satisfy the 32,766-byte
+  // Lucene term limit for flattened fields. Applied unconditionally — the
+  // truncation is a no-op for values already within limits.
+  patchForFlattenedFieldTruncation(client);
 
   return client;
 };

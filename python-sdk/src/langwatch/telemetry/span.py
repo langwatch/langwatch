@@ -24,7 +24,6 @@ from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
     convert_typed_values,
-    truncate_object_recursively,
 )
 from opentelemetry import trace as trace_api
 from opentelemetry.util.types import Attributes as OtelAttributes
@@ -372,29 +371,13 @@ class LangWatchSpan:
         if self.capture_input and input is not None:
             self.input = input
             attributes[AttributeKey.LangWatchInput] = json.dumps(
-                truncate_object_recursively(
-                    convert_typed_values(deepcopy(input)),
-                    max_string_length=(
-                        self.trace
-                        or langwatch.telemetry.context.get_current_trace(
-                            suppress_warning=True
-                        )
-                    ).max_string_length,
-                ),
+                convert_typed_values(deepcopy(input)),
                 cls=SerializableWithStringFallback,
             )
         if self.capture_output and output is not None:
             self.output = output
             attributes[AttributeKey.LangWatchOutput] = json.dumps(
-                truncate_object_recursively(
-                    convert_typed_values(deepcopy(output)),
-                    max_string_length=(
-                        self.trace
-                        or langwatch.telemetry.context.get_current_trace(
-                            suppress_warning=True
-                        )
-                    ).max_string_length,
-                ),
+                convert_typed_values(deepcopy(output)),
                 cls=SerializableWithStringFallback,
             )
         if error is not None:
@@ -408,15 +391,7 @@ class LangWatchSpan:
         if contexts is not None:
             self.contexts = contexts
             attributes[AttributeKey.LangWatchRAGContexts] = json.dumps(
-                truncate_object_recursively(
-                    rag_contexts(contexts),
-                    max_string_length=(
-                        self.trace
-                        or langwatch.telemetry.context.get_current_trace(
-                            suppress_warning=True
-                        )
-                    ).max_string_length,
-                ),
+                rag_contexts(contexts),
                 cls=SerializableWithStringFallback,
             )
         if model is not None:
