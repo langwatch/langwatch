@@ -1,6 +1,6 @@
-import type { Client as ElasticClient } from "@elastic/elasticsearch";
-import type { TransportRequestOptions } from "@elastic/transport";
 import type {
+  Client as ElasticClient,
+  TransportRequestOptions,
   estypesWithBody as TB,
   estypes as T,
 } from "@elastic/elasticsearch";

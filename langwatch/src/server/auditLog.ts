@@ -3,10 +3,10 @@ import { getClientIp } from "../utils/getClientIp";
 import { prisma } from "./db";
 
 /** Truncate a JSON-serializable value to fit within a Postgres column. */
-function truncateForAuditLog(value: unknown, maxBytes = 4 * 1024): unknown {
+function truncateForAuditLog<T>(value: T, maxBytes = 4 * 1024): T {
   const json = JSON.stringify(value);
   if (json.length <= maxBytes) return value;
-  return JSON.parse(json.slice(0, maxBytes));
+  return JSON.parse(json.slice(0, maxBytes)) as T;
 }
 
 export const auditLog = async ({
