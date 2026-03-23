@@ -13,7 +13,6 @@ import {
   buildJoinClause,
   tableAliases,
   TRACE_ANALYTICS_COLUMNS,
-  TRACE_IDENTITY_COLUMNS,
 } from "./field-mappings";
 import {
   type MetricTranslation,

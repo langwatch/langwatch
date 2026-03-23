@@ -10,7 +10,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { resetParamCounter } from "../filter-translator";
 import {
   buildTimeseriesQuery,
-  buildDataForFilterQuery,
 } from "../aggregation-builder";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import {
