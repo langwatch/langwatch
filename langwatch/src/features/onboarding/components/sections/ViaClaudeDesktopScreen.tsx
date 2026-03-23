@@ -1,16 +1,16 @@
-import { Box, Button, Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { Check, Clipboard, Info } from "lucide-react";
+import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { Info } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { toaster } from "../../../../components/ui/toaster";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import { buildMcpConfig } from "./shared/build-mcp-config";
+import { InlineCopyButton } from "./shared/InlineCopyButton";
+import { TabButton } from "./shared/TabButton";
 
 const MotionVStack = motion(VStack);
-
-const CLOUD_ENDPOINT = "https://app.langwatch.ai";
 
 type AppKey = "claude-desktop" | "chatgpt";
 
@@ -38,123 +38,6 @@ const APPS: {
     ],
   },
 ];
-
-function buildMcpConfig({
-  apiKey,
-  endpoint,
-}: {
-  apiKey: string;
-  endpoint: string | undefined;
-}): object {
-  const env: Record<string, string> = {
-    LANGWATCH_API_KEY: apiKey,
-  };
-  if (endpoint && endpoint !== CLOUD_ENDPOINT) {
-    env.LANGWATCH_ENDPOINT = endpoint;
-  }
-  return {
-    mcpServers: {
-      langwatch: {
-        command: "npx",
-        args: ["-y", "@langwatch/mcp-server"],
-        env,
-      },
-    },
-  };
-}
-
-function InlineCopyButton({
-  text,
-  label,
-}: {
-  text: string;
-  label: string;
-}): React.ReactElement {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      toaster.create({
-        title: "Copied",
-        description: `${label} copied to clipboard`,
-        type: "success",
-        meta: { closable: true },
-      });
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toaster.create({
-        title: "Copy failed",
-        description: "Couldn't copy. Please try again.",
-        type: "error",
-        meta: { closable: true },
-      });
-    }
-  }
-
-  return (
-    <Tooltip
-      content={copied ? "Copied!" : `Copy ${label.toLowerCase()}`}
-      openDelay={0}
-      showArrow
-    >
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={() => void handleCopy()}
-        aria-label={`Copy ${label.toLowerCase()}`}
-        colorPalette={copied ? "green" : "gray"}
-        backdropFilter="blur(8px)"
-        bg="white/50"
-        borderRadius="lg"
-        _hover={{ bg: "white/70" }}
-        flexShrink={0}
-        gap={1.5}
-      >
-        {copied ? <Check size={14} /> : <Clipboard size={14} />}
-      </Button>
-    </Tooltip>
-  );
-}
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}): React.ReactElement {
-  return (
-    <Button
-      size="sm"
-      variant="ghost"
-      onClick={onClick}
-      borderRadius="lg"
-      px={5}
-      py={1.5}
-      fontSize="sm"
-      fontWeight={active ? "semibold" : "medium"}
-      color={active ? "fg.DEFAULT" : "fg.muted"}
-      bg={active ? "white" : "transparent"}
-      backdropFilter={active ? "blur(20px) saturate(1.3)" : undefined}
-      boxShadow={
-        active
-          ? "0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 white"
-          : undefined
-      }
-      border="1px solid"
-      borderColor={active ? "gray.200" : "transparent"}
-      transition="all 0.17s ease"
-      _hover={{ bg: active ? "white" : "gray.50" }}
-      letterSpacing="-0.01em"
-    >
-      {label}
-    </Button>
-  );
-}
 
 export function ViaClaudeDesktopScreen(): React.ReactElement {
   const { project } = useActiveProject();
