@@ -1,12 +1,22 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOrganizationPermission } from "../rbac";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
 import { ScimTokenService } from "~/server/scim/scim-token.service";
 
+const enterpriseScimProcedure = protectedProcedure
+  .input(z.object({ organizationId: z.string() }))
+  .use(checkOrganizationPermission("organization:manage"))
+  .use(async ({ ctx, input, next }) => {
+    await assertEnterprisePlan({
+      organizationId: input.organizationId,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
+    });
+    return next({ ctx });
+  });
+
 export const scimTokenRouter = createTRPCRouter({
-  list: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+  list: enterpriseScimProcedure
     .query(async ({ ctx, input }) => {
       const tokens = await ctx.prisma.scimToken.findMany({
         where: { organizationId: input.organizationId },
@@ -21,14 +31,12 @@ export const scimTokenRouter = createTRPCRouter({
       return tokens;
     }),
 
-  generate: protectedProcedure
+  generate: enterpriseScimProcedure
     .input(
       z.object({
-        organizationId: z.string(),
         description: z.string().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const tokenService = ScimTokenService.create(ctx.prisma);
       return tokenService.generate({
@@ -37,14 +45,12 @@ export const scimTokenRouter = createTRPCRouter({
       });
     }),
 
-  revoke: protectedProcedure
+  revoke: enterpriseScimProcedure
     .input(
       z.object({
-        organizationId: z.string(),
         tokenId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.scimToken.delete({
         where: {
