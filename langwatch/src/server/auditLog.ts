@@ -1,7 +1,13 @@
 import type { NextApiRequest } from "next";
 import { getClientIp } from "../utils/getClientIp";
-import { safeTruncate } from "../utils/truncate";
 import { prisma } from "./db";
+
+/** Truncate a JSON-serializable value to fit within a Postgres column. */
+function truncateForAuditLog(value: unknown, maxBytes = 4 * 1024): unknown {
+  const json = JSON.stringify(value);
+  if (json.length <= maxBytes) return value;
+  return JSON.parse(json.slice(0, maxBytes));
+}
 
 export const auditLog = async ({
   userId,
@@ -32,7 +38,7 @@ export const auditLog = async ({
       projectId,
       action,
       args: args
-        ? safeTruncate(JSON.parse(JSON.stringify(args)), 4 * 1024)
+        ? truncateForAuditLog(JSON.parse(JSON.stringify(args)))
         : undefined,
       error: error?.toString(),
       ipAddress,

@@ -201,4 +201,28 @@ describe("patchForFlattenedFieldTruncation", () => {
       );
     });
   });
+
+  describe("when applied multiple times to the same client", () => {
+    it("only wraps methods once (idempotent)", async () => {
+      const client = new ElasticClient({ node: "http://localhost:19200" });
+      let callCount = 0;
+
+      // Replace index with a counter
+      (client as any).index = async () => {
+        callCount++;
+      };
+
+      // Apply patch twice
+      patchForFlattenedFieldTruncation(client);
+      patchForFlattenedFieldTruncation(client);
+
+      await client.index({
+        index: "test-index",
+        body: { value: SMALL },
+      });
+
+      // Should only be called once — not double-wrapped
+      expect(callCount).toBe(1);
+    });
+  });
 });
