@@ -165,15 +165,18 @@ export class ClickHouseTraceService {
           );
 
           // Map to legacy Trace format and apply protections
+          // Iterate over the caller's traceIds (not the Map) to preserve
+          // the ordering the caller requested.
           const traces: Trace[] = [];
-          for (const [_traceId, { summary, spans }] of tracesWithSpans) {
-            const mappedSpans = mapNormalizedSpansToSpans(spans);
+          for (const traceId of traceIds) {
+            const data = tracesWithSpans.get(traceId);
+            if (!data) continue;
+            const mappedSpans = mapNormalizedSpansToSpans(data.spans);
             const trace = mapTraceSummaryToTrace(
-              summary,
+              data.summary,
               mappedSpans,
               projectId,
             );
-            // Apply redaction protections
             traces.push(applyTraceProtections(trace, protections));
           }
 
@@ -264,7 +267,7 @@ export class ClickHouseTraceService {
             return [];
           }
 
-          // Fetch full traces with spans
+          // Fetch full traces with spans (order preserved by getTracesWithSpans)
           return this.getTracesWithSpans(projectId, traceIds, protections);
         } catch (error) {
           this.logger.error(
@@ -355,7 +358,7 @@ export class ClickHouseTraceService {
             return [];
           }
 
-          // Fetch full traces with spans
+          // Fetch full traces with spans (order preserved by getTracesWithSpans)
           return this.getTracesWithSpans(projectId, traceIds, protections);
         } catch (error) {
           this.logger.error(

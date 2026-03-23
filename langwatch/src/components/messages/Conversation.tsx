@@ -80,29 +80,32 @@ export function Conversation({
           <>
             {threadId ? (
               threadTraces.data ? (
-                threadTraces.data
-                  .slice(Math.max(0, threadTraces.data.length - 50))
-                  .map((trace, index) => (
-                    <TraceMessages
-                      key={trace.trace_id}
-                      trace={trace}
-                      index={
-                        threadTraces.data.length === 1
-                          ? "only"
-                          : index === 0
-                            ? "first"
-                            : index === threadTraces.data.length - 1
-                              ? "last"
-                              : "other"
-                      }
-                      ref={
-                        trace.trace_id == (modalTraceId || traceId)
-                          ? currentTraceRef
-                          : undefined
-                      }
-                      highlighted={trace.trace_id == modalTraceId}
-                    />
-                  ))
+                (() => {
+                const sliced = threadTraces.data.slice(
+                  Math.max(0, threadTraces.data.length - 50),
+                );
+                return sliced.map((trace, index) => (
+                  <TraceMessages
+                    key={trace.trace_id}
+                    trace={trace}
+                    index={
+                      sliced.length === 1
+                        ? "only"
+                        : index === 0
+                          ? "first"
+                          : index === sliced.length - 1
+                            ? "last"
+                            : "other"
+                    }
+                    ref={
+                      trace.trace_id == (modalTraceId || traceId)
+                        ? currentTraceRef
+                        : undefined
+                    }
+                    highlighted={trace.trace_id == modalTraceId}
+                  />
+                ));
+              })()
               ) : threadTraces.error && !isPublicRoute ? (
                 <Box maxWidth="800px" paddingTop={8} paddingBottom={4}>
                   <Text color="red.500">
