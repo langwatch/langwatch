@@ -58,7 +58,6 @@ export const useCreateProductScreens = ({
         subHeading:
           "Add LangWatch to any MCP-compatible app in under a minute",
         widthVariant: "full",
-        compressedHeader: true,
         component: ViaClaudeDesktopScreen,
       },
       [ProductScreenIndex.MANUALLY]: {

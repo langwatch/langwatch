@@ -323,14 +323,23 @@ function SkillRow({
             type="button"
             aria-label={`Copy ${skill.slashCommand}`}
             onClick={() => {
-              void navigator.clipboard.writeText(skill.slashCommand).then(() => {
-                toaster.create({
-                  title: "Copied",
-                  description: `${skill.slashCommand} copied to clipboard`,
-                  type: "success",
-                  meta: { closable: true },
+              void navigator.clipboard
+                .writeText(skill.slashCommand)
+                .then(() => {
+                  toaster.create({
+                    title: "Copied",
+                    description: `${skill.slashCommand} copied to clipboard`,
+                    type: "success",
+                    meta: { closable: true },
+                  });
+                })
+                .catch(() => {
+                  toaster.create({
+                    title: "Failed to copy",
+                    type: "error",
+                    meta: { closable: true },
+                  });
                 });
-              });
             }}
           >
             <Text
@@ -484,14 +493,23 @@ function McpTab({
               transition="all 0.15s ease"
               _hover={{ borderColor: "rgba(237,137,38,0.25)", bg: "white" }}
               onClick={() => {
-                void navigator.clipboard.writeText(ep.path).then(() => {
-                  toaster.create({
-                    title: "Copied",
-                    description: `${ep.editor} config path copied`,
-                    type: "success",
-                    meta: { closable: true },
+                void navigator.clipboard
+                  .writeText(ep.path)
+                  .then(() => {
+                    toaster.create({
+                      title: "Copied",
+                      description: `${ep.editor} config path copied`,
+                      type: "success",
+                      meta: { closable: true },
+                    });
+                  })
+                  .catch(() => {
+                    toaster.create({
+                      title: "Failed to copy",
+                      type: "error",
+                      meta: { closable: true },
+                    });
                   });
-                });
               }}
             >
               <button type="button" aria-label={`Copy ${ep.editor} config path`}>
