@@ -193,7 +193,7 @@ model Organization {
 model ScimToken {
     id             String       @id @default(nanoid())
     organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
+    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
     hashedToken    String
     description    String?
     createdAt      DateTime     @default(now())

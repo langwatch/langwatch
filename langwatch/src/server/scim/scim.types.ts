@@ -36,7 +36,7 @@ export interface ScimError {
 export interface ScimPatchOperation {
   op: "replace" | "add" | "remove";
   path?: string;
-  value?: Record<string, unknown>;
+  value?: unknown;
 }
 
 export interface ScimPatchRequest {

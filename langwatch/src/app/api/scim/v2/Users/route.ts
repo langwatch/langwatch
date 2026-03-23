@@ -5,7 +5,7 @@ import {
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
 import { ScimService } from "~/server/scim/scim.service";
-import type { ScimError } from "~/server/scim/scim.types";
+import type { ScimCreateUserRequest, ScimError } from "~/server/scim/scim.types";
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
@@ -33,10 +33,23 @@ export async function POST(request: NextRequest) {
   if (isAuthError(auth)) return auth;
 
   const scimService = ScimService.create(prisma);
-  const body = await request.json();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "400",
+        detail: "Invalid JSON in request body",
+      },
+      { status: 400 }
+    );
+  }
 
   const result = await scimService.createUser({
-    request: body,
+    request: body as ScimCreateUserRequest,
     organizationId: auth.organizationId,
   });
 

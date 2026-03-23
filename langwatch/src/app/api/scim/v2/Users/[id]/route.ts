@@ -5,7 +5,7 @@ import {
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
 import { ScimService } from "~/server/scim/scim.service";
-import type { ScimError } from "~/server/scim/scim.types";
+import type { ScimCreateUserRequest, ScimError, ScimPatchRequest } from "~/server/scim/scim.types";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -34,12 +34,25 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params;
   const scimService = ScimService.create(prisma);
-  const body = await request.json();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "400",
+        detail: "Invalid JSON in request body",
+      },
+      { status: 400 }
+    );
+  }
 
   const result = await scimService.replaceUser({
     id,
     organizationId: auth.organizationId,
-    request: body,
+    request: body as ScimCreateUserRequest,
   });
 
   if (isScimError(result)) {
@@ -55,12 +68,25 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params;
   const scimService = ScimService.create(prisma);
-  const body = await request.json();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "400",
+        detail: "Invalid JSON in request body",
+      },
+      { status: 400 }
+    );
+  }
 
   const result = await scimService.updateUser({
     id,
     organizationId: auth.organizationId,
-    patchRequest: body,
+    patchRequest: body as ScimPatchRequest,
   });
 
   if (isScimError(result)) {
