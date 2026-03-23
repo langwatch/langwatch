@@ -5,7 +5,8 @@ import {
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
 import { ScimService } from "~/server/scim/scim.service";
-import type { ScimCreateUserRequest, ScimError } from "~/server/scim/scim.types";
+import { scimCreateUserRequestSchema } from "~/server/scim/scim.types";
+import type { ScimError } from "~/server/scim/scim.types";
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
@@ -48,8 +49,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const parsed = scimCreateUserRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "400",
+        detail: parsed.error.message,
+      },
+      { status: 400 }
+    );
+  }
+
   const result = await scimService.createUser({
-    request: body as ScimCreateUserRequest,
+    request: parsed.data,
     organizationId: auth.organizationId,
   });
 
