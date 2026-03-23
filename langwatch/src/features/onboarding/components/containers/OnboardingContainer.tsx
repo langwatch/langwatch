@@ -209,51 +209,27 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         px={isFullWidth ? { base: 5, md: 10 } : { base: 4, md: 0 }}
         {...(isFullWidth ? { fluid: true } : {})}
       >
-        {isFullWidth ? (
-          <MotionBox
-            bg="white"
-            borderRadius="16px"
-            border="1px solid"
-            borderColor="rgba(0,0,0,0.06)"
-            boxShadow="0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.02)"
-            px={{ base: 5, md: 8 }}
-            py={{ base: 6, md: 8 }}
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{
-              duration: 0.5,
-              ease: [0.16, 1, 0.3, 1],
-              delay: 0.1,
-            }}
-          >
-            <VStack gap={8} align="stretch">
-              {titleBlock}
-              {loading ? <SpookyScarySkeleton loading /> : children}
-            </VStack>
-          </MotionBox>
-        ) : (
-          <MotionBox
-            bg="white"
-            borderRadius="16px"
-            border="1px solid"
-            borderColor="rgba(0,0,0,0.06)"
-            boxShadow="0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.02)"
-            px={{ base: 5, md: 7 }}
-            py={{ base: 6, md: 8 }}
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{
-              duration: 0.5,
-              ease: [0.16, 1, 0.3, 1],
-              delay: 0.1,
-            }}
-          >
-            <VStack gap={6} align="stretch" w="full">
-              {titleBlock}
-              {loading ? <SpookyScarySkeleton loading /> : children}
-            </VStack>
-          </MotionBox>
-        )}
+        <MotionBox
+          bg="white"
+          borderRadius="16px"
+          border="1px solid"
+          borderColor="rgba(0,0,0,0.06)"
+          boxShadow="0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.02)"
+          px={{ base: 5, md: isFullWidth ? 8 : 7 }}
+          py={{ base: 6, md: 8 }}
+          initial={{ opacity: 0, y: 16, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+            delay: 0.1,
+          }}
+        >
+          <VStack gap={isFullWidth ? 8 : 6} align="stretch" w="full">
+            {titleBlock}
+            {loading ? <SpookyScarySkeleton loading /> : children}
+          </VStack>
+        </MotionBox>
       </Container>
     </Box>
   );
