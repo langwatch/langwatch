@@ -322,6 +322,13 @@ export class OtlpSpanPiiRedactionService {
     if (texts.length === 0) return;
 
     const results = await this.deps.batchClearPII(texts, options);
+
+    if (results.length !== refs.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${refs.length} inputs`,
+      );
+    }
+
     for (let i = 0; i < refs.length; i++) {
       const redacted = results[i];
       if (redacted != null) {
@@ -388,6 +395,13 @@ export class OtlpSpanPiiRedactionService {
     if (texts.length === 0) return;
 
     const results = await this.deps.batchClearPII(texts, options);
+
+    if (results.length !== refs.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${refs.length} inputs`,
+      );
+    }
+
     for (let i = 0; i < refs.length; i++) {
       const redacted = results[i];
       if (redacted != null) {
