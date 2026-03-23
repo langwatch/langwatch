@@ -88,7 +88,8 @@ export interface SimulationRepository {
    * Returns distinct external (non-internal) scenario set IDs across the given projects.
    * Used for cross-org counting of scenario sets for limit enforcement.
    */
-  getDistinctExternalSetIds(params: {
+  getExternalSetIdsForOrganization(params: {
+    organizationId: string;
     projectIds: string[];
   }): Promise<Set<string>>;
 }
@@ -138,7 +139,7 @@ export class NullSimulationRepository implements SimulationRepository {
     return [];
   }
 
-  async getDistinctExternalSetIds(): Promise<Set<string>> {
+  async getExternalSetIdsForOrganization(): Promise<Set<string>> {
     return new Set();
   }
 }
