@@ -58,7 +58,7 @@ const createMockPrisma = () => ({
     count: vi.fn().mockResolvedValue(0),
   },
   experiment: {
-    findMany: vi.fn().mockResolvedValue([]),
+    count: vi.fn().mockResolvedValue(0),
   },
   batchEvaluation: {
     count: vi.fn().mockResolvedValue(0),
@@ -618,16 +618,12 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getExperimentCount", () => {
-    it("fetches project IDs then counts experiments with projectId filter", async () => {
+    it("counts experiments excluding real_time via NOT filter on workbenchState", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },
         { id: "proj-2" },
       ]);
-      mockPrisma.experiment.findMany.mockResolvedValue([
-        { workbenchState: { task: "dataset" } },
-        { workbenchState: { task: "dataset" } },
-        { workbenchState: { task: "dataset" } },
-      ]);
+      mockPrisma.experiment.count.mockResolvedValue(3);
 
       const result = await repository.getExperimentCount(organizationId);
 
@@ -635,11 +631,16 @@ describe("LicenseEnforcementRepository", () => {
         where: { team: { organizationId } },
         select: { id: true },
       });
-      expect(mockPrisma.experiment.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.experiment.count).toHaveBeenCalledWith({
         where: {
           projectId: { in: ["proj-1", "proj-2"] },
+          NOT: {
+            workbenchState: {
+              path: ["task"],
+              equals: "real_time",
+            },
+          },
         },
-        select: { workbenchState: true },
       });
       expect(result).toBe(3);
     });
@@ -649,66 +650,7 @@ describe("LicenseEnforcementRepository", () => {
 
       const result = await repository.getExperimentCount(organizationId);
 
-      expect(mockPrisma.experiment.findMany).not.toHaveBeenCalled();
-      expect(result).toBe(0);
-    });
-
-    it("excludes experiments where workbenchState.task is real_time", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
-      mockPrisma.experiment.findMany.mockResolvedValue([
-        { workbenchState: { task: "dataset" } },
-        { workbenchState: { task: "real_time" } },
-        { workbenchState: { task: "dataset" } },
-        { workbenchState: { task: "real_time" } },
-      ]);
-
-      const result = await repository.getExperimentCount(organizationId);
-
-      expect(result).toBe(2);
-    });
-
-    it("counts experiments with null workbenchState", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
-      mockPrisma.experiment.findMany.mockResolvedValue([
-        { workbenchState: null },
-        { workbenchState: { task: "dataset" } },
-      ]);
-
-      const result = await repository.getExperimentCount(organizationId);
-
-      expect(result).toBe(2);
-    });
-
-    it("counts experiments with non-object workbenchState", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
-      mockPrisma.experiment.findMany.mockResolvedValue([
-        { workbenchState: "some string" },
-        { workbenchState: { task: "dataset" } },
-      ]);
-
-      const result = await repository.getExperimentCount(organizationId);
-
-      expect(result).toBe(2);
-    });
-
-    it("returns zero when all experiments are real_time", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
-      mockPrisma.experiment.findMany.mockResolvedValue([
-        { workbenchState: { task: "real_time" } },
-        { workbenchState: { task: "real_time" } },
-      ]);
-
-      const result = await repository.getExperimentCount(organizationId);
-
-      expect(result).toBe(0);
-    });
-
-    it("returns zero when no experiments exist", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
-      mockPrisma.experiment.findMany.mockResolvedValue([]);
-
-      const result = await repository.getExperimentCount(organizationId);
-
+      expect(mockPrisma.experiment.count).not.toHaveBeenCalled();
       expect(result).toBe(0);
     });
   });
