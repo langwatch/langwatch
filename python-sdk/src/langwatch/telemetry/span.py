@@ -24,6 +24,7 @@ from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
     convert_typed_values,
+    truncate_object_recursively,
 )
 from opentelemetry import trace as trace_api
 from opentelemetry.util.types import Attributes as OtelAttributes
@@ -370,14 +371,32 @@ class LangWatchSpan:
             attributes[AttributeKey.LangWatchSpanType] = str(type)
         if self.capture_input and input is not None:
             self.input = input
+            max_str_len = (
+                self.trace
+                or langwatch.telemetry.context.get_current_trace(
+                    suppress_warning=True
+                )
+            ).max_string_length
             attributes[AttributeKey.LangWatchInput] = json.dumps(
-                convert_typed_values(deepcopy(input)),
+                truncate_object_recursively(
+                    convert_typed_values(deepcopy(input)),
+                    max_string_length=max_str_len,
+                ),
                 cls=SerializableWithStringFallback,
             )
         if self.capture_output and output is not None:
             self.output = output
+            max_str_len = (
+                self.trace
+                or langwatch.telemetry.context.get_current_trace(
+                    suppress_warning=True
+                )
+            ).max_string_length
             attributes[AttributeKey.LangWatchOutput] = json.dumps(
-                convert_typed_values(deepcopy(output)),
+                truncate_object_recursively(
+                    convert_typed_values(deepcopy(output)),
+                    max_string_length=max_str_len,
+                ),
                 cls=SerializableWithStringFallback,
             )
         if error is not None:
@@ -390,8 +409,17 @@ class LangWatchSpan:
             )
         if contexts is not None:
             self.contexts = contexts
+            max_str_len = (
+                self.trace
+                or langwatch.telemetry.context.get_current_trace(
+                    suppress_warning=True
+                )
+            ).max_string_length
             attributes[AttributeKey.LangWatchRAGContexts] = json.dumps(
-                rag_contexts(contexts),
+                truncate_object_recursively(
+                    rag_contexts(contexts),
+                    max_string_length=max_str_len,
+                ),
                 cls=SerializableWithStringFallback,
             )
         if model is not None:

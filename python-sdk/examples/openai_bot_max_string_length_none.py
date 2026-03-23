@@ -10,7 +10,7 @@ client = OpenAI()
 
 
 @cl.on_message
-@langwatch.trace(max_string_length=None)  # default is 5000
+@langwatch.trace(max_string_length=None)  # default is None (no client-side truncation)
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
     langwatch.get_current_trace().update(

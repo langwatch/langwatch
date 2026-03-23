@@ -79,7 +79,7 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
-        max_string_length: Optional[int] = 5000,
+        max_string_length: Optional[int] = None,
         # Root span parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -721,7 +721,7 @@ def trace(
     expected_output: Optional[str] = None,
     api_key: Optional[str] = None,
     disable_sending: bool = False,
-    max_string_length: Optional[int] = 5000,
+    max_string_length: Optional[int] = None,
     # Root span parameters
     span_id: Optional[str] = None,
     capture_input: bool = True,
