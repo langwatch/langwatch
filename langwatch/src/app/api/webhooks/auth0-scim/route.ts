@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const domain = email.split("@")[1];
     if (!domain) continue;
 
-    const org = await prisma.organization.findFirst({
+    const org = await prisma.organization.findUnique({
       where: { ssoDomain: domain },
     });
     if (!org) continue;

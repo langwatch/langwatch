@@ -169,7 +169,7 @@ model Organization {
     s3Bucket               String?
     useCustomS3            Boolean              @default(false)
     sentPlanLimitAlert     DateTime?
-    ssoDomain              String?
+    ssoDomain              String?              @unique
     ssoProvider            String?
 
     promoCode     String?
@@ -186,7 +186,6 @@ model Organization {
     licenseExpiresAt       DateTime?
     licenseLastValidatedAt DateTime?
 
-    @@index([ssoDomain])
     @@index([ssoProvider])
 }
 
