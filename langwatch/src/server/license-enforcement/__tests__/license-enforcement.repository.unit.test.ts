@@ -618,7 +618,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getExperimentCount", () => {
-    it("counts experiments excluding real_time via NOT filter on workbenchState", async () => {
+    it("excludes real_time experiments from count", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },
         { id: "proj-2" },
