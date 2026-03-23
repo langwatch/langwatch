@@ -133,17 +133,17 @@ describe.skipIf(!hasTestcontainers)(
       // instances causes competing global queue consumers where one skips
       // the other's jobs as "unknown pipeline".
       const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(clickHouseClient),
+        new EventRepositoryClickHouse(async () => clickHouseClient),
       );
       const eventSourcing = EventSourcing.createWithStores({
         eventStore,
-        clickhouse: clickHouseClient,
+        clickhouse: async () => clickHouseClient,
         redis: redisConnection,
       });
 
       // --- Evaluation pipeline ---
       const evalRunStore = new EvaluationRunStore(
-        new EvaluationRunService(new EvaluationRunClickHouseRepository(clickHouseClient)).repository,
+        new EvaluationRunService(new EvaluationRunClickHouseRepository(async () => clickHouseClient)).repository,
       );
       const evalPipelineName = `eval_processing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const evalPipelineDef = definePipeline<EvaluationProcessingEvent>()
@@ -164,10 +164,10 @@ describe.skipIf(!hasTestcontainers)(
       // --- Trace pipeline (with customEvaluationSync reactor wired to eval pipeline) ---
 
       const spanAppendStore = new SpanAppendStore(
-        new SpanStorageService(new SpanStorageClickHouseRepository(clickHouseClient)).repository,
+        new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository,
       );
       const traceSummaryStore = new TraceSummaryStore(
-        new TraceSummaryService(new TraceSummaryClickHouseRepository(clickHouseClient)).repository,
+        new TraceSummaryService(new TraceSummaryClickHouseRepository(async () => clickHouseClient)).repository,
       );
 
       // Create the reactor with zero delay for faster tests

@@ -70,6 +70,17 @@ export const textMessageEndCommandDataSchema = z.object({
 });
 export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
 
+export const updateRunMetricsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  traceId: z.string(),
+  totalCost: z.number(),
+  roleCosts: z.record(z.string(), z.number()),
+  roleLatencies: z.record(z.string(), z.number()),
+  occurredAt: z.number(),
+});
+export type UpdateRunMetricsCommandData = z.infer<typeof updateRunMetricsCommandDataSchema>;
+
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),

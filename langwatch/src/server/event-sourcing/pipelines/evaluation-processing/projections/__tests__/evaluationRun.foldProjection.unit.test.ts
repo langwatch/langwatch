@@ -196,6 +196,76 @@ describe("evaluationRun foldProjection", () => {
         expect(afterReported.score).toBeNull();
         expect(afterReported.passed).toBeNull();
       });
+
+      it("preserves inputs when present", () => {
+        const projection = createEvaluationRunFoldProjection({
+          store: createStubStore(),
+        });
+        const state = createInitState();
+        const inputs = { input: "hello world", output: "response text" };
+        const afterReported = projection.apply(
+          state,
+          createReportedEvent({
+            data: {
+              evaluationId: "eval-1",
+              evaluatorId: "evaluator-1",
+              evaluatorType: "custom",
+              evaluatorName: "toxicity",
+              traceId: "trace-1",
+              isGuardrail: false,
+              status: "processed",
+              score: 0.9,
+              passed: true,
+              label: null,
+              details: null,
+              error: null,
+              inputs,
+            },
+          } as Partial<EvaluationReportedEvent>),
+        );
+
+        expect(afterReported.inputs).toEqual(inputs);
+      });
+
+      it("defaults inputs to null when not provided", () => {
+        const projection = createEvaluationRunFoldProjection({
+          store: createStubStore(),
+        });
+        const state = createInitState();
+        const afterReported = projection.apply(state, createReportedEvent());
+
+        expect(afterReported.inputs).toBeNull();
+      });
+    });
+
+    describe("when EvaluationCompletedEvent has inputs", () => {
+      it("preserves inputs in state", () => {
+        const projection = createEvaluationRunFoldProjection({
+          store: createStubStore(),
+        });
+        const state = createInitState();
+        const afterStarted = projection.apply(state, createStartedEvent());
+        const inputs = { input: "test input", contexts: ["ctx1"] };
+        const afterCompleted = projection.apply(
+          afterStarted,
+          createCompletedEvent({
+            data: {
+              evaluationId: "eval-1",
+              status: "processed",
+              score: 0.8,
+              passed: true,
+              label: null,
+              details: null,
+              error: null,
+              errorDetails: null,
+              costId: null,
+              inputs,
+            },
+          } as Partial<EvaluationCompletedEvent>),
+        );
+
+        expect(afterCompleted.inputs).toEqual(inputs);
+      });
     });
   });
 });

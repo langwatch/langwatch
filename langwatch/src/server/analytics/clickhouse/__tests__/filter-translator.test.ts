@@ -102,10 +102,11 @@ describe("filter-translator", () => {
           expect(result.requiredJoins).toHaveLength(0);
         });
 
-        it("translates application origin as empty-or-null check", () => {
+        it("translates application origin as empty-or-null-or-literal check", () => {
           const result = translateFilter("traces.origin", ["application"]);
           expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] = ''");
           expect(result.whereClause).toContain("IS NULL");
+          expect(result.whereClause).toContain("= 'application'");
           expect(result.params).toEqual({});
         });
 

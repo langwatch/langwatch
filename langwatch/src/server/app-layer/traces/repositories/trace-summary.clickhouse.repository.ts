@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
@@ -49,10 +49,13 @@ interface ClickHouseSummaryRecord {
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
+  ScenarioRoleCosts: Record<string, number>;
+  ScenarioRoleLatencies: Record<string, number>;
+  ScenarioRoleSpans: Record<string, string>;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
     EventUtils.validateTenantId(
@@ -67,6 +70,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     );
 
     try {
+      const client = await this.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -74,7 +78,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -102,7 +106,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId,
@@ -134,7 +139,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
-            HasAnnotation
+            HasAnnotation,
+            ScenarioRoleCosts,
+            ScenarioRoleLatencies,
+            ScenarioRoleSpans
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -191,6 +199,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       hasAnnotation:
         record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
       attributes: record.Attributes ?? {},
+      scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
+      scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
+      scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -235,6 +246,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       SubTopicId: data.subTopicId,
       HasAnnotation:
         data.hasAnnotation != null ? (data.hasAnnotation ? 1 : 0) : null,
+      ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
+      ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
+      ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
     };
   }
 }

@@ -120,17 +120,11 @@ function AnnotationScorePage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Annotation Scoring</Heading>
           <Spacer />
-          <Tooltip
-            content="You need annotations view permissions to add new scores."
-            disabled={hasPermission("annotations:manage")}
+          <PageLayout.HeaderButton
+            onClick={() => openDrawer("addOrEditAnnotationScore")}
           >
-            <PageLayout.HeaderButton
-              onClick={() => openDrawer("addOrEditAnnotationScore")}
-              disabled={!hasPermission("annotations:manage")}
-            >
-              <Plus /> Add new score metric
-            </PageLayout.HeaderButton>
-          </Tooltip>
+            <Plus /> Add new score metric
+          </PageLayout.HeaderButton>
         </HStack>
         {getAllAnnotationScores.data &&
         getAllAnnotationScores.data.length == 0 ? (

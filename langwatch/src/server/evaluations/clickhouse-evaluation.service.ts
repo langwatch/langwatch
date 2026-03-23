@@ -1,7 +1,6 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
@@ -20,7 +19,6 @@ import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClic
  * ReplacingMergeTree versions.
  */
 export class ClickHouseEvaluationService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger(
     "langwatch:evaluations:clickhouse-service",
   );
@@ -28,9 +26,7 @@ export class ClickHouseEvaluationService {
     "langwatch.evaluations.clickhouse-service",
   );
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseClient = getClickHouseClient();
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   /**
    * Static factory method for creating ClickHouseEvaluationService with default dependencies.
@@ -49,7 +45,8 @@ export class ClickHouseEvaluationService {
       "ClickHouseEvaluationService.isClickHouseEnabled",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return false;
         }
 
@@ -88,7 +85,12 @@ export class ClickHouseEvaluationService {
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -98,7 +100,7 @@ export class ClickHouseEvaluationService {
         );
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT *
               FROM evaluation_runs
@@ -161,7 +163,12 @@ export class ClickHouseEvaluationService {
       },
       async () => {
         const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!isEnabled) {
+          return null;
+        }
+
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -175,7 +182,7 @@ export class ClickHouseEvaluationService {
         );
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT *
               FROM evaluation_runs

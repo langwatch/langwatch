@@ -22,6 +22,8 @@ import { enforceLicenseLimit } from "../../license-enforcement";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -72,6 +74,20 @@ export const workflowRouter = createTRPCRouter({
           },
         });
       }
+
+      void ctx.prisma.workflow
+        .count({
+          where: { projectId: input.projectId, archivedAt: null },
+        })
+        .then((count) => {
+          fireWorkflowCreatedNurturing({
+            userId: ctx.session.user.id,
+            workflowCount: count,
+            workflowId: workflow.id,
+            projectId: input.projectId,
+          });
+        })
+        .catch(captureException);
 
       return { workflow, version };
     }),

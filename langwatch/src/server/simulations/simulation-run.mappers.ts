@@ -31,6 +31,9 @@ export interface ClickHouseSimulationRunRow {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: string | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
   CreatedAt: string;
   UpdatedAt: string;
   FinishedAt: string | null;
@@ -52,6 +55,10 @@ export function mapStatus(status: string): ScenarioRunStatus {
       return ScenarioRunStatus.IN_PROGRESS;
     case "PENDING":
       return ScenarioRunStatus.PENDING;
+    case "QUEUED":
+      return ScenarioRunStatus.QUEUED;
+    case "STALLED":
+      return ScenarioRunStatus.STALLED;
     default:
       return ScenarioRunStatus.IN_PROGRESS;
   }
@@ -148,5 +155,8 @@ export function mapClickHouseRowToScenarioRunData(
     timestamp: updatedAt,
     durationInMs:
       durationMs ?? (finishedAt != null ? finishedAt - createdAt : updatedAt - createdAt),
+    totalCost: row.TotalCost ?? undefined,
+    roleCosts: row.RoleCosts && Object.keys(row.RoleCosts).length > 0 ? row.RoleCosts : undefined,
+    roleLatencies: row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0 ? row.RoleLatencies : undefined,
   };
 }

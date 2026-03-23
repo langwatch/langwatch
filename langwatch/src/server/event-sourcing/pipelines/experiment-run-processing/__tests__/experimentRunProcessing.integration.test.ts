@@ -67,18 +67,18 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
   }
 
   const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(clickHouseClient),
+    new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
   });
 
-  const repository = new ExperimentRunStateRepositoryClickHouse(clickHouseClient);
+  const repository = new ExperimentRunStateRepositoryClickHouse(async () => clickHouseClient);
   const experimentRunStateFoldStore = createExperimentRunStateFoldStore(repository);
-  const experimentRunItemAppendStore = createExperimentRunItemAppendStore(clickHouseClient);
+  const experimentRunItemAppendStore = createExperimentRunItemAppendStore(async () => clickHouseClient);
 
   const pipelineDefinition = definePipeline<ExperimentRunProcessingEvent>()
     .withName(pipelineName)

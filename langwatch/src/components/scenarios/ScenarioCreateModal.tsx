@@ -4,7 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
@@ -105,7 +105,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         const generatedData = await generateScenarioWithAI(description, project.id);
         openEditorWithData(generatedData);
       } catch (error) {
-        if (isHandledByGlobalLicenseHandler(error)) return;
+        if (isHandledByGlobalHandler(error)) return;
         throw error;
       }
     },

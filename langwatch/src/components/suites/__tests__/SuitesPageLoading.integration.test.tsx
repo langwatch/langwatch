@@ -40,6 +40,12 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
   },
 }));
@@ -66,6 +72,10 @@ vi.mock("next/router", () => ({
     push: vi.fn(),
     isReady: true,
   }),
+}));
+
+vi.mock("~/hooks/useSimulationUpdateListener", () => ({
+  useSimulationUpdateListener: () => {},
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({

@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
@@ -159,6 +160,7 @@ export const AddAnnotationQueueDrawer = ({
           reset();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Error creating annotation score",
             description: error.message,

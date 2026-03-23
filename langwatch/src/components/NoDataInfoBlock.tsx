@@ -26,12 +26,12 @@ export const NoDataInfoBlock = ({
           <EmptyState.Title>{title}</EmptyState.Title>
           <EmptyState.Description>
             <Center>
-              <VStack>
+              <VStack align="center">
                 <Box>{description}</Box>
                 <Box>
                   {docsInfo}
-                  {children}
                 </Box>
+                {children}
               </VStack>
             </Center>
           </EmptyState.Description>

@@ -8,7 +8,12 @@
 import type { AggregationTypes } from "../types";
 import type { SeriesInputType } from "../registry";
 import type { FilterField } from "../../filters/types";
-import { type CHTable, buildJoinClause, tableAliases } from "./field-mappings";
+import {
+  type CHTable,
+  buildJoinClause,
+  tableAliases,
+  TRACE_ANALYTICS_COLUMNS,
+} from "./field-mappings";
 import {
   type MetricTranslation,
   translateMetric,
@@ -31,10 +36,20 @@ const logger = createLogger("langwatch:analytics:aggregation-builder");
  *
  * The TenantId filter is pushed into the subquery so ClickHouse can prune
  * data early. All callers already bind `{tenantId:String}` in their params.
+ *
+ * @param alias - Table alias (e.g., "ts")
+ * @param columns - Optional explicit column list. When omitted, selects all
+ *   analytics columns (still excludes ComputedInput/ComputedOutput).
  */
-function dedupedTraceSummaries(alias: string): string {
+function dedupedTraceSummaries(
+  alias: string,
+  columns?: readonly string[],
+): string {
+  const columnList = columns
+    ? Array.from(columns).join(", ")
+    : TRACE_ANALYTICS_COLUMNS.join(", ");
   return `(
-    SELECT * FROM trace_summaries
+    SELECT ${columnList} FROM trace_summaries
     WHERE TenantId = {tenantId:String}
     ORDER BY TraceId, UpdatedAt DESC
     LIMIT 1 BY TenantId, TraceId

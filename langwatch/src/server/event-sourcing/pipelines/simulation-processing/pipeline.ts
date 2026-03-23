@@ -8,6 +8,7 @@ import { QueueRunCommand } from "./commands/queueRun.command";
 import { StartRunCommand } from "./commands/startRun.command";
 import { TextMessageStartCommand } from "./commands/textMessageStart.command";
 import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
+import { UpdateRunMetricsCommand } from "./commands/updateRunMetrics.command";
 import { createSimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
@@ -15,6 +16,7 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
 }
 
 /**
@@ -43,6 +45,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
     .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
+    .withReactor("simulationRunState", "traceMetricsSync", deps.traceMetricsSyncReactor)
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
@@ -50,5 +53,6 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
+    .withCommand("updateRunMetrics", UpdateRunMetricsCommand)
     .build();
 }

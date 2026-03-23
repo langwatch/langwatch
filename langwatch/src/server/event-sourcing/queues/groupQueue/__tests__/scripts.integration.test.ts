@@ -761,6 +761,71 @@ describe("GroupStagingScripts", () => {
   });
 
   describe("dispatchBatch", () => {
+    describe("when all groups have active keys", () => {
+      it("exits early without scanning additional passes", async () => {
+        // Stage jobs in multiple groups and dispatch them all so every group has an active key
+        const groupCount = 10;
+        for (let i = 0; i < groupCount; i++) {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: `j${i}`,
+              groupId: `group-${i}`,
+              dispatchAfterMs: 100,
+            }),
+          );
+        }
+
+        // Dispatch all — each group now has an active key
+        const firstBatch = await scripts.dispatchBatch({
+          nowMs: 200,
+          activeTtlSec: 60,
+          maxJobs: groupCount,
+        });
+        expect(firstBatch).toHaveLength(groupCount);
+
+        // Stage more jobs in each group (they can't dispatch due to active keys)
+        for (let i = 0; i < groupCount; i++) {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: `j${i}-second`,
+              groupId: `group-${i}`,
+              dispatchAfterMs: 100,
+            }),
+          );
+        }
+
+        // This dispatch should find nothing eligible and exit early
+        const secondBatch = await scripts.dispatchBatch({
+          nowMs: 200,
+          activeTtlSec: 60,
+          maxJobs: groupCount,
+        });
+        expect(secondBatch).toHaveLength(0);
+      });
+    });
+
+    describe("when some groups become eligible after first pass dispatches", () => {
+      it("does not dispatch from the same group twice in one call", async () => {
+        // Stage two jobs in the same group
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", groupId: "group-a", dispatchAfterMs: 100 }),
+        );
+        await scripts.stage(
+          makeJob({ stagedJobId: "j2", groupId: "group-a", dispatchAfterMs: 200 }),
+        );
+
+        // dispatchBatch should only dispatch j1 (per-group FIFO: active key blocks j2)
+        const results = await scripts.dispatchBatch({
+          nowMs: 300,
+          activeTtlSec: 60,
+          maxJobs: 10,
+        });
+
+        expect(results).toHaveLength(1);
+        expect(results[0]!.stagedJobId).toBe("j1");
+      });
+    });
+
     describe("when paused jobs exist", () => {
     it("skips paused groups and returns only non-paused", async () => {
       await scripts.stage(

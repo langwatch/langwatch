@@ -1,7 +1,6 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { isClickHouseEnabled, getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   esClient as defaultEsClient,
@@ -39,7 +38,7 @@ export class TraceUsageService {
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
     private readonly prisma: PrismaClient,
-    private readonly clickHouseClient: ClickHouseClient | null,
+    private readonly clickHouseAvailable: boolean,
   ) {}
 
   /**
@@ -50,7 +49,7 @@ export class TraceUsageService {
       new OrganizationRepository(db),
       defaultEsClient,
       db,
-      getClickHouseClient(),
+      isClickHouseEnabled(),
     );
   }
 
@@ -147,7 +146,7 @@ export class TraceUsageService {
   private async splitProjectsByFlag(
     projectIds: string[],
   ): Promise<{ chProjectIds: string[]; esProjectIds: string[] }> {
-    if (!this.clickHouseClient) {
+    if (!this.clickHouseAvailable) {
       return { chProjectIds: [], esProjectIds: projectIds };
     }
 
@@ -178,7 +177,9 @@ export class TraceUsageService {
     projectIds: string[],
     monthStart: number,
   ): Promise<Array<{ projectId: string; count: number }>> {
-    const result = await this.clickHouseClient!.query({
+    const client = await getClickHouseClientForProject(projectIds[0]!);
+    if (!client) return [];
+    const result = await client.query({
       query: `
         SELECT TenantId, toString(count(DISTINCT TraceId)) AS Total
         FROM trace_summaries
@@ -257,9 +258,9 @@ export class TraceUsageService {
   }: {
     organizationId: string;
   }): Promise<number | null> {
-    if (!getClickHouseClient()) return null;
+    if (!isClickHouseEnabled()) return null;
 
-    
+
     const projectIds =
       await this.organizationRepository.getProjectIds(organizationId);
     const billingMonth = getBillingMonth();
@@ -277,7 +278,7 @@ export class TraceUsageService {
   }: {
     projectIds: string[];
   }): Promise<Array<{ projectId: string; count: number }> | null> {
-    if (!getClickHouseClient()) return null;
+    if (!isClickHouseEnabled()) return null;
 
     const billingMonth = getBillingMonth();
     return Promise.all(

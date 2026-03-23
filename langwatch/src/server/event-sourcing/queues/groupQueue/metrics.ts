@@ -11,6 +11,7 @@ const metricNames = [
   "gq_jobs_deduped_total",
   "gq_jobs_retried_total",
   "gq_jobs_exhausted_total",
+  "gq_jobs_non_retryable_total",
   "gq_fastq_pending",
   "gq_fastq_active",
 ] as const;
@@ -70,6 +71,12 @@ export const gqJobsRetriedTotal = new Counter({
 export const gqJobsExhaustedTotal = new Counter({
   name: "gq_jobs_exhausted_total",
   help: "Total number of jobs that exhausted all retry attempts",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqJobsNonRetryableTotal = new Counter({
+  name: "gq_jobs_non_retryable_total",
+  help: "Total number of jobs that failed with non-retryable (critical) errors",
   labelNames: ["queue_name"] as const,
 });
 

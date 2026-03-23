@@ -52,10 +52,13 @@ export async function getProtectionsForProject(
   prisma: PrismaClient,
   { projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
-  return await getUserProtectionsForProject(
+  const protections = await getUserProtectionsForProject(
     { prisma, session: null, publiclyShared: false },
     { projectId },
   );
+
+  // API key holders have full project access — all roles grant cost:view
+  return { ...protections, canSeeCosts: true };
 }
 
 // New function for internal operations that need full access

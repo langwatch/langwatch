@@ -28,7 +28,11 @@ export default function Error({ session }: { session: Session | null }) {
 
     if (
       error &&
-      ["DIFFERENT_EMAIL_NOT_ALLOWED", "OAuthAccountNotLinked"].includes(error)
+      [
+        "DIFFERENT_EMAIL_NOT_ALLOWED",
+        "OAuthAccountNotLinked",
+        "SSO_PROVIDER_NOT_ALLOWED",
+      ].includes(error)
     ) {
       return;
     }
@@ -123,9 +127,9 @@ export function SignInError({ error }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      You cannot sign in with this authentication method. Please
-                      sign in via email first in order to login via your
-                      company&apos;s SSO provider.
+                      Your organization requires SSO login. Please go back
+                      and sign in by entering your company email address in
+                      the login form.
                     </Text>
                     <Button asChild marginTop={4} color="white">
                       <Link href="/">Back to Login</Link>

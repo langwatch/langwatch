@@ -13,10 +13,10 @@ importers:
         version: 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/hono':
         specifier: ^6.20.2
-        version: 6.20.3(hono@4.12.2)
+        version: 6.20.3(hono@4.12.8)
       '@hono/node-server':
-        specifier: ^1.19.9
-        version: 1.19.9(hono@4.12.2)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.8)
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
@@ -24,8 +24,8 @@ importers:
         specifier: ^17.3.1
         version: 17.3.1
       hono:
-        specifier: ^4.12.2
-        version: 4.12.2
+        specifier: ^4.12.7
+        version: 4.12.8
       ioredis:
         specifier: ^5.9.3
         version: 5.9.3
@@ -49,8 +49,8 @@ packages:
   '@bull-board/ui@6.20.3':
     resolution: {integrity: sha512-oANyYoW0X+xd0j/09DRyh3u7Q3wqBtXiLEWyZUJIi/Bjp/hINwiw20RwWuRcaFkqkFylEJL9l+pjmeSA9X5L2A==}
 
-  '@hono/node-server@1.19.9':
-    resolution: {integrity: sha512-vHL6w3ecZsky+8P5MD+eFfaGTyCeOHUIFYMGpQGbrBTSmNNoxv0if69rEZ5giu36weC5saFuznL411gRX7bJDw==}
+  '@hono/node-server@1.19.11':
+    resolution: {integrity: sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g==}
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
@@ -137,8 +137,8 @@ packages:
   filelist@1.0.4:
     resolution: {integrity: sha512-w1cEuf3S+DrLCQL7ET6kz+gmlJdbq9J7yXCSjK/OZCPA+qEN1WyF4ZAf0YYJa4/shHJra2t/d/r8SV4Ji+x+8Q==}
 
-  hono@4.12.2:
-    resolution: {integrity: sha512-gJnaDHXKDayjt8ue0n8Gs0A007yKXj4Xzb8+cNjZeYsSzzwKc0Lr+OZgYwVfB0pHfUs17EPoLvrOsEaJ9mj+Tg==}
+  hono@4.12.8:
+    resolution: {integrity: sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A==}
     engines: {node: '>=16.9.0'}
 
   ioredis@5.9.3:
@@ -225,20 +225,20 @@ snapshots:
       '@bull-board/ui': 6.20.3
       redis-info: 3.1.0
 
-  '@bull-board/hono@6.20.3(hono@4.12.2)':
+  '@bull-board/hono@6.20.3(hono@4.12.8)':
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/ui': 6.20.3
       ejs: 3.1.10
-      hono: 4.12.2
+      hono: 4.12.8
 
   '@bull-board/ui@6.20.3':
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
 
-  '@hono/node-server@1.19.9(hono@4.12.2)':
+  '@hono/node-server@1.19.11(hono@4.12.8)':
     dependencies:
-      hono: 4.12.2
+      hono: 4.12.8
 
   '@ioredis/commands@1.5.0': {}
 
@@ -305,7 +305,7 @@ snapshots:
     dependencies:
       minimatch: 5.1.6
 
-  hono@4.12.2: {}
+  hono@4.12.8: {}
 
   ioredis@5.9.3:
     dependencies:

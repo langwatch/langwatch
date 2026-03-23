@@ -25,8 +25,8 @@ vi.mock("~/server/elasticsearch", () => ({
   traceIndexId: vi.fn(({ traceId }: { traceId: string }) => traceId),
 }));
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: vi.fn(),
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForProject: vi.fn(),
 }));
 
 vi.mock("../../env.mjs", () => ({
@@ -82,7 +82,7 @@ vi.mock("fetch-h2", () => ({
 }));
 
 import { prisma } from "~/server/db";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { clusterTopicsForProject } from "../topicClustering";
 
 function makeProject(overrides: Record<string, unknown> = {}) {
@@ -108,7 +108,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
-      vi.mocked(getClickHouseClient).mockReturnValue(null);
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
 
       // 4 count queries return low counts
       mockEsClient.count.mockResolvedValue({ count: 0 });
@@ -128,7 +128,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject({ featureClickHouseDataSourceTraces: true }) as any,
       );
-      vi.mocked(getClickHouseClient).mockReturnValue({
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -156,7 +156,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject({ featureClickHouseDataSourceTraces: true }) as any,
       );
-      vi.mocked(getClickHouseClient).mockReturnValue({
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -191,12 +191,12 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
-  describe("when CH flag is on but getClickHouseClient returns null", () => {
+  describe("when CH flag is on but getClickHouseClientForProject returns null", () => {
     it("falls back to ES", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject({ featureClickHouseDataSourceTraces: true }) as any,
       );
-      vi.mocked(getClickHouseClient).mockReturnValue(null);
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
 
       mockEsClient.count.mockResolvedValue({ count: 0 });
       mockEsClient.search.mockResolvedValue({
@@ -214,7 +214,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject({ featureClickHouseDataSourceTraces: true }) as any,
       );
-      vi.mocked(getClickHouseClient).mockReturnValue({
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -250,7 +250,7 @@ describe("clusterTopicsForProject", () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject({ featureClickHouseDataSourceTraces: true }) as any,
       );
-      vi.mocked(getClickHouseClient).mockReturnValue({
+      vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 

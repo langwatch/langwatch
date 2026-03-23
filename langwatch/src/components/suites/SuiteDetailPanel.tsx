@@ -55,7 +55,11 @@ export function SuiteDetailPanel({
       return [];
     }
   })();
-  const jobCount =
+  // Active job count excludes archived scenarios/targets.
+  // We don't know which are archived without a query, so we use the suite's
+  // raw counts only for the header stats. The RunHistoryPanel gets the actual
+  // per-batch count from the data (via event-sourcing queueRun projections).
+  const headerJobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
 
   const [liveStats, setLiveStats] = useState<RunHistoryStats | null>(null);
@@ -118,7 +122,7 @@ export function SuiteDetailPanel({
               />
               <StatPill
                 icon={<Layers size={14} />}
-                value={jobCount}
+                value={headerJobCount}
                 label="executions"
                 colorScheme="gray"
               />
@@ -148,7 +152,7 @@ export function SuiteDetailPanel({
               />
               <StatPill
                 icon={<Layers size={14} />}
-                value={jobCount}
+                value={headerJobCount}
                 label="executions"
                 colorScheme="gray"
               />
@@ -164,7 +168,6 @@ export function SuiteDetailPanel({
         scenarioSetId={getSuiteSetId(suite.id)}
         onStatsReady={setLiveStats}
         period={period}
-        expectedJobCount={jobCount}
         isRunStarting={isRunning}
       />
     </VStack>

@@ -59,7 +59,7 @@ export function OrganizationUserRoleField({
           <Select.Trigger width="200px">
             <Select.ValueText placeholder="Select role" />
           </Select.Trigger>
-          <Select.Content width="320px" paddingY={2}>
+          <Select.Content width="320px" paddingY={2} zIndex="popover">
             {orgRoleOptions.map((option) => (
               <Select.Item key={option.value} item={option}>
                 <VStack align="start" gap={0} flex={1}>

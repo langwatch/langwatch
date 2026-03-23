@@ -25,6 +25,8 @@ export interface TraceProcessingPipelineDeps {
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
 }
 
@@ -54,6 +56,8 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
+    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
+    .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)

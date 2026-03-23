@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -20,6 +21,8 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
+import type { ReactorDefinition } from "./reactors/reactor.types";
+import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
@@ -40,7 +43,7 @@ const logger = createLogger("langwatch:event-sourcing");
  * Options for constructing an EventSourcing instance.
  */
 export interface EventSourcingOptions {
-  clickhouse?: ClickHouseClient;
+  clickhouse?: ClickHouseClientResolver;
   redis?: IORedis | Cluster | null;
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
@@ -96,7 +99,7 @@ export class EventSourcing {
 
   // Options
   private readonly _enabled: boolean;
-  private readonly _clickhouse?: ClickHouseClient | null;
+  private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
 
@@ -129,6 +132,34 @@ export class EventSourcing {
 
   get isEnabled(): boolean {
     return this._enabled;
+  }
+
+  /**
+   * Register a reactor on a global fold projection.
+   *
+   * Must be called before the projection registry is initialized
+   * (i.e., before the first pipeline is registered).
+   *
+   * Silently skips registration when the fold projection does not exist
+   * (e.g. `projectDailySdkUsage` is only registered in SaaS mode).
+   */
+  registerGlobalFoldReactor(
+    foldName: string,
+    reactor: ReactorDefinition<Event>,
+  ): void {
+    try {
+      this.projectionRegistry.registerReactor(foldName, reactor);
+    } catch (error) {
+      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
+      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+        logger.debug(
+          { foldName, reactorName: reactor.name },
+          "Skipping global fold reactor — fold not registered",
+        );
+        return;
+      }
+      throw error;
+    }
   }
 
   get eventStore(): EventStore | undefined {
@@ -463,7 +494,7 @@ export class EventSourcing {
   static createWithStores(options: {
     eventStore: EventStore;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
-    clickhouse?: ClickHouseClient;
+    clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
   }): EventSourcing {
     const es = new EventSourcing({

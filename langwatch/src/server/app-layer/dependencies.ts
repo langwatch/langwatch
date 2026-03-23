@@ -20,6 +20,7 @@ import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { UsageService } from "./usage/usage.service";
 
@@ -57,6 +58,7 @@ export interface AppDependencies {
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
   notifications: NotificationService;
+  nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   commands: AppCommands;
 

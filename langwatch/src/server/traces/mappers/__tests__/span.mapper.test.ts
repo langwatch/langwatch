@@ -209,6 +209,46 @@ describe("mapNormalizedSpanToSpan", () => {
     });
   });
 
+  describe("when span has model and token counts", () => {
+    it("computes cost from static model registry", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "gen_ai.request.model": "gpt-5-mini",
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.metrics).not.toBeNull();
+      expect(result.metrics?.cost).not.toBeNull();
+      expect(result.metrics!.cost).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when token counts are strings (ClickHouse)", () => {
+    it("coerces string tokens and computes cost", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "gen_ai.request.model": "gpt-5-mini",
+          "gen_ai.usage.input_tokens": "100",
+          "gen_ai.usage.output_tokens": "50",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.metrics).not.toBeNull();
+      expect(result.metrics?.prompt_tokens).toBe(100);
+      expect(result.metrics?.completion_tokens).toBe(50);
+      expect(result.metrics?.cost).not.toBeNull();
+      expect(result.metrics!.cost).toBeGreaterThan(0);
+    });
+  });
+
   describe("when langwatch.input is a deserialized {type, value} wrapper", () => {
     it("unwraps text wrapper to plain text type", () => {
       // After ClickHouse round-trip: canonicalization unwraps text wrapper to just the value string,

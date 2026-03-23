@@ -216,6 +216,8 @@ for pass = 1, maxPasses do
   local groups = redis.call("ZREVRANGE", readyKey, scanStart, scanEnd)
   if #groups == 0 then break end
 
+  local passDispatched = 0
+
   for _, groupId in ipairs(groups) do
     if dispatched >= maxJobs then break end
 
@@ -275,12 +277,14 @@ for pass = 1, maxPasses do
             results[#results + 1] = jobDataJson or ""
             results[#results + 1] = tostring(originalScore)
             dispatched = dispatched + 1
+            passDispatched = passDispatched + 1
           end
         end
       end
     end
   end
 
+  if passDispatched == 0 then break end
   scanStart = scanStart + scanWindow
 end
 
@@ -713,7 +717,7 @@ export class GroupStagingScripts {
    * slot is freed immediately.
    *
    * The active key TTL is set to match the backoff period so the key expires
-   * naturally. On the next dispatcher poll (≤1s) the retry job is dispatched.
+   * naturally. On the next dispatcher poll (≤5s) the retry job is dispatched.
    * This is fully Redis-driven — no Node.js timers, survives restarts.
    *
    * @returns true if re-staged, false if stale (active key doesn't match)

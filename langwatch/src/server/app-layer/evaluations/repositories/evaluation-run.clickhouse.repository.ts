@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
@@ -28,6 +28,7 @@ interface ClickHouseEvaluationRunRecord {
   Passed: number | null;
   Label: string | null;
   Details: string | null;
+  Inputs: string | null;
   Error: string | null;
   ErrorDetails: string | null;
   CreatedAt: number;
@@ -48,7 +49,7 @@ type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
 export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: EvaluationRunData, tenantId: string): Promise<void> {
     EventUtils.validateTenantId(
@@ -65,6 +66,7 @@ export class EvaluationRunClickHouseRepository
       : data.evaluationId;
 
     try {
+      const client = await this.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -72,7 +74,7 @@ export class EvaluationRunClickHouseRepository
         EVALUATION_PROJECTION_VERSIONS.STATE,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -100,7 +102,8 @@ export class EvaluationRunClickHouseRepository
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId,
@@ -117,6 +120,7 @@ export class EvaluationRunClickHouseRepository
             Passed,
             Label,
             Details,
+            Inputs,
             Error,
             ErrorDetails,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
@@ -169,6 +173,9 @@ export class EvaluationRunClickHouseRepository
       passed: record.Passed === null ? null : record.Passed === 1,
       label: record.Label,
       details: record.Details,
+      inputs: record.Inputs
+        ? (JSON.parse(record.Inputs) as Record<string, unknown>)
+        : null,
       error: record.Error,
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
@@ -204,6 +211,7 @@ export class EvaluationRunClickHouseRepository
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
       Details: data.details,
+      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
       Error: data.error,
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),

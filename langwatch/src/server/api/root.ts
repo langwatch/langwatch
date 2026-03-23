@@ -10,6 +10,7 @@ import { dashboardsRouter } from "./routers/dashboards";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
+import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { licenseRouter } from "./routers/license";
@@ -68,6 +69,7 @@ const coreRouters = {
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
+  export: exportRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,

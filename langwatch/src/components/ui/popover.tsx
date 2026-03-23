@@ -15,7 +15,16 @@ export const PopoverContent = React.forwardRef<
   const { portalled = true, portalRef, positionerProps, ...rest } = props;
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      <ChakraPopover.Positioner {...positionerProps}>
+      <ChakraPopover.Positioner
+        {...positionerProps}
+        ref={(node: HTMLElement | null) => {
+          if (node) {
+            // Zag.js sets --z-index inline based on layer stack order, which
+            // can place popovers behind drawers. Force it higher. See #2390.
+            node.style.setProperty("z-index", "2000", "important");
+          }
+        }}
+      >
         <ChakraPopover.Content
           borderRadius="lg"
           background="bg.panel/75"
@@ -70,6 +79,7 @@ export const PopoverHeader = ChakraPopover.Header;
 export const PopoverRoot = ChakraPopover.Root;
 export const PopoverBody = ChakraPopover.Body;
 export const PopoverTrigger = ChakraPopover.Trigger;
+export const PopoverAnchor = ChakraPopover.Anchor;
 
 export const Popover = {
   Root: PopoverRoot,
@@ -83,4 +93,5 @@ export const Popover = {
   Body: PopoverBody,
   Trigger: PopoverTrigger,
   ArrowTip: PopoverArrowTip,
+  Anchor: PopoverAnchor,
 };

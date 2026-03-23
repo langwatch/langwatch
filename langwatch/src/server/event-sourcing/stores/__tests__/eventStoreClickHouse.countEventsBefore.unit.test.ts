@@ -20,7 +20,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
     } as unknown as ClickHouseClient;
 
     store = new EventStoreClickHouse(
-      new EventRepositoryClickHouse(mockClickHouseClient),
+      new EventRepositoryClickHouse(async () => mockClickHouseClient),
     );
   });
 

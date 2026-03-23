@@ -37,7 +37,7 @@ processors:
   batch:
 
 exporters:
-  otlphttp:
+  otlp_http:
     endpoint: ${effectiveEndpoint}/api/otel # +
     headers:
       Authorization: Bearer ${effectiveApiKey} # +
@@ -47,7 +47,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp]
+      exporters: [otlp_http]
 `);
 
   return (

@@ -11,14 +11,13 @@ import {
   Center,
   HStack,
   IconButton,
+  Skeleton,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import {
-  CircleAlert,
-  CircleCheck,
   List,
   MoreVertical,
   PanelLeftOpen,
@@ -28,6 +27,10 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "~/components/shared/PassRateIndicator";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
@@ -67,7 +70,10 @@ type SuiteSidebarProps = {
   onSelectSuite: (slug: string | typeof ALL_RUNS_ID) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
+  isLoading?: boolean;
 };
+
+const SKELETON_COUNT = 6;
 
 export function SuiteSidebar({
   suites,
@@ -77,6 +83,7 @@ export function SuiteSidebar({
   onSelectSuite,
   onRunSuite,
   onContextMenu,
+  isLoading = false,
 }: SuiteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -174,7 +181,20 @@ export function SuiteSidebar({
         gap={isCollapsed ? 0 : 1}
         align="stretch"
       >
-        {!isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
+        {isLoading && !isCollapsed && (
+          Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <Skeleton
+              key={i}
+              data-testid="suite-sidebar-skeleton"
+              height="60px"
+              width="100%"
+              borderRadius="md"
+              marginBottom={1}
+            />
+          ))
+        )}
+
+        {!isLoading && !isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
           <Text
             fontSize="sm"
             color="fg.muted"
@@ -185,7 +205,7 @@ export function SuiteSidebar({
             No run plans yet
           </Text>
         )}
-        {!isCollapsed && hasNoResults &&
+        {!isLoading && !isCollapsed && hasNoResults &&
           (suites.length > 0 || externalSets.length > 0) && (
             <Text
               fontSize="sm"
@@ -198,7 +218,7 @@ export function SuiteSidebar({
             </Text>
           )}
 
-        {filteredSuites.map((suite) =>
+        {!isLoading && filteredSuites.map((suite) =>
           isCollapsed ? (
             <Tooltip
               key={suite.id}
@@ -237,7 +257,7 @@ export function SuiteSidebar({
           ),
         )}
 
-        {filteredExternalSets.length > 0 && (
+        {!isLoading && filteredExternalSets.length > 0 && (
           <>
             {!isCollapsed && (
               <Text
@@ -360,47 +380,29 @@ function SidebarButton({
   );
 }
 
-function StatusIcon({ passed, total }: { passed: number; total: number }) {
-  if (total === 0) return null;
-  if (passed === total) {
-    return (
-      <CircleCheck
-        size={12}
-        color="var(--chakra-colors-green-500)"
-        data-testid="status-icon-pass"
-      />
-    );
-  }
-  return (
-    <CircleAlert
-      size={12}
-      color="var(--chakra-colors-red-500)"
-      data-testid="status-icon-fail"
-    />
-  );
-}
-
 function RunSummaryLine({
   passedCount,
+  failedCount,
   totalCount,
-  lastRunTimestamp,
 }: {
   passedCount: number;
+  failedCount: number;
   totalCount: number;
-  lastRunTimestamp: number | null;
 }) {
   if (totalCount === 0) return null;
+
+  const completedCount = passedCount + failedCount;
+  const passRate = completedCount > 0 ? (passedCount / totalCount) * 100 : null;
+
   return (
-    <HStack gap={1}>
-      <StatusIcon passed={passedCount} total={totalCount} />
-      <Text fontSize="xs">
+    <HStack gap={1} color="fg.muted">
+      <PassRateCircle passRate={passRate} size="8px" />
+      <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
+        {passRate === null ? "-" : `${Math.round(passRate)}%`}
+      </Text>
+      <Text fontSize="xs" color="gray.350">·</Text>
+      <Text fontSize="xs" color="fg.subtle">
         {passedCount} passed
-        {lastRunTimestamp && (
-          <Text as="span" color="fg.muted">
-            {" · "}
-            {formatTimeAgoCompact(lastRunTimestamp)}
-          </Text>
-        )}
       </Text>
     </HStack>
   );
@@ -486,10 +488,15 @@ function SuiteListItem({
         textAlign="left"
       >
         <HStack gap={1.5} width="full">
-          <Text fontSize="sm" fontWeight="medium" truncate>
-            {suite.name}
+          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+            {suite.name || "<empty>"}
           </Text>
           <Spacer />
+          {runSummary?.lastRunTimestamp && (
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+              {formatTimeAgoCompact(runSummary.lastRunTimestamp)}
+            </Text>
+          )}
           <HStack gap={0} flexShrink={0}>
             <Box
               as="button"
@@ -512,7 +519,7 @@ function SuiteListItem({
             </Box>
             <Box
               as="button"
-              aria-label="Suite options"
+              aria-label="Run plan options"
               data-testid="suite-menu-button"
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
@@ -536,8 +543,8 @@ function SuiteListItem({
         {runSummary && runSummary.totalCount > 0 && (
           <RunSummaryLine
             passedCount={runSummary.passedCount}
+            failedCount={runSummary.failedCount}
             totalCount={runSummary.totalCount}
-            lastRunTimestamp={runSummary.lastRunTimestamp}
           />
         )}
       </VStack>
@@ -568,14 +575,22 @@ function ExternalSetListItem({
         overflow="hidden"
         textAlign="left"
       >
-        <Text fontSize="sm" fontWeight="medium" truncate>
-          {externalSet.scenarioSetId}
-        </Text>
+        <HStack gap={1.5} width="full">
+          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+            {externalSet.scenarioSetId || "<empty>"}
+          </Text>
+          <Spacer />
+          {externalSet.lastRunTimestamp && (
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+              {formatTimeAgoCompact(externalSet.lastRunTimestamp)}
+            </Text>
+          )}
+        </HStack>
         {externalSet.totalCount > 0 && (
           <RunSummaryLine
             passedCount={externalSet.passedCount}
+            failedCount={externalSet.failedCount}
             totalCount={externalSet.totalCount}
-            lastRunTimestamp={externalSet.lastRunTimestamp}
           />
         )}
       </VStack>

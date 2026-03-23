@@ -15,17 +15,17 @@ export function ResourceLimitRow({ label, current, max }: ResourceLimitRowProps)
       paddingY={4}
       paddingX={5}
       borderWidth="1px"
-      borderColor="gray.100"
+      borderColor="border"
       borderRadius="lg"
-      backgroundColor="gray.50"
+      bg="bg.subtle"
     >
-      <Text fontSize="xs" color="gray.500" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
+      <Text fontSize="xs" color="fg.muted" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
         {label}
       </Text>
-      <Text fontSize="xl" fontWeight="semibold" color="gray.900">
+      <Text fontSize="xl" fontWeight="semibold" color="fg">
         {current.toLocaleString()}
         {max != null && (
-          <Text as="span" fontSize="sm" fontWeight="normal" color="gray.400">
+          <Text as="span" fontSize="sm" fontWeight="normal" color="fg.muted">
             {" "}/ {formatLimitOrUnlimited(max)}
           </Text>
         )}
