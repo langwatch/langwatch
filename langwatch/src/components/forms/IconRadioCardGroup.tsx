@@ -1,5 +1,6 @@
 import { Box, Circle, Grid, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
+import { useCallback, useRef } from "react";
 
 type IconListItem<T> = {
   title: string;
@@ -25,8 +26,34 @@ export const IconRadioCardGroup = <T extends string = string>({
   maxColumns,
 }: IconRadioCardGroupProps<T>) => {
   const isHorizontal = layout === "horizontal";
+  const groupRef = useRef<HTMLDivElement>(null);
 
-  const renderItem = (item: IconListItem<T>) => {
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      let nextIndex: number | null = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        nextIndex = (index + 1) % items.length;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        nextIndex = (index - 1 + items.length) % items.length;
+      }
+      if (nextIndex !== null) {
+        const nextItem = items[nextIndex];
+        if (nextItem) {
+          onChange(nextItem.value);
+          const buttons =
+            groupRef.current?.querySelectorAll<HTMLButtonElement>(
+              '[role="radio"] button',
+            );
+          buttons?.[nextIndex]?.focus();
+        }
+      }
+    },
+    [items, onChange],
+  );
+
+  const renderItem = (item: IconListItem<T>, index: number) => {
     const isSelected = value === item.value;
 
     return (
@@ -35,7 +62,7 @@ export const IconRadioCardGroup = <T extends string = string>({
         asChild
         role="radio"
         aria-checked={isSelected}
-        onClick={() => onChange(isSelected ? undefined : item.value)}
+        onClick={() => onChange(item.value)}
         cursor="pointer"
         borderWidth="1px"
         borderColor={isSelected ? "orange.400" : "rgba(0,0,0,0.06)"}
@@ -57,7 +84,11 @@ export const IconRadioCardGroup = <T extends string = string>({
         minW="0"
         textAlign="start"
       >
-        <button type="button">
+        <button
+          type="button"
+          tabIndex={isSelected ? 0 : -1}
+          onKeyDown={(e) => handleKeyDown(e, index)}
+        >
           <HStack align="center" justify="space-between" w="full" minW="0">
             <HStack align="center" gap="2" minW="0" flex="1">
               {item.icon && (
@@ -101,6 +132,8 @@ export const IconRadioCardGroup = <T extends string = string>({
     const cols = maxColumns ? Math.min(items.length, maxColumns) : items.length;
     return (
       <Grid
+        ref={groupRef}
+        role="radiogroup"
         templateColumns={{
           base: "1fr",
           md: `repeat(${cols}, minmax(0, 1fr))`,
@@ -114,7 +147,7 @@ export const IconRadioCardGroup = <T extends string = string>({
   }
 
   return (
-    <Stack direction="column" gap="2" w="full">
+    <Stack ref={groupRef} role="radiogroup" direction="column" gap="2" w="full">
       {items.map(renderItem)}
     </Stack>
   );

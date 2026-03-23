@@ -164,14 +164,21 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
 
+  const configReady = !!publicEnv.data && !!effectiveApiKey;
+
   const configJson = useMemo(
     () =>
-      JSON.stringify(
-        buildMcpConfig({ apiKey: effectiveApiKey, endpoint: effectiveEndpoint }),
-        null,
-        2,
-      ),
-    [effectiveApiKey, effectiveEndpoint],
+      configReady
+        ? JSON.stringify(
+            buildMcpConfig({
+              apiKey: effectiveApiKey,
+              endpoint: effectiveEndpoint,
+            }),
+            null,
+            2,
+          )
+        : null,
+    [configReady, effectiveApiKey, effectiveEndpoint],
   );
 
   const maskedApiKey = effectiveApiKey
@@ -180,12 +187,17 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
 
   const displayConfigJson = useMemo(
     () =>
-      JSON.stringify(
-        buildMcpConfig({ apiKey: maskedApiKey, endpoint: effectiveEndpoint }),
-        null,
-        2,
-      ),
-    [maskedApiKey, effectiveEndpoint],
+      configReady
+        ? JSON.stringify(
+            buildMcpConfig({
+              apiKey: maskedApiKey,
+              endpoint: effectiveEndpoint,
+            }),
+            null,
+            2,
+          )
+        : null,
+    [configReady, maskedApiKey, effectiveEndpoint],
   );
 
   const currentApp = APPS.find((a) => a.key === activeApp)!;
@@ -363,11 +375,13 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
             letterSpacing="0.01em"
             fontWeight="500"
           >
-            {displayConfigJson}
+            {displayConfigJson ?? "Loading config…"}
           </Box>
-          <Box position="absolute" top={2.5} right={2.5}>
-            <InlineCopyButton text={configJson} label="Config" />
-          </Box>
+          {configJson && (
+            <Box position="absolute" top={2.5} right={2.5}>
+              <InlineCopyButton text={configJson} label="Config" />
+            </Box>
+          )}
         </Box>
       </VStack>
     </Grid>
