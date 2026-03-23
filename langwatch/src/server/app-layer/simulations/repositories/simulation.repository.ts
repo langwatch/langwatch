@@ -89,7 +89,6 @@ export interface SimulationRepository {
    * Used for cross-org counting of scenario sets for limit enforcement.
    */
   getExternalSetIdsForOrganization(params: {
-    organizationId: string;
     projectIds: string[];
   }): Promise<Set<string>>;
 }

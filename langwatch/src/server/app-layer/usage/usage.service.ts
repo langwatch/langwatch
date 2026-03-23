@@ -126,7 +126,7 @@ export class UsageService {
       }
 
       knownSets =
-        await this.simulationRunService.getExternalSetIdsForOrganization({ organizationId, projectIds });
+        await this.simulationRunService.getExternalSetIdsForOrganization({ projectIds });
       this.scenarioSetCache.set(organizationId, knownSets);
     }
 

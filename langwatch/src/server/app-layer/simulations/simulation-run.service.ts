@@ -104,7 +104,7 @@ export class SimulationRunService {
    * Returns distinct external (non-internal) scenario set IDs across the given projects.
    * Used by UsageService for cross-org scenario set limit enforcement.
    */
-  async getExternalSetIdsForOrganization(params: { organizationId: string; projectIds: string[] }): Promise<Set<string>> {
+  async getExternalSetIdsForOrganization(params: { projectIds: string[] }): Promise<Set<string>> {
     return this.repository.getExternalSetIdsForOrganization(params);
   }
 }
