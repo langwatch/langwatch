@@ -272,7 +272,7 @@ function translateOriginFilter(values: string[]): FilterTranslation {
 
   if (hasApplication) {
     parts.push(
-      `(${ts}.Attributes['langwatch.origin'] = '' OR ${ts}.Attributes['langwatch.origin'] IS NULL)`,
+      `(${ts}.Attributes['langwatch.origin'] = '' OR ${ts}.Attributes['langwatch.origin'] IS NULL OR ${ts}.Attributes['langwatch.origin'] = 'application')`,
     );
   }
 
