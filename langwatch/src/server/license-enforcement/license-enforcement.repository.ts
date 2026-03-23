@@ -4,12 +4,23 @@ import {
   type Prisma,
   type PrismaClient,
 } from "@prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/library";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import {
   isFullMember,
   isLiteMember,
   isViewOnlyCustomRole,
 } from "./member-classification";
+
+/**
+ * Checks whether an experiment's workbenchState marks it as a real-time
+ * (online) evaluation. Real-time experiments also create a Monitor record
+ * and are counted separately under `maxOnlineEvaluations`.
+ */
+function isRealTimeExperiment(workbenchState: JsonValue | null): boolean {
+  if (!workbenchState || typeof workbenchState !== "object") return false;
+  return (workbenchState as Record<string, unknown>).task === "real_time";
+}
 
 // Re-export classification functions for backwards compatibility
 export {
@@ -390,8 +401,14 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all experiments for license enforcement.
-   * Experiments do not support archival - all experiments count against limits.
+   * Counts non-real-time experiments for license enforcement.
+   * Excludes experiments where `workbenchState.task === "real_time"` because
+   * those are online evaluations already counted under `maxOnlineEvaluations`
+   * via `getOnlineEvaluationCount`. Including them here would double-count.
+   *
+   * Uses `findMany` + JS filter instead of Prisma `count` because Prisma JSON
+   * path filtering is unreliable for nested fields (same approach as
+   * `getAllForEvaluationsList` in experiments.ts).
    *
    * Note: Experiment model has RLS policy requiring direct projectId filter,
    * so we first get project IDs then filter by them.
@@ -400,11 +417,16 @@ export class LicenseEnforcementRepository
     const projectIds = await this.getProjectIds(organizationId);
     if (projectIds.length === 0) return 0;
 
-    return this.prisma.experiment.count({
+    const experiments = await this.prisma.experiment.findMany({
       where: {
         projectId: { in: projectIds },
       },
+      select: { workbenchState: true },
     });
+
+    return experiments.filter(
+      (e) => !isRealTimeExperiment(e.workbenchState)
+    ).length;
   }
 
   /**
