@@ -35,7 +35,9 @@ function resolveClaudeBinary(overridePath?: string): string | undefined {
   }
 
   if (process.env.CLAUDE_BIN) {
-    return process.env.CLAUDE_BIN;
+    return fs.existsSync(process.env.CLAUDE_BIN)
+      ? process.env.CLAUDE_BIN
+      : undefined;
   }
 
   try {
@@ -153,6 +155,12 @@ export class ClaudeCodeRunner implements AgentRunner {
         const mcpConfigPath = path.join(workingDirectory, ".mcp-config.json");
 
         if (!skipMcp) {
+          if (!process.env.LANGWATCH_API_KEY) {
+            throw new Error(
+              "[claude-code] LANGWATCH_API_KEY is required when MCP is enabled."
+            );
+          }
+
           const mcpConfig = {
             mcpServers: {
               LangWatch: {

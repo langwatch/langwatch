@@ -35,7 +35,9 @@ function resolveCursorBinary(overridePath?: string): string | undefined {
   }
 
   if (process.env.CURSOR_BIN) {
-    return process.env.CURSOR_BIN;
+    return fs.existsSync(process.env.CURSOR_BIN)
+      ? process.env.CURSOR_BIN
+      : undefined;
   }
 
   try {
@@ -174,6 +176,12 @@ export class CursorRunner implements AgentRunner {
           .join("\n\n");
 
         if (!skipMcp) {
+          if (!process.env.LANGWATCH_API_KEY) {
+            throw new Error(
+              "[cursor] LANGWATCH_API_KEY is required when MCP is enabled."
+            );
+          }
+
           const cursorDir = path.join(workingDirectory, ".cursor");
           fs.mkdirSync(cursorDir, { recursive: true });
 

@@ -99,12 +99,12 @@ export class CodexRunner implements AgentRunner {
       .map((parsed) => {
         // Normalize output_text blocks to text blocks
         const content = Array.isArray(parsed.item.content)
-          ? parsed.item.content.map(
-              (block: { type: string; text: string }) => ({
+          ? parsed.item.content
+              .map((block: { type: string; text?: string }) => ({
                 type: "text",
-                text: block.text,
-              })
-            )
+                text: block.text ?? "",
+              }))
+              .filter((block: { text: string }) => block.text !== "")
           : parsed.item.content;
 
         return {

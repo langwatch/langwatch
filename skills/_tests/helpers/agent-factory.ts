@@ -64,14 +64,9 @@ export function createAgent(options: RunnerOptions): AgentAdapter {
  * runner is not installed.
  */
 export function isRunnerAvailable(): boolean {
-  try {
-    const runner = getRunner();
-    // Duck-type check for isBinaryAvailable method
-    if ("isBinaryAvailable" in runner && typeof (runner as any).isBinaryAvailable === "function") {
-      return (runner as any).isBinaryAvailable();
-    }
-    return true;
-  } catch {
-    return false;
+  const runner = getRunner(); // let config errors propagate — don't swallow them
+  if ("isBinaryAvailable" in runner && typeof (runner as any).isBinaryAvailable === "function") {
+    return (runner as any).isBinaryAvailable();
   }
+  return true;
 }
