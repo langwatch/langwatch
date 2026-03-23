@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams;
   const filter = searchParams.get("filter") ?? undefined;
-  const startIndex = parseInt(searchParams.get("startIndex") ?? "1", 10);
-  const count = parseInt(searchParams.get("count") ?? "100", 10);
+  const startIndex = parseInt(searchParams.get("startIndex") ?? "1", 10) || 1;
+  const count = parseInt(searchParams.get("count") ?? "100", 10) || 100;
 
   const result = await scimService.listUsers({
     organizationId: auth.organizationId,
