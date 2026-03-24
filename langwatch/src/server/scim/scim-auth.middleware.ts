@@ -23,8 +23,10 @@ export async function authenticateScimRequest(
   request: Request
 ): Promise<{ organizationId: string }> {
   const authHeader = request.headers.get("authorization");
+  const bearerMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+  const token = bearerMatch?.[1]?.trim();
 
-  if (!authHeader?.startsWith("Bearer ")) {
+  if (!token) {
     throw new ScimAuthError(
       NextResponse.json(
         {
@@ -36,8 +38,6 @@ export async function authenticateScimRequest(
       )
     );
   }
-
-  const token = authHeader.slice(7);
   const tokenService = ScimTokenService.create(prisma);
   const result = await tokenService.verify({ token });
 
