@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { ScimService } from "~/server/scim/scim.service";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
  * Receives Auth0 Log Stream webhook events for SCIM provisioning.
@@ -72,8 +73,10 @@ export async function POST(request: NextRequest) {
           });
         }
       }
-    } catch {
-      // Continue processing remaining events even if one fails
+    } catch (e) {
+      captureException(new Error("Auth0 SCIM webhook event processing failed"), {
+        extra: { email, action, organizationId: org.id, error: e },
+      });
     }
   }
 
