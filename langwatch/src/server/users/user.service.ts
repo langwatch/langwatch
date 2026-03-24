@@ -29,6 +29,14 @@ export class UserService {
     });
   }
 
+  async getSsoStatus({ id }: { id: string }): Promise<{ pendingSsoSetup: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { pendingSsoSetup: true },
+    });
+    return { pendingSsoSetup: user?.pendingSsoSetup ?? false };
+  }
+
   async deactivate({ id }: { id: string }): Promise<User> {
     return this.prisma.user.update({ where: { id }, data: { deactivatedAt: new Date() } });
   }

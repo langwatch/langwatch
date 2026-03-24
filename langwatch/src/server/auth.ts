@@ -121,6 +121,12 @@ export const authOptions = (
         },
       });
 
+      // User hasn't migrated to SSO yet — let them in with old method
+      // so they can link SSO from the authentication settings page
+      if (existingUser?.pendingSsoSetup) {
+        return true;
+      }
+
       // SSO flow for orgs with ssoDomain configured:
       // - Existing user + correct SSO provider → auto-link account (replaces old auth method)
       // - Existing user + wrong provider → block with SSO_PROVIDER_NOT_ALLOWED
@@ -403,6 +409,10 @@ const linkExistingUserToOAuthProvider = async (
         provider: account.provider,
         providerAccountId: { not: account.providerAccountId },
       },
+    }),
+    prisma.user.update({
+      where: { id: existingUser.id },
+      data: { pendingSsoSetup: false },
     }),
   ]);
 };

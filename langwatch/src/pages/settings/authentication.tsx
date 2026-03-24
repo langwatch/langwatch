@@ -71,6 +71,7 @@ export default function AuthenticationSettings() {
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const apiContext = api.useContext();
+  const { data: ssoStatus } = api.user.getSsoStatus.useQuery({});
 
   const passwordForm = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -82,6 +83,7 @@ export default function AuthenticationSettings() {
   });
 
   const hasSSOProvider = !!organization?.ssoProvider;
+  const pendingSsoSetup = ssoStatus?.pendingSsoSetup ?? false;
 
   if (!isAuthProvider) {
     return null;
@@ -272,9 +274,11 @@ export default function AuthenticationSettings() {
                   <Button
                     onClick={handleLinkProvider}
                     colorPalette="orange"
-                    disabled={hasSSOProvider}
+                    disabled={hasSSOProvider && !pendingSsoSetup}
                   >
-                    Link New Sign-in Method
+                    {pendingSsoSetup
+                      ? "Link SSO Sign-in Method"
+                      : "Link New Sign-in Method"}
                   </Button>
                 </VStack>
               )}
