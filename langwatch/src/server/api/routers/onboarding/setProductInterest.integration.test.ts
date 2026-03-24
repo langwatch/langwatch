@@ -70,61 +70,61 @@ describe("onboarding.setProductInterest", () => {
     return onboardingRouter.createCaller(ctx);
   }
 
-  describe("when the user selects 'Observability'", () => {
-    it("fires an identifyUser call with product_interest 'observability'", async () => {
+  describe("when the user selects 'Via Coding Agent'", () => {
+    it("fires an identifyUser call with product_interest 'coding_agent'", async () => {
       const caller = createCaller();
 
       const result = await caller.setProductInterest({
-        productInterest: "observability",
+        productInterest: "via-claude-code",
       });
 
       expect(result).toEqual({ success: true });
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "observability" },
+        traits: { product_interest: "coding_agent" },
       });
     });
   });
 
-  describe("when the user selects 'Evaluations'", () => {
-    it("fires an identifyUser call with product_interest 'evaluations'", async () => {
+  describe("when the user selects 'Via the Platform'", () => {
+    it("fires an identifyUser call with product_interest 'platform'", async () => {
       const caller = createCaller();
 
-      await caller.setProductInterest({ productInterest: "evaluations" });
+      await caller.setProductInterest({ productInterest: "via-platform" });
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "evaluations" },
+        traits: { product_interest: "platform" },
       });
     });
   });
 
-  describe("when the user selects 'prompt-management'", () => {
-    it("maps to product_interest 'prompt_management'", async () => {
-      const caller = createCaller();
-
-      await caller.setProductInterest({
-        productInterest: "prompt-management",
-      });
-
-      expect(mockIdentifyUser).toHaveBeenCalledWith({
-        userId: "user-42",
-        traits: { product_interest: "prompt_management" },
-      });
-    });
-  });
-
-  describe("when the user selects 'agent-simulations'", () => {
-    it("maps to product_interest 'agent_simulations'", async () => {
+  describe("when the user selects 'Via MCP'", () => {
+    it("maps to product_interest 'mcp'", async () => {
       const caller = createCaller();
 
       await caller.setProductInterest({
-        productInterest: "agent-simulations",
+        productInterest: "via-claude-desktop",
       });
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "agent_simulations" },
+        traits: { product_interest: "mcp" },
+      });
+    });
+  });
+
+  describe("when the user selects 'Manually'", () => {
+    it("maps to product_interest 'manual_sdk'", async () => {
+      const caller = createCaller();
+
+      await caller.setProductInterest({
+        productInterest: "manually",
+      });
+
+      expect(mockIdentifyUser).toHaveBeenCalledWith({
+        userId: "user-42",
+        traits: { product_interest: "manual_sdk" },
       });
     });
   });
@@ -134,7 +134,7 @@ describe("onboarding.setProductInterest", () => {
       const caller = createCaller();
 
       await caller.setProductInterest({
-        productInterest: "observability",
+        productInterest: "via-claude-code",
       });
 
       const callArgs = mockIdentifyUser.mock.calls[0]![0];
@@ -148,7 +148,7 @@ describe("onboarding.setProductInterest", () => {
 
       const caller = createCaller();
       const result = await caller.setProductInterest({
-        productInterest: "evaluations",
+        productInterest: "via-platform",
       });
 
       // The mutation resolves immediately (fire-and-forget)

@@ -3,6 +3,7 @@ import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react
 import { motion } from "motion/react";
 import type React from "react";
 import type { ProductSelection } from "../../types/types";
+import { api } from "~/utils/api";
 
 const MotionBox = motion(Box);
 
@@ -57,6 +58,9 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
+  const setProductInterest =
+    api.onboarding.setProductInterest.useMutation();
+
   return (
     <VStack gap={3} align="stretch" w="full" maxW="520px" mx="auto">
       {productOptions.map((opt, i) => (
@@ -77,7 +81,10 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           cursor="pointer"
           role="button"
           tabIndex={0}
-          onClick={() => onSelectProduct(opt.key)}
+          onClick={() => {
+            setProductInterest.mutate({ productInterest: opt.key });
+            onSelectProduct(opt.key);
+          }}
           textAlign="left"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

@@ -129,10 +129,10 @@ export const onboardingRouter = createTRPCRouter({
     .input(
       z.object({
         productInterest: z.enum([
-          "observability",
-          "evaluations",
-          "prompt-management",
-          "agent-simulations",
+          "via-claude-code",
+          "via-platform",
+          "via-claude-desktop",
+          "manually",
         ]),
       }),
     )

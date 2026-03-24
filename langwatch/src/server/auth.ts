@@ -26,6 +26,7 @@ import { dependencies } from "../injection/dependencies.server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
+import { ensureUserSyncedToCio } from "../../ee/billing/nurturing/hooks/userSync";
 
 const logger = createLogger("langwatch:auth");
 
@@ -80,9 +81,14 @@ export const authOptions = (
         const orgCount_ = await prisma.organizationUser.count({
           where: { userId: user_.id },
         });
+        const hasOrg_ = orgCount_ > 0;
         fireActivityTrackingNurturing({
           userId: user_.id,
-          hasOrganization: orgCount_ > 0,
+          hasOrganization: hasOrg_,
+        });
+        ensureUserSyncedToCio({
+          userId: user_.id,
+          hasOrganization: hasOrg_,
         });
 
         return {
@@ -98,9 +104,14 @@ export const authOptions = (
       const orgCount = await prisma.organizationUser.count({
         where: { userId: user.id },
       });
+      const hasOrg = orgCount > 0;
       fireActivityTrackingNurturing({
         userId: user.id,
-        hasOrganization: orgCount > 0,
+        hasOrganization: hasOrg,
+      });
+      ensureUserSyncedToCio({
+        userId: user.id,
+        hasOrganization: hasOrg,
       });
 
       return {
