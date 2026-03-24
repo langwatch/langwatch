@@ -245,7 +245,7 @@ describe("ensureUserSyncedToCio()", () => {
         expect(mockNurturing.groupUser).not.toHaveBeenCalled();
       });
 
-      it("does not add user to the sync cache", async () => {
+      it("keeps user in the sync cache (optimistic lock, cleared on restart)", async () => {
         mockPrisma.user.findUnique.mockResolvedValue({
           id: "user-1",
           email: "jane@example.com",
@@ -258,7 +258,9 @@ describe("ensureUserSyncedToCio()", () => {
 
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        expect(getUserSyncCacheSize()).toBe(0);
+        // Optimistic add keeps user cached even on no-op early return.
+        // Cache is process-local, so next server restart re-syncs.
+        expect(getUserSyncCacheSize()).toBe(1);
       });
     });
   });

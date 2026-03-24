@@ -35,20 +35,20 @@ vi.mock("../../../../src/server/app-layer/app", () => ({
 
 describe("mapProductSelectionToTrait()", () => {
   describe("when given a valid product selection", () => {
-    it("maps 'via-claude-code' to 'coding_agent'", () => {
-      expect(mapProductSelectionToTrait("via-claude-code")).toBe("coding_agent");
+    it("maps 'via-claude-code' to 'observability'", () => {
+      expect(mapProductSelectionToTrait("via-claude-code")).toBe("observability");
     });
 
-    it("maps 'via-platform' to 'platform'", () => {
-      expect(mapProductSelectionToTrait("via-platform")).toBe("platform");
+    it("maps 'via-platform' to 'evaluations'", () => {
+      expect(mapProductSelectionToTrait("via-platform")).toBe("evaluations");
     });
 
-    it("maps 'via-claude-desktop' to 'mcp'", () => {
-      expect(mapProductSelectionToTrait("via-claude-desktop")).toBe("mcp");
+    it("maps 'via-claude-desktop' to 'prompt_management'", () => {
+      expect(mapProductSelectionToTrait("via-claude-desktop")).toBe("prompt_management");
     });
 
-    it("maps 'manually' to 'manual_sdk'", () => {
-      expect(mapProductSelectionToTrait("manually")).toBe("manual_sdk");
+    it("maps 'manually' to 'agent_simulations'", () => {
+      expect(mapProductSelectionToTrait("manually")).toBe("agent_simulations");
     });
   });
 
@@ -71,19 +71,19 @@ describe("fireProductInterestNurturing()", () => {
     it("sends only product_interest trait via identifyUser", () => {
       fireProductInterestNurturing({
         userId: "user-123",
-        productInterest: "coding_agent",
+        productInterest: "observability",
       });
 
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-123",
-        traits: { product_interest: "coding_agent" },
+        traits: { product_interest: "observability" },
       });
     });
 
     it("does not re-send other signup traits", () => {
       fireProductInterestNurturing({
         userId: "user-123",
-        productInterest: "platform",
+        productInterest: "evaluations",
       });
 
       const call = mockNurturing.identifyUser.mock.calls[0]![0];
@@ -93,7 +93,7 @@ describe("fireProductInterestNurturing()", () => {
     it("does not call trackEvent or groupUser", () => {
       fireProductInterestNurturing({
         userId: "user-123",
-        productInterest: "mcp",
+        productInterest: "prompt_management",
       });
 
       expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe("fireProductInterestNurturing()", () => {
       expect(() =>
         fireProductInterestNurturing({
           userId: "user-123",
-          productInterest: "coding_agent",
+          productInterest: "observability",
         })
       ).not.toThrow();
 
@@ -129,7 +129,7 @@ describe("fireProductInterestNurturing()", () => {
 
       fireProductInterestNurturing({
         userId: "user-123",
-        productInterest: "manual_sdk",
+        productInterest: "agent_simulations",
       });
 
       expect(mockNurturing.identifyUser).not.toHaveBeenCalled();

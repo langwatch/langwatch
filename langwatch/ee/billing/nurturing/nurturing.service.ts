@@ -139,7 +139,6 @@ export class NurturingService {
     }
 
     const url = `${this.baseUrl}${path}`;
-    logger.error({ url, body: JSON.stringify(body).slice(0, 500) }, `[CIO] >>> ${path}`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(
@@ -169,8 +168,6 @@ export class NurturingService {
           new Error(`Customer.io ${path} failed: HTTP ${response.status}`),
           { extra: { path, status: response.status } },
         );
-      } else {
-        logger.error({ path, status: response.status }, `[CIO] <<< ${path} OK`);
       }
     } catch (error) {
       logger.error({ error, path }, `[CIO] <<< ${path} EXCEPTION`);

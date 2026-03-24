@@ -71,7 +71,7 @@ describe("onboarding.setProductInterest", () => {
   }
 
   describe("when the user selects 'Via Coding Agent'", () => {
-    it("fires an identifyUser call with product_interest 'coding_agent'", async () => {
+    it("fires an identifyUser call with product_interest 'observability'", async () => {
       const caller = createCaller();
 
       const result = await caller.setProductInterest({
@@ -81,26 +81,26 @@ describe("onboarding.setProductInterest", () => {
       expect(result).toEqual({ success: true });
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "coding_agent" },
+        traits: { product_interest: "observability" },
       });
     });
   });
 
   describe("when the user selects 'Via the Platform'", () => {
-    it("fires an identifyUser call with product_interest 'platform'", async () => {
+    it("fires an identifyUser call with product_interest 'evaluations'", async () => {
       const caller = createCaller();
 
       await caller.setProductInterest({ productInterest: "via-platform" });
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "platform" },
+        traits: { product_interest: "evaluations" },
       });
     });
   });
 
   describe("when the user selects 'Via MCP'", () => {
-    it("maps to product_interest 'mcp'", async () => {
+    it("maps to product_interest 'prompt_management'", async () => {
       const caller = createCaller();
 
       await caller.setProductInterest({
@@ -109,13 +109,13 @@ describe("onboarding.setProductInterest", () => {
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "mcp" },
+        traits: { product_interest: "prompt_management" },
       });
     });
   });
 
   describe("when the user selects 'Manually'", () => {
-    it("maps to product_interest 'manual_sdk'", async () => {
+    it("maps to product_interest 'agent_simulations'", async () => {
       const caller = createCaller();
 
       await caller.setProductInterest({
@@ -124,7 +124,7 @@ describe("onboarding.setProductInterest", () => {
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "manual_sdk" },
+        traits: { product_interest: "agent_simulations" },
       });
     });
   });

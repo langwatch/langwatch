@@ -37,7 +37,13 @@ export function ensureUserSyncedToCio({
   if (!hasOrganization) return;
   if (syncedUserIds.has(userId)) return;
 
+  // Optimistic: mark as synced BEFORE async work to prevent concurrent
+  // logins from both triggering a full sync. Removed on failure so the
+  // next login can retry.
+  syncedUserIds.add(userId);
+
   void performFullSync({ userId }).catch((error) => {
+    syncedUserIds.delete(userId);
     captureException(error);
   });
 }
@@ -110,8 +116,6 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
       traits: orgTraits,
     }),
   ]);
-
-  syncedUserIds.add(userId);
 }
 
 /**
