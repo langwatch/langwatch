@@ -23,7 +23,7 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
-import { getClickHouseClient } from "../../clickhouse/client";
+import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
@@ -880,7 +880,7 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const chCleanup = Promise.resolve().then(async () => {
-        const chClient = getClickHouseClient();
+        const chClient = await getClickHouseClientForProject(input.projectId);
         if (!chClient) return;
         await Promise.all([
           chClient.command({

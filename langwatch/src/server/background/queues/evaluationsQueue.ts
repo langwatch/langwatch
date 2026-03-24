@@ -7,7 +7,6 @@ import {
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger/server";
-import { safeTruncate } from "../../../utils/truncate";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { isElasticSearchWriteDisabled } from "../../elasticsearch/isElasticSearchWriteDisabled";
 import { prisma } from "../../db";
@@ -281,7 +280,7 @@ export const updateEvaluationStatusInES = async ({
     ...(error && { error: captureError(error) }),
     ...(details !== undefined && { details }),
     ...(retries && { retries }),
-    ...(inputs && { inputs: safeTruncate(inputs, 32 * 1024) }),
+    ...(inputs && { inputs }),
     timestamps: {
       ...(status == "in_progress" && { started_at: Date.now() }),
       ...((status == "skipped" || status == "processed") && {

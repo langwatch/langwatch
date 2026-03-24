@@ -54,7 +54,7 @@ describe("SimulationClickHouseRepository date filtering", () => {
 
   beforeEach(() => {
     clickhouse = createMockClickHouse();
-    repo = new SimulationClickHouseRepository(clickhouse);
+    repo = new SimulationClickHouseRepository(async () => clickhouse);
   });
 
   describe("getRunDataForAllSuites()", () => {

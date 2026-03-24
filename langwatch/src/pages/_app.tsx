@@ -474,48 +474,6 @@ export const system = createSystem(defaultConfig, {
           },
         },
       },
-      shadows: {
-        "2xs": {
-          value: {
-            _light:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
-            _dark:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.15)",
-          },
-        },
-        xs: {
-          value: {
-            _light:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
-            _dark:
-              "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.25)",
-          },
-        },
-        sm: {
-          value: {
-            _light:
-              "1px 1px 2px color-mix(in srgb, var(--chakra-colors-gray-900) 15%, transparent), 0px 0px 1px color-mix(in srgb, var(--chakra-colors-gray-900) 30%, transparent)",
-            _dark:
-              "1px 1px 3px rgba(0, 0, 0, 0.4), 0px 0px 1px rgba(0, 0, 0, 0.6)",
-          },
-        },
-        md: {
-          value: {
-            _light:
-              "0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1)",
-            _dark:
-              "0px 4px 6px -1px rgba(0, 0, 0, 0.4), 0px 2px 4px -2px rgba(0, 0, 0, 0.3)",
-          },
-        },
-        lg: {
-          value: {
-            _light:
-              "0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -4px rgba(0, 0, 0, 0.1)",
-            _dark:
-              "0px 10px 15px -3px rgba(0, 0, 0, 0.4), 0px 4px 6px -4px rgba(0, 0, 0, 0.3)",
-          },
-        },
-      },
     },
     recipes: {
       heading: defineRecipe({
@@ -1127,11 +1085,11 @@ export const system = createSystem(defaultConfig, {
             boxShadow: "lg",
             "&[data-type=info]": {
               bg: {
-                _light: "rgba(49, 130, 206, 0.85)",
+                _light: "blue.solid/85",
                 _dark: "rgba(37, 99, 235, 0.8)",
               },
               borderColor: {
-                _light: "rgba(49, 130, 206, 0.3)",
+                _light: "blue.solid/30",
                 _dark: "rgba(96, 165, 250, 0.25)",
               },
               color: "white",
@@ -1140,44 +1098,44 @@ export const system = createSystem(defaultConfig, {
             },
             "&[data-type=success]": {
               bg: {
-                _light: "rgba(34, 197, 94, 0.85)",
+                _light: "green.solid/85",
                 _dark: "rgba(22, 163, 74, 0.8)",
               },
               borderColor: {
-                _light: "rgba(34, 197, 94, 0.3)",
+                _light: "green.solid/30",
                 _dark: "rgba(74, 222, 128, 0.25)",
               },
               color: "white",
             },
             "&[data-type=error]": {
               bg: {
-                _light: "rgba(239, 68, 68, 0.88)",
+                _light: "red.solid/88",
                 _dark: "rgba(220, 38, 38, 0.8)",
               },
               borderColor: {
-                _light: "rgba(239, 68, 68, 0.3)",
+                _light: "red.solid/30",
                 _dark: "rgba(248, 113, 113, 0.25)",
               },
               color: "white",
             },
             "&[data-type=warning]": {
               bg: {
-                _light: "rgba(245, 158, 11, 0.88)",
+                _light: "yellow.solid/88",
                 _dark: "rgba(217, 119, 6, 0.8)",
               },
               borderColor: {
-                _light: "rgba(245, 158, 11, 0.3)",
+                _light: "yellow.solid/30",
                 _dark: "rgba(251, 191, 36, 0.25)",
               },
               color: "white",
             },
             "&[data-type=loading]": {
               bg: {
-                _light: "rgba(255, 255, 255, 0.8)",
+                _light: "white/80",
                 _dark: "rgba(30, 30, 36, 0.8)",
               },
               borderColor: {
-                _light: "rgba(0, 0, 0, 0.08)",
+                _light: "black/8",
                 _dark: "rgba(255, 255, 255, 0.1)",
               },
               color: { _light: "gray.800", _dark: "gray.100" },

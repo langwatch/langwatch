@@ -130,20 +130,14 @@ export const api = createTRPCNext<AppRouter>({
         }),
         queryCache: new QueryCache({
           onError: (error) => {
+            // Silently mark lite member restriction errors on queries.
+            // Queries may fail on allowed pages (e.g., cost:view on analytics)
+            // — the component handles missing data gracefully.
+            // Only mutations and route guards should trigger the modal.
             const restrictionInfo = extractLiteMemberRestrictionInfo(error);
-            if (!restrictionInfo) return;
-
-            if (error instanceof Error) {
+            if (restrictionInfo && error instanceof Error) {
               markAsHandledByLiteMemberHandler(error);
             }
-
-            if (useUpgradeModalStore.getState().isOpen) return;
-
-            useUpgradeModalStore
-              .getState()
-              .openLiteMemberRestriction({
-                resource: restrictionInfo.resource,
-              });
           },
         }),
         defaultOptions: {

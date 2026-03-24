@@ -13,6 +13,19 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "connected",
+    isConnected: true,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: false,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  }),
+}));
+
 // Mock tRPC api
 vi.mock("~/utils/api", () => ({
   api: {

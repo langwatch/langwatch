@@ -74,6 +74,10 @@ vi.mock("next/router", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useSimulationUpdateListener", () => ({
+  useSimulationUpdateListener: () => {},
+}));
+
 vi.mock("~/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dashboard-layout">{children}</div>

@@ -104,6 +104,8 @@ For PROPOSAL type, prefix the title with "PROPOSAL: ".
 
 Construct the issue body by filling in the template sections with information from the user's description. Place the user's description in the main section and leave other template sections as defaults if not enough info is provided.
 
+**IMPORTANT: Never include customer names, account IDs, project IDs, personal information, or any details that could identify a specific customer or user in the issue body or title. Issues are public — describe the problem generically. If the issue was reported by a customer, omit that context entirely.**
+
 Template sections for reference:
 - **Bug Report**: Describe the bug, To reproduce, Expected behavior, Environment, Additional context
 - **Feature Request**: Problem, Proposed solution, Alternatives considered, Additional context

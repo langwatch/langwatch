@@ -26,7 +26,7 @@ import type {
   DatasetRecordEntry,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 // Import from our UI components
 import { Drawer } from "../components/ui/drawer";
 import { Popover } from "../components/ui/popover";
@@ -224,7 +224,7 @@ export function AutomationDrawer() {
             closeDrawer();
           },
           onError: (error) => {
-            if (isHandledByGlobalLicenseHandler(error)) return;
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Error",
               description: "Error creating automation",
@@ -458,7 +458,6 @@ export function AutomationDrawer() {
                 <DatasetSelector
                   datasets={datasets.data}
                   localStorageDatasetId={localStorageDatasetId}
-                  register={register}
                   errors={errors}
                   setValue={setValue}
                   onCreateNew={editDataset.onOpen}

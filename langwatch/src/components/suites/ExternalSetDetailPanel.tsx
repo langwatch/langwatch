@@ -213,8 +213,6 @@ export function ExternalSetDetailPanel({
       <HStack
         paddingX={6}
         paddingY={4}
-        borderBottom="1px solid"
-        borderColor="border"
         justify="space-between"
       >
         <VStack align="start" gap={0}>
@@ -238,9 +236,18 @@ export function ExternalSetDetailPanel({
           paddingX={6}
           paddingY={4}
           bg="bg"
-          borderBottom="1px solid"
-          borderColor="border"
           flexShrink={0}
+          _after={{
+            content: '""',
+            position: "absolute",
+            bottom: "-5px",
+            left: 0,
+            right: 0,
+            height: "5px",
+            borderTop: "1px solid var(--chakra-colors-border-muted)",
+            background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+            pointerEvents: "none",
+          }}
         >
           <RunHistoryFilters
             scenarioOptions={scenarioOptions}

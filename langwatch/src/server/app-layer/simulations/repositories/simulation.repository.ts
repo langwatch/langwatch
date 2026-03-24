@@ -67,6 +67,8 @@ export interface SimulationRepository {
 
   getExternalSetSummaries(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ExternalSetSummary[]>;
 
   getRunDataForAllSuites(params: {

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import {
@@ -67,6 +68,8 @@ export function BatchEvaluationResults({
   selectedRunId: externalSelectedRunId,
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
+  const { isLiteMember } = useLiteMemberGuard();
+
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
 
@@ -482,14 +485,16 @@ export function BatchEvaluationResults({
               onToggle={toggleColumn}
             />
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDownloadCSV}
-            disabled={!isDownloadCSVEnabled}
-          >
-            <Download size={16} /> Export to CSV
-          </Button>
+          {!isLiteMember && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadCSV}
+              disabled={!isDownloadCSVEnabled}
+            >
+              <Download size={16} /> Export to CSV
+            </Button>
+          )}
           {experiment?.workflowId && (
             <Link
               target="_blank"

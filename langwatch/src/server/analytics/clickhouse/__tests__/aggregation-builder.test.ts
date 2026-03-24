@@ -373,7 +373,7 @@ describe("aggregation-builder", () => {
         endDate
       );
 
-      expect(result.sql).toContain("JOIN stored_spans");
+      expect(result.sql).toContain("FROM stored_spans");
       expect(result.sql).toContain("gen_ai.request.model");
     });
 
@@ -385,7 +385,7 @@ describe("aggregation-builder", () => {
         endDate
       );
 
-      expect(result.sql).toContain("JOIN stored_spans");
+      expect(result.sql).toContain("FROM stored_spans");
       expect(result.sql).toContain("langwatch.span.type");
     });
 

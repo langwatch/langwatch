@@ -51,7 +51,6 @@ function computeFieldsFromEvaluatorType(evaluatorType: string): {
   if (def.result.score) outputs.push({ identifier: "score", type: "float" });
   if (def.result.passed) outputs.push({ identifier: "passed", type: "bool" });
   if (def.result.label) outputs.push({ identifier: "label", type: "str" });
-  outputs.push({ identifier: "details", type: "str" });
 
   return { inputs, outputs };
 }

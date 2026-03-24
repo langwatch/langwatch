@@ -20,15 +20,15 @@ type FormatRunStatusLabelInput = {
 };
 
 const STATUS_LABELS: Record<ScenarioRunStatus, string> = {
-  [ScenarioRunStatus.SUCCESS]: "passed",
-  [ScenarioRunStatus.FAILED]: "failed",
-  [ScenarioRunStatus.ERROR]: "failed",
-  [ScenarioRunStatus.CANCELLED]: "cancelled",
-  [ScenarioRunStatus.STALLED]: "stalled",
-  [ScenarioRunStatus.IN_PROGRESS]: "running",
-  [ScenarioRunStatus.PENDING]: "pending",
-  [ScenarioRunStatus.QUEUED]: "queued",
-  [ScenarioRunStatus.RUNNING]: "running",
+  [ScenarioRunStatus.SUCCESS]: "Passed",
+  [ScenarioRunStatus.FAILED]: "Failed",
+  [ScenarioRunStatus.ERROR]: "Failed",
+  [ScenarioRunStatus.CANCELLED]: "Cancelled",
+  [ScenarioRunStatus.STALLED]: "Stalled",
+  [ScenarioRunStatus.IN_PROGRESS]: "Running",
+  [ScenarioRunStatus.PENDING]: "Pending",
+  [ScenarioRunStatus.QUEUED]: "Queued",
+  [ScenarioRunStatus.RUNNING]: "Running",
 };
 
 const TERMINAL_WITH_CRITERIA: Set<ScenarioRunStatus> = new Set([
@@ -40,9 +40,9 @@ const TERMINAL_WITH_CRITERIA: Set<ScenarioRunStatus> = new Set([
 /**
  * Formats a scenario run status into a display label with optional criteria count.
  *
- * Terminal statuses (success, failed, error) show "passed" or "failed" with
- * criteria count in parentheses when criteria exist, e.g. "passed (4/5)".
- * Non-terminal statuses return their label as-is: "running", "pending", etc.
+ * Terminal statuses (success, failed, error) show "Passed" or "Failed" with
+ * criteria count in parentheses when criteria exist, e.g. "Passed (4/5)".
+ * Non-terminal statuses return their label as-is: "Running", "Pending", etc.
  */
 export function formatRunStatusLabel({
   status,

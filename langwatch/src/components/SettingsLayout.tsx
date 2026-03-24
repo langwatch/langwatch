@@ -59,6 +59,9 @@ export default function SettingsLayout({
             Topic Clustering
           </MenuLink>
           <MenuLink href="/settings/authentication">Authentication</MenuLink>
+          {isEnterprise && (
+            <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
+          )}
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
           {isSaaS && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
           {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}

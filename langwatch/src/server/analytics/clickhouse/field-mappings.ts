@@ -7,6 +7,92 @@
  */
 
 /**
+ * Identity columns always included in trace_summaries dedup subqueries.
+ * These are required for deduplication (TraceId, UpdatedAt),
+ * tenant isolation (TenantId), and time filtering (OccurredAt).
+ */
+export const TRACE_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "OccurredAt",
+  "UpdatedAt",
+] as const;
+
+/**
+ * All trace_summaries columns that analytics queries may reference.
+ * Excludes wide payload columns (ComputedInput, ComputedOutput) that
+ * are never needed by analytics aggregations.
+ */
+export const TRACE_ANALYTICS_COLUMNS = [
+  ...TRACE_IDENTITY_COLUMNS,
+  "CreatedAt",
+  "TotalCost",
+  "TotalDurationMs",
+  "TimeToFirstTokenMs",
+  "TotalPromptTokenCount",
+  "TotalCompletionTokenCount",
+  "TokensPerSecond",
+  "ContainsErrorStatus",
+  "ErrorMessage",
+  "TopicId",
+  "SubTopicId",
+  "HasAnnotation",
+  "Models",
+  "Attributes",
+] as const;
+
+/**
+ * Identity columns always included in evaluation_runs subqueries.
+ * Required for deduplication, tenant isolation, and JOIN keys.
+ */
+export const EVALUATION_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "EvaluationId",
+  "UpdatedAt",
+] as const;
+
+/**
+ * All evaluation_runs columns that analytics queries may reference.
+ */
+export const EVALUATION_ANALYTICS_COLUMNS = [
+  ...EVALUATION_IDENTITY_COLUMNS,
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluatorType",
+  "Score",
+  "Passed",
+  "Label",
+  "Status",
+  "IsGuardrail",
+] as const;
+
+/**
+ * Identity columns always included in stored_spans subqueries.
+ */
+export const SPAN_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "SpanId",
+] as const;
+
+/**
+ * All stored_spans columns that analytics queries may reference.
+ * Excludes wide columns like Input, Output, and the full SpanAttributes map
+ * when only specific attribute keys are needed.
+ */
+export const SPAN_ANALYTICS_COLUMNS = [
+  ...SPAN_IDENTITY_COLUMNS,
+  "SpanAttributes",
+  "StartTime",
+  "EndTime",
+  "StatusCode",
+  `"Events.Name"`,
+  `"Events.Timestamp"`,
+  `"Events.Attributes"`,
+] as const;
+
+/**
  * The ClickHouse table that contains the data for a field
  */
 export type CHTable =
@@ -386,25 +472,56 @@ export function getTableAlias(table: CHTable): string {
 }
 
 /**
- * Build JOIN clause for a table
+ * Build JOIN clause for a table, selecting only the columns needed.
+ *
+ * @param table - The table to JOIN
+ * @param requiredColumns - Optional set of columns needed by the query.
+ *   When provided, only these columns (plus identity columns) are selected.
+ *   When omitted, all analytics columns for the table are selected.
  */
-export function buildJoinClause(table: CHTable): string {
+export function buildJoinClause(
+  table: CHTable,
+  requiredColumns?: ReadonlySet<string>,
+): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
 
   switch (table) {
-    case "stored_spans":
-      return `JOIN stored_spans ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
-    case "evaluation_runs":
+    case "stored_spans": {
+      const columns = requiredColumns
+        ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
+        : SPAN_ANALYTICS_COLUMNS;
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    }
+    case "evaluation_runs": {
+      const columns = requiredColumns
+        ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
+        : EVALUATION_ANALYTICS_COLUMNS;
       return `JOIN (
-        SELECT * FROM evaluation_runs
+        SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
         WHERE TenantId = {tenantId:String}
         ORDER BY EvaluationId, UpdatedAt DESC
         LIMIT 1 BY TenantId, EvaluationId
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    }
     default:
       return "";
   }
+}
+
+/**
+ * Merge required columns with identity columns, ensuring identity columns
+ * are always present.
+ */
+function mergeWithIdentity(
+  required: ReadonlySet<string>,
+  identity: readonly string[],
+): string[] {
+  const merged = new Set<string>(identity);
+  for (const col of required) {
+    merged.add(col);
+  }
+  return Array.from(merged);
 }
 
 /**

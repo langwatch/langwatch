@@ -19,7 +19,7 @@ import {
 } from "../api/routers/modelProviders.utils";
 import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
-import { getClickHouseClient } from "../clickhouse/client";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
@@ -65,7 +65,7 @@ export const clusterTopicsForProject = async (
   }
 
   const clickhouse = project.featureClickHouseDataSourceTraces
-    ? getClickHouseClient()
+    ? await getClickHouseClientForProject(projectId)
     : null;
 
   const { totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount } =

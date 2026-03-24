@@ -883,6 +883,8 @@ export class ScenarioEventService {
     projectId,
   }: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ExternalSetSummary[]> {
     return tracer.withActiveSpan(
       "ScenarioEventService.getExternalSetSummaries",
@@ -903,6 +905,7 @@ export class ScenarioEventService {
           .map((s) => ({
             scenarioSetId: s.scenarioSetId,
             passedCount: 0,
+            failedCount: 0,
             totalCount: 0,
             lastRunTimestamp: s.lastRunAt,
           }))

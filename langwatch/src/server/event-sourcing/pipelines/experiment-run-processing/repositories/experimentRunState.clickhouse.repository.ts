@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
 	ErrorCategory,
@@ -63,7 +63,7 @@ export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements ExperimentRunStateRepository<ProjectionType>
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseExperimentRunRecord,
@@ -145,7 +145,8 @@ export class ExperimentRunStateRepositoryClickHouse<
     const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(context.tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
@@ -227,6 +228,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
+      const client = await this.resolveClient(context.tenantId);
       const { runId } = parseExperimentRunKey(String(projection.aggregateId));
       const projectionRecord = this.mapProjectionDataToClickHouseRecord(
         projection.data as ExperimentRunStateData,
@@ -237,7 +239,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         runId,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",

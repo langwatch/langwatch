@@ -10,6 +10,19 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "connected",
+    isConnected: true,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: false,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  }),
+}));
+
 // Capture the archive mutation's onSuccess so tests can trigger it manually
 let capturedArchiveOnSuccess: (() => void) | undefined;
 
@@ -58,6 +71,9 @@ vi.mock("~/utils/api", () => ({
       },
     },
     scenarios: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
       getSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },

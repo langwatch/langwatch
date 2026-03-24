@@ -8,10 +8,12 @@
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
+import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 export type SuiteRunSummary = {
   passedCount: number;
+  failedCount: number;
   totalCount: number;
   lastRunTimestamp: number | null;
 };
@@ -59,14 +61,23 @@ export type BatchRun = RunGroup & {
 
 /** Summary statistics for a run group (batch, scenario, or target). */
 export type RunGroupSummary = {
-  passRate: number;
+  /** Pass rate as percentage (0-100), or null when no runs have a verdict (all stalled/cancelled/in-progress). */
+  passRate: number | null;
   passedCount: number;
   failedCount: number;
   stalledCount: number;
   cancelledCount: number;
+  /** Runs with an actual verdict: passed + failed (SUCCESS + FAILED + ERROR). */
+  completedCount: number;
   totalCount: number;
   inProgressCount: number;
   queuedCount: number;
+  totalCost: number | null;
+  averageAgentLatencyMs: number | null;
+  totalDurationMs: number | null;
+  agentLatencyStats: MetricStats | null;
+  agentCostStats: MetricStats | null;
+  averageAgentCost: number | null;
 };
 
 /** Backward-compatible alias for RunGroupSummary. */
@@ -276,8 +287,9 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / all finished (SUCCESS, ERROR, FAILED, STALLED, CANCELLED).
- * In-progress and pending runs are tracked separately.
+ * Pass rate = passed / total (all runs count in denominator).
+ * When no runs have an actual verdict (completedCount == 0), passRate is null
+ * to distinguish "nothing evaluated yet" from "everything failed" (0%).
  */
 export function computeGroupSummary({
   group,
@@ -314,8 +326,31 @@ export function computeGroupSummary({
     }
   }
 
-  const finishedCount = passedCount + failedCount + stalledCount + cancelledCount;
-  const passRate = finishedCount > 0 ? (passedCount / finishedCount) * 100 : 0;
+  const completedCount = passedCount + failedCount;
+  const totalCount = group.scenarioRuns.length;
+  const passRate = completedCount > 0
+    ? (passedCount / totalCount) * 100
+    : (totalCount > 0 ? null : 0);
+
+  let totalCost = 0;
+  let totalDurationMs = 0;
+  const allAgentLatencies: number[] = [];
+  const allAgentCosts: number[] = [];
+  for (const run of group.scenarioRuns) {
+    if (run.totalCost != null) totalCost += run.totalCost;
+    if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
+    const agentLatencies = run.roleLatencies?.["Agent"];
+    if (agentLatencies) {
+      allAgentLatencies.push(...agentLatencies);
+    }
+    const agentCosts = run.roleCosts?.["Agent"];
+    if (agentCosts) {
+      allAgentCosts.push(...agentCosts);
+    }
+  }
+
+  const agentLatencyStats = computeMetricStats(allAgentLatencies);
+  const agentCostStats = computeMetricStats(allAgentCosts);
 
   return {
     passRate,
@@ -323,9 +358,16 @@ export function computeGroupSummary({
     failedCount,
     stalledCount,
     cancelledCount,
-    totalCount: group.scenarioRuns.length,
+    completedCount,
+    totalCount,
     inProgressCount,
     queuedCount,
+    totalCost: totalCost > 0 ? totalCost : null,
+    averageAgentLatencyMs: agentLatencyStats?.avg ?? null,
+    totalDurationMs: totalDurationMs > 0 ? totalDurationMs : null,
+    agentLatencyStats,
+    agentCostStats,
+    averageAgentCost: agentCostStats?.avg ?? null,
   };
 }
 
@@ -512,6 +554,7 @@ export function computeSuiteRunSummaries({
     const summary = computeBatchRunSummary({ batchRun: latestBatch });
     map.set(suiteId, {
       passedCount: summary.passedCount,
+      failedCount: summary.failedCount,
       totalCount: summary.totalCount,
       lastRunTimestamp: latestBatch.timestamp,
     });

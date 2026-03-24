@@ -13,6 +13,19 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "connected",
+    isConnected: true,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: false,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  }),
+}));
+
 const mockPush = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
 

@@ -115,7 +115,7 @@ export const authOptions = (
       }
 
       const domain = user.email.split("@")[1];
-      const orgWithSsoDomain = await prisma.organization.findFirst({
+      const orgWithSsoDomain = await prisma.organization.findUnique({
         where: {
           ssoDomain: domain,
         },

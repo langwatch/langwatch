@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Heading, Text, VStack } from "@chakra-ui/react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -39,6 +40,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to trigger topic clustering",
         description: error.message,

@@ -3,7 +3,7 @@
  *
  * Integration tests for GroupRow component.
  *
- * Tests that summary counts appear in header and no footer is rendered.
+ * Tests that summary metrics appear in header and no footer is rendered.
  *
  * @see specs/features/suites/footer-to-header-migration.feature
  */
@@ -41,11 +41,11 @@ describe("<GroupRow/>", () => {
   });
 
   describe("when viewing the header", () => {
-    it("displays word-label counts alongside run count", () => {
+    it("displays run count and pass rate", () => {
       render(
         <GroupRow
           group={makeGroup()}
-          summary={makeSummary({ passedCount: 4, failedCount: 1, totalCount: 5 })}
+          summary={makeSummary({ passedCount: 4, failedCount: 1, totalCount: 5, passRate: 80 })}
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
@@ -55,15 +55,14 @@ describe("<GroupRow/>", () => {
       );
 
       expect(screen.getByText("5 runs")).toBeInTheDocument();
-      expect(screen.getByText("4 passed")).toBeInTheDocument();
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("80%")).toBeInTheDocument();
     });
 
-    it("displays word labels for status counts", () => {
+    it("displays pass rate in metrics summary", () => {
       render(
         <GroupRow
           group={makeGroup()}
-          summary={makeSummary({ passedCount: 4, failedCount: 1 })}
+          summary={makeSummary({ passedCount: 4, failedCount: 1, passRate: 80 })}
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
@@ -72,8 +71,8 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("4 passed")).toBeInTheDocument();
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("Pass")).toBeInTheDocument();
+      expect(screen.getByText("80%")).toBeInTheDocument();
     });
   });
 

@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}EventTimestamp)
 PARTITION BY (AggregateType, toYearWeek(toDateTime64(EventOccurredAt / 1000, 3)))
 ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_spans
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}StartTime)
 PARTITION BY toYearWeek(StartTime)
 ORDER BY (TenantId, TraceId, SpanId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_summaries
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(OccurredAt)
 ORDER BY (TenantId, TraceId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_runs
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(ScheduledAt)
 ORDER BY (TenantId, EvaluationId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.experiment_runs
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(StartedAt)
 ORDER BY (TenantId, RunId, ExperimentId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.experiment_run_items
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}OccurredAt)
 PARTITION BY toYearWeek(OccurredAt)
 ORDER BY (TenantId, RunId, ProjectionId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -370,7 +370,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.simulation_runs
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(StartedAt)
 ORDER BY (TenantId, ScenarioRunId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -392,7 +392,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.billable_events
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYYYYMM(EventTimestamp)
 ORDER BY (OrganizationId, TenantId, DeduplicationKeyHash)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_log_records
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(TimeUnixMs)
 ORDER BY (TenantId, TraceId, SpanId, ProjectionId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- ---------------------------------------------------------------------------
@@ -484,7 +484,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_metric_records
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(TimeUnixMs)
 ORDER BY (TenantId, TraceId, SpanId, MetricName, ProjectionId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose ENVSUB OFF

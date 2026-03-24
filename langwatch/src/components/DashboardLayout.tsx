@@ -709,6 +709,7 @@ export const DashboardLayout = ({
   );
 };
 
+
 function GlobalUpgradeModal() {
   const { isOpen, variant, close } = useUpgradeModalStore();
   if (!variant) return null;

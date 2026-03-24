@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("~/server/db", () => ({
   prisma: {
     user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
-    organization: { findFirst: vi.fn() },
+    organization: { findUnique: vi.fn() },
     session: { findUnique: vi.fn() },
     account: {
       create: vi.fn(),
@@ -112,7 +112,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
   describe("when existing user signs in with correct SSO provider", () => {
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue(existingUser);
-      prismaMock.organization.findFirst.mockResolvedValue(ssoOrg);
+      prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
       prismaMock.account.upsert.mockResolvedValue({});
       prismaMock.account.deleteMany.mockResolvedValue({ count: 0 });
       prismaMock.user.update.mockResolvedValue({});
@@ -184,7 +184,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
   describe("when existing user signs in with wrong provider (old method)", () => {
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue(existingUser);
-      prismaMock.organization.findFirst.mockResolvedValue(ssoOrg);
+      prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
     });
 
     it("throws SSO_PROVIDER_NOT_ALLOWED", async () => {
@@ -215,7 +215,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
 
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue(null);
-      prismaMock.organization.findFirst.mockResolvedValue(ssoOrg);
+      prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
       prismaMock.user.create.mockResolvedValue({
         id: "new-user-id",
         email: "bob@sso-corp.com",
@@ -262,7 +262,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
   describe("when new user signs in with wrong provider for SSO domain", () => {
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue(null);
-      prismaMock.organization.findFirst.mockResolvedValue(ssoOrg);
+      prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
     });
 
     it("throws SSO_PROVIDER_NOT_ALLOWED", async () => {
@@ -316,7 +316,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
         deactivatedAt: null,
         pendingSsoSetup: false,
       });
-      prismaMock.organization.findFirst.mockResolvedValue(null);
+      prismaMock.organization.findUnique.mockResolvedValue(null);
     });
 
     it("allows sign-in without any SSO checks", async () => {
@@ -333,7 +333,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
   describe("when existing user signs in via SSO on subsequent login", () => {
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue(existingUser);
-      prismaMock.organization.findFirst.mockResolvedValue(ssoOrg);
+      prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
       prismaMock.account.upsert.mockResolvedValue({});
       prismaMock.account.deleteMany.mockResolvedValue({ count: 0 });
       prismaMock.user.update.mockResolvedValue({});

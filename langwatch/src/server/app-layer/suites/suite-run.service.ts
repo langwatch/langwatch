@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { generate } from "@langwatch/ksuid";
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
@@ -55,12 +55,12 @@ export class SuiteRunService {
   ) {}
 
   static create(params: {
-    clickhouse: ClickHouseClient | null;
+    resolveClickHouseClient: ClickHouseClientResolver | null;
     startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
     queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
   }): SuiteRunService {
-    const repo = params.clickhouse
-      ? new SuiteRunClickHouseRepository(params.clickhouse)
+    const repo = params.resolveClickHouseClient
+      ? new SuiteRunClickHouseRepository(params.resolveClickHouseClient)
       : new NullSuiteRunReadRepository();
     return traced(new SuiteRunService(repo, params.startSuiteRun, params.queueSimulationRun), "SuiteRunService");
   }

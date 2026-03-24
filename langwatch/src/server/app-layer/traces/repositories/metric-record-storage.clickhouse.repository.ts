@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { NormalizedMetricRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/metricRecords";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
@@ -13,7 +13,7 @@ const logger = createLogger(
 export class MetricRecordStorageClickHouseRepository
   implements MetricRecordStorageRepository
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertMetricRecord(record: NormalizedMetricRecord): Promise<void> {
     EventUtils.validateTenantId(
@@ -22,8 +22,9 @@ export class MetricRecordStorageClickHouseRepository
     );
 
     try {
+      const client = await this.resolveClient(record.tenantId);
       const now = new Date();
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [
           {

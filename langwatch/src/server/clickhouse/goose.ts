@@ -40,6 +40,7 @@ interface ClickHouseConfig {
   databaseUrl: string; // For bootstrap with database context
   gooseConnectionString: string; // HTTP connection string for goose
   clusterName: string | undefined; // If set, enables replication with this cluster name
+  hasLocalPrimaryPolicy?: boolean; // Set during bootstrap — true if 'local_primary' storage policy exists
 }
 
 /**
@@ -316,6 +317,21 @@ async function bootstrapDatabase(
     );
   });
 
+  // Check if 'local_primary' storage policy exists on this CH instance.
+  // Production CH has it (configured via k8s statefulset XML config).
+  // Local dev / bare CH instances don't — migrations use 'default' policy instead.
+  await withClient(config.databaseUrl, async (client) => {
+    const result = await client.query({
+      query: `SELECT policy_name FROM system.storage_policies WHERE policy_name = 'local_primary'`,
+      format: "JSONEachRow",
+    });
+    const rows = await result.json();
+    config.hasLocalPrimaryPolicy = rows.length > 0;
+    if (!config.hasLocalPrimaryPolicy) {
+      logger.info("Storage policy 'local_primary' not found — migrations will use 'default' policy");
+    }
+  });
+
   logger.info("Bootstrap completed");
 }
 
@@ -342,6 +358,12 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
     CLICKHOUSE_ENGINE_REPLACING_PREFIX: config.clusterName
       ? "ReplicatedReplacingMergeTree("
       : "ReplacingMergeTree(",
+
+    // Storage policy: use 'local_primary' if available (production with S3 tiering),
+    // otherwise omit the setting (uses ClickHouse default policy)
+    CLICKHOUSE_STORAGE_POLICY_SETTING: config.hasLocalPrimaryPolicy
+      ? ", storage_policy = 'local_primary'"
+      : "",
   };
 
   // Filter out undefined values

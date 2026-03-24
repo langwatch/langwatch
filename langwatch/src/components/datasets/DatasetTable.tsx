@@ -39,6 +39,7 @@ import type {
   DatasetRecordInput,
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
@@ -118,6 +119,7 @@ export function DatasetTable({
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
       onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Error fetching dataset",
           description: error.message,

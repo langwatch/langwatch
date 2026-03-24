@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
   ErrorCategory,
@@ -49,6 +49,10 @@ interface ClickHouseSimulationRunRecord {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: string | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
+  TraceMetricsJson: string;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -67,7 +71,7 @@ export class SimulationRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements SimulationRunStateRepository<ProjectionType>
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseSimulationRunRecord,
@@ -96,6 +100,10 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: record.UnmetCriteria ?? [],
       Error: record.Error,
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
+      TotalCost: record.TotalCost ?? null,
+      RoleCosts: record.RoleCosts ?? {},
+      RoleLatencies: record.RoleLatencies ?? {},
+      TraceMetrics: record.TraceMetricsJson ? JSON.parse(record.TraceMetricsJson) : {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
@@ -137,6 +145,10 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: data.UnmetCriteria,
       Error: data.Error,
       DurationMs: data.DurationMs?.toString() ?? null,
+      TotalCost: data.TotalCost,
+      RoleCosts: data.RoleCosts,
+      RoleLatencies: data.RoleLatencies,
+      TraceMetricsJson: Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -159,7 +171,8 @@ export class SimulationRunStateRepositoryClickHouse<
     const scenarioRunId = String(aggregateId);
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(context.tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
@@ -169,6 +182,7 @@ export class SimulationRunStateRepositoryClickHouse<
             TraceIds,
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
+            TotalCost, RoleCosts, RoleLatencies, TraceMetricsJson,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
@@ -251,7 +265,8 @@ export class SimulationRunStateRepositoryClickHouse<
         scenarioRunId,
       );
 
-      await this.clickHouseClient.insert({
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
@@ -277,4 +292,5 @@ export class SimulationRunStateRepositoryClickHouse<
       );
     }
   }
+
 }

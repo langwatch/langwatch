@@ -11,7 +11,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
-import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { TypedAgent } from "../../server/agents/agent.repository";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { TagList } from "../ui/TagList";
@@ -131,7 +131,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to create scenario",
         description: error.message,
@@ -151,7 +151,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to update scenario",
         description: error.message,

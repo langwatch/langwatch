@@ -948,38 +948,16 @@ function CustomGraphForm({
           Cancel
         </Button>
         {customId ? (
-          <Tooltip
-            content={
-              !hasPermission("analytics:manage")
-                ? "You need analytics:manage permission to update graphs"
-                : undefined
-            }
-            disabled={hasPermission("analytics:manage")}
-            positioning={{ placement: "top" }}
-            showArrow
-          >
             <Button
               colorPalette="orange"
               onClick={updateGraph}
               loading={updateGraphById.isLoading}
-              disabled={!hasPermission("analytics:manage")}
               marginX={2}
               minWidth="fit-content"
             >
               Update
             </Button>
-          </Tooltip>
         ) : (
-          <Tooltip
-            content={
-              !hasPermission("analytics:create")
-                ? "You need analytics:create permission to create graphs"
-                : undefined
-            }
-            disabled={hasPermission("analytics:create")}
-            positioning={{ placement: "top" }}
-            showArrow
-          >
             <Button
               colorPalette="orange"
               loading={addNewGraph.isLoading}
@@ -988,13 +966,11 @@ function CustomGraphForm({
                   addGraph();
                 });
               }}
-              disabled={!hasPermission("analytics:create")}
               marginX={2}
               minWidth="fit-content"
             >
               Save
             </Button>
-          </Tooltip>
         )}
       </HStack>
     </VStack>
