@@ -12,8 +12,8 @@ interface IconCheckboxCardGroupProps<T extends string = string> {
   items: IconListItem<T>[];
   value: T[];
   onChange: (value: T[]) => void;
-  size?: "sm" | "md" | "lg";
   label?: string;
+  ariaLabel?: string;
 }
 
 export const IconCheckboxCardGroup = <T extends string = string>({
@@ -21,6 +21,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
   value,
   onChange,
   label,
+  ariaLabel,
 }: IconCheckboxCardGroupProps<T>) => {
   const toggle = (item: T) => {
     onChange(
@@ -29,7 +30,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
   };
 
   return (
-    <VStack gap="2" w="full" p="1" m="-1">
+    <VStack role="group" aria-label={ariaLabel ?? label} gap="2" w="full" p="1" m="-1">
       {label && (
         <Text textStyle="sm" fontWeight="medium">
           {label}

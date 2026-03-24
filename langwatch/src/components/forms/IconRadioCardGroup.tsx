@@ -13,8 +13,6 @@ interface IconRadioCardGroupProps<T extends string = string> {
   value?: T;
   onChange: (value: T | undefined) => void;
   direction?: "horizontal" | "vertical";
-  size?: "sm" | "md" | "lg";
-  variant?: "outline";
   maxColumns?: number;
   ariaLabel?: string;
   ariaLabelledBy?: string;
