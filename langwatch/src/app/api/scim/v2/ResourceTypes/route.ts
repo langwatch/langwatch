@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-    totalResults: 1,
-    itemsPerPage: 1,
+    totalResults: 2,
+    itemsPerPage: 2,
     startIndex: 1,
     Resources: [
       {
@@ -16,6 +16,17 @@ export async function GET() {
         meta: {
           resourceType: "ResourceType",
           location: "/api/scim/v2/ResourceTypes/User",
+        },
+      },
+      {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+        id: "Group",
+        name: "Group",
+        endpoint: "/api/scim/v2/Groups",
+        schema: "urn:ietf:params:scim:schemas:core:2.0:Group",
+        meta: {
+          resourceType: "ResourceType",
+          location: "/api/scim/v2/ResourceTypes/Group",
         },
       },
     ],

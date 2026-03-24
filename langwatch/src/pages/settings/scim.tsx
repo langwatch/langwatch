@@ -11,7 +11,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Key, Plus, Trash2 } from "lucide-react";
+import { Key, Link, Plus, Trash2, Unlink } from "lucide-react";
 import { useState } from "react";
 import { CopyInput } from "../../components/CopyInput";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -201,6 +201,7 @@ function ScimSettingsContent({
             </Table.Root>
           </Card.Body>
         </Card.Root>
+        <GroupMappingsSection organizationId={organizationId} />
       </VStack>
 
       {/* Generate Token Dialog */}
@@ -318,5 +319,207 @@ function ScimSettingsContent({
         </Dialog.Content>
       </Dialog.Root>
     </SettingsLayout>
+  );
+}
+
+function GroupMappingsSection({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
+  const teamMappings = api.scimToken.listTeamMappings.useQuery({
+    organizationId,
+  });
+  const linkMutation = api.scimToken.linkTeam.useMutation();
+  const unlinkMutation = api.scimToken.unlinkTeam.useMutation();
+  const queryClient = api.useContext();
+
+  const [linkingTeamId, setLinkingTeamId] = useState<string | null>(null);
+  const [scimGroupId, setScimGroupId] = useState("");
+
+  const handleLink = (teamId: string) => {
+    if (!scimGroupId.trim()) return;
+
+    linkMutation.mutate(
+      { organizationId, teamId, externalScimId: scimGroupId.trim() },
+      {
+        onSuccess: () => {
+          setLinkingTeamId(null);
+          setScimGroupId("");
+          toaster.create({
+            title: "Team linked to SCIM group",
+            type: "success",
+            duration: 3000,
+            meta: { closable: true },
+          });
+          void queryClient.scimToken.listTeamMappings.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to link team",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
+  const handleUnlink = (teamId: string) => {
+    unlinkMutation.mutate(
+      { organizationId, teamId },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: "Team unlinked from SCIM group",
+            type: "success",
+            duration: 3000,
+            meta: { closable: true },
+          });
+          void queryClient.scimToken.listTeamMappings.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to unlink team",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <>
+      <HStack width="full" paddingTop={4}>
+        <Heading size="md">Group Mappings</Heading>
+        <Spacer />
+      </HStack>
+
+      <Text fontSize="sm" color="gray.500">
+        SCIM groups from your identity provider are mapped to LangWatch teams.
+        When users are added to or removed from a group in Okta/Azure AD, their
+        team membership in LangWatch is updated automatically. Groups are linked
+        automatically by name when pushed, or you can link them manually below.
+      </Text>
+
+      <Card.Root width="full" overflow="hidden">
+        <Card.Body paddingY={0} paddingX={0}>
+          <Table.Root variant="line" size="md" width="full">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Team</Table.ColumnHeader>
+                <Table.ColumnHeader>SCIM Group ID</Table.ColumnHeader>
+                <Table.ColumnHeader>Status</Table.ColumnHeader>
+                <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {teamMappings.data?.length === 0 && (
+                <Table.Row>
+                  <Table.Cell colSpan={4}>
+                    <Text color="gray.500" textAlign="center" paddingY={4}>
+                      No teams found. Create teams first, then map them to SCIM
+                      groups.
+                    </Text>
+                  </Table.Cell>
+                </Table.Row>
+              )}
+              {teamMappings.data?.map((team) => (
+                <Table.Row key={team.id}>
+                  <Table.Cell>
+                    <Text fontWeight="500">{team.name}</Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {linkingTeamId === team.id ? (
+                      <HStack>
+                        <Input
+                          size="sm"
+                          placeholder="Enter SCIM Group ID"
+                          value={scimGroupId}
+                          onChange={(e) => setScimGroupId(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleLink(team.id);
+                            if (e.key === "Escape") {
+                              setLinkingTeamId(null);
+                              setScimGroupId("");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          size="xs"
+                          onClick={() => handleLink(team.id)}
+                          disabled={!scimGroupId.trim()}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => {
+                            setLinkingTeamId(null);
+                            setScimGroupId("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </HStack>
+                    ) : (
+                      <Text
+                        fontSize="sm"
+                        color={team.externalScimId ? "inherit" : "gray.400"}
+                        fontFamily={team.externalScimId ? "mono" : undefined}
+                      >
+                        {team.externalScimId ?? "Not linked"}
+                      </Text>
+                    )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    {team.externalScimId ? (
+                      <Badge colorPalette="green" size="sm">
+                        Linked
+                      </Badge>
+                    ) : (
+                      <Badge colorPalette="gray" size="sm">
+                        Unlinked
+                      </Badge>
+                    )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    {team.externalScimId ? (
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        colorPalette="red"
+                        onClick={() => handleUnlink(team.id)}
+                        disabled={unlinkMutation.isLoading}
+                      >
+                        <Unlink size={14} />
+                        Unlink
+                      </Button>
+                    ) : (
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={() => {
+                          setLinkingTeamId(team.id);
+                          setScimGroupId("");
+                        }}
+                      >
+                        <Link size={14} />
+                        Link
+                      </Button>
+                    )}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </Card.Body>
+      </Card.Root>
+    </>
   );
 }

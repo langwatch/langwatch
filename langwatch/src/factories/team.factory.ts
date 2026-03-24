@@ -10,5 +10,6 @@ export const teamFactory = Factory.define<Team>(({ sequence }) => ({
   createdAt: new Date(),
   updatedAt: new Date(),
   archivedAt: null,
+  externalScimId: null,
   defaultCustomRoleId: null,
 }));

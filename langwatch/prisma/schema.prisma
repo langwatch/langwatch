@@ -133,17 +133,19 @@ model OrganizationUser {
 }
 
 model Team {
-    id             String       @id @default(nanoid())
-    name           String
-    slug           String       @unique
-    members        TeamUser[]
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    projects       Project[]
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    archivedAt     DateTime?
+    id              String       @id @default(nanoid())
+    name            String
+    slug            String       @unique
+    members         TeamUser[]
+    organizationId  String
+    organization    Organization @relation(fields: [organizationId], references: [id])
+    projects        Project[]
+    createdAt       DateTime     @default(now())
+    updatedAt       DateTime     @default(now()) @updatedAt
+    archivedAt      DateTime?
+    externalScimId  String?
 
+    @@unique([organizationId, externalScimId])
     @@index([organizationId])
 }
 
