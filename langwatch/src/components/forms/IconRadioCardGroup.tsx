@@ -65,7 +65,7 @@ export const IconRadioCardGroup = <T extends string = string>({
     return (
       <Button
         key={item.value}
-        variant="unstyled"
+        variant="plain"
         role="radio"
         aria-checked={isSelected}
         onClick={() => onChange(item.value)}

@@ -40,7 +40,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
         return (
           <Button
             key={item.value}
-            variant="unstyled"
+            variant="plain"
             role="checkbox"
             aria-checked={isSelected}
             onClick={() => toggle(item.value)}
