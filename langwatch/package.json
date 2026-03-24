@@ -200,6 +200,7 @@
     "qs": "^6.15.0",
     "react": "^19.0.0",
     "react-admin": "^5.1.1",
+    "react-collapsed": "^4.2.0",
     "react-contextual-analytics": "^1.1.2",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",

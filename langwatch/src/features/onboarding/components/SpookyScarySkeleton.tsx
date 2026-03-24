@@ -14,7 +14,7 @@ const SpookyScarySkeleton: React.FC<SpookyScarySkeletonProps> = ({
         <Skeleton
           loading={loading}
           h="40px"
-          borderRadius="md"
+          borderRadius="lg"
           variant="shine"
         />
         <SkeletonText loading={loading} noOfLines={1} gap={2} variant="shine" />
@@ -43,7 +43,7 @@ const SpookyScarySkeleton: React.FC<SpookyScarySkeletonProps> = ({
             loading={loading}
             h="40px"
             w="80px"
-            borderRadius="md"
+            borderRadius="lg"
             variant="shine"
           />
         </HStack>

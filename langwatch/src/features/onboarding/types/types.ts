@@ -7,9 +7,10 @@ export enum OnboardingScreenIndex {
 
 export enum ProductScreenIndex {
   SELECTION = 0,
-  OBSERVABILITY = 1,
-  EVALUATIONS = 2,
-  PROMPT_MANAGEMENT = 3,
+  VIA_CLAUDE_CODE = 1,
+  VIA_PLATFORM = 2,
+  VIA_CLAUDE_DESKTOP = 3,
+  MANUALLY = 4,
 }
 
 export enum OnboardingFlowDirection {
@@ -112,9 +113,10 @@ export interface OnboardingFlowConfig {
 }
 
 export type ProductSelection =
-  | "observability"
-  | "evaluations"
-  | "prompt-management";
+  | "via-claude-code"
+  | "via-platform"
+  | "via-claude-desktop"
+  | "manually";
 
 export interface ProductFlowConfig {
   variant: "product";

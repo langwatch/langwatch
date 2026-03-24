@@ -99,7 +99,7 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Completing onboarding flow...");
 
     // Fill in organization/company name
-    const companyInput = page.getByPlaceholder("Company Name");
+    const companyInput = page.getByPlaceholder("Company or your name");
     await companyInput.fill("Browser Test Org");
     console.log("  - Filled company name");
 
