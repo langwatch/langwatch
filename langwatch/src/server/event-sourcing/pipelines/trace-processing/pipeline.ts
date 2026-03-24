@@ -28,6 +28,7 @@ export interface TraceProcessingPipelineDeps {
   projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -38,7 +39,7 @@ export interface TraceProcessingPipelineDeps {
  * individual spans to the stored_spans table (map projection).
  */
 export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
-  return definePipeline<TraceProcessingEvent>()
+  let builder = definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
     .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({
@@ -58,7 +59,17 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
-    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+
+  if (deps.customerIoTraceSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "customerIoTraceSync",
+      deps.customerIoTraceSyncReactor,
+    );
+  }
+
+  return builder
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
