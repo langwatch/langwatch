@@ -8,7 +8,7 @@ import httpx
 import langwatch
 from pydantic import BaseModel, Field
 import dspy
-from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential, before_log, after_log
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log, after_log
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
@@ -114,13 +114,6 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
             raise ValueError(f"Unsupported evaluation weighting: {weighting}")
 
 
-def _should_retry(exception: BaseException) -> bool:
-    """Don't retry on 4xx client errors (permanent failures)."""
-    if isinstance(exception, httpx.HTTPStatusError):
-        return exception.response.status_code >= 500
-    return True
-
-
 class EvaluationReporting:
     weighting: Weighting
 
@@ -147,7 +140,6 @@ class EvaluationReporting:
         self.last_sent = 0
         self.debounce_interval = 1  # 1 second
         self.threads: List[threading.Thread] = []
-        self.post_errors: list[str] = []
 
     def evaluate_and_report(
         self,
@@ -284,7 +276,7 @@ class EvaluationReporting:
 
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=self._post_results_with_logging,
+                target=EvaluationReporting._post_results_with_logging,
                 args=(self.workflow.api_key, body, self.run_id),
             )
             thread.start()
@@ -294,15 +286,16 @@ class EvaluationReporting:
             self.batch = {"dataset": [], "evaluations": []}
             self.last_sent = time.time()
 
-    def _post_results_with_logging(self, api_key: str, body: dict, run_id: str):
+    @classmethod
+    def _post_results_with_logging(cls, api_key: str, body: dict, run_id: str):
         """Thread-safe wrapper that catches and logs errors from post_results."""
         try:
-            posted = self.post_results(api_key, body)
+            posted = cls.post_results(api_key, body)
             if posted:
                 logger.info(
                     "Successfully posted evaluation results: run_id=%s", run_id
                 )
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Failed to post evaluation results after retries: run_id=%s, "
                 "experiment_slug=%s, endpoint=%s",
@@ -310,14 +303,11 @@ class EvaluationReporting:
                 body.get("experiment_slug"),
                 langwatch.get_endpoint(),
             )
-            with self.lock:
-                self.post_errors.append(str(e))
 
     @classmethod
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception(_should_retry),
         reraise=True,
         before=before_log(logger, logging.DEBUG),
         after=after_log(logger, logging.DEBUG),
@@ -345,16 +335,6 @@ class EvaluationReporting:
             )
         response.raise_for_status()
         return True
-
-    def has_errors(self) -> bool:
-        """Return True if any post errors were recorded during batch sends."""
-        with self.lock:
-            return len(self.post_errors) > 0
-
-    def get_error_summary(self) -> str:
-        """Return a combined summary of all post errors."""
-        with self.lock:
-            return "; ".join(self.post_errors)
 
     async def wait_for_completion(self):
         # Send any remaining batch
