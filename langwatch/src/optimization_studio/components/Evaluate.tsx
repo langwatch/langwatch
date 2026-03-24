@@ -264,7 +264,7 @@ export function EvaluateModalContent({
         return;
       }
 
-      checkAndProceed(async () => {
+      await checkAndProceed(async () => {
         let versionId: string | undefined;
 
         if (canSave) {
