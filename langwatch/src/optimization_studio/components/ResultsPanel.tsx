@@ -164,7 +164,7 @@ export function EvaluationResults({
         workflowId,
       }),
       refetchOnWindowFocus: false,
-      refetchInterval: keepFetching ? 2000 : undefined,
+      refetchInterval: keepFetching ? 1 : undefined,
     },
   );
 
@@ -256,29 +256,6 @@ export function EvaluationResults({
     !experiment.data ||
     !project
   ) {
-    if (evaluationState?.status === "error" && evaluationState?.error) {
-      return (
-        <Alert.Root status="error" margin={4}>
-          <Alert.Indicator />
-          <Alert.Title>{evaluationState.error}</Alert.Title>
-        </Alert.Root>
-      );
-    }
-    if (
-      evaluationState?.status === "success" &&
-      experiment.isError &&
-      experiment.error.data?.httpStatus === 404 &&
-      !keepFetching
-    ) {
-      return (
-        <Alert.Root status="error" margin={4}>
-          <Alert.Indicator />
-          <Alert.Title>
-            Evaluation completed but results could not be saved
-          </Alert.Title>
-        </Alert.Root>
-      );
-    }
     if (keepFetching) {
       return <Text padding={4}>Loading...</Text>;
     }
@@ -368,7 +345,7 @@ export function OptimizationResults() {
     {
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
-      refetchInterval: keepFetching ? 2000 : undefined,
+      refetchInterval: keepFetching ? 1 : undefined,
     },
   );
 
