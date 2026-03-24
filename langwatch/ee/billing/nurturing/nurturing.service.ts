@@ -139,6 +139,8 @@ export class NurturingService {
     }
 
     const url = `${this.baseUrl}${path}`;
+    logger.error({ url, body: JSON.stringify(body).slice(0, 500) }, `[CIO] >>> ${path}`);
+
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
@@ -159,18 +161,19 @@ export class NurturingService {
 
       if (!response.ok) {
         const responseBody = await response.text().catch(() => "<unreadable>");
-        const safeResponseBody = responseBody.slice(0, 256);
         logger.error(
-          { path, status: response.status, responseBody: safeResponseBody },
-          `Customer.io ${path} failed: HTTP ${response.status}`,
+          { path, status: response.status, responseBody: responseBody.slice(0, 500) },
+          `[CIO] <<< ${path} FAILED: HTTP ${response.status}`,
         );
         captureException(
           new Error(`Customer.io ${path} failed: HTTP ${response.status}`),
           { extra: { path, status: response.status } },
         );
+      } else {
+        logger.error({ path, status: response.status }, `[CIO] <<< ${path} OK`);
       }
     } catch (error) {
-      logger.error({ error, path }, `Failed to send Customer.io ${path} call`);
+      logger.error({ error, path }, `[CIO] <<< ${path} EXCEPTION`);
       captureException(error);
     } finally {
       clearTimeout(timeoutId);

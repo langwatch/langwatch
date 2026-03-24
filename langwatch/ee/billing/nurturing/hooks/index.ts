@@ -9,3 +9,4 @@ export {
   fireActivityTrackingNurturing,
   resetActivityTrackingCache,
 } from "./activityTracking";
+export { ensureUserSyncedToCio, resetUserSyncCache } from "./userSync";

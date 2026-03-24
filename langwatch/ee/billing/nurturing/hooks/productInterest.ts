@@ -5,28 +5,29 @@ import type { CioPersonTraits } from "../types";
 /**
  * Valid product interest trait values sent to Customer.io.
  *
- * Maps from the onboarding "Pick your flavour" selection to CIO trait values.
+ * Maps from the onboarding integration-method selection to CIO trait values.
+ * The onboarding asks "how do you want to integrate?" rather than "what product?"
  */
 export type ProductInterestValue =
-  | "observability"
-  | "evaluations"
-  | "prompt_management"
-  | "agent_simulations";
+  | "coding_agent"
+  | "platform"
+  | "mcp"
+  | "manual_sdk";
 
 /**
  * Maps the UI product selection key to the Customer.io trait value.
  *
- * The UI uses hyphenated keys ("prompt-management", "agent-simulations")
- * while CIO traits use underscores.
+ * The UI uses hyphenated keys ("via-claude-code", "via-platform", etc.)
+ * while CIO traits use underscore-separated descriptive values.
  */
 export function mapProductSelectionToTrait(
   selection: string
 ): ProductInterestValue {
   const mapping: Record<string, ProductInterestValue> = {
-    observability: "observability",
-    evaluations: "evaluations",
-    "prompt-management": "prompt_management",
-    "agent-simulations": "agent_simulations",
+    "via-claude-code": "coding_agent",
+    "via-platform": "platform",
+    "via-claude-desktop": "mcp",
+    "manually": "manual_sdk",
   };
 
   if (!Object.hasOwn(mapping, selection)) {
