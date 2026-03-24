@@ -1,4 +1,4 @@
-import { Box, Circle, Grid, HStack, Icon, Stack, Text } from "@chakra-ui/react";
+import { Button, Circle, Grid, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useRef } from "react";
 
@@ -63,26 +63,27 @@ export const IconRadioCardGroup = <T extends string = string>({
       isSelected || (value === undefined && index === 0);
 
     return (
-      <Box
+      <Button
         key={item.value}
-        asChild
+        variant="unstyled"
         role="radio"
         aria-checked={isSelected}
         onClick={() => onChange(item.value)}
         cursor="pointer"
         borderWidth="1px"
-        borderColor={isSelected ? "orange.400" : "border.subtle"}
+        borderColor={isSelected ? "orange.emphasized" : "border.subtle"}
         borderRadius="xl"
         bg={isSelected ? "orange.subtle" : "bg.panel"}
         p="3"
+        h="auto"
         transition="all 0.2s ease"
-        boxShadow={isSelected ? "0 0 0 1px var(--chakra-colors-orange-100)" : "none"}
+        boxShadow={isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"}
         position="relative"
         _hover={{
-          borderColor: isSelected ? "orange.400" : "border.emphasized",
+          borderColor: isSelected ? "orange.emphasized" : "border.emphasized",
           bg: isSelected ? "orange.subtle" : "bg.muted",
           boxShadow: isSelected
-            ? "0 0 0 1px var(--chakra-colors-orange-100)"
+            ? "0 0 0 1px var(--colors-orange-muted)"
             : "sm",
           transform: "translateY(-1px)",
           zIndex: 1,
@@ -90,48 +91,44 @@ export const IconRadioCardGroup = <T extends string = string>({
         w="full"
         minW="0"
         textAlign="start"
+        tabIndex={isTabbable ? 0 : -1}
+        onKeyDown={(e) => handleKeyDown(e, index)}
       >
-        <button
-          type="button"
-          tabIndex={isTabbable ? 0 : -1}
-          onKeyDown={(e) => handleKeyDown(e, index)}
-        >
-          <HStack align="center" justify="space-between" w="full" minW="0">
-            <HStack align="center" gap="2" minW="0" flex="1">
-              {item.icon && (
-                <Icon
-                  size="sm"
-                  color={isSelected ? "orange.fg" : "fg.muted"}
-                  transition="color 0.15s ease"
-                  flexShrink={0}
-                >
-                  <item.icon />
-                </Icon>
-              )}
-
-              <Text
-                textStyle="sm"
-                fontWeight="medium"
-                color="fg.DEFAULT"
-                truncate
+        <HStack align="center" justify="space-between" w="full" minW="0">
+          <HStack align="center" gap="2" minW="0" flex="1">
+            {item.icon && (
+              <Icon
+                size="sm"
+                color={isSelected ? "orange.fg" : "fg.muted"}
+                transition="color 0.15s ease"
+                flexShrink={0}
               >
-                {item.title}
-              </Text>
-            </HStack>
+                <item.icon />
+              </Icon>
+            )}
 
-            <Circle
-              size="4"
-              borderWidth="1px"
-              borderColor={isSelected ? "orange.solid" : "border.emphasized"}
-              bg={isSelected ? "orange.solid" : "bg.surface"}
-              transition="all 0.15s ease"
-              flexShrink={0}
+            <Text
+              textStyle="sm"
+              fontWeight="medium"
+              color="fg.DEFAULT"
+              truncate
             >
-              {isSelected && <Circle size="1.5" bg="white" />}
-            </Circle>
+              {item.title}
+            </Text>
           </HStack>
-        </button>
-      </Box>
+
+          <Circle
+            size="4"
+            borderWidth="1px"
+            borderColor={isSelected ? "orange.solid" : "border.emphasized"}
+            bg={isSelected ? "orange.solid" : "bg.surface"}
+            transition="all 0.15s ease"
+            flexShrink={0}
+          >
+            {isSelected && <Circle size="1.5" bg="white" />}
+          </Circle>
+        </HStack>
+      </Button>
     );
   };
 

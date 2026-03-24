@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type React from "react";
 
@@ -38,28 +38,29 @@ export const IconCheckboxCardGroup = <T extends string = string>({
       {items.map((item) => {
         const isSelected = value.includes(item.value);
         return (
-          <Box
+          <Button
             key={item.value}
-            asChild
+            variant="unstyled"
             role="checkbox"
             aria-checked={isSelected}
             onClick={() => toggle(item.value)}
             cursor="pointer"
             borderWidth="1px"
-            borderColor={isSelected ? "orange.400" : "border.subtle"}
+            borderColor={isSelected ? "orange.emphasized" : "border.subtle"}
             borderRadius="xl"
             bg={isSelected ? "orange.subtle" : "bg.panel"}
             p="3"
+            h="auto"
             transition="all 0.2s ease"
             boxShadow={
-              isSelected ? "0 0 0 1px var(--chakra-colors-orange-100)" : "none"
+              isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"
             }
             position="relative"
             _hover={{
-              borderColor: isSelected ? "orange.400" : "border.emphasized",
+              borderColor: isSelected ? "orange.emphasized" : "border.emphasized",
               bg: isSelected ? "orange.subtle" : "bg.muted",
               boxShadow: isSelected
-                ? "0 0 0 1px var(--chakra-colors-orange-100)"
+                ? "0 0 0 1px var(--colors-orange-muted)"
                 : "sm",
               transform: "translateY(-1px)",
               zIndex: 1,
@@ -68,47 +69,44 @@ export const IconCheckboxCardGroup = <T extends string = string>({
             minW="0"
             textAlign="start"
           >
-            <button type="button">
-              <HStack align="center" justify="space-between" w="full" minW="0">
-                <HStack align="center" gap="2" minW="0" flex="1">
-                  <Icon
-                    size="sm"
-                    color={isSelected ? "orange.fg" : "fg.muted"}
-                    transition="color 0.15s ease"
-                    flexShrink={0}
-                  >
-                    <item.icon />
-                  </Icon>
-                  <Text
-                    textStyle="sm"
-                    fontWeight="medium"
-                    color="fg.DEFAULT"
-                    truncate
-                  >
-                    {item.title}
-                  </Text>
-                </HStack>
-
-                <Box
-                  w="4"
-                  h="4"
-                  borderRadius="4px"
-                  borderWidth="1px"
-                  borderColor={
-                    isSelected ? "orange.solid" : "border.emphasized"
-                  }
-                  bg={isSelected ? "orange.solid" : "bg.surface"}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  transition="all 0.15s ease"
+            <HStack align="center" justify="space-between" w="full" minW="0">
+              <HStack align="center" gap="2" minW="0" flex="1">
+                <Icon
+                  size="sm"
+                  color={isSelected ? "orange.fg" : "fg.muted"}
+                  transition="color 0.15s ease"
                   flexShrink={0}
                 >
-                  {isSelected && <Check size={10} color="white" strokeWidth={3} />}
-                </Box>
+                  <item.icon />
+                </Icon>
+                <Text
+                  textStyle="sm"
+                  fontWeight="medium"
+                  color="fg.DEFAULT"
+                  truncate
+                >
+                  {item.title}
+                </Text>
               </HStack>
-            </button>
-          </Box>
+
+              <HStack
+                w="4"
+                h="4"
+                borderRadius="4px"
+                borderWidth="1px"
+                borderColor={
+                  isSelected ? "orange.solid" : "border.emphasized"
+                }
+                bg={isSelected ? "orange.solid" : "bg.surface"}
+                align="center"
+                justify="center"
+                transition="all 0.15s ease"
+                flexShrink={0}
+              >
+                {isSelected && <Check size={10} color="white" strokeWidth={3} />}
+              </HStack>
+            </HStack>
+          </Button>
         );
       })}
     </VStack>
