@@ -87,8 +87,9 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
             boxShadow:
               "0 12px 40px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
             borderColor: "var(--chakra-colors-orange-200)",
+            transition: { duration: 0.25, ease: "easeOut" },
           }}
-          whileTap={{ scale: 0.98 }}
+          whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
         >
           {/* Gradient overlay */}
           <Box
