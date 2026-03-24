@@ -20,7 +20,6 @@ import {
   startSpan,
   withScope,
 } from "../../../utils/posthogErrorCapture";
-import { safeTruncate } from "../../../utils/truncate";
 import {
   flattenObjectKeys,
   getInternalProtectionsForProject,
@@ -330,7 +329,7 @@ const processCollectorJob_ = async (
     };
     if (esSpan.params && typeof span.params === "object") {
       esSpan.params = {
-        ...safeTruncate(esSpan.params, 128 * 1024),
+        ...esSpan.params,
         _keys: flattenObjectKeys(esSpan.params),
       };
     } else {
@@ -413,10 +412,10 @@ const processCollectorJob_ = async (
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
         ? {
-            custom: safeTruncate({
+            custom: {
               ...customExistingMetadata,
               ...customMetadata,
-            }),
+            },
           }
         : {}),
       all_keys: Array.from(

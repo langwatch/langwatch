@@ -10,7 +10,6 @@ import {
 import type { ESBatchEvaluation } from "~/server/experiments/types";
 import { eSBatchEvaluationSchema } from "~/server/experiments/types.generated";
 import { createLogger } from "~/utils/logger/server";
-import { safeTruncate } from "~/utils/truncate";
 import type {
   BatchEvaluation,
   BatchEvaluationRepository,
@@ -90,26 +89,9 @@ export const createElasticsearchBatchEvaluationRepository =
       const id = batchEvaluationId({ projectId, experimentId, runId });
       const now = Date.now();
 
-      // Truncate large fields
-      const truncatedDataset =
-        dataset?.map((entry) => ({
-          ...entry,
-          entry: safeTruncate(entry.entry, 32 * 1024),
-          predicted: entry.predicted
-            ? safeTruncate(entry.predicted, 32 * 1024)
-            : undefined,
-        })) ?? [];
+      const truncatedDataset = dataset ?? [];
 
-      const truncatedEvaluations =
-        evaluations?.map((evaluation) => ({
-          ...evaluation,
-          inputs: evaluation.inputs
-            ? safeTruncate(evaluation.inputs, 32 * 1024)
-            : undefined,
-          details: evaluation.details
-            ? safeTruncate(evaluation.details, 32 * 1024)
-            : undefined,
-        })) ?? [];
+      const truncatedEvaluations = evaluations ?? [];
 
       // Script for merging results with existing document
       // Uses target_id for uniqueness in Evaluations V3

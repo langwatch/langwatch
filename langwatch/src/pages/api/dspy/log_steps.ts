@@ -22,7 +22,6 @@ import {
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
 import { createLogger } from "../../../utils/logger/server";
-import { safeTruncate } from "../../../utils/truncate";
 import { findOrCreateExperiment } from "../experiment/init";
 import { getApp } from "../../../server/app-layer/app";
 import type { DspyStepData } from "../../../server/app-layer/dspy-steps/types";
@@ -185,12 +184,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
       },
       hash: generateHash(example),
     };
-    return safeTruncate(processedExample, 16 * 1024, [
-      8 * 1024,
-      4 * 1024,
-      2 * 1024,
-      1024,
-    ]);
+    return processedExample;
   });
 
   const llmCalls = param.llm_calls
@@ -205,12 +199,6 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
       }
 
       if (llmCall.response) {
-        llmCall.response = safeTruncate(llmCall.response, 16 * 1024, [
-          8 * 1024,
-          4 * 1024,
-          2 * 1024,
-          1024,
-        ]);
         totalSize = JSON.stringify(llmCall).length;
 
         if (totalSize >= 256_000) {
