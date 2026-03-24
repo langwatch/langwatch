@@ -131,16 +131,19 @@ interface CursorPayload {
 export class SimulationClickHouseRepository implements SimulationRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
+  /** Guards against empty/missing tenantId before delegating to the injected resolver. */
   private async getClient(tenantId: string): Promise<ClickHouseClient> {
+    if (!tenantId) {
+      throw new Error("tenantId is required for ClickHouse client resolution");
+    }
     return this.resolveClient(tenantId);
   }
 
   private async queryRows<T>(
     query: string,
-    params: Record<string, string | string[]>,
+    params: { tenantId: string } & Record<string, string | string[]>,
   ): Promise<T[]> {
-    const tenantId = typeof params.tenantId === "string" ? params.tenantId : params.tenantId?.[0] ?? "unknown";
-    const client = await this.getClient(tenantId);
+    const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
@@ -800,7 +803,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }: {
     projectIds: string[];
   }): Promise<Set<string>> {
-    if (projectIds.length === 0) {
+    const [firstProjectId] = projectIds;
+    if (!firstProjectId) {
       return new Set();
     }
 
@@ -815,7 +819,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { projectIds },
+      { tenantId: firstProjectId, projectIds },
     );
 
     return new Set(rows.map((r) => r.ScenarioSetId));
