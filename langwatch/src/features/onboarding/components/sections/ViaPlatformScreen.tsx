@@ -77,15 +77,15 @@ function CapabilityCard({
       borderRadius="xl"
       border="1px solid"
       borderColor="gray.200"
-      bg="white/70"
+      bg="bg.panel/70"
       backdropFilter="blur(20px) saturate(1.3)"
-      boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
+      boxShadow="0 1px 3px rgba(0,0,0,0.04)"
       transition="all 0.2s ease"
       cursor="pointer"
       _hover={{
-        borderColor: "rgba(237,137,38,0.25)",
+        borderColor: "orange.200",
         boxShadow:
-          "0 6px 28px rgba(237,137,38,0.06), inset 0 1px 0 white",
+          "0 6px 28px rgba(237,137,38,0.06)",
         transform: "translateY(-2px)",
         textDecoration: "none",
       }}
@@ -95,7 +95,7 @@ function CapabilityCard({
         flexShrink={0}
         p={2.5}
         borderRadius="xl"
-        bg="rgba(237,137,38,0.08)"
+        bg="orange.50"
         color="orange.500"
         display="flex"
         alignItems="center"

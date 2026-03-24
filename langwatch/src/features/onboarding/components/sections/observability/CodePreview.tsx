@@ -118,9 +118,9 @@ export function CodePreview({
             borderRadius="xl"
             border="1px solid"
             borderColor="gray.200"
-            bg="white/60"
+            bg="bg.panel/60"
             backdropFilter="blur(20px) saturate(1.3)"
-            boxShadow="0 4px 30px rgba(0,0,0,0.06), inset 0 1px 0 white"
+            boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             overflow="hidden"
           >
             <CodeBlock.Header display="flex" justifyContent="space-between" borderColor="gray.200">

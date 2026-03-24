@@ -48,9 +48,9 @@ export function InlineCopyButton({
         aria-label={`Copy ${label.toLowerCase()}`}
         colorPalette={copied ? "green" : "gray"}
         backdropFilter="blur(8px)"
-        bg="white/50"
+        bg="bg.panel/50"
         borderRadius="lg"
-        _hover={{ bg: "white/70" }}
+        _hover={{ bg: "bg.panel/70" }}
         flexShrink={0}
         gap={1.5}
       >

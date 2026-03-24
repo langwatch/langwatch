@@ -64,24 +64,23 @@ export function SelectableIconCard(
         cursor="pointer"
         borderWidth={selected ? "2px" : "1px"}
         borderColor={
-          selected ? selectedBorderColor : "rgba(0,0,0,0.06)"
+          selected ? selectedBorderColor : "border.subtle"
         }
-        bg={selected ? selectedBg : "rgba(255,255,255,0.6)"}
-        backdropFilter="blur(12px)"
+        bg={selected ? selectedBg : "bg.panel"}
         boxShadow={
           selected
-            ? "0 0 0 1px rgba(237,137,38,0.15)"
+            ? "0 0 0 1px var(--chakra-colors-orange-100)"
             : "none"
         }
         transition="all 0.2s ease"
         _hover={{
           borderColor: selected
             ? selectedBorderColor
-            : "rgba(0,0,0,0.10)",
-          bg: selected ? selectedBg : "rgba(255,255,255,0.85)",
+            : "border.emphasized",
+          bg: selected ? selectedBg : "gray.50",
           boxShadow: selected
-            ? "0 0 0 1px rgba(237,137,38,0.15)"
-            : "0 2px 8px rgba(0,0,0,0.04)",
+            ? "0 0 0 1px var(--chakra-colors-orange-100)"
+            : "sm",
           transform: "translateY(-1px)",
         }}
         aspectRatio="1 / 1"

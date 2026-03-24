@@ -177,7 +177,7 @@ export function PhoneNumberInput(
 
   return (
     <Group attached w="full">
-      <Box position="relative" w="9em" zIndex={1}>
+      <Box position="relative" w="7em" zIndex={1}>
         <NativeSelect.Root
           size="md"
           position="relative"
@@ -191,9 +191,11 @@ export function PhoneNumberInput(
             onChange={(e) => handleCountryChange(e.target.value as CountryCode)}
             css={{
               color: "transparent",
-              "& option": { color: "black" },
+              colorScheme: "light dark",
+              "& option": { color: "initial", backgroundColor: "initial" },
             }}
             bg="bg.surface"
+            color="fg.DEFAULT"
           >
             {(() => {
               const renderOption = (code: CountryCode) => {
@@ -235,11 +237,9 @@ export function PhoneNumberInput(
           alignItems="center"
           px="3"
           pr="8"
-          color="inherit"
+          color="fg.DEFAULT"
         >
-          {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(
-            country,
-          )}`}
+          {`+${getCountryCallingCode(country)}`}
         </Box>
       </Box>
 

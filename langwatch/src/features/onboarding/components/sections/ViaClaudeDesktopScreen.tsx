@@ -108,10 +108,10 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
             py={1.5}
             borderRadius="xl"
             border="1px solid"
-            borderColor="gray.200"
-            bg="white/70"
+            borderColor="border.subtle"
+            bg="bg.panel/70"
             backdropFilter="blur(20px) saturate(1.3)"
-            boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
+            boxShadow="0 2px 16px rgba(0,0,0,0.04)"
             w="fit-content"
           >
             {APPS.map((app) => (
@@ -164,15 +164,14 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
                   py={2.5}
                   borderRadius="xl"
                   border="1px solid"
-                  borderColor="gray.200"
-                  bg="white/70"
+                  borderColor="border.subtle"
+                  bg="bg.panel/70"
                   backdropFilter="blur(20px) saturate(1.3)"
-                  boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
+                  boxShadow="sm"
                   transition="all 0.17s ease"
                   _hover={{
-                    borderColor: "gray.300",
-                    boxShadow:
-                      "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
+                    borderColor: "border.emphasized",
+                    boxShadow: "md",
                     transform: "translateY(-1px)",
                   }}
                 >
@@ -181,7 +180,7 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
                     w={5}
                     h={5}
                     borderRadius="full"
-                    bg="rgba(237,137,38,0.10)"
+                    bg="orange.50"
                     color="orange.500"
                     display="flex"
                     alignItems="center"
@@ -233,14 +232,14 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
           borderRadius="xl"
           overflow="hidden"
           border="1px solid"
-          borderColor="gray.200"
-          bg="white/70"
+          borderColor="border.subtle"
+          bg="bg.panel/70"
           backdropFilter="blur(20px) saturate(1.3)"
-          boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
+          boxShadow="sm"
           transition="all 0.17s ease"
           _hover={{
-            borderColor: "rgba(237,137,38,0.25)",
-            boxShadow: "0 6px 28px rgba(237,137,38,0.06), inset 0 1px 0 white",
+            borderColor: "orange.200",
+            boxShadow: "md",
           }}
         >
           <Box
@@ -250,7 +249,7 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
             pr={12}
             fontSize="12.5px"
             fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
-            color="gray.800"
+            color="fg.DEFAULT"
             lineHeight="1.8"
             overflowX="hidden"
             whiteSpace="pre-wrap"

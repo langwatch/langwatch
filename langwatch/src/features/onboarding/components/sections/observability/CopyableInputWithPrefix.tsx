@@ -37,15 +37,15 @@ export function CopyableInputWithPrefix({
       borderRadius="xl"
       border="1px solid"
       borderColor="gray.200"
-      bg="white/70"
+      bg="bg.panel/70"
       backdropFilter="blur(24px) saturate(1.4)"
-      boxShadow="0 4px 30px rgba(0,0,0,0.06), inset 0 1px 0 white"
+      boxShadow="0 4px 30px rgba(0,0,0,0.06)"
       overflow="hidden"
       transition="all 0.2s ease"
       _hover={{
         borderColor: "gray.300",
         boxShadow:
-          "0 8px 40px rgba(0,0,0,0.08), inset 0 1px 0 white",
+          "0 8px 40px rgba(0,0,0,0.08)",
       }}
     >
       <Box
@@ -80,9 +80,9 @@ export function CopyableInputWithPrefix({
               onClick={toggleVisibility}
               aria-label={isVisible ? "Hide key" : "Show key"}
               backdropFilter="blur(8px)"
-              bg="white/50"
+              bg="bg.panel/50"
               borderRadius="lg"
-              _hover={{ bg: "white/70" }}
+              _hover={{ bg: "bg.panel/70" }}
             >
               {isVisible ? <EyeOff size={14} /> : <Eye size={14} />}
             </IconButton>
@@ -99,9 +99,9 @@ export function CopyableInputWithPrefix({
             onClick={() => void onCopy({ withBashPrefix: false })}
             aria-label={`Copy ${ariaLabel.toLowerCase()}`}
             backdropFilter="blur(8px)"
-            bg="white/50"
+            bg="bg.panel/50"
             borderRadius="lg"
-            _hover={{ bg: "white/70" }}
+            _hover={{ bg: "bg.panel/70" }}
           >
             <Clipboard size={14} />
           </IconButton>
@@ -117,9 +117,9 @@ export function CopyableInputWithPrefix({
             onClick={() => void onCopy({ withBashPrefix: true })}
             aria-label={`Copy ${ariaLabel.toLowerCase()} with bash prefix`}
             backdropFilter="blur(8px)"
-            bg="white/50"
+            bg="bg.panel/50"
             borderRadius="lg"
-            _hover={{ bg: "white/70" }}
+            _hover={{ bg: "bg.panel/70" }}
           >
             <ClipboardPlus size={14} />
           </IconButton>

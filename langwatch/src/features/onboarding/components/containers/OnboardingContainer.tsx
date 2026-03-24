@@ -12,7 +12,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { signOut } from "next-auth/react";
 import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
-import { LightMode } from "~/components/ui/color-mode";
 import { Tooltip } from "~/components/ui/tooltip";
 import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
@@ -83,7 +82,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   );
 
   return (
-    <Box w="full" minH="100dvh" bg="#FAFAFA" position="relative" style={{ scrollbarGutter: "stable" }} overflowY="auto">
+    <Box w="full" minH="100dvh" bg="bg.page" position="relative" style={{ scrollbarGutter: "stable" }} overflowY="auto">
       <OnboardingMeshBackground />
 
       {showBackButton && onBack && (
@@ -158,21 +157,21 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             borderRadius="10px"
             fontSize="13px"
             fontWeight="500"
-            color="#6B7280"
-            bg="rgba(255,255,255,0.7)"
+            color="fg.muted"
+            bg="bg.panel/70"
             backdropFilter="blur(12px)"
-
-            border="1px solid rgba(0,0,0,0.06)"
-            boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+            border="1px solid"
+            borderColor="border.subtle"
+            boxShadow="sm"
             textDecoration="none"
             cursor="pointer"
             transition="all 0.25s ease"
             _hover={{
-              bg: "rgba(255,255,255,0.95)",
-              color: "#374151",
-              boxShadow: "0 3px 12px rgba(0,0,0,0.08)",
+              bg: "bg.panel",
+              color: "fg.DEFAULT",
+              boxShadow: "md",
               transform: "translateY(-2px)",
-              borderColor: "rgba(0,0,0,0.10)",
+              borderColor: "border.emphasized",
             }}
           >
             <a href={skipHref}>
@@ -191,9 +190,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <LightMode>
-          <FullLogo width={150} />
-        </LightMode>
+        <FullLogo width={150} />
       </MotionCenter>
 
       {/* Content */}
@@ -210,11 +207,11 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         {...(isFullWidth ? { fluid: true } : {})}
       >
         <MotionBox
-          bg="white"
+          bg="bg.panel"
           borderRadius="16px"
           border="1px solid"
-          borderColor="rgba(0,0,0,0.06)"
-          boxShadow="0 1px 2px rgba(0,0,0,0.03), 0 4px 16px rgba(0,0,0,0.02)"
+          borderColor="border.subtle"
+          boxShadow="sm"
           px={{ base: 5, md: isFullWidth ? 8 : 7 }}
           py={{ base: 6, md: 8 }}
           initial={{ opacity: 0, y: 16, scale: 0.98 }}

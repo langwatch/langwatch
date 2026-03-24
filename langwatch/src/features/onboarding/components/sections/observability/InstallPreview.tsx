@@ -64,12 +64,12 @@ export function InstallPreview({
               language="bash"
               size="sm"
               transition="all 0.3s ease"
-              bg="white/60"
+              bg="bg.panel/60"
               borderRadius="xl"
               border="1px solid"
               borderColor="gray.200"
               backdropFilter="blur(20px) saturate(1.3)"
-              boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
+              boxShadow="0 2px 16px rgba(0,0,0,0.04)"
               overflow="hidden"
               meta={{ colorScheme: colorMode }}
             >

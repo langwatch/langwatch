@@ -64,7 +64,7 @@ export const OnboardingNavigation = <T extends number = number>({
             fontSize="14px"
             borderRadius="8px"
             disabled={isSubmitting}
-            _hover={{ color: "fg.DEFAULT", bg: "blackAlpha.50" }}
+            _hover={{ color: "fg.DEFAULT", bg: "bg.muted" }}
             onClick={() => {
               emit("clicked", "previous", { currentScreenIndex });
               onPrev();
@@ -82,7 +82,7 @@ export const OnboardingNavigation = <T extends number = number>({
             fontWeight="semibold"
             fontSize="14px"
             borderRadius="8px"
-            _hover={{ color: "fg.DEFAULT", bg: "blackAlpha.50" }}
+            _hover={{ color: "fg.DEFAULT", bg: "bg.muted" }}
             onClick={() => {
               emit("clicked", isLastScreen ? "finish" : "skip", {
                 currentScreenIndex,

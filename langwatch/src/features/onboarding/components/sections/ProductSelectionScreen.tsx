@@ -67,10 +67,10 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           position="relative"
           overflow="hidden"
           borderRadius="2xl"
-          bg="white/80"
+          bg="bg.panel/80"
           border="1px solid"
-          borderColor="gray.200"
-          boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+          borderColor="border.subtle"
+          boxShadow="sm"
           backdropFilter="blur(20px) saturate(1.3)"
           px={6}
           py={5}
@@ -108,14 +108,14 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
               flexShrink={0}
               p={3}
               borderRadius="xl"
-              bg="rgba(237,137,38,0.08)"
+              bg="orange.50"
               border="1px solid"
-              borderColor="rgba(237,137,38,0.12)"
+              borderColor="orange.100"
               transition="all 0.25s ease"
               css={{
                 "button:hover &": {
-                  background: "rgba(237,137,38,0.14)",
-                  borderColor: "rgba(237,137,38,0.22)",
+                  background: "var(--chakra-colors-orange-100)",
+                  borderColor: "var(--chakra-colors-orange-200)",
                   transform: "scale(1.05)",
                 },
               }}

@@ -102,18 +102,18 @@ function glassCard({
   return {
     borderRadius: "xl",
     border: "1px solid",
-    borderColor: highlight ? "orange.200" : "gray.200",
-    bg: highlight ? "orange.50" : "white/70",
+    borderColor: highlight ? "orange.200" : "border.subtle",
+    bg: highlight ? "orange.subtle" : "bg.panel/70",
     backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: highlight
-      ? "0 0 0 1px rgba(237,137,38,0.08), 0 4px 24px rgba(237,137,38,0.12), inset 0 1px 0 white"
-      : "0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white",
+      ? "0 0 0 1px var(--chakra-colors-orange-100)"
+      : "sm",
     transition: "all 0.17s ease",
     _hover: {
-      borderColor: highlight ? "orange.300" : "gray.300",
+      borderColor: highlight ? "orange.300" : "border.emphasized",
       boxShadow: highlight
-        ? "0 0 0 1px rgba(237,137,38,0.12), 0 8px 32px rgba(237,137,38,0.18), inset 0 1px 0 white"
-        : "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
+        ? "0 0 0 1px var(--chakra-colors-orange-200)"
+        : "md",
       transform: "translateY(-1px)",
     },
   };
@@ -180,9 +180,9 @@ function SkillRow({
         px={3}
         py={2}
         borderRadius="lg"
-        bg="white/60"
+        bg="bg.panel/60"
         border="1px solid"
-        borderColor="gray.200"
+        borderColor="border.subtle"
       >
         <Text fontSize="xs" color="fg.muted">
           Then use
@@ -317,14 +317,14 @@ function McpTab({
         borderRadius="xl"
         overflow="hidden"
         border="1px solid"
-        borderColor="gray.200"
-        bg="white/70"
+        borderColor="border.subtle"
+        bg="bg.panel/70"
         backdropFilter="blur(20px) saturate(1.3)"
-        boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
+        boxShadow="0 1px 3px rgba(0,0,0,0.04)"
         transition="all 0.17s ease"
         _hover={{
-          borderColor: "rgba(237,137,38,0.25)",
-          boxShadow: "0 6px 28px rgba(237,137,38,0.06), inset 0 1px 0 white",
+          borderColor: "orange.200",
+          boxShadow: "0 6px 28px rgba(237,137,38,0.06)",
         }}
       >
         <Box
@@ -334,7 +334,7 @@ function McpTab({
           pr={12}
           fontSize="12.5px"
           fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
-          color="gray.800"
+          color="fg.DEFAULT"
           lineHeight="1.8"
           overflowX="hidden"
           whiteSpace="pre-wrap"
@@ -362,12 +362,12 @@ function McpTab({
               px={2.5}
               py={1}
               borderRadius="md"
-              bg="white/60"
+              bg="bg.panel/60"
               border="1px solid"
-              borderColor="gray.200"
+              borderColor="border.subtle"
               cursor="pointer"
               transition="all 0.15s ease"
-              _hover={{ borderColor: "rgba(237,137,38,0.25)", bg: "white" }}
+              _hover={{ borderColor: "orange.200", bg: "bg.panel" }}
               onClick={() => {
                 void navigator.clipboard
                   .writeText(ep.path)
@@ -437,10 +437,10 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
           py={1.5}
           borderRadius="xl"
           border="1px solid"
-          borderColor="gray.200"
-          bg="white/70"
+          borderColor="border.subtle"
+          bg="bg.panel/70"
           backdropFilter="blur(20px) saturate(1.3)"
-          boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
+          boxShadow="0 2px 16px rgba(0,0,0,0.04)"
         >
           <TabButton
             label="Prompt"

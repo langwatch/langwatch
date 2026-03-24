@@ -21,17 +21,17 @@ export function TabButton({
       fontSize="sm"
       fontWeight={active ? "semibold" : "medium"}
       color={active ? "fg.DEFAULT" : "fg.muted"}
-      bg={active ? "white" : "transparent"}
+      bg={active ? "bg.panel" : "transparent"}
       backdropFilter={active ? "blur(20px) saturate(1.3)" : undefined}
       boxShadow={
         active
-          ? "0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 white"
+          ? "0 2px 8px rgba(0,0,0,0.06)"
           : undefined
       }
       border="1px solid"
       borderColor={active ? "gray.200" : "transparent"}
       transition="all 0.17s ease"
-      _hover={{ bg: active ? "white" : "gray.50" }}
+      _hover={{ bg: active ? "bg.panel" : "bg.muted" }}
       letterSpacing="-0.01em"
     >
       {label}

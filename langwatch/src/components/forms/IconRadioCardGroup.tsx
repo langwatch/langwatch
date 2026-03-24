@@ -71,20 +71,21 @@ export const IconRadioCardGroup = <T extends string = string>({
         onClick={() => onChange(item.value)}
         cursor="pointer"
         borderWidth="1px"
-        borderColor={isSelected ? "orange.400" : "rgba(0,0,0,0.06)"}
-        borderRadius="12px"
-        bg={isSelected ? "orange.subtle" : "rgba(255,255,255,0.6)"}
-        backdropFilter="blur(12px)"
+        borderColor={isSelected ? "orange.400" : "border.subtle"}
+        borderRadius="xl"
+        bg={isSelected ? "orange.subtle" : "bg.panel"}
         p="3"
         transition="all 0.2s ease"
-        boxShadow={isSelected ? "0 0 0 1px rgba(237,137,38,0.15)" : "none"}
+        boxShadow={isSelected ? "0 0 0 1px var(--chakra-colors-orange-100)" : "none"}
+        position="relative"
         _hover={{
-          borderColor: isSelected ? "orange.400" : "rgba(0,0,0,0.10)",
-          bg: isSelected ? "orange.subtle" : "rgba(255,255,255,0.85)",
+          borderColor: isSelected ? "orange.400" : "border.emphasized",
+          bg: isSelected ? "orange.subtle" : "bg.muted",
           boxShadow: isSelected
-            ? "0 0 0 1px rgba(237,137,38,0.15)"
-            : "0 2px 8px rgba(0,0,0,0.04)",
+            ? "0 0 0 1px var(--chakra-colors-orange-100)"
+            : "sm",
           transform: "translateY(-1px)",
+          zIndex: 1,
         }}
         w="full"
         minW="0"
@@ -144,10 +145,12 @@ export const IconRadioCardGroup = <T extends string = string>({
         aria-labelledby={ariaLabelledBy}
         templateColumns={{
           base: "1fr",
-          md: `repeat(${cols}, minmax(0, 1fr))`,
+          md: `repeat(${cols}, 1fr)`,
         }}
         gap="2"
         w="full"
+        p="1"
+        m="-1"
       >
         {items.map(renderItem)}
       </Grid>
@@ -163,6 +166,8 @@ export const IconRadioCardGroup = <T extends string = string>({
       direction="column"
       gap="2"
       w="full"
+      p="1"
+      m="-1"
     >
       {items.map(renderItem)}
     </Stack>
