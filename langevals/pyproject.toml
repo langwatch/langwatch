@@ -49,7 +49,7 @@ dev = [
     "toml>=0.10.2",
     "tomli-w>=1.0.0",
     "grevillea>=0.0.1",
-    "litellm>=1.79.0",
+    "litellm>=1.79.0,<=1.82.6",
     "instructor>=1.2.2",
     "pytest-xdist>=3.5.0",
     "flaky>=3.8.1",

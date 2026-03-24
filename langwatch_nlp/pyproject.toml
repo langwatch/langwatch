@@ -17,7 +17,7 @@ dependencies = [
     "jsonpath-ng>=1.7.0,<2",
     "langevals-core>=0.1.21,<0.2",
     "langwatch>=0.1.37,<0.11",
-    "litellm[proxy]>=1.81.3",
+    "litellm[proxy]>=1.81.3,<=1.82.6",
     "mangum>=0.17.0,<0.22",
     "nanoid>=2.0.0,<3",
     "numpy>=1.26.4,<3",
