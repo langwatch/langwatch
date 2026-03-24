@@ -457,6 +457,7 @@ function PublishModalContent({
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
+    checkCanCommitNewVersion,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -465,6 +466,7 @@ function PublishModalContent({
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
+      checkCanCommitNewVersion,
     }) => ({
       workflowId,
       getWorkflow,
@@ -472,6 +474,7 @@ function PublishModalContent({
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -494,13 +497,19 @@ function PublishModalContent({
 
   const {
     versions,
-    canSaveNewVersion: canSave,
     versionToBeEvaluated,
   } = useVersionState({
     project,
     form,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
+
+  // Use the same check as VersionToBeUsed to decide whether a new commit is needed.
+  // canSaveNewVersion (from useVersionState) may be true due to autoSaved conditions
+  // even when there are no actual DSL changes, which causes a mismatch: the UI shows
+  // CurrentVersionDisplay (no commit message input) but onSubmit tries to commit,
+  // fails form validation silently, and the button appears to hang.
+  const canSave = checkCanCommitNewVersion();
 
   const publishWorkflow = api.workflow.publish.useMutation();
 

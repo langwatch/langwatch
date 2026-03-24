@@ -239,7 +239,13 @@ export const mapEvaluatorResult = (
           label: typeof executionState.outputs?.label === 'string'
             ? executionState.outputs.label
             : undefined,
-          details: executionState.outputs?.details as string | undefined,
+          // Only include details when it's a non-empty string.
+          // Python's EvaluationResultWithMetadata always serializes details
+          // (default None -> null), so we filter out null/undefined to prevent
+          // the "sticky details" bug where details appears even after removal.
+          details: typeof executionState.outputs?.details === 'string' && executionState.outputs.details
+            ? executionState.outputs.details
+            : undefined,
           cost: executionState.cost
             ? { currency: "USD", amount: executionState.cost }
             : undefined,

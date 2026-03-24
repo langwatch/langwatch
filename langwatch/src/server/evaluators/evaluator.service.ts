@@ -169,7 +169,9 @@ export class EvaluatorService {
   /**
    * Computes output fields for a built-in evaluator from its result definition.
    * Only includes score/passed/label when the evaluator actually produces them.
-   * Always includes details since all evaluators can produce a freeform explanation.
+   * Does NOT unconditionally add `details` -- it is included as a default when
+   * creating NEW evaluator nodes (see useEvaluatorPickerFlow), but users can
+   * remove it. Respecting the declared outputFields prevents "sticky" fields.
    */
   private computeBuiltInOutputFields(evaluatorType: string): EvaluatorField[] {
     const def = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
@@ -179,10 +181,8 @@ export class EvaluatorService {
     if (def.result.score) fields.push({ identifier: "score", type: "float" });
     if (def.result.passed) fields.push({ identifier: "passed", type: "bool" });
     if (def.result.label) fields.push({ identifier: "label", type: "str" });
-    // details is always available on EvaluationResult
-    fields.push({ identifier: "details", type: "str" });
 
-    return fields.length > 1 ? fields : STANDARD_EVALUATOR_OUTPUT_FIELDS;
+    return fields.length > 0 ? fields : STANDARD_EVALUATOR_OUTPUT_FIELDS;
   }
 
   /**
