@@ -89,9 +89,9 @@ export const createElasticsearchBatchEvaluationRepository =
       const id = batchEvaluationId({ projectId, experimentId, runId });
       const now = Date.now();
 
-      const truncatedDataset = dataset ?? [];
+      const normalizedDataset = dataset ?? [];
 
-      const truncatedEvaluations = evaluations ?? [];
+      const normalizedEvaluations = evaluations ?? [];
 
       // Script for merging results with existing document
       // Uses target_id for uniqueness in Evaluations V3
@@ -157,8 +157,8 @@ export const createElasticsearchBatchEvaluationRepository =
         }
       `,
         params: {
-          dataset: truncatedDataset,
-          evaluations: truncatedEvaluations,
+          dataset: normalizedDataset,
+          evaluations: normalizedEvaluations,
           targets: targets ?? null,
           updated_at: now,
           progress: progress ?? null,
@@ -176,8 +176,8 @@ export const createElasticsearchBatchEvaluationRepository =
       logger.debug(
         {
           runId,
-          datasetCount: truncatedDataset.length,
-          evaluationsCount: truncatedEvaluations.length,
+          datasetCount: normalizedDataset.length,
+          evaluationsCount: normalizedEvaluations.length,
           progress,
         },
         "Upserted batch evaluation results",

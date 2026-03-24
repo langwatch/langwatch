@@ -7,7 +7,6 @@ import { useMemo, useState } from "react";
 const MotionVStack = motion(VStack);
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
-import { toaster } from "../../../../components/ui/toaster";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import {
   PROMPT_ANALYTICS,
@@ -17,7 +16,9 @@ import {
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
 } from "./code-prompts";
+import { maskApiKey } from "./shared/api-key-utils";
 import { buildMcpJson, CLOUD_ENDPOINT } from "./shared/build-mcp-config";
+import { copyToClipboard } from "./shared/copy-to-clipboard";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
 import { TabButton } from "./shared/TabButton";
 
@@ -199,23 +200,10 @@ function SkillRow({
             type="button"
             aria-label={`Copy ${skill.slashCommand}`}
             onClick={() => {
-              void navigator.clipboard
-                .writeText(skill.slashCommand)
-                .then(() => {
-                  toaster.create({
-                    title: "Copied",
-                    description: `${skill.slashCommand} copied to clipboard`,
-                    type: "success",
-                    meta: { closable: true },
-                  });
-                })
-                .catch(() => {
-                  toaster.create({
-                    title: "Failed to copy",
-                    type: "error",
-                    meta: { closable: true },
-                  });
-                });
+              void copyToClipboard({
+                text: skill.slashCommand,
+                successMessage: `${skill.slashCommand} copied to clipboard`,
+              });
             }}
           >
             <Text
@@ -369,23 +357,10 @@ function McpTab({
               transition="all 0.15s ease"
               _hover={{ borderColor: "orange.200", bg: "bg.panel" }}
               onClick={() => {
-                void navigator.clipboard
-                  .writeText(ep.path)
-                  .then(() => {
-                    toaster.create({
-                      title: "Copied",
-                      description: `${ep.editor} config path copied`,
-                      type: "success",
-                      meta: { closable: true },
-                    });
-                  })
-                  .catch(() => {
-                    toaster.create({
-                      title: "Failed to copy",
-                      type: "error",
-                      meta: { closable: true },
-                    });
-                  });
+                void copyToClipboard({
+                  text: ep.path,
+                  successMessage: `${ep.editor} config path copied`,
+                });
               }}
             >
               <button type="button" aria-label={`Copy ${ep.editor} config path`}>
@@ -410,9 +385,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
 
-  const maskedApiKey = effectiveApiKey
-    ? `${effectiveApiKey.slice(0, 6)}•••${effectiveApiKey.slice(-4)}`
-    : "";
+  const maskedApiKey = maskApiKey(effectiveApiKey);
 
   const mcpJson = useMemo(
     () =>

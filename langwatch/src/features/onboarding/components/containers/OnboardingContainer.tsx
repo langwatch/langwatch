@@ -7,7 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, LogOut } from "lucide-react";
+import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import { AnimatePresence, motion } from "motion/react";
 import { signOut } from "next-auth/react";
 import { useAnalytics } from "react-contextual-analytics";
@@ -174,10 +175,10 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
               borderColor: "border.emphasized",
             }}
           >
-            <a href={skipHref}>
+            <Link href={skipHref}>
               Continue to LangWatch
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </a>
+              <ArrowRight size={14} />
+            </Link>
           </Box>
         </MotionBox>
       )}

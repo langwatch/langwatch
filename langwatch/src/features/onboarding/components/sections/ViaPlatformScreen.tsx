@@ -1,6 +1,7 @@
 import { Box, Grid, GridItem, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   Activity,
+  ArrowUpRight,
   BookOpen,
   FlaskConical,
   type LucideIcon,
@@ -8,6 +9,7 @@ import {
   Settings,
   Shield,
 } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import type React from "react";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 
@@ -90,7 +92,7 @@ function CapabilityCard({
         textDecoration: "none",
       }}
     >
-    <a href={href} style={{ textDecoration: "none", color: "inherit" }}>
+    <Link href={href} textDecoration="none" color="inherit">
       <Box
         flexShrink={0}
         p={2.5}
@@ -116,7 +118,7 @@ function CapabilityCard({
           {description}
         </Text>
       </VStack>
-    </a>
+    </Link>
     </VStack>
   );
 }
@@ -148,22 +150,19 @@ export function ViaPlatformScreen(): React.ReactElement {
         </Grid>
 
         <HStack justify="center" pt={2}>
-          <a
+          <Link
             href="https://docs.langwatch.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-              fontSize: "13px",
-              color: "#51676C",
-              textDecoration: "none",
-            }}
+            isExternal
+            display="inline-flex"
+            alignItems="center"
+            gap="4px"
+            fontSize="13px"
+            color="#51676C"
+            textDecoration="none"
           >
             Read the docs
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
-          </a>
+            <ArrowUpRight size={14} />
+          </Link>
         </HStack>
       </VStack>
 

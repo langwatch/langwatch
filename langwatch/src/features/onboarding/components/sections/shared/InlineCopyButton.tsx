@@ -2,8 +2,8 @@ import { Button } from "@chakra-ui/react";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { toaster } from "../../../../../components/ui/toaster";
 import { Tooltip } from "../../../../../components/ui/tooltip";
+import { copyToClipboard } from "./copy-to-clipboard";
 
 export function InlineCopyButton({
   text,
@@ -15,23 +15,13 @@ export function InlineCopyButton({
   const [copied, setCopied] = useState(false);
 
   async function handleCopy(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyToClipboard({
+      text,
+      successMessage: `${label} copied to clipboard`,
+    });
+    if (ok) {
       setCopied(true);
-      toaster.create({
-        title: "Copied",
-        description: `${label} copied to clipboard`,
-        type: "success",
-        meta: { closable: true },
-      });
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toaster.create({
-        title: "Copy failed",
-        description: "Couldn't copy. Please try again.",
-        type: "error",
-        meta: { closable: true },
-      });
     }
   }
 

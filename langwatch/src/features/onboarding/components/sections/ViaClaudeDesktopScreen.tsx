@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import { maskApiKey } from "./shared/api-key-utils";
 import { buildMcpConfig } from "./shared/build-mcp-config";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
 import { TabButton } from "./shared/TabButton";
@@ -39,7 +40,7 @@ const APPS: {
   },
 ];
 
-export function ViaClaudeDesktopScreen(): React.ReactElement {
+export function ViaMcpClientScreen(): React.ReactElement {
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
   const [activeApp, setActiveApp] = useState<AppKey>("claude-desktop");
@@ -64,9 +65,7 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
     [configReady, effectiveApiKey, effectiveEndpoint],
   );
 
-  const maskedApiKey = effectiveApiKey
-    ? `${effectiveApiKey.slice(0, 6)}•••••${effectiveApiKey.slice(-4)}`
-    : "";
+  const maskedApiKey = maskApiKey(effectiveApiKey);
 
   const displayConfigJson = useMemo(
     () =>

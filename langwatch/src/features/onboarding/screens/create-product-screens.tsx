@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
 import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
 import { ViaClaudeCodeScreen } from "../components/sections/ViaClaudeCodeScreen";
-import { ViaClaudeDesktopScreen } from "../components/sections/ViaClaudeDesktopScreen";
+import { ViaMcpClientScreen } from "../components/sections/ViaClaudeDesktopScreen";
 import { ViaPlatformScreen } from "../components/sections/ViaPlatformScreen";
 import type { ProductFlowConfig } from "../types/types";
 import {
@@ -58,7 +58,7 @@ export const useCreateProductScreens = ({
         subHeading:
           "Add LangWatch to any MCP-compatible app in under a minute",
         widthVariant: "full",
-        component: ViaClaudeDesktopScreen,
+        component: ViaMcpClientScreen,
       },
       [ProductScreenIndex.MANUALLY]: {
         id: "manually",
