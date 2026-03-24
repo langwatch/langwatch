@@ -86,6 +86,7 @@ export const SPAN_ANALYTICS_COLUMNS = [
   "SpanAttributes",
   "StartTime",
   "EndTime",
+  "DurationMs",
   "StatusCode",
   `"Events.Name"`,
   `"Events.Timestamp"`,

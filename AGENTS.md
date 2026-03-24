@@ -86,6 +86,7 @@ specs/               # BDD feature specs
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
+| Using `form.watch()` in child components that receive `form` as a prop | Use `useWatch({ control: form.control, name: "field" })` instead — `form.watch()` doesn't trigger re-renders in child components (especially inside `useFieldArray` items). Only the form owner component should use `form.watch()` |
 
 ## TypeScript
 

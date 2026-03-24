@@ -228,6 +228,23 @@ describe("column-pruning", () => {
         expect(result.sql).toContain("Events.Name");
       });
     });
+
+    describe("when requesting performance.tokens_per_second", () => {
+      it("includes DurationMs in the stored_spans subquery", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).toContain("DurationMs");
+      });
+    });
   });
 
   describe("query correctness after pruning", () => {
@@ -337,6 +354,7 @@ describe("column-pruning", () => {
         "SpanAttributes",
         "StartTime",
         "EndTime",
+        "DurationMs",
         "Events.Name",
         "Events.Timestamp",
         "Events.Attributes",
