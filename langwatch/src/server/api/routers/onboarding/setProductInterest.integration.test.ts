@@ -17,7 +17,7 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-// Mock the organization/project routers (needed by initializeOrganization, not setProductInterest)
+// Mock the organization/project routers (needed by initializeOrganization, not setIntegrationMethod)
 vi.mock("../organization", () => ({
   organizationRouter: { createCaller: vi.fn(() => ({})) },
 }));
@@ -50,7 +50,7 @@ vi.mock("../../../auditLog", () => ({
 
 import { onboardingRouter } from "./onboarding.router";
 
-describe("onboarding.setProductInterest", () => {
+describe("onboarding.setIntegrationMethod", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -71,74 +71,74 @@ describe("onboarding.setProductInterest", () => {
   }
 
   describe("when the user selects 'Via Coding Agent'", () => {
-    it("fires an identifyUser call with product_interest 'observability'", async () => {
+    it("fires an identifyUser call with integration_method 'coding_agent'", async () => {
       const caller = createCaller();
 
-      const result = await caller.setProductInterest({
-        productInterest: "via-claude-code",
+      const result = await caller.setIntegrationMethod({
+        integrationMethod: "via-claude-code",
       });
 
       expect(result).toEqual({ success: true });
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "observability" },
+        traits: { integration_method: "coding_agent" },
       });
     });
   });
 
   describe("when the user selects 'Via the Platform'", () => {
-    it("fires an identifyUser call with product_interest 'evaluations'", async () => {
+    it("fires an identifyUser call with integration_method 'platform'", async () => {
       const caller = createCaller();
 
-      await caller.setProductInterest({ productInterest: "via-platform" });
+      await caller.setIntegrationMethod({ integrationMethod: "via-platform" });
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "evaluations" },
+        traits: { integration_method: "platform" },
       });
     });
   });
 
   describe("when the user selects 'Via MCP'", () => {
-    it("maps to product_interest 'prompt_management'", async () => {
+    it("maps to integration_method 'mcp'", async () => {
       const caller = createCaller();
 
-      await caller.setProductInterest({
-        productInterest: "via-claude-desktop",
+      await caller.setIntegrationMethod({
+        integrationMethod: "via-claude-desktop",
       });
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "prompt_management" },
+        traits: { integration_method: "mcp" },
       });
     });
   });
 
   describe("when the user selects 'Manually'", () => {
-    it("maps to product_interest 'agent_simulations'", async () => {
+    it("maps to integration_method 'manual_sdk'", async () => {
       const caller = createCaller();
 
-      await caller.setProductInterest({
-        productInterest: "manually",
+      await caller.setIntegrationMethod({
+        integrationMethod: "manually",
       });
 
       expect(mockIdentifyUser).toHaveBeenCalledWith({
         userId: "user-42",
-        traits: { product_interest: "agent_simulations" },
+        traits: { integration_method: "manual_sdk" },
       });
     });
   });
 
   describe("when the identify call is independent of the initial signup", () => {
-    it("sends only product_interest trait, no other signup traits", async () => {
+    it("sends only integration_method trait, no other signup traits", async () => {
       const caller = createCaller();
 
-      await caller.setProductInterest({
-        productInterest: "via-claude-code",
+      await caller.setIntegrationMethod({
+        integrationMethod: "via-claude-code",
       });
 
       const callArgs = mockIdentifyUser.mock.calls[0]![0];
-      expect(Object.keys(callArgs.traits)).toEqual(["product_interest"]);
+      expect(Object.keys(callArgs.traits)).toEqual(["integration_method"]);
     });
   });
 
@@ -147,8 +147,8 @@ describe("onboarding.setProductInterest", () => {
       mockIdentifyUser.mockRejectedValueOnce(new Error("CIO down"));
 
       const caller = createCaller();
-      const result = await caller.setProductInterest({
-        productInterest: "via-platform",
+      const result = await caller.setIntegrationMethod({
+        integrationMethod: "via-platform",
       });
 
       // The mutation resolves immediately (fire-and-forget)

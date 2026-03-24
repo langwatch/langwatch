@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  fireProductInterestNurturing,
-  mapProductSelectionToTrait,
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
 } from "./productInterest";
 
 vi.mock("../../../../src/utils/logger/server", () => ({
@@ -33,67 +33,67 @@ vi.mock("../../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-describe("mapProductSelectionToTrait()", () => {
+describe("mapProductSelectionToIntegrationMethod()", () => {
   describe("when given a valid product selection", () => {
-    it("maps 'via-claude-code' to 'observability'", () => {
-      expect(mapProductSelectionToTrait("via-claude-code")).toBe("observability");
+    it("maps 'via-claude-code' to 'coding_agent'", () => {
+      expect(mapProductSelectionToIntegrationMethod("via-claude-code")).toBe("coding_agent");
     });
 
-    it("maps 'via-platform' to 'evaluations'", () => {
-      expect(mapProductSelectionToTrait("via-platform")).toBe("evaluations");
+    it("maps 'via-platform' to 'platform'", () => {
+      expect(mapProductSelectionToIntegrationMethod("via-platform")).toBe("platform");
     });
 
-    it("maps 'via-claude-desktop' to 'prompt_management'", () => {
-      expect(mapProductSelectionToTrait("via-claude-desktop")).toBe("prompt_management");
+    it("maps 'via-claude-desktop' to 'mcp'", () => {
+      expect(mapProductSelectionToIntegrationMethod("via-claude-desktop")).toBe("mcp");
     });
 
-    it("maps 'manually' to 'agent_simulations'", () => {
-      expect(mapProductSelectionToTrait("manually")).toBe("agent_simulations");
+    it("maps 'manually' to 'manual_sdk'", () => {
+      expect(mapProductSelectionToIntegrationMethod("manually")).toBe("manual_sdk");
     });
   });
 
   describe("when given an unknown selection", () => {
     it("throws an error", () => {
-      expect(() => mapProductSelectionToTrait("unknown")).toThrow(
+      expect(() => mapProductSelectionToIntegrationMethod("unknown")).toThrow(
         "Unknown product selection: unknown"
       );
     });
   });
 });
 
-describe("fireProductInterestNurturing()", () => {
+describe("fireIntegrationMethodNurturing()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentNurturing = mockNurturing;
   });
 
-  describe("when the user selects a product interest", () => {
-    it("sends only product_interest trait via identifyUser", () => {
-      fireProductInterestNurturing({
+  describe("when the user selects an integration method", () => {
+    it("sends only integration_method trait via identifyUser", () => {
+      fireIntegrationMethodNurturing({
         userId: "user-123",
-        productInterest: "observability",
+        integrationMethod: "coding_agent",
       });
 
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-123",
-        traits: { product_interest: "observability" },
+        traits: { integration_method: "coding_agent" },
       });
     });
 
     it("does not re-send other signup traits", () => {
-      fireProductInterestNurturing({
+      fireIntegrationMethodNurturing({
         userId: "user-123",
-        productInterest: "evaluations",
+        integrationMethod: "platform",
       });
 
       const call = mockNurturing.identifyUser.mock.calls[0]![0];
-      expect(Object.keys(call.traits)).toEqual(["product_interest"]);
+      expect(Object.keys(call.traits)).toEqual(["integration_method"]);
     });
 
     it("does not call trackEvent or groupUser", () => {
-      fireProductInterestNurturing({
+      fireIntegrationMethodNurturing({
         userId: "user-123",
-        productInterest: "prompt_management",
+        integrationMethod: "mcp",
       });
 
       expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
@@ -111,9 +111,9 @@ describe("fireProductInterestNurturing()", () => {
       );
 
       expect(() =>
-        fireProductInterestNurturing({
+        fireIntegrationMethodNurturing({
           userId: "user-123",
-          productInterest: "observability",
+          integrationMethod: "coding_agent",
         })
       ).not.toThrow();
 
@@ -127,9 +127,9 @@ describe("fireProductInterestNurturing()", () => {
     it("silently skips without calling any nurturing methods", () => {
       currentNurturing = undefined;
 
-      fireProductInterestNurturing({
+      fireIntegrationMethodNurturing({
         userId: "user-123",
-        productInterest: "agent_simulations",
+        integrationMethod: "manual_sdk",
       });
 
       expect(mockNurturing.identifyUser).not.toHaveBeenCalled();

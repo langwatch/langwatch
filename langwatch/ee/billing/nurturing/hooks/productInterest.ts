@@ -3,38 +3,37 @@ import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioPersonTraits } from "../types";
 
 /**
- * Valid product interest trait values sent to Customer.io (R10 spec).
+ * Valid integration method trait values sent to Customer.io.
  *
- * These are the canonical CIO trait values. The onboarding integration-method
+ * These are the canonical CIO trait values. The onboarding product-selection
  * screen ("Pick your flavour") uses different UI keys; the mapping below
  * translates from those UI keys to these trait values.
  */
-export type ProductInterestValue =
-  | "observability"
-  | "evaluations"
-  | "prompt_management"
-  | "agent_simulations";
+export type IntegrationMethodValue =
+  | "coding_agent"
+  | "platform"
+  | "mcp"
+  | "manual_sdk";
 
 /**
- * Maps the UI product selection key to the Customer.io trait value.
+ * Maps the UI product selection key to the Customer.io integration_method trait value.
  *
  * The onboarding "Pick your flavour" screen asks HOW the user wants to
- * integrate, not WHAT product they're interested in. We map the integration
- * method to a best-guess product interest:
+ * integrate. We map the integration method UI key to the CIO trait:
  *
- * - "via-claude-code"    -> "observability"       (coding agent users want traces/analytics)
- * - "via-platform"       -> "evaluations"         (platform UI users want evaluations)
- * - "via-claude-desktop" -> "prompt_management"   (MCP users want prompt management)
- * - "manually"           -> "agent_simulations"   (manual SDK users often test agents)
+ * - "via-claude-code"    -> "coding_agent"
+ * - "via-platform"       -> "platform"
+ * - "via-claude-desktop" -> "mcp"
+ * - "manually"           -> "manual_sdk"
  */
-export function mapProductSelectionToTrait(
+export function mapProductSelectionToIntegrationMethod(
   selection: string
-): ProductInterestValue {
-  const mapping: Record<string, ProductInterestValue> = {
-    "via-claude-code": "observability",
-    "via-platform": "evaluations",
-    "via-claude-desktop": "prompt_management",
-    "manually": "agent_simulations",
+): IntegrationMethodValue {
+  const mapping: Record<string, IntegrationMethodValue> = {
+    "via-claude-code": "coding_agent",
+    "via-platform": "platform",
+    "via-claude-desktop": "mcp",
+    "manually": "manual_sdk",
   };
 
   if (!Object.hasOwn(mapping, selection)) {
@@ -44,18 +43,18 @@ export function mapProductSelectionToTrait(
 }
 
 /**
- * Fires a separate identifyUser call to set the product_interest trait.
+ * Fires a separate identifyUser call to set the integration_method trait.
  *
  * Called from the "Pick your flavour" onboarding screen AFTER the initial
  * signup identification (initializeOrganization fires before flavour selection).
- * Fire-and-forget — does not block navigation.
+ * Fire-and-forget -- does not block navigation.
  */
-export function fireProductInterestNurturing({
+export function fireIntegrationMethodNurturing({
   userId,
-  productInterest,
+  integrationMethod,
 }: {
   userId: string;
-  productInterest: ProductInterestValue;
+  integrationMethod: IntegrationMethodValue;
 }): void {
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
@@ -63,7 +62,7 @@ export function fireProductInterestNurturing({
   void nurturing
     .identifyUser({
       userId,
-      traits: { product_interest: productInterest } as Partial<CioPersonTraits>,
+      traits: { integration_method: integrationMethod } as Partial<CioPersonTraits>,
     })
     .catch(captureException);
 }

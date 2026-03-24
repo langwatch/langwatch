@@ -5,8 +5,8 @@ import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import {
-  fireProductInterestNurturing,
-  mapProductSelectionToTrait,
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
 } from "~/../ee/billing/nurturing/hooks/productInterest";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
@@ -119,16 +119,16 @@ export const onboardingRouter = createTRPCRouter({
     }),
 
   /**
-   * Sets the product_interest trait in Customer.io after the user
+   * Sets the integration_method trait in Customer.io after the user
    * picks their flavour on the onboarding screen.
    *
    * Separate from initializeOrganization because the org is created
    * BEFORE the flavour selection screen.
    */
-  setProductInterest: protectedProcedure
+  setIntegrationMethod: protectedProcedure
     .input(
       z.object({
-        productInterest: z.enum([
+        integrationMethod: z.enum([
           "via-claude-code",
           "via-platform",
           "via-claude-desktop",
@@ -138,11 +138,11 @@ export const onboardingRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      const traitValue = mapProductSelectionToTrait(input.productInterest);
+      const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
 
-      fireProductInterestNurturing({
+      fireIntegrationMethodNurturing({
         userId: ctx.session.user.id,
-        productInterest: traitValue,
+        integrationMethod: traitValue,
       });
 
       return { success: true };
