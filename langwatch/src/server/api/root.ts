@@ -45,6 +45,7 @@ import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
+import { scimTokenRouter } from "./routers/scimToken";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
 
@@ -95,6 +96,7 @@ const coreRouters = {
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  scimToken: scimTokenRouter,
 };
 
 const eeRouters = {

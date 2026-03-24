@@ -40,6 +40,10 @@ const EXEMPT_MODELS = [
    * Billing meter checkpoints are organization-level, keyed by organizationId + billingMonth
    */
   "BillingMeterCheckpoint",
+  /**
+   * SCIM tokens are organization-level, used for IdP provisioning
+   */
+  "ScimToken",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
