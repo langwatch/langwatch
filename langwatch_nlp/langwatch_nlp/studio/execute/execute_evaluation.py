@@ -167,6 +167,15 @@ async def execute_evaluation(
             eval_logger.info(
                 "All evaluation batches sent: run_id=%s", run_id
             )
+
+            if reporting.has_errors():
+                error_summary = reporting.get_error_summary()
+                eval_logger.error(
+                    "Evaluation completed with post errors: run_id=%s, errors=%s",
+                    run_id, error_summary,
+                )
+                yield error_evaluation_event(run_id, error_summary)
+                return
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
         if valid:
