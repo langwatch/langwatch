@@ -396,10 +396,9 @@ const CustomGraph_ = React.memo(
     );
 
     const sortedKeys = expectedKeys
-      .filter((key) => keysToSum[key]! !== 0)
       .toSorted((a, b) => {
-        const totalA = keysToSum[a]!;
-        const totalB = keysToSum[b]!;
+        const totalA = keysToSum[a] ?? 0;
+        const totalB = keysToSum[b] ?? 0;
 
         return totalB - totalA;
       });
@@ -799,7 +798,7 @@ const CustomGraph_ = React.memo(
               }}
               style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
-              {summaryData.current.map((entry, index) => (
+              {sortedCurrentData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={colorForSeries(entry.key, index)}
@@ -1006,7 +1005,9 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-      JSON.stringify(nextProps.titleProps) &&
+        JSON.stringify(nextProps.titleProps) &&
+      JSON.stringify(prevProps.filters) ===
+        JSON.stringify(nextProps.filters) &&
       prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
@@ -1084,18 +1085,17 @@ const shapeDataForGraph = (
   const flattenPreviousPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
-  const currentAndPreviousData =
-    flattenPreviousPeriod &&
-    flattenCurrentPeriod?.map((entry, index) => {
-      return {
-        ...entry,
-        ...Object.fromEntries(
-          Object.entries(flattenPreviousPeriod[index] ?? {}).map(
-            ([key, value]) => [`previous>${key}`, value ?? 0],
-          ),
+  const currentAndPreviousData = flattenCurrentPeriod?.map((entry, index) => {
+    if (!flattenPreviousPeriod) return entry;
+    return {
+      ...entry,
+      ...Object.fromEntries(
+        Object.entries(flattenPreviousPeriod[index] ?? {}).map(
+          ([key, value]) => [`previous>${key}`, value ?? 0],
         ),
-      };
-    });
+      ),
+    };
+  });
 
   return currentAndPreviousData as
     | ({ date: string } & Record<string, number>)[]
@@ -1153,7 +1153,7 @@ const collectAllDays = (
       if (!result[key]) {
         result[key] = [];
       }
-      result[key]!.push(entry[key]!);
+      result[key]?.push(entry[key] ?? 0);
     }
   }
 
