@@ -77,7 +77,13 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        fireActivityTrackingNurturing({ userId: user_.id });
+        const orgCount_ = await prisma.organizationUser.count({
+          where: { userId: user_.id },
+        });
+        fireActivityTrackingNurturing({
+          userId: user_.id,
+          hasOrganization: orgCount_ > 0,
+        });
 
         return {
           ...session,
@@ -89,7 +95,13 @@ export const authOptions = (
         };
       }
 
-      fireActivityTrackingNurturing({ userId: user.id });
+      const orgCount = await prisma.organizationUser.count({
+        where: { userId: user.id },
+      });
+      fireActivityTrackingNurturing({
+        userId: user.id,
+        hasOrganization: orgCount > 0,
+      });
 
       return {
         ...session,
