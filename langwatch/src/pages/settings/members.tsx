@@ -249,10 +249,12 @@ function MembersList({
         <HStack width="full">
           <Heading>Organization Members</Heading>
           <Spacer />
-          <PageLayout.HeaderButton onClick={onAddMembersOpen}>
-            <Plus size={20} />
-            Add members
-          </PageLayout.HeaderButton>
+          {hasOrganizationManagePermission && (
+            <PageLayout.HeaderButton onClick={onAddMembersOpen}>
+              <Plus size={20} />
+              Add members
+            </PageLayout.HeaderButton>
+          )}
         </HStack>
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>
@@ -417,6 +419,7 @@ function MembersList({
               isLoading={isSubmitting}
               hasEmailProvider={hasEmailProvider ?? false}
               onClose={onAddMembersClose}
+              isInviterAdmin={hasOrganizationManagePermission}
             />
           </Dialog.Body>
         </Dialog.Content>
