@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
@@ -20,8 +21,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== secret) {
+  const authHeader = request.headers.get("authorization") ?? "";
+  if (!constantTimeEqual(authHeader, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -51,24 +52,28 @@ export async function POST(request: NextRequest) {
 
     const action = extractAction(event);
 
-    if (action === "create") {
-      const name = extractName(event) ?? email.split("@")[0] ?? email;
-      await scimService.createUser({
-        request: {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-          userName: email,
-          name: parseName(name),
-        },
-        organizationId: org.id,
-      });
-    } else if (action === "deactivate") {
-      const user = await prisma.user.findUnique({ where: { email } });
-      if (user) {
-        await scimService.deleteUser({
-          id: user.id,
+    try {
+      if (action === "create") {
+        const name = extractName(event) ?? email.split("@")[0] ?? email;
+        await scimService.createUser({
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: email,
+            name: parseName(name),
+          },
           organizationId: org.id,
         });
+      } else if (action === "deactivate") {
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (user) {
+          await scimService.deleteUser({
+            id: user.id,
+            organizationId: org.id,
+          });
+        }
       }
+    } catch {
+      // Continue processing remaining events even if one fails
     }
   }
 
@@ -154,4 +159,14 @@ function parseName(
     givenName: fullName.substring(0, spaceIndex),
     familyName: fullName.substring(spaceIndex + 1),
   };
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
 }
