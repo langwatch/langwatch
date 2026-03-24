@@ -78,18 +78,15 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        const orgCount_ = await prisma.organizationUser.count({
-          where: { userId: user_.id },
-        });
-        const hasOrg_ = orgCount_ > 0;
-        fireActivityTrackingNurturing({
-          userId: user_.id,
-          hasOrganization: hasOrg_,
-        });
-        ensureUserSyncedToCio({
-          userId: user_.id,
-          hasOrganization: hasOrg_,
-        });
+        // Fire-and-forget: don't block session callback with DB query
+        void prisma.organizationUser
+          .count({ where: { userId: user_.id } })
+          .then((orgCount_) => {
+            const hasOrg_ = orgCount_ > 0;
+            fireActivityTrackingNurturing({ userId: user_.id, hasOrganization: hasOrg_ });
+            ensureUserSyncedToCio({ userId: user_.id, hasOrganization: hasOrg_ });
+          })
+          .catch(() => {});
 
         return {
           ...session,
@@ -101,18 +98,15 @@ export const authOptions = (
         };
       }
 
-      const orgCount = await prisma.organizationUser.count({
-        where: { userId: user.id },
-      });
-      const hasOrg = orgCount > 0;
-      fireActivityTrackingNurturing({
-        userId: user.id,
-        hasOrganization: hasOrg,
-      });
-      ensureUserSyncedToCio({
-        userId: user.id,
-        hasOrganization: hasOrg,
-      });
+      // Fire-and-forget: don't block session callback with DB query
+      void prisma.organizationUser
+        .count({ where: { userId: user.id } })
+        .then((orgCount) => {
+          const hasOrg = orgCount > 0;
+          fireActivityTrackingNurturing({ userId: user.id, hasOrganization: hasOrg });
+          ensureUserSyncedToCio({ userId: user.id, hasOrganization: hasOrg });
+        })
+        .catch(() => {});
 
       return {
         ...session,
