@@ -140,7 +140,7 @@ export const WelcomeScreen: React.FC = () => {
         showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
-          <Box position="relative" overflow="hidden">
+          <Box position="relative" overflow="hidden" py="1" my="-1">
             <AnimatePresence
               mode="popLayout"
               custom={direction}
