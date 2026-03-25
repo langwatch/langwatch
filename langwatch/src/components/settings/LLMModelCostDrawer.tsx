@@ -126,10 +126,10 @@ function LLMModelCostForm({
           closeDrawer();
           void llmModelCostsQuery.refetch();
         },
-        onError: () => {
+        onError: (error) => {
           toaster.create({
             title: "Error",
-            description: "Error creating LLM model cost",
+            description: error.message || "Error creating LLM model cost",
             type: "error",
             duration: 5000,
             meta: {
@@ -231,20 +231,11 @@ function LLMModelCostForm({
   );
 }
 
-/**
- * Client-side regex validation: checks syntax and rejects obvious
- * catastrophic-backtracking patterns (nested quantifiers).
- * The server performs a full safe-regex2 check as the authoritative gate.
- */
 const isValidRegex = (pattern: string): boolean => {
   try {
     new RegExp(pattern);
+    return true;
   } catch {
     return false;
   }
-  // Reject nested quantifiers like (a+)+, (a*)+, (a+)*, (\d+)+, etc.
-  if (/([*+?}])\s*[)]\s*[*+?{]/.test(pattern)) {
-    return false;
-  }
-  return true;
 };

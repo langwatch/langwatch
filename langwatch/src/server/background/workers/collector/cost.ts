@@ -109,43 +109,68 @@ export const normalizeModelName = (model: string): string => {
   return normalized;
 };
 
+/** Cache: pattern → compiled RegExp (safe) or null (unsafe/invalid). */
+const regexCache = new Map<string, RegExp | null>();
+
 /**
- * Tests a regex pattern against a model string, skipping patterns
- * that are vulnerable to catastrophic backtracking (ReDoS).
+ * Returns a cached, safe-checked RegExp for the given pattern.
+ * Unsafe or invalid patterns are cached as null and warned once.
  */
-const safeRegexTest = (pattern: string, input: string): boolean => {
+const getSafeRegex = (pattern: string): RegExp | null => {
+  const cached = regexCache.get(pattern);
+  if (cached !== undefined) return cached;
+
   try {
     const re = new RegExp(pattern);
     if (!safe(re)) {
       logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
-      return false;
+      regexCache.set(pattern, null);
+      return null;
     }
-    return re.test(input);
+    regexCache.set(pattern, re);
+    return re;
   } catch {
-    return false;
+    regexCache.set(pattern, null);
+    return null;
   }
+};
+
+/**
+ * Tests a regex pattern against a model string, skipping patterns
+ * that are vulnerable to catastrophic backtracking (ReDoS).
+ * Results are cached so each pattern is compiled and safety-checked only once.
+ */
+const safeRegexTest = (pattern: string, input: string): boolean => {
+  const re = getSafeRegex(pattern);
+  return re !== null && re.test(input);
 };
 
 export const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
+  // Try raw model string first so custom case-sensitive regexes work
+  const rawMatch = findModelCost(model, llmModelCosts);
+  if (rawMatch) return rawMatch;
+
+  // Fall back to normalized form for built-in fuzzy matching
   const normalizedModel = normalizeModelName(model);
-  return findModelCost(normalizedModel, llmModelCosts);
+  if (normalizedModel !== model) {
+    return findModelCost(normalizedModel, llmModelCosts);
+  }
+  return undefined;
 };
 
 const findModelCost = (
-  normalizedModel: string,
+  model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
   const match = llmModelCosts.find((entry) =>
-    safeRegexTest(entry.regex, normalizedModel),
+    safeRegexTest(entry.regex, model),
   );
 
-  if (!match && normalizedModel.includes("/")) {
-    const stripped = normalizedModel.substring(
-      normalizedModel.indexOf("/") + 1,
-    );
+  if (!match && model.includes("/")) {
+    const stripped = model.substring(model.indexOf("/") + 1);
     return findModelCost(stripped, llmModelCosts);
   }
   return match;

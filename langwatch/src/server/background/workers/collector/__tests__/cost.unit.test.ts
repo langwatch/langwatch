@@ -268,6 +268,37 @@ describe("matchingLLMModelCost", () => {
       ).toBe("minimax/minimax-m2.1");
     });
   });
+
+  describe("when a custom regex expects original casing", () => {
+    const caseSensitiveCosts: MaybeStoredLLMModelCost[] = [
+      {
+        projectId: "proj1",
+        model: "custom/MyModel-V2",
+        regex: "^MyModel-V2$",
+        inputCostPerToken: 0.001,
+        outputCostPerToken: 0.002,
+      },
+      ...fakeModelCosts,
+    ];
+
+    it("matches raw model string before normalizing", () => {
+      expect(
+        matchingLLMModelCost("MyModel-V2", caseSensitiveCosts)?.model
+      ).toBe("custom/MyModel-V2");
+    });
+
+    it("still falls back to normalized matching for lowercase input", () => {
+      expect(
+        matchingLLMModelCost("gpt-4o", caseSensitiveCosts)?.model
+      ).toBe("openai/gpt-4o");
+    });
+
+    it("falls back to normalized matching when raw does not match", () => {
+      expect(
+        matchingLLMModelCost("GPT-4O", caseSensitiveCosts)?.model
+      ).toBe("openai/gpt-4o");
+    });
+  });
 });
 
 describe("estimateCost", () => {
