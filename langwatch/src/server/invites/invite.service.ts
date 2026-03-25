@@ -443,29 +443,36 @@ export class InviteService {
    * hitting the onboarding flow.
    */
   async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
-    const firstTeamId = (() => {
+    // Collect all invited team IDs from either format
+    const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
         const assignments = invite.teamAssignments as Array<{ teamId: string }>;
-        return assignments[0]?.teamId ?? null;
+        return assignments.map((a) => a.teamId).filter(Boolean);
       }
-      const legacyId = invite.teamIds.split(",")[0]?.trim();
-      return legacyId || null;
+      return invite.teamIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
     })();
 
+    // Look for a project in any of the invited teams
     const project =
-      (firstTeamId
+      (invitedTeamIds.length > 0
         ? await this.prisma.project.findFirst({
-            where: { teamId: firstTeamId, archivedAt: null },
+            where: { teamId: { in: invitedTeamIds }, archivedAt: null },
             select: { slug: true },
           })
         : null) ??
-      (await this.prisma.project.findFirst({
-        where: {
-          team: { organizationId: invite.organizationId, archivedAt: null },
-          archivedAt: null,
-        },
-        select: { slug: true },
-      }));
+      // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
+      ([OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER].includes(invite.role)
+        ? await this.prisma.project.findFirst({
+            where: {
+              team: { organizationId: invite.organizationId, archivedAt: null },
+              archivedAt: null,
+            },
+            select: { slug: true },
+          })
+        : null);
 
     return project?.slug ?? null;
   }
