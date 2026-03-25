@@ -1,9 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   createResilientClickHouseClient,
   isTransientClickHouseError,
+  classifyClickHouseError,
+  FailureRateMonitor,
+  type ClickHouseErrorType,
 } from "../clickhouse.resilient";
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: () => ({
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  }),
+}));
+
+vi.mock("~/server/clickhouse/metrics", () => ({
+  observeClickHouseQueryDuration: vi.fn(),
+  incrementClickHouseQueryCount: vi.fn(),
+}));
 
 function makeMockClient(overrides?: Partial<ClickHouseClient>) {
   return {
@@ -17,7 +34,186 @@ function makeMockClient(overrides?: Partial<ClickHouseClient>) {
   } as unknown as ClickHouseClient;
 }
 
-describe("createResilientClickHouseClient", () => {
+describe("classifyClickHouseError()", () => {
+  describe("when error contains MEMORY_LIMIT_EXCEEDED", () => {
+    it("returns oom", () => {
+      expect(classifyClickHouseError(new Error("MEMORY_LIMIT_EXCEEDED"))).toBe(
+        "oom"
+      );
+    });
+  });
+
+  describe("when error message matches timeout", () => {
+    it("returns timeout for Request Timeout", () => {
+      expect(classifyClickHouseError(new Error("Request Timeout"))).toBe(
+        "timeout"
+      );
+    });
+
+    it("returns timeout for ETIMEDOUT code", () => {
+      const err = new Error("timed out");
+      (err as NodeJS.ErrnoException).code = "ETIMEDOUT";
+      expect(classifyClickHouseError(err)).toBe("timeout");
+    });
+  });
+
+  describe("when error has a network code", () => {
+    it("returns network for ECONNRESET", () => {
+      const err = new Error("connection reset");
+      (err as NodeJS.ErrnoException).code = "ECONNRESET";
+      expect(classifyClickHouseError(err)).toBe("network");
+    });
+
+    it("returns network for ECONNREFUSED", () => {
+      const err = new Error("connection refused");
+      (err as NodeJS.ErrnoException).code = "ECONNREFUSED";
+      expect(classifyClickHouseError(err)).toBe("network");
+    });
+
+    it("returns network for EPIPE", () => {
+      const err = new Error("broken pipe");
+      (err as NodeJS.ErrnoException).code = "EPIPE";
+      expect(classifyClickHouseError(err)).toBe("network");
+    });
+
+    it("returns network for ENOTFOUND", () => {
+      const err = new Error("not found");
+      (err as NodeJS.ErrnoException).code = "ENOTFOUND";
+      expect(classifyClickHouseError(err)).toBe("network");
+    });
+  });
+
+  describe("when error has HTTP 429 status", () => {
+    it("returns rate_limit", () => {
+      const err = new Error("Too Many Requests") as Error & {
+        statusCode: number;
+      };
+      err.statusCode = 429;
+      expect(classifyClickHouseError(err)).toBe("rate_limit");
+    });
+  });
+
+  describe("when error has HTTP 503 status", () => {
+    it("returns unavailable", () => {
+      const err = new Error("Service Unavailable") as Error & {
+        statusCode: number;
+      };
+      err.statusCode = 503;
+      expect(classifyClickHouseError(err)).toBe("unavailable");
+    });
+  });
+
+  describe("when error contains SYNTAX_ERROR", () => {
+    it("returns syntax", () => {
+      expect(classifyClickHouseError(new Error("SYNTAX_ERROR near ..."))).toBe(
+        "syntax"
+      );
+    });
+  });
+
+  describe("when error contains Unknown column", () => {
+    it("returns syntax", () => {
+      expect(
+        classifyClickHouseError(new Error("Unknown column 'foo'"))
+      ).toBe("syntax");
+    });
+  });
+
+  describe("when error is not recognized", () => {
+    it("returns unknown for generic errors", () => {
+      expect(classifyClickHouseError(new Error("something else"))).toBe(
+        "unknown"
+      );
+    });
+
+    it("returns unknown for non-Error values", () => {
+      expect(classifyClickHouseError("string error")).toBe("unknown");
+    });
+  });
+});
+
+describe("FailureRateMonitor", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("when failures stay below threshold", () => {
+    it("returns false from record()", () => {
+      const monitor = new FailureRateMonitor({
+        threshold: 5,
+        windowMs: 60_000,
+      });
+      for (let i = 0; i < 4; i++) {
+        expect(monitor.record()).toBe(false);
+      }
+    });
+  });
+
+  describe("when failures reach the threshold within the window", () => {
+    it("returns true from record()", () => {
+      const monitor = new FailureRateMonitor({
+        threshold: 5,
+        windowMs: 60_000,
+      });
+      for (let i = 0; i < 4; i++) {
+        monitor.record();
+      }
+      expect(monitor.record()).toBe(true);
+    });
+  });
+
+  describe("when old failures fall outside the window", () => {
+    it("does not count them toward the threshold", () => {
+      const monitor = new FailureRateMonitor({
+        threshold: 3,
+        windowMs: 60_000,
+      });
+      monitor.record(); // t=0
+      monitor.record(); // t=0
+
+      vi.advanceTimersByTime(61_000);
+
+      // Old failures expired, only 1 new one
+      expect(monitor.record()).toBe(false);
+    });
+  });
+
+  describe("when alert fires", () => {
+    it("does not fire again until cooldown expires", () => {
+      const monitor = new FailureRateMonitor({
+        threshold: 2,
+        windowMs: 60_000,
+      });
+      monitor.record();
+      expect(monitor.record()).toBe(true); // first alert
+
+      // Immediately add more failures — should NOT alert again
+      expect(monitor.record()).toBe(false);
+      expect(monitor.record()).toBe(false);
+    });
+
+    it("fires again after cooldown expires", () => {
+      const monitor = new FailureRateMonitor({
+        threshold: 2,
+        windowMs: 60_000,
+      });
+      monitor.record();
+      expect(monitor.record()).toBe(true); // first alert
+
+      // Advance past cooldown (default 5 minutes)
+      vi.advanceTimersByTime(5 * 60_000 + 1);
+
+      monitor.record();
+      expect(monitor.record()).toBe(true); // second alert
+    });
+  });
+});
+
+describe("createResilientClickHouseClient()", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -25,7 +221,9 @@ describe("createResilientClickHouseClient", () => {
   describe("when insert succeeds on first attempt", () => {
     it("calls insert once and returns the result", async () => {
       const result = { executed: true };
-      const mock = makeMockClient({ insert: vi.fn().mockResolvedValue(result) });
+      const mock = makeMockClient({
+        insert: vi.fn().mockResolvedValue(result),
+      });
       const client = createResilientClickHouseClient({
         client: mock,
         maxRetries: 3,
@@ -83,7 +281,7 @@ describe("createResilientClickHouseClient", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
+        client.insert({ table: "test", values: [], format: "JSONEachRow" })
       ).rejects.toThrow("Table does_not_exist doesn't exist");
       expect(mock.insert).toHaveBeenCalledTimes(1);
     });
@@ -102,19 +300,17 @@ describe("createResilientClickHouseClient", () => {
       });
 
       await expect(
-        client.insert({ table: "test", values: [], format: "JSONEachRow" }),
+        client.insert({ table: "test", values: [], format: "JSONEachRow" })
       ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
       expect(mock.insert).toHaveBeenCalledTimes(3);
     });
   });
 
-  describe("when query, command, or close is called", () => {
-    it("passes through to the underlying client", async () => {
+  describe("when query succeeds", () => {
+    it("returns the result without retry", async () => {
       const queryResult = { data: [] };
       const mock = makeMockClient({
         query: vi.fn().mockResolvedValue(queryResult),
-        command: vi.fn().mockResolvedValue(undefined),
-        close: vi.fn().mockResolvedValue(undefined),
       });
       const client = createResilientClickHouseClient({
         client: mock,
@@ -124,6 +320,37 @@ describe("createResilientClickHouseClient", () => {
       const qr = await client.query({ query: "SELECT 1" });
       expect(qr).toBe(queryResult);
       expect(mock.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when query fails", () => {
+    it("throws without retrying", async () => {
+      const err = new Error("MEMORY_LIMIT_EXCEEDED");
+      const mock = makeMockClient({
+        query: vi.fn().mockRejectedValue(err),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
+
+      await expect(
+        client.query({ query: "SELECT 1" })
+      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+      expect(mock.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when command or close is called", () => {
+    it("passes through to the underlying client", async () => {
+      const mock = makeMockClient({
+        command: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
 
       await client.command({ query: "CREATE TABLE ..." });
       expect(mock.command).toHaveBeenCalledTimes(1);
@@ -134,11 +361,11 @@ describe("createResilientClickHouseClient", () => {
   });
 });
 
-describe("isTransientClickHouseError", () => {
+describe("isTransientClickHouseError()", () => {
   describe("when error contains MEMORY_LIMIT_EXCEEDED", () => {
     it("returns true", () => {
       expect(
-        isTransientClickHouseError(new Error("MEMORY_LIMIT_EXCEEDED")),
+        isTransientClickHouseError(new Error("MEMORY_LIMIT_EXCEEDED"))
       ).toBe(true);
     });
   });
@@ -160,7 +387,7 @@ describe("isTransientClickHouseError", () => {
   describe("when error message contains timeout", () => {
     it("returns true", () => {
       expect(
-        isTransientClickHouseError(new Error("Request Timeout")),
+        isTransientClickHouseError(new Error("Request Timeout"))
       ).toBe(true);
     });
   });
@@ -188,7 +415,7 @@ describe("isTransientClickHouseError", () => {
   describe("when error is non-transient", () => {
     it("returns false for schema errors", () => {
       expect(
-        isTransientClickHouseError(new Error("Table foo doesn't exist")),
+        isTransientClickHouseError(new Error("Table foo doesn't exist"))
       ).toBe(false);
     });
 
