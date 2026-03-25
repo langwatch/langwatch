@@ -344,8 +344,8 @@ describe("ClickHouseTraceService", () => {
         });
       });
 
-      describe("when scrollId is passed via input (legacy)", () => {
-        it("applies keyset pagination from input.scrollId", async () => {
+      describe("when scrollId is only in input (not options)", () => {
+        it("ignores input.scrollId and does not apply cursor", async () => {
           setupMocksForCursorTest();
           const scrollId = makeScrollId();
 
@@ -365,47 +365,13 @@ describe("ClickHouseTraceService", () => {
 
           expect(result).not.toBeNull();
 
-          // The data query (2nd call) includes the keyset cursor condition
+          // input.scrollId is ignored — only options.scrollId is read
           const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query).toContain(
+          expect(dataCall[0].query).not.toContain(
             "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
           );
-          expect(dataCall[0].query_params.lastTimestamp).toBe(cursorTimestamp);
-          expect(dataCall[0].query_params.lastTraceId).toBe(cursorTraceId);
-        });
-      });
-
-      describe("when scrollId is in both options and input", () => {
-        it("uses options.scrollId over input.scrollId", async () => {
-          setupMocksForCursorTest();
-          const optionsScrollId = makeScrollId({
-            lastTraceId: "trace-from-options",
-          });
-          const inputScrollId = makeScrollId({
-            lastTraceId: "trace-from-input",
-          });
-
-          const service = new ClickHouseTraceService({
-            project: { findUnique: mockPrismaFindUnique },
-          } as never);
-
-          const inputWithScrollId = {
-            ...baseInput,
-            scrollId: inputScrollId,
-          } as GetAllTracesForProjectInput;
-
-          const result = await service.getAllTracesForProject(
-            inputWithScrollId,
-            protections,
-            { scrollId: optionsScrollId },
-          );
-
-          expect(result).not.toBeNull();
-
-          // options.scrollId takes precedence — cursor uses "trace-from-options"
-          const dataCall = mockClickHouseQuery.mock.calls[1]!;
-          expect(dataCall[0].query_params.lastTraceId).toBe(
-            "trace-from-options",
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
           );
         });
       });
