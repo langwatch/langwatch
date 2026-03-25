@@ -1,20 +1,29 @@
+# Complementary stub for langwatch-app-ci.yml
+# Job names and paths-ignore MUST mirror the real workflow's jobs and paths.
 name: langwatch-app-ci
 
 on:
   pull_request:
     paths-ignore:
       - "langwatch/**"
+      - ".github/workflows/langwatch-app-ci.yml"
+      - ".github/.release-please-manifest.json"
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "no modifications, skipping tests"
-
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - run: echo "no modifications, skipping typecheck"
+
+  test-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping unit tests"
+
+  test-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping integration tests"
 
   lint:
     runs-on: ubuntu-latest

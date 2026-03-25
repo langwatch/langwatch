@@ -1,9 +1,12 @@
+# Complementary stub for sdk-python-ci.yml
+# Job names and paths-ignore MUST mirror the real workflow's jobs and paths.
 name: sdk-python-ci
 
 on:
   pull_request:
     paths-ignore:
       - "python-sdk/**"
+      - ".github/.release-please-manifest.json"
 
 jobs:
   test:

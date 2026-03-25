@@ -1,0 +1,16 @@
+# Complementary stub for e2e-ci.yml
+# Job names and paths-ignore MUST mirror the real workflow's jobs and paths.
+name: e2e-ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - "langwatch/**"
+      - "agentic-e2e-tests/**"
+      - ".github/workflows/e2e-ci.yml"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping e2e tests"
