@@ -296,26 +296,38 @@ export class OtlpSpanPiiRedactionService {
 
     const texts: string[] = [];
     const refs: { obj: Record<string, string>; key: string }[] = [];
+    const maxLen = this.deps.piiRedactionMaxAttributeLength;
+    let totalLength = 0;
+
+    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
+      if (totalLength + value.length > maxLen) {
+        this.logger.warn(
+          { key, valueLength: value.length, totalLength, maxLength: maxLen },
+          "Skipping PII redaction — cumulative batch size would exceed limit",
+        );
+        return;
+      }
+      texts.push(value);
+      refs.push({ obj, key });
+      totalLength += value.length;
+    };
 
     // Body
     if (log.body) {
-      texts.push(log.body);
-      refs.push({ obj: log as unknown as Record<string, string>, key: "body" });
+      tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
 
     // Attributes
     for (const key of Object.keys(log.attributes)) {
       if (log.attributes[key]) {
-        texts.push(log.attributes[key]!);
-        refs.push({ obj: log.attributes, key });
+        tryPush(log.attributes, key, log.attributes[key]!);
       }
     }
 
     // Resource attributes
     for (const key of Object.keys(log.resourceAttributes)) {
       if (log.resourceAttributes[key]) {
-        texts.push(log.resourceAttributes[key]!);
-        refs.push({ obj: log.resourceAttributes, key });
+        tryPush(log.resourceAttributes, key, log.resourceAttributes[key]!);
       }
     }
 
@@ -377,18 +389,31 @@ export class OtlpSpanPiiRedactionService {
 
     const texts: string[] = [];
     const refs: { obj: Record<string, string>; key: string }[] = [];
+    const maxLen = this.deps.piiRedactionMaxAttributeLength;
+    let totalLength = 0;
+
+    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
+      if (totalLength + value.length > maxLen) {
+        this.logger.warn(
+          { key, valueLength: value.length, totalLength, maxLength: maxLen },
+          "Skipping PII redaction — cumulative batch size would exceed limit",
+        );
+        return;
+      }
+      texts.push(value);
+      refs.push({ obj, key });
+      totalLength += value.length;
+    };
 
     for (const key of Object.keys(metric.attributes)) {
       if (metric.attributes[key]) {
-        texts.push(metric.attributes[key]!);
-        refs.push({ obj: metric.attributes, key });
+        tryPush(metric.attributes, key, metric.attributes[key]!);
       }
     }
 
     for (const key of Object.keys(metric.resourceAttributes)) {
       if (metric.resourceAttributes[key]) {
-        texts.push(metric.resourceAttributes[key]!);
-        refs.push({ obj: metric.resourceAttributes, key });
+        tryPush(metric.resourceAttributes, key, metric.resourceAttributes[key]!);
       }
     }
 
