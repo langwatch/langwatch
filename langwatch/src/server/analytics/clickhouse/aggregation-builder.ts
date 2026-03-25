@@ -232,7 +232,7 @@ const groupByExpressions: Partial<
     requiredJoins: ["evaluation_runs"],
     handlesUnknown: true,
     additionalWhere: groupByKey
-      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed'`
+      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL`
       : undefined,
   }),
 
@@ -1014,10 +1014,8 @@ function buildDateBucketedPipelineQuery({
       : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
     : null;
 
-  let fullFilterWhere = filterWhere;
-  if (groupByAdditionalWhere) {
-    fullFilterWhere += ` AND ${groupByAdditionalWhere}`;
-  }
+  // NOTE: filterWhere already includes groupByAdditionalWhere (added in buildTimeseriesQuery)
+  const fullFilterWhere = filterWhere;
 
   // Skip HAVING group_key != '' for boolean fields and columns that already handle unknown
   const skipGroupKeyHaving =
