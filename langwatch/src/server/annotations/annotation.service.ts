@@ -6,6 +6,7 @@ import {
   AnnotationRepository,
   type CreateAnnotationInput,
   type DeleteAnnotationInput,
+  type UpdateAnnotationInput,
 } from "./annotation.repository";
 import { AnnotationEsSync } from "./annotationEsSync";
 
@@ -77,6 +78,14 @@ export class AnnotationService {
     }
 
     return annotation;
+  }
+
+  /**
+   * Updates an existing annotation.
+   * No ES sync needed — updates don't change annotation count on the trace.
+   */
+  async update(input: UpdateAnnotationInput): Promise<Annotation> {
+    return this.repository.update(input);
   }
 
   /**

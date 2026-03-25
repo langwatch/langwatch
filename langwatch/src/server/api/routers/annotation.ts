@@ -140,18 +140,19 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.annotation.update({
-        where: {
-          id: input.id,
-          projectId: input.projectId,
-          traceId: input.traceId,
-        },
-        data: {
-          comment: input.comment ?? "",
-          isThumbsUp: input.isThumbsUp,
-          scoreOptions: input.scoreOptions ?? {},
-          expectedOutput: input.expectedOutput ?? null,
-        },
+      const service = await AnnotationService.create({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
+
+      return service.update({
+        id: input.id,
+        projectId: input.projectId,
+        traceId: input.traceId,
+        comment: input.comment ?? "",
+        isThumbsUp: input.isThumbsUp,
+        scoreOptions: input.scoreOptions ?? {},
+        expectedOutput: input.expectedOutput ?? null,
       });
     }),
   getByTraceId: publicProcedure
