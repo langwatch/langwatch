@@ -7,15 +7,9 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { Session } from "next-auth";
 import { z } from "zod";
-import {
-  esClient,
-  TRACE_COLD_INDEX,
-  TRACE_INDEX,
-  traceIndexId,
-} from "~/server/elasticsearch";
+import { AnnotationService } from "~/server/annotations/annotation.service";
 import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
-import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../elasticsearch/protections";
 import { checkPermissionOrPubliclyShared } from "../rbac";
 import { checkProjectPermission } from "../rbac";
@@ -29,8 +23,6 @@ const scoreOptionSchema = z.object({
     .nullable(),
   reason: z.string().optional().nullable(),
 });
-
-const logger = createLogger("langwatch:api:annotation");
 
 const scoreOptions = z.record(z.string(), scoreOptionSchema);
 
@@ -118,40 +110,21 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
-      logger.info({ input }, "create annotation");
-
-      const createdAnnotation = await ctx.prisma.$transaction(async (tx) => {
-        const annotation = await tx.annotation.create({
-          data: {
-            id: nanoid(),
-            projectId: input.projectId,
-            comment: input.comment ?? "",
-            isThumbsUp: input.isThumbsUp ?? null,
-            traceId: input.traceId,
-            userId: ctx.session.user.id,
-            scoreOptions: input.scoreOptions ?? {},
-            expectedOutput: input.expectedOutput ?? null,
-          },
-        });
-
-        try {
-          await updateTraceWithAnnotation(input.traceId, input.projectId);
-        } catch (error) {
-          logger.error(
-            { error, traceId: input.traceId, projectId: input.projectId },
-            "Failed to update Elasticsearch after annotation creation",
-          );
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to add annotation to trace.",
-            cause: error,
-          });
-        }
-
-        return annotation;
+      const service = await AnnotationService.create({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
       });
 
-      return createdAnnotation;
+      return service.create({
+        id: nanoid(),
+        projectId: input.projectId,
+        traceId: input.traceId,
+        userId: ctx.session.user.id,
+        comment: input.comment ?? "",
+        isThumbsUp: input.isThumbsUp ?? null,
+        scoreOptions: input.scoreOptions ?? {},
+        expectedOutput: input.expectedOutput ?? null,
+      });
     }),
   updateByTraceId: protectedProcedure
     .input(
@@ -250,37 +223,15 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("annotations:delete"))
     .mutation(async ({ ctx, input }) => {
-      const deletedAnnotation = await ctx.prisma.$transaction(async (tx) => {
-        const annotation = await tx.annotation.delete({
-          where: {
-            id: input.annotationId,
-            projectId: input.projectId,
-          },
-        });
-
-        try {
-          await updateTraceRemoveAnnotation(
-            annotation.traceId,
-            input.projectId,
-          );
-        } catch (error) {
-          // If Elasticsearch update fails, we should fail the transaction
-          // to maintain consistency between database and Elasticsearch
-          logger.error(
-            { error, traceId: annotation.traceId, projectId: input.projectId },
-            "Failed to update Elasticsearch after annotation deletion",
-          );
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to delete annotation from trace.",
-            cause: error,
-          });
-        }
-
-        return annotation;
+      const service = await AnnotationService.create({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
       });
 
-      return deletedAnnotation;
+      return service.delete({
+        id: input.annotationId,
+        projectId: input.projectId,
+      });
     }),
   getAll: protectedProcedure
     .input(
@@ -772,123 +723,6 @@ export const annotationRouter = createTRPCRouter({
       };
     }),
 });
-
-// Helper function to update trace with fallback strategy
-const updateTraceInElasticsearch = async (
-  traceId: string,
-  projectId: string,
-  updateScript: string,
-) => {
-  const client = await esClient({ projectId });
-  let currentColdIndex: string | undefined;
-  try {
-    currentColdIndex = Object.keys(
-      await client.indices.getAlias({
-        name: TRACE_COLD_INDEX.alias,
-      }),
-    )[0];
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      ((error.message.includes("alias") && error.message.includes("missing")) ||
-        (error as any).meta?.body?.error?.includes("missing"))
-    ) {
-      // no cold index found, that's fine
-    } else {
-      throw error;
-    }
-  }
-
-  const traceIndexIdValue = traceIndexId({
-    traceId: traceId,
-    projectId: projectId,
-  });
-
-  // Try alias first
-  try {
-    await client.update({
-      index: TRACE_INDEX.alias,
-      id: traceIndexIdValue,
-      retry_on_conflict: 10,
-      body: {
-        script: {
-          source: updateScript,
-          lang: "painless",
-        },
-      },
-    });
-  } catch (error) {
-    // If alias fails, try cold index
-    if (currentColdIndex) {
-      await client.update({
-        index: currentColdIndex,
-        id: traceIndexIdValue,
-        retry_on_conflict: 10,
-        body: {
-          script: {
-            source: updateScript,
-            lang: "painless",
-          },
-        },
-      });
-    } else {
-      // Re-throw the original error if no cold index available
-      throw error;
-    }
-  }
-};
-
-const updateTraceWithAnnotation = async (
-  traceId: string,
-  projectId: string,
-) => {
-  const updateScript = `
-    try {
-      if (!ctx._source.containsKey('annotations')) {
-        ctx._source.annotations = [
-          'count': 1,
-          'hasAnnotation': true
-        ];
-      } else if (ctx._source.annotations.containsKey('count')) {
-        ctx._source.annotations.count += 1;
-      } else {
-        ctx._source.annotations.count = 1;
-      }
-      ctx._source.annotations.hasAnnotation = true;
-    } catch (Exception e) {
-      // If anything goes wrong, ensure we have a valid annotations object
-      ctx._source.annotations = [
-        'count': 1,
-        'hasAnnotation': true
-      ];
-    }
-  `;
-
-  await updateTraceInElasticsearch(traceId, projectId, updateScript);
-};
-
-const updateTraceRemoveAnnotation = async (
-  traceId: string,
-  projectId: string,
-) => {
-  const updateScript = `
-    try {
-      if (ctx._source.containsKey('annotations') && ctx._source.annotations.containsKey('count')) {
-        ctx._source.annotations.count -= 1;
-        if (ctx._source.annotations.count <= 0) {
-          ctx._source.remove('annotations');
-        } else {
-          ctx._source.annotations.hasAnnotation = true;
-        }
-      }
-    } catch (Exception e) {
-      // If anything goes wrong, remove the annotations object
-      ctx._source.remove('annotations');
-    }
-  `;
-
-  await updateTraceInElasticsearch(traceId, projectId, updateScript);
-};
 
 export async function createOrUpdateQueueItems({
   traceIds,
