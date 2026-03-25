@@ -422,6 +422,7 @@ export class ClickHouseTraceService {
     options: {
       includeSpans?: boolean;
       scrollId?: string | null;
+      /** Accepted for interface parity with ElasticsearchTraceService; unused here. */
       downloadMode?: boolean;
     } = {},
   ): Promise<TracesForProjectResult | null> {
@@ -444,10 +445,7 @@ export class ClickHouseTraceService {
           let cursor: ClickHouseScrollCursor | null = null;
           if (effectiveScrollId) {
             this.logger.debug(
-              {
-                scrollId: effectiveScrollId,
-                hasScrollId: !!effectiveScrollId,
-              },
+              { scrollId: effectiveScrollId },
               "Parsing scrollId from request",
             );
             try {
