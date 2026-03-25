@@ -419,7 +419,11 @@ export class ClickHouseTraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: { includeSpans?: boolean } = {},
+    options: {
+      includeSpans?: boolean;
+      scrollId?: string | null;
+      downloadMode?: boolean;
+    } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
@@ -434,19 +438,21 @@ export class ClickHouseTraceService {
           const sortDirection =
             (input.sortDirection as "asc" | "desc") ?? "desc";
 
-          // Parse cursor from scrollId if present
+          // Parse cursor from scrollId — prefer options (matches ES service contract),
+          // fall back to input for callers that spread it into the query params.
+          const effectiveScrollId = options.scrollId ?? input.scrollId;
           let cursor: ClickHouseScrollCursor | null = null;
-          if (input.scrollId) {
+          if (effectiveScrollId) {
             this.logger.debug(
               {
-                scrollId: input.scrollId,
-                hasScrollId: !!input.scrollId,
+                scrollId: effectiveScrollId,
+                hasScrollId: !!effectiveScrollId,
               },
               "Parsing scrollId from request",
             );
             try {
               cursor = JSON.parse(
-                Buffer.from(input.scrollId, "base64").toString("utf-8"),
+                Buffer.from(effectiveScrollId, "base64").toString("utf-8"),
               );
 
               // Validate that cursor parameters match current request
@@ -483,7 +489,7 @@ export class ClickHouseTraceService {
             } catch (e) {
               this.logger.warn(
                 {
-                  scrollId: input.scrollId,
+                  scrollId: effectiveScrollId,
                   error: e instanceof Error ? e.message : e,
                 },
                 "Invalid scrollId, starting from beginning",
