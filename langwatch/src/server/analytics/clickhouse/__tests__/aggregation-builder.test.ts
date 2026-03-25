@@ -217,6 +217,133 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
+    describe("when timeScale is full with groupBy", () => {
+      // @regression issue #2644: Summary charts with groupBy render blank because
+      // buildSubqueryTimeseriesQuery never includes group_key in SELECT, GROUP BY,
+      // or UNION ALL — causing the frontend to receive no group dimension to render.
+
+      it("includes group_key in the UNION ALL SELECT for simple metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+      });
+
+      it("includes group_key in the CTE query for pipeline metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+      });
+
+      it("includes group_key in both sides of UNION ALL for simple metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Both the current and previous SELECT branches of UNION ALL must include group_key
+        const unionParts = result.sql.split("UNION ALL");
+        expect(unionParts.length).toBeGreaterThanOrEqual(2);
+        expect(unionParts[0]).toContain("group_key");
+        expect(unionParts[1]).toContain("group_key");
+      });
+
+      it("does not include group_key when groupBy is absent", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).not.toContain("group_key");
+      });
+
+      it("includes group_key via FULL OUTER JOIN when mixing simple and subquery metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+            {
+              metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("FULL OUTER JOIN");
+        expect(result.sql).toContain("UNION ALL");
+      });
+
+      it("uses direct group_key alias without null-check wrapper when groupBy handlesUnknown", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_passed" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        // When handlesUnknown=true the column expression itself handles unknown values,
+        // so no outer if(... IS NULL, 'unknown', toString(...)) wrapper is added.
+        expect(result.sql).not.toContain("IS NULL, 'unknown'");
+      });
+    });
+
     it("uses date-bucketed pipeline query for pipeline metrics with numeric timeScale", () => {
       const input = {
         ...baseInput,
