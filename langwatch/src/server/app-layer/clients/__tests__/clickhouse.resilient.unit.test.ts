@@ -274,6 +274,94 @@ describe("createResilientClickHouseClient()", () => {
       expect(actual).toBe(result);
       expect(mock.insert).toHaveBeenCalledTimes(2);
     });
+
+    it("increments error metric for the transient failure", async () => {
+      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const result = { executed: true };
+      const mock = makeMockClient({
+        insert: vi
+          .fn()
+          .mockRejectedValueOnce(transientError)
+          .mockResolvedValueOnce(result),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+        baseDelayMs: 1,
+      });
+
+      await client.insert({
+        table: "test",
+        values: [],
+        format: "JSONEachRow",
+      });
+
+      // Transient failure increments error, success increments success
+      expect(mockIncrementCount).toHaveBeenCalledWith("INSERT", "error");
+      expect(mockIncrementCount).toHaveBeenCalledWith("INSERT", "success");
+    });
+
+    it("feeds the failure rate monitor on transient retries", async () => {
+      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const result = { executed: true };
+      const mock = makeMockClient({
+        insert: vi
+          .fn()
+          .mockRejectedValueOnce(transientError)
+          .mockResolvedValueOnce(result),
+      });
+      const monitor = new FailureRateMonitor({
+        threshold: 1,
+        windowMs: 60_000,
+      });
+      const recordSpy = vi.spyOn(monitor, "record");
+
+      const client = createResilientClickHouseClient({
+        client: mock,
+        failureMonitor: monitor,
+        maxRetries: 3,
+        baseDelayMs: 1,
+      });
+
+      await client.insert({
+        table: "test",
+        values: [],
+        format: "JSONEachRow",
+      });
+
+      expect(recordSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("includes source and errorType in retry warning log", async () => {
+      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const result = { executed: true };
+      const mock = makeMockClient({
+        insert: vi
+          .fn()
+          .mockRejectedValueOnce(transientError)
+          .mockResolvedValueOnce(result),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+        baseDelayMs: 1,
+      });
+
+      await client.insert({
+        table: "test",
+        values: [],
+        format: "JSONEachRow",
+      });
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "clickhouse",
+          operation: "insert",
+          errorType: "oom",
+        }),
+        expect.any(String)
+      );
+    });
   });
 
   describe("when insert fails with non-transient error", () => {

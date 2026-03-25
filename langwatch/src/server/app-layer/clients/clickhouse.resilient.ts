@@ -346,6 +346,13 @@ export function createResilientClickHouseClient({
                 throw error;
               }
 
+              // Track transient failures in metrics and alerting even
+              // when the insert will be retried — a flapping ClickHouse
+              // should show up in dashboards before retries exhaust.
+              const errorType = classifyClickHouseError(error);
+              incrementClickHouseQueryCount("INSERT", "error");
+              failureMonitor.record();
+
               const delay = jitteredBackoff({
                 attempt,
                 baseDelayMs,
@@ -353,6 +360,9 @@ export function createResilientClickHouseClient({
               });
               logger.warn(
                 {
+                  source: "clickhouse",
+                  operation: "insert",
+                  errorType,
                   attempt: attempt + 1,
                   maxRetries,
                   delayMs: Math.round(delay),
