@@ -1474,35 +1474,10 @@ export const organizationRouter = createTRPCRouter({
         });
       });
 
-      // Resolve the first teamId from either the new teamAssignments format or legacy teamIds
-      const firstTeamId = (() => {
-        if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
-          const assignments = invite.teamAssignments as Array<{ teamId: string }>;
-          return assignments[0]?.teamId ?? null;
-        }
-        const legacyId = invite.teamIds.split(",")[0]?.trim();
-        return legacyId || null;
-      })();
+      const inviteService = InviteService.create(prisma);
+      const projectSlug = await inviteService.findLandingProjectSlug(invite);
 
-      // Try to find a project via the team first, then fall back to any
-      // non-archived project in the invited org so the client can skip the
-      // onboarding redirect and land directly in the app.
-      const project =
-        (firstTeamId
-          ? await prisma.project.findFirst({
-              where: { teamId: firstTeamId, archivedAt: null },
-              select: { slug: true },
-            })
-          : null) ??
-        (await prisma.project.findFirst({
-          where: {
-            team: { organizationId: invite.organizationId, archivedAt: null },
-            archivedAt: null,
-          },
-          select: { slug: true },
-        }));
-
-      return { success: true, invite, project };
+      return { success: true, invite, project: projectSlug ? { slug: projectSlug } : null };
     }),
   updateTeamMemberRole: protectedProcedure
     .input(
