@@ -73,6 +73,10 @@ export class ClickHouseTraceService {
 
   /**
    * Resolve the ClickHouse client for a given project.
+   *
+   * The returned client is already wrapped with wrapWithDefaultSettings
+   * by getClickHouseClientForProject, so every query automatically receives
+   * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    */
   private async resolveClient(projectId: string) {
     return getClickHouseClientForProject(projectId);

@@ -62,7 +62,6 @@ export async function seedSpans(
   } = opts;
 
   const now = Date.now();
-  const spansPerTrace = Math.ceil(count / traceCount);
 
   // Pre-generate trace IDs for deterministic distribution
   const traceIds: string[] = [];
@@ -70,7 +69,16 @@ export async function seedSpans(
     traceIds.push(`${tenantId}-trace-${t}`);
   }
 
-  // Build trace summary rows
+  // Precompute a per-trace span allocation that sums to exactly `count`.
+  // Base allocation distributes the floor evenly; remainder spans go to the
+  // first `remainder` traces so the total is always exact.
+  const baseSpansPerTrace = Math.floor(count / traceCount);
+  const remainder = count % traceCount;
+  const spansAllocation: number[] = traceIds.map((_, t) =>
+    t < remainder ? baseSpansPerTrace + 1 : baseSpansPerTrace,
+  );
+
+  // Build trace summary rows using the per-trace allocation for SpanCount
   const traceSummaryRows = traceIds.map((traceId, t) => ({
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
@@ -91,7 +99,7 @@ export async function seedSpans(
     TimeToLastTokenMs: 200,
     TotalDurationMs: 200,
     TokensPerSecond: 100,
-    SpanCount: spansPerTrace,
+    SpanCount: spansAllocation[t]!,
     ContainsErrorStatus: 0,
     ContainsOKStatus: 1,
     ErrorMessage: null,
@@ -130,11 +138,8 @@ export async function seedSpans(
 
   for (let t = 0; t < traceCount; t++) {
     const traceId = traceIds[t]!;
-    const spansForThisTrace = Math.min(
-      spansPerTrace,
-      count - t * spansPerTrace,
-    );
-    if (spansForThisTrace <= 0) break;
+    const spansForThisTrace = spansAllocation[t]!;
+    if (spansForThisTrace <= 0) continue;
 
     for (let s = 0; s < spansForThisTrace; s++) {
       spanRows.push({

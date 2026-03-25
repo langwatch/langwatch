@@ -19,6 +19,7 @@ import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
 import type { SeriesInputType } from "../../registry";
 import { seedSpans } from "./test-utils/clickhouse-fixtures";
+import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 
 const TENANT_ID = "memory-safety-test";
 
@@ -240,8 +241,9 @@ describe("memory-safety integration", () => {
 
   beforeAll(
     async () => {
-      ch = getTestClickHouseClient()!;
-      if (!ch) throw new Error("ClickHouse client not available");
+      const rawClient = getTestClickHouseClient();
+      if (!rawClient) throw new Error("ClickHouse client not available");
+      ch = wrapWithDefaultSettings(rawClient);
 
       // Seed 10K spans with 50 attribute keys across 1000 traces
       // knownCost: 0.05 per trace so total_cost = 1000 * 0.05 = 50.0
@@ -361,6 +363,92 @@ describe("memory-safety integration", () => {
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // Column pruning: wide SpanAttributes should not be read for metrics that
+  // only need trace_summaries columns (e.g. total_cost, token counts).
+  // ---------------------------------------------------------------------------
+  describe("when proving column pruning prevents OOM on wide SpanAttributes data", () => {
+    const WIDE_COLUMN_TENANT_ID = "memory-safety-wide-column-test";
+
+    beforeAll(
+      async () => {
+        // Seed spans with 50 attribute keys × 4KB per value ≈ 200KB per span.
+        // This data set would cause OOM if analytics queries read SpanAttributes
+        // without key-level pruning on metrics that don't need it.
+        await seedSpans(ch, {
+          tenantId: WIDE_COLUMN_TENANT_ID,
+          count: 1_000,
+          attributeKeys: 50,
+          attributeValueSize: 4096,
+          traceCount: 100,
+        });
+      },
+      120_000,
+    );
+
+    afterAll(async () => {
+      await cleanupTestData(WIDE_COLUMN_TENANT_ID);
+    });
+
+    it("generates SQL that does not reference SpanAttributes for total_cost metric", () => {
+      resetParamCounter();
+      const { sql } = buildTimeseriesQuery({
+        ...baseInput,
+        projectId: WIDE_COLUMN_TENANT_ID,
+        timeScale: "full",
+        series: [
+          {
+            metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+            aggregation: "sum" as AggregationTypes,
+          },
+        ],
+      });
+
+      // total_cost reads TotalCost from trace_summaries — SpanAttributes must
+      // not appear at all since that column lives in stored_spans.
+      expect(sql).not.toContain("SpanAttributes");
+    });
+
+    it("completes total_cost query within 50MB on wide-attribute data", async () => {
+      resetParamCounter();
+      const { sql, params } = buildTimeseriesQuery({
+        ...baseInput,
+        projectId: WIDE_COLUMN_TENANT_ID,
+        timeScale: "full",
+        series: [
+          {
+            metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+            aggregation: "sum" as AggregationTypes,
+          },
+        ],
+      });
+
+      // Execute with a 50MB hard cap. If SpanAttributes were read without
+      // column pruning this would exceed the budget on 1000 spans × 200KB.
+      try {
+        const result = await ch.query({
+          query: sql,
+          query_params: params,
+          format: "JSONEachRow",
+          clickhouse_settings: {
+            max_memory_usage: "50000000",
+          },
+        });
+        await result.json();
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
+          expect.fail(
+            `total_cost query exceeded 50MB on wide-attribute data — ` +
+              `column pruning may be broken: ${message}`,
+          );
+        }
+        throw error;
+      }
+    });
+  });
+
   describe("when verifying query result correctness on seeded data", () => {
     it("returns expected trace_count for cardinality of metadata.trace_id", async () => {
       // Use "full" timeScale to get a single aggregation across all time
@@ -384,7 +472,9 @@ describe("memory-safety integration", () => {
 
       const fullRows = await fullResult.json<Record<string, unknown>>();
       // Find the current period row
-      const currentRow = fullRows.find((r) => r.period === "current");
+      const currentRow = fullRows.find(
+        (r: Record<string, unknown>) => r.period === "current",
+      );
       expect(currentRow).toBeDefined();
 
       // Extract the cardinality value
@@ -415,7 +505,9 @@ describe("memory-safety integration", () => {
       });
 
       const rows = await result.json<Record<string, unknown>>();
-      const currentRow = rows.find((r) => r.period === "current");
+      const currentRow = rows.find(
+        (r: Record<string, unknown>) => r.period === "current",
+      );
       expect(currentRow).toBeDefined();
 
       const metricKey = Object.keys(currentRow!).find(
