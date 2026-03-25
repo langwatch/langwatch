@@ -114,3 +114,10 @@ Feature: Analytics Chart Rendering
     Then the chart shows an error alert with a red indicator
     When there is no data instead of an error
     Then the chart shows a neutral "No data" message without error styling
+
+  @regression @integration
+  Scenario: All chart types show "No data" when query returns empty results
+    Given an analytics chart of any type including summary, bar, pie, or line
+    When the query succeeds but returns no data
+    Then the chart shows a "No data" message instead of a blank area
+    And the empty chart content is not rendered underneath

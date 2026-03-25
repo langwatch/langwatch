@@ -548,13 +548,14 @@ const CustomGraph_ = React.memo(
     };
 
     const container = (child: React.ReactNode) => {
+      const dataLoaded = !timeseries.isLoading && timeseries.data;
       const allEmpty =
-        currentAndPreviousData &&
+        dataLoaded &&
         (maxValue == 0 || currentAndPreviousData?.length === 0);
 
       return (
         <Box width="full" height="full" position="relative">
-          {input.graphType !== "summary" && timeseries.isFetching && (
+          {timeseries.isFetching && !timeseries.isLoading && (
             <Delayed>
               <Spinner position="absolute" right={4} top={4} />
             </Delayed>
@@ -592,7 +593,7 @@ const CustomGraph_ = React.memo(
                   </Badge>
                 </button>
               )}
-              {input.graphType !== "summary" && allEmpty && (
+              {allEmpty ? (
                 <Box
                   position="absolute"
                   top="50%"
@@ -601,8 +602,9 @@ const CustomGraph_ = React.memo(
                 >
                   No data
                 </Box>
+              ) : (
+                child
               )}
-              {child}
             </>
           )}
         </Box>
