@@ -234,10 +234,11 @@ export class TraceService {
         );
 
         if (useClickHouse) {
+          const { downloadMode: _, ...clickHouseOptions } = options;
           const result = await this.clickHouseService.getAllTracesForProject(
             input,
             protections,
-            options,
+            clickHouseOptions,
           );
           if (result === null) {
             throw new Error(

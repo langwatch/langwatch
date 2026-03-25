@@ -422,8 +422,6 @@ export class ClickHouseTraceService {
     options: {
       includeSpans?: boolean;
       scrollId?: string | null;
-      /** Accepted for interface parity with ElasticsearchTraceService; unused here. */
-      downloadMode?: boolean;
     } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
