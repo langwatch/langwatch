@@ -134,66 +134,51 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   describe("topic and field-discovery query attribute access", () => {
     /**
-     * These are hand-written SQL queries in clickhouse-trace.service.ts.
-     * We inline the known SQL patterns and assert structural properties.
-     * If the queries change, these tests catch regressions.
+     * Read the actual production source of clickhouse-trace.service.ts and
+     * extract the method bodies for getTopicCounts and getDistinctFieldNames.
+     * This way, if the SQL changes the test checks the ACTUAL code.
      */
+    const traceServicePath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "traces",
+      "clickhouse-trace.service.ts",
+    );
+    const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
+
+    const getTopicCountsBody = traceServiceSource.match(
+      /async getTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+    );
+
+    const getDistinctFieldNamesBody = traceServiceSource.match(
+      /async getDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+    );
 
     describe("when the topic counting query SQL is inspected", () => {
-      // The getTopicCounts query selects: TopicId, SubTopicId, count()
-      // It does NOT touch SpanAttributes or Attributes map columns at all.
-      const topicCountSql = `
-        SELECT
-          TopicId,
-          SubTopicId,
-          count() as count
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
-        GROUP BY TopicId, SubTopicId
-      `;
-
       it("does not select the full SpanAttributes Map column", () => {
-        expect(topicCountSql).not.toContain("SpanAttributes");
+        expect(getTopicCountsBody).not.toBeNull();
+        expect(getTopicCountsBody![0]).not.toContain("SpanAttributes");
       });
 
       it("does not select the full Attributes Map column without key access", () => {
+        expect(getTopicCountsBody).not.toBeNull();
         // Attributes without ['key'] means reading the entire Map
-        expect(topicCountSql).not.toMatch(/\bAttributes\b(?!\[)/);
+        expect(getTopicCountsBody![0]).not.toMatch(/\bAttributes\b(?!\[)/);
       });
     });
 
     describe("when the field discovery query SQL is inspected", () => {
-      // getDistinctFieldNames has two queries:
-      // 1. SELECT DISTINCT SpanName FROM stored_spans (safe - no SpanAttributes)
-      // 2. SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key FROM trace_summaries
-      //    This uses mapKeys() which extracts keys only, not values - memory safe.
-      const spanNamesSql = `
-        SELECT DISTINCT SpanName
-        FROM stored_spans
-        WHERE TenantId = {tenantId:String}
-          AND SpanName != ''
-        ORDER BY SpanName ASC
-      `;
-
-      const metadataKeysSql = `
-        SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-        ORDER BY key ASC
-      `;
-
-      it("does not select the full SpanAttributes Map column in span names query", () => {
-        expect(spanNamesSql).not.toContain("SpanAttributes");
-      });
-
-      it("does not select the full SpanAttributes Map column in metadata keys query", () => {
-        expect(metadataKeysSql).not.toContain("SpanAttributes");
+      it("does not select the full SpanAttributes Map column", () => {
+        expect(getDistinctFieldNamesBody).not.toBeNull();
+        expect(getDistinctFieldNamesBody![0]).not.toContain("SpanAttributes");
       });
 
       it("uses mapKeys() for Attributes access (extracts keys only, not values)", () => {
+        expect(getDistinctFieldNamesBody).not.toBeNull();
         // mapKeys extracts only the key names, avoiding reading all Map values
-        expect(metadataKeysSql).toContain("mapKeys(Attributes)");
+        expect(getDistinctFieldNamesBody![0]).toContain("mapKeys(Attributes)");
       });
     });
   });
@@ -203,19 +188,6 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   describe("topic counting query LIMIT clause", () => {
     describe("when the topic counting query SQL is inspected", () => {
-      // Current production query does NOT have a LIMIT clause.
-      // This is a known gap that should be fixed.
-      const topicCountSql = `
-        SELECT
-          TopicId,
-          SubTopicId,
-          count() as count
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
-        GROUP BY TopicId, SubTopicId
-      `;
-
       test.todo(
         "includes a LIMIT clause — getTopicCounts() currently has no LIMIT; " +
           "add LIMIT to prevent unbounded result sets on projects with many topics",
@@ -310,59 +282,10 @@ describe("memory-safety", () => {
         }
       });
 
-      it("passes clickhouse_settings to every .query() call in clickhouse-trace.service.ts (topic and field queries)", () => {
-        const servicePath = path.resolve(
-          __dirname,
-          "..",
-          "..",
-          "..",
-          "traces",
-          "clickhouse-trace.service.ts",
-        );
-        const source = fs.readFileSync(servicePath, "utf-8");
-
-        // Extract only getTopicCounts and getDistinctFieldNames methods
-        const topicCountsMatch = source.match(
-          /async getTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
-        );
-        const distinctFieldsMatch = source.match(
-          /async getDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
-        );
-
-        // These methods have .query() calls that currently do NOT pass clickhouse_settings.
-        // This is a known gap — mark as expected failures.
-        if (topicCountsMatch) {
-          const topicBlock = topicCountsMatch[0];
-          const queryCallsInTopic = topicBlock.match(/\.query\(\s*\{/g) ?? [];
-          for (const _call of queryCallsInTopic) {
-            // Find the block for each query call
-            const queryPattern = /\.query\(\s*\{/g;
-            let m: RegExpExecArray | null;
-            while ((m = queryPattern.exec(topicBlock)) !== null) {
-              const startIdx = m.index + m[0].length - 1;
-              let depth = 1;
-              let i = startIdx + 1;
-              while (i < topicBlock.length && depth > 0) {
-                if (topicBlock[i] === "{") depth++;
-                else if (topicBlock[i] === "}") depth--;
-                i++;
-              }
-              const block = topicBlock.slice(startIdx, i);
-              // Currently FAILS: getTopicCounts does not pass clickhouse_settings
-              // Uncomment assertion when fixed:
-              // expect(block).toContain("clickhouse_settings");
-              if (!block.includes("clickhouse_settings")) {
-                // Known gap - log but don't fail
-                // TODO: Add clickhouse_settings to getTopicCounts query
-              }
-            }
-          }
-        }
-
-        // For now, just verify the analytics service passes settings (tested above)
-        // and note the gap in trace service
-        expect(true).toBe(true); // Placeholder - real assertions are in the test above
-      });
+      test.todo(
+        "clickhouse-trace.service.ts query calls include clickhouse_settings — " +
+          "getTopicCounts and getDistinctFieldNames currently do not pass clickhouse_settings",
+      );
     });
   });
 
