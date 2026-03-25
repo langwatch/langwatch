@@ -4,7 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "test:static": "vitest run static-validation.test.ts",
+    "test:unit": "vitest run helpers/__tests__/",
+    "test:e2e": "npx tsx scripts/run-selected.ts",
+    "test:e2e:all": "EVALS_ALL=1 npx tsx scripts/run-selected.ts",
+    "test:select": "npx tsx scripts/test-select.ts",
+    "test:claude": "AGENT_UNDER_TEST=claude-code npx tsx scripts/run-selected.ts",
+    "test:codex": "AGENT_UNDER_TEST=codex npx tsx scripts/run-selected.ts",
+    "test:cursor": "AGENT_UNDER_TEST=cursor npx tsx scripts/run-selected.ts",
+    "test:all-agents": "pnpm test:claude && pnpm test:codex && pnpm test:cursor"
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.44",
@@ -14,7 +23,8 @@
     "dotenv": "^17.2.2",
     "node-pty": "^1.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "yaml": "^2.8.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

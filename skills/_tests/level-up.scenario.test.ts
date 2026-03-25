@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,9 +18,10 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "level-up");
+  const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, "level-up");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
     path.resolve(__dirname, "../level-up/SKILL.md"),
@@ -53,7 +52,7 @@ describe("Level-up Skill", () => {
         description:
           "Taking a Python OpenAI bot to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -66,11 +65,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             // Verify tracing was added
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -103,7 +103,7 @@ describe("Level-up Skill", () => {
         description:
           "Taking a TypeScript Vercel AI bot to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -116,11 +116,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -151,7 +152,7 @@ describe("Level-up Skill", () => {
         description:
           "Taking a Python LangGraph agent to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -163,11 +164,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
               "utf8"
@@ -198,7 +200,7 @@ describe("Level-up Skill", () => {
         description:
           "Taking a TypeScript Mastra agent to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -210,11 +212,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"

@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,9 +18,10 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 function copyRecipeSkillToWorkDir(tempFolder: string, recipeName: string) {
-  const skillDir = path.join(tempFolder, ".skills", recipeName);
+  const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, recipeName);
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
     path.resolve(__dirname, `../recipes/${recipeName}/SKILL.md`),
@@ -99,7 +98,7 @@ describe("Recipes", () => {
         description:
           "Generate a synthetic evaluation dataset from the TerraVerde farm advisory RAG knowledge base, including diverse question types and context per row.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -117,6 +116,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "generate-rag-dataset");
 
             // Find CSV or Python dataset files
             const csvFiles = findTestFiles(tempFolder, /\.csv$/);
@@ -196,7 +196,7 @@ describe("Recipes", () => {
         description:
           "Create scenario tests that verify the health wellness agent stays observational and does not give prescriptive medical advice. Include boundary enforcement and red team tests.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -214,6 +214,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "test-compliance");
 
             // Find test files (Python or TypeScript)
             const pyTestFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
@@ -270,7 +271,7 @@ describe("Recipes", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || !runner.capabilities.supportsMcp)(
     "uses MCP to debug instrumentation traces",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -287,7 +288,7 @@ describe("Recipes", () => {
         description:
           "Use the LangWatch MCP to inspect production traces and identify instrumentation issues or suggest improvements.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -304,6 +305,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "debug-instrumentation");
 
             // Verify the agent used MCP trace tools
             const allContent = state.messages

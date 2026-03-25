@@ -30,7 +30,17 @@ For PDF evaluation specifically, reference the pattern from `python-sdk/examples
 - Define extraction pipeline
 - Use LangWatch experiment SDK to evaluate extraction accuracy
 
-## Step 3: Set Up Evaluation by Modality
+## Step 3: Ensure Evaluators Exist on the Platform
+
+Before writing experiment code, set up the evaluators you will use:
+
+1. Call `platform_list_evaluators` to see what already exists
+2. If no suitable evaluator exists, call `platform_create_evaluator` to create one (e.g., `llm_boolean` for pass/fail judgments)
+3. Note the returned slug — use it exactly in your experiment code
+
+Also verify a model provider is configured via `platform_list_model_providers`. If none, set one up with `platform_set_model_provider`.
+
+## Step 4: Set Up Evaluation by Modality
 
 ### Image Evaluation
 LangWatch's LLM-as-judge evaluators can accept images. Create an evaluation that:
@@ -77,14 +87,14 @@ For agents that process arbitrary files:
 - Use Scenario's file analysis patterns
 - `fetch_scenario_docs` with url for `multimodal/multimodal-files.md`
 
-## Step 4: Generate Domain-Specific Test Data
+## Step 5: Generate Domain-Specific Test Data
 
 For each modality, generate or collect test data that matches the agent's actual use case:
 - If it's a medical imaging agent → use relevant medical image samples
 - If it's a document parser → use real document types the agent encounters
 - If it's a voice assistant → record realistic voice prompts
 
-## Step 5: Run and Iterate
+## Step 6: Run and Iterate
 
 Run the evaluation, review results, fix issues, re-run until quality is acceptable.
 

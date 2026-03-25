@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,9 +18,10 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "prompts");
+  const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, "prompts");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
     path.resolve(__dirname, "../prompts/SKILL.md"),
@@ -72,7 +71,7 @@ describe("Prompts Skill", () => {
         description:
           "Setting up prompt versioning in a Python OpenAI bot project using the LangWatch Prompts CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -84,11 +83,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             // Verify the agent modified main.py to use langwatch prompts
             const mainPy = fs.readFileSync(
@@ -135,7 +135,7 @@ describe("Prompts Skill", () => {
         description:
           "Setting up prompt versioning in a TypeScript Vercel AI bot project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -147,11 +147,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -196,7 +197,7 @@ describe("Prompts Skill", () => {
         description:
           "Setting up prompt versioning in a Python LangGraph agent project using the LangWatch Prompts CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -207,11 +208,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             const mainPy = fs.readFileSync(
               path.join(tempFolder, "main.py"),
@@ -259,7 +261,7 @@ describe("Prompts Skill", () => {
         description:
           "Setting up prompt versioning in a TypeScript Mastra agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -270,11 +272,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
@@ -320,7 +323,7 @@ describe("Prompts Skill", () => {
         description:
           "Adding a new versioned prompt for a specific customer support use case.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -337,6 +340,7 @@ describe("Prompts Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             // Either the code was updated to use langwatch prompts, or prompt files were created
             const hasPromptsJson = fs.existsSync(

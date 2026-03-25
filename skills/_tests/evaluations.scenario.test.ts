@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner } from "./helpers/agent-factory";
+import { toolCallFix, assertSkillWasRead } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,9 +18,10 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 
 const judgeModel = openai("gpt-5-mini");
+const runner = getRunner();
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "evaluations");
+  const skillDir = path.join(tempFolder, runner.capabilities.skillsDirectory, "evaluations");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
     path.resolve(__dirname, "../evaluations/SKILL.md"),
@@ -77,7 +76,7 @@ describe("Evaluations Skill", () => {
         description:
           "Creating an evaluation experiment for a Python OpenAI chatbot that replies with tweet-like responses and emojis.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -89,11 +88,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests), short and sweet, no need to run it. IMPORTANT: read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests). Read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
 
             const newFiles = findNewPythonFiles(tempFolder);
             expect(
@@ -140,7 +140,7 @@ describe("Evaluations Skill", () => {
         description:
           "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -152,11 +152,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch experiments SDK, short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch experiments SDK"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             // Find new TypeScript files (not index.ts)
             const files = fs
               .readdirSync(tempFolder)
@@ -197,7 +198,7 @@ describe("Evaluations Skill", () => {
         description:
           "Creating an evaluation experiment for a Python LangGraph agent.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -209,11 +210,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK, short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(
               newFiles.length,
@@ -248,7 +250,7 @@ describe("Evaluations Skill", () => {
         description:
           "Adding a specific evaluation for checking if the agent's responses are faithful to the context provided.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -260,11 +262,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create an evaluation that checks if my agent hallucinates or makes up information, use langwatch experiments SDK with a faithfulness evaluator, short and sweet, no need to run it"
+            "create an evaluation that checks if my agent hallucinates, use langwatch experiments SDK with a faithfulness evaluator"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(newFiles.length).toBeGreaterThan(0);
             const content = newFiles
@@ -296,7 +299,7 @@ describe("Evaluations Skill", () => {
         description:
           "Creating an evaluation experiment for a TerraVerde farm advisory RAG agent.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -308,11 +311,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK, no need to run it."
+            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(newFiles.length).toBeGreaterThan(0);
             const content = newFiles
@@ -343,5 +347,142 @@ describe("Evaluations Skill", () => {
       expect(result.success).toBe(true);
     },
     600_000
+  );
+
+  it.skipIf(isCI)(
+    "creates evaluation for a Google ADK agent using Gemini models — not OpenAI",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-evaluations-google-adk-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-google-adk")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Google ADK evaluation — model provider detection",
+        description:
+          "Creating an evaluation experiment for a Google ADK agent. The agent uses Gemini models, so the generated evaluation code should use Gemini-compatible model references, NOT hardcode OpenAI models.",
+        agents: [
+          createAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created an evaluation experiment file (notebook or script)",
+              "Agent detected that this is a Google ADK project using Gemini models and adapted accordingly — evaluator model settings should reference a Gemini-compatible model (e.g., gemini/gemini-2.0-flash or vertex_ai/gemini-2.0-flash), NOT openai/gpt-5-mini",
+              "Agent generated a dataset specific to the weather assistant domain",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK, short and sweet, no need to run it. IMPORTANT: read my agent code first to understand what framework and model provider it uses."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+
+            const newFiles = findNewPythonFiles(tempFolder);
+            expect(
+              newFiles.length,
+              `Expected at least one new .py or .ipynb file created in ${tempFolder}`
+            ).toBeGreaterThan(0);
+
+            const fileContents = newFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+
+            expect(fileContents).toContain("langwatch");
+
+            // The generated code should NOT hardcode OpenAI models for a Google ADK project
+            const lowerContents = fileContents.toLowerCase();
+            expect(
+              lowerContents,
+              "Evaluation for a Google ADK agent should NOT hardcode openai/gpt-5-mini — it should use a Gemini-compatible model"
+            ).not.toMatch(/["']openai\/gpt/);
+
+            // Should reference Gemini or Google model provider
+            const usesGeminiModel =
+              lowerContents.includes("gemini") ||
+              lowerContents.includes("vertex_ai") ||
+              lowerContents.includes("google");
+            expect(
+              usesGeminiModel,
+              "Expected evaluation to reference Gemini/Google model provider, not OpenAI"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI || !runner.capabilities.supportsMcp)(
+    "evaluations actually work — evaluators created on platform",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-evaluations-e2e-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-weather-agent")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\nOPENAI_API_KEY=${process.env.OPENAI_API_KEY}\n`
+      );
+
+      const result = await scenario.run({
+        name: "Evaluations work end-to-end — evaluators exist on platform",
+        description:
+          "User sets up evaluations for a weather agent. The agent must create evaluators on the LangWatch platform so the experiment actually produces results.",
+        agents: [
+          createAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created and ran an evaluation experiment for the weather agent",
+              "Agent set up evaluators on the LangWatch platform before or during the experiment",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "Set up evaluations for my agent"
+          ),
+          scenario.agent(),
+          async (state) => {
+            toolCallFix(state);
+
+            // Verify evaluators actually exist on the platform
+            const apiKey = process.env.LANGWATCH_API_KEY!;
+            const res = await fetch(
+              "https://app.langwatch.ai/api/evaluators",
+              {
+                headers: { "X-Auth-Token": apiKey },
+              }
+            );
+            const evaluators = await res.json();
+
+            expect(
+              Array.isArray(evaluators) && evaluators.length > 0,
+              `Expected evaluators to exist on the platform after setup, but found none. The experiment will fail with 'Evaluator not found' errors.`
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    900_000
   );
 });

@@ -128,7 +128,12 @@ IMPORTANT: The exact pattern depends on the framework. Always follow the docs, n
 
 ## Step 6: Verify
 
-Run the application and check that traces appear in your LangWatch dashboard at https://app.langwatch.ai
+Do NOT consider the instrumentation complete without verifying it works. Follow these steps in order:
+
+1. **Install dependencies** — run `pip install langwatch` (or `uv add langwatch`) / `npm install langwatch` (or `pnpm add langwatch`). If the install fails due to peer dependency conflicts, widen the conflicting range and retry — do NOT silently skip this step.
+2. **Run a quick test** — execute the agent with a simple test input to generate at least one trace. For Python, try running the main script. For TypeScript/Mastra, try running with `npx tsx` or the framework's dev command. Study how the framework starts to find the right approach; only give up if the framework requires infrastructure you cannot spin up (databases, external services, etc.).
+3. **Check traces arrived** — if the LangWatch MCP is available, wait 5 seconds then call `search_traces` to verify the trace appeared. If traces show up, instrumentation is confirmed working.
+4. **If verification isn't possible** (no MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
 
 ## Common Mistakes
 

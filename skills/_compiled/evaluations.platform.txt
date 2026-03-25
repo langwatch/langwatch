@@ -143,7 +143,15 @@ Bad:
 
 ## Prerequisites
 
-Set up the LangWatch MCP for documentation access:
+### LangWatch MCP (REQUIRED for experiments with evaluators)
+
+The LangWatch MCP is **required** — not optional — when setting up experiments that use evaluators. SDK evaluators (e.g. `ragas/answer_relevancy`, `off-topic`, `llm-answer-match`) run on the LangWatch platform and need:
+1. A **model provider** configured on the platform (the LLM API key that powers the evaluator)
+2. The **evaluator to exist** on the platform
+
+Without MCP access, you cannot create evaluators or configure model providers, and the experiment will silently fail with "Evaluator not found" errors on every row.
+
+**Set up the MCP before proceeding:**
 
 # Installing the LangWatch MCP
 
@@ -179,7 +187,8 @@ Use the hosted remote MCP server:
 
 **Tip:** If `LANGWATCH_API_KEY` is already in the project's `.env` file, use that same key for the MCP configuration.
 
-If MCP installation fails, see # Fetching LangWatch Docs Without MCP
+If MCP installation fails:
+1. For documentation, see # Fetching LangWatch Docs Without MCP
 
 If the LangWatch MCP cannot be installed, you can fetch docs directly:
 
@@ -190,7 +199,8 @@ If the LangWatch MCP cannot be installed, you can fetch docs directly:
 Example flow:
 1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
 2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
-3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation.
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation
+2. For evaluator/model provider setup, you MUST get MCP working or tell the user to manually create evaluators at https://app.langwatch.ai → Evaluators before running the experiment
 
 Read the evaluations overview first: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/overview.md`
 
@@ -201,7 +211,13 @@ Create a script or notebook that runs your agent against a dataset and measures 
 1. Read the SDK docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/experiments/sdk.md`
 2. Analyze the agent's code to understand what it does
 3. Create a dataset with representative examples that are as close to real-world inputs as possible. Focus on domain realism — the dataset should look like actual production data the agent would encounter.
-4. Create the experiment file:
+4. **Set up evaluators on the platform BEFORE writing experiment code.** SDK evaluators run server-side — if the slug doesn't exist on the platform, every row fails silently with "Evaluator not found".
+
+   a. `platform_list_model_providers` → if none, detect the user's LLM key from `.env` and configure it with `platform_set_model_provider`
+   b. `platform_list_evaluators` → if none, call `discover_schema` category "evaluators", then `platform_create_evaluator` for evaluators suited to the agent's domain
+   c. Note the **slugs** returned — use these exact slugs in the experiment code
+
+5. Create the experiment file. CRITICAL: evaluator slugs in `evaluation.evaluate("slug", ...)` MUST match evaluators on the platform from step 4. Do NOT hardcode slugs like `ragas/answer_relevancy` — use the slugs you just created/verified.
 
 **Python — Jupyter Notebook (.ipynb):**
 ```python
@@ -219,8 +235,9 @@ evaluation = langwatch.experiment.init("agent-evaluation")
 
 for index, row in evaluation.loop(df.iterrows()):
     response = my_agent(row["input"])
+    # Use the EXACT slug from the evaluator you created on the platform
     evaluation.evaluate(
-        "ragas/answer_relevancy",
+        "your-evaluator-slug",  # ← slug from platform_create_evaluator
         index=index,
         data={"input": row["input"], "output": response},
         settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
@@ -240,7 +257,8 @@ const evaluation = await langwatch.experiments.init("agent-evaluation");
 
 await evaluation.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await evaluation.evaluate("ragas/answer_relevancy", {
+  // Use the EXACT slug from the evaluator you created on the platform
+  await evaluation.evaluate("your-evaluator-slug", {  // ← slug from platform_create_evaluator
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -248,7 +266,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
 });
 ```
 
-5. Run the experiment to verify it works
+6. Run the experiment to verify it works
 
 ### Verify by Running
 
@@ -401,6 +419,7 @@ Go to https://app.langwatch.ai and:
 
 ## Common Mistakes
 
+- Do NOT run an experiment with SDK evaluators without first ensuring the evaluators exist on the platform and a model provider is configured — otherwise every evaluation row will fail with "Evaluator not found" and the experiment will appear successful but have zero results
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
 - Do NOT use `platform_` MCP tools for code-based features (experiments, guardrails) — write code

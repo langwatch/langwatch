@@ -35,9 +35,9 @@ interface ParsedSkill {
   path: string;
 }
 
-type CompileMode = "platform" | "docs";
+export type CompileMode = "platform" | "docs";
 
-interface CompileOptions {
+export interface CompileOptions {
   skills: string[];
   mode: CompileMode;
   apiKey?: string;
@@ -218,7 +218,7 @@ function compileSkill(skillName: string): { body: string; userPrompt?: string } 
   return { body: resolveReferences(parsed.body, skillDir), userPrompt };
 }
 
-function compile(options: CompileOptions): string {
+export function compile(options: CompileOptions): string {
   const { skills, mode, apiKey } = options;
 
   // Expand composed skills
@@ -317,6 +317,9 @@ Examples:
 // Main
 // ──────────────────────────────────────────────────
 
-const options = parseArgs();
-const result = compile(options);
-console.log(result);
+// Only run CLI when executed directly (not when imported as a module)
+if (process.argv[1] === __filename) {
+  const options = parseArgs();
+  const result = compile(options);
+  console.log(result);
+}
