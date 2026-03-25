@@ -409,6 +409,7 @@ model Cost {
     @@index([referenceType, referenceId])
     @@index([costType])
     @@index([projectId])
+    @@index([projectId, createdAt])
 }
 
 model Topic {

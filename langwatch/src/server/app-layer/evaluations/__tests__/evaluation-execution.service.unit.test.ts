@@ -298,6 +298,22 @@ describe("EvaluationExecutionService", () => {
       });
     });
 
+    describe("when maxMonthlyUsageLimit is Infinity", () => {
+      it("skips getCurrentMonthCost call", async () => {
+        const getCurrentMonthCost = vi.fn().mockResolvedValue(0);
+        const { service } = createTestService({
+          costChecker: {
+            maxMonthlyUsageLimit: vi.fn().mockResolvedValue(Infinity),
+            getCurrentMonthCost,
+          },
+        });
+
+        await service.executeForTrace(defaultParams);
+
+        expect(getCurrentMonthCost).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when project is not found", () => {
       it("throws EvaluatorConfigError", async () => {
         const { service } = createTestService({

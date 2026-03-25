@@ -509,14 +509,16 @@ export const runEvaluation = async ({
   const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
     project.team.organizationId,
   );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return {
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    };
+  if (maxMonthlyUsage !== Infinity) {
+    const getCurrentCost = await costChecker.getCurrentMonthCost(
+      project.team.organizationId,
+    );
+    if (getCurrentCost >= maxMonthlyUsage) {
+      return {
+        status: "skipped",
+        details: "Monthly usage limit exceeded",
+      };
+    }
   }
 
   if (data.type === "custom") {

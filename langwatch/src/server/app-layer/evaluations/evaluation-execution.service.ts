@@ -341,11 +341,13 @@ export class EvaluationExecutionService {
     const maxMonthlyUsage = await this.deps.costChecker.maxMonthlyUsageLimit(
       project.team.organizationId,
     );
-    const currentCost = await this.deps.costChecker.getCurrentMonthCost(
-      project.team.organizationId,
-    );
-    if (currentCost >= maxMonthlyUsage) {
-      throw new CostLimitExceededError(project.team.organizationId);
+    if (maxMonthlyUsage !== Infinity) {
+      const currentCost = await this.deps.costChecker.getCurrentMonthCost(
+        project.team.organizationId,
+      );
+      if (currentCost >= maxMonthlyUsage) {
+        throw new CostLimitExceededError(project.team.organizationId);
+      }
     }
 
     // Custom/workflow evaluators
