@@ -30,18 +30,9 @@ function renderChartErrorState({
 
 describe("<ChartErrorState />", () => {
   describe("when the query has failed", () => {
-    it("displays a prominent error heading", () => {
+    it("displays an error heading and retry button (distinct from 'No data')", () => {
       renderChartErrorState();
 
-      expect(
-        screen.getByText("Failed to load chart data"),
-      ).toBeInTheDocument();
-    });
-
-    it("renders the error state visually distinct from empty state", () => {
-      renderChartErrorState();
-
-      // Error icon and heading indicate error state (distinct from "No data")
       expect(
         screen.getByText("Failed to load chart data"),
       ).toBeInTheDocument();
