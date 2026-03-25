@@ -3,6 +3,7 @@ import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { createLogger } from "~/utils/logger/server";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
@@ -114,6 +115,7 @@ export class ClickHouseEvaluationService {
               traceId,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const rows =
@@ -196,6 +198,7 @@ export class ClickHouseEvaluationService {
               traceIds,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const rows =

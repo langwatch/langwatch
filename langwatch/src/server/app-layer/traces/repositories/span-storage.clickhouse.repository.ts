@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
@@ -255,6 +256,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
+        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = (await result.json()) as Array<{
@@ -371,6 +373,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
+        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = (await result.json()) as Array<{

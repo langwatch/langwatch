@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
   ErrorCategory,
@@ -144,6 +145,7 @@ export class SuiteRunStateRepositoryClickHouse<
         `,
         query_params: { tenantId: context.tenantId, batchRunId },
         format: "JSONEachRow",
+        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = await result.json<ClickHouseSuiteRunRecord>();

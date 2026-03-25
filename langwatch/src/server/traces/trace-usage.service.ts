@@ -1,6 +1,7 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { PrismaClient } from "@prisma/client";
 import { isClickHouseEnabled, getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { prisma } from "~/server/db";
 import {
   esClient as defaultEsClient,
@@ -192,6 +193,7 @@ export class TraceUsageService {
         monthStart,
       },
       format: "JSONEachRow",
+      clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
     });
 
     const rows = (await result.json()) as Array<{

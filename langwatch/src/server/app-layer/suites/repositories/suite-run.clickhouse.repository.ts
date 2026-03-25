@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunReadRepository } from "./suite-run.repository";
 
@@ -33,6 +34,7 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
       `,
       query_params: { projectId: params.projectId, batchRunId: params.batchRunId },
       format: "JSONEachRow",
+      clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
     });
 
     const rows = await result.json<Record<string, unknown>>();
@@ -71,6 +73,7 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
         limit,
       },
       format: "JSONEachRow",
+      clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
     });
 
     const rows = await result.json<Record<string, unknown>>();

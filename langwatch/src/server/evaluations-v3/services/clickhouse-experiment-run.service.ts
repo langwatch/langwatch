@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import { getVersionMap } from "./getVersionMap";
@@ -122,12 +123,14 @@ export class ClickHouseExperimentRunService {
                 LIMIT 1 BY TenantId, RunId, ExperimentId
               )
               ORDER BY CreatedAt DESC
+              LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
               experimentIds,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const runRows =
@@ -164,12 +167,14 @@ export class ClickHouseExperimentRunService {
               WHERE ResultType = 'evaluator'
                 AND EvaluationStatus = 'processed'
               GROUP BY RunId, EvaluatorId
+              LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
               runIds,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const breakdownRows =
@@ -211,12 +216,14 @@ export class ClickHouseExperimentRunService {
                 LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               GROUP BY RunId
+              LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
               runIds,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const costRows =
@@ -336,6 +343,7 @@ export class ClickHouseExperimentRunService {
               runId,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const runRows =
@@ -372,6 +380,7 @@ export class ClickHouseExperimentRunService {
               runId,
             },
             format: "JSONEachRow",
+            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const itemRows =

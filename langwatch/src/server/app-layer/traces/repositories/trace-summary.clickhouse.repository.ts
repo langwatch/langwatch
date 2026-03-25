@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
@@ -151,7 +152,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
-        clickhouse_settings: { select_sequential_consistency: "1" },
+        clickhouse_settings: { ...DEFAULT_CLICKHOUSE_SETTINGS, select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSummaryRecord>();

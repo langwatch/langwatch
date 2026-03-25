@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { createLogger } from "../../../../utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
@@ -95,6 +96,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           aggregateId: String(aggregateId),
         },
         format: "JSONEachRow",
+        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = await result.json<{
@@ -180,6 +182,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           upToEventId,
         },
         format: "JSONEachRow",
+        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = await result.json<{
@@ -256,6 +259,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           beforeEventId,
         },
         format: "JSONEachRow",
+        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = await result.json<{ count: string }>();

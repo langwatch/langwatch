@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type {
   BatchHistoryItem,
   ExternalSetSummary,
@@ -148,6 +149,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       query,
       query_params: params,
       format: "JSONEachRow",
+      clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
     });
     return result.json<T>();
   }
@@ -790,9 +792,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }): Promise<string[]> {
     const client = await this.getClient(projectId);
     const result = await client.query({
-      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL`,
+      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL LIMIT 10000`,
       query_params: { tenantId: projectId },
       format: "JSONEachRow",
+      clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
     });
     const rows = await result.json<{ ScenarioRunId: string }>();
     return rows.map((r) => r.ScenarioRunId);
