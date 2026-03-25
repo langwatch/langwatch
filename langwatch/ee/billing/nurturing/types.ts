@@ -21,7 +21,7 @@ export interface CioPersonTraits {
   utm_campaign: string;
   how_heard: string;
   createdAt: string;
-  product_interest: string;
+  integration_method: string;
 
   // Trace milestones (customerIoTraceSync reactor)
   has_traces: boolean;

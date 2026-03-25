@@ -2,6 +2,7 @@ import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
+import { api } from "~/utils/api";
 import type { ProductSelection } from "../../types/types";
 
 const MotionBox = motion(Box);
@@ -57,6 +58,8 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
+  const setIntegrationMethod = api.onboarding.setIntegrationMethod.useMutation();
+
   return (
     <VStack gap={3} align="stretch" w="full" maxW="520px" mx="auto">
       {productOptions.map((opt, i) => (
@@ -77,7 +80,10 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           cursor="pointer"
           role="button"
           tabIndex={0}
-          onClick={() => onSelectProduct(opt.key)}
+          onClick={() => {
+            setIntegrationMethod.mutate({ integrationMethod: opt.key });
+            onSelectProduct(opt.key);
+          }}
           textAlign="left"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

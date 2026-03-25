@@ -10,6 +10,7 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
 } from "~/prompts/schemas";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
@@ -218,11 +219,19 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      return await service.createPrompt({
+      const result = await service.createPrompt({
         ...input.data,
         projectId: input.projectId,
         authorId,
       });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
+      });
+
+      return result;
     }),
 
   /**
@@ -511,6 +520,12 @@ export const promptsRouter = createTRPCRouter({
       await ctx.prisma.llmPromptConfig.update({
         where: { id: copiedPrompt.id },
         data: { copiedFromPromptId: sourcePrompt.id },
+      });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
       });
 
       return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };

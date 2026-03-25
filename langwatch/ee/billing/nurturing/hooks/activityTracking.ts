@@ -41,11 +41,15 @@ function sweepExpiredEntries({ now }: { now: number }): void {
  */
 export function fireActivityTrackingNurturing({
   userId,
+  hasOrganization = true,
 }: {
   userId: string;
+  /** When false, the user hasn't completed onboarding yet — skip identify to avoid ghost people in Customer.io. */
+  hasOrganization?: boolean;
 }): void {
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
+  if (!hasOrganization) return;
 
   const now = Date.now();
   sweepExpiredEntries({ now });
