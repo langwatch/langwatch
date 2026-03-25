@@ -207,7 +207,7 @@ function logQueryFailure({
       queryId: meta.queryId,
       format: meta.format,
       paramKeys: meta.paramKeys,
-      error: error instanceof Error ? error.message : String(error),
+      error,
     },
     `ClickHouse ${operation} failed`
   );
@@ -356,8 +356,7 @@ export function createResilientClickHouseClient({
                   attempt: attempt + 1,
                   maxRetries,
                   delayMs: Math.round(delay),
-                  error:
-                    error instanceof Error ? error.message : String(error),
+                  error,
                 },
                 "Transient ClickHouse insert error, retrying"
               );

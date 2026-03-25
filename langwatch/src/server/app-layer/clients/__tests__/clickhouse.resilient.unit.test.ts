@@ -392,6 +392,27 @@ describe("createResilientClickHouseClient()", () => {
         expect.any(String)
       );
     });
+
+    it("passes the raw error object for Pino serializer", async () => {
+      const err = new Error("MEMORY_LIMIT_EXCEEDED");
+      const mock = makeMockClient({
+        query: vi.fn().mockRejectedValue(err),
+      });
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
+
+      await expect(
+        client.query({ query: "SELECT 1" })
+      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+
+      const loggedObj = mockQueryLogger.error.mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      expect(loggedObj.error).toBe(err);
+    });
   });
 
   describe("when failure rate threshold is breached", () => {
