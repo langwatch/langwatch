@@ -92,22 +92,34 @@ it("does X when Y given Z", () => {
 });
 ```
 
+## Coverage is Mandatory
+
+Every change ships with tests. No exceptions. This is not aspirational — it is a hard requirement.
+
+- **Bug fixes** must include a regression test that fails without the fix and passes with it. Tag with `@regression`.
+- **New features** must have integration and/or unit tests covering all acceptance criteria from the feature spec.
+- **Refactors** must not reduce existing test coverage.
+
+Target near-100% coverage via integration + unit tests. E2E tests are deprioritized (see below).
+
 ## Test Hierarchy
 
 Avoid overlap. Each level has a distinct purpose.
 
 | Level | Purpose | Mocking | Quantity |
 |-------|---------|---------|----------|
-| **E2E** | Catastrophic regression detection for stable core flows | None | 5-10 total |
+| **E2E** | Catastrophic regression detection for stable core flows | None | 5-10 total (deprioritized) |
 | **Browser Verification** | Interactive feature validation during development | None | Per-feature, not persisted as tests |
 | **Integration** | Edge cases, error handling, component rendering | External boundaries only | As many as needed |
 | **Unit** | Pure logic, branches | Everything | As many as needed |
 
-### E2E Tests: Less is More
+### E2E Tests: Deprioritized
 
-E2E tests are expensive and brittle. We maintain a **minimal stable suite** (5-10 tests) that covers core happy paths of established features — sign in, view traces, run an evaluation. These run on a schedule or before releases, not per PR.
+E2E tests are expensive and brittle. The app's UI and API surface changes too fast for e2e tests to keep up — they break frequently and take too long to run, providing poor ROI.
 
-We do **not** generate E2E tests per feature. Interactive browser verification (`/browser-test`) provides development-time confidence without the maintenance burden. See [ADR-010](adr/010-e2e-testing-strategy.md) for the full rationale.
+We maintain a **minimal stable suite** (5-10 tests) that covers core happy paths of established features — sign in, view traces, run an evaluation. These run on a schedule or before releases, not per PR.
+
+We do **not** generate E2E tests per feature. Interactive browser verification (`/browser-test`) provides development-time confidence without the maintenance burden. Integration and unit tests are the primary coverage mechanism. See [ADR-010](adr/010-e2e-testing-strategy.md) for the full rationale.
 
 ### Language-Specific Patterns
 
@@ -141,11 +153,43 @@ const user = createFullUser({ name, email, address, preferences, ... })
 const user = { id: "1", role: "guest" }
 ```
 
+## Feature File Parity
+
+Feature specs in `specs/` define what tests must exist. **Every scenario in a feature file must have a corresponding test implementation.** This is enforced — not aspirational.
+
+### Convention
+
+| Feature file | Test file |
+|-------------|-----------|
+| `specs/analytics/chart-rendering.feature` | `src/server/analytics/__tests__/chart-rendering.integration.test.ts` |
+| `specs/scenarios/welcome-modal.feature` | `src/components/scenarios/__tests__/welcome-modal.integration.test.ts` |
+
+The scenario title in the feature file should match the `it()` description in the test. Use `describe("Feature: <feature name>")` as the outer block.
+
+### Tags
+
+| Tag | Meaning | Use when |
+|-----|---------|----------|
+| `@unit` | Pure logic test | Testing functions, utilities, transformations |
+| `@integration` | Component/boundary test | Testing rendering, API calls, DB queries |
+| `@regression` | Prevents a previously-fixed bug from recurring | Bug fix scenarios — must fail without the fix |
+| `@e2e` | Stable core flow (deprioritized) | Only for the 5-10 stable happy-path tests |
+
+Bug-fix feature specs should use `@regression` (alongside `@unit` or `@integration` for pyramid level):
+
+```gherkin
+@regression @integration
+Scenario: Analytics chart shows error state when ClickHouse query fails
+  Given an analytics dashboard with a configured chart
+  When the ClickHouse query returns a memory limit error
+  Then the chart displays an error badge with a retry option
+```
+
 ## Workflow
 
 See `specs/README.md` for detailed BDD guidance.
 
-1. **Spec first**: Write a `.feature` file in `specs/`. Use tags: `@integration`, `@unit`.
+1. **Spec first**: Write a `.feature` file in `specs/`. Use tags: `@integration`, `@unit`, `@regression`.
 2. **Challenge**: LLM/reviewer challenges missing edge cases before implementation.
 3. **Implement**: Outside-in TDD. Red -> Green -> Refactor.
 4. **Browser verify**: Use `/browser-test` to validate the feature works in a real browser.

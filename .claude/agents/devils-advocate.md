@@ -69,7 +69,21 @@ When presented with any architecture, plan, or technical idea, systematically ch
 - Does this make the easy things easy and the hard things possible, or vice versa?
 - What technical debt does this create or resolve?
 
-### 8. Requirements Volatility
+### 8. Root Cause vs Symptom
+- Is this solving the actual root cause, or just patching a symptom?
+- If this is a bug fix, what systemic failure allowed the bug to exist? Does the fix prevent the entire class of bug, or just this one instance?
+- Are there other places in the codebase where the same underlying problem exists?
+- Will this fix hold up when the surrounding code changes, or is it fragile to context?
+
+### 9. Test Coverage & Regression Prevention
+- Is the test coverage extensive enough to prevent this problem from recurring?
+- Are there feature specs (`specs/*.feature`) that define the expected behavior? If not, that's a gap.
+- Do the tests cover edge cases, not just the happy path? What inputs would break this?
+- Are regression tests tagged with `@regression` so they're identifiable?
+- Is test coverage at the right pyramid level? (unit for logic, integration for boundaries, NOT e2e for new features)
+- Would a new developer understand *why* these tests exist from reading them?
+
+### 10. Requirements Volatility
 - Which requirements are most likely to change?
 - How expensive is it to change direction after implementing this?
 - Are you optimizing for the current problem or the problem you'll have in 6 months?
