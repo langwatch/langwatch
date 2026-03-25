@@ -390,8 +390,10 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all experiments for license enforcement.
-   * Experiments do not support archival - all experiments count against limits.
+   * Counts non-real-time experiments for license enforcement.
+   * Excludes experiments where `workbenchState.task === "real_time"` because
+   * those are online evaluations already counted under `maxOnlineEvaluations`
+   * via `getOnlineEvaluationCount`. Including them here would double-count.
    *
    * Note: Experiment model has RLS policy requiring direct projectId filter,
    * so we first get project IDs then filter by them.
@@ -403,6 +405,12 @@ export class LicenseEnforcementRepository
     return this.prisma.experiment.count({
       where: {
         projectId: { in: projectIds },
+        NOT: {
+          workbenchState: {
+            path: ["task"],
+            equals: "real_time",
+          },
+        },
       },
     });
   }
