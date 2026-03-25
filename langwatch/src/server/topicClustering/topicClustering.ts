@@ -54,14 +54,17 @@ export const clusterTopicsForProject = async (
   const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
     project.team.organizationId,
   );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    logger.info(
-      { projectId },
-      "skipping clustering for project as monthly limit has been reached",
+  if (maxMonthlyUsage !== Infinity) {
+    const getCurrentCost = await costChecker.getCurrentMonthCost(
+      project.team.organizationId,
     );
+    if (getCurrentCost >= maxMonthlyUsage) {
+      logger.info(
+        { projectId },
+        "skipping clustering for project as monthly limit has been reached",
+      );
+      return;
+    }
   }
 
   const clickhouse = project.featureClickHouseDataSourceTraces

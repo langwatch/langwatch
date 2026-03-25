@@ -110,15 +110,17 @@ export default async function handler(
   const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
     project.team.organizationId,
   );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
+  if (maxMonthlyUsage !== Infinity) {
+    const getCurrentCost = await costChecker.getCurrentMonthCost(
+      project.team.organizationId,
+    );
 
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return res.status(200).json({
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    });
+    if (getCurrentCost >= maxMonthlyUsage) {
+      return res.status(200).json({
+        status: "skipped",
+        details: "Monthly usage limit exceeded",
+      });
+    }
   }
 
   const { datasetSlug } = params;
