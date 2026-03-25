@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -633,25 +633,37 @@ export const DashboardLayout = ({
 
             {ssoStatus?.pendingSsoSetup && (
               <Alert.Root
-                status="warning"
+                status="error"
                 width="full"
-                borderBottom="1px solid"
-                borderBottomColor="yellow.300"
+                border="1px solid"
+                borderColor="colorPalette.muted"
+                marginX={4}
+                marginTop={3}
+                borderRadius="lg"
+                maxWidth="calc(100% - 22px)"
               >
                 <Alert.Indicator />
                 <Alert.Content>
-                  <HStack width="full">
-                    <Text>
-                      Your organization has switched to SSO login. Please link
-                      your new sign-in method to keep access to your account.
-                    </Text>
+                  <HStack width="full" gap={4}>
+                    <VStack align="start" gap={0} flex={1}>
+                      <Alert.Title fontWeight="bold">
+                        Action Required: Link your SSO account
+                      </Alert.Title>
+                      <Text fontSize="sm">
+                        Your organization requires SSO login. Please link your
+                        account by logging in via the email input box on the
+                        sign-in page.
+                      </Text>
+                    </VStack>
                     <Button
-                      size="xs"
-                      variant="outline"
-                      colorPalette="orange"
+                      size="sm"
+                      colorPalette="red"
+                      flexShrink={0}
+                      color="white"
                       asChild
                     >
                       <Link href="/settings/authentication">
+                        <KeyRound size={14} />
                         Link SSO Account
                       </Link>
                     </Button>
@@ -691,15 +703,25 @@ export const DashboardLayout = ({
               <Alert.Root
                 status="warning"
                 width="full"
-                borderBottom="1px solid"
-                borderBottomColor="yellow.300"
+                border="1px solid"
+                borderColor="colorPalette.muted"
+                marginX={4}
+                marginTop={3}
+                borderRadius="lg"
+                maxWidth="calc(100% - 22px)"
               >
                 <Alert.Indicator />
                 <Alert.Content>
-                  <Text>
-                    You are not part of any team in this organization, please
-                    ask your administrator to add you to a team.
-                  </Text>
+                  <HStack width="full" gap={4}>
+                    <Text flex={1}>
+                      You are not part of any team in this organization. Ask
+                      your administrator to add you, or{" "}
+                      <Link href="/" textDecoration="underline">
+                        go back to your home page
+                      </Link>
+                      .
+                    </Text>
+                  </HStack>
                 </Alert.Content>
               </Alert.Root>
             )}
