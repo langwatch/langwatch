@@ -1,3 +1,4 @@
+import safe from "safe-regex2";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
@@ -66,12 +67,29 @@ export function estimateCost({
     : undefined;
 }
 
+/**
+ * Tests a regex pattern against a model string, skipping patterns
+ * that are vulnerable to catastrophic backtracking (ReDoS).
+ */
+const safeRegexTest = (pattern: string, input: string): boolean => {
+  try {
+    const re = new RegExp(pattern);
+    if (!safe(re)) {
+      logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
+      return false;
+    }
+    return re.test(input);
+  } catch {
+    return false;
+  }
+};
+
 export const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
   const llmModelCost = llmModelCosts.find((llmModelCost) =>
-    new RegExp(llmModelCost.regex).test(model),
+    safeRegexTest(llmModelCost.regex, model),
   );
   if (!llmModelCost && model.includes("/")) {
     const model_ = model.split("/")[1]!;
