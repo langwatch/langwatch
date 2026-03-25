@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Flex,
@@ -17,6 +16,7 @@ import { format } from "date-fns";
 import numeral from "numeral";
 import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
+import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
   AreaChart,
@@ -559,33 +559,26 @@ const CustomGraph_ = React.memo(
               <Spinner position="absolute" right={4} top={4} />
             </Delayed>
           )}
-          {timeseries.error && (
-            <Alert.Root
-              status="error"
-              position="absolute"
-              borderStartWidth="4px"
-              borderStartColor="colorPalette.solid"
-              width="fit-content"
-              right={4}
-              top={4}
-            >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>Error loading graph data</Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
+          {timeseries.error && !timeseries.data ? (
+            <ChartErrorState
+              errorMessage={timeseries.error.message}
+              onRetry={() => void timeseries.refetch()}
+            />
+          ) : (
+            <>
+              {input.graphType !== "summary" && allEmpty && (
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="50%"
+                  transform="translate(-50%, -50%)"
+                >
+                  No data
+                </Box>
+              )}
+              {child}
+            </>
           )}
-          {input.graphType !== "summary" && allEmpty && (
-            <Box
-              position="absolute"
-              top="50%"
-              left="50%"
-              transform="translate(-50%, -50%)"
-            >
-              No data
-            </Box>
-          )}
-          {child}
         </Box>
       );
     };
