@@ -1,5 +1,4 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
@@ -232,7 +231,6 @@ async function fetchCountsFromClickHouse(
     `,
     query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
-    clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
   });
 
   const rows = (await result.json()) as Array<{
@@ -378,7 +376,6 @@ async function fetchTracesFromClickHouse(
         : {}),
     },
     format: "JSONEachRow",
-    clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
   });
 
   const rows = (await result.json()) as Array<{

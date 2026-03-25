@@ -19,7 +19,6 @@ import type {
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Span, Trace } from "~/server/tracer/types";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { createLogger } from "~/utils/logger/server";
 import {
   applyTraceProtections,
@@ -256,7 +255,6 @@ export class ClickHouseTraceService {
               threadId,
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{ TraceId: string }>;
@@ -348,7 +346,6 @@ export class ClickHouseTraceService {
               threadIds,
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{ TraceId: string }>;
@@ -568,7 +565,6 @@ export class ClickHouseTraceService {
                 traceIds,
               },
               format: "JSONEachRow",
-              clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
             });
 
             const evalRows =
@@ -670,7 +666,6 @@ export class ClickHouseTraceService {
               endDate: input.endDate ?? Date.now(),
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const rows = (await result.json()) as Array<{
@@ -777,7 +772,6 @@ export class ClickHouseTraceService {
               endDate: input.endDate ?? Date.now(),
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const customerRows = (await customerResult.json()) as Array<{
@@ -800,7 +794,6 @@ export class ClickHouseTraceService {
               endDate: input.endDate ?? Date.now(),
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const labelsRows = (await labelsResult.json()) as Array<{
@@ -905,7 +898,6 @@ export class ClickHouseTraceService {
               spanId,
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const allRows = (await queryResult.json()) as Array<{
@@ -1188,7 +1180,6 @@ export class ClickHouseTraceService {
               endDate,
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const spanRows = (await spanResult.json()) as Array<{
@@ -1217,7 +1208,6 @@ export class ClickHouseTraceService {
               endDate,
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const metaRows = (await metaResult.json()) as Array<{
@@ -1320,7 +1310,6 @@ export class ClickHouseTraceService {
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           }),
           clickHouseClient.query({
             query: `
@@ -1374,7 +1363,6 @@ export class ClickHouseTraceService {
               pageSize,
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           }),
         ]);
 
@@ -1568,7 +1556,6 @@ export class ClickHouseTraceService {
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           }),
           clickHouseClient.query({
             query: `
@@ -1610,7 +1597,6 @@ export class ClickHouseTraceService {
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           }),
         ]);
 

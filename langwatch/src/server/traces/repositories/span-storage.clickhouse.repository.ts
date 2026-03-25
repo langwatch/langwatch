@@ -1,5 +1,4 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type {
@@ -50,7 +49,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       `,
       query_params: { tenantId, traceId },
       format: "JSONEachRow",
-      clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
     });
 
     const rows = (await result.json()) as Array<{

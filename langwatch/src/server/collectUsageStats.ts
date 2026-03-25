@@ -1,6 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 
@@ -133,7 +132,6 @@ async function getChTraceCount(
     `,
     query_params: { projectIds },
     format: "JSONEachRow",
-    clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
   });
 
   const rows = (await result.json()) as Array<{ Total: string }>;
@@ -203,7 +201,6 @@ async function getChScenariosCount(
     `,
     query_params: { projectIds },
     format: "JSONEachRow",
-    clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
   });
 
   const rows = (await result.json()) as Array<{ Total: string }>;

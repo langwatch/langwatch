@@ -1,5 +1,4 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { createLogger } from "~/utils/logger/server";
 import type {
@@ -187,7 +186,6 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         `,
         query_params: { tenantId, experimentId },
         format: "JSONEachRow",
-        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = await result.json<ClickHouseSummaryRow>();
@@ -256,7 +254,6 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         `,
         query_params: { tenantId, experimentId, runId, stepIndex },
         format: "JSONEachRow",
-        clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
       });
 
       const rows = await result.json<ClickHouseRecord>();

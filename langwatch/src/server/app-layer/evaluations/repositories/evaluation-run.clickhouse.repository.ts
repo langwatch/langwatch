@@ -1,5 +1,4 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
@@ -140,7 +139,7 @@ export class EvaluationRunClickHouseRepository
         `,
         query_params: { tenantId, evaluationId },
         format: "JSONEachRow",
-        clickhouse_settings: { ...DEFAULT_CLICKHOUSE_SETTINGS, select_sequential_consistency: "1" },
+        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseEvaluationRunRecord>();

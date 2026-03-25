@@ -2,7 +2,6 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import { DEFAULT_CLICKHOUSE_SETTINGS } from "~/server/clickhouse/queryDefaults";
 import { createLogger } from "~/utils/logger/server";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
@@ -208,7 +207,6 @@ export class ClickHouseFilterService {
               ...scopeParams, // Merge scope params
             },
             format: "JSONEachRow",
-            clickhouse_settings: DEFAULT_CLICKHOUSE_SETTINGS,
           });
 
           const rows = await result.json();
