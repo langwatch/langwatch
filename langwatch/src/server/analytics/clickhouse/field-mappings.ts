@@ -526,6 +526,92 @@ function mergeWithIdentity(
 }
 
 /**
+ * Non-identity columns from stored_spans that may appear in SQL expressions.
+ * Used by `extractReferencedSpanColumns` to detect which columns a query needs.
+ */
+const SPAN_SELECTABLE_COLUMNS = [
+  "SpanAttributes",
+  "StartTime",
+  "EndTime",
+  "DurationMs",
+  "StatusCode",
+  `"Events.Name"`,
+  `"Events.Timestamp"`,
+  `"Events.Attributes"`,
+] as const;
+
+/**
+ * Non-identity columns from evaluation_runs that may appear in SQL expressions.
+ */
+const EVALUATION_SELECTABLE_COLUMNS = [
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluatorType",
+  "Score",
+  "Passed",
+  "Label",
+  "Status",
+  "IsGuardrail",
+] as const;
+
+/**
+ * Extract which stored_spans columns are referenced in a set of SQL expressions.
+ *
+ * Scans the expressions for references to known span column names (including
+ * through the table alias `ss.`). Returns the set of column names suitable for
+ * passing to `buildJoinClause` as `requiredColumns`.
+ *
+ * WHY: The full SpanAttributes Map column can be kilobytes per span.
+ * Selecting only the columns actually referenced avoids reading unused data
+ * and prevents ClickHouse OOM on large result sets.
+ */
+export function extractReferencedSpanColumns(
+  expressions: string[],
+): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.stored_spans;
+
+  for (const col of SPAN_SELECTABLE_COLUMNS) {
+    // Match either the raw column name or alias-qualified (ss.Column)
+    // Strip quotes for matching, since Events columns are quoted
+    const rawCol = col.replace(/"/g, "");
+    if (
+      joined.includes(`${alias}.${rawCol}`) ||
+      joined.includes(`${alias}.${col}`) ||
+      // Unqualified references (e.g., in subqueries)
+      joined.includes(rawCol)
+    ) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Extract which evaluation_runs columns are referenced in a set of SQL expressions.
+ */
+export function extractReferencedEvaluationColumns(
+  expressions: string[],
+): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.evaluation_runs;
+
+  for (const col of EVALUATION_SELECTABLE_COLUMNS) {
+    if (
+      joined.includes(`${alias}.${col}`) ||
+      joined.includes(col)
+    ) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
  * Build a qualified column reference with table alias
  */
 export function qualifiedColumn(esField: string): string {
