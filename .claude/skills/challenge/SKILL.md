@@ -7,8 +7,25 @@ user-invocable: true
 argument-hint: "[proposal or plan to challenge]"
 ---
 
-Challenge the proposal below. Focus ONLY on what is presented — do not explore the codebase, search for other issues, or expand scope beyond what is being proposed.
+Challenge the proposal below. You may explore the codebase to verify claims and find real conflicts, but stay focused on evaluating the proposal — do not expand scope to unrelated issues.
 
 $ARGUMENTS
 
-Find weaknesses, hidden assumptions, and failure modes in this specific proposal. Be concrete and constructive. Do not suggest alternative architectures unless a flaw demands it.
+## How to Challenge
+
+### 1. Root-Cause Check (5 Whys)
+Before critiquing the solution, question the problem. Ask "why?" repeatedly until you reach the root cause:
+- Is this proposal solving the actual problem, or a symptom?
+- Could a different framing of the problem lead to a simpler solution?
+- What triggered this proposal — is that trigger the real issue?
+
+### 2. Find Weaknesses
+- Hidden assumptions that could break under different conditions
+- Failure modes — what happens when things go wrong?
+- Scaling, performance, or maintenance risks
+- Gaps between what the proposal claims and what the code actually supports
+
+### 3. Be Constructive
+- Be concrete: point to specific scenarios, not vague concerns
+- Only suggest alternatives when a flaw demands it
+- Distinguish fatal flaws from minor concerns
