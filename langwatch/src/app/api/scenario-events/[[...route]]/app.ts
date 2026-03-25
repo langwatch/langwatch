@@ -145,7 +145,7 @@ app.post(
     }
 
     const path = `/${project.slug}/simulations/${
-      event.scenarioSetId ?? "default"
+      event.scenarioSetId || "default"
     }`;
 
     const base = process.env.BASE_HOST;
@@ -220,7 +220,7 @@ async function dispatchSimulationEvent(
       ...basePayload,
       scenarioId: event.scenarioId,
       batchRunId: event.batchRunId,
-      scenarioSetId: event.scenarioSetId ?? "default",
+      scenarioSetId: event.scenarioSetId || "default",
       name: event.metadata?.name,
       description: event.metadata?.description,
       metadata: event.metadata,
