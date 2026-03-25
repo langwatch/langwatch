@@ -1,3 +1,4 @@
+import safe from "safe-regex2";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
@@ -108,6 +109,23 @@ export const normalizeModelName = (model: string): string => {
   return normalized;
 };
 
+/**
+ * Tests a regex pattern against a model string, skipping patterns
+ * that are vulnerable to catastrophic backtracking (ReDoS).
+ */
+const safeRegexTest = (pattern: string, input: string): boolean => {
+  try {
+    const re = new RegExp(pattern);
+    if (!safe(re)) {
+      logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
+      return false;
+    }
+    return re.test(input);
+  } catch {
+    return false;
+  }
+};
+
 export const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
@@ -121,7 +139,7 @@ const findModelCost = (
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
   const match = llmModelCosts.find((entry) =>
-    new RegExp(entry.regex).test(normalizedModel),
+    safeRegexTest(entry.regex, normalizedModel),
   );
 
   if (!match && normalizedModel.includes("/")) {
