@@ -1,0 +1,1226 @@
+---
+title: Python SDK API Reference
+sidebarTitle: Reference
+description: Use the LangWatch Python SDK API reference to implement tracing, events, and evaluation logic for AI agent testing workflows.
+icon: terminal
+---
+
+## Setup
+
+### `langwatch.setup()`
+
+Initializes the LangWatch client, enabling data collection and tracing for your LLM application. This is typically the first function you'll call when integrating LangWatch.
+
+<CodeGroup>
+```python Basic Setup
+import langwatch
+import os
+
+client = langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    endpoint_url=os.getenv("LANGWATCH_ENDPOINT_URL") # Optional, defaults to LangWatch Cloud
+)
+```
+
+```python Advanced Setup
+import langwatch
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from langwatch.domain import SpanProcessingExcludeRule
+from langwatch.types import BaseAttributes
+
+# Example: Configure with a custom TracerProvider and exclude rules
+my_provider = TracerProvider()
+exclude_rules = [
+    SpanProcessingExcludeRule(
+        field_name="span_name",
+        match_value="InternalHealthCheck",
+        match_operation="exact_match"
+    )
+]
+custom_attributes = BaseAttributes(
+    tags=["my-app", "production"],
+    props={"service.version": "1.2.3"}
+)
+
+client = langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=my_provider,
+    span_exclude_rules=exclude_rules,
+    base_attributes=custom_attributes,
+    debug=True
+)
+```
+</CodeGroup>
+
+<ParamField path="api_key" type="Optional[str]" default="None">
+  Your LangWatch API key. It's recommended to set this via an environment variable (e.g., `LANGWATCH_API_KEY`) and retrieve it using `os.getenv("LANGWATCH_API_KEY")`.
+</ParamField>
+
+<ParamField path="endpoint_url" type="Optional[str]" default="LangWatch Cloud URL">
+  The URL of the LangWatch backend where traces will be sent. Defaults to the LangWatch Cloud service. For self-hosted instances, you'll need to provide this.
+</ParamField>
+
+<ParamField path="base_attributes" type="Optional[BaseAttributes]" default="None">
+  A `BaseAttributes` object allowing you to set default tags and properties that will be attached to all traces and spans. See `BaseAttributes` type for more details.
+</ParamField>
+
+<ParamField path="tracer_provider" type="Optional[TracerProvider]" default="None">
+  An OpenTelemetry `TracerProvider` instance. If you have an existing OpenTelemetry setup, you can pass your `TracerProvider` here. LangWatch will add its exporter to this provider. If not provided, LangWatch will configure its own.
+</ParamField>
+
+<ParamField path="instrumentors" type="Optional[Sequence[Instrumentor]]" default="None">
+  A sequence of OpenTelemetry instrumentor instances. LangWatch can automatically apply these instrumentors. (Note: Specific instrumentor types might need to be defined or linked here).
+</ParamField>
+
+<ParamField path="span_exclude_rules" type="Optional[List[SpanProcessingExcludeRule]]" default="[]">
+  A list of `SpanProcessingExcludeRule` objects. These rules allow you to filter out specific spans from being exported to LangWatch, based on span name or attributes. See `SpanProcessingExcludeRule` for details.
+</ParamField>
+
+<ParamField path="debug" type="bool" default="False">
+  If `True`, enables debug logging for the LangWatch client, providing more verbose output about its operations.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="client" type="Client">
+  An instance of the LangWatch `Client`.
+</ResponseField>
+
+## Tracing
+
+### `@langwatch.trace()` / `langwatch.trace()`
+
+This is the primary way to define the boundaries of a request or a significant operation in your application. It can be used as a decorator around a function or as a context manager.
+
+When used, it creates a new trace and a root span for that trace. Any `@langwatch.span()` or other instrumented calls made within the decorated function or context manager will be nested under this root span.
+
+<CodeGroup>
+```python Decorator Usage
+import langwatch
+
+langwatch.setup()
+
+@langwatch.trace(name="MyRequestHandler", metadata={"user_id": "123"})
+def handle_request(query: str):
+    # ... your logic ...
+    # langwatch.get_current_span().update(output=response)
+    return f"Processed: {query}"
+
+handle_request("Hello LangWatch!")
+```
+
+```python Context Manager Usage
+import langwatch
+
+langwatch.setup()
+
+def process_data(data: str):
+    with langwatch.trace(name="DataProcessingFlow", input={"data_input": data}) as current_trace:
+        # ... your logic ...
+        # langwatch.get_current_span().update(output={"status": "success"})
+        result = f"Processed data: {data}"
+        if langwatch.get_current_span(): # Check if span exists
+            langwatch.get_current_span().update(output=result)
+        return result
+
+process_data("Sample Data")
+```
+</CodeGroup>
+
+
+<ParamField path="name" type="Optional[str]" default="Name of the decorated function or a default name">
+  The name for the root span of this trace. If used as a decorator and not provided, it defaults to the name of the decorated function. For context manager usage, a name like "LangWatch Trace" might be used if not specified.
+</ParamField>
+
+<ParamField path="trace_id" type="Optional[Union[str, UUID]]" default="Auto-generated">
+  (Deprecated) A specific ID to assign to this trace. If not provided, a new UUID will be generated. It's generally recommended to let LangWatch auto-generate trace IDs. This will be mapped to `deprecated.trace_id` in metadata.
+</ParamField>
+
+<ParamField path="metadata" type="Optional[TraceMetadata]" default="None">
+  A dictionary of metadata to attach to the entire trace. This can include things like user IDs, session IDs, or any other contextual information relevant to the whole operation. `TraceMetadata` is typically `Dict[str, Any]`.
+</ParamField>
+
+<ParamField path="expected_output" type="Optional[str]" default="None">
+  If you have a known expected output for this trace (e.g., for testing or evaluation), you can provide it here.
+</ParamField>
+
+<ParamField path="api_key" type="Optional[str]" default="Global or None">
+  Overrides the global API key for this specific trace. Useful if you need to direct traces to different projects or accounts dynamically.
+</ParamField>
+
+<ParamField path="disable_sending" type="bool" default="False">
+  If `True`, this trace (and its spans) will be processed but not sent to the LangWatch backend. This can be useful for local debugging or conditional tracing.
+</ParamField>
+
+<ParamField path="max_string_length" type="Optional[int]" default="5000">
+  The maximum length for string values captured in inputs, outputs, and metadata. Longer strings will be truncated.
+</ParamField>
+
+<ParamField path="skip_root_span" type="bool" default="False">
+  If `True`, a root span will not be automatically created for this trace. This is an advanced option, typically used if you intend to manage the root span's lifecycle manually or if the trace is purely a logical grouping without its own primary operation.
+</ParamField>
+
+<Expandable title="Root Span Parameters">
+The following parameters are used to configure the root span that is automatically created when the trace starts. Refer to `@langwatch.span()` documentation for more details on these, as they behave similarly.
+
+<ParamField path="span_id" type="Optional[str]">
+  A specific ID for the root span.
+</ParamField>
+
+<ParamField path="capture_input" type="bool" default="True">
+  Whether to capture the input of the decorated function/context block for the root span.
+</ParamField>
+
+<ParamField path="capture_output" type="bool" default="True">
+  Whether to capture the output/result for the root span.
+</ParamField>
+
+<ParamField path="type" type="SpanTypes" default="'span'">
+  The type of the root span (e.g., 'llm', 'rag', 'agent', 'tool', 'span').
+</ParamField>
+
+<ParamField path="input" type="Optional[Union[SpanInputOutput, str, List[ChatMessage]]]">
+  Explicitly sets the input for the root span. If not provided and `capture_input` is `True`, it may be inferred from function arguments.
+</ParamField>
+
+<ParamField path="output" type="Optional[Union[SpanInputOutput, str, List[ChatMessage]]]">
+  Explicitly sets the output for the root span. If not provided and `capture_output` is `True`, it may be inferred from the function's return value.
+</ParamField>
+
+<ParamField path="error" type="Optional[Exception]">
+  Records an error for the root span.
+</ParamField>
+
+<ParamField path="timestamps" type="Optional[SpanTimestamps]">
+  Custom start and end timestamps for the root span.
+</ParamField>
+
+<ParamField path="contexts" type="Optional[Union[List[RAGChunk], List[str]]]">
+  RAG chunks or string contexts relevant to the root span.
+</ParamField>
+
+<ParamField path="model" type="Optional[str]">
+  The model used in the operation represented by the root span (e.g., an LLM model name).
+</ParamField>
+
+<ParamField path="params" type="Optional[SpanParams]">
+  Parameters associated with the operation of the root span (e.g., LLM call parameters).
+</ParamField>
+
+<ParamField path="metrics" type="Optional[SpanMetrics]">
+  Metrics for the root span (e.g., token counts, cost).
+</ParamField>
+
+<ParamField path="evaluations" type="Optional[List[Evaluation]]">
+  A list of `Evaluation` objects to associate directly with the root span.
+</ParamField>
+</Expandable>
+
+
+**Context Manager Return**
+
+When used as a context manager, `langwatch.trace()` returns a `LangWatchTrace` object.
+
+<ResponseField name="current_trace" type="LangWatchTrace">
+  The `LangWatchTrace` instance. You can use this object to call methods like `current_trace.add_evaluation()`.
+</ResponseField>
+
+#### `LangWatchTrace` Object Methods
+
+When `langwatch.trace()` is used as a context manager, it yields a `LangWatchTrace` object. This object has several methods to interact with the current trace:
+
+<ParamField path="update" type="Callable">
+  Updates attributes of the trace or its root span.
+  This method can take many of the same parameters as the `langwatch.trace()` decorator/context manager itself, such as `metadata`, `expected_output`, or any of the root span parameters like `name`, `input`, `output`, `metrics`, etc.
+
+  ```python
+  with langwatch.trace(name="Initial Trace") as current_trace:
+      # ... some operations ...
+      current_trace.update(metadata={"step": "one_complete"})
+      # ... more operations ...
+      root_span_output = "Final output of root operation"
+      current_trace.update(output=root_span_output, metrics={"total_items": 10})
+  ```
+</ParamField>
+
+<ParamField path="add_evaluation" type="Callable">
+  Adds an `Evaluation` object directly to the trace (or a specified span within it).
+
+  ```python
+  from langwatch.domain import Evaluation, EvaluationTimestamps
+
+  with langwatch.trace(name="MyEvaluatedProcess") as current_trace:
+      # ... operation ...
+      eval_result = Evaluation(
+          name="Accuracy Check",
+          status="processed",
+          passed=True,
+          score=0.95,
+          details="All checks passed.",
+          timestamps=EvaluationTimestamps(started_at=..., finished_at=...)
+      )
+      current_trace.add_evaluation(**eval_result) # Pass fields as keyword arguments
+  ```
+  (Refer to `Evaluation` type in Core Data Types and `langwatch.evaluations` module for more details on parameters.)
+</ParamField>
+
+<ParamField path="evaluate" type="Callable">
+  Triggers a remote evaluation for this trace using a pre-configured evaluator slug on the LangWatch platform.
+
+  ```python
+  with langwatch.trace(name="ProcessWithRemoteEval") as current_trace:
+      output_to_evaluate = "Some generated text."
+      current_trace.evaluate(
+          slug="sentiment-analyzer",
+          output=output_to_evaluate,
+          as_guardrail=False
+      )
+  ```
+  Parameters include `slug`, `name`, `input`, `output`, `expected_output`, `contexts`, `conversation`, `settings`, `as_guardrail`, `data`.
+  Returns: Result of the evaluation call.
+</ParamField>
+
+<ParamField path="async_evaluate" type="Callable">
+  An asynchronous version of `evaluate`.
+</ParamField>
+
+<ParamField path="autotrack_openai_calls" type="Callable">
+  Instruments an OpenAI client instance (e.g., `openai.OpenAI()`) to automatically create spans for any OpenAI API calls made using that client within the current trace.
+
+  ```python
+  import openai
+  # client = openai.OpenAI() # or AzureOpenAI, etc.
+
+  with langwatch.trace(name="OpenAICallsDemo") as current_trace:
+      # current_trace.autotrack_openai_calls(client)
+      # response = client.chat.completions.create(...)
+      # The above call will now be automatically traced as a span.
+      pass
+  ```
+  Takes the OpenAI client instance as an argument.
+</ParamField>
+
+<ParamField path="autotrack_dspy" type="Callable">
+  Enables automatic tracing for DSPy operations within the current trace. Requires DSPy to be installed and properly configured.
+
+  ```python
+  with langwatch.trace(name="DSPyPipeline") as current_trace:
+      # current_trace.autotrack_dspy()
+      # ... your DSPy calls ...
+      pass
+  ```
+</ParamField>
+
+<ParamField path="get_langchain_callback" type="Callable">
+  Returns a LangChain callback handler (`LangChainTracer`) associated with the current trace. This handler can be passed to LangChain runs to automatically trace LangChain operations.
+
+  ```python
+  # from langchain_core.llms import FakeLLM (or any LangChain LLM)
+  # from langchain.chains import LLMChain
+
+  with langwatch.trace(name="LangChainFlow") as current_trace:
+      # handler = current_trace.get_langchain_callback()
+      # llm = FakeLLM()
+      # chain = LLMChain(llm=llm, prompt=...)
+      # chain.run("some input", callbacks=[handler])
+      pass
+  ```
+  Returns: `LangChainTracer` instance.
+</ParamField>
+
+<ParamField path="share" type="Callable">
+  (Potentially) Generates a shareable link or identifier for this trace. The exact behavior might depend on backend support and configuration.
+  Returns: A string, possibly a URL or an ID.
+</ParamField>
+
+<ParamField path="unshare" type="Callable">
+  (Potentially) Revokes sharing for this trace if it was previously shared.
+</ParamField>
+
+### `@langwatch.span()` / `langwatch.span()`
+
+Use this to instrument specific operations or blocks of code within a trace. Spans can be nested to create a hierarchical view of your application's execution flow.
+
+It can be used as a decorator around a function or as a context manager.
+
+<CodeGroup>
+```python Decorator Usage
+import langwatch
+
+langwatch.setup()
+
+@langwatch.trace(name="MainProcess")
+def main_process():
+    do_first_step("data for step 1")
+    do_second_step("data for step 2")
+
+@langwatch.span(name="StepOne", type="tool")
+def do_first_step(data: str):
+    # langwatch.get_current_span().set_attributes({"custom_info": "info1"})
+    return f"Step 1 processed: {data}"
+
+@langwatch.span() # Name will be 'do_second_step', type will be 'span'
+def do_second_step(data: str):
+    # langwatch.get_current_span().update(metrics={"items_processed": 10})
+    return f"Step 2 processed: {data}"
+
+main_process()
+```
+
+```python Context Manager Usage
+import langwatch
+
+langwatch.setup()
+
+@langwatch.trace(name="ComplexOperation")
+def complex_op():
+    # ... some initial work ...
+    with langwatch.span(name="DataRetrieval", type="rag") as rag_span:
+        # rag_span.update(contexts=[{"document_id": "doc1", "content": "..."}])
+        retrieved_data = "some data from RAG"
+        rag_span.update(output=retrieved_data)
+
+    # ... more work ...
+    with langwatch.span(name="LLMCall", type="llm", input={"prompt": "Summarize this"}, model="gpt-5") as llm_span:
+        summary = "summary from LLM"
+        llm_span.update(output=summary, metrics={"input_tokens": 50, "output_tokens": 15})
+    return summary
+
+complex_op()
+```
+</CodeGroup>
+
+
+<ParamField path="name" type="Optional[str]" default="Name of the decorated function or a default name">
+  The name for the span. If used as a decorator and not provided, it defaults to the name of the decorated function. For context manager usage, a default name like "LangWatch Span" might be used if not specified.
+</ParamField>
+
+<ParamField path="type" type="Optional[SpanType]" default="'span'">
+  The semantic type of the span, which helps categorize the operation. Common types include `'llm'`, `'rag'`, `'agent'`, `'tool'`, `'embedding'`, or a generic `'span'`. `SpanType` is typically a string literal from `langwatch.domain.SpanTypes`.
+</ParamField>
+
+<ParamField path="span_id" type="Optional[Union[str, UUID]]" default="Auto-generated">
+  (Deprecated) A specific ID to assign to this span. It's generally recommended to let LangWatch auto-generate span IDs. This will be mapped to `deprecated.span_id` in the span's attributes.
+</ParamField>
+
+<ParamField path="parent" type="Optional[Union[OtelSpan, LangWatchSpan]]" default="Current span in context">
+  Explicitly sets the parent for this span. If not provided, the span will be nested under the currently active `LangWatchSpan` or OpenTelemetry span.
+</ParamField>
+
+<ParamField path="capture_input" type="bool" default="True">
+  If `True` (and used as a decorator), automatically captures the arguments of the decorated function as the span's input.
+</ParamField>
+
+<ParamField path="capture_output" type="bool" default="True">
+  If `True` (and used as a decorator), automatically captures the return value of the decorated function as the span's output.
+</ParamField>
+
+<ParamField path="input" type="SpanInputType" default="None">
+  Explicitly sets the input for this span. `SpanInputType` can be a dictionary, a string, or a list of `ChatMessage` objects. This overrides automatic input capture.
+</ParamField>
+
+<ParamField path="output" type="SpanInputType" default="None">
+  Explicitly sets the output for this span. `SpanInputType` has the same flexibility as for `input`. This overrides automatic output capture.
+</ParamField>
+
+<ParamField path="error" type="Optional[Exception]" default="None">
+  Records an error for this span. If an exception occurs within a decorated function or context manager, it's often automatically recorded.
+</ParamField>
+
+<ParamField path="timestamps" type="Optional[SpanTimestamps]" default="None">
+  A `SpanTimestamps` object to explicitly set the `start_time` and `end_time` for the span. Useful for instrumenting operations where the duration is known or externally managed.
+</ParamField>
+
+<ParamField path="contexts" type="ContextsType" default="None">
+  Relevant contextual information for this span, especially for RAG operations. `ContextsType` can be a list of `RAGChunk` objects or a list of strings.
+</ParamField>
+
+<ParamField path="model" type="Optional[str]" default="None">
+  The name or identifier of the model used in this operation (e.g., `'gpt-5'`, `'text-embedding-ada-002'`).
+</ParamField>
+
+<ParamField path="params" type="Optional[Union[SpanParams, Dict[str, Any]]]" default="None">
+  A dictionary or `SpanParams` object containing parameters relevant to the operation (e.g., temperature for an LLM call, k for a vector search).
+</ParamField>
+
+<ParamField path="metrics" type="Optional[SpanMetrics]" default="None">
+  A `SpanMetrics` object or dictionary to record quantitative measurements for this span, such as token counts (`input_tokens`, `output_tokens`), cost, or other custom metrics.
+</ParamField>
+
+<ParamField path="evaluations" type="Optional[List[Any]]" default="None">
+  A list of `Evaluation` objects to directly associate with this span.
+</ParamField>
+
+<ParamField path="ignore_missing_trace_warning" type="bool" default="False">
+  If `True`, suppresses the warning that is normally emitted if a span is created without an active parent trace.
+</ParamField>
+
+**OpenTelemetry Parameters:**
+These parameters are passed directly to the underlying OpenTelemetry span creation. Refer to OpenTelemetry documentation for more details.
+
+<ParamField path="kind" type="SpanKind" default="SpanKind.INTERNAL">
+  The OpenTelemetry `SpanKind` (e.g., `INTERNAL`, `CLIENT`, `SERVER`, `PRODUCER`, `CONSUMER`).
+</ParamField>
+
+<ParamField path="span_context" type="Optional[Context]" default="None">
+  An OpenTelemetry `Context` object to use for creating the span.
+</ParamField>
+
+<ParamField path="attributes" type="Optional[Dict[str, Any]]" default="None">
+  Additional custom attributes (key-value pairs) to attach to the span.
+</ParamField>
+
+<ParamField path="links" type="Optional[List[Link]]" default="None">
+  A list of OpenTelemetry `Link` objects to associate with this span.
+</ParamField>
+
+<ParamField path="start_time" type="Optional[int]" default="None">
+  An explicit start time for the span (in nanoseconds since epoch).
+</ParamField>
+
+<ParamField path="record_exception" type="bool" default="True">
+  Whether OpenTelemetry should automatically record exceptions for this span.
+</ParamField>
+
+<ParamField path="set_status_on_exception" type="bool" default="True">
+  Whether OpenTelemetry should automatically set the span status to error when an exception is recorded.
+</ParamField>
+
+
+**Context Manager Return**
+
+When used as a context manager, `langwatch.span()` returns a `LangWatchSpan` object.
+
+<ResponseField name="current_span" type="LangWatchSpan">
+  The `LangWatchSpan` instance. You can use this object to call methods like `current_span.update()` or `current_span.add_evaluation()`.
+</ResponseField>
+
+#### `LangWatchSpan` Object Methods
+
+When `langwatch.span()` is used as a context manager, it yields a `LangWatchSpan` object. This object provides methods to interact with the current span:
+
+<ParamField path="update" type="Callable">
+  Updates attributes of the span. This is the primary method for adding or changing information on an active span.
+  It accepts most of the same parameters as the `@langwatch.span()` decorator itself, such as `name`, `type`, `input`, `output`, `error`, `timestamps`, `contexts`, `model`, `params`, `metrics`, and arbitrary key-value pairs for custom attributes.
+
+  ```python
+  with langwatch.span(name="MySpan", type="tool") as current_span:
+      # ... some operation ...
+      current_span.update(output={"result": "success"}, metrics={"items_processed": 5})
+      # Add a custom attribute
+      current_span.update(custom_tool_version="1.2.3")
+  ```
+</ParamField>
+
+<ParamField path="add_evaluation" type="Callable">
+  Adds an `Evaluation` object directly to this span.
+
+  ```python
+  from langwatch.domain import Evaluation
+
+  with langwatch.span(name="SubOperation") as current_span:
+      # ... operation ...
+      eval_data = {
+          "name": "Correctness Check",
+          "status": "processed",
+          "passed": False,
+          "score": 0.2,
+          "label": "Incorrect"
+      } # Example, more fields available
+      current_span.add_evaluation(**eval_data)
+  ```
+  (Refer to `Evaluation` type in Core Data Types and `langwatch.evaluations` module for more details on parameters.)
+</ParamField>
+
+<ParamField path="evaluate" type="Callable">
+  Triggers a remote evaluation for this span using a pre-configured evaluator slug on the LangWatch platform.
+
+  ```python
+  with langwatch.span(name="LLM Generation", type="llm") as llm_span:
+      llm_output = "Some text generated by an LLM."
+      llm_span.update(output=llm_output)
+      llm_span.evaluate(slug="toxicity-check", output=llm_output, as_guardrail=True)
+  ```
+  Parameters include `slug`, `name`, `input`, `output`, `expected_output`, `contexts`, `conversation`, `settings`, `as_guardrail`, `data`.
+  Returns: Result of the evaluation call.
+</ParamField>
+
+<ParamField path="async_evaluate" type="Callable">
+  An asynchronous version of `evaluate` for spans.
+</ParamField>
+
+<ParamField path="end" type="Callable">
+  Explicitly ends the span. If you provide arguments (like `output`, `metrics`, etc.), it will call `update()` with those arguments before ending.
+  Usually not needed when using the span as a context manager, as `__exit__` handles this.
+
+  ```python
+  # Manual span management example
+  # current_span = langwatch.span(name="ManualSpan").__enter__() # Start span manually
+  # try:
+  #     # ... operations ...
+  #     result = "some result"
+  #     current_span.end(output=result) # Update and end
+  # except Exception as e:
+  #     current_span.end(error=e) # Record error and end
+  #     raise
+  ```
+</ParamField>
+
+**OpenTelemetry Span Methods:**
+
+The `LangWatchSpan` object also directly exposes standard OpenTelemetry `trace.Span` API methods for more advanced use cases or direct OTel interop. These include:
+- `record_error(exception)`: Records an exception against the span.
+- `add_event(name, attributes)`: Adds a timed event to the span.
+- `set_status(status_code, description)`: Sets the OTel status of the span (e.g., `StatusCode.ERROR`).
+- `set_attributes(attributes_dict)`: Sets multiple OTel attributes at once.
+- `update_name(new_name)`: Changes the name of the span.
+- `is_recording()`: Returns `True` if the span is currently recording information.
+- `get_span_context()`: Returns the `SpanContext` of the underlying OTel span.
+
+Refer to the OpenTelemetry Python documentation for details on these methods.
+
+```python
+from opentelemetry.trace import Status, StatusCode
+
+with langwatch.span(name="MyDetailedSpan") as current_span:
+    current_span.add_event("Checkpoint 1", {"detail": "Reached stage A"})
+    # ... some work ...
+    try:
+        # risky_operation()
+        pass
+    except Exception as e:
+        current_span.record_error(e)
+        current_span.set_status(Status(StatusCode.ERROR, description="Risky op failed"))
+    current_span.set_attributes({"otel_attribute": "value"})
+```
+
+### Context Accessors
+
+These functions allow you to access the currently active LangWatch trace or span from anywhere in your code, provided that a trace/span has been started (e.g., via `@langwatch.trace` or `@langwatch.span`).
+
+#### `langwatch.get_current_trace()`
+
+Retrieves the currently active `LangWatchTrace` object.
+
+This is useful if you need to interact with the trace object directly, for example, to add trace-level metadata or evaluations from a helper function called within an active trace.
+
+```python
+import langwatch
+
+langwatch.setup()
+
+def some_utility_function(detail: str):
+    current_trace = langwatch.get_current_trace()
+    if current_trace:
+        current_trace.update(metadata={"utility_info": detail})
+
+@langwatch.trace(name="MainOperation")
+def main_operation():
+    # ... some work ...
+    some_utility_function("Processed step A")
+    # ... more work ...
+
+main_operation()
+```
+
+<ParamField path="suppress_warning" type="bool" default="False">
+  If `True`, suppresses the warning that is normally emitted if this function is called when no LangWatch trace is currently in context.
+</ParamField>
+
+<ResponseField name="trace" type="LangWatchTrace">
+  The current `LangWatchTrace` object. If no trace is active and `suppress_warning` is `False`, a warning is issued and a new (detached) `LangWatchTrace` instance might be returned.
+</ResponseField>
+
+#### `langwatch.get_current_span()`
+
+Retrieves the currently active `LangWatchSpan` object.
+
+This allows you to get a reference to the current span to update its attributes, add events, or record information specific to that span from nested function calls.
+If no LangWatch-specific span is in context, it will attempt to wrap the current OpenTelemetry span.
+
+```python
+import langwatch
+
+langwatch.setup()
+
+def enrich_span_data(key: str, value: any):
+    current_span = langwatch.get_current_span()
+    if current_span:
+        current_span.update(**{key: value})
+        # Or using the older set_attributes for OpenTelemetry compatible attributes
+        # current_span.set_attributes({key: value})
+
+@langwatch.trace(name="UserFlow")
+def user_flow():
+    with langwatch.span(name="Step1") as span1:
+        # ... step 1 logic ...
+        enrich_span_data("step1_result", "success")
+
+    with langwatch.span(name="Step2") as span2:
+        # ... step 2 logic ...
+        enrich_span_data("step2_details", {"info": "more data"})
+
+user_flow()
+```
+
+<ResponseField name="span" type="LangWatchSpan">
+  The current `LangWatchSpan` object. This could be a span initiated by `@langwatch.span`, the root span of a `@langwatch.trace`, or a `LangWatchSpan` wrapping an existing OpenTelemetry span if no LangWatch span is directly in context.
+</ResponseField>
+
+## Prompt Management
+
+### `langwatch.prompts.create()`
+
+Creates a new prompt in the LangWatch platform.
+
+```python
+# Create a basic prompt
+prompt = langwatch.prompts.create(
+    handle="customer-support-bot",
+    scope="PROJECT",
+    prompt="You are a helpful customer support assistant.",
+    messages=[{"role": "user", "content": "{{question}}"}],
+    inputs=[{"identifier": "question", "type": "str"}],
+    outputs=[{"identifier": "answer", "type": "str", "json_schema": {"type": "str"}}]
+)
+```
+
+<ParamField path="handle" type="str" required>
+  The unique identifier (handle) for the prompt.
+</ParamField>
+
+<ParamField path="scope" type="str" required>
+  The scope of the prompt. Must be either `"ORGANIZATION"` or `"PROJECT"`.
+</ParamField>
+
+<ParamField path="prompt" type="Optional[str]">
+  The prompt text template. Cannot be used simultaneously with `messages`.
+</ParamField>
+
+<ParamField path="messages" type="Optional[List[Dict[str, str]]]">
+  A list of message objects defining the conversation structure. Cannot be used simultaneously with `prompt`.
+</ParamField>
+
+<ParamField path="inputs" type="Optional[List[Dict[str, Any]]]">
+  List of input definitions with identifier, type, and optional JSON schema.
+</ParamField>
+
+<ParamField path="outputs" type="Optional[List[Dict[str, Any]]]">
+  List of output definitions with identifier, type, and optional JSON schema.
+</ParamField>
+
+<ParamField path="author_id" type="Optional[str]">
+  The ID of the author creating the prompt.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="prompt" type="Prompt">
+  The newly created prompt object.
+</ResponseField>
+
+### `langwatch.prompts.get()`
+
+Retrieves a prompt from the LangWatch platform using its handle.
+
+```python
+# Get a prompt by handle
+prompt = langwatch.prompts.get("customer-support-bot")
+```
+
+<ParamField path="handle" type="str" required>
+  The handle (identifier) of the prompt to retrieve.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="prompt" type="Prompt">
+  The prompt object.
+</ResponseField>
+
+<ResponseField name="error" type="Error">
+  Throws an error if the specified prompt is not found.
+</ResponseField>
+
+### `langwatch.prompts.update()`
+
+Updates an existing prompt, creating a new version automatically.
+
+```python
+# Update prompt content
+updated_prompt = langwatch.prompts.update(
+    "customer-support-bot",
+    prompt="You are a helpful and friendly customer support assistant.",
+    scope="PROJECT"
+)
+```
+
+<ParamField path="handle" type="str" required>
+  The handle (identifier) of the prompt to update.
+</ParamField>
+
+<ParamField path="scope" type="Optional[str]">
+  The new scope for the prompt. Must be either `"ORGANIZATION"` or `"PROJECT"`.
+</ParamField>
+
+<ParamField path="prompt" type="Optional[str]">
+  The updated prompt text template.
+</ParamField>
+
+<ParamField path="messages" type="Optional[List[Dict[str, str]]]">
+  Updated list of message objects.
+</ParamField>
+
+<ParamField path="inputs" type="Optional[List[Dict[str, Any]]]">
+  Updated list of input definitions.
+</ParamField>
+
+<ParamField path="outputs" type="Optional[List[Dict[str, Any]]]">
+  Updated list of output definitions.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="prompt" type="Prompt">
+  The updated prompt object (new version).
+</ResponseField>
+
+<Warning>
+Each update operation creates a new version of the prompt. Previous versions are preserved for version control and rollback purposes.
+</Warning>
+
+### `langwatch.prompts.delete()`
+
+Deletes a prompt and all its versions from the LangWatch platform.
+
+```python
+# Delete prompts programmatically using LangWatch to manage versioning and maintain clean evaluation pipelines.
+result = langwatch.prompts.delete("customer-support-bot")
+```
+
+<ParamField path="handle" type="str" required>
+  The handle (identifier) of the prompt to delete.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="result" type="DeletePromptResult">
+  Confirmation of the deletion operation.
+</ResponseField>
+
+<Warning>
+This action is irreversible and will permanently remove the prompt and all its versions.
+</Warning>
+
+### Prompt Compilation
+
+#### `prompt.compile()`
+
+Compiles a prompt template with provided variables, using lenient compilation that handles missing variables gracefully.
+
+```python
+# Compile a prompt with variables
+compiled_prompt = prompt.compile(
+    question="What is the capital of France?",
+    subject="geography"
+)
+```
+
+<ParamField path="variables" type="Dict[str, Any]" required>
+  Variables to substitute into the prompt template.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="compiled_prompt" type="CompiledPrompt">
+  The compiled prompt with resolved variables and messages.
+</ResponseField>
+
+<Info>
+Lenient compilation will not throw errors for missing variables, making it suitable for dynamic content where some variables may be optional.
+</Info>
+
+##### `prompt.compile_strict()`
+
+Compiles a prompt template with strict variable validation, throwing an error if any required variables are missing.
+
+```python
+# Strict compilation with all required variables
+compiled_prompt = prompt.compile_strict(
+    subject="quantum computing",
+    question="How does it work in 10 words or less?"
+)
+```
+
+<ParamField path="variables" type="Dict[str, Any]" required>
+  Variables to substitute into the prompt template. All template variables must be provided.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="compiled_prompt" type="CompiledPrompt">
+  The compiled prompt with resolved variables and messages.
+</ResponseField>
+
+<ResponseField name="error" type="PromptCompilationError">
+  Throws an error if any template variables are missing or invalid.
+</ResponseField>
+
+<Warning>
+Strict compilation will throw a `PromptCompilationError` if any template variables are missing, ensuring all required data is provided.
+</Warning>
+
+## Core Data Types
+
+This section describes common data structures used throughout the LangWatch SDK, particularly as parameters to functions like `langwatch.setup()`, `@langwatch.trace()`, and `@langwatch.span()`, or as part of the data captured.
+
+### `SpanProcessingExcludeRule`
+
+Defines a rule to filter out spans before they are exported to LangWatch. Used in the `span_exclude_rules` parameter of `langwatch.setup()`.
+
+<ResponseField name="field_name" type="Literal['span_name']" required>
+  The field of the span to match against. Currently, only `"span_name"` is supported.
+</ResponseField>
+<ResponseField name="match_value" type="str" required>
+  The value to match for the specified `field_name`.
+</ResponseField>
+<ResponseField name="match_operation" type="Literal['includes', 'exact_match', 'starts_with', 'ends_with']" required>
+  The operation to use for matching (e.g., `"exact_match"`, `"starts_with"`).
+</ResponseField>
+
+```python Example
+from langwatch.domain import SpanProcessingExcludeRule
+
+exclude_health_checks = SpanProcessingExcludeRule(
+    field_name="span_name",
+    match_value="/health_check",
+    match_operation="exact_match"
+)
+
+exclude_internal_utils = SpanProcessingExcludeRule(
+    field_name="span_name",
+    match_value="utils.",
+    match_operation="starts_with"
+)
+```
+
+### `ChatMessage`
+
+Represents a single message in a chat conversation, typically used for `input` or `output` of LLM spans.
+
+<ResponseField name="role" type="ChatRole" required>
+  The role of the message sender. `ChatRole` is a Literal: `"system"`, `"user"`, `"assistant"`, `"function"`, `"tool"`, `"guardrail"`, `"evaluation"`, `"unknown"`.
+</ResponseField>
+<ResponseField name="content" type="Optional[str]">
+  The textual content of the message.
+</ResponseField>
+<ResponseField name="function_call" type="Optional[FunctionCall]">
+  For assistant messages that involve a function call (legacy OpenAI format).
+  <Expandable title="FunctionCall Properties">
+    <ResponseField name="name" type="str">Name of the function to call.</ResponseField>
+    <ResponseField name="arguments" type="str">JSON string of arguments for the function.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="tool_calls" type="Optional[List[ToolCall]]">
+  For assistant messages that involve tool calls (current OpenAI format).
+  <Expandable title="ToolCall Properties">
+    <ResponseField name="id" type="str">ID of the tool call.</ResponseField>
+    <ResponseField name="type" type="str">Type of the tool (usually `"function"`).</ResponseField>
+    <ResponseField name="function" type="FunctionCall">Details of the function to be called (see `FunctionCall` above).</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="tool_call_id" type="Optional[str]">
+  For messages that are responses from a tool, this is the ID of the tool call that this message is a response to.
+</ResponseField>
+<ResponseField name="name" type="Optional[str]">
+  The name of the function whose result is in the `content` (if role is `"function"`), or the name of the tool/participant (if role is `"tool"`).
+</ResponseField>
+
+```python Example
+from langwatch.domain import ChatMessage
+
+user_message = ChatMessage(role="user", content="Hello, world!")
+assistant_response = ChatMessage(role="assistant", content="Hi there!")
+```
+
+### `RAGChunk`
+
+Represents a chunk of retrieved context, typically used with RAG (Retrieval Augmented Generation) operations in the `contexts` field of a span.
+
+<ResponseField name="document_id" type="Optional[str]">
+  An identifier for the source document of this chunk.
+</ResponseField>
+<ResponseField name="chunk_id" type="Optional[str]">
+  An identifier for this specific chunk within the document.
+</ResponseField>
+<ResponseField name="content" type="Union[str, Dict[str, Any], List[Any]]" required>
+  The actual content of the RAG chunk. Can be a simple string or a more complex structured object.
+</ResponseField>
+
+```python Example
+from langwatch.domain import RAGChunk
+
+retrieved_chunk = RAGChunk(
+    document_id="doc_123",
+    chunk_id="chunk_005",
+    content="LangWatch helps monitor LLM applications."
+)
+```
+
+### `SpanInputOutput`
+
+This is a flexible type used for the `input` and `output` fields of spans. It's a Union that can take several forms to represent different kinds of data. LangWatch will store it as a typed value.
+Common forms include:
+- `TypedValueText`: For simple string inputs/outputs. `{"type": "text", "value": "your string"}`
+- `TypedValueChatMessages`: For conversational inputs/outputs. `{"type": "chat_messages", "value": [ChatMessage, ...]}`
+- `TypedValueJson`: For arbitrary JSON-serializable data. `{"type": "json", "value": {"key": "value"}}`
+- `TypedValueRaw`: For data that should be stored as a raw string, escaping any special interpretation. `{"type": "raw", "value": "<xml>data</xml>"}`
+- `TypedValueList`: For a list of `SpanInputOutput` objects. `{"type": "list", "value": [SpanInputOutput, ...]}`
+
+When providing `input` or `output` to `@langwatch.span()` or `span.update()`, you can often provide the raw Python object (e.g., a string, a list of `ChatMessage` dicts, a dictionary for JSON), and the SDK will attempt to serialize it correctly. For more control, you can construct the `TypedValue` dictionaries yourself.
+
+### `SpanTimestamps`
+
+A dictionary defining custom start and end times for a span, in nanoseconds since epoch.
+
+<ResponseField name="started_at" type="int" required>
+  Timestamp when the span started (nanoseconds since epoch).
+</ResponseField>
+<ResponseField name="first_token_at" type="Optional[int]">
+  For LLM operations, timestamp when the first token was received (nanoseconds since epoch).
+</ResponseField>
+<ResponseField name="finished_at" type="int" required>
+  Timestamp when the span finished (nanoseconds since epoch).
+</ResponseField>
+
+### `SpanTypes` (Semantic Span Types)
+
+A string literal defining the semantic type of a span. This helps categorize spans in the LangWatch UI and for analytics. Possible values include:
+- `"span"` (generic span)
+- `"llm"` (Language Model operation)
+- `"chain"` (a sequence of operations, e.g., LangChain chain)
+- `"tool"` (execution of a tool or function call)
+- `"agent"` (an autonomous agent's operation)
+- `"guardrail"` (a guardrail or safety check)
+- `"evaluation"` (an evaluation step)
+- `"rag"` (Retrieval Augmented Generation operation)
+- `"workflow"` (a broader workflow or business process)
+- `"component"` (a sub-component within a larger system)
+- `"module"` (a logical module of code)
+- `"server"` (server-side operation)
+- `"client"` (client-side operation)
+- `"producer"` (message producer)
+- `"consumer"` (message consumer)
+- `"task"` (a background task or job)
+- `"unknown"`
+
+### `SpanMetrics`
+
+A dictionary for quantitative measurements associated with a span.
+
+<ResponseField name="prompt_tokens" type="Optional[int]">
+  Number of tokens in the input/prompt to an LLM.
+</ResponseField>
+<ResponseField name="completion_tokens" type="Optional[int]">
+  Number of tokens in the output/completion from an LLM.
+</ResponseField>
+<ResponseField name="cost" type="Optional[float]">
+  Estimated or actual monetary cost of the operation (e.g., LLM API call cost).
+</ResponseField>
+
+### `SpanParams`
+
+A dictionary for parameters related to an operation, especially LLM calls.
+Examples include:
+<ResponseField name="frequency_penalty" type="Optional[float]">
+  Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
+</ResponseField>
+<ResponseField name="logit_bias" type="Optional[Dict[str, float]]">
+  Modify the likelihood of specified tokens appearing in the completion. Accepts a dictionary mapping token IDs (or tokens, depending on the model) to a bias value from -100 to 100.
+</ResponseField>
+<ResponseField name="logprobs" type="Optional[bool]">
+  Whether to return log probabilities of the output tokens.
+</ResponseField>
+<ResponseField name="top_logprobs" type="Optional[int]">
+  An integer between 0 and 5 specifying the number of most likely tokens to return at each token position, each with log probability. `logprobs` must be `True` if this is used.
+</ResponseField>
+<ResponseField name="max_tokens" type="Optional[int]">
+  The maximum number of tokens to generate in the completion.
+</ResponseField>
+<ResponseField name="n" type="Optional[int]">
+  How many completions to generate for each prompt.
+</ResponseField>
+<ResponseField name="presence_penalty" type="Optional[float]">
+  Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
+</ResponseField>
+<ResponseField name="seed" type="Optional[int]">
+  If specified, the system will make a best effort to sample deterministically, such that repeated requests with the same `seed` and parameters should return the same result.
+</ResponseField>
+<ResponseField name="stop" type="Optional[Union[str, List[str]]]">
+  Up to 4 sequences where the API will stop generating further tokens.
+</ResponseField>
+<ResponseField name="stream" type="Optional[bool]">
+  If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only server-sent events as they become available.
+</ResponseField>
+<ResponseField name="temperature" type="Optional[float]">
+  What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+</ResponseField>
+<ResponseField name="top_p" type="Optional[float]">
+  An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with `top_p` probability mass.
+</ResponseField>
+<ResponseField name="tools" type="Optional[List[Dict[str, Any]]]">
+  A list of tools the model may call. Currently, only functions are supported as a tool.
+</ResponseField>
+<ResponseField name="tool_choice" type="Optional[str]">
+  Controls which (if any) tool is called by the model. `none` means the model will not call any tool. `auto` means the model can pick between generating a message or calling a tool.
+</ResponseField>
+<ResponseField name="user" type="Optional[str]">
+  A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse.
+</ResponseField>
+
+### `Prompt`
+
+Represents a prompt configuration that can be used with OpenAI's API. Handles formatting messages with variables using Liquid templating.
+
+<ResponseField name="id" type="str">
+  Unique identifier for the prompt.
+</ResponseField>
+
+<ResponseField name="handle" type="str">
+  The handle (identifier) of the prompt.
+</ResponseField>
+
+<ResponseField name="version" type="str">
+  Version string of the prompt.
+</ResponseField>
+
+<ResponseField name="version_id" type="str">
+  Unique identifier for this specific version.
+</ResponseField>
+
+<ResponseField name="prompt" type="Optional[str]">
+  The prompt text template.
+</ResponseField>
+
+<ResponseField name="messages" type="Optional[List[MessageDict]]">
+  List of message objects defining the conversation structure.
+</ResponseField>
+
+<ResponseField name="inputs" type="Optional[List[Dict[str, Any]]]">
+  List of input definitions with identifier, type, and optional JSON schema.
+</ResponseField>
+
+<ResponseField name="outputs" type="Optional[List[Dict[str, Any]]]">
+  List of output definitions with identifier, type, and optional JSON schema.
+</ResponseField>
+
+<ResponseField name="scope" type="str">
+  The scope of the prompt (`"ORGANIZATION"` or `"PROJECT"`).
+</ResponseField>
+
+<ResponseField name="author_id" type="Optional[str]">
+  The ID of the author who created the prompt.
+</ResponseField>
+
+<ResponseField name="raw" type="Any">
+  Get the raw prompt data from the API.
+</ResponseField>
+
+<ResponseField name="version_number" type="int">
+  Returns the version number of the prompt as an integer.
+</ResponseField>
+
+#### Methods
+
+<ParamField path="compile" type="Callable">
+  Compiles the prompt template with provided variables using lenient compilation.
+
+  ```python
+  compiled = prompt.compile(variables={"name": "Alice"})
+  # or
+  compiled = prompt.compile(name="Alice")
+  ```
+</ParamField>
+
+<ParamField path="compile_strict" type="Callable">
+  Compiles with strict validation, throwing error if required variables are missing.
+
+  ```python
+  compiled = prompt.compile_strict(variables={"name": "Alice", "topic": "weather"})
+  ```
+</ParamField>
+
+### `CompiledPrompt`
+
+Represents a compiled prompt with resolved variables and compiled content.
+
+<ResponseField name="original" type="Prompt">
+  Reference to the original prompt object.
+</ResponseField>
+
+<ResponseField name="prompt" type="str">
+  The compiled prompt text with variables resolved.
+</ResponseField>
+
+<ResponseField name="variables" type="TemplateVariables">
+  The original compilation variables used.
+</ResponseField>
+
+<ResponseField name="messages" type="List[ChatCompletionMessageParam]">
+  Compiled messages as a list of ChatCompletionMessageParam objects, ready for OpenAI API.
+</ResponseField>
+
+<ResponseField name="id" type="str">
+  Inherited from original prompt - unique identifier.
+</ResponseField>
+
+<ResponseField name="version" type="str">
+  Inherited from original prompt - version string.
+</ResponseField>
+
+<ResponseField name="version_id" type="str">
+  Inherited from original prompt - version identifier.
+</ResponseField>
+
+### `TemplateVariables`
+
+Type alias for template variables supporting common data types.
+
+```python
+TemplateVariables = Dict[
+    str, Union[str, int, float, bool, Dict[str, Any], List[Any], None]
+]
+```
+
+### `MessageDict`
+
+Represents a single message in the conversation structure.
+
+<ResponseField name="role" type="str">
+  The role of the message sender (e.g., "user", "assistant", "system").
+</ResponseField>
+
+<ResponseField name="content" type="str">
+  The textual content of the message.
+</ResponseField>
+
+### `PromptCompilationError`
+
+Exception raised when prompt template compilation fails.
+
+<ResponseField name="message" type="str">
+  Human-readable error message describing the compilation failure.
+</ResponseField>
+
+<ResponseField name="template" type="str">
+  The template string that failed to compile.
+</ResponseField>
+
+<ResponseField name="original_error" type="Optional[Exception]">
+  The underlying exception that caused the compilation failure.
+</ResponseField>
+
+<ResponseField name="name" type="str">
+  Always set to "PromptCompilationError".
+</ResponseField>

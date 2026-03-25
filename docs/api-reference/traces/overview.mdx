@@ -1,0 +1,30 @@
+---
+title: 'Overview'
+description: 'Search, retrieve, and share LangWatch traces via the REST API. Traces capture the full execution of your LLM pipelines including all spans, evaluations, and metadata.'
+---
+
+## Intro
+
+The Traces API lets you search and retrieve traces for your project. Each trace captures a complete LLM pipeline execution, including nested spans (LLM calls, tool calls, RAG retrievals), evaluations, and metadata.
+
+Both search and get-trace endpoints support a `format` parameter:
+- **`digest`** (default) — Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
+- **`json`** — Returns the full raw trace data with all fields.
+
+## Authentication
+
+Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be found on the setup page under settings.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/traces/search` | Search traces with filters and pagination |
+| `GET` | `/api/traces/{traceId}` | Get full trace details by ID |
+| `GET` | `/api/thread/{id}` | Get all traces in a thread |
+| `POST` | `/api/trace/{id}/share` | Create a public share link |
+| `POST` | `/api/trace/{id}/unshare` | Remove a public share link |
+
+<Info>
+The older `/api/trace/search` and `/api/trace/{id}` endpoints still work but are deprecated. Migrate to `/api/traces/search` and `/api/traces/{traceId}` for the improved `format` parameter and AI-readable digests.
+</Info>

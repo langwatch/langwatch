@@ -1,0 +1,35 @@
+---
+title: "Skills Directory"
+description: "Get started with LangWatch in seconds. Copy a prompt, install a skill, or set up the MCP — your AI agent does the rest."
+sidebarTitle: "Skills Directory"
+---
+
+import { SkillInstall } from "/snippets/skill-install.jsx"
+
+Don't want to install skills? Copy a ready-to-paste prompt instead: [Code Prompts](/skills/code-prompts) | [Platform Prompts](/skills/platform-prompts)
+
+## Available Skills
+
+Install any skill with a single command:
+
+<SkillInstall title="Instrument my agent with open telemetry" skill="langwatch/skills/tracing" slashCommand="/tracing" />
+<SkillInstall title="Write evaluations for my agent" skill="langwatch/skills/evaluations" slashCommand="/evaluations" />
+<SkillInstall title="Write scenario tests and a CI pipeline for my agent" skill="langwatch/skills/scenarios" slashCommand="/scenarios" />
+<SkillInstall title="Version my prompts" skill="langwatch/skills/prompts" slashCommand="/prompts" />
+<SkillInstall title="Do all of the above" skill="langwatch/skills/level-up" slashCommand="/level-up" highlighted />
+
+<Tip>
+  **Starting an agent from scratch?** Use [Better Agents](/better-agents/overview) to scaffold a production-ready project with all LangWatch features built in.
+</Tip>
+
+## Recipes
+
+Domain-specific recipes for common use cases — your AI agent can execute these directly.
+
+<CardGroup cols={3}>
+  <Card title="Debug Instrumentation" description="Fix broken traces" icon="bug" href="/skills/recipes" />
+  <Card title="Generate RAG Dataset" description="Test data from your knowledge base" icon="database" href="/skills/recipes" />
+  <Card title="Test Compliance" description="Verify advisory boundaries" icon="shield-check" href="/skills/recipes" />
+</CardGroup>
+
+[See all recipes →](/skills/recipes)

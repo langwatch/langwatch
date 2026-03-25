@@ -1,0 +1,451 @@
+---
+title: OpenTelemetry Migration
+description: "Migrate from OpenTelemetry to LangWatch while preserving custom tracing to support more advanced AI agent testing."
+---
+
+# OpenTelemetry Migration
+
+This guide covers migrating from existing OpenTelemetry setups to LangWatch while maintaining all your custom configurations, instrumentations, and advanced features.
+
+<CardGroup cols={2}>
+<Card title="Configuration Migration" icon="migration" href="#complete-nodesdk-configuration">
+  Preserve all your OpenTelemetry NodeSDK configuration options and custom settings.
+</Card>
+
+<Card title="Migration Checklist" icon="checklist" href="#migration-checklist">
+  Step-by-step process to safely migrate your observability setup.
+</Card>
+</CardGroup>
+
+## Overview
+
+The LangWatch observability SDK is built on OpenTelemetry and passes through all NodeSDK configuration options, making it easy to migrate from existing OpenTelemetry setups while maintaining all your custom configuration.
+
+<Info>
+LangWatch supports all OpenTelemetry NodeSDK configuration options, so you can migrate without losing any functionality or custom settings.
+</Info>
+
+<Note>
+For consistent attribute naming and semantic conventions, see our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide which covers both OpenTelemetry standards and LangWatch's custom attributes.
+</Note>
+
+## Complete NodeSDK Configuration
+
+LangWatch supports all OpenTelemetry NodeSDK configuration options:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import { envDetector, processDetector, hostDetector } from "@opentelemetry/resources";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'batch'
+  },
+  serviceName: "my-service",
+  
+  // All NodeSDK options are supported
+  autoDetectResources: true,
+  contextManager: undefined, // Use default
+  textMapPropagator: new W3CTraceContextPropagator(),
+  resourceDetectors: [envDetector, processDetector, hostDetector],
+  
+  // Sampling strategy
+  sampler: new TraceIdRatioBasedSampler(0.1), // Sample 10% of traces
+  
+  // Span limits
+  spanLimits: {
+    attributeCountLimit: 128,
+    eventCountLimit: 128,
+    linkCountLimit: 128
+  },
+  
+  // Auto-instrumentations
+  instrumentations: [
+    new HttpInstrumentation(),
+    // Add other instrumentations as needed
+  ],
+  
+  // Advanced options
+  advanced: {
+    throwOnSetupError: false, // Don't throw on setup errors
+    skipOpenTelemetrySetup: false, // Handle setup yourself
+    UNSAFE_forceOpenTelemetryReinitialization: false // Force reinit (dangerous)
+  }
+});
+```
+
+## Migration Example: From NodeSDK to LangWatch
+
+<Steps>
+<Step title="Before: Direct NodeSDK Usage">
+  ```typescript
+  import { NodeSDK } from "@opentelemetry/sdk-node";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+
+  const sdk = new NodeSDK({
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
+
+  sdk.start();
+  ```
+</Step>
+
+<Step title="After: Using LangWatch with Same Configuration">
+  ```typescript
+  import { setupObservability } from "langwatch/observability/node";
+  import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+  import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+
+  const handle = setupObservability({
+    langwatch: {
+      apiKey: process.env.LANGWATCH_API_KEY
+    },
+    serviceName: "my-service",
+    spanProcessors: [
+      new BatchSpanProcessor(new JaegerExporter())
+    ],
+    instrumentations: [new HttpInstrumentation()],
+    sampler: new TraceIdRatioBasedSampler(0.1),
+    spanLimits: { attributeCountLimit: 128 }
+  });
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    await handle.shutdown();
+    process.exit(0);
+  });
+  ```
+</Step>
+</Steps>
+
+## Advanced Sampling Strategies
+
+Implement sophisticated sampling strategies for different use cases:
+
+```typescript
+import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
+
+// Sample based on trace ID ratio
+const ratioSampler = new TraceIdRatioBasedSampler(0.1); // 10% sampling
+
+// Parent-based sampling (respect parent span sampling decision)
+const parentBasedSampler = new ParentBasedSampler({
+  root: ratioSampler,
+  remoteParentSampled: new AlwaysOnSampler(),
+  remoteParentNotSampled: new AlwaysOffSampler(),
+  localParentSampled: new AlwaysOnSampler(),
+  localParentNotSampled: new AlwaysOffSampler(),
+});
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  sampler: parentBasedSampler
+});
+```
+
+## Custom Resource Detection
+
+Configure custom resource detection for better service identification:
+
+```typescript
+import { Resource } from "@opentelemetry/resources";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+
+const customResource = new Resource({
+  [SemanticResourceAttributes.SERVICE_NAME]: "my-service",
+  [SemanticResourceAttributes.SERVICE_VERSION]: "1.0.0",
+  [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV,
+  "custom.team": "ai-platform",
+  "custom.datacenter": "us-west-2"
+});
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  resource: customResource
+});
+```
+
+<Tip>
+For consistent attribute naming and TypeScript autocomplete support, consider using LangWatch's semantic conventions. See our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide for details.
+</Tip>
+
+## Custom Instrumentations
+
+Add custom instrumentations for specific libraries or frameworks:
+
+```typescript
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
+import { MongoDBInstrumentation } from "@opentelemetry/instrumentation-mongodb";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  instrumentations: [
+    new HttpInstrumentation({
+      ignoreIncomingPaths: ['/health', '/metrics'],
+      ignoreOutgoingUrls: ['https://external-service.com/health']
+    }),
+    new ExpressInstrumentation(),
+    new MongoDBInstrumentation()
+  ]
+});
+```
+
+## Context Propagation Configuration
+
+Configure custom context propagation for distributed tracing:
+
+```typescript
+import { W3CTraceContextPropagator, W3CBaggagePropagator } from "@opentelemetry/core";
+import { CompositePropagator } from "@opentelemetry/core";
+
+const compositePropagator = new CompositePropagator({
+  propagators: [
+    new W3CTraceContextPropagator(),
+    new W3CBaggagePropagator()
+  ]
+});
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  textMapPropagator: compositePropagator
+});
+```
+
+## Environment-Specific Configuration
+
+Create different configurations for different environments:
+
+```typescript
+const getObservabilityConfig = (environment: string) => {
+  const baseConfig = {
+    serviceName: "my-service",
+    langwatch: {
+      apiKey: process.env.LANGWATCH_API_KEY
+    }
+  };
+
+  switch (environment) {
+    case 'development':
+      return {
+        ...baseConfig,
+        langwatch: {
+          ...baseConfig.langwatch,
+          processorType: 'simple'
+        },
+        debug: {
+          consoleTracing: true,
+          logLevel: 'debug'
+        }
+      };
+    
+    case 'staging':
+      return {
+        ...baseConfig,
+        langwatch: {
+          ...baseConfig.langwatch,
+          processorType: 'batch'
+        },
+        sampler: new TraceIdRatioBasedSampler(0.5), // 50% sampling
+        debug: {
+          consoleTracing: false,
+          logLevel: 'info'
+        }
+      };
+    
+    case 'production':
+      return {
+        ...baseConfig,
+        langwatch: {
+          ...baseConfig.langwatch,
+          processorType: 'batch'
+        },
+        sampler: new TraceIdRatioBasedSampler(0.1), // 10% sampling
+        debug: {
+          consoleTracing: false,
+          logLevel: 'warn'
+        }
+      };
+    
+    default:
+      return baseConfig;
+  }
+};
+
+const handle = setupObservability(
+  getObservabilityConfig(process.env.NODE_ENV)
+);
+```
+
+## Performance Tuning
+
+Optimize performance for high-volume applications:
+
+```typescript
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'batch'
+  },
+  serviceName: "my-service",
+  
+  // Performance tuning
+  spanLimits: {
+    attributeCountLimit: 64, // Reduce attribute count
+    eventCountLimit: 32,     // Reduce event count
+    linkCountLimit: 32       // Reduce link count
+  },
+  
+  // Sampling for high volume
+  sampler: new TraceIdRatioBasedSampler(0.05), // 5% sampling
+  
+  // Batch processing configuration
+  spanProcessors: [
+    new BatchSpanProcessor(new LangWatchExporter({
+      apiKey: process.env.LANGWATCH_API_KEY
+    }), {
+      maxQueueSize: 4096,
+      maxExportBatchSize: 1024,
+      scheduledDelayMillis: 1000,
+      exportTimeoutMillis: 30000
+    })
+  ]
+});
+```
+
+## Migration Checklist
+
+<Steps>
+<Step title="Inventory Current Setup">
+  Document all current instrumentations, exporters, and configurations in your OpenTelemetry setup.
+</Step>
+
+<Step title="Test in Development">
+  Start with development environment migration to validate the configuration.
+</Step>
+
+<Step title="Verify Data Flow">
+  Ensure traces are appearing in LangWatch dashboard with correct attributes and structure.
+</Step>
+
+<Step title="Performance Testing">
+  Monitor application performance impact and adjust sampling/processing settings as needed.
+</Step>
+
+<Step title="Gradual Rollout">
+  Migrate environments one at a time, starting with staging before production.
+</Step>
+
+<Step title="Fallback Plan">
+  Keep existing OpenTelemetry setup as backup during transition period.
+</Step>
+
+<Step title="Documentation">
+  Update team documentation and runbooks with new observability configuration.
+</Step>
+</Steps>
+
+## Troubleshooting Migration Issues
+
+### Common Migration Problems
+
+<AccordionGroup>
+<Accordion title="Duplicate Spans">
+  **Problem**: Spans appearing twice in your traces.
+  
+  **Solution**: Ensure only one observability setup is running. Check for multiple `setupObservability` calls or conflicting OpenTelemetry initializations.
+</Accordion>
+
+<Accordion title="Missing Traces">
+  **Problem**: No traces appearing in LangWatch dashboard.
+  
+  **Solution**: Verify API key configuration, check network connectivity to LangWatch endpoints, and ensure spans are being created and ended properly.
+</Accordion>
+
+<Accordion title="Performance Degradation">
+  **Problem**: Application performance impacted after migration.
+  
+  **Solution**: Adjust sampling rates, optimize batch processing settings, and monitor memory usage of span processors.
+</Accordion>
+
+<Accordion title="Context Loss">
+  **Problem**: Span context not propagating across async boundaries.
+  
+  **Solution**: Verify context propagation configuration and ensure proper async context management in your code.
+</Accordion>
+
+<Accordion title="Instrumentation Conflicts">
+  **Problem**: Conflicting instrumentations causing errors or unexpected behavior.
+  
+  **Solution**: Review instrumentation configuration, check for duplicate instrumentations, and verify compatibility between different instrumentations.
+</Accordion>
+</AccordionGroup>
+
+### Debugging Migration
+
+Enable detailed logging during migration to identify issues:
+
+```typescript
+// Enable detailed logging during migration
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  debug: {
+    consoleTracing: true,
+    consoleLogging: true,
+    logLevel: 'debug'
+  },
+  advanced: {
+    throwOnSetupError: true
+  }
+});
+```
+
+## Migration Benefits
+
+<CardGroup cols={2}>
+<Card title="Zero Configuration Loss" icon="preserve">
+  All your existing OpenTelemetry configurations, instrumentations, and custom settings are preserved.
+</Card>
+
+<Card title="Enhanced Features" icon="features">
+  Gain access to LangWatch's specialized LLM observability features while keeping your existing setup.
+</Card>
+
+<Card title="Gradual Migration" icon="gradual">
+  Migrate at your own pace with the ability to run both systems in parallel during transition.
+</Card>
+
+<Card title="Production Ready" icon="production">
+  LangWatch is built on OpenTelemetry standards, ensuring production-grade reliability and performance.
+</Card>
+</CardGroup>
+
+<Info>
+The migration process is designed to be non-disruptive. You can run your existing OpenTelemetry setup alongside LangWatch during the transition period to ensure everything works correctly.
+</Info>

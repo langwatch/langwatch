@@ -1,0 +1,235 @@
+.tabs .overflow-x-auto {
+  overflow-x: visible !important;
+}
+
+a[href="https://github.com/langwatch/langwatch"] .text-sm
+{
+  white-space: nowrap;
+}
+
+[aria-controls~="accordion"] {
+  padding-right: 8px;
+  padding-left: 8px;
+  align-items: start;
+}
+
+[aria-controls~="accordion"] p:last-child {
+  font-size: 14px;
+  margin-top: 0.5rem;
+}
+
+[aria-controls~="accordion"] [class="mr-0.5"] {
+  margin-top: 5px;
+}
+
+[aria-controls~="accordion"][aria-expanded="true"] [class="mr-0.5"] {
+  margin-top: 8px;
+}
+
+/* Sidebar navigation styling */
+#sidebar-group .lg\:text-sm {
+  font-size: 0.85rem !important;
+}
+
+#sidebar-group .lg\:leading-6 {
+  line-height: 1.375rem !important;
+}
+
+#sidebar-group .mb-5 {
+  margin-bottom: 0.75rem !important;
+}
+
+#sidebar-group .sm\:mb-4 {
+  margin-bottom: 0.5rem !important;
+}
+
+#sidebar-group .py-1\.5 {
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+}
+
+#sidebar-group .mt-12 .lg\:mt-8 {
+  margin-top: 2rem !important;
+}
+
+#sidebar-group .mb-3\.5 {
+  margin-bottom: 0.5rem !important;
+}
+
+#sidebar-group h5 {
+  font-size: 0.9rem !important;
+}
+
+#sidebar-group svg {
+  height: 0.8rem !important;
+  width: 0.8rem !important;
+}
+
+/* Fix chevron visibility and alignment */
+#sidebar-group svg[viewBox="0 -9 3 24"] {
+  stroke-width: 1px !important; /* Make chevron thicker */
+  height: 28px !important; /* Restore height */
+  width: 12px !important; /* Restore width */
+  opacity: 0.8 !important; /* Make it more visible */
+}
+
+/* Make the chevron container position absolute to align right */
+#sidebar-group .group {
+  position: relative !important;
+  padding-right: 20px !important; /* Add space for the chevron */
+}
+
+/* Position the chevron to the right */
+#sidebar-group .group svg[viewBox="0 -9 3 24"] {
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+/* Override the inline transform style for rotation */
+#sidebar-group .duration-75 {
+  transform: none !important;
+}
+
+/* Handle the rotation separately with a pseudo-element */
+#sidebar-group .group svg[viewBox="0 -9 3 24"].duration-75 {
+  transform: translateY(-50%) !important;
+}
+
+/* Apply rotation to the rotated class */
+#sidebar-group .group svg[viewBox="0 -9 3 24"].duration-75.rotate-90 {
+  transform: translateY(-50%) rotate(90deg) !important;
+}
+
+.line-highlight {
+  background: rgb(85 215 153 / 0.2) !important;
+}
+
+.line-highlight:before {
+  background: rgb(85 215 153 / 0.2) !important;
+  border-left: 4px solid rgb(85 215 153) !important;
+}
+
+.line-highlight:after {
+  background: rgb(85 215 153 / 0.2) !important;
+}
+
+/* Fixes code block overflow */
+code {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ── LangWatch custom components ── */
+
+/* CopyPrompt / CopyLine shared card */
+.lw-copy-prompt {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 8px;
+}
+.lw-copy-prompt:hover {
+  background: #f9fafb;
+}
+
+.lw-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+  color: inherit;
+}
+
+/* Copied toggle — both icons rendered, CSS shows/hides via data-copied */
+.lw-copy-btn .lw-check-icon { display: none; }
+.lw-copy-btn .lw-copy-icon { display: flex; align-items: center; gap: 6px; }
+.lw-copy-btn[data-copied] .lw-copy-icon { display: none; }
+.lw-copy-btn[data-copied] .lw-check-icon { display: flex; align-items: center; gap: 6px; }
+.lw-copy-btn[data-copied] {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #059669;
+}
+
+/* CopyLine copied toggle */
+.lw-copy-prompt[data-copied] .lw-copy-line-icon { display: none !important; }
+.lw-copy-prompt[data-copied] .lw-copy-line-check { display: flex !important; }
+
+/* Dark mode overrides */
+.dark .lw-copy-prompt {
+  border-color: #374151;
+}
+.dark .lw-copy-prompt:hover {
+  background: transparent;
+  border-color: #6b7280;
+}
+.dark .lw-copy-prompt:hover span {
+  color: #f9fafb;
+}
+
+.dark .lw-copy-btn {
+  border-color: #374151;
+}
+.dark .lw-copy-prompt:hover .lw-copy-btn {
+  border-color: #6b7280;
+  color: #f9fafb;
+}
+.dark .lw-copy-btn[data-copied] {
+  background: rgba(5, 150, 105, 0.15);
+  border-color: rgba(5, 150, 105, 0.4);
+  color: #059669;
+}
+
+/* SkillInstall card */
+.lw-skill-install {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.lw-skill-install.lw-skill-highlighted {
+  border-color: rgba(225, 113, 0, 0.4);
+  background: rgba(225, 113, 0, 0.06);
+}
+
+.dark .lw-skill-install {
+  border-color: #374151;
+}
+.dark .lw-skill-install.lw-skill-highlighted {
+  border-color: rgba(225, 113, 0, 0.4);
+}
+
+/* Inline copy button (next to install cmd and slash command) */
+.lw-inline-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s;
+  vertical-align: middle;
+}
+.lw-inline-copy-btn:hover {
+  color: #6b7280;
+}
+.dark .lw-inline-copy-btn:hover {
+  color: #d1d5db;
+}

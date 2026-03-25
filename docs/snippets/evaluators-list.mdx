@@ -1,0 +1,74 @@
+## Expected Answer Evaluation
+For when you have the golden answer and want to measure how correct the LLM gets it
+
+| Evaluator | Description |
+| --------- | ----------- |
+| [Exact Match Evaluator](/api-reference/evaluators/exact-match-evaluator) | Use the Exact Match evaluator in LangWatch to verify outputs that require precise matching during AI agent testing. |
+| [LLM Answer Match](/api-reference/evaluators/llm-answer-match) | Uses an LLM to check if the generated output answers a question correctly the same way as the expected output, even if their style is different. |
+| [BLEU Score](/api-reference/evaluators/bleu-score) | Use the BLEU Score evaluator to measure string similarity and support automated NLP and AI agent evaluation workflows. |
+| [LLM Factual Match](/api-reference/evaluators/llm-factual-match) | Compute factual similarity with LangWatch’s LLM Factual Match evaluator to validate truthfulness in AI agent evaluations. |
+| [ROUGE Score](/api-reference/evaluators/rouge-score) | Use the ROUGE Score evaluator in LangWatch to measure text similarity and support AI agent evaluations and NLP quality checks. |
+| [SQL Query Equivalence](/api-reference/evaluators/sql-query-equivalence) | Checks if the SQL query is equivalent to a reference one by using an LLM to infer if it would generate the same results given the table schemas. |
+
+## LLM-as-Judge
+For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality
+
+| Evaluator | Description |
+| --------- | ----------- |
+| [LLM-as-a-Judge Boolean Evaluator](/api-reference/evaluators/llm-as-a-judge-boolean-evaluator) | Use the LLM-as-a-Judge Boolean Evaluator to classify outputs as true or false for fast automated agent evaluations. |
+| [LLM-as-a-Judge Category Evaluator](/api-reference/evaluators/llm-as-a-judge-category-evaluator) | Use the LLM-as-a-Judge Category Evaluator to classify outputs into custom categories for structured AI agent evaluations. |
+| [LLM-as-a-Judge Score Evaluator](/api-reference/evaluators/llm-as-a-judge-score-evaluator) | Score messages with an LLM-as-a-Judge evaluator to generate numeric performance metrics for AI agent testing. |
+| [Rubrics Based Scoring](/api-reference/evaluators/rubrics-based-scoring) | Rubric-based evaluation metric that is used to evaluate responses. The rubric consists of descriptions for each score, typically ranging from 1 to 5 |
+
+## RAG Quality
+For measuring the quality of your RAG, check for hallucinations with faithfulness and precision/recall
+
+| Evaluator | Description |
+| --------- | ----------- |
+| [Ragas Context Precision](/api-reference/evaluators/ragas-context-precision) | This metric evaluates whether all of the ground-truth relevant items present in the contexts are ranked higher or not. Higher scores indicate better precision. |
+| [Ragas Context Recall](/api-reference/evaluators/ragas-context-recall) | This evaluator measures the extent to which the retrieved context aligns with the annotated answer, treated as the ground truth. Higher values indicate better performance. |
+| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
+| [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
+| [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
+| [Context Recall](/api-reference/evaluators/context-recall) | Measures how many relevant contexts were retrieved compared to expected contexts, increasing it means more signal in the retrieval. Uses traditional string distance metrics. |
+| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
+| [Ragas Response Context Precision](/api-reference/evaluators/ragas-response-context-precision) | Uses an LLM to measure the proportion of chunks in the retrieved context that were relevant to generate the output or the expected output. |
+| [Ragas Response Context Recall](/api-reference/evaluators/ragas-response-context-recall) | Uses an LLM to measure how many of relevant documents attributable the claims in the output were successfully retrieved in order to generate an expected output. |
+| [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy) | Evaluates how pertinent the generated answer is to the given prompt. Higher scores indicate better relevancy. |
+
+## Quality Aspects Evaluation
+For when you want to check the language, structure, style and other general quality metrics
+
+| Evaluator | Description |
+| --------- | ----------- |
+| [Valid Format Evaluator](/api-reference/evaluators/valid-format-evaluator) | Allows you to check if the output is a valid json, markdown, python, sql, etc. For JSON, can optionally validate against a provided schema. |
+| [Lingua Language Detection](/api-reference/evaluators/lingua-language-detection) | This evaluator detects the language of the input and output text to check for example if the generated answer is in the same language as the prompt, or if it's in a specific expected language. |
+| [Summarization Score](/api-reference/evaluators/summarization-score) | Measure summary quality with LangWatch’s Summarization Score to support RAG evaluations and AI agent testing accuracy. |
+
+## Safety
+Check for PII, prompt injection attempts and toxic content
+
+| Evaluator | Description |
+| --------- | ----------- |
+| [Azure Content Safety](/api-reference/evaluators/azure-content-safety) | This evaluator detects potentially unsafe content in text, including hate speech, self-harm, sexual content, and violence. It allows customization of the severity threshold and the specific categories to check. |
+| [Azure Jailbreak Detection](/api-reference/evaluators/azure-jailbreak-detection) | Use Azure Jailbreak Detection in LangWatch to identify jailbreak attempts and improve safety across AI agent testing workflows. |
+| [Azure Prompt Shield](/api-reference/evaluators/azure-prompt-shield) | This evaluator checks for prompt injection attempt in the input and the contexts using Azure's Content Safety API. |
+| [OpenAI Moderation](/api-reference/evaluators/openai-moderation) | This evaluator uses OpenAI's moderation API to detect potentially harmful content in text, including harassment, hate speech, self-harm, sexual content, and violence. |
+| [Presidio PII Detection](/api-reference/evaluators/presidio-pii-detection) | Detects personally identifiable information in text, including phone numbers, email addresses, and social security numbers. It allows customization of the detection threshold and the specific types of PII to check. |
+
+## Other
+Miscellaneous evaluators
+
+| Evaluator | Description |
+| --------- | ----------- |
+| [Custom Basic Evaluator](/api-reference/evaluators/custom-basic-evaluator) | Configure the Custom Basic Evaluator to check simple matches or regex rules for lightweight automated AI agent evaluations. |
+| [Competitor Blocklist](/api-reference/evaluators/competitor-blocklist) | Detect competitor mentions using LangWatch’s Competitor Blocklist evaluator to enforce content rules in AI agent testing pipelines. |
+| [Competitor Allowlist Check](/api-reference/evaluators/competitor-allowlist-check) | This evaluator use an LLM-as-judge to check if the conversation is related to competitors, without having to name them explicitly |
+| [Competitor LLM Check](/api-reference/evaluators/competitor-llm-check) | This evaluator implements LLM-as-a-judge with a function call approach to check if the message contains a mention of a competitor. |
+| [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator) | Detect off-topic messages using LangWatch’s Off Topic Evaluator to enforce domain boundaries during AI agent testing. |
+| [Query Resolution](/api-reference/evaluators/query-resolution) | This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user. |
+| [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | Allows you to check for semantic similarity or dissimilarity between input and output and a target value, so you can avoid sentences that you don't want to be present without having to match on the exact text. |
+| [Ragas Answer Correctness](/api-reference/evaluators/ragas-answer-correctness) | Computes with an LLM a weighted combination of factual as well as semantic similarity between the generated answer and the expected output. |
+| [Ragas Answer Relevancy](/api-reference/evaluators/ragas-answer-relevancy) | Evaluates how pertinent the generated answer is to the given prompt. Higher scores indicate better relevancy. |
+| [Ragas Context Relevancy](/api-reference/evaluators/ragas-context-relevancy) | This metric gauges the relevancy of the retrieved context, calculated based on both the question and contexts. The values fall within the range of (0, 1), with higher values indicating better relevancy. |
+| [Ragas Context Utilization](/api-reference/evaluators/ragas-context-utilization) | This metric evaluates whether all of the output relevant items present in the contexts are ranked higher or not. Higher scores indicate better utilization. |

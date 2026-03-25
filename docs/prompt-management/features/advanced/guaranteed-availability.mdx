@@ -1,0 +1,324 @@
+---
+title: "Guaranteed Availability"
+description: "Ensure prompt availability with LangWatch’s Guaranteed Availability feature, even in offline or air-gapped agent testing setups."
+---
+
+Guaranteed availability ensures your application can continue operating with prompts even when disconnected from the LangWatch platform. This is achieved through local prompt materialization using the [Prompts CLI](/prompt-management/cli).
+
+## How It Works
+
+When you use the Prompts CLI to manage dependencies, prompts are **materialized locally** as standard YAML files. The LangWatch SDKs automatically detect and use these materialized prompts when available, providing seamless fallback behavior.
+
+**Benefits:**
+
+- **Offline operation** - Your application works without internet connectivity
+- **Air-gapped deployments** - Deploy in secure environments with no external access
+- **Reduced latency** - No network calls for prompt retrieval
+- **Guaranteed consistency** - Prompts are locked to specific versions in your deployment
+
+## Setting Up Local Materialization
+
+### 1. Initialize Prompt Dependencies
+
+```bash
+# Install CLI and authenticate
+npm install -g langwatch
+langwatch login
+
+# Initialize in your project
+langwatch prompt init
+```
+
+### 2. Add Prompt Dependencies
+
+Add the prompts your application needs:
+
+```bash
+# Add specific prompts your app uses
+langwatch prompt add customer-support-bot@5
+langwatch prompt add data-analyzer@latest
+langwatch prompt add error-handler@3
+```
+
+This creates a `prompts.json` file:
+
+```json
+{
+  "prompts": {
+    "customer-support-bot": "5",
+    "data-analyzer": "latest",
+    "error-handler": "3"
+  }
+}
+```
+
+### 3. Materialize Prompts Locally
+
+```bash
+# Fetch and materialize all prompts locally
+langwatch prompt pull
+```
+
+This creates materialized YAML files:
+
+```
+prompts/
+└── .materialized/
+    ├── customer-support-bot.prompt.yaml
+    ├── data-analyzer.prompt.yaml
+    └── error-handler.prompt.yaml
+```
+
+### 4. Deploy with Materialized Prompts
+
+Include the materialized prompts in your deployment package. Your application can now run completely offline.
+
+## Using Materialized Prompts in Code
+
+The SDKs automatically detect and use materialized prompts when available, falling back to API calls only when necessary.
+
+<Tabs>
+  <Tab title="Python SDK">
+    ```python offline_app.py
+    import langwatch
+    from litellm import completion
+
+    # Initialize LangWatch
+    langwatch.setup()
+
+    # The SDK will automatically use materialized prompts if available
+    # No network call needed if prompt is materialized locally
+    prompt = langwatch.prompts.get("customer-support-bot")
+
+    # Compile prompt with variables
+    compiled_prompt = prompt.compile(
+        user_name="John Doe",
+        user_email="john.doe@example.com",
+        input="How do I reset my password?"
+    )
+
+    # Use with LiteLLM (no need to strip provider prefixes)
+    response = completion(
+        model=compiled_prompt.model,
+        messages=compiled_prompt.messages
+    )
+
+    print(response.choices[0].message.content)
+    ```
+
+    **Behavior:**
+    1. SDK checks for `./prompts/.materialized/customer-support-bot.prompt.yaml`
+    2. If found, loads prompt from local file (no network call)
+    3. If not found, attempts to fetch from LangWatch API
+    4. Throws error if both local file and API are unavailable
+
+  </Tab>
+
+  <Tab title="TypeScript SDK">
+    ```typescript offline_app.ts
+    import { getPrompt, setupLangWatch } from "langwatch";
+    import OpenAI from "openai";
+
+    // Initialize LangWatch
+    await setupLangWatch();
+
+    # Example 1: Basic usage
+    prompt = langwatch.prompts.get("customer-support-bot")
+    compiled_prompt = prompt.compile(
+        user_name="John Doe",
+        input="Help me with my account"
+    )
+
+    response = completion(
+        model=compiled_prompt.model,
+        messages=compiled_prompt.messages
+    )
+
+    # Example 2: With tracing
+    @langwatch.trace()
+    def generate_response():
+        prompt = langwatch.prompts.get("customer-support-bot")
+        compiled_prompt = prompt.compile(
+            user_name="John Doe",
+            input="Help me with my account"
+        )
+
+        response = completion(
+            model=compiled_prompt.model,
+            messages=compiled_prompt.messages
+        )
+        return response.choices[0].message.content
+
+    # Example 3: Offline usage
+    prompt = langwatch.prompts.get("customer-support-bot")
+    compiled_prompt = prompt.compile(
+        user_name="John Doe",
+        input="Help me with my account"
+    )
+
+    response = completion(
+        model=compiled_prompt.model,
+        messages=compiled_prompt.messages
+    )
+
+    # Example 4: Final example
+    prompt = langwatch.prompts.get("customer-support-bot")
+    compiled_prompt = prompt.compile(
+        user_name="John Doe",
+        input="Help me with my account"
+    )
+
+    response = completion(
+        model=compiled_prompt.model,
+        messages=compiled_prompt.messages
+    )
+    ```
+
+    **Behavior:**
+    1. SDK checks for `./prompts/.materialized/customer-support-bot.prompt.yaml`
+    2. If found, loads prompt from local file (no network call)
+    3. If not found, attempts to fetch from LangWatch API
+    4. Throws error if both local file and API are unavailable
+
+  </Tab>
+</Tabs>
+
+## Air-Gapped Deployment
+
+For completely air-gapped environments:
+
+### 1. Prepare on Connected Environment
+
+```bash
+# On development machine with internet access
+langwatch prompt pull
+
+# Verify all prompts are materialized
+ls prompts/.materialized/
+```
+
+### 2. Package for Deployment
+
+Include these files in your deployment package:
+
+- `prompts/.materialized/` directory (all YAML files)
+- Your application code
+- Dependencies
+
+### 3. Deploy to Air-Gapped Environment
+
+The application will run entirely offline, using only materialized prompts. No LangWatch API access required.
+{/*
+## Advanced Fetch Policies (Future Feature)
+
+<Note>
+  **Coming Soon**: Advanced fetch policies will provide fine-grained control
+  over when prompts are fetched vs. using materialized versions.
+</Note>
+
+<Tabs>
+  <Tab title="Python SDK (Future)">
+    ```python fetch_policies.py
+    import langwatch
+    from langwatch.prompt import FetchPolicy
+
+    # Always fetch from API, use materialized as fallback
+    prompt = langwatch.prompt.get_prompt(
+        "customer-support-bot",
+        fetch_policy=FetchPolicy.ALWAYS_FETCH
+    )
+
+    # Fetch every 5 minutes, use materialized between fetches
+    prompt = langwatch.prompt.get_prompt(
+        "customer-support-bot",
+        fetch_policy=FetchPolicy.CACHE_TTL,
+        cache_ttl_minutes=5
+    )
+
+    # Never fetch, use materialized only (air-gapped mode)
+    prompt = langwatch.prompt.get_prompt(
+        "customer-support-bot",
+        fetch_policy=FetchPolicy.MATERIALIZED_ONLY
+    )
+
+    # Default behavior: use materialized if available, otherwise fetch
+    prompt = langwatch.prompt.get_prompt(
+        "customer-support-bot",
+        fetch_policy=FetchPolicy.MATERIALIZED_FIRST  # default
+    )
+    ```
+
+  </Tab>
+
+  <Tab title="TypeScript SDK (Future)">
+    ```typescript fetch_policies.ts
+    import { getPrompt, FetchPolicy } from "langwatch";
+
+    // Always fetch from API, use materialized as fallback
+    const prompt = await getPrompt("customer-support-bot", {
+      fetchPolicy: FetchPolicy.ALWAYS_FETCH
+    });
+
+    // Fetch every 5 minutes, use materialized between fetches
+    const prompt = await getPrompt("customer-support-bot", {
+      fetchPolicy: FetchPolicy.CACHE_TTL,
+      cacheTtlMinutes: 5
+    });
+
+    // Never fetch, use materialized only (air-gapped mode)
+    const prompt = await getPrompt("customer-support-bot", {
+      fetchPolicy: FetchPolicy.MATERIALIZED_ONLY
+    });
+
+    // Default behavior: use materialized if available, otherwise fetch
+    const prompt = await getPrompt("customer-support-bot", {
+      fetchPolicy: FetchPolicy.MATERIALIZED_FIRST // default
+    });
+    ```
+
+  </Tab>
+</Tabs>
+
+### Fetch Policy Options
+
+| Policy               | Behavior                                              | Use Case                                         |
+| -------------------- | ----------------------------------------------------- | ------------------------------------------------ |
+| `MATERIALIZED_FIRST` | Use local file if available, otherwise fetch from API | Default behavior, best for most applications     |
+| `ALWAYS_FETCH`       | Always try API first, fall back to materialized       | Live updates with offline fallback               |
+| `CACHE_TTL`          | Fetch every X minutes, use materialized between       | Hot deployments with controlled update frequency |
+| `MATERIALIZED_ONLY`  | Never fetch, use materialized files only              | Air-gapped or strict offline environments        | */}
+
+## CI/CD Integration
+
+Integrate prompt materialization into your deployment pipeline:
+
+```yaml .github/workflows/deploy.yml
+name: Deploy with Prompts
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install LangWatch CLI
+        run: npm install -g langwatch
+
+      - name: Materialize prompts
+        env:
+          LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}
+        run: langwatch prompt pull
+
+      - name: Build application
+        run: npm run build
+
+      - name: Deploy with materialized prompts
+        run: |
+          # Deploy application including prompts/.materialized/
+          # Your deployment commands here
+```

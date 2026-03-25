@@ -1,0 +1,980 @@
+---
+title: Using LangWatch with OpenTelemetry
+description: Learn how to integrate LangWatch with your existing OpenTelemetry setup in Python and TypeScript.
+keywords: OpenTelemetry, OTel, auto-instrumentation, LangWatch, Python, TypeScript, observability, tracing
+---
+
+The LangWatch SDKs are built entirely on top of the robust [OpenTelemetry (OTel)](https://opentelemetry.io/) standard. This means seamless integration with existing OTel setups and interoperability with the wider OTel ecosystem across both Python and TypeScript environments.
+
+## LangWatch Spans are OpenTelemetry Spans
+
+It's important to understand that LangWatch traces and spans **are** standard OpenTelemetry traces and spans. LangWatch adds specific semantic attributes (like `langwatch.span.type`, `langwatch.inputs`, `langwatch.outputs`, `langwatch.metadata`) to these standard spans to power its observability features.
+
+This foundation provides several benefits:
+- **Interoperability:** Traces generated with LangWatch can be sent to any OTel-compatible backend (Jaeger, Tempo, Datadog, etc.) alongside your other application traces.
+- **Familiar API:** If you're already familiar with OpenTelemetry concepts and APIs, working with LangWatch's manual instrumentation will feel natural.
+- **Leverage Existing Setup:** LangWatch integrates smoothly with your existing OTel `TracerProvider` and instrumentation.
+
+Perhaps the most significant advantage is that **LangWatch seamlessly integrates with the vast ecosystem of standard OpenTelemetry auto-instrumentation libraries.** This means you can easily combine LangWatch's LLM-specific observability with insights from other parts of your application stack.
+
+## Leverage the OpenTelemetry Ecosystem: Auto-Instrumentation
+
+One of the most powerful benefits of LangWatch's OpenTelemetry foundation is its **automatic compatibility with the extensive ecosystem of OpenTelemetry auto-instrumentation libraries.**
+
+When you use standard OTel auto-instrumentation for libraries like web frameworks, databases, or task queues alongside LangWatch, you gain **complete end-to-end visibility** into your LLM application's requests. Because LangWatch and these auto-instrumentors use the same underlying OpenTelemetry tracing system and context propagation mechanisms, spans generated across different parts of your application are automatically linked together into a single, unified trace.
+
+### Examples of Auto-Instrumentation Integration
+
+Here are common scenarios where combining LangWatch with OTel auto-instrumentation provides significant value:
+
+*   **Web Frameworks:** Using libraries like `opentelemetry-instrumentation-fastapi` (Python) or `@opentelemetry/instrumentation-express` (TypeScript), an incoming HTTP request automatically starts a trace. When your request handler calls a function instrumented with LangWatch, those LangWatch spans become children of the incoming request span.
+
+*   **HTTP Clients:** If your LLM application makes outbound API calls using libraries instrumented by `opentelemetry-instrumentation-requests` (Python) or `@opentelemetry/instrumentation-http` (TypeScript), these HTTP request spans will automatically appear within your LangWatch trace.
+
+*   **Task Queues:** When a request handled by your web server (and traced by LangWatch) enqueues a background job using `opentelemetry-instrumentation-celery` (Python) or similar task queue instrumentations, the trace context is automatically propagated.
+
+*   **Databases & ORMs:** Using libraries like `opentelemetry-instrumentation-sqlalchemy` (Python) or `@opentelemetry/instrumentation-mongodb` (TypeScript), any database queries executed during your LLM processing will appear as spans within the relevant LangWatch trace.
+
+## Basic Setup and Configuration
+
+### Python Setup
+
+<CodeGroup>
+
+```python Basic Python Setup
+import langwatch
+import os
+
+# Basic setup - LangWatch will create its own TracerProvider
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY")
+)
+
+# Your LangWatch spans are now standard OpenTelemetry spans
+with langwatch.span(name="my-operation") as span:
+    span.set_attribute("custom.attribute", "value")
+    # ... your logic ...
+```
+
+```python Python with Existing OTel Setup
+import langwatch
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
+
+# Create your own TracerProvider
+my_tracer_provider = TracerProvider()
+
+# Add the ConsoleSpanExporter for debugging
+my_tracer_provider.add_span_processor(
+    SimpleSpanProcessor(ConsoleSpanExporter())
+)
+
+# Setup LangWatch with your pre-configured provider
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=my_tracer_provider,
+    ignore_global_tracer_provider_override_warning=True
+)
+```
+
+</CodeGroup>
+
+### TypeScript Setup
+
+<CodeGroup>
+
+```typescript Basic TypeScript Setup
+import { setupObservability } from "langwatch/observability/node";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service"
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await handle.shutdown();
+  process.exit(0);
+});
+```
+
+```typescript TypeScript with Custom Configuration
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'batch'
+  },
+  serviceName: "my-service",
+  spanProcessors: [
+    new BatchSpanProcessor(new ConsoleSpanExporter())
+  ]
+});
+```
+
+</CodeGroup>
+
+## Manual Span Management
+
+### Python Manual Span Control
+
+<CodeGroup>
+
+```python Python Manual Span Management
+import langwatch
+from opentelemetry.trace import Status, StatusCode
+
+# Using context manager (recommended)
+with langwatch.span(name="my-operation") as span:
+    span.set_attribute("custom.attribute", "value")
+    span.add_event("operation_started", {"detail": "more info"})
+    
+    try:
+        # ... your logic ...
+        span.set_status(Status(StatusCode.OK))
+    except Exception as e:
+        span.set_status(Status(StatusCode.ERROR, description=str(e)))
+        span.record_exception(e)
+        raise
+
+# Using manual control
+span = langwatch.span(name="my-operation")
+try:
+    span.set_attribute("custom.attribute", "value")
+    # ... your logic ...
+    span.set_status(Status(StatusCode.OK))
+except Exception as e:
+    span.set_status(Status(StatusCode.ERROR, description=str(e)))
+    span.record_exception(e)
+    raise
+finally:
+    span.end()
+```
+
+```python Python Span Context Propagation
+import langwatch
+import asyncio
+from opentelemetry import context, trace
+
+async def process_with_context(user_id: str):
+    with langwatch.span(name="process-user") as span:
+        span.set_attribute("user.id", user_id)
+        
+        # Propagate context to async operations
+        ctx = trace.set_span(context.active(), span)
+        await context.with_(ctx, process_user_data, user_id)
+        await context.with_(ctx, update_user_profile, user_id)
+```
+
+</CodeGroup>
+
+### TypeScript Manual Span Control
+
+<CodeGroup>
+
+```typescript TypeScript Manual Span Management
+import { getLangWatchTracer } from "langwatch";
+import { SpanStatusCode } from "@opentelemetry/api";
+
+const tracer = getLangWatchTracer("my-service");
+
+// Using startActiveSpan (recommended)
+tracer.startActiveSpan("my-operation", (span) => {
+  try {
+    span.setType("llm");
+    span.setInput("Hello, world!");
+    span.setAttributes({
+      "custom.business_unit": "marketing",
+      "custom.campaign_id": "summer-2024"
+    });
+    
+    // ... your logic ...
+    
+    span.setOutput("Hello! How can I help you?");
+    span.setStatus({ code: SpanStatusCode.OK });
+  } catch (error) {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message
+    });
+    span.recordException(error);
+    throw error;
+  } finally {
+    span.end();
+  }
+});
+
+// Using startSpan (complete manual control)
+const span = tracer.startSpan("my-operation");
+try {
+  span.setType("llm");
+  span.setInput("Hello, world!");
+  // ... your logic ...
+  span.setOutput("Hello! How can I help you?");
+  span.setStatus({ code: SpanStatusCode.OK });
+} catch (error) {
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: error.message
+  });
+  span.recordException(error);
+  throw error;
+} finally {
+  span.end();
+}
+```
+
+```typescript TypeScript Span Context Propagation
+import { context, trace } from "@opentelemetry/api";
+
+async function processWithContext(userId: string) {
+  const span = tracer.startSpan("process-user");
+  const ctx = trace.setSpan(context.active(), span);
+  
+  try {
+    // Propagate context to async operations
+    await context.with(ctx, async () => {
+      await processUserData(userId);
+      await updateUserProfile(userId);
+    });
+    
+    span.setStatus({ code: SpanStatusCode.OK });
+  } catch (error) {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message
+    });
+    span.recordException(error);
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+```
+
+</CodeGroup>
+
+## Advanced Configuration
+
+### Python Advanced Configuration
+
+<CodeGroup>
+
+```python Python with Multiple Exporters
+import langwatch
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from langwatch.domain import SpanProcessingExcludeRule
+
+# Create TracerProvider
+provider = TracerProvider()
+
+# Add Jaeger exporter for debugging
+provider.add_span_processor(
+    BatchSpanProcessor(JaegerExporter(
+        agent_host_name="localhost",
+        agent_port=6831
+    ))
+)
+
+# Define exclude rules for LangWatch
+exclude_rules = [
+    SpanProcessingExcludeRule(
+        field_name="span_name",
+        match_value="GET /health_check",
+        match_operation="exact_match"
+    ),
+    SpanProcessingExcludeRule(
+        field_name="attribute",
+        attribute_name="http.method",
+        match_value="OPTIONS",
+        match_operation="exact_match"
+    ),
+]
+
+# Setup LangWatch with existing provider
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=provider,
+    span_exclude_rules=exclude_rules,
+    ignore_global_tracer_provider_override_warning=True
+)
+```
+
+```python Python with Auto-Instrumentation
+import langwatch
+import os
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.celery import CeleryInstrumentor
+
+# Setup auto-instrumentation
+FastAPIInstrumentor().instrument()
+RequestsInstrumentor().instrument()
+CeleryInstrumentor().instrument()
+
+# Setup LangWatch
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    ignore_global_tracer_provider_override_warning=True
+)
+```
+
+</CodeGroup>
+
+### TypeScript Advanced Configuration
+
+<CodeGroup>
+
+```typescript TypeScript with Multiple Exporters
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { LangWatchExporter } from "langwatch";
+
+const handle = setupObservability({
+  langwatch: 'disabled', // Disable default LangWatch integration
+  serviceName: "my-service",
+  spanProcessors: [
+    // Send to Jaeger for debugging
+    new BatchSpanProcessor(new JaegerExporter({
+      endpoint: "http://localhost:14268/api/traces"
+    })),
+    // Send to LangWatch for production monitoring
+    new BatchSpanProcessor(new LangWatchExporter({
+      apiKey: process.env.LANGWATCH_API_KEY
+    }))
+  ]
+});
+```
+
+```typescript TypeScript with Auto-Instrumentation
+import { setupObservability } from "langwatch/observability/node";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
+import { MongoDBInstrumentation } from "@opentelemetry/instrumentation-mongodb";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  instrumentations: [
+    new HttpInstrumentation({
+      ignoreIncomingPaths: ['/health', '/metrics'],
+      ignoreOutgoingUrls: ['https://external-service.com/health']
+    }),
+    new ExpressInstrumentation(),
+    new MongoDBInstrumentation()
+  ]
+});
+```
+
+</CodeGroup>
+
+## Sampling and Performance Tuning
+
+### Python Sampling Configuration
+
+<CodeGroup>
+
+```python Python Sampling Configuration
+import langwatch
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.sampling import TraceIdRatioBasedSampler
+
+# Create provider with sampling
+provider = TracerProvider(
+    sampler=TraceIdRatioBasedSampler(0.1)  # Sample 10% of traces
+)
+
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=provider,
+    ignore_global_tracer_provider_override_warning=True
+)
+```
+
+```python Python Performance Tuning
+import langwatch
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.sampling import TraceIdRatioBasedSampler
+
+provider = TracerProvider(
+    sampler=TraceIdRatioBasedSampler(0.05),  # 5% sampling for high volume
+    span_limits={
+        "attribute_count_limit": 64,
+        "event_count_limit": 32,
+        "link_count_limit": 32
+    }
+)
+
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=provider,
+    ignore_global_tracer_provider_override_warning=True
+)
+```
+
+</CodeGroup>
+
+### TypeScript Sampling Configuration
+
+<CodeGroup>
+
+```typescript TypeScript Sampling Configuration
+import { setupObservability } from "langwatch/observability/node";
+import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  sampler: new TraceIdRatioBasedSampler(0.1) // 10% sampling
+});
+```
+
+```typescript TypeScript Performance Tuning
+import { setupObservability } from "langwatch/observability/node";
+import { TraceIdRatioBasedSampler } from "@opentelemetry/sdk-trace-base";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'batch'
+  },
+  serviceName: "my-service",
+  
+  // Performance tuning
+  spanLimits: {
+    attributeCountLimit: 64,
+    eventCountLimit: 32,
+    linkCountLimit: 32
+  },
+  
+  // Sampling for high volume
+  sampler: new TraceIdRatioBasedSampler(0.05), // 5% sampling
+  
+  // Batch processing configuration
+  spanProcessors: [
+    new BatchSpanProcessor(new LangWatchExporter({
+      apiKey: process.env.LANGWATCH_API_KEY
+    }), {
+      maxQueueSize: 4096,
+      maxExportBatchSize: 1024,
+      scheduledDelayMillis: 1000,
+      exportTimeoutMillis: 30000
+    })
+  ]
+});
+```
+
+</CodeGroup>
+
+## Complete Example: RAG with OpenAI and Background Tasks
+
+### Python Complete Example
+
+<CodeGroup>
+
+```python Python Complete Example
+import langwatch
+import os
+import time
+import asyncio
+from celery import Celery
+from openai import OpenAI
+from langwatch.types import RAGChunk
+from opentelemetry_instrumentation.celery import CeleryInstrumentor
+
+# 1. Configure Celery App
+celery_app = Celery('tasks', broker=os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'))
+
+# 2. Setup Auto-Instrumentation
+CeleryInstrumentor().instrument()
+
+# 3. Setup LangWatch
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    ignore_global_tracer_provider_override_warning=True
+)
+
+client = OpenAI()
+
+# 4. Define the Celery Task
+@celery_app.task
+def process_result_background(result_id: str, llm_output: str):
+    # This task execution will be automatically linked to the trace
+    # that enqueued it, thanks to CeleryInstrumentor.
+    print(f"[Celery Worker] Processing result {result_id}...")
+    time.sleep(1)
+    print(f"[Celery Worker] Finished processing {result_id}")
+    return f"Processed: {llm_output[:10]}..."
+
+# 5. Define RAG and Main Processing Logic
+@langwatch.span(type="rag")
+def retrieve_documents(query: str) -> list:
+    print(f"Retrieving documents for: {query}")
+    chunks = [
+        RAGChunk(document_id="doc-abc", content="LangWatch uses OpenTelemetry."),
+        RAGChunk(document_id="doc-def", content="Celery integrates with OpenTelemetry."),
+    ]
+    langwatch.get_current_span().update(contexts=chunks)
+    time.sleep(0.1)
+    return [c.content for c in chunks]
+
+@langwatch.trace(name="Handle User Query with Celery")
+def handle_request(user_query: str):
+    # This is the root span for the request
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+    langwatch.get_current_trace().update(metadata={"user_query": user_query})
+
+    context_docs = retrieve_documents(user_query)
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[
+                {"role": "system", "content": f"Use this context: {context_docs}"},
+                {"role": "user", "content": user_query}
+            ],
+            temperature=0.5,
+        )
+        llm_result = completion.choices[0].message.content
+    except Exception as e:
+        langwatch.get_current_trace().record_exception(e)
+        llm_result = "Error calling OpenAI"
+
+    result_id = f"res_{int(time.time())}"
+    # The current trace context is automatically propagated
+    process_result_background.delay(result_id, llm_result)
+    print(f"Enqueued background processing task {result_id}")
+
+    return llm_result
+
+# 6. Simulate Triggering the Request
+if __name__ == "__main__":
+    print("Simulating web request...")
+    final_answer = handle_request("How does LangWatch work with Celery?")
+    print(f"\nFinal Answer returned to user: {final_answer}")
+    time.sleep(3)  # Allow time for task to be processed
+```
+
+</CodeGroup>
+
+### TypeScript Complete Example
+
+<CodeGroup>
+
+```typescript TypeScript Complete Example
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
+import { ExpressInstrumentation } from "@opentelemetry/instrumentation-express";
+import OpenAI from "openai";
+
+// 1. Setup Observability
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "rag-service",
+  instrumentations: [
+    new HttpInstrumentation(),
+    new ExpressInstrumentation()
+  ]
+});
+
+const tracer = getLangWatchTracer("rag-service");
+const client = new OpenAI();
+
+// 2. Define RAG Function
+async function retrieveDocuments(query: string): Promise<string[]> {
+  return tracer.startActiveSpan("rag", async (span) => {
+    try {
+      span.setType("rag");
+      span.setInput({ query });
+      
+      console.log(`Retrieving documents for: ${query}`);
+      
+      // Simulate RAG retrieval
+      const chunks = [
+        { document_id: "doc-abc", content: "LangWatch uses OpenTelemetry." },
+        { document_id: "doc-def", content: "Express integrates with OpenTelemetry." }
+      ];
+      
+      span.setAttributes({
+        "rag.chunks_count": chunks.length,
+        "rag.query": query
+      });
+      
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const results = chunks.map(c => c.content);
+      span.setOutput({ documents: results });
+      span.setStatus({ code: SpanStatusCode.OK });
+      
+      return results;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error.message
+      });
+      span.recordException(error);
+      throw error;
+    }
+  });
+}
+
+// 3. Define Background Task
+async function processResultBackground(resultId: string, llmOutput: string): Promise<string> {
+  return tracer.startActiveSpan("background-processing", async (span) => {
+    try {
+      span.setType("background_job");
+      span.setInput({ resultId, llmOutput });
+      
+      console.log(`[Background] Processing result ${resultId}...`);
+      
+      // Simulate background processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const result = `Processed: ${llmOutput.substring(0, 10)}...`;
+      
+      span.setOutput({ result });
+      span.setStatus({ code: SpanStatusCode.OK });
+      
+      console.log(`[Background] Finished processing ${resultId}`);
+      return result;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error.message
+      });
+      span.recordException(error);
+      throw error;
+    }
+  });
+}
+
+// 4. Define Main Request Handler
+async function handleRequest(userQuery: string): Promise<string> {
+  return tracer.startActiveSpan("handle-user-query", async (span) => {
+    try {
+      span.setType("request");
+      span.setInput({ userQuery });
+      
+      // Get context documents
+      const contextDocs = await retrieveDocuments(userQuery);
+      
+      // Call OpenAI
+      const completion = await client.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: `Use this context: ${contextDocs.join(" ")}` },
+          { role: "user", content: userQuery }
+        ],
+        temperature: 0.5,
+      });
+      
+      const llmResult = completion.choices[0].message.content || "No response";
+      
+      // Trigger background processing
+      const resultId = `res_${Date.now()}`;
+      processResultBackground(resultId, llmResult).catch(console.error);
+      
+      console.log(`Enqueued background processing task ${resultId}`);
+      
+      span.setOutput({ result: llmResult });
+      span.setStatus({ code: SpanStatusCode.OK });
+      
+      return llmResult;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error.message
+      });
+      span.recordException(error);
+      throw error;
+    }
+  });
+}
+
+// 5. Simulate Request
+async function main() {
+  console.log("Simulating web request...");
+  const finalAnswer = await handleRequest("How does LangWatch work with Express?");
+  console.log(`\nFinal Answer returned to user: ${finalAnswer}`);
+  
+  // Allow time for background task
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Graceful shutdown
+  await handle.shutdown();
+}
+
+main().catch(console.error);
+```
+
+</CodeGroup>
+
+## Debugging and Troubleshooting
+
+### Python Debugging
+
+<CodeGroup>
+
+```python Python Console Exporter for Debugging
+import langwatch
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter
+
+# Create TracerProvider with console exporter
+provider = TracerProvider()
+provider.add_span_processor(
+    SimpleSpanProcessor(ConsoleSpanExporter())
+)
+
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=provider,
+    ignore_global_tracer_provider_override_warning=True
+)
+
+# Test span creation
+with langwatch.span(name="test-span") as span:
+    span.set_attribute("test.attribute", "value")
+    print("This span should appear in the console.")
+```
+
+```python Python Accessing OTel Span API
+import langwatch
+from opentelemetry.trace import Status, StatusCode
+
+langwatch.setup()
+
+with langwatch.span(name="MyInitialSpanName") as span:
+    # Use standard OpenTelemetry Span API methods directly on span:
+    span.set_attribute("my.custom.otel.attribute", "value")
+    span.add_event("Specific OTel Event", {"detail": "more info"})
+    span.set_status(Status(StatusCode.ERROR, description="Something went wrong"))
+    span.update_name("MyUpdatedSpanName")  # Renaming the span
+
+    print(f"Is Recording? {span.is_recording()}")
+    print(f"OTel Span Context: {span.get_span_context()}")
+
+    # You can still use LangWatch-specific methods like update()
+    span.update(langwatch_info="extra data")
+```
+
+</CodeGroup>
+
+### TypeScript Debugging
+
+<CodeGroup>
+
+```typescript TypeScript Console Exporter for Debugging
+import { setupObservability } from "langwatch/observability/node";
+import { ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  spanProcessors: [
+    new ConsoleSpanExporter()
+  ],
+  debug: {
+    consoleTracing: true,
+    consoleLogging: true,
+    logLevel: 'debug'
+  }
+});
+```
+
+```typescript TypeScript Custom Span Attributes
+const span = tracer.startSpan("custom-operation");
+
+// Add custom attributes
+span.setAttributes({
+  "custom.business_unit": "marketing",
+  "custom.campaign_id": "summer-2024",
+  "custom.user_tier": "premium"
+});
+
+// Add events to the span
+span.addEvent("user_action", {
+  action: "button_click",
+  button_id: "cta-primary"
+});
+
+span.end();
+```
+
+</CodeGroup>
+
+## Best Practices
+
+### General Best Practices
+
+1. **Always End Spans:** Use try-finally blocks or context managers to ensure spans are ended
+2. **Set Appropriate Types:** Use meaningful span types for better categorization
+3. **Add Context:** Include relevant attributes and events
+4. **Handle Errors:** Properly record exceptions and set error status
+5. **Use Async Context:** Propagate span context across async boundaries
+6. **Monitor Performance:** Track the impact of span management on your application
+
+### Language-Specific Best Practices
+
+<CodeGroup>
+
+```python Python Best Practices
+# Use context managers for automatic span management
+with langwatch.span(name="operation") as span:
+    # Your code here
+    pass
+
+# Set meaningful attributes
+span.set_attribute("user.id", user_id)
+span.set_attribute("operation.type", "database_query")
+
+# Record exceptions properly
+try:
+    # Your code
+    pass
+except Exception as e:
+    span.record_exception(e)
+    span.set_status(Status(StatusCode.ERROR, description=str(e)))
+    raise
+
+# Use span.update() for LangWatch-specific data
+span.update(
+    inputs={"query": user_query},
+    outputs={"result": result},
+    metadata={"custom": "data"}
+)
+```
+
+```typescript TypeScript Best Practices
+// Use startActiveSpan for automatic span management
+tracer.startActiveSpan("operation", (span) => {
+  try {
+    // Your code here
+    span.setStatus({ code: SpanStatusCode.OK });
+  } catch (error) {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message
+    });
+    span.recordException(error);
+    throw error;
+  } finally {
+    span.end();
+  }
+});
+
+// Set meaningful attributes
+span.setAttributes({
+  "user.id": userId,
+  "operation.type": "database_query"
+});
+
+// Use LangWatch-specific methods
+span.setType("llm");
+span.setInput({ query: userQuery });
+span.setOutput({ result: result });
+```
+
+</CodeGroup>
+
+## Migration Checklist
+
+When migrating from an existing OpenTelemetry setup:
+
+1. **Inventory Current Setup:** Document all current instrumentations, exporters, and configurations
+2. **Test in Development:** Start with development environment migration
+3. **Verify Data Flow:** Ensure traces are appearing in LangWatch dashboard
+4. **Performance Testing:** Monitor application performance impact
+5. **Gradual Rollout:** Migrate environments one at a time
+6. **Fallback Plan:** Keep existing setup as backup during transition
+7. **Documentation:** Update team documentation and runbooks
+
+## Troubleshooting Common Issues
+
+### Common Migration Problems
+
+1. **Duplicate Spans:** Ensure only one observability setup is running
+2. **Missing Traces:** Check API key and endpoint configuration
+3. **Performance Degradation:** Adjust sampling and batch processing settings
+4. **Context Loss:** Verify context propagation configuration
+5. **Instrumentation Conflicts:** Check for conflicting instrumentations
+
+### Debugging Migration
+
+<CodeGroup>
+
+```python Python Debugging Migration
+import langwatch
+import os
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+
+# Enable detailed logging during migration
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    tracer_provider=TracerProvider(),
+    span_exclude_rules=[],  # No exclusions during debugging
+    ignore_global_tracer_provider_override_warning=True
+)
+
+# Add console exporter for debugging
+provider = langwatch.get_current_trace().get_span_context().trace_id
+provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+```
+
+```typescript TypeScript Debugging Migration
+// Enable detailed logging during migration
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+  debug: {
+    consoleTracing: true,
+    consoleLogging: true,
+    logLevel: 'debug'
+  },
+  advanced: {
+    throwOnSetupError: true
+  }
+});
+```
+
+</CodeGroup>
+
+## Performance Considerations
+
+When using OpenTelemetry with LangWatch, consider these performance implications:
+
+1. **Memory Usage:** Spans consume memory until explicitly ended
+2. **Context Propagation:** Context management can be error-prone in complex async scenarios
+3. **Error Handling:** Ensure spans are always ended, even when exceptions occur
+4. **Batch Processing:** Use batch processors for high-volume applications
+5. **Sampling:** Implement sampling to reduce overhead in production
+
+By following these guidelines and leveraging the power of OpenTelemetry's ecosystem, you can achieve comprehensive observability of your LLM applications while maintaining compatibility with existing monitoring infrastructure.
+

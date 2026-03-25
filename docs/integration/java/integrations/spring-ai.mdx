@@ -1,0 +1,116 @@
+---
+title: Spring AI (Java) Integration
+sidebarTitle: Spring AI
+description: Configure Spring AI with OpenTelemetry and LangWatch to capture LLM traces and enable full-stack AI agent evaluations.
+keywords: java, spring, spring ai, spring boot, opentelemetry, langwatch, observability
+---
+
+LangWatch captures comprehensive traces from Java applications using Spring AI when you export OpenTelemetry data to LangWatch. This guide focuses on the minimal configuration you add to your Spring Boot app.
+
+<Note>
+This page focuses on configuration. For a complete, runnable example, see the full working example repository: [Spring AI + LangWatch (OpenTelemetry) example](https://github.com/langwatch/otel-integration-examples/tree/main/java-spring-ai).
+</Note>
+
+## Prerequisites
+
+- Java 17 or later
+- An OpenAI API key (if you use the OpenAI provider via Spring AI)
+- A LangWatch API key
+
+## Setup
+
+<Steps>
+<Step title="Set required environment variables">
+  Export your provider API keys as environment variables used by your app.
+
+  ```bash
+  export OPENAI_API_KEY="your-openai-api-key"
+  export LANGWATCH_API_KEY="your-langwatch-api-key"
+  ```
+
+  <Tip>
+  Use your platform's secret manager for variables in production. Never store secrets in source control.
+  </Tip>
+</Step>
+
+<Step title="Configure the OpenTelemetry exporter to LangWatch">
+  Configure OpenTelemetry and SpringAI in your `src/main/resources/application.yaml` so your app captures and sends traces directly to LangWatch.
+
+  ```yaml application.yaml
+spring.ai:
+  chat:
+    client:
+      observations:
+        log-prompt: true
+    observations:
+      log-prompt: true # Include prompt content in tracing (disabled by default for privacy)
+      log-completion: true # Include completion content in tracing (disabled by default)
+  openai:
+    api-key: ${OPENAI_API_KEY}
+
+
+management:
+  tracing.enabled: true
+  logging.export.enabled: true
+
+otel:
+  java:
+    global-autoconfigure:
+      enabled: true
+  exporter:
+    otlp:
+      endpoint: "https://app.langwatch.ai/api/otel"
+      protocol: "http/protobuf"
+      headers:
+        Authorization: ${LANGWATCH_API_KEY}
+  traces:
+    exporter: otlp
+    sampler:
+      ratio: 1.0
+  metrics.exporter: otlp
+  logs.exporter: otlp
+  ```
+</Step>
+
+<Step title="Start your Spring Boot application as usual">
+  Run your application the way you normally do (IDE, Gradle, Maven, or a container). No special commands are required beyond your standard start procedure.
+
+  <Check>
+  After your application handles AI calls via Spring AI, traces will appear in your LangWatch workspace.
+  </Check>
+</Step>
+</Steps>
+
+## What gets traced
+
+- HTTP requests handled by your Spring Boot application
+- AI model calls performed via Spring AI (e.g., OpenAI)
+- Prompt and completion content, when capture is enabled/configured
+- Performance metrics and errors/exceptions
+
+## Monitoring
+
+Once configured:
+- Visit your LangWatch dashboard to explore spans and AI-specific attributes
+- Analyze model performance, usage, and costs
+- Investigate failures with full trace context
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="I don't see any traces in LangWatch">
+  - **Authorization header**: Ensure `Authorization: Bearer <your-langwatch-key>` is set under `otel.exporter.otlp.headers`.
+  - **Endpoint URL**: Confirm `otel.exporter.otlp.endpoint` resolves to your LangWatch endpoint (for cloud: `https://app.langwatch.ai/api/otel`) and protocol is `http/protobuf`.
+  - **Network egress**: Verify your environment can reach LangWatch (egress/proxy/firewall settings).
+</Accordion>
+
+<Accordion title="Spring AI calls aren't producing spans">
+  - **Provider configuration**: Ensure your Spring AI provider (e.g., OpenAI) is properly configured and invoked by your code.
+  - **Sampling**: Check OpenTelemetry sampling configuration if you've customized it; overly aggressive sampling can drop spans.
+</Accordion>
+</AccordionGroup>
+
+<Info>
+For a complete implementation showing controllers, Spring AI configuration, and OpenTelemetry setup, see the
+[full working example repository](https://github.com/langwatch/otel-integration-examples/tree/main/java-spring-ai).
+</Info>

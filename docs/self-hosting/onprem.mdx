@@ -1,0 +1,80 @@
+---
+title: OnPrem
+description: Deploy LangWatch on-premises for full control over data, compliance, and secure AI agent evaluation workflows.
+---
+
+<img src="/images/onprem-logo.png" alt="LangWatch On Prem" width="400px" style={{marginTop: "50px"}} />
+
+
+### Key Features
+
+- Self-hosted on your AWS, Google Cloud, Azure or any other instances
+- Full control over your data
+- Feature parity with the SaaS version
+- Scalable to enterprise needs
+- Hosted in preferred region (e.g. eu-central-1 for GDPR compliance)
+- Installation and maintenance service
+- Dedicated support agent to help you optimize your deployment
+- Purchase and billing option through AWS Marketplace to facilitate procurement
+
+## Infrastructure Diagram
+
+Check out below a high-level diagram of how the LangWatch on-premises infrastructure is deployed on the cloud provider.
+
+<Tabs>
+  <Tab title="AWS">
+    <Frame>
+    <img
+      className="block"
+      src="/images/aws-infra.png"
+      alt="LangWatch"
+    />
+    </Frame>
+  </Tab>
+  <Tab title="Azure">
+    <Frame>
+    <img
+      className="block"
+      src="/images/azure-infra.png"
+      alt="LangWatch"
+    />
+    </Frame>
+  </Tab>
+</Tabs>
+
+The diagram above outlines the overall architecture of LangWatch deployed OnPrem and the network boundaries. In short, all LangWatch components live in its own private network, with access control in between each component to make sure only the components that must have access to each other do have access.
+
+Only the main application frontend port is exposed via a Load Balancer, which can be positioned either on a public subnet or VPN-protected company access for users access.
+To run LangWatch, 4 pods are required: the main LangWatch application, the workers that processes traces and real evaluations, the LangEvals service that holds the evaluators and some eval models, and the LangWatchNLP pod that runs the evals and optimization studio workflows.
+
+The basic user storage database is Postgres, with ElasticSearch being the main storage for all the traces and evaluations for heavy scalability. Redis is used as a queue mechanism for accumulating and processing the traces as they arrive, guaranteeing delivery, retrial, back pressure and so on. Finally, blob storage is used to store datasets created on the platform and Communication Services for Email, specially for alerts and system notifications.
+
+On AWS, all those components are natively available, and on Google Cloud and Azure, all but ElasticSearch/OpenSearch are natively available, however around 80% of Fortune 500 companies already have an ElasticSearch in-house, so it's likely this setup is already done for you and your customers.
+
+## Data Flow Diagram
+
+To understand how the data flows through the platform, check out the diagram below:
+
+<Frame>
+<img
+  className="block"
+  src="/images/data-flow-diagram.png"
+  alt="LangWatch"
+/>
+</Frame>
+
+In short, the data is collected from your application in the background, via the LangWatch SDK, from this moment on everything happens inside the platform. The only moment it leaves the platform again, is for running evaluations with your own LLM providers and API keys.
+
+As data comes in, the traces are enqueued in the Redis queue, and then processed by the workers which then stores it in ElasticSearch/OpenSearch, the main application reads from this data to display it in the UI. LangEvals and LangWatchNLP components never talk to the databases directly.
+
+## Proof of Concept Setup
+
+Our permissive license allows you to run a proof of concept of LangWatch on your own infrastructure before getting to production while commercial negotiations are ongoing, please reach out to our team to get started and we can help unblock you as soon as possible.
+
+### Setup
+
+Schedule a free consultation with our team to get started on the On-Prem setup:
+
+<div style={{fontSize: "18px", marginBottom: "56px"}}>
+[Schedule a Call](https://get.langwatch.ai/request-a-demo)
+</div>

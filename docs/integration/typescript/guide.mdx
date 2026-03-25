@@ -1,0 +1,445 @@
+---
+title: TypeScript Integration Guide
+sidebarTitle: Guide
+description: Get started with the LangWatch TypeScript SDK to trace LLM calls, track tokens, and prepare data for AI agent testing.
+keywords: langwatch, typescript, sdk, guide, observability, tracing, logging, data capture, data collection, data ingestion
+---
+
+import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
+
+<Tip>
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+</Tip>
+
+<div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
+  <div>
+  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+    <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
+  </a>
+  </div>
+
+  <div>
+  <a href="https://www.npmjs.com/package/langwatch" target="_blank">
+    <img src="https://img.shields.io/badge/npm-langwatch-007EC6?style=flat&logo=npm" noZoom alt="LangWatch TypeScript SDK version" />
+  </a>
+  </div>
+</div>
+
+Get started with LangWatch TypeScript SDK in under 5 minutes. This guide will walk you through setting up observability for your LLM applications, from basic tracing to advanced features.
+
+<LLMsTxtProtip />
+
+## Prerequisites
+
+Before you start, make sure you have:
+
+- **Node.js** 18+ installed
+- A **LangWatch account** (sign up at [app.langwatch.ai](https://app.langwatch.ai))
+- Your **LangWatch API key** from the dashboard
+- An **OpenAI API key** (for the LLM example)
+
+## Quick Start (5 minutes)
+
+### Step 1: Install Dependencies
+
+```bash
+npm install langwatch @opentelemetry/sdk-node @opentelemetry/context-async-hooks
+npm install @ai-sdk/openai ai
+```
+
+<Note>
+The `@ai-sdk/openai` and `ai` packages are only required for the example in this guide. You can skip this step if you're only looking to install the LangWatch SDK.
+</Note>
+
+### Step 2: Set Up API Keys
+
+1. **LangWatch API Key**:
+   - Go to [app.langwatch.ai](https://app.langwatch.ai) and sign up
+   - Create a new project
+   - Copy your API key from the project settings
+
+2. **OpenAI API Key**:
+   - Get your API key from [platform.openai.com](https://platform.openai.com/api-keys)
+
+3. **Set environment variables**:
+
+```bash
+export LANGWATCH_API_KEY=your_langwatch_api_key_here
+export OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### Step 3: Your First LLM Trace
+
+Create a new file `app.ts`:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+// Setup LangWatch Observability (uses LANGWATCH_API_KEY by default)
+setupObservability({
+  serviceName: "my-ai-laundry-startup",
+});
+
+// Create a tracer
+const tracer = getLangWatchTracer("laundry-chatbot");
+
+// Your first traced LLM interaction
+async function askAI(question: string) {
+  return await tracer.withActiveSpan("ask-ai", async (span) => {
+    // Make the LLM call using Vercel AI SDK
+    const response = await generateText({
+      model: openai("gpt-5-mini"),
+      prompt: question,
+      maxTokens: 100,
+      // The LangWatch SDK will automatically capture LLM data
+      // input, output, metrics, etc.
+      experimental_telemetry: { isEnabled: true },
+    });
+
+    return response.text;
+  });
+}
+
+// Test it
+const answer = await askAI("What is LangWatch?");
+console.log("AI Response:", answer);
+console.log("Check your LangWatch dashboard!");
+```
+
+### Step 4: Run and See Results
+
+```bash
+npx tsx app.ts
+```
+
+Now visit your LangWatch dashboard - you should see your first trace! 🎉
+
+<Check>
+**What you'll see**: A trace named "greet-user" with input/output data, timing, and status.
+</Check>
+
+## What Just Happened?
+
+Let's break down what we just set up:
+
+- **Trace**: The entire `greetUser` function execution
+- **Span**: The individual operation within the trace
+- **Input/Output**: The data flowing through your function
+- **Timing**: How long each operation took
+- **Status**: Whether the operation succeeded
+
+## Core Concepts
+
+Think of LangWatch like a **debugger for your LLM applications**:
+
+- **Traces** = Complete user interactions (e.g., "What's the weather?")
+- **Spans** = Individual steps within a trace (e.g., "LLM call", "database query")
+- **Threads** = Conversations (group related traces together)
+- **Users** = Individual users (for analytics)
+
+<Note>
+For detailed explanations of all concepts, see our [Concepts Guide](/concepts).
+</Note>
+
+<Tip>
+For consistent observability across your application, learn about [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) - standardized naming guidelines for attributes and metadata.
+</Tip>
+
+## Integrations
+
+LangWatch offers seamless integrations with many popular TypeScript libraries and frameworks. These integrations provide automatic instrumentation, capturing relevant data from your LLM applications with minimal setup.
+
+Below is a list of currently supported integrations. Click on each to learn more about specific setup instructions and available features:
+
+- [Azure AI](/integration/typescript/integrations/azure)
+- [Langchain](/integration/typescript/integrations/langchain)
+- [Mastra](/integration/typescript/integrations/mastra)
+- [OpenAI](/integration/typescript/integrations/open-ai)
+- [Vercel AI SDK](/integration/typescript/integrations/vercel-ai-sdk)
+
+<Note>
+For detailed integration guides, see our [integration documentation](/integration/typescript/integrations). Each integration includes framework-specific examples and best practices.
+</Note>
+
+
+## Common Development Scenarios
+
+### Scenario 1: LLM Application
+
+```typescript
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+async function chatWithAI(userMessage: string) {
+  return await tracer.withActiveSpan("chat-with-ai", async (span) => {
+    // Make the LLM call
+    const response = await generateText({
+      model: openai("gpt-5-mini"),
+      prompt: userMessage,
+      experimental_telemetry: { isEnabled: true }, // Auto-captures LLM data
+    });
+
+    return response.text;
+  });
+}
+```
+
+### Scenario 2: RAG Application
+
+```typescript
+async function answerWithRAG(question: string) {
+  return await tracer.withActiveSpan("rag-answer", async (span) => {
+    // 1. Retrieve documents
+    const docs = await tracer.withActiveSpan("retrieve-docs", async (retrieveSpan) => {
+      retrieveSpan.setType("rag");
+      const documents = await searchDocuments(question);
+
+      // Record what documents were retrieved
+      retrieveSpan.setRAGContexts(
+        documents.map(doc => ({
+          document_id: doc.id,
+          chunk_id: doc.chunkId,
+          content: doc.content
+        }))
+      );
+
+      return documents;
+    });
+
+    // 2. Generate answer
+    const answer = await generateAnswer(question, docs);
+
+    span.setOutput(answer);
+
+    return answer;
+  });
+}
+```
+
+<Note>
+For consistent attribute naming and TypeScript autocomplete support, see our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide. For advanced span management techniques, check out [Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation).
+</Note>
+
+### Scenario 3: Conversation Threading
+
+```typescript
+async function handleConversation(userId: string, threadId: string, message: string) {
+  return await tracer.withActiveSpan("conversation-turn", {
+    attributes: {
+      "langwatch.user.id": userId,
+      "langwatch.thread.id": threadId
+    }
+  }, async (span) => {
+    // Your conversation logic here
+    const response = await processMessage(message);
+
+    span.setOutput(response);
+
+    return response;
+  });
+}
+```
+
+## Configuration
+
+### Basic Configuration
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+const handle = setupObservability({
+  // Required: Your service name
+  serviceName: "my-ai-service",
+
+  // Optional: Custom API key (defaults to LANGWATCH_API_KEY env var)
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+  },
+
+  // Optional: Global attributes for all traces
+  attributes: {
+    "service.version": "1.0.0",
+    "environment": process.env.NODE_ENV,
+  }
+});
+```
+
+### Environment-Specific Setup
+
+<CodeGroup>
+```typescript Development
+const handle = setupObservability({
+  serviceName: "my-laundry-startup",
+  dataCapture: "all", // Capture everything in dev
+  attributes: {
+    "deployment.environment.name": process.env.NODE_ENV,
+  }
+});
+```
+
+```typescript Production
+const handle = setupObservability({
+  serviceName: "my-laundry-startup",
+  dataCapture: "output", // Capture only output data in production
+  attributes: {
+    "deployment.environment.name": process.env.NODE_ENV,
+  }
+});
+```
+</CodeGroup>
+
+### Graceful Shutdown
+
+The `setupObservability` function returns an `ObservabilityHandle` that provides a `shutdown` method for graceful cleanup. This ensures all pending traces are exported before your application terminates.
+
+#### Automatic Shutdown
+
+By default, LangWatch automatically handles shutdown when your application receives a `SIGTERM` signal:
+
+```typescript
+// Automatic shutdown is enabled by default
+const handle = setupObservability({
+  serviceName: "my-service",
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  }
+});
+
+// No manual shutdown needed - handled automatically
+```
+
+#### Manual Shutdown
+
+For environments where you can't listen to `SIGTERM` or need custom shutdown logic, you can manually call the shutdown method:
+
+```typescript
+const handle = setupObservability({
+  serviceName: "my-service",
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  advanced: {
+    disableAutoShutdown: true, // Disable automatic SIGTERM handling
+  }
+});
+
+// Manual shutdown when your application terminates
+process.on('SIGTERM', async () => {
+  console.log('Shutting down observability...');
+  await handle.shutdown();
+  console.log('Observability shutdown complete');
+  process.exit(0);
+});
+
+// Force shutdown with timeout
+process.on('SIGINT', async () => {
+  console.log('Force shutdown...');
+  await Promise.race([
+    handle.shutdown(),
+    new Promise(resolve => setTimeout(resolve, 5000))
+  ]);
+  process.exit(1);
+});
+```
+
+#### What Happens During Shutdown
+
+The shutdown process ensures data integrity:
+
+1. **Flushes pending traces** to the exporter
+2. **Closes the trace exporter** connection
+3. **Shuts down the tracer provider**
+4. **Cleans up registered instrumentations**
+
+<Tip>
+Always call `shutdown()` before your application exits to prevent data loss. The method is safe to call multiple times.
+</Tip>
+
+<Warning>
+If you don't call `shutdown()`, some traces may be lost when your application terminates abruptly.
+</Warning>
+
+## Development Workflow
+
+### Local Development
+
+1. **Set up environment**:
+```bash
+export LANGWATCH_API_KEY=your_key
+export NODE_ENV=development
+```
+
+2. **Run your app**:
+```bash
+npm run dev
+```
+
+3. **Check dashboard**: Visit [app.langwatch.ai](https://app.langwatch.ai) to see traces
+
+### Debugging
+
+Enable console logging for local development:
+
+```typescript
+const handle = setupObservability({
+  serviceName: "my-service",
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+  },
+  debug: {
+    consoleTracing: true,
+    consoleLogging: true,
+    logLevel: 'info' // Lower this to `debug` if you're debugging the LangWatch integration
+  },
+});
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+<Accordion title="No traces appearing in dashboard">
+- Check your API key is correct
+- Verify network connectivity to app.langwatch.ai
+- Ensure `setupObservability` is called before any tracing
+- Check browser console for errors
+- See [Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript) for detailed solutions
+</Accordion>
+
+<Accordion title="High memory usage">
+- Use batch processing: `processorType: 'batch'`
+- Implement graceful shutdown
+- Consider reducing data capture in production
+</Accordion>
+
+<Accordion title="Performance impact">
+- Tracer overhead is minimal (~1-2ms per span)
+- Use module-level tracers (not function-level)
+- Consider sampling in high-traffic scenarios
+</Accordion>
+</AccordionGroup>
+
+### Getting Help
+
+- **Documentation**: [docs.langwatch.ai](https://docs.langwatch.ai)
+- **GitHub**: [github.com/langwatch/langwatch](https://github.com/langwatch/langwatch)
+- **Discord**: [discord.gg/langwatch](https://discord.gg/langwatch)
+
+## Next Steps
+
+Now that you have basic tracing working, explore:
+
+- **[API Reference](/integration/typescript/reference)** - Complete API documentation for the LangWatch TypeScript SDK
+- **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Advanced span management and fine-grained control
+- **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - Standardized naming guidelines for attributes and metadata
+- **[Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript)** - Debug tracing issues and optimize performance
+- **[OpenTelemetry Migration](/integration/typescript/tutorials/opentelemetry-migration)** - Migrate your existing OpenTelemetry setup with LangWatch
+- **[Framework Integrations](/integration/typescript/integrations)** - Specific guides for OpenAI, LangChain, Azure, and more
+
+<Tip>
+Start simple and add complexity gradually. You can always add more detailed tracing later as your application grows!
+</Tip>
