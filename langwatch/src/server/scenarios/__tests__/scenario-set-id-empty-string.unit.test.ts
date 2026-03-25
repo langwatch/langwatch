@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * Regression test for issue #2596:
- * Empty string scenarioSetId must not pass through — it must be
- * rejected by Zod validation or defaulted to "default" at runtime.
+ * Empty string scenarioSetId must be coerced to "default", never rejected.
+ * Rejecting events loses data — we always accept and normalize.
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
@@ -23,20 +23,26 @@ const validEvent = {
 
 describe("scenarioSetId empty string handling", () => {
   describe("when scenarioSetId is an empty string", () => {
-    it("rejects the event at schema validation", () => {
+    it("coerces to 'default' via discriminated union schema", () => {
       const event = { ...validEvent, scenarioSetId: "" };
 
       const result = scenarioEventSchema.safeParse(event);
 
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.scenarioSetId).toBe("default");
+      }
     });
 
-    it("rejects in the individual run started schema", () => {
+    it("coerces to 'default' via run started schema", () => {
       const event = { ...validEvent, scenarioSetId: "" };
 
       const result = scenarioRunStartedSchema.safeParse(event);
 
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.scenarioSetId).toBe("default");
+      }
     });
   });
 
