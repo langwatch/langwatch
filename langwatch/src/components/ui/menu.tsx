@@ -3,7 +3,7 @@
 import { AbsoluteCenter, Menu as ChakraMenu, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { LuCheck, LuChevronRight } from "react-icons/lu";
-import { OVERLAY_Z_INDEX } from "./z-index";
+import { OverlayDepthContext, useOverlayZIndex } from "./z-index";
 
 interface MenuContentProps extends ChakraMenu.ContentProps {
   portalled?: boolean;
@@ -13,6 +13,7 @@ interface MenuContentProps extends ChakraMenu.ContentProps {
 export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
   function MenuContent(props, ref) {
     const { portalled = true, portalRef, ...rest } = props;
+    const { zIndex, depth } = useOverlayZIndex();
     return (
       <Portal disabled={!portalled} container={portalRef}>
         <ChakraMenu.Positioner
@@ -20,17 +21,19 @@ export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
             if (node) {
               // Zag.js sets --z-index inline based on layer stack order, which
               // can place menus behind dialogs. Force it higher. See #2519.
-              node.style.setProperty("z-index", OVERLAY_Z_INDEX, "important");
+              node.style.setProperty("z-index", zIndex, "important");
             }
           }}
         >
-          <ChakraMenu.Content
-            borderRadius="lg"
-            background="bg.panel/75"
-            backdropFilter="blur(8px)"
-            ref={ref}
-            {...rest}
-          />
+          <OverlayDepthContext.Provider value={depth}>
+            <ChakraMenu.Content
+              borderRadius="lg"
+              background="bg.panel/75"
+              backdropFilter="blur(8px)"
+              ref={ref}
+              {...rest}
+            />
+          </OverlayDepthContext.Provider>
         </ChakraMenu.Positioner>
       </Portal>
     );

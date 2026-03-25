@@ -5,7 +5,7 @@ import type { CollectionItem } from "@chakra-ui/react";
 import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
-import { OVERLAY_Z_INDEX } from "./z-index";
+import { OverlayDepthContext, useOverlayZIndex } from "./z-index";
 
 interface SelectTriggerProps extends ChakraSelect.ControlProps {
   clearable?: boolean;
@@ -54,6 +54,7 @@ export const SelectContent = React.forwardRef<
   SelectContentProps
 >(function SelectContent(props, ref) {
   const { portalled = true, portalRef, ...rest } = props;
+  const { zIndex, depth } = useOverlayZIndex();
   return (
     <Portal disabled={!portalled} container={portalRef}>
       <ChakraSelect.Positioner
@@ -61,11 +62,13 @@ export const SelectContent = React.forwardRef<
           if (node) {
             // Zag.js sets --z-index inline based on layer stack order, which
             // can place selects behind dialogs. Force it higher. See #2519.
-            node.style.setProperty("z-index", OVERLAY_Z_INDEX, "important");
+            node.style.setProperty("z-index", zIndex, "important");
           }
         }}
       >
-        <ChakraSelect.Content {...rest} ref={ref} />
+        <OverlayDepthContext.Provider value={depth}>
+          <ChakraSelect.Content {...rest} ref={ref} />
+        </OverlayDepthContext.Provider>
       </ChakraSelect.Positioner>
     </Portal>
   );
