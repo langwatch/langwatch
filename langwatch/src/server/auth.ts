@@ -27,6 +27,7 @@ import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../ee/billing/nurturing/hooks/userSync";
+import { getApp } from "./app-layer/app";
 
 const logger = createLogger("langwatch:auth");
 
@@ -78,15 +79,17 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        // Fire-and-forget: don't block session callback with DB query
-        void prisma.organizationUser
-          .count({ where: { userId: user_.id } })
-          .then((orgCount_) => {
-            const hasOrg_ = orgCount_ > 0;
-            fireActivityTrackingNurturing({ userId: user_.id, hasOrganization: hasOrg_ });
-            ensureUserSyncedToCio({ userId: user_.id, hasOrganization: hasOrg_ });
-          })
-          .catch(() => {});
+        // Fire-and-forget: skip the DB query entirely when nurturing is off
+        if (getApp().nurturing) {
+          void prisma.organizationUser
+            .count({ where: { userId: user_.id } })
+            .then((orgCount_) => {
+              const hasOrg_ = orgCount_ > 0;
+              fireActivityTrackingNurturing({ userId: user_.id, hasOrganization: hasOrg_ });
+              ensureUserSyncedToCio({ userId: user_.id, hasOrganization: hasOrg_ });
+            })
+            .catch(() => {});
+        }
 
         return {
           ...session,
@@ -98,15 +101,17 @@ export const authOptions = (
         };
       }
 
-      // Fire-and-forget: don't block session callback with DB query
-      void prisma.organizationUser
-        .count({ where: { userId: user.id } })
-        .then((orgCount) => {
-          const hasOrg = orgCount > 0;
-          fireActivityTrackingNurturing({ userId: user.id, hasOrganization: hasOrg });
-          ensureUserSyncedToCio({ userId: user.id, hasOrganization: hasOrg });
-        })
-        .catch(() => {});
+      // Fire-and-forget: skip the DB query entirely when nurturing is off
+      if (getApp().nurturing) {
+        void prisma.organizationUser
+          .count({ where: { userId: user.id } })
+          .then((orgCount) => {
+            const hasOrg = orgCount > 0;
+            fireActivityTrackingNurturing({ userId: user.id, hasOrganization: hasOrg });
+            ensureUserSyncedToCio({ userId: user.id, hasOrganization: hasOrg });
+          })
+          .catch(() => {});
+      }
 
       return {
         ...session,
