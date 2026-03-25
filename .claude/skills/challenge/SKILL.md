@@ -1,7 +1,6 @@
 ---
 name: challenge
 description: "Stress-test an architecture proposal, plan, or technical idea. Invokes the devils-advocate agent to find weaknesses before you commit."
-context: conversation
 agent: devils-advocate
 user-invocable: true
 argument-hint: "[proposal or plan to challenge]"
