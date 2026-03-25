@@ -566,6 +566,22 @@ const CustomGraph_ = React.memo(
             />
           ) : (
             <>
+              {timeseries.error && timeseries.data && (
+                <Badge
+                  position="absolute"
+                  right={4}
+                  top={4}
+                  zIndex={1}
+                  colorPalette="red"
+                  variant="solid"
+                  fontSize="xs"
+                  cursor="pointer"
+                  onClick={() => void timeseries.refetch()}
+                  title={timeseries.error.message}
+                >
+                  Refresh failed — click to retry
+                </Badge>
+              )}
               {input.graphType !== "summary" && allEmpty && (
                 <Box
                   position="absolute"
