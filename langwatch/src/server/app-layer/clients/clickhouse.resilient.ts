@@ -89,8 +89,8 @@ export function isTransientClickHouseError(error: unknown): boolean {
  * alert. A cooldown prevents repeated alerts from flooding logs.
  */
 export class FailureRateMonitor {
-  private readonly threshold: number;
-  private readonly windowMs: number;
+  readonly threshold: number;
+  readonly windowMs: number;
   private readonly cooldownMs: number;
   private timestamps: number[] = [];
   private lastAlertAt = 0;
@@ -229,7 +229,7 @@ function logQueryFailure({
         source: "clickhouse",
         alert: true,
         recentErrorType: errorType,
-        windowMinutes: 5,
+        windowMinutes: failureMonitor.windowMs / 60_000,
       },
       "ClickHouse failure rate threshold exceeded"
     );
