@@ -121,24 +121,31 @@ export const authOptions = (
         },
       });
 
-      // User hasn't migrated to SSO yet — let them in with old method
-      // so they can link SSO from the authentication settings page
-      if (existingUser?.pendingSsoSetup) {
-        return true;
-      }
-
-      // SSO flow for orgs with ssoDomain configured:
-      // - Existing user + correct SSO provider → auto-link account (replaces old auth method)
-      // - Existing user + wrong provider → block with SSO_PROVIDER_NOT_ALLOWED
+      // SSO flow for orgs with ssoDomain+ssoProvider configured:
+      // - Existing user + correct SSO provider → auto-link account (clears pendingSsoSetup)
+      // - Existing user + wrong provider → set pendingSsoSetup and let them in to show the
+      //   "link your SSO account" banner (avoids hard-blocking existing users during migration)
       if (existingUser && account && orgWithSsoDomain) {
         if (isSsoProviderMatch(orgWithSsoDomain, account)) {
           await linkExistingUserToOAuthProvider(existingUser, account);
           return true;
         }
-        throw new Error("SSO_PROVIDER_NOT_ALLOWED");
+        if (!existingUser.pendingSsoSetup) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: { pendingSsoSetup: true },
+          });
+        }
+        return true;
       }
 
-      // Block non-SSO sign-in attempts for users whose domain has SSO enforced
+      // Fallback: user is already marked pendingSsoSetup but org lookup returned nothing
+      // (e.g. credentials provider login, or domain no longer has an SSO org) — let them in
+      if (existingUser?.pendingSsoSetup) {
+        return true;
+      }
+
+      // Block non-SSO sign-in attempts for new users whose domain has SSO enforced
       if (orgWithSsoDomain && account) {
         await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
       }
