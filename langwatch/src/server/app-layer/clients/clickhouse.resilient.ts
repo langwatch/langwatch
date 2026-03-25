@@ -28,13 +28,6 @@ const NETWORK_CODES = new Set([
   "ENOTFOUND",
 ]);
 
-const TRANSIENT_NETWORK_CODES = new Set([
-  ...NETWORK_CODES,
-  "ETIMEDOUT",
-]);
-
-const TRANSIENT_HTTP_STATUSES = new Set([503, 429]);
-
 /**
  * Classifies a ClickHouse error into a well-known category for structured
  * logging and alerting. Returns a short string tag suitable for log fields
@@ -74,23 +67,16 @@ export function classifyClickHouseError(error: unknown): ClickHouseErrorType {
   return "unknown";
 }
 
+const TRANSIENT_ERROR_TYPES: ReadonlySet<ClickHouseErrorType> = new Set([
+  "oom",
+  "timeout",
+  "network",
+  "rate_limit",
+  "unavailable",
+]);
+
 export function isTransientClickHouseError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-
-  const message = error.message;
-
-  if (message.includes("MEMORY_LIMIT_EXCEEDED")) return true;
-  if (/timeout/i.test(message)) return true;
-
-  const code = (error as NodeJS.ErrnoException).code;
-  if (code && TRANSIENT_NETWORK_CODES.has(code)) return true;
-
-  const status =
-    (error as { statusCode?: number }).statusCode ??
-    (error as { status?: number }).status;
-  if (status && TRANSIENT_HTTP_STATUSES.has(status)) return true;
-
-  return false;
+  return TRANSIENT_ERROR_TYPES.has(classifyClickHouseError(error));
 }
 
 // ---------------------------------------------------------------------------
@@ -175,13 +161,20 @@ function safeQueryMeta(params: unknown): {
   queryId?: string;
   format?: string;
   paramKeys?: string[];
+  table?: string;
 } {
   if (!params || typeof params !== "object") return {};
   const p = params as Record<string, unknown>;
-  const meta: { queryId?: string; format?: string; paramKeys?: string[] } = {};
+  const meta: {
+    queryId?: string;
+    format?: string;
+    paramKeys?: string[];
+    table?: string;
+  } = {};
 
   if (typeof p.query_id === "string") meta.queryId = p.query_id;
   if (typeof p.format === "string") meta.format = p.format;
+  if (typeof p.table === "string") meta.table = p.table;
   if (p.query_params && typeof p.query_params === "object") {
     meta.paramKeys = Object.keys(p.query_params as Record<string, unknown>);
   }
@@ -189,21 +182,18 @@ function safeQueryMeta(params: unknown): {
   return meta;
 }
 
-const failureMonitor = new FailureRateMonitor({
-  threshold: 10,
-  windowMs: 5 * 60_000,
-});
-
 function logQueryFailure({
   operation,
   error,
   durationMs,
   params,
+  failureMonitor,
 }: {
   operation: "query" | "insert";
   error: unknown;
   durationMs: number;
   params: unknown;
+  failureMonitor: FailureRateMonitor;
 }): void {
   const errorType = classifyClickHouseError(error);
   const meta = safeQueryMeta(params);
@@ -228,7 +218,7 @@ function logQueryFailure({
   );
   observeClickHouseQueryDuration(
     operation === "query" ? "SELECT" : "INSERT",
-    "unknown",
+    meta.table ?? "unknown",
     durationMs / 1000
   );
 
@@ -273,7 +263,7 @@ function logQuerySuccess({
   );
   observeClickHouseQueryDuration(
     operation === "query" ? "SELECT" : "INSERT",
-    "unknown",
+    meta.table ?? "unknown",
     durationMs / 1000
   );
 }
@@ -287,11 +277,16 @@ function logQuerySuccess({
  */
 export function createResilientClickHouseClient({
   client,
+  failureMonitor = new FailureRateMonitor({
+    threshold: 10,
+    windowMs: 5 * 60_000,
+  }),
   maxRetries = 3,
   baseDelayMs = 500,
   maxDelayMs = 10_000,
 }: {
   client: ClickHouseClient;
+  failureMonitor?: FailureRateMonitor;
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
@@ -312,7 +307,7 @@ export function createResilientClickHouseClient({
             return result;
           } catch (error) {
             const durationMs = performance.now() - start;
-            logQueryFailure({ operation: "query", error, durationMs, params });
+            logQueryFailure({ operation: "query", error, durationMs, params, failureMonitor });
             throw error;
           }
         };
@@ -346,6 +341,7 @@ export function createResilientClickHouseClient({
                   error,
                   durationMs,
                   params,
+                  failureMonitor,
                 });
                 throw error;
               }
