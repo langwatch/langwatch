@@ -555,6 +555,26 @@ const EVALUATION_SELECTABLE_COLUMNS = [
 ] as const;
 
 /**
+ * Characters that can appear immediately after a column name in SQL.
+ * Used to prevent false-positive substring matches (e.g. "Status" matching "StatusCode").
+ */
+const COLUMN_BOUNDARY = /(?=[\s,)=<>!\[\.'"]|$)/;
+
+/**
+ * Build a regex that matches a column name at a word boundary in SQL context.
+ * Handles both quoted ("Events.Name") and unqualified column names,
+ * optionally prefixed with a table alias (e.g. `ss.SpanAttributes`).
+ */
+function buildColumnPattern(col: string, alias: string): RegExp {
+  const rawCol = col.replace(/"/g, "");
+  // Escape special regex chars in the column name (e.g. dots in "Events.Name")
+  const escaped = rawCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match alias.Column or unqualified Column, followed by a boundary
+  const pattern = `(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
+  return new RegExp(pattern);
+}
+
+/**
  * Extract which stored_spans columns are referenced in a set of SQL expressions.
  *
  * Scans the expressions for references to known span column names (including
@@ -573,15 +593,7 @@ export function extractReferencedSpanColumns(
   const alias = tableAliases.stored_spans;
 
   for (const col of SPAN_SELECTABLE_COLUMNS) {
-    // Match either the raw column name or alias-qualified (ss.Column)
-    // Strip quotes for matching, since Events columns are quoted
-    const rawCol = col.replace(/"/g, "");
-    if (
-      joined.includes(`${alias}.${rawCol}`) ||
-      joined.includes(`${alias}.${col}`) ||
-      // Unqualified references (e.g., in subqueries)
-      joined.includes(rawCol)
-    ) {
+    if (buildColumnPattern(col, alias).test(joined)) {
       columns.add(col);
     }
   }
@@ -600,10 +612,7 @@ export function extractReferencedEvaluationColumns(
   const alias = tableAliases.evaluation_runs;
 
   for (const col of EVALUATION_SELECTABLE_COLUMNS) {
-    if (
-      joined.includes(`${alias}.${col}`) ||
-      joined.includes(col)
-    ) {
+    if (buildColumnPattern(col, alias).test(joined)) {
       columns.add(col);
     }
   }
