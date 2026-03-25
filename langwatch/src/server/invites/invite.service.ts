@@ -464,7 +464,7 @@ export class InviteService {
           })
         : null) ??
       // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
-      ([OrganizationUserRole.ADMIN, OrganizationUserRole.MEMBER].includes(invite.role)
+      (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER
         ? await this.prisma.project.findFirst({
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },
