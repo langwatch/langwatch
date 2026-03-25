@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, isRunnerAvailable } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,25 +16,14 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
+const runnerUnavailable = !isRunnerAvailable();
 
 const judgeModel = openai("gpt-5-mini");
 
-function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "level-up");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../level-up/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
-}
+const skillPath = path.resolve(__dirname, "../level-up/SKILL.md");
 
 describe("Level-up Skill", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "orchestrates all sub-skills for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -46,14 +33,13 @@ describe("Level-up Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python OpenAI level-up",
         description:
           "Taking a Python OpenAI bot to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -87,7 +73,7 @@ describe("Level-up Skill", () => {
     900_000 // 15 min timeout for meta-skill
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "orchestrates all sub-skills for a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -96,14 +82,13 @@ describe("Level-up Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Vercel AI level-up",
         description:
           "Taking a TypeScript Vercel AI bot to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -135,7 +120,7 @@ describe("Level-up Skill", () => {
     900_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "orchestrates all sub-skills for a Python LangGraph agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -144,14 +129,13 @@ describe("Level-up Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python LangGraph level-up",
         description:
           "Taking a Python LangGraph agent to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -182,7 +166,7 @@ describe("Level-up Skill", () => {
     900_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "orchestrates all sub-skills for a TypeScript Mastra agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -191,14 +175,13 @@ describe("Level-up Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Mastra level-up",
         description:
           "Taking a TypeScript Mastra agent to the next level with full LangWatch integration.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

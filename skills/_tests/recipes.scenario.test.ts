@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner, isRunnerAvailable } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,22 +16,10 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
+const runner = getRunner();
+const runnerUnavailable = !isRunnerAvailable();
 
 const judgeModel = openai("gpt-5-mini");
-
-function copyRecipeSkillToWorkDir(tempFolder: string, recipeName: string) {
-  const skillDir = path.join(tempFolder, ".skills", recipeName);
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, `../recipes/${recipeName}/SKILL.md`),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
-}
 
 function findTestFiles(dir: string, pattern: RegExp): string[] {
   const results: string[] = [];
@@ -82,7 +68,7 @@ function findNewPythonFiles(
 }
 
 describe("Recipes", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "generates a RAG evaluation dataset from the TerraVerde knowledge base",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -92,14 +78,17 @@ describe("Recipes", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
       );
-      copyRecipeSkillToWorkDir(tempFolder, "generate-rag-dataset");
+      const recipeSkillPath = path.resolve(
+        __dirname,
+        "../recipes/generate-rag-dataset/SKILL.md"
+      );
 
       const result = await scenario.run({
         name: "Generate RAG evaluation dataset",
         description:
           "Generate a synthetic evaluation dataset from the TerraVerde farm advisory RAG knowledge base, including diverse question types and context per row.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath: recipeSkillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -179,7 +168,7 @@ describe("Recipes", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates compliance scenario tests for the health agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -189,14 +178,17 @@ describe("Recipes", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-health-agent")}/* ${tempFolder}/`
       );
-      copyRecipeSkillToWorkDir(tempFolder, "test-compliance");
+      const recipeSkillPath = path.resolve(
+        __dirname,
+        "../recipes/test-compliance/SKILL.md"
+      );
 
       const result = await scenario.run({
         name: "Health agent compliance tests",
         description:
           "Create scenario tests that verify the health wellness agent stays observational and does not give prescriptive medical advice. Include boundary enforcement and red team tests.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath: recipeSkillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -270,7 +262,7 @@ describe("Recipes", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable || !runner.capabilities.supportsMcp)(
     "uses MCP to debug instrumentation traces",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -280,14 +272,17 @@ describe("Recipes", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copyRecipeSkillToWorkDir(tempFolder, "debug-instrumentation");
+      const recipeSkillPath = path.resolve(
+        __dirname,
+        "../recipes/debug-instrumentation/SKILL.md"
+      );
 
       const result = await scenario.run({
         name: "Debug instrumentation via MCP",
         description:
           "Use the LangWatch MCP to inspect production traces and identify instrumentation issues or suggest improvements.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath: recipeSkillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

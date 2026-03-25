@@ -1,0 +1,8 @@
+{"type":"system","subtype":"init","apiKeySource":"flag","cwd":"/tmp/test","session_id":"abc123","model":"Auto","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"instrument my code"}]},"session_id":"abc123"}
+{"type":"thinking","subtype":"delta","text":"Let me help with that","session_id":"abc123"}
+{"type":"thinking","subtype":"completed","session_id":"abc123"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I will help you instrument your code with LangWatch."}]},"session_id":"abc123"}
+{"type":"tool_use","name":"read_file","input":{"path":"main.py"},"session_id":"abc123"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done! I added LangWatch tracing to your project."}]},"session_id":"abc123"}
+{"type":"result","subtype":"success","duration_ms":5000,"is_error":false,"result":"Done!","session_id":"abc123"}

@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "test:claude": "AGENT_UNDER_TEST=claude-code vitest run --exclude static-validation.test.ts",
+    "test:codex": "AGENT_UNDER_TEST=codex vitest run --exclude static-validation.test.ts",
+    "test:cursor": "AGENT_UNDER_TEST=cursor vitest run --exclude static-validation.test.ts",
+    "test:all-agents": "pnpm test:claude && pnpm test:codex && pnpm test:cursor"
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^3.0.44",

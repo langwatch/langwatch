@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner, isRunnerAvailable } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,22 +16,12 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
+const runner = getRunner();
+const runnerUnavailable = !isRunnerAvailable();
 
 const judgeModel = openai("gpt-5-mini");
 
-function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "scenarios");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../scenarios/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
-}
+const skillPath = path.resolve(__dirname, "../scenarios/SKILL.md");
 
 function findTestFiles(dir: string, pattern: RegExp): string[] {
   const results: string[] = [];
@@ -51,7 +39,7 @@ function findTestFiles(dir: string, pattern: RegExp): string[] {
 }
 
 describe("Scenarios Skill", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates scenario tests for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -61,14 +49,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python OpenAI scenario tests",
         description:
           "Adding agent simulation tests to a Python OpenAI conversational bot project using the LangWatch Scenario framework.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -132,7 +119,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates scenario tests for a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -142,14 +129,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Vercel AI scenario tests",
         description:
           "Adding agent simulation tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -196,7 +182,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates scenario tests for a Python LangGraph agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -205,14 +191,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python LangGraph scenario tests",
         description:
           "Adding scenario tests to a Python LangGraph agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -244,7 +229,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates red team tests for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -254,14 +239,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python OpenAI red team tests",
         description:
           "Adding adversarial red team tests to a Python OpenAI bot project using the LangWatch Scenario framework's RedTeamAgent.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -306,7 +290,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates red team tests for a TypeScript Vercel AI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -316,14 +300,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Vercel AI red team tests",
         description:
           "Adding adversarial red team tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework's RedTeamAgent.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -371,7 +354,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates a targeted scenario for a specific behavior",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -381,14 +364,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Targeted scenario for emoji handling",
         description:
           "Adding a specific scenario test for the tweet-like bot to verify it uses emojis correctly.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -421,7 +403,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable || !runner.capabilities.supportsMcp)(
     "uses platform MCP tools when no codebase is present",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -429,14 +411,13 @@ describe("Scenarios Skill", () => {
       );
 
       // No fixture copied — empty directory
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Platform scenario creation",
         description:
           "Creating scenarios on the LangWatch platform when there is no codebase.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -481,7 +462,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates scenario tests for a TypeScript Mastra agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -490,14 +471,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Mastra scenario tests",
         description:
           "Adding scenario tests to a TypeScript Mastra agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -528,7 +508,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "creates domain-specific scenarios for a RAG agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -537,14 +517,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "RAG agent domain-specific scenarios",
         description:
           "Adding scenario tests to a TerraVerde farm advisory RAG agent that handles irrigation, frost protection, and pest management.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -595,7 +574,7 @@ describe("Scenarios Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "suggests domain-specific improvements after delivering initial scenarios",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -604,14 +583,13 @@ describe("Scenarios Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Consultant mode — deeper suggestions",
         description:
           "Agent sets up scenarios for a farm advisory agent, then suggests domain-specific improvements.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

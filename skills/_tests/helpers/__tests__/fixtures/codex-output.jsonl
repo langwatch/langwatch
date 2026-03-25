@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"thread_abc123"}
+{"type":"item.completed","item":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I will help you instrument your code with LangWatch."}]}}
+{"type":"item.completed","item":{"type":"function_call","name":"read_file","arguments":"{\"path\":\"main.py\"}"}}
+{"type":"item.completed","item":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done! I added LangWatch tracing to your project."}]}}
+{"type":"turn.completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done! I added LangWatch tracing to your project."}]}]}

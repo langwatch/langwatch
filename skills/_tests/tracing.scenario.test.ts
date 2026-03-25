@@ -7,10 +7,8 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
-import {
-  createClaudeCodeAgent,
-  toolCallFix,
-} from "./helpers/claude-code-adapter";
+import { createAgent, getRunner, isRunnerAvailable } from "./helpers/agent-factory";
+import { toolCallFix } from "./helpers/shared";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,25 +16,15 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
+const runner = getRunner();
+const runnerUnavailable = !isRunnerAvailable();
 
 const judgeModel = openai("gpt-5-mini");
 
-function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "tracing");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../tracing/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
-}
+const skillPath = path.resolve(__dirname, "../tracing/SKILL.md");
 
 describe("Tracing Skill", () => {
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "instruments a Python OpenAI bot with LangWatch",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -46,14 +34,13 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python OpenAI instrumentation",
         description:
           "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -86,7 +73,7 @@ describe("Tracing Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "instruments a TypeScript Vercel AI bot with LangWatch",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -96,14 +83,13 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Vercel AI instrumentation",
         description:
           "Implementing LangWatch instrumentation in a TypeScript Vercel AI bot project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -135,7 +121,7 @@ describe("Tracing Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "instruments a Python LangGraph agent with LangWatch",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -145,14 +131,13 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "Python LangGraph instrumentation",
         description:
           "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -184,7 +169,7 @@ describe("Tracing Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "instruments a TypeScript Mastra agent with LangWatch",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -194,14 +179,13 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         name: "TypeScript Mastra instrumentation",
         description:
           "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createAgent({ workingDirectory: tempFolder, skillPath }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -233,7 +217,7 @@ describe("Tracing Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "instruments code without env API key — discovers from .env file",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -243,7 +227,6 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       // Write .env with API key — agent must discover this
       fs.writeFileSync(
@@ -256,8 +239,9 @@ describe("Tracing Skill", () => {
         description:
           "Developer instruments code without LANGWATCH_API_KEY in environment. API key is in the project .env file.",
         agents: [
-          createClaudeCodeAgent({
+          createAgent({
             workingDirectory: tempFolder,
+            skillPath,
             cleanEnv: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -292,7 +276,7 @@ describe("Tracing Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable || !runner.capabilities.supportsMcp)(
     "instruments code without MCP — uses llms.txt fallback for docs",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -301,7 +285,6 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       // Write .env with API key
       fs.writeFileSync(
@@ -314,8 +297,9 @@ describe("Tracing Skill", () => {
         description:
           "Agent instruments code without MCP access, using direct URL fetching for docs.",
         agents: [
-          createClaudeCodeAgent({
+          createAgent({
             workingDirectory: tempFolder,
+            skillPath,
             skipMcp: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -346,7 +330,7 @@ describe("Tracing Skill", () => {
     600_000
   );
 
-  it.skipIf(isCI)(
+  it.skipIf(isCI || runnerUnavailable)(
     "asks user for API key when not found in environment or .env",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -355,7 +339,6 @@ describe("Tracing Skill", () => {
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
       );
-      copySkillToWorkDir(tempFolder);
 
       // NO .env file — agent must ask user for the key
 
@@ -364,8 +347,9 @@ describe("Tracing Skill", () => {
         description:
           "Agent instruments code but has no API key available. Must ask the user.",
         agents: [
-          createClaudeCodeAgent({
+          createAgent({
             workingDirectory: tempFolder,
+            skillPath,
             cleanEnv: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
