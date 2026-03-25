@@ -176,6 +176,61 @@ describe("extensible scenario metadata", () => {
     });
   });
 
+  describe("scenarioSetId validation", () => {
+    const validEvent = {
+      type: ScenarioEventType.RUN_STARTED,
+      timestamp: Date.now(),
+      batchRunId: "batch_1",
+      scenarioId: "scenario_1",
+      scenarioRunId: "run_1",
+      metadata: { name: "Test scenario" },
+    };
+
+    describe("when scenarioSetId is an empty string", () => {
+      it("rejects the event at schema validation", () => {
+        const event = { ...validEvent, scenarioSetId: "" };
+
+        const result = scenarioEventSchema.safeParse(event);
+
+        expect(result.success).toBe(false);
+      });
+
+      it("rejects in the individual run started schema", () => {
+        const event = { ...validEvent, scenarioSetId: "" };
+
+        const result = scenarioRunStartedSchema.safeParse(event);
+
+        expect(result.success).toBe(false);
+      });
+    });
+
+    describe("when scenarioSetId is omitted", () => {
+      it("defaults to 'default'", () => {
+        const event = { ...validEvent };
+
+        const result = scenarioEventSchema.safeParse(event);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.scenarioSetId).toBe("default");
+        }
+      });
+    });
+
+    describe("when scenarioSetId is a valid non-empty string", () => {
+      it("preserves the value", () => {
+        const event = { ...validEvent, scenarioSetId: "my-set" };
+
+        const result = scenarioEventSchema.safeParse(event);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.scenarioSetId).toBe("my-set");
+        }
+      });
+    });
+  });
+
   describe("Elasticsearch transforms", () => {
     describe("when event has custom metadata keys in camelCase", () => {
       it("preserves metadata keys in their original casing", () => {
