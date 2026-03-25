@@ -4,7 +4,9 @@ description: "Get started with LangWatch in seconds. Copy a prompt, install a sk
 sidebarTitle: "Skills Directory"
 ---
 
+import { CopyPrompt } from "/snippets/copy-prompt.jsx"
 import { SkillInstall } from "/snippets/skill-install.jsx"
+import { PROMPTS } from "/snippets/prompts-data.jsx"
 
 Don't want to install skills? Copy a ready-to-paste prompt instead: [Code Prompts](/skills/code-prompts) | [Platform Prompts](/skills/platform-prompts)
 
@@ -12,24 +14,138 @@ Don't want to install skills? Copy a ready-to-paste prompt instead: [Code Prompt
 
 Install any skill with a single command:
 
-<SkillInstall title="Instrument my agent with open telemetry" skill="langwatch/skills/tracing" slashCommand="/tracing" />
-<SkillInstall title="Write evaluations for my agent" skill="langwatch/skills/evaluations" slashCommand="/evaluations" />
-<SkillInstall title="Write scenario tests and a CI pipeline for my agent" skill="langwatch/skills/scenarios" slashCommand="/scenarios" />
-<SkillInstall title="Version my prompts" skill="langwatch/skills/prompts" slashCommand="/prompts" />
-<SkillInstall title="Do all of the above" skill="langwatch/skills/level-up" slashCommand="/level-up" highlighted />
+<Tabs>
+  <Tab title="Skills">
+    <SkillInstall title="Instrument my agent with open telemetry" skill="langwatch/skills/tracing" slashCommand="/tracing" />
+    <SkillInstall title="Write evaluations for my agent" skill="langwatch/skills/evaluations" slashCommand="/evaluations" />
+    <SkillInstall title="Write scenario tests and a CI pipeline for my agent" skill="langwatch/skills/scenarios" slashCommand="/scenarios" />
+    <SkillInstall title="Version my prompts" skill="langwatch/skills/prompts" slashCommand="/prompts" />
+    <SkillInstall title="Do all of the above" skill="langwatch/skills/level-up" slashCommand="/level-up" highlighted />
+  </Tab>
 
-<Tip>
-  **Starting an agent from scratch?** Use [Better Agents](/better-agents/overview) to scaffold a production-ready project with all LangWatch features built in.
-</Tip>
+  <Tab title="Prompts">
+    <CopyPrompt title="Instrument my code with LangWatch" prompt={PROMPTS.tracing} skill="tracing" />
+    <CopyPrompt title="Set up evaluations for my agent" prompt={PROMPTS.evaluations} skill="evaluations" />
+    <CopyPrompt title="Add scenario tests for my agent" prompt={PROMPTS.scenarios} skill="scenarios" />
+    <CopyPrompt title="Version my prompts with LangWatch" prompt={PROMPTS.prompts} skill="prompts" />
+    <CopyPrompt title="How is my agent performing?" prompt={PROMPTS.analytics} skill="analytics" />
+    <CopyPrompt boldPrefix="⭐ All of the above:" title="Take my agent to the next level" prompt={PROMPTS.level_up} skill="level-up" />
+  </Tab>
+
+  <Tab title="MCP">
+    Install the LangWatch MCP once:
+
+    <Tabs>
+      <Tab title="Claude Code">
+        ```bash
+        claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
+        ```
+
+        Or add manually to `~/.claude.json`:
+        ```json
+        {
+          "mcpServers": {
+            "langwatch": {
+              "command": "npx",
+              "args": ["-y", "@langwatch/mcp-server"],
+              "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
+            }
+          }
+        }
+        ```
+      </Tab>
+      <Tab title="Copilot">
+        Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette):
+        ```json
+        {
+          "servers": {
+            "langwatch": {
+              "type": "stdio",
+              "command": "npx",
+              "args": ["-y", "@langwatch/mcp-server"],
+              "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
+            }
+          }
+        }
+        ```
+      </Tab>
+      <Tab title="Cursor">
+        Open Cursor Settings → Tools and MCP, add:
+        ```json
+        {
+          "mcpServers": {
+            "langwatch": {
+              "command": "npx",
+              "args": ["-y", "@langwatch/mcp-server"],
+              "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
+            }
+          }
+        }
+        ```
+      </Tab>
+      <Tab title="ChatGPT">
+        1. Go to **Settings → Connectors**
+        2. Click **Add connector**
+        3. Enter the server URL: `https://mcp.langwatch.ai/sse`
+        4. For authentication, select **Bearer Token** and enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize))
+
+        *Requires a Plus or Team plan.*
+      </Tab>
+      <Tab title="Claude Chat">
+        1. Go to **Settings → Connectors**
+        2. Click **Add custom connector**
+        3. Enter the server URL: `https://mcp.langwatch.ai/sse`
+        4. In **Advanced settings**, enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize)) as the **OAuth Client Secret**. Leave Client ID empty.
+
+        *Requires a Pro or Max plan.*
+      </Tab>
+      <Tab title="Other">
+        Add to your editor's MCP settings:
+        ```json
+        {
+          "mcpServers": {
+            "langwatch": {
+              "command": "npx",
+              "args": ["-y", "@langwatch/mcp-server"],
+              "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
+            }
+          }
+        }
+        ```
+      </Tab>
+    </Tabs>
+
+    Ask your agent to:
+
+    <CopyLine text="Instrument my code with LangWatch" />
+    <CopyLine text="Set up evaluations for my agent" />
+    <CopyLine text="Add scenario tests for my agent" />
+    <CopyLine text="Version my prompts with LangWatch" />
+    <CopyLine text="How is my agent performing?" />
+  </Tab>
+</Tabs>
 
 ## Recipes
 
-Domain-specific recipes for common use cases — your AI agent can execute these directly.
+Domain-specific recipes for common use cases, your AI agent can execute these directly.
 
-<CardGroup cols={3}>
-  <Card title="Debug Instrumentation" description="Fix broken traces" icon="bug" href="/skills/recipes" />
-  <Card title="Generate RAG Dataset" description="Test data from your knowledge base" icon="database" href="/skills/recipes" />
-  <Card title="Test Compliance" description="Verify advisory boundaries" icon="shield-check" href="/skills/recipes" />
-</CardGroup>
+<Tabs>
+  <Tab title="Skills">
+    <SkillInstall title="What should I do next to improve my agent?" skill="langwatch/skills/recipes/improve-setup" slashCommand="/improve-setup" highlighted />
+    <SkillInstall title="Debug and improve my agent instrumentation" skill="langwatch/skills/recipes/debug-instrumentation" slashCommand="/debug-instrumentation" />
+    <SkillInstall title="Evaluate my multimodal agent" skill="langwatch/skills/recipes/evaluate-multimodal" slashCommand="/evaluate-multimodal" />
+    <SkillInstall title="Generate an evaluation dataset from my RAG knowledge base" skill="langwatch/skills/recipes/generate-rag-dataset" slashCommand="/generate-rag-dataset" />
+    <SkillInstall title="Check my agent doesn't give prescriptive advice" skill="langwatch/skills/recipes/test-compliance" slashCommand="/test-compliance" />
+    <SkillInstall title="Test my CLI is well usable by AI agents" skill="langwatch/skills/recipes/test-cli-usability" slashCommand="/test-cli-usability" />
+  </Tab>
 
-[See all recipes →](/skills/recipes)
+  <Tab title="Prompts">
+    <CopyPrompt boldPrefix="⭐" title="What should I do next to improve my agent?" prompt={PROMPTS.recipe_improve_setup} skill="recipe-improve-setup" />
+    <CopyPrompt title="Debug and improve my agent instrumentation" prompt={PROMPTS.recipe_debug_instrumentation} skill="recipe-debug-instrumentation" />
+    <CopyPrompt title="Evaluate my multimodal agent" prompt={PROMPTS.recipe_evaluate_multimodal} skill="recipe-evaluate-multimodal" />
+    <CopyPrompt title="Generate an evaluation dataset from my RAG knowledge base" prompt={PROMPTS.recipe_generate_rag_dataset} skill="recipe-generate-rag-dataset" />
+    <CopyPrompt title="Check my agent doesn't give prescriptive advice" prompt={PROMPTS.recipe_test_compliance} skill="recipe-test-compliance" />
+    <CopyPrompt title="Test my CLI is well usable by AI agents" prompt={PROMPTS.recipe_test_cli_usability} skill="recipe-test-cli-usability" />
+  </Tab>
+</Tabs>
+
