@@ -119,8 +119,8 @@ services:
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
         pnpm install &&
-        pnpm run types:zod:generate &&
-        pnpm prisma generate
+        pnpm prisma generate &&
+        pnpm run types:zod:generate
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
