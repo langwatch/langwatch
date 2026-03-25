@@ -790,7 +790,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }): Promise<string[]> {
     const client = await this.getClient(projectId);
     const result = await client.query({
-      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL`,
+      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL LIMIT 10000`,
       query_params: { tenantId: projectId },
       format: "JSONEachRow",
     });

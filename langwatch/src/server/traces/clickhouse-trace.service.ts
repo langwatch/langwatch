@@ -73,6 +73,10 @@ export class ClickHouseTraceService {
 
   /**
    * Resolve the ClickHouse client for a given project.
+   *
+   * The returned client is already wrapped with wrapWithDefaultSettings
+   * by getClickHouseClientForProject, so every query automatically receives
+   * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
    */
   private async resolveClient(projectId: string) {
     return getClickHouseClientForProject(projectId);
@@ -658,6 +662,7 @@ export class ClickHouseTraceService {
               WHERE ${whereClause}
                 AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
               GROUP BY TopicId, SubTopicId
+              LIMIT 10000
             `,
             query_params: {
               tenantId: input.projectId,
@@ -890,6 +895,7 @@ export class ClickHouseTraceService {
                     AND SpanId = {spanId:String}
                   LIMIT 1
                 )
+              LIMIT 1000
             `,
             query_params: {
               tenantId: projectId,
@@ -1170,6 +1176,7 @@ export class ClickHouseTraceService {
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
               ORDER BY SpanName ASC
+              LIMIT 1000
             `,
             query_params: {
               tenantId: projectId,
@@ -1197,6 +1204,7 @@ export class ClickHouseTraceService {
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
+              LIMIT 1000
             `,
             query_params: {
               tenantId: projectId,

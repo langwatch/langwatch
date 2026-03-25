@@ -13,6 +13,8 @@ import {
   buildJoinClause,
   tableAliases,
   TRACE_ANALYTICS_COLUMNS,
+  extractReferencedSpanColumns,
+  extractReferencedEvaluationColumns,
 } from "./field-mappings";
 import {
   type MetricTranslation,
@@ -26,6 +28,29 @@ import {
 import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:analytics:aggregation-builder");
+
+/**
+ * Resolve which columns a joined table needs based on the SQL expressions
+ * that reference it.
+ *
+ * Returns a `ReadonlySet<string>` of column names to pass as
+ * `requiredColumns` to `buildJoinClause`. This ensures each JOIN subquery
+ * only SELECTs the columns actually used, avoiding expensive reads of
+ * wide columns like SpanAttributes or Events arrays.
+ */
+function resolveRequiredColumns(
+  table: CHTable,
+  expressions: string[],
+): ReadonlySet<string> | undefined {
+  switch (table) {
+    case "stored_spans":
+      return extractReferencedSpanColumns(expressions);
+    case "evaluation_runs":
+      return extractReferencedEvaluationColumns(expressions);
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.
@@ -433,9 +458,20 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     }
   }
 
-  // Build JOIN clauses
+  // Build JOIN clauses with column pruning.
+  // Collect all SQL expressions that reference columns from joined tables
+  // so we only SELECT the columns actually needed in each JOIN subquery.
+  const allExpressions = [
+    ...metricTranslations.map((m) => m.selectExpression),
+    filterTranslation.whereClause,
+    groupByColumn ?? "",
+    groupByAdditionalWhere ?? "",
+  ];
   const joinClauses = Array.from(allJoins)
-    .map((table) => buildJoinClause(table))
+    .map((table) => {
+      const requiredColumns = resolveRequiredColumns(table, allExpressions);
+      return buildJoinClause(table, requiredColumns);
+    })
     .join("\n");
 
   // Build WHERE clause
@@ -1270,8 +1306,12 @@ export function buildDataForFilterQuery(
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
+  const filterExpressions = [filterTranslation.whereClause];
   const filterJoins = Array.from(filterTranslation.requiredJoins)
-    .map((table) => buildJoinClause(table))
+    .map((table) => {
+      const requiredColumns = resolveRequiredColumns(table, filterExpressions);
+      return buildJoinClause(table, requiredColumns);
+    })
     .join("\n");
 
   let sql: string;
@@ -1362,7 +1402,7 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.model":
-      joins = buildJoinClause("stored_spans");
+      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
       sql = `
         SELECT
           ${ss}.SpanAttributes['gen_ai.request.model'] AS field,
@@ -1384,7 +1424,7 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.type":
-      joins = buildJoinClause("stored_spans");
+      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
       sql = `
         SELECT
           ${ss}.SpanAttributes['langwatch.span.type'] AS field,

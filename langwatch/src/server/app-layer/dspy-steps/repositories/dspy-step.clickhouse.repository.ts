@@ -182,6 +182,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
           WHERE TenantId = {tenantId:String}
             AND ExperimentId = {experimentId:String}
           ORDER BY CreatedAt ASC
+          LIMIT 10000
         `,
         query_params: { tenantId, experimentId },
         format: "JSONEachRow",

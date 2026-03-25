@@ -3,6 +3,7 @@ import { createResilientClickHouseClient } from "~/server/app-layer/clients/clic
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { _getSharedClickHouseClient } from "./client";
+import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:routing");
 
@@ -186,7 +187,9 @@ function getOrCreateCustomClient(
     },
   });
 
-  const client = createResilientClickHouseClient({ client: raw });
+  const client = wrapWithDefaultSettings(
+    createResilientClickHouseClient({ client: raw }),
+  );
   customClientCache.set(organizationId, client);
   return client;
 }

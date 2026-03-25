@@ -247,6 +247,75 @@ describe("column-pruning", () => {
     });
   });
 
+  describe("sentiment metrics column pruning", () => {
+    describe("when requesting sentiment.thumbs_up_down", () => {
+      it("does not include wide span columns like Input and Output", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              aggregation: "sum" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).not.toContain("ss.Input");
+        expect(result.sql).not.toContain("ss.Output");
+      });
+
+      it("references Events.Name for thumbs up/down detection", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              aggregation: "sum" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).toContain("Events.Name");
+      });
+    });
+  });
+
+  describe("threads metrics column pruning", () => {
+    describe("when requesting threads.average_duration_per_thread", () => {
+      it("does not use SELECT * in the trace_summaries subquery", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+trace_summaries/);
+      });
+
+      it("accesses Attributes only via key extraction for conversation id", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).toContain("Attributes['gen_ai.conversation.id']");
+      });
+    });
+  });
+
   describe("query correctness after pruning", () => {
     describe("when building a timeseries query for trace_count", () => {
       it("generates syntactically valid SQL", () => {
