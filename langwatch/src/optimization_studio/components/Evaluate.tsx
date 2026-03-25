@@ -24,6 +24,7 @@ import { Dialog } from "../../components/ui/dialog";
 import { Select } from "../../components/ui/select";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
@@ -99,6 +100,7 @@ export function EvaluateModalContent({
   onClose: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
+  const { checkAndProceed } = useLicenseEnforcement("experiments");
   const {
     workflowId,
     getWorkflow,
@@ -262,57 +264,60 @@ export function EvaluateModalContent({
         return;
       }
 
-      let versionId: string | undefined;
+      await checkAndProceed(async () => {
+        let versionId: string | undefined;
 
-      if (canSave) {
-        try {
-          const versionResponse = await commitVersion.mutateAsync({
-            projectId: project.id,
-            workflowId,
-            commitMessage,
-            dsl: {
-              ...getWorkflow(),
-              version,
-            },
-          });
-          versionId = versionResponse.id;
-          setLastCommittedWorkflow(getWorkflow());
-          setCurrentVersionId(versionId);
-        } catch (error) {
+        if (canSave) {
+          try {
+            const versionResponse = await commitVersion.mutateAsync({
+              projectId: project.id,
+              workflowId,
+              commitMessage,
+              dsl: {
+                ...getWorkflow(),
+                version,
+              },
+            });
+            versionId = versionResponse.id;
+            setLastCommittedWorkflow(getWorkflow());
+            setCurrentVersionId(versionId);
+          } catch (error) {
+            toaster.create({
+              title: "Error saving version",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+            throw error;
+          }
+        } else {
+          versionId = currentVersionId;
+        }
+
+        if (!versionId) {
           toaster.create({
-            title: "Error saving version",
+            title: "Version ID not found for evaluation",
             type: "error",
             duration: 5000,
             meta: { closable: true },
           });
-          throw error;
+          return;
         }
-      } else {
-        versionId = currentVersionId;
-      }
 
-      if (!versionId) {
-        toaster.create({
-          title: "Version ID not found for evaluation",
-          type: "error",
-          duration: 5000,
-          meta: { closable: true },
+        void trpc.workflow.getVersions.invalidate();
+
+        startEvaluationExecution({
+          workflow_version_id: versionId,
+          evaluate_on: evaluateOn.value,
+          dataset_entry:
+            evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
         });
-        return;
-      }
-
-      void trpc.workflow.getVersions.invalidate();
-
-      startEvaluationExecution({
-        workflow_version_id: versionId,
-        evaluate_on: evaluateOn.value,
-        dataset_entry:
-          evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+        setHasStarted(true);
       });
-      setHasStarted(true);
     },
     [
       canSave,
+      checkAndProceed,
       commitVersion,
       currentVersionId,
       estimatedTotal,
