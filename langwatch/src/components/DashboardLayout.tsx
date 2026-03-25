@@ -34,6 +34,7 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
+import { AnnouncementBanner } from "./AnnouncementBanner";
 import { SdkRadarBanner } from "./SdkRadarBanner";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import { FullLogo } from "./icons/FullLogo";
@@ -627,6 +628,7 @@ export const DashboardLayout = ({
                 </Alert.Root>
               )}
 
+            <AnnouncementBanner />
             <SdkRadarBanner />
 
             {ssoStatus?.pendingSsoSetup && (
