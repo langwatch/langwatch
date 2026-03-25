@@ -15,19 +15,19 @@ LangWatch integrates with Mastra through OpenTelemetry to capture traces from yo
 
 <CodeGroup>
 ```bash npm
-npm i langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+npm i langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 
 ```bash pnpm
-pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 
 ```bash yarn
-yarn add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+yarn add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 
 ```bash bun
-bun add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+bun add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 </CodeGroup>
 
@@ -39,8 +39,8 @@ Configure your Mastra instance with OpenTelemetry exporter pointing to LangWatch
 import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { openai } from "@ai-sdk/openai";
+import { Observability } from "@mastra/observability";
 import { OtelExporter } from "@mastra/otel-exporter";
-import { PinoLogger } from "@mastra/loggers";
 import { LibSQLStore } from "@mastra/libsql";
 
 export const mastra = new Mastra({
@@ -48,15 +48,13 @@ export const mastra = new Mastra({
     assistant: new Agent({
       name: "assistant",
       instructions: "You are a helpful assistant.",
-      model: openai("gpt-5"),
+      model: openai("gpt-5-mini"),
     }),
   },
-  // Storage is required for tracing in Mastra
-  storage: new LibSQLStore({ url: ":memory:" }),
-  logger: new PinoLogger({ name: "mastra", level: "info" }),
-  observability: {
+  storage: new LibSQLStore({ id: "mastra-storage", url: "file:./mastra.db" }),
+  observability: new Observability({
     configs: {
-      otel: {
+      langwatch: {
         serviceName: "<project_name>",
         exporters: [
           new OtelExporter({
@@ -70,7 +68,7 @@ export const mastra = new Mastra({
         ],
       },
     },
-  },
+  }),
 });
 ```
 
