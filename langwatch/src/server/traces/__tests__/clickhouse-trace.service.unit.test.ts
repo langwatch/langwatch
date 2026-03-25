@@ -287,6 +287,240 @@ describe("ClickHouseTraceService", () => {
       });
     });
 
+    describe("scrollId / pagination cursor handling", () => {
+      const cursorTimestamp = 1700000000000;
+      const cursorTraceId = "trace-cursor";
+
+      /** Builds a valid base64-encoded scrollId cursor */
+      const makeScrollId = (overrides: Record<string, unknown> = {}) =>
+        Buffer.from(
+          JSON.stringify({
+            lastTimestamp: cursorTimestamp,
+            lastTraceId: cursorTraceId,
+            sortDirection: "desc",
+            pageSize: baseInput.pageSize,
+            ...overrides,
+          }),
+        ).toString("base64");
+
+      const setupMocksForCursorTest = () => {
+        const summaryRow = makeSummaryRow("trace-1");
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([summaryRow]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+      };
+
+      describe("when scrollId is passed via options", () => {
+        it("applies keyset pagination from options.scrollId", async () => {
+          setupMocksForCursorTest();
+          const scrollId = makeScrollId();
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const result = await service.getAllTracesForProject(
+            baseInput,
+            protections,
+            { scrollId },
+          );
+
+          expect(result).not.toBeNull();
+
+          // The data query (2nd call) includes the keyset cursor condition
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+          );
+          expect(dataCall[0].query_params.lastTimestamp).toBe(cursorTimestamp);
+          expect(dataCall[0].query_params.lastTraceId).toBe(cursorTraceId);
+        });
+      });
+
+      describe("when scrollId is passed via input (legacy)", () => {
+        it("applies keyset pagination from input.scrollId", async () => {
+          setupMocksForCursorTest();
+          const scrollId = makeScrollId();
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const inputWithScrollId = {
+            ...baseInput,
+            scrollId,
+          } as GetAllTracesForProjectInput;
+
+          const result = await service.getAllTracesForProject(
+            inputWithScrollId,
+            protections,
+          );
+
+          expect(result).not.toBeNull();
+
+          // The data query (2nd call) includes the keyset cursor condition
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+          );
+          expect(dataCall[0].query_params.lastTimestamp).toBe(cursorTimestamp);
+          expect(dataCall[0].query_params.lastTraceId).toBe(cursorTraceId);
+        });
+      });
+
+      describe("when scrollId is in both options and input", () => {
+        it("uses options.scrollId over input.scrollId", async () => {
+          setupMocksForCursorTest();
+          const optionsScrollId = makeScrollId({
+            lastTraceId: "trace-from-options",
+          });
+          const inputScrollId = makeScrollId({
+            lastTraceId: "trace-from-input",
+          });
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const inputWithScrollId = {
+            ...baseInput,
+            scrollId: inputScrollId,
+          } as GetAllTracesForProjectInput;
+
+          const result = await service.getAllTracesForProject(
+            inputWithScrollId,
+            protections,
+            { scrollId: optionsScrollId },
+          );
+
+          expect(result).not.toBeNull();
+
+          // options.scrollId takes precedence — cursor uses "trace-from-options"
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query_params.lastTraceId).toBe(
+            "trace-from-options",
+          );
+        });
+      });
+
+      describe("when no scrollId is provided", () => {
+        it("does not apply keyset cursor condition", async () => {
+          setupMocksForCursorTest();
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const result = await service.getAllTracesForProject(
+            baseInput,
+            protections,
+          );
+
+          expect(result).not.toBeNull();
+
+          // The data query (2nd call) must NOT contain cursor condition
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+          );
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+          );
+        });
+      });
+
+      describe("when scrollId is malformed base64", () => {
+        it("falls back to no cursor", async () => {
+          setupMocksForCursorTest();
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const result = await service.getAllTracesForProject(
+            baseInput,
+            protections,
+            { scrollId: "not-valid-base64!!!" },
+          );
+
+          expect(result).not.toBeNull();
+
+          // The data query (2nd call) must NOT contain cursor condition
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+          );
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+          );
+        });
+      });
+
+      describe("when scrollId has mismatched sortDirection", () => {
+        it("discards the cursor and paginates from the beginning", async () => {
+          setupMocksForCursorTest();
+          // baseInput defaults to desc (or undefined which defaults to desc)
+          // Build a cursor with "asc" sortDirection to trigger mismatch
+          const scrollId = makeScrollId({ sortDirection: "asc" });
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const result = await service.getAllTracesForProject(
+            baseInput,
+            protections,
+            { scrollId },
+          );
+
+          expect(result).not.toBeNull();
+
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+          );
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+          );
+        });
+      });
+
+      describe("when scrollId has mismatched pageSize", () => {
+        it("discards the cursor and paginates from the beginning", async () => {
+          setupMocksForCursorTest();
+          // baseInput.pageSize is 2, build cursor with pageSize 10
+          const scrollId = makeScrollId({ pageSize: 10 });
+
+          const service = new ClickHouseTraceService({
+            project: { findUnique: mockPrismaFindUnique },
+          } as never);
+
+          const result = await service.getAllTracesForProject(
+            baseInput,
+            protections,
+            { scrollId },
+          );
+
+          expect(result).not.toBeNull();
+
+          const dataCall = mockClickHouseQuery.mock.calls[1]!;
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) <",
+          );
+          expect(dataCall[0].query).not.toContain(
+            "(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) >",
+          );
+        });
+      });
+    });
+
     describe("when includeSpans is true", () => {
       it("fetches and attaches spans to traces", async () => {
         const summaryRow = makeSummaryRow("trace-1");
