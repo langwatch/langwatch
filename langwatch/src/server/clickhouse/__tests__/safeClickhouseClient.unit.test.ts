@@ -50,7 +50,7 @@ describe("wrapWithDefaultSettings", () => {
         query: "SELECT 1",
         format: "JSONEachRow",
         clickhouse_settings: {
-          max_memory_usage: "4000000000",
+          max_bytes_before_external_group_by: "1000000000",
         },
       });
 
@@ -59,7 +59,7 @@ describe("wrapWithDefaultSettings", () => {
         format: "JSONEachRow",
         clickhouse_settings: {
           ...DEFAULT_CLICKHOUSE_SETTINGS,
-          max_memory_usage: "4000000000",
+          max_bytes_before_external_group_by: "1000000000",
         },
       });
     });

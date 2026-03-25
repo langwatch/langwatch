@@ -38,15 +38,16 @@ const MS_PER_MINUTE = 1000 * 60;
 /**
  * Default ClickHouse settings applied to all analytics queries.
  *
- * max_memory_usage: Hard cap (4 GiB) on per-query memory. Queries that exceed
- * this limit are terminated instead of causing OOM on the ClickHouse server.
+ * max_memory_usage is intentionally omitted: the ClickHouse server profile
+ * already enforces a per-query memory cap via Terraform (1.5–2 GiB depending
+ * on cluster). Setting it client-side would override that cap upward, which
+ * is counterproductive.
  *
  * max_bytes_before_external_group_by: When GROUP BY intermediate state exceeds
  * this threshold (500 MB), ClickHouse spills to disk instead of failing with OOM.
  * This acts as a safety net for large GROUP BY operations under concurrent load.
  */
 export const ANALYTICS_CLICKHOUSE_SETTINGS: Record<string, number> = {
-  max_memory_usage: 4_000_000_000,
   max_bytes_before_external_group_by: 500_000_000,
 };
 
