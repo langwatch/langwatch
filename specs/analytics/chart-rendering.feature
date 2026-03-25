@@ -87,3 +87,30 @@ Feature: Analytics Chart Rendering
     Given an analytics query for the performance tokens per second metric
     When the ClickHouse query is built
     Then the stored spans data includes duration information needed to compute the rate
+
+  # ---------------------------------------------------------------------------
+  # Error state when query fails (bug fix #2599)
+  # ---------------------------------------------------------------------------
+
+  @regression @integration
+  Scenario: Chart shows error state when analytics query fails
+    Given an analytics chart with no cached data
+    When the ClickHouse query returns an error
+    Then the chart displays an error message instead of a blank area
+    And a retry button is available
+    And the backend error details are accessible via a "Show details" control
+
+  @regression @integration
+  Scenario: Chart shows stale-data badge when refetch fails with cached data
+    Given an analytics chart with previously loaded data
+    When a background refetch fails
+    Then the chart continues showing the cached data
+    And a badge indicates the data may be stale with a retry option
+
+  @regression @integration
+  Scenario: Error state is visually distinct from empty data state
+    Given an analytics chart
+    When the query fails with an error
+    Then the chart shows an error alert with a red indicator
+    When there is no data instead of an error
+    Then the chart shows a neutral "No data" message without error styling
