@@ -135,7 +135,6 @@ const FALLBACK_TOKENIZER: MaybeStoredLLMModelCost = {
   regex: "^gpt-4o$",
 };
 
-// TODO: test
 export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
 

@@ -66,6 +66,22 @@ export function estimateCost({
     : undefined;
 }
 
+const VENDOR_MAPPINGS: Record<string, string> = {
+  "deepseek-ai/": "deepseek/",
+  "minimaxai/": "minimax/",
+  "zai-org/": "z-ai/",
+  "zhipu-ai/": "z-ai/",
+};
+
+const QUANTIZATION_SUFFIXES = [
+  "-fp8",
+  "-gptq",
+  "-awq",
+  "-gguf",
+  "-int4",
+  "-int8",
+];
+
 /**
  * Normalize model name for better matching:
  * - Convert to lowercase
@@ -75,30 +91,14 @@ export function estimateCost({
 export const normalizeModelName = (model: string): string => {
   let normalized = model.toLowerCase();
 
-  const vendorMappings: Record<string, string> = {
-    "deepseek-ai/": "deepseek/",
-    "minimaxai/": "minimax/",
-    "zai-org/": "z-ai/",
-    "zhipu-ai/": "z-ai/",
-  };
-
-  for (const [from, to] of Object.entries(vendorMappings)) {
+  for (const [from, to] of Object.entries(VENDOR_MAPPINGS)) {
     if (normalized.startsWith(from)) {
       normalized = normalized.replace(from, to);
       break;
     }
   }
 
-  const suffixesToRemove = [
-    "-fp8",
-    "-gptq",
-    "-awq",
-    "-gguf",
-    "-int4",
-    "-int8",
-  ];
-
-  for (const suffix of suffixesToRemove) {
+  for (const suffix of QUANTIZATION_SUFFIXES) {
     if (normalized.endsWith(suffix)) {
       normalized = normalized.slice(0, -suffix.length);
       break;
@@ -113,19 +113,24 @@ export const matchingLLMModelCost = (
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
   const normalizedModel = normalizeModelName(model);
+  return findModelCost(normalizedModel, llmModelCosts);
+};
 
-  const llmModelCost = llmModelCosts.find((llmModelCost) => {
-    const regex = new RegExp(llmModelCost.regex);
-    return regex.test(normalizedModel);
-  });
+const findModelCost = (
+  normalizedModel: string,
+  llmModelCosts: MaybeStoredLLMModelCost[],
+): MaybeStoredLLMModelCost | undefined => {
+  const match = llmModelCosts.find((entry) =>
+    new RegExp(entry.regex).test(normalizedModel),
+  );
 
-  if (!llmModelCost && normalizedModel.includes("/")) {
-    const model_ = normalizedModel.substring(
+  if (!match && normalizedModel.includes("/")) {
+    const stripped = normalizedModel.substring(
       normalizedModel.indexOf("/") + 1,
     );
-    return matchingLLMModelCost(model_, llmModelCosts);
+    return findModelCost(stripped, llmModelCosts);
   }
-  return llmModelCost;
+  return match;
 };
 
 export const getMatchingLLMModelCost = async (
