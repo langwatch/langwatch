@@ -39,6 +39,7 @@ describe("<ChartErrorState />", () => {
       expect(
         screen.getByRole("button", { name: /retry/i }),
       ).toBeInTheDocument();
+      expect(screen.queryByText(/no data/i)).not.toBeInTheDocument();
     });
   });
 

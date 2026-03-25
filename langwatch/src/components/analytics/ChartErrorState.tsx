@@ -63,7 +63,13 @@ export function ChartErrorState({
             onOpenChange={({ open }) => setDetailsOpen(open)}
           >
             <Collapsible.Trigger asChild>
-              <HStack gap={1} cursor="pointer">
+              <Button
+                size="xs"
+                variant="ghost"
+                justifyContent="flex-start"
+                px={0}
+                minH="unset"
+              >
                 {detailsOpen ? (
                   <ChevronDown size={12} />
                 ) : (
@@ -72,7 +78,7 @@ export function ChartErrorState({
                 <Text fontSize="xs" color="fg.muted">
                   Show details
                 </Text>
-              </HStack>
+              </Button>
             </Collapsible.Trigger>
             <Collapsible.Content>
               <Box

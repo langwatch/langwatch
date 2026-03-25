@@ -567,20 +567,30 @@ const CustomGraph_ = React.memo(
           ) : (
             <>
               {timeseries.error && timeseries.data && (
-                <Badge
-                  position="absolute"
-                  right={4}
-                  top={4}
-                  zIndex={1}
-                  colorPalette="red"
-                  variant="solid"
-                  fontSize="xs"
-                  cursor="pointer"
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    right: 16,
+                    top: 16,
+                    zIndex: 1,
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                  }}
+                  aria-label="Retry loading chart data"
                   onClick={() => void timeseries.refetch()}
                   title={timeseries.error.message}
                 >
-                  Refresh failed — click to retry
-                </Badge>
+                  <Badge
+                    colorPalette="red"
+                    variant="solid"
+                    fontSize="xs"
+                  >
+                    Refresh failed — click to retry
+                  </Badge>
+                </button>
               )}
               {input.graphType !== "summary" && allEmpty && (
                 <Box
