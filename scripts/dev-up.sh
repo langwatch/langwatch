@@ -79,6 +79,7 @@ fi
 # Start services in detached mode
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
+export NEXTAUTH_PROVIDER=email
 $COMPOSE_CMD up -d
 
 # ---------------------------------------------------------------------------
