@@ -3,10 +3,10 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 const mockOpenDrawer = vi.fn();
@@ -91,6 +91,10 @@ describe("DatasetSelection", () => {
     setIsEditing: vi.fn(),
   };
 
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -116,6 +120,73 @@ describe("DatasetSelection", () => {
         "uploadCSV",
         expect.anything(),
       );
+    });
+
+    it("calls setIsEditing with the created dataset when onSuccess fires", async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(<DatasetSelection {...defaultProps} />);
+
+      const newDatasetButton = screen.getByRole("button", {
+        name: /new dataset/i,
+      });
+      await user.click(newDatasetButton);
+
+      const onSuccess = mockOpenDrawer.mock.calls[0]![1].onSuccess as (
+        args: { datasetId: string; name: string },
+      ) => void;
+      onSuccess({ datasetId: "new-ds-42", name: "My New Dataset" });
+
+      expect(defaultProps.setIsEditing).toHaveBeenCalledWith({
+        id: "new-ds-42",
+        name: "My New Dataset",
+      });
+    });
+  });
+
+  describe("when a dataset already exists on the node", () => {
+    it("opens addOrEditDataset drawer, not uploadCSV", async () => {
+      const user = userEvent.setup();
+      const propsWithDataset = {
+        ...defaultProps,
+        node: {
+          ...defaultProps.node,
+          data: { dataset: { id: "existing-123", name: "Existing Dataset" } },
+        } as never,
+      };
+
+      renderWithProviders(<DatasetSelection {...propsWithDataset} />);
+
+      const newDatasetButton = screen.getByRole("button", {
+        name: /new dataset/i,
+      });
+      await user.click(newDatasetButton);
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith("addOrEditDataset", {
+        onSuccess: expect.any(Function),
+      });
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "uploadCSV",
+        expect.anything(),
+      );
+    });
+  });
+
+  // @regression #2506
+  describe("when any interaction triggers openDrawer", () => {
+    it("never passes uploadCSV to openDrawer", async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(<DatasetSelection {...defaultProps} />);
+
+      const newDatasetButton = screen.getByRole("button", {
+        name: /new dataset/i,
+      });
+      await user.click(newDatasetButton);
+
+      for (const call of mockOpenDrawer.mock.calls) {
+        expect(call[0]).not.toBe("uploadCSV"); // @regression #2506
+      }
     });
   });
 });
