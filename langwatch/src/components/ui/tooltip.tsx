@@ -1,7 +1,7 @@
 // eslint-disable-next-line no-restricted-imports
 import { Tooltip as ChakraTooltip, Portal, Text } from "@chakra-ui/react";
 import * as React from "react";
-import { OverlayDepthContext, useOverlayZIndex } from "./z-index";
+import { OverlayDepthContext, useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 
 export interface TooltipProps extends ChakraTooltip.RootProps {
   showArrow?: boolean;

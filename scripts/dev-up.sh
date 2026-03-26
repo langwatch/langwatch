@@ -79,7 +79,8 @@ fi
 # Start services in detached mode
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
-export NEXTAUTH_PROVIDER=email
+# Use email auth for browser tests (overrides .env's NEXTAUTH_PROVIDER)
+echo "NEXTAUTH_PROVIDER=email" > langwatch/.env.dev-up
 $COMPOSE_CMD up -d
 
 # ---------------------------------------------------------------------------

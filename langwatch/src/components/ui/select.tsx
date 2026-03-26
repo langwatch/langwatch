@@ -5,7 +5,7 @@ import type { CollectionItem } from "@chakra-ui/react";
 import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
-import { OverlayDepthContext, useOverlayZIndex } from "./z-index";
+import { OverlayDepthContext, useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 
 interface SelectTriggerProps extends ChakraSelect.ControlProps {
   clearable?: boolean;
