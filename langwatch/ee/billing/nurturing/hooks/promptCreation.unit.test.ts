@@ -82,18 +82,14 @@ describe("firePromptCreatedNurturing()", () => {
         });
       });
 
-      it("sends first_prompt_created event (CIO Journey deduplicates per person)", async () => {
+      it("does not send first_prompt_created event", async () => {
         firePromptCreatedNurturing({
           userId: "user-1",
           projectId: "proj-1",
           orgPromptCount: 5,
         });
 
-        expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
-          userId: "user-1",
-          event: "first_prompt_created",
-          properties: { project_id: "proj-1" },
-        });
+        expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
       });
     });
   });
