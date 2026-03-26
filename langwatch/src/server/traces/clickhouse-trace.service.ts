@@ -269,7 +269,20 @@ export class ClickHouseTraceService {
           }
 
           // Fetch full traces with spans
-          return this.getTracesWithSpans(projectId, traceIds, protections);
+          const traces = await this.getTracesWithSpans(
+            projectId,
+            traceIds,
+            protections,
+          );
+          if (!traces) return null;
+
+          // Re-sort by timestamp — getTracesWithSpans returns in TraceId
+          // order which doesn't match the chronological order we need.
+          traces.sort(
+            (a, b) =>
+              (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+          );
+          return traces;
         } catch (error) {
           this.logger.error(
             {
@@ -360,7 +373,20 @@ export class ClickHouseTraceService {
           }
 
           // Fetch full traces with spans
-          return this.getTracesWithSpans(projectId, traceIds, protections);
+          const traces = await this.getTracesWithSpans(
+            projectId,
+            traceIds,
+            protections,
+          );
+          if (!traces) return null;
+
+          // Re-sort by timestamp — getTracesWithSpans returns in TraceId
+          // order which doesn't match the chronological order we need.
+          traces.sort(
+            (a, b) =>
+              (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+          );
+          return traces;
         } catch (error) {
           this.logger.error(
             {
