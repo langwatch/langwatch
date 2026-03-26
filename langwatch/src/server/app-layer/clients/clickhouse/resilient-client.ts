@@ -13,11 +13,7 @@ import { FailureRateMonitor } from "./failure-monitor";
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-export function jitteredBackoff({
+function jitteredBackoff({
   attempt,
   baseDelayMs,
   maxDelayMs,
@@ -31,8 +27,7 @@ export function jitteredBackoff({
   return Math.min(exponential + jitter, maxDelayMs);
 }
 
-/** Extract safe metadata from query params (keys only, no values). */
-export function safeQueryMeta(params: unknown): {
+function safeQueryMeta(params: unknown): {
   queryId?: string;
   format?: string;
   paramKeys?: string[];
@@ -57,7 +52,7 @@ export function safeQueryMeta(params: unknown): {
   return meta;
 }
 
-export function logQueryFailure({
+function logQueryFailure({
   operation,
   error,
   durationMs,
@@ -111,7 +106,7 @@ export function logQueryFailure({
   }
 }
 
-export function logQuerySuccess({
+function logQuerySuccess({
   operation,
   durationMs,
   params,
@@ -142,10 +137,6 @@ export function logQuerySuccess({
     durationMs / 1000
   );
 }
-
-// ---------------------------------------------------------------------------
-// Resilient wrapper
-// ---------------------------------------------------------------------------
 
 /**
  * Wraps a ClickHouseClient with:
@@ -217,9 +208,6 @@ export function createResilientClickHouseClient({
           throw error;
         }
 
-        // Track transient failures in metrics and alerting even
-        // when the insert will be retried — a flapping ClickHouse
-        // should show up in dashboards before retries exhaust.
         const errorType = classifyClickHouseError(error);
         incrementClickHouseQueryCount("INSERT", "error");
         if (failureMonitor.record()) {
