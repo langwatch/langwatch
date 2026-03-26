@@ -10,12 +10,14 @@ Run all four reviewers in parallel on the recent changes.
 
 ## Step 1: Parallel Reviews
 
-Spawn ALL agents simultaneously using the Task tool in a single message:
+Spawn ALL agents simultaneously using the **Agent tool** in a single message. Each agent MUST be a dedicated subagent — do NOT simulate their output yourself:
 
-1. **uncle-bob-reviewer**: SOLID scan, TDD interrogation, clean code inspection
-2. **cupid-reviewer**: CUPID properties assessment (Composable, Unix, Predictable, Idiomatic, Domain-based)
-3. **test-reviewer**: Test pyramid placement, spec validation, naming conventions, flakiness vectors
-4. **pii-reviewer**: PII exposure, hardcoded secrets, sensitive data in tests/logs
+1. **uncle-bob-reviewer** (`subagent_type: "uncle-bob-reviewer"`): SOLID scan, TDD interrogation, clean code inspection
+2. **cupid-reviewer** (`subagent_type: "cupid-reviewer"`): CUPID properties assessment (Composable, Unix, Predictable, Idiomatic, Domain-based)
+3. **test-reviewer** (`subagent_type: "test-reviewer"`): Test pyramid placement, spec validation, naming conventions, flakiness vectors
+4. **pii-reviewer** (`subagent_type: "pii-reviewer"`): PII exposure, hardcoded secrets, sensitive data in tests/logs
+
+**IMPORTANT:** You MUST use `subagent_type` to invoke the actual agent definitions (`.claude/agents/*.md`). These agents have specific instructions and decision trees that you don't have. Do NOT role-play as the reviewers — delegate to them.
 
 Focus area: $ARGUMENTS
 
