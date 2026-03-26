@@ -4,10 +4,11 @@
  * Unit tests for the useNewScenarioFlow hook.
  *
  * Covers:
- * - Show welcome modal on first scenario creation (no scenarios, not seen before)
- * - Proceed from welcome modal to scenario creation (persists welcomeSeen)
- * - Skip welcome modal when scenarios already exist
- * - Skip welcome modal when already seen (localStorage)
+ * - Inline welcome visibility (zero scenarios, not dismissed)
+ * - Welcome modal on "New Scenario" click (not yet dismissed)
+ * - Proceed from welcome persists welcomeSeen
+ * - Skip welcome when already seen (localStorage)
+ * - Skip welcome when scenarios exist
  * - Dismiss welcome modal via onOpenChange
  */
 import { act, renderHook } from "@testing-library/react";
@@ -26,6 +27,14 @@ describe("useNewScenarioFlow()", () => {
   });
 
   describe("when no scenarios exist and welcome not yet seen", () => {
+    it("shows inline welcome", () => {
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      expect(result.current.showInlineWelcome).toBe(true);
+    });
+
     it("shows welcome modal on handleNewScenario", () => {
       const { result } = renderHook(() =>
         useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
@@ -35,7 +44,7 @@ describe("useNewScenarioFlow()", () => {
         result.current.handleNewScenario();
       });
 
-      expect(result.current.showWelcome).toBe(true);
+      expect(result.current.showWelcomeModal).toBe(true);
       expect(result.current.showCreateModal).toBe(false);
     });
 
@@ -52,7 +61,7 @@ describe("useNewScenarioFlow()", () => {
         result.current.handleWelcomeProceed();
       });
 
-      expect(result.current.showWelcome).toBe(false);
+      expect(result.current.showWelcomeModal).toBe(false);
       expect(result.current.showCreateModal).toBe(true);
     });
 
@@ -71,6 +80,18 @@ describe("useNewScenarioFlow()", () => {
 
       expect(localStorage.getItem(WELCOME_SEEN_KEY)).toBe("true");
     });
+
+    it("hides inline welcome after proceeding", () => {
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      act(() => {
+        result.current.handleWelcomeProceed();
+      });
+
+      expect(result.current.showInlineWelcome).toBe(false);
+    });
   });
 
   describe("when no scenarios exist but welcome already seen", () => {
@@ -86,7 +107,17 @@ describe("useNewScenarioFlow()", () => {
       });
 
       expect(result.current.showCreateModal).toBe(true);
-      expect(result.current.showWelcome).toBe(false);
+      expect(result.current.showWelcomeModal).toBe(false);
+    });
+
+    it("does not show inline welcome", () => {
+      localStorage.setItem(WELCOME_SEEN_KEY, "true");
+
+      const { result } = renderHook(() =>
+        useNewScenarioFlow({ scenarioCount: 0, isLoading: false })
+      );
+
+      expect(result.current.showInlineWelcome).toBe(false);
     });
   });
 
@@ -101,7 +132,7 @@ describe("useNewScenarioFlow()", () => {
       });
 
       expect(result.current.showCreateModal).toBe(true);
-      expect(result.current.showWelcome).toBe(false);
+      expect(result.current.showWelcomeModal).toBe(false);
     });
   });
 
@@ -116,7 +147,7 @@ describe("useNewScenarioFlow()", () => {
       });
 
       expect(result.current.showCreateModal).toBe(true);
-      expect(result.current.showWelcome).toBe(false);
+      expect(result.current.showWelcomeModal).toBe(false);
     });
   });
 
@@ -148,13 +179,13 @@ describe("useNewScenarioFlow()", () => {
         result.current.handleNewScenario();
       });
 
-      expect(result.current.showWelcome).toBe(true);
+      expect(result.current.showWelcomeModal).toBe(true);
 
       act(() => {
-        result.current.handleWelcomeOpenChange(false);
+        result.current.handleWelcomeModalOpenChange(false);
       });
 
-      expect(result.current.showWelcome).toBe(false);
+      expect(result.current.showWelcomeModal).toBe(false);
     });
 
     it("persists welcomeSeen in localStorage on dismiss", () => {
@@ -167,12 +198,10 @@ describe("useNewScenarioFlow()", () => {
       });
 
       act(() => {
-        result.current.handleWelcomeOpenChange(false);
+        result.current.handleWelcomeModalOpenChange(false);
       });
 
-      expect(localStorage.getItem("langwatch:scenarios:welcomeSeen")).toBe(
-        "true"
-      );
+      expect(localStorage.getItem(WELCOME_SEEN_KEY)).toBe("true");
     });
   });
 });

@@ -13,7 +13,7 @@ import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal"
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
-import { ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -102,11 +102,12 @@ function ScenarioLibraryPage() {
   } = useLabelFilter(scenarios);
 
   const {
-    showWelcome,
+    showInlineWelcome,
+    showWelcomeModal,
     showCreateModal,
     handleNewScenario,
     handleWelcomeProceed,
-    handleWelcomeOpenChange,
+    handleWelcomeModalOpenChange,
     handleCloseCreateModal,
   } = useNewScenarioFlow({ scenarioCount: scenarios?.length ?? 0, isLoading });
 
@@ -191,7 +192,11 @@ function ScenarioLibraryPage() {
           </VStack>
         )}
 
-        {!isLoading && !error && scenarios?.length === 0 && (
+        {!isLoading && !error && scenarios?.length === 0 && showInlineWelcome && (
+          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
+        )}
+
+        {!isLoading && !error && scenarios?.length === 0 && !showInlineWelcome && (
           <ScenarioEmptyState onCreateClick={handleNewScenario} />
         )}
 
@@ -215,9 +220,9 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
-      <ScenarioWelcomeScreen
-        open={showWelcome}
-        onOpenChange={handleWelcomeOpenChange}
+      <ScenarioWelcomeModal
+        open={showWelcomeModal}
+        onOpenChange={handleWelcomeModalOpenChange}
         onProceed={handleWelcomeProceed}
       />
       <ScenarioCreateModal
