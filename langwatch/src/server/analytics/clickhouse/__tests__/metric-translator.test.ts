@@ -107,18 +107,19 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("TimeToFirstTokenMs");
       });
 
-      it("translates performance.tokens_per_second using span-level calculation", () => {
+      it("translates performance.tokens_per_second using pre-aggregated trace-level column", () => {
         const result = translateMetric(
           "performance.tokens_per_second",
           "avg",
           0
         );
-        // Calculates TPS at span level to match ES behavior
-        // Uses canonical OTel attribute: gen_ai.usage.output_tokens
-        expect(result.selectExpression).toContain("avgIf(");
-        expect(result.selectExpression).toContain("gen_ai.usage.output_tokens");
-        expect(result.selectExpression).toContain("DurationMs");
-        expect(result.requiredJoins).toContain("stored_spans");
+        // Uses pre-aggregated TokensPerSecond from trace_summaries to avoid
+        // reading SpanAttributes (Map column with large LLM text), which causes OOM.
+        expect(result.selectExpression).toContain("TokensPerSecond");
+        expect(result.selectExpression).not.toContain("stored_spans");
+        expect(result.selectExpression).not.toContain("SpanAttributes");
+        expect(result.selectExpression).not.toContain("gen_ai.usage.output_tokens");
+        expect(result.requiredJoins).not.toContain("stored_spans");
       });
 
       it("translates performance.total_tokens", () => {
