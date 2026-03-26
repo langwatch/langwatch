@@ -70,9 +70,26 @@ Feature: Lite member access restrictions
     And the "Translate", "Annotate", and "Suggest" buttons are shown
 
   @integration
-  Scenario: Lite member can annotate and suggest on traces
+  Scenario: Lite member can create annotations with comments on traces
     Given sarah has opened a trace detail drawer
-    Then she can leave comments and suggestions on messages
+    When she clicks "Annotate" and writes a comment
+    And she clicks "Save"
+    Then the annotation is saved successfully
+    And no restriction modal appears
+
+  @integration
+  Scenario: Lite member can suggest output on traces
+    Given sarah has opened a trace detail drawer
+    When she clicks "Suggest" and edits the suggested output
+    And she clicks "Save"
+    Then the suggestion is saved successfully
+    And no restriction modal appears
+
+  @integration
+  Scenario: Lite member cannot delete annotations or manage scoring metrics
+    Given sarah has opened a trace detail drawer with existing annotations
+    Then she cannot delete other users' annotations
+    And "Enable scoring metrics" is not actionable for her
 
   # ============================================================================
   # R3b: Trace Export Restriction

@@ -227,6 +227,8 @@ export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
   "analytics:view",
   "traces:view",
   "annotations:view",
+  "annotations:create",
+  "annotations:update",
   "evaluations:view",
   "datasets:view",
   "workflows:view",
