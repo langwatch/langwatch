@@ -20,9 +20,7 @@ import {
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
-import type { ProjectService } from "../projects/project.service";
 import {
-  CostLimitExceededError,
   EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
@@ -42,16 +40,9 @@ const INTERNAL_PROTECTIONS: Protections = {
 
 export interface EvaluationExecutionDeps {
   traceService: TraceService;
-  projectService: ProjectService;
-  costChecker: CostChecker;
   modelEnvResolver: ModelEnvResolver;
   langevalsClient: LangEvalsClient;
   workflowExecutor: WorkflowExecutor;
-}
-
-export interface CostChecker {
-  maxMonthlyUsageLimit(organizationId: string): Promise<number>;
-  getCurrentMonthCost(organizationId: string): Promise<number>;
 }
 
 export interface ModelEnvResolver {
@@ -331,24 +322,6 @@ export class EvaluationExecutionService {
     workflowId?: string | null;
   }): Promise<SingleEvaluationResult> {
     const { projectId, evaluatorType, data, settings, trace, workflowId } = params;
-
-    // Cost limit check
-    const project = await this.deps.projectService.getWithTeam(projectId);
-    if (!project) {
-      throw new EvaluatorConfigError("Project not found");
-    }
-
-    const maxMonthlyUsage = await this.deps.costChecker.maxMonthlyUsageLimit(
-      project.team.organizationId,
-    );
-    if (maxMonthlyUsage !== Infinity) {
-      const currentCost = await this.deps.costChecker.getCurrentMonthCost(
-        project.team.organizationId,
-      );
-      if (currentCost >= maxMonthlyUsage) {
-        throw new CostLimitExceededError(project.team.organizationId);
-      }
-    }
 
     // Custom/workflow evaluators
     if (data.type === "custom") {

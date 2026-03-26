@@ -71,7 +71,6 @@ import { NotificationRepository } from "../../../ee/billing/notifications/reposi
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 
 export function initializeWebApp(): App {
@@ -151,8 +150,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const evaluationExecution = traced(
     new EvaluationExecutionService({
       traceService,
-      projectService: projects,
-      costChecker: createCostChecker(prisma),
       modelEnvResolver: createDefaultModelEnvResolver(),
       langevalsClient: config.langevalsEndpoint
         ? new LangEvalsHttpClient(config.langevalsEndpoint)
