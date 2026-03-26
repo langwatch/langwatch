@@ -262,4 +262,73 @@ describe("extensible metadata integration", () => {
       });
     });
   });
+
+  describe("given a scenario event with empty-string scenarioSetId", () => {
+    describe("when the event is ingested via the Zod schema and stored", () => {
+      it("coerces scenarioSetId to 'default' at the schema level", async () => {
+        const ids = generateTestIds("empty-set-id");
+
+        // Simulate what the API does: validate through Zod schema first
+        const rawEvent = {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: ids.batchRunId,
+          scenarioId: ids.scenarioId,
+          scenarioRunId: ids.scenarioRunId,
+          scenarioSetId: "",
+          metadata: { name: "Empty set regression" },
+        };
+
+        const { scenarioEventSchema } = await import(
+          "~/server/scenarios/schemas/event-schemas"
+        );
+        const parsed = scenarioEventSchema.parse(rawEvent);
+
+        // Verify coercion happened before storage
+        expect(parsed.scenarioSetId).toBe("default");
+
+        // Now store the coerced event and retrieve it
+        const client = await esClient({ test: true });
+        const now = Date.now();
+
+        const events = [
+          {
+            type: ScenarioEventType.RUN_STARTED,
+            timestamp: now - 5000,
+            project_id: project.id,
+            scenario_id: ids.scenarioId,
+            scenario_run_id: ids.scenarioRunId,
+            batch_run_id: ids.batchRunId,
+            scenario_set_id: parsed.scenarioSetId,
+            metadata: { name: "Empty set regression" },
+          },
+          {
+            type: ScenarioEventType.RUN_FINISHED,
+            timestamp: now,
+            project_id: project.id,
+            scenario_id: ids.scenarioId,
+            scenario_run_id: ids.scenarioRunId,
+            batch_run_id: ids.batchRunId,
+            scenario_set_id: parsed.scenarioSetId,
+            status: ScenarioRunStatus.SUCCESS,
+            results: { verdict: Verdict.SUCCESS },
+          },
+        ];
+
+        await client.bulk({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: events.flatMap((event) => [{ index: {} }, event]),
+          refresh: true,
+        });
+
+        const runs = await service.getScenarioRunDataBatch({
+          projectId: project.id,
+          scenarioRunIds: [ids.scenarioRunId],
+        });
+
+        expect(runs).toHaveLength(1);
+        expect(runs[0]!.scenarioSetId).toBe("default");
+      });
+    });
+  });
 });

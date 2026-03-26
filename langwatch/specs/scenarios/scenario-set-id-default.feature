@@ -14,7 +14,7 @@ Feature: scenarioSetId defaults to "default" on ingestion
     Then the event is accepted
     And scenarioSetId is set to "default"
 
-  @unit
+  @unit @regression
   Scenario: scenarioSetId is empty string
     When the SDK sends a RUN_STARTED event with scenarioSetId ""
     Then the event is accepted
@@ -27,7 +27,7 @@ Feature: scenarioSetId defaults to "default" on ingestion
     And scenarioSetId is "my-set"
 
   @unit
-  Scenario: all event types inherit the default
+  Scenario: MESSAGE_SNAPSHOT event omits scenarioSetId
     When the SDK sends a MESSAGE_SNAPSHOT event without a scenarioSetId field
     Then scenarioSetId is set to "default"
 

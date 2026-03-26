@@ -72,8 +72,8 @@ describe("scenarioSetId default", () => {
     });
   });
 
-  describe("all event types inherit the default", () => {
-    it("defaults scenarioSetId on MESSAGE_SNAPSHOT events", () => {
+  describe("when MESSAGE_SNAPSHOT event omits scenarioSetId", () => {
+    it("defaults to 'default'", () => {
       const result = scenarioMessageSnapshotSchema.safeParse({
         type: ScenarioEventType.MESSAGE_SNAPSHOT,
         timestamp: Date.now(),

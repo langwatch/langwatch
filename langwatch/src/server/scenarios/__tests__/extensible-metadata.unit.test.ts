@@ -187,20 +187,26 @@ describe("extensible scenario metadata", () => {
     };
 
     describe("when scenarioSetId is an empty string", () => {
-      it("rejects the event at schema validation", () => {
+      it("coerces to 'default' at schema validation", () => {
         const event = { ...validEvent, scenarioSetId: "" };
 
         const result = scenarioEventSchema.safeParse(event);
 
-        expect(result.success).toBe(false);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.scenarioSetId).toBe("default");
+        }
       });
 
-      it("rejects in the individual run started schema", () => {
+      it("coerces to 'default' in the individual run started schema", () => {
         const event = { ...validEvent, scenarioSetId: "" };
 
         const result = scenarioRunStartedSchema.safeParse(event);
 
-        expect(result.success).toBe(false);
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.scenarioSetId).toBe("default");
+        }
       });
     });
 
