@@ -326,6 +326,34 @@ export interface BuiltQuery {
  * Medium ranges (days) use hourly buckets to avoid too many data points.
  * Long ranges (weeks/months) use day/week/month buckets for performance.
  */
+/**
+ * Build the HAVING clause for group_key filtering.
+ *
+ * Different groupBy fields produce different sentinel values for non-matching rows:
+ * - evaluation_label with groupByKey: returns '' → filter with != ''
+ * - evaluation_passed with groupByKey: returns NULL → filter with IS NOT NULL
+ * - Fields with handlesUnknown=true: already handle empty/null internally → no HAVING
+ * - No groupBy: no HAVING needed
+ */
+function buildGroupKeyHavingClause({
+  groupByColumn,
+  groupByHandlesUnknown,
+  groupBy,
+  groupByKey,
+}: {
+  groupByColumn: string | null;
+  groupByHandlesUnknown: boolean;
+  groupBy?: string;
+  groupByKey?: string;
+}): string {
+  if (!groupByColumn) return "";
+  const hasGroupByKey = !!groupByKey;
+  const isEvaluationPassed = groupBy === "evaluations.evaluation_passed";
+  if (isEvaluationPassed && hasGroupByKey) return "HAVING group_key IS NOT NULL";
+  if (!groupByHandlesUnknown && !isEvaluationPassed) return "HAVING group_key != ''";
+  return "";
+}
+
 function getDateTruncFunction(
   timeScaleMinutes: number,
   timeZone: string,
@@ -594,20 +622,12 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     groupByExprs.push("group_key");
   }
 
-  // Filter out empty/null groupBy values to match ES terms aggregation behavior.
-  // - evaluation_label with groupByKey: column returns '' for non-matching rows, so filter != ''
-  // - evaluation_passed with groupByKey: column returns NULL for non-matching rows, so filter IS NOT NULL
-  // - evaluation_passed without groupByKey: 'unknown' for unresolved — no HAVING needed
-  // - Other columns with handlesUnknown=true: they already exclude empty/null, no HAVING needed
-  const hasGroupByKey = !!input.groupByKey;
-  const isEvaluationPassed = input.groupBy === "evaluations.evaluation_passed";
-  const havingClause = groupByColumn
-    ? isEvaluationPassed && hasGroupByKey
-      ? "HAVING group_key IS NOT NULL"
-      : !groupByHandlesUnknown && !isEvaluationPassed
-        ? "HAVING group_key != ''"
-        : ""
-    : "";
+  const havingClause = buildGroupKeyHavingClause({
+    groupByColumn,
+    groupByHandlesUnknown,
+    groupBy: input.groupBy,
+    groupByKey: input.groupByKey,
+  });
 
   // Build the complete SQL
   const sql = `
@@ -1170,19 +1190,12 @@ function buildDateBucketedPipelineQuery({
 
   const fullFilterWhere = filterWhere;
 
-  // Determine HAVING clause for group_key filtering.
-  // - evaluation_passed with groupByKey: column returns NULL for non-matching rows
-  // - Other non-handlesUnknown columns: column returns '' for non-matching rows
-  // - Columns that handle unknown / no groupBy key: no HAVING needed
-  const hasGroupByKey = !!input.groupByKey;
-  const isEvaluationPassed = input.groupBy === "evaluations.evaluation_passed";
-  const groupKeyHaving = groupByColumn
-    ? isEvaluationPassed && hasGroupByKey
-      ? "HAVING group_key IS NOT NULL"
-      : !groupByHandlesUnknown && !isEvaluationPassed
-        ? "HAVING group_key != ''"
-        : ""
-    : "";
+  const groupKeyHaving = buildGroupKeyHavingClause({
+    groupByColumn,
+    groupByHandlesUnknown,
+    groupBy: input.groupBy,
+    groupByKey: input.groupByKey,
+  });
 
   const ctes = pipelineMetrics.map((metric) =>
     buildPipelineMetricCTE(metric, {
