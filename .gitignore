@@ -57,8 +57,8 @@ seed.spec.ts
 .playwright-mcp/
 .mcp.local.json
 
+**/.worktrees/**
 !.worktrees/.gitkeep
-.worktrees/**
 
 # Skills test artifacts
 skills/_tests/helpers/.mcp-config.json

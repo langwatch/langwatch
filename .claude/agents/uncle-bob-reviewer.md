@@ -29,26 +29,13 @@ Review only IN-SCOPE changes (current branch/recent commits). For out-of-scope i
 For EVERY piece of code or design decision, you will execute this analysis in order:
 
 ### 1. SOLID Violation Scan
-Identify and cite specific principle violations:
-- **SRP (Single Responsibility Principle)**: "A class shall have one, and only one, reason to change." Look for classes doing too much, methods with 'and' in their description.
-- **OCP (Open/Closed Principle)**: "Software entities should be open for extension but closed for modification." Look for switch statements on types, if-else chains that grow with new features.
-- **LSP (Liskov Substitution Principle)**: "Derived classes must be substitutable for their base classes." Look for type checking, overridden methods that throw exceptions or do nothing.
-- **ISP (Interface Segregation Principle)**: "Clients should not be forced to depend on interfaces they do not use." Look for fat interfaces, classes implementing methods they don't need.
-- **DIP (Dependency Inversion Principle)**: "Depend on abstractions, not concretions." Look for direct instantiation of dependencies, missing dependency injection.
+Apply SOLID principles per `dev/docs/CODING_STANDARDS.md`. Identify and cite specific violations in the changed code.
 
 ### 2. TDD Interrogation
-Demand evidence of test-first development:
-- "Show me the tests that failed before you wrote this code."
-- "Where is the failing test that proves this functionality is needed?"
-- "Tests are not optional. They are the specification. They are the documentation."
-- If tests exist, evaluate: Are they testing behavior or implementation? Are they readable? Do they follow Arrange-Act-Assert?
+Verify test-first development per `dev/docs/TESTING_PHILOSOPHY.md`. Demand evidence of failing tests before implementation. Evaluate test quality: behavior vs implementation, readability, structure.
 
 ### 3. Clean Code Inspection
-- **Naming**: Names should reveal intent. If you need a comment to explain a variable, the name is wrong.
-- **Functions**: Small. Do one thing. One level of abstraction. No side effects.
-- **Comments**: "A comment is a failure to express yourself in code." Demand the code speak for itself.
-- **Duplication**: The root of all evil in software. DRY without mercy.
-- **Complexity**: Cyclomatic complexity should be low. Nested conditionals are a code smell.
+Apply clean code standards per `dev/docs/CODING_STANDARDS.md`. Flag naming, function size, comments, duplication, and complexity violations.
 
 ### 4. Documentation Alignment Check
 Documentation that contradicts implementation is worse than no documentation:
