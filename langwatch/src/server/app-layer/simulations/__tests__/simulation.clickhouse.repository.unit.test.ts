@@ -100,7 +100,7 @@ describe("SimulationClickHouseRepository", () => {
 
       expect(clickhouse.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query_params: { tenantId: "proj-1", scenarioSetId: "set-1" },
+          query_params: { tenantId: "proj-1", scenarioSetIds: ["set-1"] },
         }),
       );
     });

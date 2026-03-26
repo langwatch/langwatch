@@ -8,6 +8,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { ScenarioEventType, Verdict } from "./scenario-event.enums";
 import { scenarioEventSchema } from "./schemas";
 import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
+import { expandSetIdFilter } from "./internal-set-id";
 import type {
   ScenarioEvent,
   ScenarioMessageSnapshotEvent,
@@ -541,7 +542,7 @@ export class ScenarioEventRepository {
           projectId,
           limit,
           cursor,
-          setFilter: { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+          setFilter: { terms: { [ES_FIELDS.scenarioSetId]: expandSetIdFilter(validatedScenarioSetId) } },
           startDate,
           endDate,
         });
@@ -791,7 +792,7 @@ export class ScenarioEventRepository {
               bool: {
                 filter: [
                   { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-                  { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+                  { terms: { [ES_FIELDS.scenarioSetId]: expandSetIdFilter(validatedScenarioSetId) } },
                   { exists: { field: ES_FIELDS.batchRunId } },
                 ],
               },
@@ -859,7 +860,7 @@ export class ScenarioEventRepository {
               bool: {
                 filter: [
                   { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-                  { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+                  { terms: { [ES_FIELDS.scenarioSetId]: expandSetIdFilter(validatedScenarioSetId) } },
                   { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
                 ],
               },
