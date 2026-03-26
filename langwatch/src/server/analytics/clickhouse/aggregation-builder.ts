@@ -316,14 +316,6 @@ export interface BuiltQuery {
 }
 
 /**
- * Get the ClickHouse date truncation function for a time scale.
- *
- * WHY: Different time ranges require different grouping granularities.
- * Short ranges (hours) need minute-level precision for detail.
- * Medium ranges (days) use hourly buckets to avoid too many data points.
- * Long ranges (weeks/months) use day/week/month buckets for performance.
- */
-/**
  * Build the HAVING clause for group_key filtering.
  *
  * Different groupBy fields produce different sentinel values for non-matching rows:
@@ -351,6 +343,14 @@ function buildGroupKeyHavingClause({
   return "";
 }
 
+/**
+ * Get the ClickHouse date truncation function for a time scale.
+ *
+ * WHY: Different time ranges require different grouping granularities.
+ * Short ranges (hours) need minute-level precision for detail.
+ * Medium ranges (days) use hourly buckets to avoid too many data points.
+ * Long ranges (weeks/months) use day/week/month buckets for performance.
+ */
 function getDateTruncFunction(
   timeScaleMinutes: number,
   timeZone: string,
