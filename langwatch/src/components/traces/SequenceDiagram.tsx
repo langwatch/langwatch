@@ -680,7 +680,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
               <Select.Indicator />
             </Select.IndicatorGroup>
           </Select.Control>
-          <Select.Content zIndex="popover">
+          <Select.Content>
             {spanTypesCollection.items.map((spanType) => (
               <Select.Item item={spanType} key={spanType.value}>
                 {spanType.label}

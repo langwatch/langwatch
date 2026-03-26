@@ -161,6 +161,8 @@ services:
       RELEASE_UI_SUITES_ENABLED: "1"
     env_file:
       - langwatch/.env
+      - path: langwatch/.env.dev-up
+        required: false
     depends_on:
       init:
         condition: service_completed_successfully

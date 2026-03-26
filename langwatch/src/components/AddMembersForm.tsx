@@ -334,7 +334,7 @@ function MemberRow({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select role" />
                 </Select.Trigger>
-                <Select.Content paddingY={2} zIndex={1501} width="320px">
+                <Select.Content paddingY={2} width="320px">
                   {orgRoleOptions.map((option) => (
                     <Select.Item key={option.value} item={option}>
                       <VStack align="start" gap={0} flex={1}>
@@ -504,7 +504,7 @@ function TeamSelect({
           <Select.Trigger background="bg" width="full">
             <Select.ValueText placeholder="Select team" />
           </Select.Trigger>
-          <Select.Content paddingY={2} zIndex={1501}>
+          <Select.Content paddingY={2}>
             {availableOptions.map((option) => (
               <Select.Item key={option.value} item={option}>
                 {option.label}
@@ -644,7 +644,7 @@ function TeamRoleSelect({
             <Select.Trigger background="bg" width="full">
               <Select.ValueText placeholder="Select role" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex={1501} width="320px">
+            <Select.Content paddingY={2} width="320px">
               {roleOptions.map((option) => (
                 <Select.Item key={option.value} item={option}>
                   <TeamRoleSelectItemContent option={option} />

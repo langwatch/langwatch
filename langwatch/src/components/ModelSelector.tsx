@@ -248,7 +248,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
-      <Select.Content zIndex="1600">
+      <Select.Content>
         <Field.Root asChild>
           <Box position="sticky" top={0} zIndex="1">
             <InputGroup

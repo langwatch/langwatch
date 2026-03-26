@@ -181,7 +181,7 @@ export const TeamForm = ({
                                   <Select.Trigger width="full" background="bg">
                                     <Select.ValueText placeholder="Select..." />
                                   </Select.Trigger>
-                                  <Select.Content paddingY={2} zIndex="popover">
+                                  <Select.Content paddingY={2}>
                                     {userOptions.map((option) => (
                                       <Select.Item key={option.value} item={option}>
                                         {option.label}

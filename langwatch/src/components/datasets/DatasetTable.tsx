@@ -666,7 +666,7 @@ export function DatasetTable({
               <ChevronDown width={16} height={16} />
             </Button>
           </Menu.Trigger>
-          <Menu.Content zIndex="popover">
+          <Menu.Content>
             <Menu.Item
               value="import-csv"
               onClick={() => addRowsFromCSVModal.onOpen()}
