@@ -126,10 +126,10 @@ function LLMModelCostForm({
           closeDrawer();
           void llmModelCostsQuery.refetch();
         },
-        onError: () => {
+        onError: (error) => {
           toaster.create({
             title: "Error",
-            description: "Error creating LLM model cost",
+            description: error.message || "Error creating LLM model cost",
             type: "error",
             duration: 5000,
             meta: {

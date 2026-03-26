@@ -28,12 +28,22 @@ const getImportedModelCosts = () => {
       const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
 
       const escapedModelName = escapeStringRegexp(modelName)
+        // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
         .replaceAll("\\x2d", "-")
+        .replaceAll("\\-", "-")
         // Fix for langchain using vertexai while litellm uses vertex_ai
-        .replace("vertex_ai", "(vertex_ai|vertexai)");
+        .replace("vertex_ai", "(vertex_ai|vertexai)")
+        // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
+        .replaceAll("\\.", "[.-]");
+
+      const escapedVendorPrefix = hasVendorPrefix
+        ? escapeStringRegexp(vendorPrefix!)
+            .replaceAll("\\x2d", "-")
+            .replaceAll("\\-", "-")
+        : "";
 
       const regex = hasVendorPrefix
-        ? `^(${escapeStringRegexp(vendorPrefix!)}\\/)?${escapedModelName}$`
+        ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}$`
         : `^${escapedModelName}$`;
 
       tokenModels[modelId] = {

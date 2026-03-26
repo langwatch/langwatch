@@ -1,3 +1,4 @@
+import safe from "safe-regex2";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
@@ -18,7 +19,7 @@ async function countTokens(
   if (!text) return 0;
 
   const model = llmModelCost.model.includes("/")
-    ? llmModelCost.model.split("/")[1]!
+    ? llmModelCost.model.substring(llmModelCost.model.indexOf("/") + 1)
     : llmModelCost.model;
 
   return tiktokenClient.countTokens(model, text);
@@ -66,18 +67,113 @@ export function estimateCost({
     : undefined;
 }
 
+const VENDOR_MAPPINGS: Record<string, string> = {
+  "deepseek-ai/": "deepseek/",
+  "minimaxai/": "minimax/",
+  "zai-org/": "z-ai/",
+  "zhipu-ai/": "z-ai/",
+};
+
+const QUANTIZATION_SUFFIXES = [
+  "-fp8",
+  "-gptq",
+  "-awq",
+  "-gguf",
+  "-int4",
+  "-int8",
+];
+
+/**
+ * Normalize model name for better matching:
+ * - Convert to lowercase
+ * - Normalize common vendor prefix variations
+ * - Remove quantization variant suffixes (FP8, GPTQ, etc.)
+ */
+export const normalizeModelName = (model: string): string => {
+  let normalized = model.toLowerCase();
+
+  for (const [from, to] of Object.entries(VENDOR_MAPPINGS)) {
+    if (normalized.startsWith(from)) {
+      normalized = normalized.replace(from, to);
+      break;
+    }
+  }
+
+  for (const suffix of QUANTIZATION_SUFFIXES) {
+    if (normalized.endsWith(suffix)) {
+      normalized = normalized.slice(0, -suffix.length);
+      break;
+    }
+  }
+
+  return normalized;
+};
+
+/** Cache: pattern → compiled RegExp (safe) or null (unsafe/invalid). */
+const regexCache = new Map<string, RegExp | null>();
+
+/**
+ * Returns a cached, safe-checked RegExp for the given pattern.
+ * Unsafe or invalid patterns are cached as null and warned once.
+ */
+const getSafeRegex = (pattern: string): RegExp | null => {
+  const cached = regexCache.get(pattern);
+  if (cached !== undefined) return cached;
+
+  try {
+    const re = new RegExp(pattern);
+    if (!safe(re)) {
+      logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
+      regexCache.set(pattern, null);
+      return null;
+    }
+    regexCache.set(pattern, re);
+    return re;
+  } catch {
+    regexCache.set(pattern, null);
+    return null;
+  }
+};
+
+/**
+ * Tests a regex pattern against a model string, skipping patterns
+ * that are vulnerable to catastrophic backtracking (ReDoS).
+ * Results are cached so each pattern is compiled and safety-checked only once.
+ */
+const safeRegexTest = (pattern: string, input: string): boolean => {
+  const re = getSafeRegex(pattern);
+  return re !== null && re.test(input);
+};
+
 export const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
-  const llmModelCost = llmModelCosts.find((llmModelCost) =>
-    new RegExp(llmModelCost.regex).test(model),
-  );
-  if (!llmModelCost && model.includes("/")) {
-    const model_ = model.split("/")[1]!;
-    return matchingLLMModelCost(model_, llmModelCosts);
+  // Try raw model string first so custom case-sensitive regexes work
+  const rawMatch = findModelCost(model, llmModelCosts);
+  if (rawMatch) return rawMatch;
+
+  // Fall back to normalized form for built-in fuzzy matching
+  const normalizedModel = normalizeModelName(model);
+  if (normalizedModel !== model) {
+    return findModelCost(normalizedModel, llmModelCosts);
   }
-  return llmModelCost;
+  return undefined;
+};
+
+const findModelCost = (
+  model: string,
+  llmModelCosts: MaybeStoredLLMModelCost[],
+): MaybeStoredLLMModelCost | undefined => {
+  const match = llmModelCosts.find((entry) =>
+    safeRegexTest(entry.regex, model),
+  );
+
+  if (!match && model.includes("/")) {
+    const stripped = model.substring(model.indexOf("/") + 1);
+    return findModelCost(stripped, llmModelCosts);
+  }
+  return match;
 };
 
 export const getMatchingLLMModelCost = async (
