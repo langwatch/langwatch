@@ -162,7 +162,7 @@ describe("cross-evaluator-groupby", () => {
 
   describe("regression: issue #2668 — groupByKey evaluator filter removed from global WHERE", () => {
     describe("when evaluation_label groupBy with groupByKey uses the SAME evaluator as the metric key", () => {
-      it("returns non-null evaluation_score values for each label group", async () => {
+      it("returns correct per-label average scores for evaluatorA label groups", async () => {
         // This is the primary regression case. Before the fix, the global WHERE
         // added `AND es.EvaluatorId = evaluatorA`, which excluded all non-evaluatorA
         // rows. Since evaluatorA rows carried BOTH the label and the score, the fix
@@ -211,13 +211,13 @@ describe("cross-evaluator-groupby", () => {
         const goodScore = Number(goodRows[0]![metricKey!]);
         const badScore = Number(badRows[0]![metricKey!]);
 
-        expect(goodScore).toBeGreaterThan(0);
-        expect(badScore).toBeGreaterThan(0);
+        expect(goodScore).toBeCloseTo(0.8);
+        expect(badScore).toBeCloseTo(0.2);
       });
     });
 
     describe("when evaluation_passed groupBy with groupByKey uses the SAME evaluator as the metric key", () => {
-      it("returns non-null evaluation_score values for passed and failed groups", async () => {
+      it("returns correct per-pass/fail average scores for evaluatorA groups", async () => {
         // evaluatorA has Passed=1 for trace 0 ("good") and Passed=0 for trace 1 ("bad").
         // groupBy evaluation_passed with groupByKey=evaluatorA, metric evaluatorA score.
         resetParamCounter();
@@ -267,13 +267,13 @@ describe("cross-evaluator-groupby", () => {
         const failedScore = Number(failedRows[0]![metricKey!]);
 
         // evaluatorA trace 0 (passed=1) has score 0.8; trace 1 (passed=0) has score 0.2
-        expect(passedScore).toBeGreaterThan(0);
-        expect(failedScore).toBeGreaterThan(0);
+        expect(passedScore).toBeCloseTo(0.8);
+        expect(failedScore).toBeCloseTo(0.2);
       });
     });
 
     describe("when evaluation_label groupBy has no groupByKey", () => {
-      it("returns labels from all evaluators and executes without crash", async () => {
+      it("returns labels from all evaluators with correct metric values", async () => {
         // Without groupByKey, the groupBy column is just `es.Label` — no evaluator
         // filtering at all. All labels from all evaluators (that have labels) appear.
         resetParamCounter();
@@ -320,13 +320,13 @@ describe("cross-evaluator-groupby", () => {
 
         expect(goodRow).toBeDefined();
         expect(badRow).toBeDefined();
-        expect(Number(goodRow![metricKey!])).toBeGreaterThan(0);
-        expect(Number(badRow![metricKey!])).toBeGreaterThan(0);
+        expect(Number(goodRow![metricKey!])).toBeCloseTo(0.8);
+        expect(Number(badRow![metricKey!])).toBeCloseTo(0.2);
       });
     });
 
     describe("when evaluation_label groupBy uses evaluatorA and evaluation_score metric uses evaluatorB", () => {
-      it("executes without crash and returns group rows with label keys (evaluatorB score correlation is a known limitation)", async () => {
+      it("executes cross-evaluator query without crash and returns label groups", async () => {
         // Cross-evaluator scenario: groupBy label from evaluatorA, metric score from evaluatorB.
         //
         // The fix removes the global WHERE filter so evaluatorB rows are no longer

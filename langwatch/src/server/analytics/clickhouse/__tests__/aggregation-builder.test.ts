@@ -445,7 +445,7 @@ describe("aggregation-builder", () => {
       // to find no matching rows because the global WHERE already excluded all rows for
       // the OTHER evaluator.
 
-      it("evaluation_label groupBy does not add global EvaluatorId filter to WHERE clause", () => {
+      it("excludes global EvaluatorId WHERE filter for evaluation_label groupBy", () => {
         // GroupBy evaluatorA, but metric targets evaluatorB via its own conditional aggregation.
         // The global WHERE must NOT filter by evaluatorA — that would make evaluatorB rows invisible.
         const input = {
@@ -474,7 +474,7 @@ describe("aggregation-builder", () => {
         );
       });
 
-      it("evaluation_passed groupBy does not add global EvaluatorId filter to WHERE clause", () => {
+      it("excludes global EvaluatorId WHERE filter for evaluation_passed groupBy", () => {
         const input = {
           ...baseInput,
           groupBy: "evaluations.evaluation_passed",
@@ -497,7 +497,7 @@ describe("aggregation-builder", () => {
         );
       });
 
-      it("evaluation_label groupBy incorporates evaluator condition into group_key expression", () => {
+      it("keeps EvaluatorId condition inside group_key expression for evaluation_label", () => {
         const input = {
           ...baseInput,
           groupBy: "evaluations.evaluation_label",
@@ -522,7 +522,7 @@ describe("aggregation-builder", () => {
         );
       });
 
-      it("evaluation_label groupBy without groupByKey produces no evaluator filter anywhere", () => {
+      it("produces no evaluator filter when groupByKey is absent", () => {
         const input = {
           ...baseInput,
           groupBy: "evaluations.evaluation_label",

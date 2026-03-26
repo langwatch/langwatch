@@ -158,7 +158,6 @@ interface GroupByExpression {
   requiredJoins: CHTable[];
   usesArrayJoin?: boolean;
   handlesUnknown?: boolean;
-  additionalWhere?: string;
 }
 
 /**
@@ -237,7 +236,6 @@ const groupByExpressions: Partial<
     END`,
     requiredJoins: ["evaluation_runs"],
     handlesUnknown: true,
-    additionalWhere: undefined,
   }),
 
   "evaluations.evaluation_label": (groupByKey) => ({
@@ -245,7 +243,6 @@ const groupByExpressions: Partial<
       ? `if(${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed', ${tableAliases.evaluation_runs}.Label, '')`
       : `${tableAliases.evaluation_runs}.Label`,
     requiredJoins: ["evaluation_runs"],
-    additionalWhere: undefined,
   }),
 
   "evaluations.evaluation_processing_state": () => ({
