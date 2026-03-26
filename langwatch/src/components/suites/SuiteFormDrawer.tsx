@@ -135,7 +135,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       void utils.suites.getAll.invalidate();
       // When saveAndRunRef is set, the per-call onSuccess handles
       // navigation, drawer close, and running — skip the default path.
-      if (saveAndRunRef.current) return;
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
       onSaved?.(data);
       closeDrawer();
       toaster.create({
@@ -164,7 +167,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       });
       // When saveAndRunRef is set, the per-call onSuccess handles
       // navigation, drawer close, and running — skip the default path.
-      if (saveAndRunRef.current) return;
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
       onSaved?.(data);
       closeDrawer();
       toaster.create({

@@ -43,19 +43,23 @@ const StableGridCard = memo(function StableGridCard({
   targetName,
   onScenarioRunClick,
   iteration,
-  onCancel,
+  onCancelRun,
   isCancelling,
 }: {
   scenarioRun: ScenarioRunData;
   targetName: string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   iteration?: number;
-  onCancel?: () => void;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
   isCancelling?: boolean;
 }) {
   const handleClick = useCallback(
     () => onScenarioRunClick(scenarioRun),
     [onScenarioRunClick, scenarioRun],
+  );
+  const handleCancel = useCallback(
+    () => onCancelRun?.(scenarioRun),
+    [onCancelRun, scenarioRun],
   );
   return (
     <ScenarioGridCard
@@ -63,7 +67,7 @@ const StableGridCard = memo(function StableGridCard({
       targetName={targetName}
       onClick={handleClick}
       iteration={iteration}
-      onCancel={onCancel}
+      onCancel={onCancelRun ? handleCancel : undefined}
       isCancelling={isCancelling}
     />
   );
@@ -104,7 +108,7 @@ function PlainContent({
             targetName={resolveTargetName(scenarioRun)}
             onScenarioRunClick={onScenarioRunClick}
             iteration={iterationMap.get(scenarioRun.scenarioRunId)}
-            onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+            onCancelRun={onCancelRun}
             isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
           />
         ))}
@@ -256,7 +260,7 @@ function VirtualizedContent({
                   targetName={resolveTargetName(scenarioRun)}
                   onScenarioRunClick={onScenarioRunClick}
                   iteration={iterationMap.get(scenarioRun.scenarioRunId)}
-                  onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+                  onCancelRun={onCancelRun}
                   isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
                 />
               ))}
