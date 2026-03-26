@@ -20,6 +20,7 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
+import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
@@ -286,6 +287,7 @@ export const DashboardLayout = ({
 
   const { isLoading, organization, organizations, team, project } =
     useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
@@ -475,11 +477,13 @@ export const DashboardLayout = ({
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >
-                    <Menu.Item value="setup" asChild>
-                      <Link href={`/${project?.slug}/setup`}>
-                        API Key & Setup
-                      </Link>
-                    </Menu.Item>
+                    {!isLiteMember && (
+                      <Menu.Item value="setup" asChild>
+                        <Link href={`/${project?.slug}/setup`}>
+                          API Key & Setup
+                        </Link>
+                      </Menu.Item>
+                    )}
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
