@@ -25,7 +25,7 @@ make quickstart       # Interactive profile chooser
 make down             # Stop all services
 ```
 
-See `docs/adr/004-docker-dev-environment.md` for architecture decisions.
+See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 ## Commands
 
@@ -51,10 +51,10 @@ specs/               # BDD feature specs
 
 ## Key References
 
-- `docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
-- `docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
-- `docs/best_practices/` - language/framework conventions
-- `docs/adr/` - Architecture Decision Records
+- `dev/docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
+- `dev/docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
+- `dev/docs/best_practices/` - language/framework conventions
+- `dev/docs/adr/` - Architecture Decision Records
 
 ## General
 

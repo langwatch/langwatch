@@ -31,7 +31,7 @@ interface CacheEntry {
  * - Reduced PostHog API calls (one call per 5 seconds per unique key)
  * - Resilience to PostHog outages (serves cached values while down)
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FEATURE_FLAG_CACHE_TTL_MS for TTL configuration
  */
 export class StaleWhileRevalidateCache {

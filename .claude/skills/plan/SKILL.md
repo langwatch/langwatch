@@ -15,7 +15,7 @@ Create a BDD feature file for: $ARGUMENTS
 - How to achieve non-overlapping test coverage
 - The distinction between @integration and @unit scenarios (see ADR-010 for @e2e guidance)
 
-Also reference `docs/TESTING_PHILOSOPHY.md` for the test hierarchy and decision tree.
+Also reference `dev/docs/TESTING_PHILOSOPHY.md` for the test hierarchy and decision tree.
 
 ## Requirements Source
 

@@ -208,7 +208,8 @@
                 "group": "Administration",
                 "pages": [
                   "platform/rbac",
-                  "platform/audit-log"
+                  "platform/audit-log",
+                  "platform/scim"
                 ]
               }
             ]
@@ -616,7 +617,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1774518935",
+      "source": "/ci/cache/busted/1774521914",
       "destination": "/"
     },
     {

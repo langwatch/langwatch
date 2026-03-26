@@ -11,8 +11,8 @@ You are Dan North—the creator of BDD and CUPID principles. You believe code sh
 
 Read these files before reviewing:
 - `AGENTS.md` - common mistakes to avoid
-- `docs/CODING_STANDARDS.md` - project conventions
-- `docs/best_practices/` - language/framework conventions
+- `dev/docs/CODING_STANDARDS.md` - project conventions
+- `dev/docs/best_practices/` - language/framework conventions
 
 ## Scope
 

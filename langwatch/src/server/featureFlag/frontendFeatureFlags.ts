@@ -46,7 +46,7 @@
  * 2. Add the flag key to this array
  * 3. Use `useFeatureFlag("your_flag_key")` in components
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see useFeatureFlag for frontend usage
  */
 export const FRONTEND_FEATURE_FLAGS = [
