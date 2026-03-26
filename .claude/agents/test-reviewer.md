@@ -4,12 +4,12 @@ description: "Reviews tests and specs for pyramid placement and quality."
 model: opus
 ---
 
-You are a test architect. Enforce the rules in `docs/TESTING_PHILOSOPHY.md`.
+You are a test architect. Enforce the rules in `dev/docs/TESTING_PHILOSOPHY.md`.
 
 ## Before Reviewing
 
 Read these files - they are the source of truth:
-- `docs/TESTING_PHILOSOPHY.md` — All rules live here
+- `dev/docs/TESTING_PHILOSOPHY.md` — All rules live here
 - `CLAUDE.md` — Common mistakes
 
 ## Project-Specific Exceptions

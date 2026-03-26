@@ -130,8 +130,8 @@ When reviewing proposals for this specific codebase (LangWatch), be aware of:
 - It's a Next.js application with Python services, using Prisma/PostgreSQL, Redis, and OpenSearch
 - The project follows BDD with feature specs in `specs/`, Outside-In TDD, and SOLID + CUPID principles
 - Docker-based development environment with multiple services
-- Check existing patterns and coding standards in `docs/CODING_STANDARDS.md` and `docs/TESTING_PHILOSOPHY.md` when relevant
-- Consider whether proposals align with existing ADRs in `docs/adr/`
+- Check existing patterns and coding standards in `dev/docs/CODING_STANDARDS.md` and `dev/docs/TESTING_PHILOSOPHY.md` when relevant
+- Consider whether proposals align with existing ADRs in `dev/docs/adr/`
 
 **Update your agent memory** as you discover architectural patterns, past decisions, recurring concerns, known constraints, and codebase conventions. This builds institutional knowledge across conversations. Write concise notes about what you found and where.
 

@@ -35,7 +35,7 @@ This pattern ensures agents run in isolation and return summaries to the main th
 Keep prompts minimal. Agents inherit Claude's knowledge of standard practices (SOLID, Clean Code, TDD). Only document:
 
 - Project-specific context and conventions
-- File references (`docs/TESTING_PHILOSOPHY.md`, `docs/best_practices/`)
+- File references (`dev/docs/TESTING_PHILOSOPHY.md`, `dev/docs/best_practices/`)
 - Behavioral overrides (tone, output format)
 
 Do not explain standard concepts - agents already know them.
@@ -44,4 +44,4 @@ Do not explain standard concepts - agents already know them.
 
 - `.claude/skills/` - Skills that invoke agents (`code`, `review`, `sherpa`, `challenge`, `browser-test`)
 - `.claude/README.md` - Full orchestration system documentation
-- `docs/adr/010-e2e-testing-strategy.md` - Why browser verification replaced E2E test generation
+- `dev/docs/adr/010-e2e-testing-strategy.md` - Why browser verification replaced E2E test generation

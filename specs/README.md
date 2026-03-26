@@ -18,7 +18,7 @@ A feature file should be a **complete specification** of the work:
 - No gaps - if it's not in the feature file, it's not in scope
 
 ### Non-Overlapping Test Coverage
-Each test level has a distinct purpose (see `docs/TESTING_PHILOSOPHY.md`):
+Each test level has a distinct purpose (see `dev/docs/TESTING_PHILOSOPHY.md`):
 
 | Tag | Purpose | What It Tests |
 |-----|---------|---------------|
@@ -40,4 +40,4 @@ Each test level has a distinct purpose (see `docs/TESTING_PHILOSOPHY.md`):
 - User stories, not technical architecture
 - Complete coverage plan with appropriate test levels
 
-See `docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision tree.
+See `dev/docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision tree.

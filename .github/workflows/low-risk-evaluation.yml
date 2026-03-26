@@ -86,7 +86,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
         run: |
-          POLICY=$(cat docs/LOW_RISK_PULL_REQUESTS.md)
+          POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
           PR_TITLE=$(cat /tmp/pr_title.txt)
           PR_BODY=$(cat /tmp/pr_body.txt)
           PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
@@ -213,7 +213,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](docs/LOW_RISK_PULL_REQUESTS.md) procedure.`,
+                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.`,
                   `- **Scope:** ${scope}`,
                   `- **Exclusions confirmed:** no changes to auth, security settings, database schema, business-critical logic, or external integrations.`,
                   `- **Classification:** \`low-risk-change\` under the documented policy.`,
@@ -266,7 +266,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.`,
+                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.`,
                   "",
                   `> ${reasoning}`,
                   "",
