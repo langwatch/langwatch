@@ -9,6 +9,7 @@ import { DeepSeek } from "../../components/icons/DeepSeek";
 import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
 import { Groq } from "../../components/icons/Groq";
+import { MiniMax } from "../../components/icons/MiniMax";
 import { OpenAI } from "../../components/icons/OpenAI";
 import { Xai } from "../../components/icons/Xai";
 import type { modelProviders } from "./registry";
@@ -28,4 +29,5 @@ export const modelProviderIcons: Record<
   custom: <Custom />,
   xai: <Xai />,
   cerebras: <Cerebras />,
+  minimax: <MiniMax />,
 };
