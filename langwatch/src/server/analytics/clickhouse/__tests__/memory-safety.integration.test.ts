@@ -447,6 +447,85 @@ describe("memory-safety integration", () => {
         throw error;
       }
     });
+
+    it("completes tokens_per_second query within 50MB on wide-attribute data", async () => {
+      resetParamCounter();
+      const { sql, params } = buildTimeseriesQuery({
+        ...baseInput,
+        projectId: WIDE_COLUMN_TENANT_ID,
+        timeScale: "full",
+        series: [
+          {
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as AggregationTypes,
+          },
+        ],
+      });
+
+      // Execute with a 50MB hard cap. If stored_spans were read instead of
+      // trace_summaries, the wide SpanAttributes column would cause OOM.
+      try {
+        const result = await ch.query({
+          query: sql,
+          query_params: params,
+          format: "JSONEachRow",
+          clickhouse_settings: {
+            max_memory_usage: "50000000",
+          },
+        });
+        await result.json();
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
+          expect.fail(
+            `tokens_per_second query exceeded 50MB on wide-attribute data — ` +
+              `it may be reading stored_spans instead of trace_summaries: ${message}`,
+          );
+        }
+        throw error;
+      }
+    });
+  });
+
+  describe("when verifying tokens_per_second uses trace_summaries instead of stored_spans", () => {
+    it("generates SQL that does not reference SpanAttributes for tokens_per_second metric with avg aggregation", () => {
+      resetParamCounter();
+      const { sql } = buildTimeseriesQuery({
+        ...baseInput,
+        timeScale: "full",
+        series: [
+          {
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as AggregationTypes,
+          },
+        ],
+      });
+
+      // tokens_per_second reads TokensPerSecond from trace_summaries —
+      // SpanAttributes must not appear since that column lives in stored_spans.
+      expect(sql).not.toContain("SpanAttributes");
+      expect(sql).not.toMatch(/\bstored_spans\b/);
+      expect(sql).toContain("TokensPerSecond");
+    });
+
+    it("generates SQL that does not reference SpanAttributes for tokens_per_second metric with p95 aggregation", () => {
+      resetParamCounter();
+      const { sql } = buildTimeseriesQuery({
+        ...baseInput,
+        timeScale: "full",
+        series: [
+          {
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            aggregation: "p95" as AggregationTypes,
+          },
+        ],
+      });
+
+      expect(sql).not.toContain("SpanAttributes");
+      expect(sql).toContain("TokensPerSecond");
+      expect(sql).toContain("quantileExact");
+    });
   });
 
   describe("when verifying query result correctness on seeded data", () => {
@@ -518,6 +597,41 @@ describe("memory-safety integration", () => {
       // knownCost = 0.05 per trace, 1000 traces = 50.0
       const totalCost = Number(currentRow![metricKey!]);
       expect(totalCost).toBeCloseTo(50.0, 1);
+    });
+
+    it("returns expected avg tokens_per_second of 100", async () => {
+      resetParamCounter();
+      const { sql, params } = buildTimeseriesQuery({
+        ...baseInput,
+        timeScale: "full",
+        series: [
+          {
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as AggregationTypes,
+          },
+        ],
+      });
+
+      const result = await ch.query({
+        query: sql,
+        query_params: params,
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<Record<string, unknown>>();
+      const currentRow = rows.find(
+        (r: Record<string, unknown>) => r.period === "current",
+      );
+      expect(currentRow).toBeDefined();
+
+      const metricKey = Object.keys(currentRow!).find(
+        (k) => k !== "period" && k !== "date",
+      );
+      expect(metricKey).toBeDefined();
+
+      // All trace_summaries rows have TokensPerSecond: 100 — avg must equal 100
+      const avgTps = Number(currentRow![metricKey!]);
+      expect(avgTps).toBeCloseTo(100, 0);
     });
   });
 });
