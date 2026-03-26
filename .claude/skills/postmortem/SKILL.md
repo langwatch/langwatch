@@ -47,7 +47,7 @@ Do not proceed until the content is clean.
 
 **Prerequisites:**
 - `NOTION_API_KEY` must be set in the environment. Never hardcode it.
-- Parent page ID: `32e5e165-d482-80e2-bf9b-ef42132f7424`
+- `NOTION_POSTMORTEM_PAGE_ID` must be set in the environment. This is the Notion page ID where post-mortems are created as children.
 
 ### 3a. Derive page title
 
