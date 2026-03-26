@@ -150,7 +150,9 @@ describe("DatasetSelection", () => {
       const propsWithDataset = {
         ...defaultProps,
         node: {
-          ...defaultProps.node,
+          id: "node-1",
+          type: "entry",
+          position: { x: 0, y: 0 },
           data: { dataset: { id: "existing-123", name: "Existing Dataset" } },
         } as never,
       };
