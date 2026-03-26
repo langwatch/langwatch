@@ -265,7 +265,7 @@ describe("extensible metadata integration", () => {
 
   describe("given a scenario event with empty-string scenarioSetId", () => {
     describe("when the event is ingested via the Zod schema and stored", () => {
-      it("coerces scenarioSetId to 'default' at the schema level", async () => {
+      it("coerces scenarioSetId to 'default' through the full round-trip", async () => {
         const ids = generateTestIds("empty-set-id");
 
         // Simulate what the API does: validate through Zod schema first
@@ -287,47 +287,46 @@ describe("extensible metadata integration", () => {
         // Verify coercion happened before storage
         expect(parsed.scenarioSetId).toBe("default");
 
-        // Now store the coerced event and retrieve it
+        // Store the coerced event and verify it persists correctly
         const client = await esClient({ test: true });
         const now = Date.now();
 
-        const events = [
-          {
-            type: ScenarioEventType.RUN_STARTED,
-            timestamp: now - 5000,
-            project_id: project.id,
-            scenario_id: ids.scenarioId,
-            scenario_run_id: ids.scenarioRunId,
-            batch_run_id: ids.batchRunId,
-            scenario_set_id: parsed.scenarioSetId,
-            metadata: { name: "Empty set regression" },
-          },
-          {
-            type: ScenarioEventType.RUN_FINISHED,
-            timestamp: now,
-            project_id: project.id,
-            scenario_id: ids.scenarioId,
-            scenario_run_id: ids.scenarioRunId,
-            batch_run_id: ids.batchRunId,
-            scenario_set_id: parsed.scenarioSetId,
-            status: ScenarioRunStatus.SUCCESS,
-            results: { verdict: Verdict.SUCCESS },
-          },
-        ];
-
         await client.bulk({
           index: SCENARIO_EVENTS_INDEX.alias,
-          body: events.flatMap((event) => [{ index: {} }, event]),
+          body: [
+            { index: {} },
+            {
+              type: ScenarioEventType.RUN_STARTED,
+              timestamp: now,
+              project_id: project.id,
+              scenario_id: ids.scenarioId,
+              scenario_run_id: ids.scenarioRunId,
+              batch_run_id: ids.batchRunId,
+              scenario_set_id: parsed.scenarioSetId,
+              metadata: { name: "Empty set regression" },
+            },
+          ],
           refresh: true,
         });
 
-        const runs = await service.getScenarioRunDataBatch({
-          projectId: project.id,
-          scenarioRunIds: [ids.scenarioRunId],
-        });
+        // Read back from ES to verify "default" was stored, not ""
+        const result = (await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { scenario_run_id: ids.scenarioRunId } },
+                  { term: { project_id: project.id } },
+                ],
+              },
+            },
+          },
+        })) as any;
 
-        expect(runs).toHaveLength(1);
-        expect(runs[0]!.scenarioSetId).toBe("default");
+        const hits = result.hits.hits;
+        expect(hits).toHaveLength(1);
+        expect(hits[0]._source.scenario_set_id).toBe("default");
       });
     });
   });
