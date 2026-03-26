@@ -15,7 +15,6 @@ import {
 vi.mock("~/server/background/workers/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),
   googleDLPClearPII: vi.fn(),
-  clearPII: vi.fn(),
 }));
 
 function createMockOtlpSpan(attributes: OtlpKeyValue[]): OtlpSpan {
