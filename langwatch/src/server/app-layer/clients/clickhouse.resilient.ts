@@ -351,7 +351,17 @@ export function createResilientClickHouseClient({
               // should show up in dashboards before retries exhaust.
               const errorType = classifyClickHouseError(error);
               incrementClickHouseQueryCount("INSERT", "error");
-              failureMonitor.record();
+              if (failureMonitor.record()) {
+                queryLogger.fatal(
+                  {
+                    source: "clickhouse",
+                    alert: true,
+                    recentErrorType: errorType,
+                    windowMinutes: failureMonitor.windowMs / 60_000,
+                  },
+                  "ClickHouse failure rate threshold exceeded"
+                );
+              }
 
               const delay = jitteredBackoff({
                 attempt,

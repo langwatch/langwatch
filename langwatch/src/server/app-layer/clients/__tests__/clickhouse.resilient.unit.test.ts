@@ -332,6 +332,43 @@ describe("createResilientClickHouseClient()", () => {
       expect(recordSpy).toHaveBeenCalledTimes(1);
     });
 
+    it("emits fatal alert when transient retry crosses threshold", async () => {
+      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const result = { executed: true };
+      const mock = makeMockClient({
+        insert: vi
+          .fn()
+          .mockRejectedValueOnce(transientError)
+          .mockResolvedValueOnce(result),
+      });
+      const monitor = new FailureRateMonitor({
+        threshold: 1,
+        windowMs: 60_000,
+      });
+
+      const client = createResilientClickHouseClient({
+        client: mock,
+        failureMonitor: monitor,
+        maxRetries: 3,
+        baseDelayMs: 1,
+      });
+
+      await client.insert({
+        table: "test",
+        values: [],
+        format: "JSONEachRow",
+      });
+
+      expect(mockQueryLogger.fatal).toHaveBeenCalledWith(
+        expect.objectContaining({
+          alert: true,
+          recentErrorType: "oom",
+          windowMinutes: 1,
+        }),
+        "ClickHouse failure rate threshold exceeded"
+      );
+    });
+
     it("includes source and errorType in retry warning log", async () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
       const result = { executed: true };
