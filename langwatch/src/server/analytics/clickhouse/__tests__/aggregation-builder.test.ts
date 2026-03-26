@@ -437,6 +437,111 @@ describe("aggregation-builder", () => {
       // Tenant isolation in SQL (dedupedTraceSummaries + baseWhere)
       expect(result.sql).toContain("TenantId = {tenantId:String}");
     });
+
+    describe("when groupBy is evaluation field with cross-evaluator metrics", () => {
+      // @regression issue #2668: groupByAdditionalWhere was appended to the global WHERE
+      // clause, pre-filtering the entire dataset to one evaluator. This caused metrics
+      // that use conditional aggregation (avgIf/sumIf with their OWN evaluator filter)
+      // to find no matching rows because the global WHERE already excluded all rows for
+      // the OTHER evaluator.
+
+      it("evaluation_label groupBy does not add global EvaluatorId filter to WHERE clause", () => {
+        // GroupBy evaluatorA, but metric targets evaluatorB via its own conditional aggregation.
+        // The global WHERE must NOT filter by evaluatorA — that would make evaluatorB rows invisible.
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // The group_key expression should incorporate the evaluatorA filter (not the global WHERE)
+        expect(result.sql).toContain("group_key");
+        // The metric's conditional aggregation should reference evaluatorB
+        expect(result.sql).toContain("evaluatorB");
+        // The global WHERE clause must NOT contain a standalone EvaluatorId equality filter
+        // (it would appear as "AND es.EvaluatorId = {groupByKey:String}" or similar)
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("evaluation_passed groupBy does not add global EvaluatorId filter to WHERE clause", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_passed",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("evaluatorB");
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("evaluation_label groupBy incorporates evaluator condition into group_key expression", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // The evaluator filter must live inside the group_key column expression, not in WHERE
+        expect(result.sql).toContain("{groupByKey:String}");
+        // The group_key expression should be conditional (if/CASE) so non-matching rows
+        // return NULL and get filtered by HAVING rather than excluded from the whole dataset
+        expect(result.sql).toMatch(/if\(.*EvaluatorId.*group_key|CASE.*EvaluatorId/s);
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("evaluation_label groupBy without groupByKey produces no evaluator filter anywhere", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          // no groupByKey
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Without a groupByKey there is no evaluator groupBy filter at all
+        expect(result.sql).not.toContain("{groupByKey:String}");
+        expect(result.params).not.toHaveProperty("groupByKey");
+      });
+    });
   });
 
   describe("buildDataForFilterQuery", () => {

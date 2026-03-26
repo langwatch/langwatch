@@ -224,24 +224,28 @@ const groupByExpressions: Partial<
   }),
 
   "evaluations.evaluation_passed": (groupByKey) => ({
-    column: `CASE
+    column: groupByKey
+      ? `CASE
+        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
+        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
+        ELSE NULL
+      END`
+      : `CASE
       WHEN ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
       WHEN ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
       ELSE 'unknown'
     END`,
     requiredJoins: ["evaluation_runs"],
     handlesUnknown: true,
-    additionalWhere: groupByKey
-      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL`
-      : undefined,
+    additionalWhere: undefined,
   }),
 
   "evaluations.evaluation_label": (groupByKey) => ({
-    column: `${tableAliases.evaluation_runs}.Label`,
+    column: groupByKey
+      ? `if(${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed', ${tableAliases.evaluation_runs}.Label, '')`
+      : `${tableAliases.evaluation_runs}.Label`,
     requiredJoins: ["evaluation_runs"],
-    additionalWhere: groupByKey
-      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed'`
-      : undefined,
+    additionalWhere: undefined,
   }),
 
   "evaluations.evaluation_processing_state": () => ({
@@ -448,14 +452,12 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   let usesArrayJoin = false;
   let groupByHandlesUnknown = false;
   let groupByRequiresSpans = false;
-  let groupByAdditionalWhere: string | undefined;
   if (input.groupBy) {
     const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
     groupByColumn = groupByExpr.column;
     usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
     groupByHandlesUnknown = groupByExpr.handlesUnknown ?? false;
     groupByRequiresSpans = groupByExpr.requiredJoins.includes("stored_spans");
-    groupByAdditionalWhere = groupByExpr.additionalWhere;
     for (const join of groupByExpr.requiredJoins) {
       allJoins.add(join);
     }
@@ -468,7 +470,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     ...metricTranslations.map((m) => m.selectExpression),
     filterTranslation.whereClause,
     groupByColumn ?? "",
-    groupByAdditionalWhere ?? "",
   ];
   const joinClauses = Array.from(allJoins)
     .map((table) => {
@@ -491,11 +492,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
-
-  // Add groupBy additional WHERE clause if present (e.g., for filtering by specific evaluator)
-  if (groupByAdditionalWhere) {
-    filterWhere += ` AND ${groupByAdditionalWhere}`;
-  }
 
   // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
   // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates
@@ -544,7 +540,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       pipelineMetrics: subqueryMetrics,
       groupByColumn,
       groupByHandlesUnknown,
-      groupByAdditionalWhere,
       joinClauses,
       baseWhere,
       filterWhere,
@@ -599,15 +594,20 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     groupByExprs.push("group_key");
   }
 
-  // Filter out empty groupBy values to match ES terms aggregation behavior
-  // Skip HAVING if column already handles 'unknown' conversion (those already excluded empty strings)
-  // Skip HAVING for boolean fields like evaluations.evaluation_passed (which use 0/1, not empty strings)
-  const havingClause =
-    groupByColumn &&
-    !groupByHandlesUnknown &&
-    input.groupBy !== "evaluations.evaluation_passed"
-      ? "HAVING group_key != ''"
-      : "";
+  // Filter out empty/null groupBy values to match ES terms aggregation behavior.
+  // - evaluation_label with groupByKey: column returns '' for non-matching rows, so filter != ''
+  // - evaluation_passed with groupByKey: column returns NULL for non-matching rows, so filter IS NOT NULL
+  // - evaluation_passed without groupByKey: 'unknown' for unresolved — no HAVING needed
+  // - Other columns with handlesUnknown=true: they already exclude empty/null, no HAVING needed
+  const hasGroupByKey = !!input.groupByKey;
+  const isEvaluationPassed = input.groupBy === "evaluations.evaluation_passed";
+  const havingClause = groupByColumn
+    ? isEvaluationPassed && hasGroupByKey
+      ? "HAVING group_key IS NOT NULL"
+      : !groupByHandlesUnknown && !isEvaluationPassed
+        ? "HAVING group_key != ''"
+        : ""
+    : "";
 
   // Build the complete SQL
   const sql = `
@@ -1134,7 +1134,6 @@ function buildDateBucketedPipelineQuery({
   pipelineMetrics,
   groupByColumn,
   groupByHandlesUnknown,
-  groupByAdditionalWhere,
   joinClauses,
   baseWhere,
   filterWhere,
@@ -1145,7 +1144,6 @@ function buildDateBucketedPipelineQuery({
   pipelineMetrics: MetricTranslation[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
-  groupByAdditionalWhere: string | undefined;
   joinClauses: string;
   baseWhere: string;
   filterWhere: string;
@@ -1170,14 +1168,21 @@ function buildDateBucketedPipelineQuery({
       : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
     : null;
 
-  // NOTE: filterWhere already includes groupByAdditionalWhere (added in buildTimeseriesQuery)
   const fullFilterWhere = filterWhere;
 
-  // Skip HAVING group_key != '' for boolean fields and columns that already handle unknown
-  const skipGroupKeyHaving =
-    !groupByColumn ||
-    groupByHandlesUnknown ||
-    input.groupBy === "evaluations.evaluation_passed";
+  // Determine HAVING clause for group_key filtering.
+  // - evaluation_passed with groupByKey: column returns NULL for non-matching rows
+  // - Other non-handlesUnknown columns: column returns '' for non-matching rows
+  // - Columns that handle unknown / no groupBy key: no HAVING needed
+  const hasGroupByKey = !!input.groupByKey;
+  const isEvaluationPassed = input.groupBy === "evaluations.evaluation_passed";
+  const groupKeyHaving = groupByColumn
+    ? isEvaluationPassed && hasGroupByKey
+      ? "HAVING group_key IS NOT NULL"
+      : !groupByHandlesUnknown && !isEvaluationPassed
+        ? "HAVING group_key != ''"
+        : ""
+    : "";
 
   const ctes = pipelineMetrics.map((metric) =>
     buildPipelineMetricCTE(metric, {
@@ -1186,7 +1191,7 @@ function buildDateBucketedPipelineQuery({
       dateTrunc,
       groupByColumn,
       groupKeyExpr,
-      skipGroupKeyHaving,
+      groupKeyHaving,
       joinClauses,
       baseWhere,
       fullFilterWhere,
@@ -1250,7 +1255,7 @@ interface PipelineCTEContext {
   dateTrunc: string;
   groupByColumn: string | null;
   groupKeyExpr: string | null;
-  skipGroupKeyHaving: boolean;
+  groupKeyHaving: string;
   joinClauses: string;
   baseWhere: string;
   fullFilterWhere: string;
@@ -1282,8 +1287,7 @@ function buildPipelineMetricCTE(
   // Outer GROUP BY / HAVING
   const outerGroupByCols = ["period", "date"];
   if (hasGroup) outerGroupByCols.push("group_key");
-  const outerHaving =
-    !ctx.skipGroupKeyHaving ? "HAVING group_key != ''" : "";
+  const outerHaving = ctx.groupKeyHaving;
 
   // Inner select: the base scan with period/date bucketing
   const baseSelectCols = [
