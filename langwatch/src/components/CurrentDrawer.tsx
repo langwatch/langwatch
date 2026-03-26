@@ -18,7 +18,6 @@ export { useDrawer } from "../hooks/useDrawer";
 
 /** Drawers that EXTERNAL users cannot open, mapped to their restriction resource. */
 const restrictedDrawers: Partial<Record<DrawerType, string>> = {
-  traceDetails: "traces",
   addDatasetRecord: "datasets",
 };
 

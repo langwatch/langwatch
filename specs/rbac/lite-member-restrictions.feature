@@ -46,34 +46,33 @@ Feature: Lite member access restrictions
     And filtering, sorting, and pagination work normally
 
   # ============================================================================
-  # R3: Trace Detail Restriction
+  # R3: Trace Detail — Partial Access
   # ============================================================================
 
   @integration
-  Scenario: Lite member cannot open trace details from the messages page
+  Scenario: Lite member opens trace details drawer from the messages page
     Given sarah is viewing the trace list on the messages page
     When she clicks a trace row
-    Then a restriction modal appears instead of the trace detail drawer
-    And no trace debug data is shown
+    Then the trace detail drawer opens
+    And she sees the "Thread", "Evaluations", and "Events" tabs
 
   @integration
-  Scenario: Trace detail restriction applies regardless of entry point
-    When sarah tries to open a trace detail from any entry point
-      | entry point              |
-      | trace row click          |
-      | command bar              |
-      | deep link URL            |
-      | feedback table link      |
-      | experiment result link   |
-      | annotation table link    |
-    Then the trace detail drawer does not open
-    And a restriction modal appears each time
+  Scenario: Lite member does not see "Trace Details" or "Sequence" tabs
+    Given sarah has opened a trace detail drawer
+    Then the "Trace Details" tab is not visible
+    And the "Sequence" tab is not visible
 
   @integration
-  Scenario: Direct URL to a trace shows restriction instead of trace data
-    When sarah navigates directly to a trace detail URL
-    Then she sees a restriction modal
-    And no trace debug data is rendered
+  Scenario: Lite member does not see the "View Trace" hover action on messages
+    Given sarah is viewing the messages page in card view
+    When she hovers over a message card
+    Then the "View Trace" button is not shown
+    And the "Translate", "Annotate", and "Suggest" buttons are shown
+
+  @integration
+  Scenario: Lite member can annotate and suggest on traces
+    Given sarah has opened a trace detail drawer
+    Then she can leave comments and suggestions on messages
 
   # ============================================================================
   # R3b: Trace Export Restriction
@@ -274,7 +273,8 @@ Feature: Lite member access restrictions
   Scenario: Full member retains all capabilities
     When dev logs in to the platform
     Then dev can view, create, edit, and delete all resources
-    And dev can debug individual traces
+    And dev sees all trace detail tabs including "Trace Details" and "Sequence"
+    And dev sees the "View Trace" hover action on messages
     And dev experiences no restriction modals or disabled buttons
 
   # ============================================================================
