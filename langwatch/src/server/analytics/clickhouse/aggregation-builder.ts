@@ -534,10 +534,10 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   if (subqueryMetrics.length > 0 && typeof input.timeScale === "number") {
     return buildDateBucketedPipelineQuery({
       input,
+      simpleMetrics,
       pipelineMetrics: subqueryMetrics,
       groupByColumn,
       groupByHandlesUnknown,
-      groupByAdditionalWhere,
       joinClauses,
       baseWhere,
       filterWhere,
@@ -970,10 +970,10 @@ function buildSubqueryTimeseriesQuery(
  */
 function buildDateBucketedPipelineQuery({
   input,
+  simpleMetrics,
   pipelineMetrics,
   groupByColumn,
   groupByHandlesUnknown,
-  groupByAdditionalWhere,
   joinClauses,
   baseWhere,
   filterWhere,
@@ -981,10 +981,10 @@ function buildDateBucketedPipelineQuery({
   timeZone,
 }: {
   input: TimeseriesQueryInput;
+  simpleMetrics: MetricTranslation[];
   pipelineMetrics: MetricTranslation[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
-  groupByAdditionalWhere: string | undefined;
   joinClauses: string;
   baseWhere: string;
   filterWhere: string;
@@ -1009,10 +1009,7 @@ function buildDateBucketedPipelineQuery({
       : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
     : null;
 
-  let fullFilterWhere = filterWhere;
-  if (groupByAdditionalWhere) {
-    fullFilterWhere += ` AND ${groupByAdditionalWhere}`;
-  }
+  // filterWhere already includes groupByAdditionalWhere from the caller
 
   // Skip HAVING group_key != '' for boolean fields and columns that already handle unknown
   const skipGroupKeyHaving =
@@ -1020,6 +1017,12 @@ function buildDateBucketedPipelineQuery({
     groupByHandlesUnknown ||
     input.groupBy === "evaluations.evaluation_passed";
 
+  const hasGroup = !!groupByColumn;
+  const outerGroupByCols = ["period", "date"];
+  if (hasGroup) outerGroupByCols.push("group_key");
+  const outerHaving = !skipGroupKeyHaving ? "HAVING group_key != ''" : "";
+
+  // Build pipeline metric CTEs
   const ctes = pipelineMetrics.map((metric) =>
     buildPipelineMetricCTE(metric, {
       ts,
@@ -1030,38 +1033,77 @@ function buildDateBucketedPipelineQuery({
       skipGroupKeyHaving,
       joinClauses,
       baseWhere,
-      fullFilterWhere,
+      filterWhere,
     }),
   );
 
-  // Build final SELECT
-  let finalSelect: string;
-  if (pipelineMetrics.length === 1) {
-    const cteName = `cte_${pipelineMetrics[0]!.alias}`;
-    finalSelect = `SELECT * FROM ${cteName} WHERE period IS NOT NULL ORDER BY period, date`;
-  } else {
-    // Multiple pipeline metrics: FULL OUTER JOIN on (period, date[, group_key])
-    const firstCteName = `cte_${pipelineMetrics[0]!.alias}`;
-    const joinKeys = groupByColumn
-      ? ["period", "date", "group_key"]
-      : ["period", "date"];
+  // Build simple metrics CTE when both simple and pipeline metrics are present
+  type CteSource = { name: string; metricCols: string[] };
+  const cteSources: CteSource[] = [];
 
-    let joinSql = firstCteName;
+  if (simpleMetrics.length > 0) {
+    const simpleSelectExprs = simpleMetrics.map((m) => {
+      const quotedAlias = quoteIdentifier(m.alias);
+      return m.selectExpression.replace(
+        ` AS ${m.alias}`,
+        ` AS ${quotedAlias}`,
+      );
+    });
+
+    ctes.unshift(`
+      simple_metrics AS (
+        SELECT
+          ${periodCase} AS period,
+          ${dateTrunc} AS date${groupKeyExpr ? `,\n          ${groupKeyExpr}` : ""},
+          ${simpleSelectExprs.join(",\n          ")}
+        FROM ${dedupedTraceSummaries(ts)}
+        ${joinClauses}
+        WHERE ${baseWhere}
+          ${filterWhere}
+        GROUP BY ${outerGroupByCols.join(", ")}
+        ${outerHaving}
+      )`);
+
+    cteSources.push({
+      name: "simple_metrics",
+      metricCols: simpleMetrics.map((m) => quoteIdentifier(m.alias)),
+    });
+  }
+
+  for (const metric of pipelineMetrics) {
+    cteSources.push({
+      name: `cte_${metric.alias}`,
+      metricCols: [quoteIdentifier(metric.alias)],
+    });
+  }
+
+  // Build final SELECT — single CTE uses SELECT *, multiple use FULL OUTER JOIN
+  const joinKeys = hasGroup
+    ? ["period", "date", "group_key"]
+    : ["period", "date"];
+
+  let finalSelect: string;
+  if (cteSources.length === 1) {
+    const src = cteSources[0]!;
+    finalSelect = `SELECT * FROM ${src.name} WHERE period IS NOT NULL ORDER BY period, date`;
+  } else {
+    const first = cteSources[0]!;
     const selectCols = [
-      ...joinKeys.map((k) => `${firstCteName}.${k}`),
-      `${firstCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`,
+      ...joinKeys.map((k) => `${first.name}.${k}`),
+      ...first.metricCols.map((c) => `${first.name}.${c}`),
     ];
 
-    for (let i = 1; i < pipelineMetrics.length; i++) {
-      const cteName = `cte_${pipelineMetrics[i]!.alias}`;
+    let joinSql = first.name;
+    for (let i = 1; i < cteSources.length; i++) {
+      const src = cteSources[i]!;
       const onClause = joinKeys
-        .map((k) => `${firstCteName}.${k} = ${cteName}.${k}`)
+        .map((k) => `${first.name}.${k} = ${src.name}.${k}`)
         .join(" AND ");
-      joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
-      selectCols.push(`${cteName}.${quoteIdentifier(pipelineMetrics[i]!.alias)}`);
+      joinSql += `\n    FULL OUTER JOIN ${src.name} ON ${onClause}`;
+      selectCols.push(...src.metricCols.map((c) => `${src.name}.${c}`));
     }
 
-    finalSelect = `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${firstCteName}.period IS NOT NULL ORDER BY ${firstCteName}.period, ${firstCteName}.date`;
+    finalSelect = `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${first.name}.period IS NOT NULL ORDER BY ${first.name}.period, ${first.name}.date`;
   }
 
   const sql = `
@@ -1094,7 +1136,7 @@ interface PipelineCTEContext {
   skipGroupKeyHaving: boolean;
   joinClauses: string;
   baseWhere: string;
-  fullFilterWhere: string;
+  filterWhere: string;
 }
 
 /**
@@ -1134,7 +1176,7 @@ function buildPipelineMetricCTE(
           FROM ${dedupedTraceSummaries(ctx.ts)}
           ${ctx.joinClauses}
           WHERE ${ctx.baseWhere}
-            ${ctx.fullFilterWhere}`;
+            ${ctx.filterWhere}`;
 
   if (subquery.nestedSubquery) {
     // 3-level aggregation (e.g., threads per user)
