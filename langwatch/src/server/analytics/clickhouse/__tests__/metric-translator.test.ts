@@ -122,6 +122,17 @@ describe("metric-translator", () => {
         expect(result.requiredJoins).not.toContain("stored_spans");
       });
 
+      it("translates performance.tokens_per_second with percentile aggregation", () => {
+        const result = translateMetric(
+          "performance.tokens_per_second",
+          "p95",
+          0
+        );
+        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        expect(result.selectExpression).toContain("TokensPerSecond");
+        expect(result.requiredJoins).not.toContain("stored_spans");
+      });
+
       it("translates performance.total_tokens", () => {
         const result = translateMetric("performance.total_tokens", "sum", 0);
         expect(result.selectExpression).toContain("TotalPromptTokenCount");
