@@ -19,6 +19,7 @@ import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 import { HoverableBigText } from "../../../components/HoverableBigText";
+import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -520,6 +521,11 @@ export function BasePropertiesPanel({
       existingNodeIds: workflowNodes.map((n) => n.id),
     });
     if (!result.valid) {
+      toaster.create({
+        title: "Invalid name",
+        description: result.error,
+        type: "error",
+      });
       return;
     }
     const newId = nameToId(value);
