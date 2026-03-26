@@ -1,7 +1,9 @@
 import {
+  Box,
   Button,
   HStack,
   Input,
+  Spacer,
   Text,
   VStack,
   Wrap,
@@ -223,41 +225,74 @@ export function AddCustomModelDialog({
               />
             </HorizontalFormControl>
 
-            <HorizontalFormControl
-              label="Supported Parameters"
-              helper="Which sampling parameters this model accepts"
+            <Box
+              role="group"
+              aria-label="Supported Parameters"
+              borderBottomWidth="1px"
+              paddingY={5}
             >
-              <Wrap gap={3}>
-                {DIALOG_PARAMETERS.map((param) => (
-                  <Checkbox
-                    key={param.value}
-                    checked={supportedParameters.includes(param.value)}
-                    onCheckedChange={() => toggleParameter(param.value)}
-                    size="sm"
-                  >
-                    <Text fontSize="sm">{param.label}</Text>
-                  </Checkbox>
-                ))}
-              </Wrap>
-            </HorizontalFormControl>
+              <HStack
+                width="full"
+                flexDirection={["column", "column", "row"]}
+                gap={4}
+              >
+                <VStack align="start" gap={1} width="full">
+                  <Text fontWeight="medium">Supported Parameters</Text>
+                  <Text fontSize="13px" color="fg.muted">
+                    Which sampling parameters this model accepts
+                  </Text>
+                </VStack>
+                <Spacer />
+                <Box minWidth={["full", "full", "50%"]}>
+                  <Wrap gap={3}>
+                    {DIALOG_PARAMETERS.map((param) => (
+                      <Checkbox
+                        key={param.value}
+                        checked={supportedParameters.includes(param.value)}
+                        onCheckedChange={() => toggleParameter(param.value)}
+                        size="sm"
+                      >
+                        <Text fontSize="sm">{param.label}</Text>
+                      </Checkbox>
+                    ))}
+                  </Wrap>
+                </Box>
+              </HStack>
+            </Box>
 
-            <HorizontalFormControl
-              label="Multimodal Support"
-              helper="Input types this model can process besides text"
+            <Box
+              role="group"
+              aria-label="Multimodal Support"
+              paddingY={5}
             >
-              <Wrap gap={3}>
-                {multimodalInputValues.map((input) => (
-                  <Checkbox
-                    key={input}
-                    checked={multimodalInputs.includes(input)}
-                    onCheckedChange={() => toggleMultimodal(input)}
-                    size="sm"
-                  >
-                    <Text fontSize="sm">{MULTIMODAL_LABELS[input]}</Text>
-                  </Checkbox>
-                ))}
-              </Wrap>
-            </HorizontalFormControl>
+              <HStack
+                width="full"
+                flexDirection={["column", "column", "row"]}
+                gap={4}
+              >
+                <VStack align="start" gap={1} width="full">
+                  <Text fontWeight="medium">Multimodal Support</Text>
+                  <Text fontSize="13px" color="fg.muted">
+                    Input types this model can process besides text
+                  </Text>
+                </VStack>
+                <Spacer />
+                <Box minWidth={["full", "full", "50%"]}>
+                  <Wrap gap={3}>
+                    {multimodalInputValues.map((input) => (
+                      <Checkbox
+                        key={input}
+                        checked={multimodalInputs.includes(input)}
+                        onCheckedChange={() => toggleMultimodal(input)}
+                        size="sm"
+                      >
+                        <Text fontSize="sm">{MULTIMODAL_LABELS[input]}</Text>
+                      </Checkbox>
+                    ))}
+                  </Wrap>
+                </Box>
+              </HStack>
+            </Box>
           </VStack>
         </DialogBody>
         <DialogFooter>
