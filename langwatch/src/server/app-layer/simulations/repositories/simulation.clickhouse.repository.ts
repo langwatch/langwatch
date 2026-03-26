@@ -12,7 +12,7 @@ import {
   mapStatus,
   type ClickHouseSimulationRunRow,
 } from "~/server/simulations/simulation-run.mappers";
-import { INTERNAL_SET_PREFIX } from "~/server/scenarios/internal-set-id";
+import { INTERNAL_SET_PREFIX, expandSetIdFilter } from "~/server/scenarios/internal-set-id";
 import type { SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
@@ -244,12 +244,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
 
     // Step 1: fetch batch-level aggregates
@@ -282,7 +282,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -293,7 +293,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
-        scenarioSetId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
@@ -334,14 +334,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_PREVIEW_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
            AND BatchRunId IN ({batchRunIds:Array(String)})
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunIds },
+      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId), batchRunIds },
     );
 
     // Group items by batchRunId
@@ -441,14 +441,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
            AND BatchRunId = {batchRunId:String}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunId },
+      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId), batchRunId },
     );
 
     const now = Date.now();
@@ -473,12 +473,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
@@ -525,14 +525,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY BatchRunId ASC, CreatedAt ASC
        LIMIT 10000`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
 
     const now = Date.now();
@@ -578,7 +578,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId = {scenarioSetId:String}
+           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -589,7 +589,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        LIMIT {fetchLimit:UInt32}`,
       {
         tenantId: projectId,
-        scenarioSetId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
@@ -859,7 +859,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     if (batchRunIds.length === 0) return [];
 
     const setFilter = scenarioSetId
-      ? "AND ScenarioSetId = {scenarioSetId:String}"
+      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
       : "";
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
@@ -876,7 +876,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC
        LIMIT 5000`,
-      { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetId } : {}) },
+      { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}) },
     );
 
     const now = Date.now();
