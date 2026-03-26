@@ -54,7 +54,7 @@ export function classifyClickHouseError(error: unknown): ClickHouseErrorType {
     (error as { status?: number }).status;
 
   if (status === 429) return "rate_limit";
-  if (status === 503) return "unavailable";
+  if (status === 502 || status === 503) return "unavailable";
 
   // Syntax / schema
   if (

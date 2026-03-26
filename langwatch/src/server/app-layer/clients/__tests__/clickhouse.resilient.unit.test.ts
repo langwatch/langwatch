@@ -114,6 +114,16 @@ describe("classifyClickHouseError()", () => {
     });
   });
 
+  describe("when error has HTTP 502 status", () => {
+    it("returns unavailable", () => {
+      const err = new Error("Bad Gateway") as Error & {
+        statusCode: number;
+      };
+      err.statusCode = 502;
+      expect(classifyClickHouseError(err)).toBe("unavailable");
+    });
+  });
+
   describe("when error has HTTP 503 status", () => {
     it("returns unavailable", () => {
       const err = new Error("Service Unavailable") as Error & {
@@ -685,6 +695,16 @@ describe("isTransientClickHouseError()", () => {
       expect(
         isTransientClickHouseError(new Error("Request Timeout"))
       ).toBe(true);
+    });
+  });
+
+  describe("when error has HTTP 502 status", () => {
+    it("returns true", () => {
+      const err = new Error("Bad Gateway") as Error & {
+        statusCode: number;
+      };
+      err.statusCode = 502;
+      expect(isTransientClickHouseError(err)).toBe(true);
     });
   });
 
