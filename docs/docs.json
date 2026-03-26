@@ -208,7 +208,8 @@
                 "group": "Administration",
                 "pages": [
                   "platform/rbac",
-                  "platform/audit-log"
+                  "platform/audit-log",
+                  "platform/scim"
                 ]
               }
             ]
