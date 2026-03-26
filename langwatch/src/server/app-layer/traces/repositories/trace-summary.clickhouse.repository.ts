@@ -14,7 +14,7 @@ const logger = createLogger(
 );
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
-  ClickHouseSummaryRecord,
+  ClickHouseSummaryWriteExtended,
   "OccurredAt" | "CreatedAt" | "UpdatedAt"
 >;
 
@@ -49,6 +49,13 @@ interface ClickHouseSummaryRecord {
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
+}
+
+/**
+ * Extended record type for writes only — includes Scenario columns
+ * that are NOT read back (to avoid OOM on old merged parts).
+ */
+interface ClickHouseSummaryWriteExtended extends ClickHouseSummaryRecord {
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
@@ -139,10 +146,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
-            HasAnnotation,
-            ScenarioRoleCosts,
-            ScenarioRoleLatencies,
-            ScenarioRoleSpans
+            HasAnnotation
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -199,9 +203,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       hasAnnotation:
         record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
       attributes: record.Attributes ?? {},
-      scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
-      scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
-      scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
+      scenarioRoleCosts: {},
+      scenarioRoleLatencies: {},
+      scenarioRoleSpans: {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
