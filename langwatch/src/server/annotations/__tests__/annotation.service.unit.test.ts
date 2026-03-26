@@ -17,6 +17,7 @@ vi.mock("../annotationEsSync");
 
 function createMockRepository(overrides?: {
   createResult?: Record<string, unknown>;
+  updateResult?: Record<string, unknown>;
   deleteResult?: Record<string, unknown>;
 }): AnnotationRepository {
   const defaultAnnotation = {
@@ -34,6 +35,7 @@ function createMockRepository(overrides?: {
 
   return {
     create: vi.fn().mockResolvedValue(overrides?.createResult ?? defaultAnnotation),
+    update: vi.fn().mockResolvedValue(overrides?.updateResult ?? defaultAnnotation),
     delete: vi.fn().mockResolvedValue(overrides?.deleteResult ?? defaultAnnotation),
   } as unknown as AnnotationRepository;
 }
@@ -61,6 +63,16 @@ const defaultCreateInput = {
   userId: "user-1",
   comment: "test annotation",
   isThumbsUp: null,
+  scoreOptions: {},
+  expectedOutput: null,
+};
+
+const defaultUpdateInput = {
+  id: "ann-1",
+  projectId: "proj-1",
+  traceId: "trace-1",
+  comment: "updated comment",
+  isThumbsUp: false as boolean | null,
   scoreOptions: {},
   expectedOutput: null,
 };
@@ -126,6 +138,21 @@ describe("AnnotationService", () => {
           "Failed to update Elasticsearch after annotation creation",
         );
       });
+    });
+  });
+
+  describe("update()", () => {
+    it("delegates to repository without ES sync", async () => {
+      const repository = createMockRepository();
+      const esSync = createMockEsSync();
+      const service = new AnnotationService(repository, esSync, logger);
+
+      const result = await service.update(defaultUpdateInput);
+
+      expect(result).toMatchObject({ id: "ann-1" });
+      expect(repository.update).toHaveBeenCalledWith(defaultUpdateInput);
+      expect(esSync.syncAfterCreate).not.toHaveBeenCalled();
+      expect(esSync.syncAfterDelete).not.toHaveBeenCalled();
     });
   });
 
