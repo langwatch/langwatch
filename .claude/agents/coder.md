@@ -19,8 +19,8 @@ Before writing ANY code:
 ### 2. Read Project Standards
 
 - `AGENTS.md` - commands, structure, common mistakes
-- `docs/CODING_STANDARDS.md` - clean code, SOLID
-- `docs/TESTING_PHILOSOPHY.md` - Outside-In TDD
+- `dev/docs/CODING_STANDARDS.md` - clean code, SOLID
+- `dev/docs/TESTING_PHILOSOPHY.md` - Outside-In TDD
 
 Then explore relevant code to understand existing patterns.
 
@@ -35,7 +35,7 @@ Then explore relevant code to understand existing patterns.
 ### 4. Update Documentation
 
 Before returning, check if documentation needs updating:
-- **ADRs**: If implementing a new architectural pattern, check `docs/adr/` for existing ADRs or create one
+- **ADRs**: If implementing a new architectural pattern, check `dev/docs/adr/` for existing ADRs or create one
 - **JSDoc**: Add/update JSDoc for new public APIs, classes, and exported functions
 - **README**: If feature affects usage, update README
 - **CLAUDE.md/AGENTS.md**: If introducing new patterns or common mistakes

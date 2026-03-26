@@ -13,7 +13,7 @@ Stop and realign with BDD workflow before continuing.
 
 3. **Review best practices**:
    - `AGENTS.md` - common mistakes table
-   - `docs/TESTING_PHILOSOPHY.md` - workflow and test hierarchy
+   - `dev/docs/TESTING_PHILOSOPHY.md` - workflow and test hierarchy
    - `specs/README.md` - BDD guidance
 
 4. **Rebuild the todo list** - Replace the current todo list with:

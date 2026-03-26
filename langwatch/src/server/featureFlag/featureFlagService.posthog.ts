@@ -27,7 +27,7 @@ import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
  *
  * Configure targeting rules in PostHog release conditions.
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FEATURE_FLAG_CACHE_TTL_MS for cache TTL configuration
  */
 export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {

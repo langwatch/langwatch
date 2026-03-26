@@ -53,7 +53,7 @@ interface UseFeatureFlagResult {
  * @param options - Optional targeting and query configuration
  * @returns Object with `enabled` (boolean) and `isLoading` (boolean)
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FRONTEND_FEATURE_FLAGS for available flags
  */
 export function useFeatureFlag(
