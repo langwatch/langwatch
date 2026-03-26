@@ -13,11 +13,15 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
-type ClickHouseSummaryWriteRecord = WithDateWrites<
-  ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt"
->;
-
+/**
+ * Read-side record type — intentionally excludes ScenarioRoleCosts,
+ * ScenarioRoleLatencies, and ScenarioRoleSpans.
+ *
+ * WHY: These Map(String, ...) columns were added after millions of rows already
+ * existed. When ClickHouse reads old merged parts it materializes default empty
+ * maps for every row in the granule, causing OOM kills. The trace-side reactor
+ * uses fold state instead, so these values are never needed on the read path.
+ */
 interface ClickHouseSummaryRecord {
   ProjectionId: string;
   TenantId: string;
@@ -49,10 +53,20 @@ interface ClickHouseSummaryRecord {
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
+}
+
+/** Write-side record extends the read type with ScenarioRole Map columns.
+ *  Single-row inserts are fine — only reads across old merged parts OOM. */
+interface ClickHouseSummaryWriteExtended extends ClickHouseSummaryRecord {
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
 }
+
+type ClickHouseSummaryWriteRecord = WithDateWrites<
+  ClickHouseSummaryWriteExtended,
+  "OccurredAt" | "CreatedAt" | "UpdatedAt"
+>;
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
@@ -139,10 +153,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
-            HasAnnotation,
-            ScenarioRoleCosts,
-            ScenarioRoleLatencies,
-            ScenarioRoleSpans
+            HasAnnotation
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -199,9 +210,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       hasAnnotation:
         record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
       attributes: record.Attributes ?? {},
-      scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
-      scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
-      scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
+      // Hardcoded to empty — see ClickHouseSummaryRecord comment for OOM rationale.
+      scenarioRoleCosts: {},
+      scenarioRoleLatencies: {},
+      scenarioRoleSpans: {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
