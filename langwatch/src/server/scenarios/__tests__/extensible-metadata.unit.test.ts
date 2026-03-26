@@ -9,6 +9,7 @@ import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import {
   scenarioEventSchema,
   scenarioRunStartedSchema,
+  scenarioMessageSnapshotSchema,
 } from "~/server/scenarios/schemas/event-schemas";
 import {
   transformToElasticsearch,
@@ -232,6 +233,24 @@ describe("extensible scenario metadata", () => {
         expect(result.success).toBe(true);
         if (result.success) {
           expect(result.data.scenarioSetId).toBe("my-set");
+        }
+      });
+    });
+
+    describe("when MESSAGE_SNAPSHOT event omits scenarioSetId", () => {
+      it("defaults to 'default'", () => {
+        const result = scenarioMessageSnapshotSchema.safeParse({
+          type: ScenarioEventType.MESSAGE_SNAPSHOT,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          messages: [],
+        });
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.scenarioSetId).toBe("default");
         }
       });
     });

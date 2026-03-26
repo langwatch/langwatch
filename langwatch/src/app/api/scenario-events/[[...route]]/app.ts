@@ -6,6 +6,7 @@ import { getApp } from "~/server/app-layer/app";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
+import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -145,7 +146,7 @@ app.post(
     }
 
     const path = `/${project.slug}/simulations/${
-      event.scenarioSetId || "default"
+      event.scenarioSetId || DEFAULT_SET_ID
     }`;
 
     const base = process.env.BASE_HOST;
@@ -220,7 +221,7 @@ async function dispatchSimulationEvent(
       ...basePayload,
       scenarioId: event.scenarioId,
       batchRunId: event.batchRunId,
-      scenarioSetId: event.scenarioSetId || "default",
+      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
       name: event.metadata?.name,
       description: event.metadata?.description,
       metadata: event.metadata,
