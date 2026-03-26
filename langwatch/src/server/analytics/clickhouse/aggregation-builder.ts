@@ -232,13 +232,16 @@ const groupByExpressions: Partial<
     requiredJoins: ["evaluation_runs"],
     handlesUnknown: true,
     additionalWhere: groupByKey
-      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String}`
+      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL`
       : undefined,
   }),
 
-  "evaluations.evaluation_label": () => ({
+  "evaluations.evaluation_label": (groupByKey) => ({
     column: `${tableAliases.evaluation_runs}.Label`,
     requiredJoins: ["evaluation_runs"],
+    additionalWhere: groupByKey
+      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed'`
+      : undefined,
   }),
 
   "evaluations.evaluation_processing_state": () => ({
@@ -516,9 +519,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
 
-  // For timeScale "full" (summary queries), always use CTE-based query to ensure
-  // both current and previous periods return data (even if one is empty)
-  if (input.timeScale === "full") {
+  // For timeScale "full" (summary queries) without groupBy, use CTE-based query to ensure
+  // both current and previous periods return data (even if one is empty).
+  // When groupBy is present, fall through to the standard query path which correctly
+  // handles GROUP BY group_key — the CTE path doesn't support grouped results.
+  if (input.timeScale === "full" && !groupByColumn) {
     return buildSubqueryTimeseriesQuery(
       input,
       simpleMetrics,
@@ -1165,10 +1170,8 @@ function buildDateBucketedPipelineQuery({
       : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
     : null;
 
-  let fullFilterWhere = filterWhere;
-  if (groupByAdditionalWhere) {
-    fullFilterWhere += ` AND ${groupByAdditionalWhere}`;
-  }
+  // NOTE: filterWhere already includes groupByAdditionalWhere (added in buildTimeseriesQuery)
+  const fullFilterWhere = filterWhere;
 
   // Skip HAVING group_key != '' for boolean fields and columns that already handle unknown
   const skipGroupKeyHaving =
