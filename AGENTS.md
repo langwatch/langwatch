@@ -66,6 +66,7 @@ specs/               # BDD feature specs
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
 | Flat test structure with GWT comments | Use nested `describe("given X")` and `describe("when Y")` blocks for BDD structure, not comments |
 | Naming tests as unit when they render components | Tests that render components and mock boundaries are integration tests (`.integration.test.ts`), not unit tests |
+| Writing string-assertion "regression tests" for runtime bugs | If the bug is a runtime crash/error, the regression test must execute the code path and observe the crash — not just assert the generated output string looks different. String checks are supplementary, not primary |
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
 | Shared types in `types.ts` | Colocate unless truly shared |
