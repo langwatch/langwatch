@@ -154,7 +154,7 @@ describe("cross-evaluator-groupby", () => {
     const rawClient = getTestClickHouseClient();
     if (rawClient) {
       await rawClient.exec({
-        query: `ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String}`,
+        query: `ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String} SETTINGS mutations_sync = 1`,
         query_params: { tenantId: TENANT_ID },
       });
     }
