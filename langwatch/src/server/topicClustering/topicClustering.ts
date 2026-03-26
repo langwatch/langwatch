@@ -360,7 +360,7 @@ async function fetchTracesFromClickHouse(
         SubTopicId,
         toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
       FROM (
-        SELECT *
+        SELECT TraceId, ComputedInput, TopicId, SubTopicId, OccurredAt, UpdatedAt
         FROM trace_summaries
         WHERE ${whereClause}
         ORDER BY TraceId, UpdatedAt DESC
