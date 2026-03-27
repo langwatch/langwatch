@@ -7,6 +7,8 @@ CREATE TABLE "LlmPromptConfigLabel" (
     "projectId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdById" TEXT,
+    "updatedById" TEXT,
 
     CONSTRAINT "LlmPromptConfigLabel_pkey" PRIMARY KEY ("id")
 );
@@ -23,42 +25,8 @@ CREATE INDEX "LlmPromptConfigLabel_projectId_idx" ON "LlmPromptConfigLabel"("pro
 -- CreateIndex
 CREATE UNIQUE INDEX "LlmPromptConfigLabel_configId_name_key" ON "LlmPromptConfigLabel"("configId", "name");
 
--- Seed built-in labels for existing prompts
--- For each existing prompt, create "production" and "staging" labels pointing to the highest version
-INSERT INTO "LlmPromptConfigLabel" ("id", "configId", "name", "versionId", "projectId", "createdAt", "updatedAt")
-SELECT
-    'label_' || gen_random_uuid()::text,
-    lpc."id",
-    'production',
-    lv."id",
-    lpc."projectId",
-    NOW(),
-    NOW()
-FROM "LlmPromptConfig" lpc
-INNER JOIN LATERAL (
-    SELECT v."id"
-    FROM "LlmPromptConfigVersion" v
-    WHERE v."configId" = lpc."id"
-    ORDER BY v."version" DESC
-    LIMIT 1
-) lv ON true
-WHERE lpc."deletedAt" IS NULL;
+-- AddForeignKey
+ALTER TABLE "LlmPromptConfigLabel" ADD CONSTRAINT "LlmPromptConfigLabel_configId_fkey" FOREIGN KEY ("configId") REFERENCES "LlmPromptConfig"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-INSERT INTO "LlmPromptConfigLabel" ("id", "configId", "name", "versionId", "projectId", "createdAt", "updatedAt")
-SELECT
-    'label_' || gen_random_uuid()::text,
-    lpc."id",
-    'staging',
-    lv."id",
-    lpc."projectId",
-    NOW(),
-    NOW()
-FROM "LlmPromptConfig" lpc
-INNER JOIN LATERAL (
-    SELECT v."id"
-    FROM "LlmPromptConfigVersion" v
-    WHERE v."configId" = lpc."id"
-    ORDER BY v."version" DESC
-    LIMIT 1
-) lv ON true
-WHERE lpc."deletedAt" IS NULL;
+-- AddForeignKey
+ALTER TABLE "LlmPromptConfigLabel" ADD CONSTRAINT "LlmPromptConfigLabel_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "LlmPromptConfigVersion"("id") ON DELETE CASCADE ON UPDATE CASCADE;
