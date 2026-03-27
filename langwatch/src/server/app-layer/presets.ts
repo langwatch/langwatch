@@ -468,7 +468,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageEnd: noop,
         finishRun: noop,
         deleteRun: noop,
-        updateRunMetrics: noop,
+        computeRunMetrics: noop,
       } as AppCommands["simulations"],
       suiteRuns: {
         startSuiteRun: noop,

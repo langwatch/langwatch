@@ -56,6 +56,7 @@ const RUN_COLUMNS = `
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
+  toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
@@ -78,6 +79,7 @@ const LIST_COLUMNS = `
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
+  toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
@@ -111,7 +113,7 @@ const DEDUP_LIST_COLUMNS = `
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   DurationMs, TotalCost, RoleCosts, RoleLatencies,
-  UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+  StartedAt, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
 
 /** Inner subquery columns for full-detail queries */
 const DEDUP_RUN_COLUMNS = `
@@ -121,7 +123,7 @@ const DEDUP_RUN_COLUMNS = `
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   DurationMs, TotalCost, RoleCosts, RoleLatencies,
-  UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+  StartedAt, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
 
 interface CursorPayload {
   ts: string;
