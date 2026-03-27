@@ -22,6 +22,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
+import { LlmConfigLabelRepository } from "./repositories/llm-config-label.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -103,10 +104,12 @@ export type VersionedPrompt = {
 export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
+  private readonly labelRepository: LlmConfigLabelRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
+    this.labelRepository = new LlmConfigLabelRepository(prisma);
   }
 
   /**
@@ -146,18 +149,56 @@ export class PromptService {
     version?: number;
     organizationId?: string;
     versionId?: string;
+    /** Optional: fetch the version pointed to by this label */
+    label?: string;
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
+
+    if (params.label && (params.version !== undefined || params.versionId !== undefined)) {
+      throw new Error(
+        "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
+      );
+    }
+
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(projectId));
+
+    // If a label is provided, resolve it to a versionId
+    let resolvedVersionId = params.versionId;
+    if (params.label) {
+      const config = await this.repository.getPromptByIdOrHandle({
+        idOrHandle,
+        projectId,
+        organizationId,
+      });
+
+      if (!config) {
+        return null;
+      }
+
+      const label = await this.labelRepository.getByConfigAndName({
+        configId: config.id,
+        name: params.label,
+        projectId,
+      });
+
+      if (!label) {
+        throw new NotFoundError(
+          `Label "${params.label}" not found for prompt "${idOrHandle}"`,
+        );
+      }
+
+      resolvedVersionId = label.versionId;
+    }
+
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
       {
         idOrHandle,
         projectId,
         organizationId,
         version: params.version,
-        versionId: params.versionId,
+        versionId: resolvedVersionId,
       },
     );
 
@@ -342,6 +383,15 @@ export class PromptService {
           }
         : undefined,
     });
+
+    // Create built-in labels (production, staging) pointing to the initial version
+    if (config.latestVersion) {
+      await this.labelRepository.createBuiltInLabels({
+        configId: config.id,
+        versionId: config.latestVersion.id,
+        projectId: params.projectId,
+      });
+    }
 
     return this.transformToVersionedPrompt(config);
   }
@@ -1006,5 +1056,27 @@ export class PromptService {
       projectId: params.projectId,
       organizationId,
     });
+  }
+
+  // --- Label operations ---
+
+  /** Create a label for a prompt config. */
+  async createLabel(params: Parameters<LlmConfigLabelRepository["create"]>[0]) {
+    return this.labelRepository.create(params);
+  }
+
+  /** List all labels for a prompt config. */
+  async listLabels(params: Parameters<LlmConfigLabelRepository["listByConfig"]>[0]) {
+    return this.labelRepository.listByConfig(params);
+  }
+
+  /** Update a label to point to a different version. */
+  async updateLabel(params: Parameters<LlmConfigLabelRepository["update"]>[0]) {
+    return this.labelRepository.update(params);
+  }
+
+  /** Delete a label by config ID and name. */
+  async deleteLabel(params: Parameters<LlmConfigLabelRepository["delete"]>[0]) {
+    return this.labelRepository.delete(params);
   }
 }

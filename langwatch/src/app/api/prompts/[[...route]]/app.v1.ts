@@ -12,6 +12,7 @@ import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositorie
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { prisma } from "~/server/db";
+import { NotFoundError } from "~/server/prompt-config/errors";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
@@ -150,6 +151,14 @@ app.get(
         required: false,
         schema: { type: "integer", minimum: 0 },
       },
+      {
+        name: "label",
+        in: "query",
+        description:
+          'Fetch the version pointed to by this label (e.g., "production", "staging")',
+        required: false,
+        schema: { type: "string" },
+      },
     ],
     responses: {
       ...baseResponses,
@@ -170,23 +179,44 @@ app.get(
     const version = c.req.query("version")
       ? parseInt(c.req.query("version")!)
       : undefined;
+    const label = c.req.query("label") ?? undefined;
 
-    logger.info({ projectId: project.id, id, version }, "Getting prompt");
+    logger.info(
+      { projectId: project.id, id, version, label },
+      "Getting prompt",
+    );
 
-    const config = await service.getPromptByIdOrHandle({
-      idOrHandle: id,
-      projectId: project.id,
-      organizationId: organization.id,
-      version,
-    });
-
-    if (!config) {
-      throw new HTTPException(404, {
-        message: "Prompt not found",
+    if (label && version !== undefined) {
+      throw new HTTPException(422, {
+        message:
+          "Cannot specify both 'version' and 'label'. Use one or the other.",
       });
     }
 
-    return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
+    try {
+      const config = await service.getPromptByIdOrHandle({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+        version,
+        label,
+      });
+
+      if (!config) {
+        throw new HTTPException(404, {
+          message: "Prompt not found",
+        });
+      }
+
+      return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
+    } catch (error: unknown) {
+      if (error instanceof NotFoundError) {
+        throw new HTTPException(404, {
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   },
 );
 

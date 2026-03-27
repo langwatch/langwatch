@@ -13,6 +13,11 @@ import {
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
+import {
+  LabelConflictError,
+  LabelNotFoundError,
+  LabelValidationError,
+} from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
@@ -323,10 +328,19 @@ export const promptsRouter = createTRPCRouter({
         versionId: z.string().optional(),
         /** Optional: fetch a specific version by number */
         version: z.number().optional(),
+        /** Optional: fetch the version pointed to by this label */
+        label: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
+      if (input.label && (input.version !== undefined || input.versionId !== undefined)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
+        });
+      }
+
       const service = new PromptService(ctx.prisma);
       return await service.getPromptByIdOrHandle(input);
     }),
@@ -842,5 +856,184 @@ export const promptsRouter = createTRPCRouter({
         selectedCopies: copiesToPush.length,
         results,
       };
+    }),
+
+  // --- Label CRUD ---
+
+  /**
+   * Create a label for a prompt
+   */
+  createLabel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+        name: z.string(),
+        versionId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const prompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!prompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      try {
+        return await service.createLabel({
+          configId: prompt.id,
+          name: input.name,
+          versionId: input.versionId,
+          projectId: input.projectId,
+        });
+      } catch (error) {
+        if (error instanceof LabelValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        if (error instanceof LabelConflictError) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * List all labels for a prompt
+   */
+  listLabels: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:view"))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const prompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!prompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      return await service.listLabels({
+        configId: prompt.id,
+        projectId: input.projectId,
+      });
+    }),
+
+  /**
+   * Update a label to point to a different version
+   */
+  updateLabel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+        name: z.string(),
+        versionId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const prompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!prompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      try {
+        return await service.updateLabel({
+          configId: prompt.id,
+          name: input.name,
+          versionId: input.versionId,
+          projectId: input.projectId,
+        });
+      } catch (error) {
+        if (error instanceof LabelNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        if (error instanceof LabelValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * Delete a label from a prompt
+   */
+  deleteLabel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+        name: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:delete"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const prompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!prompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      try {
+        await service.deleteLabel({
+          configId: prompt.id,
+          name: input.name,
+          projectId: input.projectId,
+        });
+        return { success: true };
+      } catch (error) {
+        if (error instanceof LabelNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
 });
