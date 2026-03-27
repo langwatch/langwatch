@@ -4,11 +4,15 @@ import {
   type CompactStreamingEvent,
 } from "~/utils/streaming-event-codec";
 import { api } from "~/utils/api";
+import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { createLogger } from "~/utils/logger";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
 
 const logger = createLogger("useSimulationUpdateListener");
+
+const normalizeSetId = (id: string | undefined): string =>
+  !id ? DEFAULT_SET_ID : id;
 
 interface SimulationUpdateFilter {
   scenarioRunId?: string;
@@ -55,7 +59,7 @@ export function useSimulationUpdateListener({
       if (!filter) return true;
       if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId) return false;
       if (filter.batchRunId && payload.batchRunId !== filter.batchRunId) return false;
-      if (filter.scenarioSetId && payload.scenarioSetId !== filter.scenarioSetId) return false;
+      if (filter.scenarioSetId && normalizeSetId(payload.scenarioSetId) !== normalizeSetId(filter.scenarioSetId)) return false;
       return true;
     },
     [filter],
