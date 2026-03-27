@@ -24,7 +24,7 @@ We use a single `PromptVersionLabel` table (option 3) with a hardcoded label voc
 
 - **Only two valid labels: `production` and `staging`** — validated in the repository layer, not in the database. This keeps the schema simple and avoids a label-definition table.
 - **No `latest` in DB** — resolved at query time by selecting the version with the highest version number. Only explicitly assigned labels are persisted.
-- **No dedicated label endpoints** — labels are assigned via the existing create/update prompt payloads (optional `labels` array) and a tRPC `assignLabel` mutation. No sub-resource endpoints.
+- **Two REST patterns for label assignment** — labels in create/update payloads (assign to new versions) and a dedicated `PUT /:id/labels/:label` sub-resource (move labels between existing versions). Plus a tRPC `assignLabel` mutation.
 - **No archiving** — reassignment updates the existing row (upsert on `configId_label`).
 - **No built-in label seeding** — labels are not auto-created when a prompt is created. They are only created when explicitly assigned.
 - **Unique constraint: `(configId, label)`** — one version per label per prompt.
@@ -75,12 +75,10 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 - Removed `LabelConflictError` and `LabelNotFoundError` (upsert eliminates conflicts; `NotFoundError` covers not-found)
 - Hardcoded valid labels to `production` and `staging` only (was open-ended with regex validation)
 
-**v3 (2026-03-27):** Added REST API surface:
-- Added optional `labels` array to `POST /` create and `PUT /:id` update payloads
-- On create: labels are assigned to the first version
-- On update: labels are assigned to the newly created version
-- Decided against a separate `PUT /:id/labels/:label` sub-resource — labels flow naturally through the existing create/update endpoints since updating a prompt always creates a new version
-- API design informed by Langfuse (labels in create/update payload)
+**v3 (2026-03-27):** Added REST API surface with both patterns:
+- `PUT /:id/labels/:label` sub-resource — move a label to an existing version (like PromptLayer)
+- Optional `labels` array in `POST /` and `PUT /:id` payloads — assign labels to newly created versions (like Langfuse)
+- Both patterns are needed: sub-resource for label promotion without version changes, payloads for label assignment during version creation
 
 ## Deferred Scope
 
@@ -101,7 +99,8 @@ The label feature follows both Langfuse's "labels in create payload" pattern and
 
 | Method | Path / Endpoint | Description |
 |--------|----------------|-------------|
-| `POST` | `/api/v1/prompts` | Create prompt with optional `labels` array |
+| `PUT` | `/api/v1/prompts/:id/labels/:label` | Move a label to an existing version |
+| `POST` | `/api/v1/prompts` | Create prompt with optional `labels` array (assigned to v1) |
 | `PUT` | `/api/v1/prompts/:id` | Update prompt with optional `labels` array (assigned to new version) |
 | `GET` | `/api/v1/prompts/:id?label=production` | Fetch the version a label points to |
 | `GET` | `/api/v1/prompts/:id?version=2` | Fetch a specific version by number |
