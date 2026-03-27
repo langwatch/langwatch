@@ -2,7 +2,6 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
@@ -430,6 +429,80 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
         const internal = summaries.find((s) => s.scenarioSetId === internalSetId);
         expect(internal).toBeUndefined();
+      });
+    });
+
+    describe("when legacy empty-string ScenarioSetId rows coexist with 'default' rows", () => {
+      it("merges them into a single 'default' entry, not two separate entries", async () => {
+        const batchLegacy = `batch-legacy-${nanoid()}`;
+        const batchNew = `batch-new-${nanoid()}`;
+
+        // Legacy row: ScenarioSetId = ""
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-legacy-${nanoid()}`,
+          BatchRunId: batchLegacy,
+          ScenarioSetId: "",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 5000),
+          UpdatedAt: new Date(now - 5000),
+        }));
+
+        // New row: ScenarioSetId = "default"
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-newdefault-${nanoid()}`,
+          BatchRunId: batchNew,
+          ScenarioSetId: "default",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now),
+          UpdatedAt: new Date(now),
+        }));
+
+        const summaries = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+
+        const legacyEntry = summaries.find((s) => s.scenarioSetId === "");
+        const defaultEntry = summaries.find((s) => s.scenarioSetId === "default");
+
+        expect(legacyEntry).toBeUndefined();
+        expect(defaultEntry).toBeDefined();
+      });
+    });
+  });
+
+  describe("getScenarioSetsData()", () => {
+    describe("when legacy empty-string ScenarioSetId rows coexist with 'default' rows", () => {
+      it("merges them into a single 'default' entry, not two separate entries", async () => {
+        const batchLegacy = `batch-sets-legacy-${nanoid()}`;
+        const batchNew = `batch-sets-new-${nanoid()}`;
+
+        // Legacy row: ScenarioSetId = ""
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-sets-legacy-${nanoid()}`,
+          BatchRunId: batchLegacy,
+          ScenarioSetId: "",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now - 5000),
+          UpdatedAt: new Date(now - 5000),
+        }));
+
+        // New row: ScenarioSetId = "default"
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-sets-newdefault-${nanoid()}`,
+          BatchRunId: batchNew,
+          ScenarioSetId: "default",
+          Status: "SUCCESS",
+          CreatedAt: new Date(now),
+          UpdatedAt: new Date(now),
+        }));
+
+        const sets = await repo.getScenarioSetsData({ projectId: tenantId });
+
+        const legacyEntry = sets.find((s) => s.scenarioSetId === "");
+        const defaultEntry = sets.find((s) => s.scenarioSetId === "default");
+
+        expect(legacyEntry).toBeUndefined();
+        expect(defaultEntry).toBeDefined();
       });
     });
   });
