@@ -328,7 +328,15 @@ function apply(
       TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
       RoleCosts: roleCosts,
       RoleLatencies: roleLatencies,
-      UpdatedAt: event.occurredAt,
+      // Use state.UpdatedAt + 1 instead of event.occurredAt.
+      // metrics_computed events are generated server-side (ECST reactor,
+      // 60s delay) with occurredAt = Date.now(), which is much higher than
+      // the user-sent finished event's occurredAt. In ReplacingMergeTree,
+      // the row with highest UpdatedAt wins the merge — if metrics has
+      // higher UpdatedAt, it permanently overwrites the finished row.
+      // Incrementing from state ensures monotonic ordering without jumping
+      // ahead of the finished event's timestamp.
+      UpdatedAt: state.UpdatedAt + 1,
     };
   }
 
