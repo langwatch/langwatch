@@ -38,13 +38,20 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 
 Labels are scoped to a prompt via `configId` rather than having a direct `projectId` column. Multitenancy is enforced transitively through the config's project ownership, which is the existing pattern for version-level data.
 
+## Audit Trail
+
+Each label record includes `createdById` and `updatedById` fields (nullable, referencing User). These track who created and last moved a label, directly on the table rather than in a separate audit log. This is sufficient for accountability ("who promoted v3 to production?") without the complexity of a full event-sourcing audit trail.
+
+Fields are nullable because the migration seed and system-initiated label creation (e.g., built-in labels on prompt creation) may not have a user context.
+
 ## Consequences
 
 - A new Prisma model and migration are required.
 - All label CRUD goes through dedicated service methods and tRPC endpoints.
 - The REST API and tRPC `getByIdOrHandle` accept a `label` parameter; `version`/`versionId` and `label` are mutually exclusive.
 - SDK updates to pass `label` parameters are a separate concern (not covered by this ADR).
-- Future label features (custom labels, RBAC, audit log) build on this table without schema changes.
+- RBAC for label management (who can create/move/delete labels) is a separate concern requiring its own issue and ADR.
+- Future label features (custom labels, RBAC, full audit log) build on this table without schema changes.
 
 ## References
 

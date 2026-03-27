@@ -77,6 +77,8 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
+    labelsCreated           LlmPromptConfigLabel[]   @relation("labelCreatedBy")
+    labelsUpdated           LlmPromptConfigLabel[]   @relation("labelUpdatedBy")
 
 }
 
@@ -974,15 +976,19 @@ model LlmPromptConfigVersion {
 }
 
 model LlmPromptConfigLabel {
-    id        String   @id @default(nanoid())
-    configId  String
-    config    LlmPromptConfig        @relation("Labels", fields: [configId], references: [id], onDelete: Cascade)
-    name      String
-    versionId String
-    version   LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-    projectId String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+    id          String   @id @default(nanoid())
+    configId    String
+    config      LlmPromptConfig        @relation("Labels", fields: [configId], references: [id], onDelete: Cascade)
+    name        String
+    versionId   String
+    version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+    projectId   String
+    createdById String?
+    createdBy   User?    @relation("labelCreatedBy", fields: [createdById], references: [id])
+    updatedById String?
+    updatedBy   User?    @relation("labelUpdatedBy", fields: [updatedById], references: [id])
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
 
     @@unique([configId, name])
     @@index([configId])

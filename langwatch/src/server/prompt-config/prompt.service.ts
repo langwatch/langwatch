@@ -390,6 +390,7 @@ export class PromptService {
         configId: config.id,
         versionId: config.latestVersion.id,
         projectId: params.projectId,
+        createdById: params.authorId,
       });
     }
 

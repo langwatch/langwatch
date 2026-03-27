@@ -893,6 +893,7 @@ export const promptsRouter = createTRPCRouter({
           name: input.name,
           versionId: input.versionId,
           projectId: input.projectId,
+          createdById: ctx.session?.user?.id,
         });
       } catch (error) {
         if (error instanceof LabelValidationError) {
@@ -975,6 +976,7 @@ export const promptsRouter = createTRPCRouter({
           name: input.name,
           versionId: input.versionId,
           projectId: input.projectId,
+          updatedById: ctx.session?.user?.id,
         });
       } catch (error) {
         if (error instanceof LabelNotFoundError) {

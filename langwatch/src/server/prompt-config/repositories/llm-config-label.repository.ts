@@ -97,12 +97,14 @@ export class LlmConfigLabelRepository {
     name,
     versionId,
     projectId,
+    createdById,
     tx,
   }: {
     configId: string;
     name: string;
     versionId: string;
     projectId: string;
+    createdById?: string;
     tx?: Prisma.TransactionClient;
   }): Promise<LlmPromptConfigLabel> {
     this.validateLabelName(name);
@@ -124,6 +126,8 @@ export class LlmConfigLabelRepository {
           name,
           versionId,
           projectId,
+          createdById: createdById ?? null,
+          updatedById: createdById ?? null,
         },
       });
     } catch (error: unknown) {
@@ -187,11 +191,13 @@ export class LlmConfigLabelRepository {
     name,
     versionId,
     projectId,
+    updatedById,
   }: {
     configId: string;
     name: string;
     versionId: string;
     projectId: string;
+    updatedById?: string;
   }): Promise<LlmPromptConfigLabel> {
     await this.validateVersionBelongsToConfig({
       versionId,
@@ -209,7 +215,10 @@ export class LlmConfigLabelRepository {
 
     return await this.prisma.llmPromptConfigLabel.update({
       where: { id: label.id, projectId },
-      data: { versionId },
+      data: {
+        versionId,
+        updatedById: updatedById ?? null,
+      },
     });
   }
 
@@ -245,11 +254,13 @@ export class LlmConfigLabelRepository {
     configId,
     versionId,
     projectId,
+    createdById,
     tx,
   }: {
     configId: string;
     versionId: string;
     projectId: string;
+    createdById?: string;
     tx?: Prisma.TransactionClient;
   }): Promise<void> {
     const client = tx ?? this.prisma;
@@ -262,6 +273,8 @@ export class LlmConfigLabelRepository {
           name: "production",
           versionId,
           projectId,
+          createdById: createdById ?? null,
+          updatedById: createdById ?? null,
         },
         {
           id: this.generateLabelId(),
@@ -269,6 +282,8 @@ export class LlmConfigLabelRepository {
           name: "staging",
           versionId,
           projectId,
+          createdById: createdById ?? null,
+          updatedById: createdById ?? null,
         },
       ],
     });
