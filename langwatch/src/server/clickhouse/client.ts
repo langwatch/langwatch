@@ -6,7 +6,7 @@ import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 const logger = createLogger("langwatch:clickhouse:client");
 
 let clickHouseClient: ClickHouseClient | null = null;
-let clickHouseMasterClient: ClickHouseClient | null = null;
+let clickHouseWriteClient: ClickHouseClient | null = null;
 
 /**
  * Checks if ClickHouse should be skipped.
@@ -65,17 +65,17 @@ function getClickHouseClient(): ClickHouseClient | null {
 }
 
 /**
- * Get or create a ClickHouse client that always connects to the master node.
+ * Get or create a ClickHouse client pinned to the write (primary) replica.
  *
- * Uses CLICKHOUSE_MASTER_URL if set, otherwise falls back to CLICKHOUSE_URL.
+ * Uses CLICKHOUSE_WRITE_URL if set, otherwise falls back to CLICKHOUSE_URL.
  * Fold stores use this for read-after-write consistency — in replicated setups,
  * reading from the same node that wrote avoids replication lag entirely.
  */
-function getClickHouseMasterClient(): ClickHouseClient | null {
-  if (!clickHouseMasterClient && !shouldSkipClickHouse()) {
-    const masterUrl = process.env.CLICKHOUSE_MASTER_URL;
+function getClickHouseWriteClient(): ClickHouseClient | null {
+  if (!clickHouseWriteClient && !shouldSkipClickHouse()) {
+    const masterUrl = process.env.CLICKHOUSE_WRITE_URL;
     if (!masterUrl) {
-      // No master URL configured — use the shared client (single-node or dev)
+      // No write URL configured — use the shared client (single-node or dev)
       return getClickHouseClient();
     }
 
@@ -85,7 +85,7 @@ function getClickHouseMasterClient(): ClickHouseClient | null {
     } catch (error) {
       logger.warn(
         { error },
-        "ClickHouse master URL was not a valid URL, it will still be set, but may not work as expected.",
+        "ClickHouse write URL was not a valid URL, it will still be set, but may not work as expected.",
       );
     }
 
@@ -101,12 +101,12 @@ function getClickHouseMasterClient(): ClickHouseClient | null {
       },
     });
 
-    clickHouseMasterClient = wrapWithDefaultSettings(
+    clickHouseWriteClient = wrapWithDefaultSettings(
       createResilientClickHouseClient({ client: raw }),
     );
   }
 
-  return clickHouseMasterClient;
+  return clickHouseWriteClient;
 }
 
 export async function closeClickHouseClient(): Promise<void> {
@@ -114,12 +114,12 @@ export async function closeClickHouseClient(): Promise<void> {
     await clickHouseClient.close();
     clickHouseClient = null;
   }
-  if (clickHouseMasterClient) {
-    await clickHouseMasterClient.close();
-    clickHouseMasterClient = null;
+  if (clickHouseWriteClient) {
+    await clickHouseWriteClient.close();
+    clickHouseWriteClient = null;
   }
 }
 
 // Internal access for clickhouseClient.ts — the only allowed consumer
 export { getClickHouseClient as _getSharedClickHouseClient };
-export { getClickHouseMasterClient as _getMasterClickHouseClient };
+export { getClickHouseWriteClient as _getWriteClickHouseClient };

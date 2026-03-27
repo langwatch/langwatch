@@ -2,7 +2,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
-import { _getSharedClickHouseClient, _getMasterClickHouseClient } from "./client";
+import { _getSharedClickHouseClient, _getWriteClickHouseClient } from "./client";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:routing");
@@ -161,13 +161,13 @@ export function isClickHouseEnabled(): boolean {
 export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
 
 /**
- * Returns the master ClickHouse client for fold store operations.
- * Uses CLICKHOUSE_MASTER_URL if configured, otherwise falls back to the shared client.
+ * Returns the write (primary) ClickHouse client for fold store operations.
+ * Uses CLICKHOUSE_WRITE_URL if configured, otherwise falls back to the shared client.
  *
  * Fold stores need read-after-write consistency. In replicated setups, routing
- * both reads and writes to the master node avoids replication lag entirely.
+ * both reads and writes to the primary replica avoids replication lag entirely.
  */
-export async function getMasterClickHouseClientForProject(
+export async function getWriteClickHouseClientForProject(
   projectId: string,
 ): Promise<ClickHouseClient | null> {
   // Private instances are single-node — no replication concern
@@ -192,7 +192,7 @@ export async function getMasterClickHouseClientForProject(
   }
 
   // Shared instance — use master client
-  return _getMasterClickHouseClient();
+  return _getWriteClickHouseClient();
 }
 
 /**

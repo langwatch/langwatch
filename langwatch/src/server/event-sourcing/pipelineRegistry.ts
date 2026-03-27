@@ -87,8 +87,8 @@ export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   prisma: PrismaClient;
   resolveClickHouseClient: ClickHouseClientResolver | null;
-  /** Master-only client for fold stores (read-after-write consistency). Falls back to resolveClickHouseClient. */
-  resolveMasterClickHouseClient?: ClickHouseClientResolver | null;
+  /** Write (primary) replica client for fold stores (read-after-write consistency). Falls back to resolveClickHouseClient. */
+  resolveWriteClickHouseClient?: ClickHouseClientResolver | null;
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
@@ -342,7 +342,7 @@ export class PipelineRegistry {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
   }) {
-    const foldClientResolver = this.deps.resolveMasterClickHouseClient ?? this.deps.resolveClickHouseClient;
+    const foldClientResolver = this.deps.resolveWriteClickHouseClient ?? this.deps.resolveClickHouseClient;
     const repository = foldClientResolver
       ? new SimulationRunStateRepositoryClickHouse(foldClientResolver)
       : new SimulationRunStateRepositoryMemory();

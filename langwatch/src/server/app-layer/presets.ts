@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClientForProject, getMasterClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForProject, getWriteClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
@@ -96,11 +96,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     return client;
   };
 
-  // Master resolver: routes fold store reads/writes to the master node.
+  // Write resolver: routes fold store reads/writes to the primary replica.
   // In replicated setups, this avoids replication lag for read-after-write.
-  // Falls back to the shared client when CLICKHOUSE_MASTER_URL is not set.
-  const resolveMasterClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
-    const client = await getMasterClickHouseClientForProject(tenantId);
+  // Falls back to the shared client when CLICKHOUSE_WRITE_URL is not set.
+  const resolveWriteClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
+    const client = await getWriteClickHouseClientForProject(tenantId);
     if (!client) throw new Error(`ClickHouse master not available for tenant ${tenantId}`);
     return client;
   };
@@ -260,7 +260,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     eventSourcing: es,
     prisma,
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
-    resolveMasterClickHouseClient: clickhouseEnabled ? resolveMasterClickHouseClient : null,
+    resolveWriteClickHouseClient: clickhouseEnabled ? resolveWriteClickHouseClient : null,
     broadcast,
     projects,
     monitors,
