@@ -1361,7 +1361,11 @@
             "description": "Fetch the version pointed to by this label (e.g., \"production\", \"staging\")",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "production",
+                "staging"
+              ]
             }
           },
           {
@@ -2074,7 +2078,11 @@
                   "labels": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "production",
+                        "staging"
+                      ]
                     }
                   },
                   "scope": {
@@ -5595,7 +5603,11 @@
                   "labels": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "production",
+                        "staging"
+                      ]
                     }
                   }
                 },
@@ -11813,19 +11825,24 @@
         "operationId": "putApiPromptsByIdLabelsByLabel",
         "parameters": [
           {
-            "schema": {
-              "type": "string"
-            },
+            "name": "label",
             "in": "path",
-            "name": "id",
-            "required": true
+            "description": "The label to assign (e.g., \"production\", \"staging\")",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "production",
+                "staging"
+              ]
+            }
           },
           {
             "schema": {
               "type": "string"
             },
             "in": "path",
-            "name": "label",
+            "name": "id",
             "required": true
           }
         ],

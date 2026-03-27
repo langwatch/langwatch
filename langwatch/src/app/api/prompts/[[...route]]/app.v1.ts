@@ -105,6 +105,15 @@ app.put(
   describeRoute({
     description:
       'Assign a label (e.g. "production", "staging") to a specific prompt version',
+    parameters: [
+      {
+        name: "label",
+        in: "path",
+        description: 'The label to assign (e.g., "production", "staging")',
+        required: true,
+        schema: { type: "string", enum: ["production", "staging"] },
+      },
+    ],
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(assignLabelResponseSchema),
@@ -245,7 +254,7 @@ app.get(
         description:
           'Fetch the version pointed to by this label (e.g., "production", "staging")',
         required: false,
-        schema: { type: "string" },
+        schema: { type: "string", enum: ["production", "staging"] },
       },
     ],
     responses: {

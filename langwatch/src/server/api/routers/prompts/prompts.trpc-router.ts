@@ -13,6 +13,7 @@ import {
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
+import { NotFoundError } from "~/server/prompt-config/errors";
 import {
   LabelValidationError,
 } from "~/server/prompt-config/repositories/llm-config-label.repository";
@@ -339,6 +340,12 @@ export const promptsRouter = createTRPCRouter({
         if (error instanceof LabelValidationError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        if (error instanceof NotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
             message: error.message,
           });
         }

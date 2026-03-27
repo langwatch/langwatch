@@ -10,6 +10,7 @@ import {
   schemaVersionSchema,
   scopeSchema,
 } from "~/prompts/schemas/field-schemas";
+import { VALID_LABELS } from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 /**
@@ -36,7 +37,7 @@ export const createPromptInputSchema = z.strictObject({
   outputs: z.array(outputsSchema).optional(),
   schemaVersion: schemaVersionSchema.optional(),
   /** Labels to assign to the initial version (e.g. ["production", "staging"]) */
-  labels: z.array(z.string()).optional(),
+  labels: z.array(z.enum(VALID_LABELS)).optional(),
 });
 
 export const updatePromptInputSchema = createPromptInputSchema

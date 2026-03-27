@@ -53,6 +53,7 @@ from .get_api_evaluators_response_400 import GetApiEvaluatorsResponse400
 from .get_api_evaluators_response_401 import GetApiEvaluatorsResponse401
 from .get_api_evaluators_response_422 import GetApiEvaluatorsResponse422
 from .get_api_evaluators_response_500 import GetApiEvaluatorsResponse500
+from .get_api_prompts_by_id_label import GetApiPromptsByIdLabel
 from .get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 from .get_api_prompts_by_id_response_200_demonstrations import GetApiPromptsByIdResponse200Demonstrations
 from .get_api_prompts_by_id_response_200_demonstrations_inline import GetApiPromptsByIdResponse200DemonstrationsInline
@@ -745,6 +746,7 @@ from .post_api_evaluators_response_500 import PostApiEvaluatorsResponse500
 from .post_api_prompts_body import PostApiPromptsBody
 from .post_api_prompts_body_inputs_item import PostApiPromptsBodyInputsItem
 from .post_api_prompts_body_inputs_item_type import PostApiPromptsBodyInputsItemType
+from .post_api_prompts_body_labels_item import PostApiPromptsBodyLabelsItem
 from .post_api_prompts_body_messages_item import PostApiPromptsBodyMessagesItem
 from .post_api_prompts_body_messages_item_role import PostApiPromptsBodyMessagesItemRole
 from .post_api_prompts_body_outputs_item import PostApiPromptsBodyOutputsItem
@@ -1261,6 +1263,7 @@ from .put_api_evaluators_by_id_response_500 import PutApiEvaluatorsByIdResponse5
 from .put_api_prompts_by_id_body import PutApiPromptsByIdBody
 from .put_api_prompts_by_id_body_inputs_item import PutApiPromptsByIdBodyInputsItem
 from .put_api_prompts_by_id_body_inputs_item_type import PutApiPromptsByIdBodyInputsItemType
+from .put_api_prompts_by_id_body_labels_item import PutApiPromptsByIdBodyLabelsItem
 from .put_api_prompts_by_id_body_messages_item import PutApiPromptsByIdBodyMessagesItem
 from .put_api_prompts_by_id_body_messages_item_role import PutApiPromptsByIdBodyMessagesItemRole
 from .put_api_prompts_by_id_body_outputs_item import PutApiPromptsByIdBodyOutputsItem
@@ -1269,6 +1272,7 @@ from .put_api_prompts_by_id_body_outputs_item_type import PutApiPromptsByIdBodyO
 from .put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from .put_api_prompts_by_id_labels_by_label_body import PutApiPromptsByIdLabelsByLabelBody
+from .put_api_prompts_by_id_labels_by_label_label import PutApiPromptsByIdLabelsByLabelLabel
 from .put_api_prompts_by_id_labels_by_label_response_200 import PutApiPromptsByIdLabelsByLabelResponse200
 from .put_api_prompts_by_id_labels_by_label_response_400 import PutApiPromptsByIdLabelsByLabelResponse400
 from .put_api_prompts_by_id_labels_by_label_response_401 import PutApiPromptsByIdLabelsByLabelResponse401
@@ -1381,6 +1385,7 @@ __all__ = (
     "GetApiEvaluatorsResponse401",
     "GetApiEvaluatorsResponse422",
     "GetApiEvaluatorsResponse500",
+    "GetApiPromptsByIdLabel",
     "GetApiPromptsByIdResponse200",
     "GetApiPromptsByIdResponse200Demonstrations",
     "GetApiPromptsByIdResponse200DemonstrationsInline",
@@ -1689,6 +1694,7 @@ __all__ = (
     "PostApiPromptsBody",
     "PostApiPromptsBodyInputsItem",
     "PostApiPromptsBodyInputsItemType",
+    "PostApiPromptsBodyLabelsItem",
     "PostApiPromptsBodyMessagesItem",
     "PostApiPromptsBodyMessagesItemRole",
     "PostApiPromptsBodyOutputsItem",
@@ -1943,6 +1949,7 @@ __all__ = (
     "PutApiPromptsByIdBody",
     "PutApiPromptsByIdBodyInputsItem",
     "PutApiPromptsByIdBodyInputsItemType",
+    "PutApiPromptsByIdBodyLabelsItem",
     "PutApiPromptsByIdBodyMessagesItem",
     "PutApiPromptsByIdBodyMessagesItemRole",
     "PutApiPromptsByIdBodyOutputsItem",
@@ -1951,6 +1958,7 @@ __all__ = (
     "PutApiPromptsByIdBodySchemaVersion",
     "PutApiPromptsByIdBodyScope",
     "PutApiPromptsByIdLabelsByLabelBody",
+    "PutApiPromptsByIdLabelsByLabelLabel",
     "PutApiPromptsByIdLabelsByLabelResponse200",
     "PutApiPromptsByIdLabelsByLabelResponse400",
     "PutApiPromptsByIdLabelsByLabelResponse401",

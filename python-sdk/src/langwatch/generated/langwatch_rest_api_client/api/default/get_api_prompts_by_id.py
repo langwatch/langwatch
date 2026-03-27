@@ -5,6 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.get_api_prompts_by_id_label import GetApiPromptsByIdLabel
 from ...models.get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 from ...models.get_api_prompts_by_id_response_400 import GetApiPromptsByIdResponse400
 from ...models.get_api_prompts_by_id_response_401 import GetApiPromptsByIdResponse401
@@ -18,13 +19,17 @@ def _get_kwargs(
     id: str,
     *,
     version: Union[Unset, int] = UNSET,
-    label: Union[Unset, str] = UNSET,
+    label: Union[Unset, GetApiPromptsByIdLabel] = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
     params["version"] = version
 
-    params["label"] = label
+    json_label: Union[Unset, str] = UNSET
+    if not isinstance(label, Unset):
+        json_label = label.value
+
+    params["label"] = json_label
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -104,7 +109,7 @@ def sync_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
     version: Union[Unset, int] = UNSET,
-    label: Union[Unset, str] = UNSET,
+    label: Union[Unset, GetApiPromptsByIdLabel] = UNSET,
 ) -> Response[
     Union[
         GetApiPromptsByIdResponse200,
@@ -120,7 +125,7 @@ def sync_detailed(
     Args:
         id (str):
         version (Union[Unset, int]):
-        label (Union[Unset, str]):
+        label (Union[Unset, GetApiPromptsByIdLabel]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,7 +153,7 @@ def sync(
     *,
     client: Union[AuthenticatedClient, Client],
     version: Union[Unset, int] = UNSET,
-    label: Union[Unset, str] = UNSET,
+    label: Union[Unset, GetApiPromptsByIdLabel] = UNSET,
 ) -> Optional[
     Union[
         GetApiPromptsByIdResponse200,
@@ -164,7 +169,7 @@ def sync(
     Args:
         id (str):
         version (Union[Unset, int]):
-        label (Union[Unset, str]):
+        label (Union[Unset, GetApiPromptsByIdLabel]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -187,7 +192,7 @@ async def asyncio_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
     version: Union[Unset, int] = UNSET,
-    label: Union[Unset, str] = UNSET,
+    label: Union[Unset, GetApiPromptsByIdLabel] = UNSET,
 ) -> Response[
     Union[
         GetApiPromptsByIdResponse200,
@@ -203,7 +208,7 @@ async def asyncio_detailed(
     Args:
         id (str):
         version (Union[Unset, int]):
-        label (Union[Unset, str]):
+        label (Union[Unset, GetApiPromptsByIdLabel]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -229,7 +234,7 @@ async def asyncio(
     *,
     client: Union[AuthenticatedClient, Client],
     version: Union[Unset, int] = UNSET,
-    label: Union[Unset, str] = UNSET,
+    label: Union[Unset, GetApiPromptsByIdLabel] = UNSET,
 ) -> Optional[
     Union[
         GetApiPromptsByIdResponse200,
@@ -245,7 +250,7 @@ async def asyncio(
     Args:
         id (str):
         version (Union[Unset, int]):
-        label (Union[Unset, str]):
+        label (Union[Unset, GetApiPromptsByIdLabel]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

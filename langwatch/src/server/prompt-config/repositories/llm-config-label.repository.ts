@@ -4,7 +4,7 @@ import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:prompt-version-labels");
 
-const VALID_LABELS = ["production", "staging"] as const;
+export const VALID_LABELS = ["production", "staging"] as const;
 type ValidLabel = (typeof VALID_LABELS)[number];
 
 export class LabelValidationError extends Error {
