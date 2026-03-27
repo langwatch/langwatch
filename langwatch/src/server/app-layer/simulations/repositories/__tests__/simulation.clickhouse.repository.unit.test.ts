@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { SimulationClickHouseRepository } from "../simulation.clickhouse.repository";
+import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 
-function makeMockClient(): ClickHouseClient {
-  const jsonFn = vi.fn().mockResolvedValue([]);
+function makeMockClient(rows: unknown[] = []): ClickHouseClient {
+  const jsonFn = vi.fn().mockResolvedValue(rows);
   const queryFn = vi.fn().mockResolvedValue({ json: jsonFn });
   return { query: queryFn } as unknown as ClickHouseClient;
 }
@@ -23,6 +24,22 @@ describe("SimulationClickHouseRepository", () => {
         expect(resolver).toHaveBeenCalledWith("project-1");
         expect(resolver).not.toHaveBeenCalledWith("unknown");
       });
+
+      it("sends a SQL query containing the IF normalization expression", async () => {
+        const mockClient = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(mockClient);
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        await repo.getDistinctExternalSetIds({
+          projectIds: ["project-1"],
+        });
+
+        const queryCall = (mockClient.query as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as { query: string };
+        expect(queryCall.query).toContain(
+          "IF(ScenarioSetId = '',"
+        );
+      });
     });
 
     describe("when called with empty projectIds", () => {
@@ -40,13 +57,11 @@ describe("SimulationClickHouseRepository", () => {
     });
 
     describe("when ClickHouse returns both empty-string and 'default' ScenarioSetId", () => {
-      it("normalizes empty string to 'default' and returns one distinct set", async () => {
-        const jsonFn = vi.fn().mockResolvedValue([
+      it("normalizes empty string to DEFAULT_SET_ID and returns one distinct set", async () => {
+        const mockClient = makeMockClient([
           { ScenarioSetId: "" },
-          { ScenarioSetId: "default" },
+          { ScenarioSetId: DEFAULT_SET_ID },
         ]);
-        const queryFn = vi.fn().mockResolvedValue({ json: jsonFn });
-        const mockClient = { query: queryFn } as unknown as ClickHouseClient;
         const resolver = vi.fn().mockResolvedValue(mockClient);
         const repo = new SimulationClickHouseRepository(resolver);
 
@@ -54,18 +69,14 @@ describe("SimulationClickHouseRepository", () => {
           projectIds: ["project-1"],
         });
 
-        expect(result).toEqual(new Set(["default"]));
+        expect(result).toEqual(new Set([DEFAULT_SET_ID]));
         expect(result.size).toBe(1);
       });
     });
 
     describe("when ClickHouse returns only empty-string ScenarioSetId", () => {
-      it("normalizes empty string to 'default'", async () => {
-        const jsonFn = vi.fn().mockResolvedValue([
-          { ScenarioSetId: "" },
-        ]);
-        const queryFn = vi.fn().mockResolvedValue({ json: jsonFn });
-        const mockClient = { query: queryFn } as unknown as ClickHouseClient;
+      it("normalizes empty string to DEFAULT_SET_ID", async () => {
+        const mockClient = makeMockClient([{ ScenarioSetId: "" }]);
         const resolver = vi.fn().mockResolvedValue(mockClient);
         const repo = new SimulationClickHouseRepository(resolver);
 
@@ -73,7 +84,7 @@ describe("SimulationClickHouseRepository", () => {
           projectIds: ["project-1"],
         });
 
-        expect(result).toEqual(new Set(["default"]));
+        expect(result).toEqual(new Set([DEFAULT_SET_ID]));
       });
     });
   });
