@@ -3,6 +3,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
+import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
@@ -166,6 +167,120 @@ export const app = new Hono<{ Variables: Variables }>()
             },
             409,
           );
+        }
+        throw error;
+      }
+    },
+  )
+
+  // ── Create + Upload Dataset from File ─────────────────────────
+  // IMPORTANT: This route MUST be registered BEFORE /:slugOrId routes
+  // so Hono doesn't match "upload" as a slugOrId parameter.
+  .post(
+    "/upload",
+    describeRoute({
+      description: "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
+    }),
+    resourceLimitMiddleware("datasets"),
+    async (c) => {
+      const project = c.get("project");
+      const service = c.get("datasetService");
+
+      const body = await c.req.parseBody();
+      const file = body["file"];
+      const name = body["name"];
+
+      if (!name || typeof name !== "string" || name.trim() === "") {
+        throw new UnprocessableEntityError("name field is required");
+      }
+
+      if (!file || !(file instanceof File)) {
+        throw new UnprocessableEntityError("file field is required");
+      }
+
+      const content = await file.text();
+
+      try {
+        const result = await service.createDatasetFromUpload({
+          projectId: project.id,
+          name: name.trim(),
+          filename: file.name,
+          content,
+          fileSize: file.size,
+        });
+
+        return c.json(result, 201);
+      } catch (error) {
+        if (error instanceof UploadValidationError) {
+          if (error.kind === "file_too_large" || error.kind === "row_limit_exceeded") {
+            throw new BadRequestError(error.message);
+          }
+          throw new UnprocessableEntityError(error.message);
+        }
+        if (error instanceof Error && error.name === "DatasetConflictError") {
+          return c.json(
+            {
+              error: "Conflict",
+              message: "A dataset with this slug already exists",
+            },
+            409,
+          );
+        }
+        // Unsupported format from detectFileFormat
+        if (error instanceof Error && error.message.includes("Unsupported file format")) {
+          throw new UnprocessableEntityError(error.message);
+        }
+        throw error;
+      }
+    },
+  )
+
+  // ── Upload File to Existing Dataset ─────────────────────────────
+  .post(
+    "/:slugOrId/upload",
+    describeRoute({
+      description: "Upload a file (CSV, JSON, JSONL) to an existing dataset",
+    }),
+    async (c) => {
+      const { slugOrId } = c.req.param();
+      const project = c.get("project");
+      const service = c.get("datasetService");
+
+      const body = await c.req.parseBody();
+      const file = body["file"];
+
+      if (!file || !(file instanceof File)) {
+        throw new UnprocessableEntityError("file field is required");
+      }
+
+      const content = await file.text();
+
+      try {
+        const result = await service.uploadToExistingDataset({
+          slugOrId,
+          projectId: project.id,
+          filename: file.name,
+          content,
+          fileSize: file.size,
+        });
+
+        return c.json(result);
+      } catch (error) {
+        if (error instanceof UploadValidationError) {
+          if (error.kind === "file_too_large" || error.kind === "row_limit_exceeded" || error.kind === "column_mismatch") {
+            throw new BadRequestError(error.message);
+          }
+          if (error.kind === "empty_file" || error.kind === "unsupported_format") {
+            throw new UnprocessableEntityError(error.message);
+          }
+          throw new UnprocessableEntityError(error.message);
+        }
+        if (error instanceof Error && error.name === "DatasetNotFoundError") {
+          throw new NotFoundError("Dataset not found");
+        }
+        // Unsupported format from detectFileFormat
+        if (error instanceof Error && error.message.includes("Unsupported file format")) {
+          throw new UnprocessableEntityError(error.message);
         }
         throw error;
       }
