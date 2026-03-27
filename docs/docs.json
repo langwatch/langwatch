@@ -165,14 +165,15 @@
             "pages": [
               "prompt-management/overview",
               "prompt-management/getting-started",
-              "prompt-management/data-model",
-              "prompt-management/scope",
               "prompt-management/cli",
               "prompt-management/prompt-playground",
               {
                 "group": "Features",
                 "pages": [
                   "prompt-management/features/essential/version-control",
+                  "prompts/template-syntax",
+                  "prompt-management/data-model",
+                  "prompt-management/scope",
                   "prompt-management/features/essential/analytics",
                   "prompt-management/features/essential/github-integration",
                   "prompt-management/features/advanced/link-to-traces",
