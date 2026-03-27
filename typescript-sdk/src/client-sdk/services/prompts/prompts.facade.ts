@@ -4,6 +4,7 @@ import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
 import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
+import { PromptsError } from "./errors";
 
 /**
  * Options for fetching a prompt.
@@ -105,7 +106,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
       if (localPrompt) {
         return new Prompt(localPrompt);
       }
-      throw new Error(`Prompt "${handleOrId}" not found locally or on server`);
+      throw new PromptsError(`Prompt "${handleOrId}" not found locally or on server`);
     }
   }
 
@@ -114,7 +115,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     if (localPrompt) {
       return new Prompt(localPrompt);
     }
-    throw new Error(`Prompt "${handleOrId}" not found in materialized files`);
+    throw new PromptsError(`Prompt "${handleOrId}" not found in materialized files`);
   }
 
   /**
@@ -146,7 +147,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
       if (localPrompt) {
         return new Prompt(localPrompt);
       }
-      throw new Error(`Prompt "${handleOrId}" not found locally or on server`);
+      throw new PromptsError(`Prompt "${handleOrId}" not found locally or on server`);
     }
   }
 
