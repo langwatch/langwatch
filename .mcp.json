@@ -7,6 +7,14 @@
         "scripts/playwright-mcp.sh"
       ],
       "env": {}
+    },
+    "playwright-headed": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "env": {}
     }
   }
 }
