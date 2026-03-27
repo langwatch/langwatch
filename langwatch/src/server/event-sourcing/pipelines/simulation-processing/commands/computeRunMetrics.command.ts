@@ -101,7 +101,27 @@ export function createComputeRunMetricsCommandClass(deps: ComputeRunMetricsDeps)
         const roleCosts = traceSummary.scenarioRoleCosts ?? {};
         const roleLatencies = traceSummary.scenarioRoleLatencies ?? {};
 
+        // Summary exists but not yet populated (cost enrichment still in progress).
+        // Treat like missing summary — schedule retry so we pick it up later.
         if (Object.keys(roleCosts).length === 0 && traceSummary.totalCost === null) {
+          logger.debug(
+            { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
+            "Trace summary exists but has no metrics yet",
+          );
+
+          if (data.retryCount < MAX_RETRIES) {
+            await deps.scheduleRetry({
+              ...data,
+              retryCount: data.retryCount + 1,
+              occurredAt: Date.now(),
+            });
+          } else {
+            logger.warn(
+              { tenantId, scenarioRunId, traceId },
+              "Max retries reached for trace metrics (summary empty), giving up",
+            );
+          }
+
           return [];
         }
 

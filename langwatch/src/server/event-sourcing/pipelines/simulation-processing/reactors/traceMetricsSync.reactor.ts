@@ -63,10 +63,14 @@ export function createTraceMetricsSyncReactor(
             occurredAt: Date.now(),
           });
         } catch (error) {
-          logger.warn(
+          // Rethrow so the GroupQueue retries the reactor job.
+          // This is the last chance (RunFinished pull path) — swallowing
+          // the error would permanently lose metrics for this trace.
+          logger.error(
             { traceId, tenantId, scenarioRunId, error },
-            "Failed to dispatch computeRunMetrics for trace, skipping",
+            "Failed to dispatch computeRunMetrics for trace, will retry",
           );
+          throw error;
         }
       }
     },
