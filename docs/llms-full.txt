@@ -6074,19 +6074,19 @@ LangWatch integrates with Mastra through OpenTelemetry to capture traces from yo
 
 <CodeGroup>
 ```bash npm
-npm i langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+npm i langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 
 ```bash pnpm
-pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 
 ```bash yarn
-yarn add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+yarn add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 
 ```bash bun
-bun add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql
+bun add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-exporter @mastra/libsql
 ```
 </CodeGroup>
 
@@ -6098,8 +6098,8 @@ Configure your Mastra instance with OpenTelemetry exporter pointing to LangWatch
 import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { openai } from "@ai-sdk/openai";
+import { Observability } from "@mastra/observability";
 import { OtelExporter } from "@mastra/otel-exporter";
-import { PinoLogger } from "@mastra/loggers";
 import { LibSQLStore } from "@mastra/libsql";
 
 export const mastra = new Mastra({
@@ -6107,15 +6107,13 @@ export const mastra = new Mastra({
     assistant: new Agent({
       name: "assistant",
       instructions: "You are a helpful assistant.",
-      model: openai("gpt-5"),
+      model: openai("gpt-5-mini"),
     }),
   },
-  // Storage is required for tracing in Mastra
-  storage: new LibSQLStore({ url: ":memory:" }),
-  logger: new PinoLogger({ name: "mastra", level: "info" }),
-  observability: {
+  storage: new LibSQLStore({ id: "mastra-storage", url: "file:./mastra.db" }),
+  observability: new Observability({
     configs: {
-      otel: {
+      langwatch: {
         serviceName: "<project_name>",
         exporters: [
           new OtelExporter({
@@ -6129,7 +6127,7 @@ export const mastra = new Mastra({
         ],
       },
     },
-  },
+  }),
 });
 ```
 
@@ -11354,7 +11352,7 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 1. Go to **Settings → Connectors**
 2. Click **Add custom connector**
 3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-4. Click **Advanced settings**, select **Bearer Token** auth, and enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize))
+4. In **Advanced settings**, enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize)) as the **OAuth Client Secret**. Leave Client ID empty.
 
 *Requires a Pro or Max plan.*
 
@@ -11398,7 +11396,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat). Hosted at `https://mcp.langwatch.ai`. API key sent as `Authorization: Bearer <key>` per session — each user brings their own key.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat). Hosted at `https://mcp.langwatch.ai`. Supports both Bearer token auth (ChatGPT) and OAuth client_credentials (Claude Chat) — each user brings their own key.
 
 ## Usage Examples
 
