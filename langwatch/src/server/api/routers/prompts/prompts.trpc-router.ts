@@ -332,15 +332,18 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
-      if (input.label && (input.version !== undefined || input.versionId !== undefined)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
-        });
+      try {
+        const service = new PromptService(ctx.prisma);
+        return await service.getPromptByIdOrHandle(input);
+      } catch (error) {
+        if (error instanceof LabelValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        throw error;
       }
-
-      const service = new PromptService(ctx.prisma);
-      return await service.getPromptByIdOrHandle(input);
     }),
 
   /**

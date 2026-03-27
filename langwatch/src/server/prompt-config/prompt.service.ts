@@ -16,6 +16,7 @@ import {
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
+import { LabelValidationError } from "./repositories/llm-config-label.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
@@ -162,7 +163,7 @@ export class PromptService {
         { idOrHandle, label: params.label, version: params.version, versionId: params.versionId },
         "Mutual exclusion: cannot specify both version/versionId and label",
       );
-      throw new Error(
+      throw new LabelValidationError(
         "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
       );
     }

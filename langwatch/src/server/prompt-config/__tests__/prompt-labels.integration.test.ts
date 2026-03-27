@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { projectFactory } from "~/factories/project.factory";
 import { PromptService } from "../prompt.service";
-import { NotFoundError } from "../errors";
 
 describe("Feature: Prompt version labels", () => {
   let testOrganization: Organization;
@@ -90,9 +89,7 @@ describe("Feature: Prompt version labels", () => {
     return { prompt: latest, allVersions: versions };
   }
 
-  // --- Assignment ---
-
-  describe("Assigning a label to a specific version", () => {
+  describe("when assigning a label to a specific version", () => {
     it("creates a PromptVersionLabel record with configId, label, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -118,7 +115,7 @@ describe("Feature: Prompt version labels", () => {
     });
   });
 
-  describe("Reassigning a label to a different version", () => {
+  describe("when reassigning a label to a different version", () => {
     it("returns the new version when fetching by label", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -133,7 +130,6 @@ describe("Feature: Prompt version labels", () => {
       const v3 = allVersions[2];
       if (!v3) throw new Error("test setup failed: missing version 2");
 
-      // Assign production to v2
       await service.assignLabel({
         configId,
         versionId: v2.versionId,
@@ -141,7 +137,6 @@ describe("Feature: Prompt version labels", () => {
         projectId: testProject.id,
       });
 
-      // Reassign production to v3
       await service.assignLabel({
         configId,
         versionId: v3.versionId,
@@ -159,8 +154,8 @@ describe("Feature: Prompt version labels", () => {
     });
   });
 
-  describe("Labels are scoped to their own prompt", () => {
-    it("returns different versions for same label name on different prompts", async () => {
+  describe("when two prompts each have the same label name", () => {
+    it("returns the correct version for each prompt independently", async () => {
       const { allVersions: pizzaVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
         versionCount: 3,
@@ -213,9 +208,7 @@ describe("Feature: Prompt version labels", () => {
     });
   });
 
-  // --- Fetch by Label (tRPC) ---
-
-  describe("Fetching a prompt via tRPC with a label parameter", () => {
+  describe("when fetching a prompt via service with a label parameter", () => {
     it("returns the version pointed to by the label", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -254,10 +247,8 @@ describe("Feature: Prompt version labels", () => {
     });
   });
 
-  // --- Mutual Exclusion ---
-
-  describe("Fetching with both version and label", () => {
-    it("rejects when both version and label are provided", async () => {
+  describe("when fetching with both version and label", () => {
+    it("rejects with a validation error for version + label", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,
         organizationId: testOrganization.id,
@@ -276,7 +267,7 @@ describe("Feature: Prompt version labels", () => {
       ).rejects.toThrow("Cannot specify both 'version'/'versionId' and 'label'");
     });
 
-    it("rejects when both versionId and label are provided", async () => {
+    it("rejects with a validation error for versionId + label", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,
         organizationId: testOrganization.id,
@@ -296,9 +287,7 @@ describe("Feature: Prompt version labels", () => {
     });
   });
 
-  // --- Error Handling ---
-
-  describe("Fetching with an unassigned label", () => {
+  describe("when fetching with an unassigned label", () => {
     it("throws a not-found error", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,

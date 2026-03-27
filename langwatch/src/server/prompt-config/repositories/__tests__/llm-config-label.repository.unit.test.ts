@@ -120,7 +120,7 @@ describe("PromptVersionLabelRepository", () => {
     });
 
     describe("when label and version are valid", () => {
-      it("calls upsert with correct parameters", async () => {
+      it("assigns the label to the version", async () => {
         const prisma = makeMockPrisma();
         (
           prisma.llmPromptConfigVersion.findFirst as ReturnType<typeof vi.fn>

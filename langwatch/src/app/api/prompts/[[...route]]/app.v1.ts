@@ -274,13 +274,6 @@ app.get(
       "Getting prompt",
     );
 
-    if (label && version !== undefined) {
-      throw new HTTPException(422, {
-        message:
-          "Cannot specify both 'version' and 'label'. Use one or the other.",
-      });
-    }
-
     try {
       const config = await service.getPromptByIdOrHandle({
         idOrHandle: id,
@@ -298,6 +291,11 @@ app.get(
 
       return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
     } catch (error: unknown) {
+      if (error instanceof LabelValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
       if (error instanceof NotFoundError) {
         throw new HTTPException(404, {
           message: error.message,
@@ -351,14 +349,16 @@ app.post(
       );
 
       if (labels && labels.length > 0) {
-        for (const label of labels) {
-          await service.assignLabel({
-            configId: newConfig.id,
-            versionId: newConfig.versionId,
-            label,
-            projectId: project.id,
-          });
-        }
+        await Promise.all(
+          labels.map((label) =>
+            service.assignLabel({
+              configId: newConfig.id,
+              versionId: newConfig.versionId,
+              label,
+              projectId: project.id,
+            }),
+          ),
+        );
 
         logger.info(
           { promptId: newConfig.id, labels },
@@ -561,14 +561,16 @@ app.put(
       }
 
       if (labels && labels.length > 0) {
-        for (const label of labels) {
-          await service.assignLabel({
-            configId: updatedConfig.id,
-            versionId: updatedConfig.versionId,
-            label,
-            projectId,
-          });
-        }
+        await Promise.all(
+          labels.map((label) =>
+            service.assignLabel({
+              configId: updatedConfig.id,
+              versionId: updatedConfig.versionId,
+              label,
+              projectId,
+            }),
+          ),
+        );
 
         logger.info(
           { projectId, promptId: id, labels, versionId: updatedConfig.versionId },
