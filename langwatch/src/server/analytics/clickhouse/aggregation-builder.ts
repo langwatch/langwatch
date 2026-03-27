@@ -240,8 +240,8 @@ const groupByExpressions: Partial<
 
   "evaluations.evaluation_label": (groupByKey) => ({
     column: groupByKey
-      ? `if(${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed', ${tableAliases.evaluation_runs}.Label, '')`
-      : `${tableAliases.evaluation_runs}.Label`,
+      ? `if(${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed', COALESCE(${tableAliases.evaluation_runs}.Label, 'unknown'), '')`
+      : `COALESCE(${tableAliases.evaluation_runs}.Label, 'unknown')`,
     requiredJoins: ["evaluation_runs"],
   }),
 
