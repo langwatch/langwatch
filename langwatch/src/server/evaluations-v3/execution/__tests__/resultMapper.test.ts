@@ -88,6 +88,56 @@ describe("resultMapper", () => {
     it("handles null output value", () => {
       expect(extractTargetOutput({ output: null })).toBeNull();
     });
+
+    describe("when outputs are evaluator-as-target (regression: sticky details)", () => {
+      it("excludes details when it is null", () => {
+        const result = extractTargetOutput({
+          passed: true,
+          score: 0.9,
+          details: null,
+        });
+        expect(result).toEqual({ passed: true, score: 0.9 });
+        expect(result).not.toHaveProperty("details");
+      });
+
+      it("excludes details when it is undefined", () => {
+        const result = extractTargetOutput({
+          passed: true,
+          score: 0.9,
+          details: undefined,
+        });
+        expect(result).toEqual({ passed: true, score: 0.9 });
+        expect(result).not.toHaveProperty("details");
+      });
+
+      it("includes details when it is a non-empty string", () => {
+        const result = extractTargetOutput({
+          passed: true,
+          score: 0.9,
+          details: "The output matched expectations",
+        });
+        expect(result).toEqual({
+          passed: true,
+          score: 0.9,
+          details: "The output matched expectations",
+        });
+      });
+
+      it("passes through all non-null output fields dynamically", () => {
+        const result = extractTargetOutput({
+          passed: false,
+          score: 0.3,
+          label: "negative",
+          custom_field: "extra data",
+        });
+        expect(result).toEqual({
+          passed: false,
+          score: 0.3,
+          label: "negative",
+          custom_field: "extra data",
+        });
+      });
+    });
   });
 
   describe("coerceScore", () => {
@@ -436,6 +486,44 @@ describe("resultMapper", () => {
           passed: true,
         });
       }
+    });
+
+    describe("when details is null (regression: sticky details)", () => {
+      it("does not include details in the result", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { passed: true, score: 1.0, details: null },
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result).toMatchObject({
+            status: "processed",
+            details: undefined,
+          });
+        }
+      });
+    });
+
+    describe("when details is a non-empty string", () => {
+      it("includes details in the result", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: {
+            passed: true,
+            score: 1.0,
+            details: "Output matched exactly",
+          },
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result).toMatchObject({
+            status: "processed",
+            details: "Output matched exactly",
+          });
+        }
+      });
     });
 
     it("does not affect error results when stripScore is true", () => {
