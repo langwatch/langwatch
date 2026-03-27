@@ -24,7 +24,7 @@ We use a single `PromptVersionLabel` table (option 3) with a hardcoded label voc
 
 - **Only two valid labels: `production` and `staging`** — validated in the repository layer, not in the database. This keeps the schema simple and avoids a label-definition table.
 - **No `latest` in DB** — resolved at query time by selecting the version with the highest version number. Only explicitly assigned labels are persisted.
-- **No label CRUD endpoints** — only assign and reassign via a single `assignLabel` mutation with upsert semantics.
+- **No label CRUD endpoints** — only assign and reassign via upsert semantics. Exposed through both tRPC (`assignLabel` mutation) and REST (`PUT /:id/labels/:label`).
 - **No archiving** — reassignment updates the existing row (upsert on `configId_label`).
 - **No built-in label seeding** — labels are not auto-created when a prompt is created. They are only created when explicitly assigned.
 - **Unique constraint: `(configId, label)`** — one version per label per prompt.
@@ -75,6 +75,11 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 - Removed `LabelConflictError` and `LabelNotFoundError` (upsert eliminates conflicts; `NotFoundError` covers not-found)
 - Hardcoded valid labels to `production` and `staging` only (was open-ended with regex validation)
 
+**v3 (2026-03-27):** Added REST API surface:
+- Added `PUT /:id/labels/:label` sub-resource endpoint for direct label management
+- Added optional `labels` array to `POST /` create payload (assign labels at creation time)
+- API design informed by Langfuse (labels in create payload) and PromptLayer (dedicated label endpoints)
+
 ## Deferred Scope
 
 The following are explicitly deferred to future issues:
@@ -88,11 +93,27 @@ The following are explicitly deferred to future issues:
 
 When custom labels are introduced, the `PromptVersionLabel.label` column will become a FK to the definition table, and the code-level validation will be replaced by a DB lookup.
 
+### API Surface
+
+The label feature follows both Langfuse's "labels in create payload" pattern and PromptLayer's "dedicated sub-resource" pattern:
+
+| Method | Path / Endpoint | Description |
+|--------|----------------|-------------|
+| `PUT` | `/api/v1/prompts/:id/labels/:label` | Assign or reassign a label (sub-resource) |
+| `POST` | `/api/v1/prompts` | Create prompt with optional `labels` array |
+| `GET` | `/api/v1/prompts/:id?label=production` | Fetch the version a label points to |
+| `GET` | `/api/v1/prompts/:id?version=2` | Fetch a specific version by number |
+| `GET` | `/api/v1/prompts/:id` | Fetch latest version (highest version number) |
+| tRPC mutation | `prompts.assignLabel` | Assign or reassign a label |
+| tRPC query | `prompts.getByIdOrHandle` | Fetch with optional `label` param |
+
+`version`/`versionId` and `label` are mutually exclusive — providing both returns 422.
+
 ## Consequences
 
 - A single Prisma model and migration are required.
-- Label assignment goes through `assignLabel` (upsert semantics) in the service and a single tRPC mutation.
-- The REST API and tRPC `getByIdOrHandle` accept a `label` parameter; `version`/`versionId` and `label` are mutually exclusive.
+- Label assignment is available through both REST and tRPC with upsert semantics.
+- Labels can be assigned at prompt creation time via the `labels` array in the REST create payload.
 - SDK updates to pass `label` parameters are a separate concern (not covered by this ADR).
 - Future label features (custom labels, RBAC) build on this table by widening the validation or adding permissions.
 
