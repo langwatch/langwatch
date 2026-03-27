@@ -9,6 +9,7 @@ import { promptResponseFactory } from "../../../../../__tests__/factories/prompt
 import { Prompt } from "../prompt";
 import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
 import { FetchPolicy } from "../types";
+import { PromptsError } from "../errors";
 
 /**
  * Tests for PromptsFacade.get
@@ -122,15 +123,15 @@ describe("Prompt Retrieval", () => {
   });
 
   describe("Scenario: Materialized Only", () => {
-    it("does NOT call API and throws error when prompt not found locally", async () => {
+    it("does NOT call API and throws PromptsError when prompt not found locally", async () => {
       // Given prompt does NOT exist locally
       localPromptsService.get.mockResolvedValue(null);
 
       // When I retrieve with fetchPolicy MATERIALIZED_ONLY
-      // Then does NOT call API and throws error
+      // Then does NOT call API and throws PromptsError
       await expect(
         facade.get(testHandle, { fetchPolicy: FetchPolicy.MATERIALIZED_ONLY })
-      ).rejects.toThrow();
+      ).rejects.toBeInstanceOf(PromptsError);
       expect(promptsApiService.get).not.toHaveBeenCalled();
     });
 
@@ -241,6 +242,37 @@ describe("Prompt Retrieval", () => {
       expect(promptsApiService.get).toHaveBeenCalled();
       expect(localPromptsService.get).toHaveBeenCalledWith(testHandle);
       expect(result).toEqual(new Prompt(mockLocalPrompt));
+    });
+  });
+
+  describe("Scenario: Always Fetch - Not Found", () => {
+    it("throws PromptsError when API fails and no local prompt exists", async () => {
+      // Given API is down and prompt does NOT exist locally
+      promptsApiService.get.mockRejectedValue(new Error("404 not found"));
+      localPromptsService.get.mockResolvedValue(null);
+
+      // When I retrieve with fetchPolicy ALWAYS_FETCH
+      // Then throws PromptsError so callers can catch consistently
+      await expect(
+        facade.get(testHandle, { fetchPolicy: FetchPolicy.ALWAYS_FETCH })
+      ).rejects.toBeInstanceOf(PromptsError);
+    });
+  });
+
+  describe("Scenario: Cache TTL - Not Found", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("throws PromptsError when API fails and no local prompt exists", async () => {
+      // Given API is down and prompt does NOT exist locally
+      promptsApiService.get.mockRejectedValue(new Error("404 not found"));
+      localPromptsService.get.mockResolvedValue(null);
+
+      // When I retrieve with fetchPolicy CACHE_TTL
+      // Then throws PromptsError so callers can catch consistently
+      await expect(
+        facade.get(testHandle, { fetchPolicy: FetchPolicy.CACHE_TTL })
+      ).rejects.toBeInstanceOf(PromptsError);
     });
   });
 
