@@ -68,10 +68,10 @@ describe("SimulationClickHouseRepository", () => {
         const batchQuery = queries.find((q) => q.query.includes("BatchRunId"));
 
         expect(batchQuery).toBeDefined();
-        expect(batchQuery!.query).toContain(
+        expect(batchQuery?.query).toContain(
           "IF(ScenarioSetId = '', 'default', ScenarioSetId)"
         );
-        expect(batchQuery!.query).not.toMatch(
+        expect(batchQuery?.query).not.toMatch(
           /any\(ScenarioSetId\)\s+AS\s+ScenarioSetId/
         );
       });
