@@ -2,7 +2,10 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { slugify } from "~/utils/slugify";
-import { createManyDatasetRecords } from "../api/routers/datasetRecord.utils";
+import {
+  createManyDatasetRecords,
+  getFullDataset,
+} from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { DatasetConflictError, DatasetNotFoundError } from "./errors";
@@ -596,19 +599,25 @@ export class DatasetService {
   async getDatasetWithRecords(params: {
     slugOrId: string;
     projectId: string;
+    limitMb?: number | null;
   }) {
     const dataset = await this.getBySlugOrId(params);
 
-    const result = await this.repository.findWithRecords({
+    const result = await getFullDataset({
       datasetId: dataset.id,
       projectId: params.projectId,
+      limitMb: params.limitMb ?? null,
     });
 
     if (!result) {
       throw new DatasetNotFoundError();
     }
 
-    return result;
+    return {
+      dataset,
+      records: result.datasetRecords,
+      truncated: result.truncated ?? false,
+    };
   }
 
   /**

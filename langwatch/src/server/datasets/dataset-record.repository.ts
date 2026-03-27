@@ -90,7 +90,7 @@ export class DatasetRecordRepository {
     const [records, total] = await Promise.all([
       this.prisma.datasetRecord.findMany({
         where,
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         skip: input.skip,
         take: input.take,
       }),

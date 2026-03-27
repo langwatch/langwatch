@@ -2,18 +2,15 @@ import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
+  PlanProviderService,
+  type PlanProvider,
+} from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-
-// Mock the resource-limit middleware so tests don't need the full app layer.
-// The middleware calls getApp() which requires initializeDefaultApp() — not available in tests.
-vi.mock("~/app/api/middleware/resource-limit", () => ({
-  resourceLimitMiddleware: () => async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  },
-}));
-
-// Import app AFTER the mock is set up
-const { app } = await import("../[[...route]]/app");
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { app } from "../[[...route]]/app";
 
 describe("Feature: Dataset REST API", () => {
   let testApiKey: string;
@@ -21,6 +18,8 @@ describe("Feature: Dataset REST API", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
+  let mockGetActivePlan: ReturnType<typeof vi.fn>;
+  let mockNotifyPlanLimitReached: ReturnType<typeof vi.fn>;
   let helpers: {
     api: {
       get: (path: string) => Response | Promise<Response>;
@@ -36,6 +35,19 @@ describe("Feature: Dataset REST API", () => {
   });
 
   beforeEach(async () => {
+    resetApp();
+    mockGetActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
+    mockNotifyPlanLimitReached = vi.fn().mockResolvedValue(undefined);
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
+      }),
+      usageLimits: {
+        notifyPlanLimitReached: mockNotifyPlanLimitReached,
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+
     testOrganization = await prisma.organization.create({
       data: {
         name: "Test Organization",
@@ -111,6 +123,7 @@ describe("Feature: Dataset REST API", () => {
     await prisma.organization.delete({
       where: { id: testOrganization.id },
     });
+    resetApp();
   });
 
   // Helper to create a dataset directly via Prisma
@@ -311,6 +324,29 @@ describe("Feature: Dataset REST API", () => {
         expect(res.status).toBe(422);
       });
     });
+
+    describe("when the project has reached its dataset plan limit", () => {
+      beforeEach(async () => {
+        await createDataset({ name: "Existing", slug: "existing" });
+        mockGetActivePlan.mockResolvedValue({
+          ...FREE_PLAN,
+          maxDatasets: 1,
+          overrideAddingLimitations: false,
+        });
+      });
+
+      it("returns 403 Forbidden", async () => {
+        const res = await helpers.api.post("/api/dataset", {
+          name: "One More",
+          columnTypes: [{ name: "input", type: "string" }],
+        });
+
+        expect(res.status).toBe(403);
+        const body = await res.json();
+        expect(body.error).toBe("resource_limit_exceeded");
+        expect(body.limitType).toBe("datasets");
+      });
+    });
   });
 
   // ── Get Single Dataset ─────────────────────────────────────────
@@ -355,6 +391,27 @@ describe("Feature: Dataset REST API", () => {
       it("returns 404 Not Found", async () => {
         const res = await helpers.api.get("/api/dataset/does-not-exist");
         expect(res.status).toBe(404);
+      });
+    });
+
+    describe("when the dataset exceeds the response size limit", () => {
+      beforeEach(async () => {
+        const dataset = await createDataset({
+          name: "Large Dataset",
+          slug: "large-dataset",
+        });
+
+        await createRecord(dataset.id, "rec-large", {
+          input: "x".repeat(26 * 1024 * 1024),
+        });
+      });
+
+      it("returns 400 Bad Request", async () => {
+        const res = await helpers.api.get("/api/dataset/large-dataset");
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.message).toContain("25MB limit");
       });
     });
   });
