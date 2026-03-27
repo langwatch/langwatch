@@ -34,9 +34,8 @@ describe("SimulationClickHouseRepository", () => {
           projectIds: ["project-1"],
         });
 
-        const queryCall = (mockClient.query as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as { query: string };
-        expect(queryCall.query).toContain(
+        const firstCallArg = (mockClient.query as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as { query: string } | undefined;
+        expect(firstCallArg?.query).toContain(
           "IF(ScenarioSetId = '',"
         );
       });
