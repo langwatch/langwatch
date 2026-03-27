@@ -17,6 +17,7 @@ import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -27,9 +28,12 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
 function AnnotationScorePage() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
+  const canManage = !isLiteMember;
 
   const { openDrawer, drawerOpen: isDrawerOpen, closeDrawer } = useDrawer();
 
@@ -60,7 +64,8 @@ function AnnotationScorePage() {
         onSuccess: () => {
           void getAllAnnotationScores.refetch();
         },
-        onError: () => {
+        onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Update score",
             type: "error",
@@ -97,7 +102,8 @@ function AnnotationScorePage() {
               },
             });
           },
-          onError: () => {
+          onError: (error) => {
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Delete score",
               type: "error",
@@ -120,11 +126,13 @@ function AnnotationScorePage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Annotation Scoring</Heading>
           <Spacer />
-          <PageLayout.HeaderButton
-            onClick={() => openDrawer("addOrEditAnnotationScore")}
-          >
-            <Plus /> Add new score metric
-          </PageLayout.HeaderButton>
+          {canManage && (
+            <PageLayout.HeaderButton
+              onClick={() => openDrawer("addOrEditAnnotationScore")}
+            >
+              <Plus /> Add new score metric
+            </PageLayout.HeaderButton>
+          )}
         </HStack>
         {getAllAnnotationScores.data &&
         getAllAnnotationScores.data.length == 0 ? (
@@ -155,24 +163,26 @@ function AnnotationScorePage() {
                 <Table.ColumnHeader>Score Type</Table.ColumnHeader>
                 <Table.ColumnHeader>Score Options</Table.ColumnHeader>
                 <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-                <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                {canManage && (
+                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                )}
               </Table.Row>
             </Table.Header>
             <Table.Body>
               {getAllAnnotationScores.isLoading ? (
                 <>
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={canManage ? 6 : 5}>
                       <Skeleton height="20px" />
                     </Table.Cell>
                   </Table.Row>
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={canManage ? 6 : 5}>
                       <Skeleton height="20px" />
                     </Table.Cell>
                   </Table.Row>
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={canManage ? 6 : 5}>
                       <Skeleton height="20px" />
                     </Table.Cell>
                   </Table.Row>
@@ -206,54 +216,57 @@ function AnnotationScorePage() {
                       <Table.Cell textAlign="center">
                         <Switch
                           checked={score.active}
+                          disabled={!canManage}
                           onCheckedChange={() => {
                             handleToggleScore(score.id, !score.active);
                           }}
                         />
                       </Table.Cell>
-                      <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant={"ghost"}>
-                              <MoreVertical />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="edit"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openDrawer("addOrEditAnnotationScore", {
-                                  annotationScoreId: score.id,
-                                  onClose: () => closeDrawer(),
-                                });
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Edit size={14} />
-                                Edit
-                              </Box>
-                            </Menu.Item>
-                            <Menu.Item
-                              value="delete"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleDeleteScore(score.id);
-                              }}
-                            >
-                              <Box
-                                display="flex"
-                                alignItems="center"
-                                gap={2}
-                                color="red.600"
+                      {canManage && (
+                        <Table.Cell>
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant={"ghost"}>
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="edit"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openDrawer("addOrEditAnnotationScore", {
+                                    annotationScoreId: score.id,
+                                    onClose: () => closeDrawer(),
+                                  });
+                                }}
                               >
-                                <Trash size={14} />
-                                Delete
-                              </Box>
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      </Table.Cell>
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Edit size={14} />
+                                  Edit
+                                </Box>
+                              </Menu.Item>
+                              <Menu.Item
+                                value="delete"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteScore(score.id);
+                                }}
+                              >
+                                <Box
+                                  display="flex"
+                                  alignItems="center"
+                                  gap={2}
+                                  color="red.600"
+                                >
+                                  <Trash size={14} />
+                                  Delete
+                                </Box>
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </Table.Cell>
+                      )}
                     </Table.Row>
                   );
                 })

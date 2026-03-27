@@ -12,7 +12,7 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project } = useOrganizationTeamProject({
+  const { project, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const publicEnv = usePublicEnv();
@@ -52,7 +52,7 @@ export default function SettingsLayout({
           {isEnterprise && (
             <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
           )}
-          {isEnterprise && (
+          {isEnterprise && hasPermission("organization:manage") && (
             <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
           )}
 

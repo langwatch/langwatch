@@ -2149,7 +2149,7 @@ export const organizationRouter = createTRPCRouter({
         endDate: z.number().optional(), // End date timestamp (milliseconds)
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

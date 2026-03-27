@@ -32,15 +32,18 @@ import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
 function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
@@ -122,7 +125,8 @@ function DatasetsPage() {
             },
           });
         },
-        onError: () => {
+        onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Failed to delete dataset",
             description:
@@ -267,34 +271,38 @@ function DatasetsPage() {
                                     <Copy size={16} /> Replicate to another
                                     project
                                   </Menu.Item>
-                                  <Menu.Item
-                                    value="edit"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setEditDataset({
-                                        datasetId: dataset.id,
-                                        name: dataset.name,
-                                        columnTypes:
-                                          dataset.columnTypes as DatasetColumns,
-                                      });
-                                      addEditDatasetDrawer.onOpen();
-                                    }}
-                                  >
-                                    <Edit size={16} /> Edit dataset
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    value="delete"
-                                    color="red.600"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      showDeleteDialog({
-                                        id: dataset.id,
-                                        name: dataset.name,
-                                      });
-                                    }}
-                                  >
-                                    <Trash2 size={16} /> Delete dataset
-                                  </Menu.Item>
+                                  {!isLiteMember && (
+                                    <>
+                                      <Menu.Item
+                                        value="edit"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setEditDataset({
+                                            datasetId: dataset.id,
+                                            name: dataset.name,
+                                            columnTypes:
+                                              dataset.columnTypes as DatasetColumns,
+                                          });
+                                          addEditDatasetDrawer.onOpen();
+                                        }}
+                                      >
+                                        <Edit size={16} /> Edit dataset
+                                      </Menu.Item>
+                                      <Menu.Item
+                                        value="delete"
+                                        color="red.600"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          showDeleteDialog({
+                                            id: dataset.id,
+                                            name: dataset.name,
+                                          });
+                                        }}
+                                      >
+                                        <Trash2 size={16} /> Delete dataset
+                                      </Menu.Item>
+                                    </>
+                                  )}
                               </Menu.Content>
                             </Menu.Root>
                           </Table.Cell>
