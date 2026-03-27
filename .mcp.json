@@ -10,9 +10,10 @@
     },
     "playwright-headed": {
       "type": "stdio",
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "@playwright/mcp@latest"
+        "scripts/playwright-mcp.sh",
+        "--headed"
       ],
       "env": {}
     }
