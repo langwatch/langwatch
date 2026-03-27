@@ -1,0 +1,377 @@
+---
+title: "Semantic Conventions"
+sidebarTitle: "Semantic Conventions"
+description: "Learn about OpenTelemetry semantic conventions and LangWatch's custom attributes for consistent observability"
+keywords: langwatch, typescript, sdk, guide, observability, attributes, semantic conventions, opentelemetry, standards, naming
+---
+
+# Semantic Conventions
+
+This guide covers OpenTelemetry semantic conventions and how LangWatch implements them, along with our custom attributes for LLM-specific observability.
+
+<CardGroup cols={2}>
+<Card title="OpenTelemetry Standards" icon="standards" href="#opentelemetry-semantic-conventions">
+  Understand the OpenTelemetry semantic conventions that LangWatch follows for consistent observability.
+</Card>
+
+<Card title="LangWatch Attributes" icon="attributes" href="#langwatch-custom-attributes">
+  Explore LangWatch's custom attributes designed specifically for LLM applications and AI observability.
+</Card>
+</CardGroup>
+
+## What Are Semantic Conventions?
+
+Semantic conventions are standardized naming and structure guidelines for observability data. They ensure consistency across different systems and make it easier to analyze and correlate data from various sources.
+
+<Info>
+OpenTelemetry semantic conventions provide a standardized way to name attributes, events, and other observability data, making it easier to build tools and dashboards that work across different applications and services. For practical examples of these conventions in action, see [Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation).
+</Info>
+
+### Benefits of Semantic Conventions
+
+- **Consistency**: Standardized naming across all your services
+- **Interoperability**: Works with any OpenTelemetry-compatible tool
+- **Analytics**: Easier to build dashboards and alerts
+- **Debugging**: Familiar patterns make troubleshooting faster
+- **Team Collaboration**: Shared understanding of observability data
+
+## OpenTelemetry Semantic Conventions
+
+LangWatch fully implements OpenTelemetry semantic conventions, ensuring your traces are compatible with any OpenTelemetry-compatible observability platform.
+
+### Core Semantic Conventions
+
+The OpenTelemetry specification defines conventions for common observability scenarios. LangWatch supports all OpenTelemetry semantic conventions while also providing its own custom attributes for LLM-specific observability.
+
+```typescript
+import * as semconv from "@opentelemetry/semantic-conventions";
+// Or for bleeding edge attributes, you can import from the `incubating` module
+import * as semconv from "@opentelemetry/semantic-conventions/incubating";
+
+// Resource attributes (service information)
+const resourceAttributes = {
+  [semconv.ATTR_SERVICE_NAME]: "my-ai-service",
+  [semconv.ATTR_SERVICE_VERSION]: "1.0.0",
+  [semconv.ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: "production",
+  [semconv.ATTR_HOST_NAME]: "server-01",
+  [semconv.ATTR_PROCESS_PID]: process.pid,
+};
+```
+
+### Span Types and Attributes
+
+OpenTelemetry defines standard span types and their associated attributes. LangWatch extends these with custom span types for LLM operations:
+
+```typescript
+// HTTP client span (OpenTelemetry standard)
+span.setAttributes({
+  "http.method": "GET",
+  "http.url": "https://api.example.com/data",
+  "http.status_code": 200,
+  "http.request.header.user_agent": "MyApp/1.0",
+});
+
+// Database span (OpenTelemetry standard)
+span.setAttributes({
+  "db.system": "mysql",
+  "db.name": "production_db",
+  "db.operation": "INSERT",
+  "db.statement": "INSERT INTO users (name, email) VALUES (?, ?)",
+});
+
+// LLM span (LangWatch custom)
+span.setType("llm");
+span.setAttributes({
+  "langwatch.user.id": "user-123",
+  "langwatch.thread.id": "thread-456",
+  "langwatch.gen_ai.streaming": false,
+});
+```
+
+## TypeScript Autocomplete Support
+
+All attribute setting methods in LangWatch provide full TypeScript autocomplete support,
+you don't need to import anything, just use the attribute names directly and autocomplete
+will appear in your editor.
+
+### Autocomplete in Span Methods
+
+```typescript
+import { getLangWatchTracer } from "langwatch";
+
+const tracer = getLangWatchTracer("my-service");
+
+await tracer.withActiveSpan("llm-operation", async (span) => {
+  // TypeScript autocomplete works for all LangWatch attributes
+  span.setAttributes({
+    // Autocomplete shows all available attributes
+    "code.function": "getLangWatchTracer",
+    "langwatch.span.type": "llm",
+    "langwatch.user.id": "user-123",
+    "langwatch.thread.id": "thread-456",
+    "langwatch.gen_ai.streaming": false,
+    // ... more attributes with autocomplete
+  });
+});
+```
+
+### Autocomplete in Configuration
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { attributes } from "langwatch";
+
+const handle = setupObservability({
+  serviceName: "my-service",
+  attributes: {
+    // Autocomplete shows all available LangWatch attributes
+    "langwatch.sdk.version": "1.0.0",
+    "langwatch.sdk.name": "langwatch-typescript",
+    "langwatch.sdk.language": "typescript",
+  }
+});
+```
+
+## LangWatch Attributes Reference
+
+LangWatch provides a comprehensive set of custom attributes for LLM-specific observability. All attributes are available with TypeScript autocomplete support.
+
+### Core LangWatch Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `langwatch.span.type` | string | Type of span being traced | `"llm"`, `"rag"`, `"prompt"` |
+| `langwatch.user.id` | string | User identifier | `"user-123"` |
+| `langwatch.thread.id` | string | Conversation thread identifier | `"thread-456"` |
+| `langwatch.customer.id` | string | Customer identifier | `"customer-789"` |
+| `langwatch.gen_ai.streaming` | boolean | Whether the operation involves streaming | `true`, `false` |
+| `langwatch.input` | string/object | Input data for the span | `"Hello, how are you?"` |
+| `langwatch.output` | string/object | Output data from the span | `"I'm doing well, thank you!"` |
+| `langwatch.contexts` | array | RAG contexts for retrieval-augmented generation | Array of document contexts |
+| `langwatch.labels` | array | Labels for categorizing spans | `["chat", "greeting"]` |
+| `langwatch.params` | object | Parameter data for operations | `{ temperature: 0.7 }` |
+| `langwatch.metrics` | object | Custom metrics data | `{ response_time: 1250 }` |
+| `langwatch.timestamps` | object | Timing information for events | `{ start: 1234567890 }` |
+| `langwatch.evaluation.custom` | object | Custom evaluation data | `{ score: 0.95 }` |
+
+### SDK Information Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `langwatch.sdk.name` | string | LangWatch SDK implementation name | `"langwatch-typescript"` |
+| `langwatch.sdk.version` | string | Version of the LangWatch SDK | `"1.0.0"` |
+| `langwatch.sdk.language` | string | Programming language of the SDK | `"typescript"` |
+
+### Prompt Management Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `langwatch.prompt.id` | string | Unique prompt identifier | `"prompt-123"` |
+| `langwatch.prompt.handle` | string | Human-readable prompt handle | `"customer-support-greeting"` |
+| `langwatch.prompt.version.id` | string | Prompt version identifier | `"version-456"` |
+| `langwatch.prompt.version.number` | number | Prompt version number | `2` |
+| `langwatch.prompt.selected.id` | string | Selected prompt from a set | `"selected-prompt-789"` |
+| `langwatch.prompt.variables` | object | Variables used in prompt templates | `{ customer_name: "John" }` |
+
+### LangChain Integration Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `langwatch.langchain.run.id` | string | LangChain run identifier | `"run-123"` |
+| `langwatch.langchain.run.type` | string | Type of LangChain run | `"chain"`, `"tool"` |
+| `langwatch.langchain.run.parent.id` | string | Parent run identifier | `"parent-run-456"` |
+| `langwatch.langchain.event_name` | string | LangChain event type | `"chain_start"` |
+| `langwatch.langchain.run.metadata` | object | Run metadata | `{ model: "gpt-5-mini" }` |
+| `langwatch.langchain.run.extra_params` | object | Additional run parameters | `{ max_tokens: 1000 }` |
+| `langwatch.langchain.run.tags` | array | Run-specific tags | `["production", "chain"]` |
+| `langwatch.langchain.tags` | array | LangChain operation tags | `["langchain", "llm"]` |
+
+### Using SDK Constants
+
+Instead of using raw attribute strings, both SDKs provide typed constants you can import:
+
+<CodeGroup>
+
+```typescript TypeScript
+import { attributes } from "langwatch";
+
+span.setAttributes({
+  [attributes.ATTR_LANGWATCH_SPAN_TYPE]: "llm",
+  [attributes.ATTR_LANGWATCH_USER_ID]: "user-123",
+  [attributes.ATTR_LANGWATCH_THREAD_ID]: "thread-456",
+  [attributes.ATTR_LANGWATCH_LABELS]: ["chat", "greeting"],
+  [attributes.ATTR_LANGWATCH_STREAMING]: false,
+});
+```
+
+```python Python
+from langwatch.attributes import AttributeKey
+
+span.set_attribute(AttributeKey.LangWatchSpanType, "llm")
+span.set_attribute(AttributeKey.LangWatchCustomerId, "customer-789")
+span.set_attribute(AttributeKey.LangWatchThreadId, "thread-456")
+span.set_attribute(AttributeKey.LangWatchPromptHandle, "customer-support-greeting")
+```
+
+</CodeGroup>
+
+<Accordion title="Full list of SDK constants">
+
+**TypeScript** — `import { attributes } from "langwatch"`
+
+| Constant | Value |
+|----------|-------|
+| `ATTR_LANGWATCH_INPUT` | `langwatch.input` |
+| `ATTR_LANGWATCH_OUTPUT` | `langwatch.output` |
+| `ATTR_LANGWATCH_SPAN_TYPE` | `langwatch.span.type` |
+| `ATTR_LANGWATCH_RAG_CONTEXTS` | `langwatch.contexts` |
+| `ATTR_LANGWATCH_METRICS` | `langwatch.metrics` |
+| `ATTR_LANGWATCH_SDK_VERSION` | `langwatch.sdk.version` |
+| `ATTR_LANGWATCH_SDK_NAME` | `langwatch.sdk.name` |
+| `ATTR_LANGWATCH_SDK_LANGUAGE` | `langwatch.sdk.language` |
+| `ATTR_LANGWATCH_TIMESTAMPS` | `langwatch.timestamps` |
+| `ATTR_LANGWATCH_EVALUATION_CUSTOM` | `langwatch.evaluation.custom` |
+| `ATTR_LANGWATCH_PARAMS` | `langwatch.params` |
+| `ATTR_LANGWATCH_CUSTOMER_ID` | `langwatch.customer.id` |
+| `ATTR_LANGWATCH_THREAD_ID` | `langwatch.thread.id` |
+| `ATTR_LANGWATCH_USER_ID` | `langwatch.user.id` |
+| `ATTR_LANGWATCH_LABELS` | `langwatch.labels` |
+| `ATTR_LANGWATCH_STREAMING` | `langwatch.gen_ai.streaming` |
+| `ATTR_LANGWATCH_PROMPT_ID` | `langwatch.prompt.id` |
+| `ATTR_LANGWATCH_PROMPT_HANDLE` | `langwatch.prompt.handle` |
+| `ATTR_LANGWATCH_PROMPT_VERSION_ID` | `langwatch.prompt.version.id` |
+| `ATTR_LANGWATCH_PROMPT_VERSION_NUMBER` | `langwatch.prompt.version.number` |
+| `ATTR_LANGWATCH_PROMPT_SELECTED_ID` | `langwatch.prompt.selected.id` |
+| `ATTR_LANGWATCH_PROMPT_VARIABLES` | `langwatch.prompt.variables` |
+
+**Python** — `from langwatch.attributes import AttributeKey`
+
+| Constant | Value |
+|----------|-------|
+| `AttributeKey.LangWatchInput` | `langwatch.input` |
+| `AttributeKey.LangWatchOutput` | `langwatch.output` |
+| `AttributeKey.LangWatchSpanType` | `langwatch.span.type` |
+| `AttributeKey.LangWatchRAGContexts` | `langwatch.rag_contexts` |
+| `AttributeKey.LangWatchMetrics` | `langwatch.metrics` |
+| `AttributeKey.LangWatchSDKVersion` | `langwatch.sdk.version` |
+| `AttributeKey.LangWatchSDKName` | `langwatch.sdk.name` |
+| `AttributeKey.LangWatchSDKLanguage` | `langwatch.sdk.language` |
+| `AttributeKey.LangWatchTimestamps` | `langwatch.timestamps` |
+| `AttributeKey.LangWatchEventEvaluationCustom` | `langwatch.evaluation.custom` |
+| `AttributeKey.LangWatchParams` | `langwatch.params` |
+| `AttributeKey.LangWatchCustomerId` | `langwatch.customer.id` |
+| `AttributeKey.LangWatchThreadId` | `langwatch.thread.id` |
+| `AttributeKey.LangWatchPromptId` | `langwatch.prompt.id` |
+| `AttributeKey.LangWatchPromptHandle` | `langwatch.prompt.handle` |
+| `AttributeKey.LangWatchPromptVersionId` | `langwatch.prompt.version.id` |
+| `AttributeKey.LangWatchPromptVersionNumber` | `langwatch.prompt.version.number` |
+| `AttributeKey.LangWatchPromptSelectedId` | `langwatch.prompt.selected.id` |
+| `AttributeKey.LangWatchPromptVariables` | `langwatch.prompt.variables` |
+
+</Accordion>
+
+## Best Practices
+
+### Attribute Naming
+
+Follow these conventions for consistent observability:
+
+```typescript
+// ✅ Good: Use LangWatch semantic convention attributes
+span.setAttributes({
+  "langwatch.span.type": "llm",
+  "langwatch.user.id": "user-123",
+  "langwatch.thread.id": "thread-456",
+});
+
+// ❌ Avoid: Custom attribute names without conventions
+span.setAttributes({
+  "span_type": "llm", // Use correct values or attributes.ATTR_LANGWATCH_SPAN_TYPE instead
+  "user": "user-123", // Use correct values or attributes.ATTR_LANGWATCH_USER_ID instead
+});
+```
+
+### Attribute Values
+
+Use appropriate data types and formats:
+
+```typescript
+// ✅ Good: Proper data types
+span.setAttributes({
+  "langwatch.gen_ai.streaming": false, // boolean
+  "langwatch.user.id": "user-123", // string
+  "langwatch.prompt.version.number": 2, // number
+  "langwatch.labels": ["chat", "greeting"], // array
+});
+
+// ❌ Avoid: Inconsistent data types
+span.setAttributes({
+  "langwatch.gen_ai.streaming": "false", // string instead of boolean
+  "langwatch.prompt.version.number": "2", // string instead of number
+});
+```
+
+### Sensitive Data
+
+Never include sensitive information in attributes:
+
+```typescript
+// ✅ Good: Safe attributes
+span.setAttributes({
+  "langwatch.user.id": "user-123",
+  "langwatch.span.type": "llm",
+  "langwatch.sdk.version": "1.0.0",
+});
+
+// ❌ Avoid: Sensitive data in attributes
+span.setAttributes({
+  [attributes.ATTR_LANGWATCH_USER_ID]: "user-123",
+  "api_key": "sk-...", // Never include API keys
+  "password": "secret123", // Never include passwords
+  "credit_card": "1234-5678-9012-3456", // Never include PII
+});
+```
+
+### Performance Considerations
+
+Limit the number and size of attributes for performance:
+
+| ✅ Good | ❌ Avoid | Reason |
+|---------|----------|---------|
+| 4-8 attributes per span | 50+ attributes | Too many impacts performance |
+| Short string values | Large text content | Use `span.setInput()` for large content |
+| Structured data | Nested objects | Keep attributes simple |
+| Essential metadata | Redundant information | Only include what's needed |
+
+## Summary
+
+Semantic conventions provide a standardized approach to observability data that:
+
+- **Ensures consistency** across your entire application
+- **Enables interoperability** with OpenTelemetry-compatible tools
+- **Improves debugging** with familiar patterns
+- **Supports team collaboration** with shared understanding
+
+LangWatch implements both OpenTelemetry semantic conventions and custom LLM-specific attributes, all with full TypeScript autocomplete support to help you use the right attributes consistently.
+
+<Check>
+**Key takeaways**:
+- Use semantic convention attributes for consistency
+- Import `attributes` from LangWatch for autocomplete
+- Follow OpenTelemetry standards for interoperability
+- Leverage LangWatch's LLM-specific attributes for AI observability
+</Check>
+
+## Related Documentation
+
+For practical examples and advanced usage patterns:
+
+- **[Integration Guide](/integration/typescript/guide)** - Basic setup and core concepts
+- **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Practical examples of semantic conventions in action
+- **[API Reference](/integration/typescript/reference)** - Complete API documentation with attribute details
+- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific semantic conventions
+- **[Capturing RAG](/integration/typescript/tutorials/capturing-rag)** - RAG-specific attributes and conventions
+
+<Tip>
+Use semantic conventions consistently across your application for better analytics, debugging, and team collaboration. Start with the [Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation) tutorial to see these conventions in practice.
+</Tip>

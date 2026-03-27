@@ -88,6 +88,7 @@ export type BatchRunDataResult =
 export type ExternalSetSummary = {
   scenarioSetId: string;
   passedCount: number;
+  failedCount: number;
   totalCount: number;
   lastRunTimestamp: number;
 };

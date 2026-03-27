@@ -10,15 +10,18 @@ import {
 // ---------------------------------------------------------------------------
 
 const {
-  mockGetClickHouseClient,
+  mockIsClickHouseEnabled,
+  mockGetClickHouseClientForProject,
   mockQueryTraceSummariesTotalUniq,
 } = vi.hoisted(() => ({
-  mockGetClickHouseClient: vi.fn(),
+  mockIsClickHouseEnabled: vi.fn(),
+  mockGetClickHouseClientForProject: vi.fn(),
   mockQueryTraceSummariesTotalUniq: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: mockGetClickHouseClient,
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  isClickHouseEnabled: mockIsClickHouseEnabled,
+  getClickHouseClientForProject: mockGetClickHouseClientForProject,
 }));
 
 vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
@@ -53,13 +56,14 @@ describe("TraceUsageService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMonthCountCache();
-    // Default: no ClickHouse (ES path) — pass null so splitProjectsByFlag returns early
-    mockGetClickHouseClient.mockReturnValue(null);
+    // Default: no ClickHouse (ES path) — pass false so splitProjectsByFlag returns early
+    mockIsClickHouseEnabled.mockReturnValue(false);
+    mockGetClickHouseClientForProject.mockResolvedValue(null);
     service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
       mockPrisma as any,
-      null,
+      false,
     );
   });
 
@@ -125,7 +129,7 @@ describe("TraceUsageService", () => {
 
     describe("when ClickHouse is available", () => {
       beforeEach(() => {
-        mockGetClickHouseClient.mockReturnValue({}); // truthy value
+        mockIsClickHouseEnabled.mockReturnValue(true); // ClickHouse available
         vi.mocked(
           mockOrganizationRepository.getProjectIds,
         ).mockResolvedValue(["proj-1"]);
@@ -210,7 +214,7 @@ describe("TraceUsageService", () => {
 
     describe("when ClickHouse is available", () => {
       beforeEach(() => {
-        mockGetClickHouseClient.mockReturnValue({}); // truthy value
+        mockIsClickHouseEnabled.mockReturnValue(true); // ClickHouse available
       });
 
       it("queries trace summaries per project", async () => {

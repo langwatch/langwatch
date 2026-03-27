@@ -1,6 +1,7 @@
 import { Popover as ChakraPopover, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
+import { OverlayDepthContext, useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 
 interface PopoverContentProps extends ChakraPopover.ContentProps {
   portalled?: boolean;
@@ -13,16 +14,28 @@ export const PopoverContent = React.forwardRef<
   PopoverContentProps
 >(function PopoverContent(props, ref) {
   const { portalled = true, portalRef, positionerProps, ...rest } = props;
+  const { zIndex, depth } = useOverlayZIndex();
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      <ChakraPopover.Positioner {...positionerProps}>
-        <ChakraPopover.Content
-          borderRadius="lg"
-          background="bg.panel/75"
-          backdropFilter="blur(8px)"
-          ref={ref}
-          {...rest}
-        />
+      <ChakraPopover.Positioner
+        {...positionerProps}
+        ref={(node: HTMLElement | null) => {
+          if (node) {
+            // Zag.js sets --z-index inline based on layer stack order, which
+            // can place popovers behind drawers. Force it higher. See #2390.
+            node.style.setProperty("z-index", zIndex, "important");
+          }
+        }}
+      >
+        <OverlayDepthContext.Provider value={depth}>
+          <ChakraPopover.Content
+            borderRadius="lg"
+            background="bg.panel/75"
+            backdropFilter="blur(8px)"
+            ref={ref}
+            {...rest}
+          />
+        </OverlayDepthContext.Provider>
       </ChakraPopover.Positioner>
     </Portal>
   );
@@ -70,6 +83,7 @@ export const PopoverHeader = ChakraPopover.Header;
 export const PopoverRoot = ChakraPopover.Root;
 export const PopoverBody = ChakraPopover.Body;
 export const PopoverTrigger = ChakraPopover.Trigger;
+export const PopoverAnchor = ChakraPopover.Anchor;
 
 export const Popover = {
   Root: PopoverRoot,
@@ -83,4 +97,5 @@ export const Popover = {
   Body: PopoverBody,
   Trigger: PopoverTrigger,
   ArrowTip: PopoverArrowTip,
+  Anchor: PopoverAnchor,
 };

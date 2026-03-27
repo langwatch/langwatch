@@ -1,9 +1,7 @@
 /**
  * Compact status badges for run/group row headers.
  *
- * Shows non-zero counts as colored badges with labels.
- * Passed and failed always show (even when zero) for clarity;
- * stalled, cancelled, running, queued only appear when > 0.
+ * Only shows non-zero counts as colored badges with labels.
  */
 
 import { HStack, Text } from "@chakra-ui/react";
@@ -52,36 +50,28 @@ function CountBadge({
 }
 
 export function RunSummaryCounts({ summary }: RunSummaryCountsProps) {
-  const finishedCount =
-    summary.passedCount +
-    summary.failedCount +
-    summary.stalledCount +
-    summary.cancelledCount;
-
-  const hasFinished = finishedCount > 0;
-
   return (
     <HStack gap={1} data-testid="run-summary-counts">
-      {/* Always show passed/failed for finished runs */}
-      {hasFinished && (
-        <>
-          <CountBadge
-            count={summary.passedCount}
-            label="passed"
-            tooltip={`${summary.passedCount} scenario${summary.passedCount !== 1 ? "s" : ""} passed all criteria`}
-            icon={Check}
-            color="green.fg"
-            bg="green.subtle"
-          />
-          <CountBadge
-            count={summary.failedCount}
-            label="failed"
-            tooltip={`${summary.failedCount} scenario${summary.failedCount !== 1 ? "s" : ""} failed one or more criteria`}
-            icon={X}
-            color="red.fg"
-            bg="red.subtle"
-          />
-        </>
+      {summary.passedCount > 0 && (
+        <CountBadge
+          count={summary.passedCount}
+          label="passed"
+          tooltip={`${summary.passedCount} scenario${summary.passedCount !== 1 ? "s" : ""} passed all criteria`}
+          icon={Check}
+          color="green.fg"
+          bg="green.subtle"
+        />
+      )}
+
+      {summary.failedCount > 0 && (
+        <CountBadge
+          count={summary.failedCount}
+          label="failed"
+          tooltip={`${summary.failedCount} scenario${summary.failedCount !== 1 ? "s" : ""} failed one or more criteria`}
+          icon={X}
+          color="red.fg"
+          bg="red.subtle"
+        />
       )}
 
       {summary.stalledCount > 0 && (

@@ -9,11 +9,15 @@ import { HomeCard } from "./HomeCard";
 import numeral from "numeral";
 
 export function SdkRadarCard() {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { isSnoozed, snooze } = useSdkRadarUpdateSnooze(project?.id);
   const { openDrawer } = useDrawer();
   const { enabled: sdkRadarEnabled } = useFeatureFlag(
     "release_ui_sdk_radar_banner_card_enabled",
+    { organizationId: organization?.id },
   );
 
   const stats = api.sdkRadar.getVersionStats.useQuery(

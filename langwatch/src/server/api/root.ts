@@ -10,6 +10,7 @@ import { dashboardsRouter } from "./routers/dashboards";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
+import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { licenseRouter } from "./routers/license";
@@ -44,6 +45,7 @@ import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
+import { scimTokenRouter } from "./routers/scimToken";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
 
@@ -67,6 +69,7 @@ const coreRouters = {
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
+  export: exportRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,
@@ -93,6 +96,7 @@ const coreRouters = {
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  scimToken: scimTokenRouter,
 };
 
 const eeRouters = {

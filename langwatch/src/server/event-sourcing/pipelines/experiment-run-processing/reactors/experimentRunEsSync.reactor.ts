@@ -10,6 +10,19 @@ const logger = createLogger(
   "langwatch:experiment-run-processing:es-sync-reactor",
 );
 
+function parseTargets(raw: string | null | undefined): unknown[] {
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as unknown[];
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      "Failed to parse targets JSON — defaulting to empty array",
+    );
+    return [];
+  }
+}
+
 export interface ExperimentRunEsSyncReactorDeps {
   project: ProjectService;
   repository: BatchEvaluationRepository;
@@ -78,12 +91,9 @@ export function createExperimentRunEsSyncReactor(
         try {
           switch (event.type) {
             case EXPERIMENT_RUN_EVENT_TYPES.STARTED: {
-              let targets: Parameters<typeof repository.create>[0]["targets"] = [];
-              try {
-                targets = JSON.parse(foldState.Targets);
-              } catch {
-                // Targets may not be valid JSON
-              }
+              const targets = parseTargets(foldState.Targets) as Parameters<
+                typeof repository.create
+              >[0]["targets"];
 
               await repository.create({
                 projectId: tenantId,
@@ -97,6 +107,10 @@ export function createExperimentRunEsSyncReactor(
             }
 
             case EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT: {
+              const targets = parseTargets(foldState.Targets) as Parameters<
+                typeof repository.upsertResults
+              >[0]["targets"];
+
               await repository.upsertResults({
                 projectId: tenantId,
                 experimentId,
@@ -114,6 +128,7 @@ export function createExperimentRunEsSyncReactor(
                   },
                 ],
                 progress: foldState.Progress,
+                targets,
               });
               break;
             }

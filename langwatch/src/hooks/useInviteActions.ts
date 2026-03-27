@@ -5,6 +5,7 @@ import { toaster } from "../components/ui/toaster";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { useLicenseEnforcement } from "./useLicenseEnforcement";
 import { api } from "../utils/api";
+import { isHandledByGlobalHandler } from "../utils/trpcError";
 
 /**
  * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
@@ -116,6 +117,7 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Sorry, something went wrong",
             description: error.message ?? "Please try that again",
@@ -163,6 +165,7 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Sorry, something went wrong",
             description: error.message ?? "Please try that again",
@@ -333,6 +336,7 @@ export function useInviteActions({
           invalidateLimits();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Sorry, something went wrong",
             description: error.message ?? "Please try that again",

@@ -6,6 +6,11 @@ node_modules
 
 llm-model-costs.json
 quickwit-*
+
+# ClickHouse local data (created by local dev CH instance)
+store/
+data/
+metadata/
 __pycache__
 dist/
 
@@ -52,5 +57,12 @@ seed.spec.ts
 .playwright-mcp/
 .mcp.local.json
 
+**/**/.worktrees/**
 !.worktrees/.gitkeep
-.worktrees/**
+
+# Skills test artifacts
+skills/_tests/helpers/.mcp-config.json
+preprocessed_configs/
+status
+uuid
+.claude/worktrees/

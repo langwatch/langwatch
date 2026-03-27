@@ -1,0 +1,734 @@
+---
+title: Experiments via SDK
+sidebarTitle: Via SDK
+description: Run experiments programmatically from notebooks or scripts to batch test your LLM applications.
+---
+
+<Tip>
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+</Tip>
+
+LangWatch makes it easy to run experiments from code.
+Just add a few lines to start tracking your experiments.
+
+## Quickstart
+
+### 1. Install the SDK
+
+<Tabs>
+  <Tab title="Python">
+```bash
+pip install langwatch
+```
+  </Tab>
+  <Tab title="TypeScript">
+```bash
+npm install langwatch
+# or
+pnpm add langwatch
+```
+  </Tab>
+</Tabs>
+
+### 2. Set your API Key
+
+<Tabs>
+  <Tab title="Python (Notebook)">
+```python
+import langwatch
+
+langwatch.login()
+```
+
+Be sure to login or create an account on the link that will be displayed, then provide your API key when prompted.
+  </Tab>
+  <Tab title="Environment Variable">
+```bash
+export LANGWATCH_API_KEY=your_api_key
+```
+  </Tab>
+</Tabs>
+
+### 3. Start tracking
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+import pandas as pd
+
+# Load your dataset
+df = pd.read_csv("my_dataset.csv")
+
+# Initialize a new experiment
+evaluation = langwatch.experiment.init("my-experiment")
+
+# Wrap your loop with evaluation.loop(), and iterate as usual
+for idx, row in evaluation.loop(df.iterrows()):
+    # Run your model or pipeline
+    response = my_agent(row["question"])
+
+    # Log a metric for this sample
+    evaluation.log("sample_metric", index=idx, score=0.95)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from 'langwatch';
+
+// Initialize the SDK
+const langwatch = new LangWatch();
+
+// Your dataset
+const dataset = [
+  { question: "What is 2+2?", expected: "4" },
+  { question: "What is the capital of France?", expected: "Paris" },
+];
+
+// Initialize evaluation
+const evaluation = await langwatch.experiments.init("my-experiment");
+
+// Run evaluation with a callback
+await evaluation.run(dataset, async ({ item, index }) => {
+  // Run your model or pipeline
+  const response = await myAgent(item.question);
+
+  // Log a metric for this sample
+  evaluation.log("sample_metric", { index, score: 0.95 });
+});
+```
+  </Tab>
+</Tabs>
+
+That's it! Your evaluation metrics are now being tracked and visualized in LangWatch.
+
+<Frame>
+<img src="/images/offline-evaluation/evaluation-sample.png" alt="Evaluation Results Sample" />
+</Frame>
+
+## Core Concepts
+
+### Evaluation Initialization
+
+The evaluation is started by creating an evaluation session with a descriptive name:
+
+<Tabs>
+  <Tab title="Python">
+```python
+evaluation = langwatch.experiment.init("rag-pipeline-openai-vs-claude")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const evaluation = await langwatch.experiments.init("rag-pipeline-openai-vs-claude");
+```
+  </Tab>
+</Tabs>
+
+### Iterating over data
+
+<Tabs>
+  <Tab title="Python">
+Use `evaluation.loop()` around your iterator so the entries are tracked:
+
+```python
+for index, row in evaluation.loop(df.iterrows()):
+    # Your existing evaluation code
+```
+  </Tab>
+  <Tab title="TypeScript">
+Use `evaluation.run()` with a callback that receives each item:
+
+```typescript
+await evaluation.run(dataset, async ({ item, index, span }) => {
+  // Your existing evaluation code
+});
+```
+
+The callback receives `item` (the current dataset item), `index` (the current index), and `span` (an OpenTelemetry span for custom tracing).
+  </Tab>
+</Tabs>
+
+### Metrics logging
+
+Track any metric you want with `evaluation.log()`:
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Numeric scores
+evaluation.log("relevance", index=index, score=0.85)
+
+# Boolean pass/fail
+evaluation.log("contains_citation", index=index, passed=True)
+
+# Include additional data for debugging
+evaluation.log("coherence", index=index, score=0.9,
+               data={"output": result["text"], "tokens": result["token_count"]})
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// Numeric scores
+evaluation.log("relevance", { index, score: 0.85 });
+
+// Boolean pass/fail
+evaluation.log("contains_citation", { index, passed: true });
+
+// Include additional data for debugging
+evaluation.log("coherence", {
+  index,
+  score: 0.9,
+  data: { output: result.text, tokens: result.tokenCount }
+});
+```
+  </Tab>
+</Tabs>
+
+## Comparing Multiple Targets
+
+When comparing different models, prompts, or configurations, use targets to organize your results.
+Both SDKs provide a `target()` / `withTarget()` context that automatically captures latency and enables context inference.
+
+<Tabs>
+  <Tab title="Python">
+Use `evaluation.target()` for automatic latency capture and context inference:
+
+```python
+evaluation = langwatch.experiment.init("model-comparison")
+
+for index, row in evaluation.loop(df.iterrows()):
+    def compare_models(index, row):
+        # Evaluate GPT-5 with automatic latency tracking
+        with evaluation.target("gpt5-baseline", {"model": "openai/gpt-5"}):
+            response = call_openai("gpt-5", row["question"])
+            evaluation.log_response(response)  # Store the model output
+            # Target is auto-inferred inside target()!
+            evaluation.log("accuracy", index=index,
+                          score=calculate_accuracy(response, row["expected"]))
+
+        # Evaluate Claude with automatic latency tracking
+        with evaluation.target("claude-experiment", {"model": "anthropic/claude-4-opus"}):
+            response = call_anthropic("claude-4-opus", row["question"])
+            evaluation.log_response(response)
+            evaluation.log("accuracy", index=index,
+                          score=calculate_accuracy(response, row["expected"]))
+
+    evaluation.submit(compare_models, index, row)
+```
+
+<Info>
+  `evaluation.target()` automatically captures latency, creates isolated traces per target, and enables context inference so `log()` calls don't need explicit `target` parameters. Use `log_response()` to store the model's output.
+</Info>
+
+Alternatively, use the `target` parameter directly with `evaluation.log()`:
+
+```python
+evaluation.log(
+    "accuracy",
+    index=index,
+    score=0.95,
+    target="gpt5-baseline",
+    metadata={"model": "openai/gpt-5", "temperature": 0.7}
+)
+```
+  </Tab>
+  <Tab title="TypeScript">
+Use `withTarget()` for automatic latency capture and context inference:
+
+```typescript
+const evaluation = await langwatch.experiments.init("model-comparison");
+
+await evaluation.run(dataset, async ({ item, index }) => {
+  // Run targets in parallel with automatic tracing
+  const [gpt5Result, claudeResult] = await Promise.all([
+    evaluation.withTarget("gpt5-baseline", { model: "openai/gpt-5" }, async () => {
+      const response = await callOpenAI("gpt-5", item.question);
+      // Target and index are auto-inferred inside withTarget()!
+      evaluation.log("accuracy", { score: calculateAccuracy(response, item.expected) });
+      return response;
+    }),
+
+    evaluation.withTarget("claude-experiment", { model: "anthropic/claude-4-opus" }, async () => {
+      const response = await callAnthropic("claude-4-opus", item.question);
+      evaluation.log("accuracy", { score: calculateAccuracy(response, item.expected) });
+      return response;
+    }),
+  ]);
+
+  // Latency is automatically captured from each withTarget() span
+  console.log(`GPT-5: ${gpt5Result.duration}ms, Claude: ${claudeResult.duration}ms`);
+});
+```
+
+<Info>
+  `withTarget()` automatically captures latency, creates isolated traces per target, and enables context inference so `log()` calls don't need explicit `target` or `index` parameters.
+</Info>
+  </Tab>
+</Tabs>
+
+### Target Registration
+
+The first time you use a target name, it's automatically registered with the provided metadata:
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Using target() - metadata is set when entering the context
+with evaluation.target("gpt5", {"model": "gpt-5", "temp": 0.7}):
+    evaluation.log_response("AI response here")  # Store the output
+    evaluation.log("latency", index=0, score=150)  # target auto-inferred
+    evaluation.log("accuracy", index=0, score=0.95)  # target auto-inferred
+
+# Or using explicit target parameter (without target() context)
+evaluation.log("latency", index=0, target="gpt5", metadata={"model": "gpt-5", "temp": 0.7})
+
+# Subsequent calls can omit metadata - it's already registered
+evaluation.log("accuracy", index=0, target="gpt5", score=0.95)
+evaluation.log("latency", index=1, target="gpt5", score=150)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// Using withTarget() - metadata is set once when registering the target
+await evaluation.withTarget("gpt5", { model: "gpt-5", temp: 0.7 }, async () => {
+  evaluation.log("latency", { score: 150 });  // target auto-inferred
+  evaluation.log("accuracy", { score: 0.95 }); // target auto-inferred
+});
+
+// Or using explicit target parameter
+evaluation.log("latency", { index: 0, target: "gpt5", metadata: { model: "gpt-5", temp: 0.7 } });
+evaluation.log("accuracy", { index: 0, target: "gpt5", score: 0.95 }); // metadata already registered
+```
+  </Tab>
+</Tabs>
+
+<Warning>
+  If you provide different metadata for the same target name, an error will be raised.
+  Use a different target name if you want different configurations.
+</Warning>
+
+### Metadata for Comparison
+
+Target metadata is used for comparison charts in the LangWatch UI. You can group results by any metadata field:
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Compare different temperatures
+for temp in [0.0, 0.5, 0.7, 1.0]:
+    for index, row in evaluation.loop(df.iterrows()):
+        response = call_llm(row["question"], temperature=temp)
+        evaluation.log(
+            "quality",
+            index=index,
+            score=evaluate_quality(response),
+            target=f"temp-{temp}",
+            metadata={"model": "gpt-5", "temperature": temp}
+        )
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// Compare different temperatures
+for (const temp of [0.0, 0.5, 0.7, 1.0]) {
+  await evaluation.run(dataset, async ({ item, index }) => {
+    const response = await callLLM(item.question, { temperature: temp });
+    evaluation.log("quality", {
+      index,
+      score: evaluateQuality(response),
+      target: `temp-${temp}`,
+      metadata: { model: "gpt-5", temperature: temp }
+    });
+  });
+}
+```
+  </Tab>
+</Tabs>
+
+In the LangWatch UI, you can then visualize how quality varies across temperature values.
+
+## Parallel Execution
+
+LLM calls can be slow. Both SDKs support parallel execution to speed up your evaluations.
+
+<Tabs>
+  <Tab title="Python">
+Use the built-in parallelization by putting the content of the loop in a function and submitting it:
+
+```python {4,8}
+evaluation = langwatch.experiment.init("parallel-eval-example")
+
+for index, row in evaluation.loop(df.iterrows(), threads=4):
+    def task(index, row):
+        result = agent(row["question"])  # Runs in parallel
+        evaluation.log("response_quality", index=index, score=0.92)
+
+    evaluation.submit(task, index, row)
+```
+
+<Note>
+  By default, `threads=4`. Adjust based on your API rate limits and system resources.
+</Note>
+  </Tab>
+  <Tab title="TypeScript">
+Pass the `concurrency` option to control how many items run in parallel:
+
+```typescript
+await evaluation.run(dataset, async ({ item, index }) => {
+  const result = await agent(item.question);  // Runs in parallel
+  evaluation.log("response_quality", { index, score: 0.92 });
+}, { concurrency: 4 });
+```
+
+<Note>
+  By default, `concurrency=4`. Adjust based on your API rate limits and system resources.
+</Note>
+  </Tab>
+</Tabs>
+
+## Built-in Evaluators
+
+LangWatch provides a comprehensive suite of evaluation metrics out of the box.
+
+<Tabs>
+  <Tab title="Python">
+Use `evaluation.run()` to leverage pre-built evaluators:
+
+```python
+for index, row in evaluation.loop(df.iterrows()):
+    def task(index, row):
+        response, contexts = execute_rag_pipeline(row["question"])
+
+        # Use built-in RAGAS faithfulness evaluator
+        evaluation.evaluate(
+            "ragas/faithfulness",
+            index=index,
+            data={
+                "input": row["question"],
+                "output": response,
+                "contexts": contexts,
+            },
+            settings={
+                "model": "openai/gpt-5",
+                "max_tokens": 2048,
+            }
+        )
+
+        # Log custom metrics alongside
+        evaluation.log("confidence", index=index, score=response.confidence)
+
+    evaluation.submit(task, index, row)
+```
+  </Tab>
+  <Tab title="TypeScript">
+Use `evaluation.evaluate()` to leverage pre-built evaluators:
+
+```typescript
+await evaluation.run(dataset, async ({ item, index }) => {
+  const { response, contexts } = await executeRagPipeline(item.question);
+
+  // Use built-in RAGAS faithfulness evaluator
+  await evaluation.evaluate("ragas/faithfulness", {
+    index,
+    data: {
+      input: item.question,
+      output: response,
+      contexts,
+    },
+    settings: {
+      model: "openai/gpt-5",
+      max_tokens: 2048,
+    }
+  });
+
+  // Log custom metrics alongside
+  evaluation.log("confidence", { index, score: response.confidence });
+});
+```
+  </Tab>
+</Tabs>
+
+<Info>
+  Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics for RAG quality, hallucination detection, safety, and more.
+</Info>
+
+## Complete Example
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+# Load dataset from LangWatch
+df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
+
+# Initialize evaluation
+evaluation = langwatch.experiment.init("rag-pipeline-evaluation-v2")
+
+# Run evaluation with parallelization
+for index, row in evaluation.loop(df.iterrows(), threads=8):
+    def task(index, row):
+        # Compare two RAG configurations
+        with evaluation.target("rag-v1", {"model": "gpt-5", "retriever": "dense"}):
+            response, contexts = execute_rag_pipeline(row["question"], version="v1")
+            evaluation.log_response(response.text)  # Store the output
+
+            # Use LangWatch evaluators - target auto-inferred
+            evaluation.evaluate(
+                "ragas/faithfulness",
+                index=index,
+                data={"input": row["question"], "output": response, "contexts": contexts},
+                settings={"model": "openai/gpt-5", "max_tokens": 2048}
+            )
+
+            # Log custom metrics - latency auto-captured by target()
+            evaluation.log("response_quality", index=index, score=response.quality)
+
+        with evaluation.target("rag-v2", {"model": "gpt-5", "retriever": "hybrid"}):
+            response, contexts = execute_rag_pipeline(row["question"], version="v2")
+            evaluation.log_response(response.text)
+
+            evaluation.evaluate(
+                "ragas/faithfulness",
+                index=index,
+                data={"input": row["question"], "output": response, "contexts": contexts},
+                settings={"model": "openai/gpt-5", "max_tokens": 2048}
+            )
+
+            evaluation.log("response_quality", index=index, score=response.quality)
+
+    evaluation.submit(task, index, row)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from 'langwatch';
+
+const langwatch = new LangWatch();
+
+// Your dataset (or load from LangWatch)
+const dataset = await loadDataset();
+
+// Initialize evaluation
+const evaluation = await langwatch.experiments.init("rag-pipeline-evaluation-v2");
+
+// Run evaluation with parallelization
+await evaluation.run(dataset, async ({ item, index }) => {
+  // Compare multiple RAG configurations in parallel
+  await Promise.all([
+    evaluation.withTarget("rag-v1", { model: "gpt-5", retriever: "dense" }, async () => {
+      const { response, contexts } = await executeRagPipeline(item.question, "v1");
+
+      // Use LangWatch evaluators - target auto-inferred
+      await evaluation.evaluate("ragas/faithfulness", {
+        data: { input: item.question, output: response, contexts },
+        settings: { model: "openai/gpt-5", max_tokens: 2048 }
+      });
+
+      // Log custom metrics - latency auto-captured by withTarget()
+      evaluation.log("response_quality", { score: response.quality });
+    }),
+
+    evaluation.withTarget("rag-v2", { model: "gpt-5", retriever: "hybrid" }, async () => {
+      const { response, contexts } = await executeRagPipeline(item.question, "v2");
+
+      await evaluation.evaluate("ragas/faithfulness", {
+        data: { input: item.question, output: response, contexts },
+        settings: { model: "openai/gpt-5", max_tokens: 2048 }
+      });
+
+      evaluation.log("response_quality", { score: response.quality });
+    }),
+  ]);
+}, { concurrency: 8 });
+```
+  </Tab>
+</Tabs>
+
+## Tracing Your Pipeline
+
+To get complete visibility into your LLM pipeline, add tracing to your functions:
+
+<Tabs>
+  <Tab title="Python">
+```python
+@langwatch.trace()
+def agent(question):
+    # Your RAG pipeline, chain, or agent logic
+    context = retrieve_documents(question)
+    completion = llm.generate(question, context)
+    return {"text": completion.text, "context": context}
+
+for index, row in evaluation.loop(df.iterrows()):
+    result = agent(row["question"])
+    evaluation.log("accuracy", index=index, score=0.9)
+```
+
+<Info>
+  Learn more in our [Python Integration Guide](/integration/python/guide).
+</Info>
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { getLangWatchTracer } from 'langwatch';
+
+const tracer = getLangWatchTracer('my-app');
+
+const agent = async (question: string) => {
+  return tracer.withActiveSpan('agent', async (span) => {
+    // Your RAG pipeline, chain, or agent logic
+    const context = await retrieveDocuments(question);
+    const completion = await llm.generate(question, context);
+    return { text: completion.text, context };
+  });
+};
+
+await evaluation.run(dataset, async ({ item, index }) => {
+  const result = await agent(item.question);
+  evaluation.log("accuracy", { index, score: 0.9 });
+});
+```
+
+<Info>
+  Learn more in our [TypeScript Integration Guide](/integration/typescript/guide).
+</Info>
+  </Tab>
+</Tabs>
+
+With tracing enabled, you can click through from any evaluation result to see the complete execution trace, including all LLM calls, prompts, and intermediate steps.
+
+## Exporting Results to CSV
+
+After running your evaluations, you can export results to CSV for further analysis in spreadsheet tools like Excel or Google Sheets.
+
+### How to Export
+
+Click the **Export to CSV** button in the top-right corner of the evaluation results page to download a complete CSV file with all your data.
+
+### CSV Structure
+
+The exported CSV contains comprehensive data organized by dataset rows and targets. Here's the complete column structure:
+
+#### Row Index
+
+| Column | Description |
+|--------|-------------|
+| `index` | Row number (0-based) for cross-referencing with the UI |
+
+#### Dataset Columns
+
+All columns from your input dataset are included with their original names.
+
+#### Target Columns (per target)
+
+For each target in your evaluation, the following columns are exported:
+
+| Column Pattern | Description | Example |
+|----------------|-------------|---------|
+| `{target}_model` | Model used for this target | `gpt-4_model` → `openai/gpt-4` |
+| `{target}_prompt_id` | Prompt configuration ID (for prompt targets) | `gpt-4_prompt_id` → `prompt-abc123` |
+| `{target}_prompt_version` | Prompt version number | `gpt-4_prompt_version` → `2` |
+| `{target}_{metadata_key}` | Custom metadata values | `gpt-4_temperature` → `0.7` |
+| `{target}_output` | Model output (or individual output fields) | `gpt-4_output` → `"The answer is 42"` |
+| `{target}_cost` | Execution cost in USD | `gpt-4_cost` → `0.0012` |
+| `{target}_duration_ms` | Execution time in milliseconds | `gpt-4_duration_ms` → `1250` |
+| `{target}_error` | Error message if execution failed | `gpt-4_error` → `"Rate limit exceeded"` |
+| `{target}_trace_id` | Trace ID for viewing execution details | `gpt-4_trace_id` → `trace_abc123` |
+
+#### Evaluator Columns (per target, per evaluator)
+
+For each evaluator applied to a target:
+
+| Column Pattern | Description | Example |
+|----------------|-------------|---------|
+| `{target}_{evaluator}_score` | Numeric score (0-1) | `gpt-4_faithfulness_score` → `0.95` |
+| `{target}_{evaluator}_passed` | Boolean pass/fail | `gpt-4_faithfulness_passed` → `true` |
+| `{target}_{evaluator}_label` | Classification label | `gpt-4_sentiment_label` → `positive` |
+| `{target}_{evaluator}_details` | Additional details or explanation | `gpt-4_faithfulness_details` → `"All claims supported"` |
+| `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
+| `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
+
+### Example CSV Output
+
+For an evaluation comparing GPT-4 and Claude with a faithfulness evaluator:
+
+```csv
+index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gpt-4_faithfulness_score,gpt-4_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
+0,What is 2+2?,4,openai/gpt-4,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-3,2+2 equals 4,0.0008,980,0.92,true
+1,Capital of France?,Paris,openai/gpt-4,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-3,The capital of France is Paris,0.0010,890,0.97,true
+```
+
+### Using the Data
+
+The CSV export enables powerful analysis workflows:
+
+<AccordionGroup>
+<Accordion title="Filter and compare models">
+Use spreadsheet filters to compare specific models or configurations:
+- Filter by `{target}_model` to analyze specific model performance
+- Sort by `{target}_{evaluator}_score` to find best/worst performing samples
+- Filter by `{target}_error` to identify failed executions
+</Accordion>
+
+<Accordion title="Analyze costs and latency">
+Calculate aggregate metrics across your evaluation:
+- Sum `{target}_cost` columns for total evaluation cost per model
+- Average `{target}_duration_ms` to compare response times
+- Identify outliers with high latency or cost
+</Accordion>
+
+<Accordion title="Group by metadata">
+Analyze performance across different configurations:
+- Pivot tables by temperature, max_tokens, or custom metadata
+- Compare prompt versions side-by-side
+- Track improvements across iterations
+</Accordion>
+
+<Accordion title="Debug failures">
+Investigate problematic samples:
+- Filter rows where `{target}_error` is not empty
+- Cross-reference `index` with the UI for detailed inspection
+- Click through to traces using `{target}_trace_id`
+</Accordion>
+</AccordionGroup>
+
+<Info>
+  All column headers are normalized to lowercase with spaces replaced by underscores for consistency and compatibility with data analysis tools.
+</Info>
+
+## Running in CI/CD
+
+You can run SDK experiments in your CI/CD pipeline. The `print_summary()` method outputs a structured summary and exits with code 1 if any evaluations fail:
+
+```python
+import langwatch
+
+experiment = langwatch.experiment.init("ci-quality-check")
+
+for idx, row in experiment.loop(dataset.iterrows()):
+    response = my_llm(row["input"])
+    experiment.evaluate("ragas/faithfulness", index=idx, data={...})
+
+# This will exit with code 1 if any evaluations failed
+experiment.print_summary()
+```
+
+See [CI/CD Integration](/evaluations/experiments/ci-cd) for complete examples with GitHub Actions, GitLab CI, and more.
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="CI/CD Integration" icon="code-branch" href="/evaluations/experiments/ci-cd">
+    Run experiments in your CI/CD pipeline
+  </Card>
+  <Card title="View Evaluators" icon="list" href="/evaluations/evaluators/list">
+    Explore all available evaluation metrics
+  </Card>
+  <Card title="Datasets" icon="table" href="/datasets/overview">
+    Learn about dataset management
+  </Card>
+  <Card title="View Examples" icon="github" href="/cookbooks/build-a-simple-rag-app">
+    Check out example notebooks
+  </Card>
+</CardGroup>

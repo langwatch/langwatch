@@ -31,12 +31,14 @@ vi.mock("~/server/elasticsearch", () => ({
   SCENARIO_EVENTS_INDEX: { alias: "scenario-events-alias" },
 }));
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: vi.fn(),
+const mockGetClickHouseClientForOrganization = vi.fn();
+
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForOrganization: (...args: unknown[]) =>
+    mockGetClickHouseClientForOrganization(...args),
 }));
 
 import { prisma } from "~/server/db";
-import { getClickHouseClient } from "~/server/clickhouse/client";
 
 describe("collectUsageStats", () => {
   beforeEach(() => {
@@ -54,7 +56,7 @@ describe("collectUsageStats", () => {
   describe("when organization has zero projects", () => {
     it("returns zero for traces and scenarios", async () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([]);
-      vi.mocked(getClickHouseClient).mockReturnValue(null);
+      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
 
       const result = await collectUsageStats("inst__org-1");
 
@@ -72,7 +74,7 @@ describe("collectUsageStats", () => {
           featureClickHouseDataSourceSimulations: false,
         },
       ] as any);
-      vi.mocked(getClickHouseClient).mockReturnValue(null);
+      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
 
       mockEsClient.count
         .mockResolvedValueOnce({ count: 100 }) // traces
@@ -95,7 +97,7 @@ describe("collectUsageStats", () => {
           featureClickHouseDataSourceSimulations: true,
         },
       ] as any);
-      vi.mocked(getClickHouseClient).mockReturnValue({
+      mockGetClickHouseClientForOrganization.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -130,7 +132,7 @@ describe("collectUsageStats", () => {
           featureClickHouseDataSourceSimulations: true,
         },
       ] as any);
-      vi.mocked(getClickHouseClient).mockReturnValue({
+      mockGetClickHouseClientForOrganization.mockResolvedValue({
         query: mockClickHouseQuery,
       } as any);
 
@@ -163,7 +165,7 @@ describe("collectUsageStats", () => {
           featureClickHouseDataSourceSimulations: true,
         },
       ] as any);
-      vi.mocked(getClickHouseClient).mockReturnValue(null);
+      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
 
       mockEsClient.count
         .mockResolvedValueOnce({ count: 100 })

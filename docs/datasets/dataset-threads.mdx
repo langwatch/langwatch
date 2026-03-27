@@ -1,0 +1,32 @@
+---
+title: Add trace threads to datasets
+description: Add full conversation threads to datasets in LangWatch to generate richer evaluation inputs for AI agent testing.
+---
+
+To add trace threads to a dataset, follow these steps:
+
+<Steps>
+<Step title="Create a new dataset">
+Create a new dataset in your LangWatch workspace.
+</Step>
+
+<Step title="Add a traces column">
+Add a traces column with the JSON data type to store the trace data associated with each thread ID.
+
+<Frame>
+<img className="block" src="/images/dataset-thread-type.png" alt="LangWatch Dataset Thread Add" />
+</Frame>
+</Step>
+
+<Step title="Add threads to the dataset">
+By selecting the thread mapping option, you can choose which information from the trace to include in the dataset. By default, the JSON object contains INPUT and OUTPUT fields.
+
+<Frame>
+<img className="block" src="/images/dataset-thread-add.png" alt="LangWatch Dataset Thread Add" />
+</Frame>
+</Step>
+
+<Step title="That's it!">
+You can select multiple traces to add to the dataset. When using the thread mapping option, all traces will be grouped by the thread ID.
+</Step>
+</Steps>

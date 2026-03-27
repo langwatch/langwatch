@@ -429,6 +429,8 @@ describe("useEvaluatorPickerFlow()", () => {
           data: expect.objectContaining({
             name: "New Evaluator",
             evaluator: "evaluators/new-eval-id",
+            inputs: [],
+            outputs: [{ identifier: "passed", type: "bool" }],
           }),
         }),
       );

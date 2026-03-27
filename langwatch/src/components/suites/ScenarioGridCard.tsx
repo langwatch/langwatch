@@ -7,10 +7,12 @@
  * doesn't require the CopilotKit runtime.
  */
 
-import { Box } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Square } from "lucide-react";
 import { SimulationCard } from "~/components/simulations/SimulationCard";
 import { MessagePreview } from "./MessagePreview";
 import { buildDisplayTitle } from "./run-history-transforms";
+import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioGridCardProps = {
@@ -18,6 +20,8 @@ type ScenarioGridCardProps = {
   targetName: string | null;
   onClick: () => void;
   iteration?: number;
+  onCancel?: () => void;
+  isCancelling?: boolean;
 };
 
 export function ScenarioGridCard({
@@ -25,24 +29,66 @@ export function ScenarioGridCard({
   targetName,
   onClick,
   iteration,
+  onCancel,
+  isCancelling = false,
 }: ScenarioGridCardProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
   const title = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   return (
-    <Box
-      as="button"
-      onClick={onClick}
-      cursor="pointer"
-      height="200px"
-      textAlign="left"
-      aria-label={`View details for ${title}`}
-      transition="transform 0.15s"
-      _hover={{ transform: "translateY(-2px)" }}
-    >
-      <SimulationCard title={title} status={scenarioRun.status}>
-        <MessagePreview messages={scenarioRun.messages} />
-      </SimulationCard>
+    <Box position="relative">
+      <Box
+        as="button"
+        onClick={onClick}
+        cursor="pointer"
+        height="200px"
+        textAlign="left"
+        width="full"
+        aria-label={`View details for ${title}`}
+      >
+        <SimulationCard title={title} status={scenarioRun.status}>
+          <MessagePreview messages={scenarioRun.messages} />
+        </SimulationCard>
+      </Box>
+      {onCancel && isCancellableStatus(scenarioRun.status) && (
+        <HStack
+          as="button"
+          tabIndex={isCancelling ? -1 : 0}
+          gap={1}
+          paddingX={2}
+          paddingY={0.5}
+          borderRadius="md"
+          border="1px solid"
+          borderColor="red.200"
+          fontSize="xs"
+          color="red.600"
+          bg="white"
+          cursor={isCancelling ? "default" : "pointer"}
+          opacity={isCancelling ? 0.6 : 1}
+          _hover={isCancelling ? undefined : { bg: "red.50", borderColor: "red.300" }}
+          position="absolute"
+          top={2}
+          right={2}
+          zIndex={1}
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (!isCancelling) onCancel();
+          }}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
+              e.stopPropagation();
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+          aria-label="Stop run"
+          aria-disabled={isCancelling}
+          data-testid="cancel-run-button"
+        >
+          {isCancelling ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+          <Text fontSize="xs">Stop</Text>
+        </HStack>
+      )}
     </Box>
   );
 }

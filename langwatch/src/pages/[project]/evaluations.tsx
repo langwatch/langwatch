@@ -45,6 +45,7 @@ import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
 function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -94,7 +95,8 @@ function EvaluationsV2() {
           },
         });
       },
-      onError: () => {
+      onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Error deleting experiment",
           description:
@@ -513,21 +515,25 @@ function EvaluationsV2() {
                                               Replicate to another project
                                             </Menu.Item>
                                           )}
-                                          <Menu.Item
-                                            value="delete"
-                                            color="red.500"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteExperiment(
-                                                experiment.id,
-                                                experiment.name ??
-                                                  experiment.slug,
-                                              );
-                                            }}
-                                          >
-                                            <LuTrash size={16} />
-                                            Delete
-                                          </Menu.Item>
+                                          {hasPermission(
+                                            "evaluations:manage",
+                                          ) && (
+                                            <Menu.Item
+                                              value="delete"
+                                              color="red.500"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteExperiment(
+                                                  experiment.id,
+                                                  experiment.name ??
+                                                    experiment.slug,
+                                                );
+                                              }}
+                                            >
+                                              <LuTrash size={16} />
+                                              Delete
+                                            </Menu.Item>
+                                          )}
                                         </Menu.Content>
                                       </Menu.Root>
                                     </Box>

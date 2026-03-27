@@ -30,6 +30,8 @@ type ScenarioRunContentProps = {
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   iterationMap: Map<string, number>;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 /**
@@ -41,11 +43,15 @@ const StableGridCard = memo(function StableGridCard({
   targetName,
   onScenarioRunClick,
   iteration,
+  onCancel,
+  isCancelling,
 }: {
   scenarioRun: ScenarioRunData;
   targetName: string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   iteration?: number;
+  onCancel?: () => void;
+  isCancelling?: boolean;
 }) {
   const handleClick = useCallback(
     () => onScenarioRunClick(scenarioRun),
@@ -57,6 +63,8 @@ const StableGridCard = memo(function StableGridCard({
       targetName={targetName}
       onClick={handleClick}
       iteration={iteration}
+      onCancel={onCancel}
+      isCancelling={isCancelling}
     />
   );
 });
@@ -76,6 +84,8 @@ function PlainContent({
   resolveTargetName,
   onScenarioRunClick,
   iterationMap,
+  onCancelRun,
+  cancellingJobId,
 }: ScenarioRunContentProps) {
   if (viewMode === "grid") {
     return (
@@ -94,6 +104,8 @@ function PlainContent({
             targetName={resolveTargetName(scenarioRun)}
             onScenarioRunClick={onScenarioRunClick}
             iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+            onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+            isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
           />
         ))}
       </Grid>
@@ -109,6 +121,8 @@ function PlainContent({
           targetName={resolveTargetName(scenarioRun)}
           onClick={() => onScenarioRunClick(scenarioRun)}
           iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+          onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+          isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
         />
       ))}
     </VStack>

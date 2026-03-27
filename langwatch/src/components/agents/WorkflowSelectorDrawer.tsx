@@ -23,7 +23,7 @@ import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { trackEvent } from "~/utils/tracking";
 import type { Workflow } from "~/optimization_studio/types/dsl";
@@ -101,7 +101,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if error was already handled by global license modal
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating agent",
         description: error.message,
@@ -162,7 +162,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         );
       } catch (error) {
         // Skip toast if error was already handled by global license modal
-        if (isHandledByGlobalLicenseHandler(error)) return;
+        if (isHandledByGlobalHandler(error)) return;
         console.error("Error creating workflow agent:", error);
         toaster.create({
           title: "Error",

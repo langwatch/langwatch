@@ -18,6 +18,7 @@ export interface ClickHouseSimulationRunRow {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   "Messages.Id": string[];
   "Messages.Role": string[];
   "Messages.Content": string[];
@@ -30,6 +31,9 @@ export interface ClickHouseSimulationRunRow {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: string | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
   CreatedAt: string;
   UpdatedAt: string;
   FinishedAt: string | null;
@@ -51,6 +55,10 @@ export function mapStatus(status: string): ScenarioRunStatus {
       return ScenarioRunStatus.IN_PROGRESS;
     case "PENDING":
       return ScenarioRunStatus.PENDING;
+    case "QUEUED":
+      return ScenarioRunStatus.QUEUED;
+    case "STALLED":
+      return ScenarioRunStatus.STALLED;
     default:
       return ScenarioRunStatus.IN_PROGRESS;
   }
@@ -123,17 +131,32 @@ export function mapClickHouseRowToScenarioRunData(
         }
       : null;
 
+  const metadata = row.Metadata
+    ? (() => {
+        try {
+          const parsed: unknown = JSON.parse(row.Metadata);
+          return parsed != null && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+        } catch { return null; }
+      })()
+    : null;
+
   return {
     scenarioId: row.ScenarioId,
     batchRunId: row.BatchRunId,
     scenarioRunId: row.ScenarioRunId,
     name: row.Name,
     description: row.Description,
+    metadata,
     status: resolvedStatus,
     results,
     messages,
     timestamp: updatedAt,
     durationInMs:
       durationMs ?? (finishedAt != null ? finishedAt - createdAt : updatedAt - createdAt),
+    totalCost: row.TotalCost ?? undefined,
+    roleCosts: row.RoleCosts && Object.keys(row.RoleCosts).length > 0 ? row.RoleCosts : undefined,
+    roleLatencies: row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0 ? row.RoleLatencies : undefined,
   };
 }

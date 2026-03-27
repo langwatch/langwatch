@@ -1,0 +1,38 @@
+name: docs-ci
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs-ci.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check_links:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for broken links
+        run: |
+          output=$(npx mintlify broken-links)
+          echo "$output"
+          if echo "$output" | grep -qi "found.*broken links in"; then
+            echo "Broken links detected!"
+            exit 1
+          else
+            echo "No broken links found"
+          fi

@@ -22,6 +22,7 @@ import {
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
 import { createLogger } from "~/utils/logger/server";
 import { trackServerEvent } from "~/server/posthog";
+import { fireExperimentRanNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:execute");
@@ -151,6 +152,13 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
               event: "evaluation_ran",
               projectId,
             });
+            if (request.experimentId && isFullRun) {
+              fireExperimentRanNurturing({
+                userId: session.user.id,
+                experimentId: request.experimentId,
+                projectId,
+              });
+            }
           }
           break;
         }

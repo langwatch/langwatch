@@ -119,7 +119,8 @@ services:
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
         pnpm install &&
-        pnpm prisma generate
+        pnpm prisma generate &&
+        pnpm run types:zod:generate
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -160,6 +161,8 @@ services:
       RELEASE_UI_SUITES_ENABLED: "1"
     env_file:
       - langwatch/.env
+      - path: langwatch/.env.dev-up
+        required: false
     depends_on:
       init:
         condition: service_completed_successfully

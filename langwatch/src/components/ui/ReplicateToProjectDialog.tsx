@@ -8,7 +8,7 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type { CopyTargetProject } from "~/hooks/useProjectsForCopy";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { Dialog } from "./dialog";
 import { Select } from "./select";
 import { toaster } from "./toaster";
@@ -81,7 +81,7 @@ export function ReplicateToProjectDialog({
       onClose();
     } catch (error) {
       // Skip toast if the global license handler already showed the upgrade modal
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
 
       logError?.(
         { error, ...(sourceId && { sourceId }), projectId },
@@ -125,7 +125,7 @@ export function ReplicateToProjectDialog({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select project" />
                 </Select.Trigger>
-                <Select.Content zIndex="popover" paddingY={2}>
+                <Select.Content paddingY={2}>
                   {projectCollection.items.map((proj) => {
                     const perm = proj.hasCreatePermission;
                     return (

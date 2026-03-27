@@ -1,9 +1,12 @@
+# Complementary stub for sdk-go-ci.yml
+# Job names and paths-ignore MUST mirror the real workflow's jobs and paths.
 name: sdk-go-ci
 
 on:
   pull_request:
     paths-ignore:
       - "sdk-go/**"
+      - ".github/.release-please-manifest.json"
 
 jobs:
   test:

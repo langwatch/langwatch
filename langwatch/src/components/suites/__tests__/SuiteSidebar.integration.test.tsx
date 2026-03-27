@@ -63,7 +63,7 @@ describe("<SuiteSidebar/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("No suites yet")).toBeInTheDocument();
+      expect(screen.getByText("No run plans yet")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
@@ -211,7 +211,7 @@ describe("<SuiteSidebar/>", () => {
         const searchInput = screen.getByPlaceholderText("Search...");
         await user.type(searchInput, "nonexistent");
 
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
     });
   });
@@ -226,14 +226,14 @@ describe("<SuiteSidebar/>", () => {
       }),
     ];
 
-    it("displays suite labels as tag pills", () => {
+    it("does not display suite labels as tag pills", () => {
       render(
         <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("nightly")).toBeInTheDocument();
-      expect(screen.getByText("regression")).toBeInTheDocument();
+      expect(screen.queryByText("nightly")).not.toBeInTheDocument();
+      expect(screen.queryByText("regression")).not.toBeInTheDocument();
     });
   });
 
@@ -250,6 +250,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_1",
           {
             passedCount: 8,
+            failedCount: 0,
             totalCount: 8,
             lastRunTimestamp: Date.now() - 2 * 60 * 60 * 1000,
           },
@@ -269,7 +270,7 @@ describe("<SuiteSidebar/>", () => {
         expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
-      it("displays a checkmark status icon", () => {
+      it("displays pass rate with circle", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -279,7 +280,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByTestId("status-icon-pass")).toBeInTheDocument();
+        expect(screen.getByText("100%")).toBeInTheDocument();
       });
 
       it("displays compact recency text", () => {
@@ -302,6 +303,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_2",
           {
             passedCount: 9,
+            failedCount: 3,
             totalCount: 12,
             lastRunTimestamp: Date.now() - 3 * 60 * 60 * 1000,
           },
@@ -321,7 +323,7 @@ describe("<SuiteSidebar/>", () => {
         expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
-      it("displays an error status icon", () => {
+      it("displays pass rate reflecting failures", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -331,7 +333,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByTestId("status-icon-fail")).toBeInTheDocument();
+        expect(screen.getByText("75%")).toBeInTheDocument();
       });
     });
 
@@ -369,6 +371,7 @@ describe("<SuiteSidebar/>", () => {
             "suite_1",
             {
               passedCount: 7,
+              failedCount: 1,
               totalCount: 8,
               lastRunTimestamp: Date.now() - 60 * 60 * 1000,
             },
@@ -391,6 +394,7 @@ describe("<SuiteSidebar/>", () => {
             "suite_1",
             {
               passedCount: 8,
+              failedCount: 0,
               totalCount: 8,
               lastRunTimestamp: Date.now(),
             },
@@ -434,6 +438,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_1",
           {
             passedCount: 8,
+            failedCount: 0,
             totalCount: 8,
             lastRunTimestamp: Date.now() - 60 * 60 * 1000,
           },
@@ -719,9 +724,9 @@ describe("<SuiteSidebar/>", () => {
 
   describe("given external sets with different timestamps", () => {
     const externalSets = [
-      { scenarioSetId: "oldest-set", passedCount: 3, totalCount: 5, lastRunTimestamp: 1000 },
-      { scenarioSetId: "newest-set", passedCount: 5, totalCount: 5, lastRunTimestamp: 3000 },
-      { scenarioSetId: "middle-set", passedCount: 4, totalCount: 5, lastRunTimestamp: 2000 },
+      { scenarioSetId: "oldest-set", passedCount: 3, failedCount: 2, totalCount: 5, lastRunTimestamp: 1000 },
+      { scenarioSetId: "newest-set", passedCount: 5, failedCount: 0, totalCount: 5, lastRunTimestamp: 3000 },
+      { scenarioSetId: "middle-set", passedCount: 4, failedCount: 1, totalCount: 5, lastRunTimestamp: 2000 },
     ];
 
     describe("when rendered in the expanded sidebar", () => {

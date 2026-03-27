@@ -21,6 +21,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 /**
  * Agents management page
@@ -35,7 +36,6 @@ function Page() {
   const utils = api.useContext();
   const router = useRouter();
 
-  const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
 
   // State for tracking which agent is being deleted
   const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
@@ -63,6 +63,7 @@ function Page() {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating agent",
         description: error.message ?? "Please try again later.",
@@ -253,10 +254,9 @@ function Page() {
                 onSyncFromSource={() => handleSyncFromSource(agent.id)}
                 onViewHistory={() =>
                   openDrawer("agentHistory", {
-                    urlParams: { agentId: agent.id },
+                    urlParams: { agentId: agent.id, agentName: agent.name },
                   })
                 }
-                hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}
           </Grid>

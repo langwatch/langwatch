@@ -1,0 +1,230 @@
+---
+title: Capturing RAG
+sidebarTitle: Capturing RAG
+description: Learn how to capture Retrieval-Augmented Generation (RAG) data with LangWatch to support evaluations and agent testing.
+icon: python
+keywords: RAG, Retrieval Augmented Generation, LangChain, LangWatch, LangChain RAG, RAG Span, RAG Chunk, RAG Tool
+---
+
+Retrieval Augmented Generation (RAG) is a common pattern in LLM applications where you first retrieve relevant context from a knowledge base and then use that context to generate a response. LangWatch provides specific ways to capture RAG data, enabling better observability and evaluation of your RAG pipelines.
+
+By capturing the `contexts` (retrieved documents) used by the LLM, you unlock several benefits in LangWatch:
+- Specialized RAG evaluators (e.g., Faithfulness, Context Relevancy).
+- Analytics on document usage (e.g., which documents are retrieved most often, which ones lead to better responses).
+- Deeper insights into the retrieval step of your pipeline.
+
+There are two main ways to capture RAG spans: manually creating a RAG span or using framework-specific integrations like the one for LangChain.
+
+## Manual RAG Span Creation
+
+You can manually create a RAG span by decorating a function with `@langwatch.span(type="rag")`. Inside this function, you should perform the retrieval and then update the span with the retrieved contexts.
+
+The `contexts` should be a list of strings or `RAGChunk` objects. The `RAGChunk` object allows you to provide more metadata about each retrieved chunk, such as `document_id` and `source`.
+
+Here's an example:
+
+```python
+import langwatch
+import time # For simulating work
+
+# Assume langwatch.setup() has been called elsewhere
+
+@langwatch.span(type="llm")
+def generate_answer_from_context(contexts: list[str], user_query: str):
+    # Simulate LLM call using the contexts
+    time.sleep(0.5)
+    response = f"Based on the context, the answer to '{user_query}' is..."
+    # You can update the LLM span with model details, token counts, etc.
+    langwatch.get_current_span().update(
+        model="gpt-5",
+        prompt=f"Contexts: {contexts}\nQuery: {user_query}",
+        completion=response
+    )
+    return response
+
+@langwatch.span(type="rag", name="My Custom RAG Process")
+def perform_rag(user_query: str):
+    # 1. Retrieve contexts
+    # Simulate retrieval from a vector store or other source
+    time.sleep(0.3)
+    retrieved_docs = [
+        "LangWatch helps monitor LLM applications.",
+        "RAG combines retrieval with generation for better answers.",
+        "Python is a popular language for AI development."
+    ]
+
+    # Update the current RAG span with the retrieved contexts
+    # You can pass a list of strings directly
+    langwatch.get_current_span().update(contexts=retrieved_docs)
+
+    # Alternatively, for richer context information:
+    # from langwatch.types import RAGChunk
+    # rag_chunks = [
+    #     RAGChunk(content="LangWatch helps monitor LLM applications.", document_id="doc1", source="internal_wiki/langwatch"),
+    #     RAGChunk(content="RAG combines retrieval with generation for better answers.", document_id="doc2", source="blog/rag_explained")
+    # ]
+    # langwatch.get_current_span().update(contexts=rag_chunks)
+
+    # 2. Generate answer using the contexts
+    final_answer = generate_answer_from_context(contexts=retrieved_docs, user_query=user_query)
+
+    # The RAG span automatically captures its input (user_query) and output (final_answer)
+    # if capture_input and capture_output are not set to False.
+    return final_answer
+
+@langwatch.trace(name="User Question Handler")
+def handle_user_question(question: str):
+    langwatch.get_current_trace().update(
+        input=question,
+        metadata={"user_id": "example_user_123"}
+    )
+
+    answer = perform_rag(user_query=question)
+
+    langwatch.get_current_trace().update(output=answer)
+    return answer
+
+if __name__ == "__main__":
+    user_question = "What is LangWatch used for?"
+    response = handle_user_question(user_question)
+    print(f"Question: {user_question}")
+    print(f"Answer: {response}")
+
+```
+
+In this example:
+1.  `perform_rag` is decorated with `@langwatch.span(type="rag")`.
+2.  Inside `perform_rag`, we simulate a retrieval step.
+3.  `langwatch.get_current_span().update(contexts=retrieved_docs)` is called to explicitly log the retrieved documents.
+4.  The generation step (`generate_answer_from_context`) is called, which itself can be another span (e.g., an LLM span).
+
+## LangChain RAG Integration
+
+If you are using LangChain, LangWatch provides utilities to simplify capturing RAG data from retrievers and tools.
+
+### Capturing RAG from a Retriever
+
+You can wrap your LangChain retriever with `langwatch.langchain.capture_rag_from_retriever`. This function takes your retriever and a lambda function to transform the retrieved `Document` objects into `RAGChunk` objects.
+
+```python
+import langwatch
+from langwatch.types import RAGChunk
+
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.vectorstores.faiss import FAISS
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.tools.retriever import create_retriever_tool
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema.runnable.config import RunnableConfig
+
+# 1. Setup LangWatch (if not done globally)
+# langwatch.setup()
+
+# 2. Prepare your retriever
+loader = WebBaseLoader("https://docs.langwatch.ai/introduction") # Example source
+docs = loader.load()
+documents = RecursiveCharacterTextSplitter(
+    chunk_size=1000, chunk_overlap=200
+).split_documents(docs)
+vector = FAISS.from_documents(documents, OpenAIEmbeddings())
+retriever = vector.as_retriever()
+
+# 3. Wrap the retriever for LangWatch RAG capture
+# This lambda tells LangWatch how to extract data for RAGChunk from LangChain's Document
+langwatch_retriever_tool = create_retriever_tool(
+    langwatch.langchain.capture_rag_from_retriever(
+        retriever,
+        lambda document: RAGChunk(
+            document_id=document.metadata.get("source", "unknown_source"), # Use a fallback for source
+            content=document.page_content,
+            # You can add other fields like 'score' if available in document.metadata
+        ),
+    ),
+    "langwatch_docs_search", # Tool name
+    "Search for information about LangWatch.", # Tool description
+)
+
+# 4. Use the wrapped retriever in your agent/chain
+tools = [langwatch_retriever_tool]
+model = ChatOpenAI(model="gpt-5", streaming=True)
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "You are a helpful assistant. Answer questions based on the retrieved context.\n{agent_scratchpad}"),
+        ("human", "{question}"),
+    ]
+)
+agent = create_tool_calling_agent(model, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True) # type: ignore
+
+@langwatch.trace(name="LangChain RAG Agent Execution")
+def run_langchain_rag(user_input: str):
+    current_trace = langwatch.get_current_trace()
+    current_trace.update(metadata={"user_id": "lc_rag_user"})
+
+    # Ensure the LangChain callback is used to capture all LangChain steps
+    response = agent_executor.invoke(
+        {"question": user_input},
+        config=RunnableConfig(
+            callbacks=[current_trace.get_langchain_callback()]
+        ),
+    )
+
+    output = response.get("output", "No output found.")=
+    return output
+
+if __name__ == "__main__":
+    question = "What is LangWatch?"
+    answer = run_langchain_rag(question)
+    print(f"Question: {question}")
+    print(f"Answer: {answer}")
+```
+
+#### Key elements
+- `langwatch.langchain.capture_rag_from_retriever(retriever, lambda document: ...)`: This wraps your existing retriever.
+- The lambda function `lambda document: RAGChunk(...)` defines how to map fields from LangChain's `Document` to LangWatch's `RAGChunk`. This is crucial for providing detailed context information.
+- The wrapped retriever is then used to create a tool, which is subsequently used in an agent or chain.
+- Remember to include `langwatch.get_current_trace().get_langchain_callback()` in your `RunnableConfig` when invoking the chain/agent to capture all LangChain operations.
+
+### Capturing RAG from a Tool
+
+Alternatively, if your RAG mechanism is encapsulated within a generic LangChain `BaseTool`, you can use `langwatch.langchain.capture_rag_from_tool`.
+
+```python
+import langwatch
+from langwatch.types import RAGChunk
+
+@langwatch.trace()
+def main():
+    my_custom_tool = ...
+    wrapped_tool = langwatch.langchain.capture_rag_from_tool(
+        my_custom_tool, lambda response: [
+          RAGChunk(
+            document_id=response["id"], # optional
+            chunk_id=response["chunk_id"], # optional
+            content=response["content"]
+          )
+        ]
+    )
+
+    tools = [wrapped_tool] # use the new wrapped tool in your agent instead of the original one
+    model = ChatOpenAI(streaming=True)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis and use tools only once.\n\n{agent_scratchpad}",
+            ),
+            ("human", "{question}"),
+        ]
+    )
+    agent = create_tool_calling_agent(model, tools, prompt)
+    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    return executor.invoke(user_input, config=RunnableConfig(
+        callbacks=[langWatchCallback]
+    ))
+```
+The `capture_rag_from_tool` approach is generally less direct for RAG from retrievers because you have to parse the tool's output (which is usually a string) to extract structured context information. `capture_rag_from_retriever` is preferred when dealing directly with LangChain retrievers.
+
+By effectively capturing RAG spans, you gain much richer data in LangWatch, enabling more powerful analysis and evaluation of your RAG systems. Refer to the SDK examples for more detailed implementations.

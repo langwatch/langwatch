@@ -6,6 +6,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import { env } from "~/env.mjs";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -93,9 +94,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Triggers
     "triggers:view",
     "triggers:manage",
-    // Workflows
-    "workflows:view",
-    "workflows:manage",
     // Prompts
     "prompts:view",
     "prompts:manage",
@@ -136,9 +134,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Triggers
     "triggers:view",
     "triggers:manage",
-    // Workflows
-    "workflows:view",
-    "workflows:manage",
     // Prompts
     "prompts:view",
     "prompts:manage",
@@ -217,6 +212,31 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
   [OrganizationUserRole.MEMBER]: ["organization:view"],
   [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for Lite Member users
 };
+
+/**
+ * Default permission set for EXTERNAL (lite member) users.
+ * Currently identical to VIEWER — lite members can view all resources but
+ * cannot create, edit, or manage them. Maintained as a separate constant so
+ * it can diverge from VIEWER independently if needed.
+ *
+ * Custom roles, when assigned to EXTERNAL users, override these defaults
+ * (see resolveProjectPermission).
+ */
+export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
+  "project:view",
+  "analytics:view",
+  "traces:view",
+  "annotations:view",
+  "annotations:create",
+  "annotations:update",
+  "evaluations:view",
+  "datasets:view",
+  "workflows:view",
+  "prompts:view",
+  "scenarios:view",
+  "secrets:view",
+  "team:view",
+];
 
 // ============================================================================
 // PERMISSION CHECKING
@@ -326,6 +346,19 @@ export function canDelete(role: TeamUserRole, resource: Resource): boolean {
 }
 
 // ============================================================================
+// PERMISSION RESULT TYPE
+// ============================================================================
+
+/**
+ * Result of resolving a permission check, including the user's organization role.
+ * Used by resolve* functions to provide richer context than a simple boolean.
+ */
+export type PermissionResult = {
+  permitted: boolean;
+  organizationRole: OrganizationUserRole | null;
+};
+
+// ============================================================================
 // MIDDLEWARE & CONTEXT HELPERS
 // ============================================================================
 
@@ -335,6 +368,7 @@ type PermissionMiddlewareParams<InputType> = {
     session: Session;
     permissionChecked: boolean;
     publiclyShared: boolean;
+    organizationRole?: OrganizationUserRole | null;
   };
   input: InputType;
   next: () => any;
@@ -354,13 +388,27 @@ export const checkProjectPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ projectId: string }>) => {
-    if (!(await hasProjectPermission(ctx, input.projectId, permission))) {
+    const { permitted, organizationRole } = await resolveProjectPermission(
+      ctx,
+      input.projectId,
+      permission,
+    );
+
+    if (!permitted) {
+      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "This feature is not available for your account",
+          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+        });
+      }
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
       });
     }
 
+    ctx.organizationRole = organizationRole;
     ctx.permissionChecked = true;
     return next();
   };
@@ -375,13 +423,27 @@ export const checkTeamPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ teamId: string }>) => {
-    if (!(await hasTeamPermission(ctx, input.teamId, permission))) {
+    const { permitted, organizationRole } = await resolveTeamPermission(
+      ctx,
+      input.teamId,
+      permission,
+    );
+
+    if (!permitted) {
+      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "This feature is not available for your account",
+          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+        });
+      }
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this team resource",
       });
     }
 
+    ctx.organizationRole = organizationRole;
     ctx.permissionChecked = true;
     return next();
   };
@@ -415,20 +477,21 @@ export const checkOrganizationPermission =
 // ============================================================================
 
 /**
- * Check if user has a specific permission for a project
+ * Resolve a project permission check, returning the permission decision
+ * along with the user's organization role.
  */
-export async function hasProjectPermission(
+export async function resolveProjectPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
   permission: Permission,
-): Promise<boolean> {
+): Promise<PermissionResult> {
   if (!ctx.session?.user) {
-    return false;
+    return { permitted: false, organizationRole: null };
   }
 
   // Check demo project access
   if (isDemoProject(projectId, permission)) {
-    return true;
+    return { permitted: true, organizationRole: null };
   }
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
@@ -437,6 +500,7 @@ export async function hasProjectPermission(
       team: {
         select: {
           id: true,
+          organizationId: true,
           members: {
             where: { userId: ctx.session.user.id },
             select: {
@@ -446,17 +510,25 @@ export async function hasProjectPermission(
               assignedRoleId: true,
             },
           },
+          organization: {
+            select: {
+              members: {
+                where: { userId: ctx.session.user.id },
+                select: { role: true },
+              },
+            },
+          },
         },
       },
     },
   });
 
-  const teamMember = projectTeam?.team.members.find(
-    (member) => member.userId === ctx.session?.user.id,
-  );
+  const organizationRole =
+    projectTeam?.team.organization?.members[0]?.role ?? null;
+  const teamMember = projectTeam?.team.members[0];
 
   if (!teamMember) {
-    return false;
+    return { permitted: false, organizationRole };
   }
 
   // Check user's individual permissions (custom role or built-in role)
@@ -476,27 +548,63 @@ export async function hasProjectPermission(
 
       // If custom role has permissions, use them; otherwise fall back to built-in role
       if (userPermissions.length > 0) {
-        return hasPermissionWithHierarchy(userPermissions, permission);
+        return {
+          permitted: hasPermissionWithHierarchy(userPermissions, permission),
+          organizationRole,
+        };
       }
       // Fall back to built-in role if custom role has no permissions
-      return teamRoleHasPermission(teamMember.role, permission);
+      // EXTERNAL users get restricted defaults instead of full team role
+      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+        return {
+          permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
+          organizationRole,
+        };
+      }
+      return {
+        permitted: teamRoleHasPermission(teamMember.role, permission),
+        organizationRole,
+      };
     }
   }
 
   // Only fall back to built-in team role if NO custom role exists
-  return teamRoleHasPermission(teamMember.role, permission);
+  // EXTERNAL users get restricted defaults instead of full VIEWER permissions
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    return {
+      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
+      organizationRole,
+    };
+  }
+  return {
+    permitted: teamRoleHasPermission(teamMember.role, permission),
+    organizationRole,
+  };
 }
 
 /**
- * Check if user has a specific permission for a team
+ * Check if user has a specific permission for a project
  */
-export async function hasTeamPermission(
-  ctx: { prisma: PrismaClient; session: Session },
-  teamId: string,
+export async function hasProjectPermission(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
   permission: Permission,
 ): Promise<boolean> {
+  const result = await resolveProjectPermission(ctx, projectId, permission);
+  return result.permitted;
+}
+
+/**
+ * Resolve a team permission check, returning the permission decision
+ * along with the user's organization role.
+ */
+export async function resolveTeamPermission(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  teamId: string,
+  permission: Permission,
+): Promise<PermissionResult> {
   if (!ctx.session?.user) {
-    return false;
+    return { permitted: false, organizationRole: null };
   }
 
   const team = await ctx.prisma.team.findUnique?.({
@@ -505,7 +613,7 @@ export async function hasTeamPermission(
   });
 
   if (!team?.organizationId) {
-    return false;
+    return { permitted: false, organizationRole: null };
   }
 
   // Check organization admin override
@@ -516,9 +624,11 @@ export async function hasTeamPermission(
     },
   });
 
+  const organizationRole = organizationUser?.role ?? null;
+
   // Organization ADMINs can do anything on all teams
   if (organizationUser?.role === OrganizationUserRole.ADMIN) {
-    return true;
+    return { permitted: true, organizationRole };
   }
 
   // Check team membership
@@ -536,7 +646,7 @@ export async function hasTeamPermission(
   });
 
   if (!teamUser) {
-    return false;
+    return { permitted: false, organizationRole };
   }
 
   // Check user's individual permissions (custom role or built-in role)
@@ -554,13 +664,35 @@ export async function hasTeamPermission(
         ? rawPermissions
         : [];
       if (hasPermissionWithHierarchy(userPermissions, permission)) {
-        return true;
+        return { permitted: true, organizationRole };
       }
     }
   }
 
   // Fall back to user's built-in team role only
-  return teamRoleHasPermission(teamUser.role, permission);
+  // EXTERNAL users get restricted defaults instead of full team role permissions
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    return {
+      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
+      organizationRole,
+    };
+  }
+  return {
+    permitted: teamRoleHasPermission(teamUser.role, permission),
+    organizationRole,
+  };
+}
+
+/**
+ * Check if user has a specific permission for a team
+ */
+export async function hasTeamPermission(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  teamId: string,
+  permission: Permission,
+): Promise<boolean> {
+  const result = await resolveTeamPermission(ctx, teamId, permission);
+  return result.permitted;
 }
 
 /**

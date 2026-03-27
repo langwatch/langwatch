@@ -1,5 +1,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
+import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:client");
 
@@ -22,9 +24,12 @@ function shouldSkipClickHouse(): boolean {
 }
 
 /**
- * Get or create a ClickHouse client instance
+ * Get or create the shared ClickHouse client instance (from env vars).
+ *
+ * NOT exported — all external code must use the org-aware functions
+ * in clickhouseClient.ts to prevent data leaks between tenants.
  */
-export function getClickHouseClient(): ClickHouseClient | null {
+function getClickHouseClient(): ClickHouseClient | null {
   if (!clickHouseClient && !shouldSkipClickHouse()) {
     const clickHouseUrl = process.env.CLICKHOUSE_URL!;
     let url: URL | string = clickHouseUrl;
@@ -38,12 +43,21 @@ export function getClickHouseClient(): ClickHouseClient | null {
       );
     }
 
-    clickHouseClient = createClient({
+    const raw = createClient({
       url,
       clickhouse_settings: {
         date_time_input_format: "best_effort",
       },
+      max_open_connections: 25,
+      keep_alive: {
+        enabled: true,
+        idle_socket_ttl: 1500,
+      },
     });
+
+    clickHouseClient = wrapWithDefaultSettings(
+      createResilientClickHouseClient({ client: raw }),
+    );
   }
 
   return clickHouseClient;
@@ -55,3 +69,6 @@ export async function closeClickHouseClient(): Promise<void> {
     clickHouseClient = null;
   }
 }
+
+// Internal access for clickhouseClient.ts — the only allowed consumer
+export { getClickHouseClient as _getSharedClickHouseClient };

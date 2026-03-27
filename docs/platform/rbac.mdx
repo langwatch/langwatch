@@ -1,0 +1,185 @@
+---
+title: "Access Control (RBAC)"
+description: "Manage user permissions and access levels in LangWatch with RBAC to secure evaluation workflows and agent testing environments."
+sidebarTitle: Access Control (RBAC)
+keywords: rbac, langwatch, llm, ai, rbac, role-based access control
+---
+
+LangWatch provides role-based access control (RBAC) to manage user permissions and access levels. This allows you to control who can access your LangWatch workspace and what they can do.
+
+# Role-Based Access Control (RBAC) System
+
+LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. This system provides fine-grained control over what users can access and modify within the platform.
+
+## Permission Structure
+
+### Actions
+The system defines six core actions that can be performed on resources:
+
+| Action | Description |
+|--------|-------------|
+| `view` | Read-only access to view resources |
+| `create` | Ability to create new resources |
+| `update` | Ability to modify existing resources |
+| `delete` | Ability to remove resources |
+| `manage` | Full CRUD access plus administrative settings |
+| `share` | Ability to share resources with others |
+
+### Resources
+Permissions are applied to the following resource types:
+
+| Resource | Description |
+|----------|-------------|
+| `organization` | Organization-level settings and management |
+| `project` | Individual projects within teams |
+| `team` | Team management and settings |
+| `analytics` | Analytics dashboards and reports |
+| `cost` | Cost tracking and billing information |
+| `traces` | LLM trace data and logs |
+| `scenarios` | Test scenarios and evaluations |
+| `annotations` | Data annotations and labeling |
+| `evaluations` | Creating and managing evaluations |
+| `datasets` | Managing datasets |
+| `automations` | Creating and managing automations |
+| `workflows` | Creating and managing workflows |
+| `prompts` | Creating and managing prompts |
+
+
+## Predefined Roles
+
+### Team Roles
+
+#### Admin
+Full administrative access to all team resources and settings.
+
+| Resource | Permissions |
+|----------|-------------|
+| Projects | `view`, `manage` |
+| Analytics | `view`, `manage` |
+| Cost | `view` |
+| Traces | `view`, `share` |
+| Annotations | `view`, `manage` |
+| Evaluations | `view`, `manage` |
+| Datasets | `view`, `manage` |
+| Automations | `view`, `manage` |
+| Workflows | `view`, `manage` |
+| Prompts | `view`, `manage` |
+| Scenarios | `view`, `manage` |
+| Team | `view`, `manage` |
+
+#### Member
+Same permissions as Admin but cannot manage team settings.
+
+#### Viewer
+Read-only access to most resources for observation and reporting purposes.
+
+| Resource | Permissions |
+|----------|-------------|
+| Projects | `view` |
+| Analytics | `view` |
+| Traces | `view` |
+| Annotations | `view` |
+| Evaluations | `view` |
+| Datasets | `view` |
+| Automations | `view` |
+| Workflows | `view` |
+| Prompts | `view` |
+| Scenarios | `view` |
+| Team | `view` |
+
+### Organization Roles
+
+#### Admin
+Complete control over organization settings and all teams.
+
+| Resource | Permissions |
+|----------|-------------|
+| Organization | `view`, `manage`, `delete` |
+
+#### Member
+Basic organization access for team members.
+
+| Resource | Permissions |
+|----------|-------------|
+| Organization | `view` |
+
+## Permission Hierarchy
+
+The system implements a hierarchical permission model where:
+
+- **`manage` permissions automatically include** `view`, `create`, `update`, and `delete` permissions
+- This means if a user has `analytics:manage`, they automatically have `analytics:view`, `analytics:create`, `analytics:update`, and `analytics:delete`
+
+## Custom Roles
+
+### Overview
+Organizations can create custom roles to provide more granular permission control beyond the predefined roles. Custom roles allow organizations to:
+
+- Define specific permission combinations
+- Create roles tailored to specific job functions
+- Implement least-privilege access principles
+- Maintain compliance with organizational policies
+
+### Creating Custom Roles
+
+Custom roles are created at the organization level and can be assigned to users within any team in that organization. Custom roles can be found under settings.
+
+#### Required Fields
+- **Name**: Unique role name (1-50 characters)
+- **Description**: Optional description of the role's purpose
+- **Permissions**: Array of specific permissions
+
+
+The following screenshot shows the roles interface in LangWatch.
+
+<Frame>
+<img src="/images/rbac/roles.png" alt="LangWatch RBAC Roles Interface" />
+</Frame>
+
+To create a new role, click the "Create Role" button.
+
+Add the name and description of the role and click the "Create" button.
+
+<Frame>
+<img src="/images/rbac/roles-create.png" alt="Creating Custom Roles in LangWatch" />
+</Frame>
+
+Once the role is created, you can attach it to a user under the teams page. 
+
+<Frame>
+<img src="/images/rbac/roles-add.png" alt="Adding Roles to Users in LangWatch" />
+</Frame>
+
+
+### Custom Role Management
+
+#### Permissions Required
+- **Create/Update/Delete Custom Roles**: `organization:manage` permission
+- **Assign Custom Roles**: `team:manage` permission
+
+#### Best Practices
+- **Naming Convention**: Use descriptive names that clearly indicate the role's purpose
+- **Documentation**: Provide clear descriptions explaining when to use each role
+- **Regular Review**: Periodically review custom roles to ensure they're still needed
+- **Least Privilege**: Grant only the minimum permissions required for the role's function
+- **Testing**: Test custom roles in a development environment before deploying
+
+### Custom Role Limitations
+
+- Custom roles cannot grant permissions that exceed the organization admin's capabilities
+- Custom roles are organization-scoped and cannot be shared across organizations
+- Users can only have one custom role assignment per team
+- Custom roles cannot be assigned to organization-level users (only team members)
+
+### Public Sharing
+The system supports public sharing of traces, allowing access without authentication when resources are explicitly shared publicly.
+
+## Security Considerations
+
+- **Principle of Least Privilege**: Grant only necessary permissions
+- **Regular Audits**: Periodically review role assignments and permissions
+- **Separation of Duties**: Use different roles for different functions
+- **Access Reviews**: Implement regular access reviews for sensitive roles
+- **Monitoring**: Track permission usage and changes for security auditing
+
+This RBAC system provides the flexibility to implement complex organizational structures while maintaining security and ease of management.

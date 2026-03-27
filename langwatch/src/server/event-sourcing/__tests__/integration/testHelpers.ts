@@ -76,12 +76,12 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
 
   // Create stores
   const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(clickHouseClient),
+    new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
   });
 

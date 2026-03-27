@@ -9,6 +9,9 @@ import { env } from "../../../../env.mjs";
 import { prisma } from "../../../../server/db";
 import type { CollectorRESTParams } from "../../../../server/tracer/types";
 import type { DeepPartial } from "../../../../utils/types";
+import { createLogger } from "../../../../utils/logger/server";
+
+const logger = createLogger("langwatch:health:processor");
 
 export async function GET(req: NextRequest) {
   const xAuthToken = req.headers.get("x-auth-token");
@@ -68,14 +71,14 @@ export async function GET(req: NextRequest) {
     },
   };
 
-  const otelTraceId = crypto.randomBytes(16).toString("hex");
+  const otelTraceIdBase64 = crypto.randomBytes(16).toString("base64");
   const otelParams: DeepPartial<IExportTraceServiceRequest> = {
     resourceSpans: [
       {
         resource: {
           attributes: [
             {
-              key: "canary",
+              key: "metadata.canary",
               value: {
                 stringValue: "true",
               },
@@ -89,7 +92,7 @@ export async function GET(req: NextRequest) {
             },
             spans: [
               {
-                traceId: Buffer.from(otelTraceId, "hex").toString("base64"),
+                traceId: otelTraceIdBase64,
                 spanId: Buffer.from(
                   crypto.randomBytes(8).toString("hex"),
                   "hex",
@@ -133,6 +136,12 @@ export async function GET(req: NextRequest) {
     ],
   };
 
+  const t0 = Date.now();
+  logger.info(
+    { restTraceId, otelTraceId: otelTraceIdBase64 },
+    "Healthcheck started, sending canary traces",
+  );
+
   const [restCollectorResponse, otelResponse] = await Promise.all([
     fetch(`${env.BASE_HOST}/api/collector`, {
       method: "POST",
@@ -151,6 +160,18 @@ export async function GET(req: NextRequest) {
       body: JSON.stringify(otelParams),
     }),
   ]);
+
+  const sendDurationMs = Date.now() - t0;
+  logger.info(
+    {
+      restTraceId,
+      otelTraceId: otelTraceIdBase64,
+      sendDurationMs,
+      restStatus: restCollectorResponse.status,
+      otelStatus: otelResponse.status,
+    },
+    "Canary traces sent",
+  );
 
   if (!restCollectorResponse.ok) {
     return NextResponse.json(
@@ -171,19 +192,30 @@ export async function GET(req: NextRequest) {
   // Check traces with retry mechanism
   try {
     await Promise.all([
-      checkTraceWithRetry(restTraceId, authToken).catch((error) => {
+      checkTraceWithRetry(restTraceId, authToken).catch(() => {
         throw new Error("Failed to get REST trace after multiple retries");
       }),
-      checkTraceWithRetry(otelTraceId, authToken).catch((error) => {
+      checkTraceWithRetry(otelTraceIdBase64, authToken).catch(() => {
         throw new Error("Failed to get OTLP trace after multiple retries");
       }),
     ]);
   } catch (error) {
+    const totalMs = Date.now() - t0;
+    logger.warn(
+      { restTraceId, otelTraceId: otelTraceIdBase64, totalMs },
+      `Healthcheck failed: ${(error as Error).message}`,
+    );
     return NextResponse.json(
       { message: (error as Error).message },
       { status: 500 },
     );
   }
+
+  const totalMs = Date.now() - t0;
+  logger.info(
+    { restTraceId, otelTraceId: otelTraceIdBase64, totalMs },
+    "Healthcheck passed",
+  );
 
   return NextResponse.json({
     status: otelResponse.status,
@@ -200,21 +232,61 @@ const checkTraceWithRetry = async (
 ): Promise<Response> => {
   const startTime = Date.now();
   const timeoutMs = 60 * 1000; // 60 seconds timeout
-  const retryIntervalMs = 5000; // 5 seconds interval
+  const retryIntervalMs = 2000; // 2 seconds between polls
+  let attempt = 0;
 
   while (Date.now() - startTime < timeoutMs) {
     await sleep(retryIntervalMs);
+    attempt++;
 
-    const traceResponse = await fetch(`${env.BASE_HOST}/api/trace/${traceId}`, {
-      headers: {
-        "X-Auth-Token": authToken,
-      },
-    });
+    try {
+      const fetchStart = Date.now();
+      const traceResponse = await fetch(
+        `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
+        {
+          headers: {
+            "X-Auth-Token": authToken,
+          },
+        },
+      );
+      const fetchMs = Date.now() - fetchStart;
 
-    if (traceResponse.ok) {
-      return traceResponse;
+      if (traceResponse.ok) {
+        logger.info(
+          { traceId, attempt, fetchMs, elapsedMs: Date.now() - startTime },
+          "Trace found",
+        );
+        return traceResponse;
+      }
+
+      if (fetchMs > 3000) {
+        logger.warn(
+          {
+            traceId,
+            attempt,
+            fetchMs,
+            status: traceResponse.status,
+            elapsedMs: Date.now() - startTime,
+          },
+          "Trace poll slow response",
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          traceId,
+          attempt,
+          elapsedMs: Date.now() - startTime,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Trace poll fetch error",
+      );
     }
   }
 
+  logger.warn(
+    { traceId, attempts: attempt, elapsedMs: Date.now() - startTime },
+    "Trace poll exhausted all attempts",
+  );
   throw new Error("Timeout waiting for trace to be available");
 };

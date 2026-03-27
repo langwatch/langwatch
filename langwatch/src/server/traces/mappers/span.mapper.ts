@@ -3,7 +3,14 @@ import type {
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
+import {
+  estimateCost,
+  matchingLLMModelCost,
+} from "~/server/background/workers/collector/cost";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import { matchModelCostWithFallbacks } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import type {
   BaseSpan,
   ChatMessage,
@@ -24,18 +31,6 @@ type JsonSerializable =
   | Record<string, unknown>
   | unknown[];
 
-/**
- * Coerces a value to a number or returns null.
- * Handles historical data where numbers may be stored as strings.
- */
-function asNumberOrNull(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -57,6 +52,56 @@ function toJsonSerializable(value: unknown): JsonSerializable {
   }
 
   return value as JsonSerializable;
+}
+
+const KNOWN_WRAPPER_TYPES = new Set([
+  "text",
+  "chat_messages",
+  "json",
+  "raw",
+  "list",
+  "evaluation_result",
+  "guardrail_result",
+]);
+
+/**
+ * Detects the legacy {type, value} wrapper format from the REST collector
+ * or preserved by canonicalization for chat_messages.
+ * After ClickHouse deserialization, these appear as objects with `type` and `value`.
+ */
+function isLegacyWrapper(
+  v: unknown,
+): v is { type: string; value: unknown } {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    "type" in v &&
+    "value" in v &&
+    typeof (v as Record<string, unknown>).type === "string" &&
+    KNOWN_WRAPPER_TYPES.has((v as Record<string, unknown>).type as string)
+  );
+}
+
+/**
+ * Unwraps a {type, value} wrapper into a proper SpanInputOutput.
+ */
+function unwrapLegacyWrapper(
+  wrapper: { type: string; value: unknown },
+  spanAttributes: NormalizedAttributes,
+  attrKey: string,
+): SpanInputOutput {
+  const { type, value } = wrapper;
+  if (type === "chat_messages" && Array.isArray(value)) {
+    return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
+  }
+  if (type === "text") {
+    return { type: "text", value: typeof value === "string" ? value : JSON.stringify(value) };
+  }
+  if (type === "evaluation_result" || type === "guardrail_result") {
+    return { type, value: toJsonSerializable(value) } as unknown as SpanInputOutput;
+  }
+  return { type: "json", value: toJsonSerializable(value) };
 }
 
 /**
@@ -121,6 +166,10 @@ function extractInput(
         // Not JSON — keep as string
       }
     }
+    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+    if (isLegacyWrapper(lwInput)) {
+      return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
+    }
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
     if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
       return {
@@ -129,7 +178,12 @@ function extractInput(
       };
     }
     if (annotatedType === "text" || typeof lwInput === "string") {
-      return { type: "text", value: String(lwInput) };
+      // ClickHouse deserializeAttributes() may parse JSON-like strings back to
+      // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
+      // String([object Object]).
+      const textValue =
+        typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
+      return { type: "text", value: textValue };
     }
     return {
       type: "json",
@@ -172,6 +226,10 @@ function extractOutput(
         // Not JSON — keep as string
       }
     }
+    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+    if (isLegacyWrapper(lwOutput)) {
+      return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
+    }
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
     if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
       return {
@@ -189,13 +247,54 @@ function extractOutput(
       } as unknown as SpanInputOutput;
     }
     if (annotatedType === "text" || typeof lwOutput === "string") {
-      return { type: "text", value: String(lwOutput) };
+      const textValue =
+        typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
+      return { type: "text", value: textValue };
     }
     return {
       type: "json",
       value: toJsonSerializable(lwOutput),
     };
   }
+
+  return null;
+}
+
+/**
+ * Computes per-span cost using the same priority as the fold projection:
+ * 1. Custom cost rates from attributes
+ * 2. Static model registry lookup
+ * 3. SDK-provided cost fallback
+ */
+function computeSpanCost({
+  spanAttributes,
+  promptTokens,
+  completionTokens,
+}: {
+  spanAttributes: NormalizedAttributes;
+  promptTokens: number | null;
+  completionTokens: number | null;
+}): number | null {
+  // Priority 1: Custom cost rates
+  const inputRate = coerceToNumber(spanAttributes["langwatch.model.inputCostPerToken"]);
+  const outputRate = coerceToNumber(spanAttributes["langwatch.model.outputCostPerToken"]);
+  if (inputRate !== null || outputRate !== null) {
+    return (promptTokens ?? 0) * (inputRate ?? 0) + (completionTokens ?? 0) * (outputRate ?? 0);
+  }
+
+  // Priority 2: Static model registry
+  const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
+  if (typeof model === "string" && ((promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0)) {
+    const matched = matchModelCostWithFallbacks(model, getStaticModelCosts(), matchingLLMModelCost);
+    if (matched) {
+      const computed = estimateCost({ llmModelCost: matched, inputTokens: promptTokens ?? 0, outputTokens: completionTokens ?? 0 });
+      if (computed !== undefined && computed > 0) return computed;
+    }
+  }
+
+  // Priority 3: SDK-provided cost fallback
+  const sdkCost = coerceToNumber(spanAttributes["langwatch.span.cost"]);
+  if (sdkCost !== null && sdkCost > 0) return sdkCost;
 
   return null;
 }
@@ -208,30 +307,31 @@ function extractOutput(
 function extractMetrics(
   spanAttributes: NormalizedAttributes,
 ): SpanMetrics | null {
-  const promptTokens = asNumberOrNull(
+  const promptTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.input_tokens"] ??
       spanAttributes["gen_ai.usage.prompt_tokens"],
   );
 
-  const completionTokens = asNumberOrNull(
+  const completionTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.output_tokens"] ??
       spanAttributes["gen_ai.usage.completion_tokens"],
   );
 
-  const reasoningTokens = asNumberOrNull(
+  const reasoningTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.reasoning_tokens"],
   );
-  const cost = asNumberOrNull(spanAttributes["langwatch.span.cost"]);
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
-  const cacheReadInputTokens = asNumberOrNull(
+  const cacheReadInputTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
       spanAttributes["gen_ai.usage.cached_input_tokens"],
   );
-  const cacheCreationInputTokens = asNumberOrNull(
+  const cacheCreationInputTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
+
+  const cost = computeSpanCost({ spanAttributes, promptTokens, completionTokens });
 
   if (
     promptTokens === null &&

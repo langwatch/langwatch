@@ -29,7 +29,7 @@ export function SuiteArchiveDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            Archive suite?
+            Archive run plan?
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
@@ -40,7 +40,7 @@ export function SuiteArchiveDialog({
               </Text>
             </Text>
             <Text color="fg.muted" fontSize="sm">
-              Archived suites will no longer appear in the sidebar. Test runs are preserved.
+              Archived run plans will no longer appear in the sidebar. Test runs are preserved.
             </Text>
           </VStack>
         </Dialog.Body>

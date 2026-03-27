@@ -26,6 +26,7 @@ import { Select } from "~/components/ui/select";
 import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import {
   type Currency,
   type BillingInterval,
@@ -247,6 +248,7 @@ export function SubscriptionPage() {
           void organizationWithMembers.refetch();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({ title: "Failed to send invites", description: error.message, type: "error" });
         },
       });
@@ -411,7 +413,7 @@ export function SubscriptionPage() {
                   <Select.Trigger>
                     <Select.ValueText />
                   </Select.Trigger>
-                  <Select.Content paddingY={2} zIndex="popover">
+                  <Select.Content paddingY={2}>
                     {currencyOptions.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         {option.label}

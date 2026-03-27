@@ -8,7 +8,8 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +26,8 @@ import {
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
-import { useSuiteRunMutation } from "~/components/suites/useSuiteRunMutation";
+import { useRunSuite } from "~/components/suites/useRunSuite";
+import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
@@ -35,11 +37,10 @@ import {
 } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-const SKELETON_PLACEHOLDER_COUNT = 5;
 
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
@@ -66,7 +67,7 @@ function SuitesPageContent() {
     { enabled: !!project },
   );
 
-  const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
+  const { data: externalSets, isLoading: isExternalSetsLoading } = api.scenarios.getExternalSetSummaries.useQuery(
     {
       projectId: project?.id ?? "",
       startDate: period.startDate.getTime(),
@@ -101,6 +102,19 @@ function SuitesPageContent() {
     },
     { enabled: !!project, refetchInterval: 30_000 },
   );
+
+  // Connect the sidebar-level query to SSE events so new runs appear without
+  // waiting for the 30s poll interval. Without this, the SSE listener only
+  // lives inside RunHistoryPanel, leaving the sidebar query unreachable.
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: () => {
+      setSuiteRunSinceTimestamp(undefined);
+      void utils.scenarios.getSuiteRunData.invalidate();
+    },
+    enabled: !!project?.id,
+    debounceMs: 500,
+  });
 
   // Update cached data only when server reports changes
   useEffect(() => {
@@ -145,6 +159,25 @@ function SuitesPageContent() {
     return extractExternalSetId(selectedSuiteSlug);
   }, [selectedSuiteSlug]);
 
+  // Auto-expand period when selected item's last run is outside current range
+  useEffect(() => {
+    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return;
+
+    let lastRunTs: number | null = null;
+    if (isExternalSetSelection(selectedSuiteSlug) && externalSets) {
+      const setId = extractExternalSetId(selectedSuiteSlug);
+      lastRunTs = externalSets.find((s) => s.scenarioSetId === setId)?.lastRunTimestamp ?? null;
+    } else if (selectedSuite && runSummaries) {
+      lastRunTs = runSummaries.get(selectedSuite.id)?.lastRunTimestamp ?? null;
+    }
+
+    if (lastRunTs && lastRunTs < period.startDate.getTime()) {
+      const daysAgo = Math.ceil((Date.now() - lastRunTs) / 86400000);
+      const newDays = daysAgo <= 30 ? 30 : daysAgo <= 90 ? 90 : 365;
+      setPeriod(subDays(new Date(), newDays), new Date());
+    }
+  }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
     : null;
@@ -159,14 +192,14 @@ function SuitesPageContent() {
       }
       setArchiveConfirmId(null);
       toaster.create({
-        title: "Suite archived",
+        title: "Run plan archived",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to archive suite",
+        title: "Failed to archive run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -179,14 +212,14 @@ function SuitesPageContent() {
       void utils.suites.getAll.invalidate();
       navigateToSuite(data.slug);
       toaster.create({
-        title: "Suite duplicated",
+        title: "Run plan duplicated",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to duplicate suite",
+        title: "Failed to duplicate run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -194,15 +227,33 @@ function SuitesPageContent() {
     },
   });
 
-  // Use a ref for handleEditSuite to break circular dependency:
-  // handleRunRequested → runMutation → useSuiteRunMutation({ onEditSuite }) → handleEditSuite → handleRunRequested
-  const handleEditSuiteRef = useRef<(suiteId: string) => void>(() => {});
+  const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const { runMutation } = useSuiteRunMutation({
-    onEditSuite: (suiteId: string) => handleEditSuiteRef.current(suiteId),
-    onSuccess: () => {
+  useEffect(() => {
+    return () => {
+      retryTimersRef.current.forEach(clearTimeout);
+    };
+  }, []);
+
+  const { requestRun, isPending: isRunPending, dialogProps: runDialogProps } = useRunSuite({
+    onRunScheduled: () => {
       setSuiteRunSinceTimestamp(undefined);
       void utils.scenarios.getSuiteRunData.invalidate();
+
+      // The queue processor stages commands to Redis and processes them async.
+      // Schedule follow-up invalidations to catch ClickHouse data once the
+      // event-sourcing pipeline settles, as a safety net alongside SSE.
+      retryTimersRef.current.forEach(clearTimeout);
+      retryTimersRef.current = [
+        setTimeout(() => {
+          setSuiteRunSinceTimestamp(undefined);
+          void utils.scenarios.getSuiteRunData.invalidate();
+        }, 1000),
+        setTimeout(() => {
+          setSuiteRunSinceTimestamp(undefined);
+          void utils.scenarios.getSuiteRunData.invalidate();
+        }, 3000),
+      ];
     },
   });
 
@@ -217,9 +268,9 @@ function SuitesPageContent() {
   const handleRunRequested = useCallback(
     (suite: SimulationSuite) => {
       navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project?.id ?? "", id: suite.id, idempotencyKey: crypto.randomUUID() });
+      requestRun(suite);
     },
-    [navigateToSuite, runMutation, project?.id],
+    [navigateToSuite, requestRun],
   );
 
   const handleNewSuite = useCallback(() => {
@@ -241,15 +292,14 @@ function SuitesPageContent() {
     [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested],
   );
 
-  handleEditSuiteRef.current = handleEditSuite;
-
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project?.id ?? "", id: suiteId, idempotencyKey: crypto.randomUUID() });
+      if (!suite) return;
+      navigateToSuite(suite.slug);
+      requestRun(suite);
     },
-    [suites, navigateToSuite, runMutation, project?.id],
+    [suites, navigateToSuite, requestRun],
   );
 
   const handleDuplicateSuite = useCallback(
@@ -273,44 +323,6 @@ function SuitesPageContent() {
     archiveMutation.mutate({ projectId: project.id, id: archiveConfirmId });
   }, [project, archiveConfirmId, archiveMutation]);
 
-  const updateLabelsMutation = api.suites.update.useMutation({
-    onSuccess: () => {
-      void utils.suites.getAll.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to update labels",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-      });
-    },
-  });
-
-  const handleAddLabel = useCallback(
-    (label: string) => {
-      if (!project || !selectedSuite || updateLabelsMutation.isPending) return;
-      updateLabelsMutation.mutate({
-        projectId: project.id,
-        id: selectedSuite.id,
-        labels: [...selectedSuite.labels, label],
-      });
-    },
-    [project, selectedSuite, updateLabelsMutation],
-  );
-
-  const handleRemoveLabel = useCallback(
-    (label: string) => {
-      if (!project || !selectedSuite || updateLabelsMutation.isPending) return;
-      updateLabelsMutation.mutate({
-        projectId: project.id,
-        id: selectedSuite.id,
-        labels: selectedSuite.labels.filter((l) => l !== label),
-      });
-    },
-    [project, selectedSuite, updateLabelsMutation],
-  );
-
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, suiteId: string) => {
       e.preventDefault();
@@ -321,39 +333,23 @@ function SuitesPageContent() {
 
   return (
     <DashboardLayout>
-      <PageLayout.Header>
-        <HStack justify="space-between" align="center" w="full">
-          <PageLayout.Heading>Suites</PageLayout.Heading>
-          <Spacer />
-          <PeriodSelector period={period} setPeriod={setPeriod} />
-          <PageLayout.HeaderButton onClick={handleNewSuite}>
-            <Plus size={16} /> New Suite
-          </PageLayout.HeaderButton>
-        </HStack>
-      </PageLayout.Header>
-      <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
-        {/* Sidebar */}
-        {isLoading ? (
-          <VStack
-            width="280px"
-            minWidth="280px"
-            padding={4}
-            gap={3}
-            align="stretch"
-          >
-            {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
-              <Box key={index} data-testid="suite-sidebar-skeleton">
-                <Skeleton height="20px" width="70%" borderRadius="md" />
-                <Skeleton
-                  height="16px"
-                  width="40%"
-                  borderRadius="md"
-                  marginTop={2}
-                />
-              </Box>
-            ))}
-          </VStack>
-        ) : (
+      <VStack width="full" height="full" gap={0}>
+        {/* Top row: heading + buttons */}
+        <PageLayout.Header withBorder={false}>
+          <HStack justify="space-between" align="center" w="full">
+            <PageLayout.Heading>Run Plans</PageLayout.Heading>
+            <HStack>
+              <PeriodSelector period={period} setPeriod={setPeriod} />
+              <PageLayout.HeaderButton onClick={handleNewSuite}>
+                <Plus size={16} /> New Run Plan
+              </PageLayout.HeaderButton>
+            </HStack>
+          </HStack>
+        </PageLayout.Header>
+
+        {/* Second row: sidebar + content box */}
+        <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
+          {/* Sidebar */}
           <SuiteSidebar
             suites={suites ?? []}
             selectedSuiteSlug={selectedSuiteSlug}
@@ -362,28 +358,44 @@ function SuitesPageContent() {
             onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
+            isLoading={isLoading || isExternalSetsLoading}
           />
-        )}
 
-        {/* Main Panel */}
-        <Box flex={1} overflow="auto">
-          <MainPanel
-            error={error ?? null}
-            selectedSuiteSlug={selectedSuiteSlug}
-            selectedSuite={selectedSuite}
-            selectedExternalSetId={selectedExternalSetId}
-            isLoading={isLoading}
-            onNewSuite={handleNewSuite}
-            onEditSuite={handleEditSuite}
-            onRunSuite={handleRunSuite}
-            isRunning={runMutation.isPending}
-            period={period}
-            suiteNameMap={suiteNameMap}
-            onAddLabel={handleAddLabel}
-            onRemoveLabel={handleRemoveLabel}
-          />
-        </Box>
-      </HStack>
+          {/* Content box */}
+          <Box
+            flex={1}
+            height="full"
+            minWidth={0}
+            paddingBottom={3}
+            paddingRight={4}
+          >
+            <Box
+              height="full"
+              width="full"
+              borderRadius="lg"
+              boxShadow="0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"
+              border="1px solid"
+              borderColor="border.muted"
+              background="bg.panel"
+              overflow="auto"
+            >
+              <MainPanel
+                error={error ?? null}
+                selectedSuiteSlug={selectedSuiteSlug}
+                selectedSuite={selectedSuite}
+                selectedExternalSetId={selectedExternalSetId}
+                isLoading={isLoading}
+                onNewSuite={handleNewSuite}
+                onEditSuite={handleEditSuite}
+                onRunSuite={handleRunSuite}
+                isRunning={isRunPending}
+                period={period}
+                suiteNameMap={suiteNameMap}
+              />
+            </Box>
+          </Box>
+        </HStack>
+      </VStack>
 
       {/* Context menu */}
       {contextMenu && (
@@ -406,6 +418,9 @@ function SuitesPageContent() {
         isLoading={archiveMutation.isPending}
       />
 
+      {/* Run confirmation dialog */}
+      <SuiteRunConfirmationDialog {...runDialogProps} />
+
     </DashboardLayout>
   );
 }
@@ -422,8 +437,6 @@ function MainPanel({
   isRunning,
   period,
   suiteNameMap,
-  onAddLabel,
-  onRemoveLabel,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -436,8 +449,6 @@ function MainPanel({
   isRunning: boolean;
   period: Period;
   suiteNameMap: Map<string, string>;
-  onAddLabel: (label: string) => void;
-  onRemoveLabel: (label: string) => void;
 }) {
   if (isLoading) {
     return null;
@@ -446,7 +457,7 @@ function MainPanel({
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
-        <Text color="red.500">Error loading suites</Text>
+        <Text color="red.500">Error loading run plans</Text>
         <Text fontSize="sm" color="fg.muted">
           {error.message}
         </Text>
@@ -474,8 +485,6 @@ function MainPanel({
         onRun={() => onRunSuite(selectedSuite.id)}
         isRunning={isRunning}
         period={period}
-        onAddLabel={onAddLabel}
-        onRemoveLabel={onRemoveLabel}
       />
     );
   }

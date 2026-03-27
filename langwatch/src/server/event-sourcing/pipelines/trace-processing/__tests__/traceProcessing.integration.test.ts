@@ -111,17 +111,17 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   }
 
   const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(clickHouseClient),
+    new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
   });
 
-  const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(clickHouseClient)).repository);
-  const traceSummaryStore = new TraceSummaryStore(new TraceSummaryService(new TraceSummaryClickHouseRepository(clickHouseClient)).repository);
+  const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository);
+  const traceSummaryStore = new TraceSummaryStore(new TraceSummaryService(new TraceSummaryClickHouseRepository(async () => clickHouseClient)).repository);
 
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)

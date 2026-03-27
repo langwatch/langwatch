@@ -20,7 +20,6 @@ import {
   startSpan,
   withScope,
 } from "../../../utils/posthogErrorCapture";
-import { safeTruncate } from "../../../utils/truncate";
 import {
   flattenObjectKeys,
   getInternalProtectionsForProject,
@@ -330,7 +329,7 @@ const processCollectorJob_ = async (
     };
     if (esSpan.params && typeof span.params === "object") {
       esSpan.params = {
-        ...safeTruncate(esSpan.params, 128 * 1024),
+        ...esSpan.params,
         _keys: flattenObjectKeys(esSpan.params),
       };
     } else {
@@ -413,10 +412,10 @@ const processCollectorJob_ = async (
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
         ? {
-            custom: safeTruncate({
+            custom: {
               ...customExistingMetadata,
               ...customMetadata,
-            }),
+            },
           }
         : {}),
       all_keys: Array.from(
@@ -908,13 +907,18 @@ export const processCollectorCheckAndAdjustJob = async (
     !Array.isArray(customMetadata);
 
   // Skip collector-based evaluation scheduling when event-sourcing handles it
+  // or when ES evaluation writes are disabled (no destination for results)
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { featureEventSourcingEvaluationIngestion: true },
+    select: {
+      featureEventSourcingEvaluationIngestion: true,
+      disableElasticSearchEvaluationWriting: true,
+    },
   });
 
   if (
     !project?.featureEventSourcingEvaluationIngestion &&
+    !project?.disableElasticSearchEvaluationWriting &&
     // Does not re-schedule trace checks for too old traces being resynced
     (!existingTrace?.timestamps?.inserted_at ||
       existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&

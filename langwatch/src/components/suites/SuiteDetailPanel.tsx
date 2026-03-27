@@ -26,7 +26,6 @@ import {
   Repeat2,
   Target,
 } from "lucide-react";
-import { TagList } from "~/components/ui/TagList";
 import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
@@ -40,8 +39,6 @@ type SuiteDetailPanelProps = {
   onRun: () => void;
   isRunning?: boolean;
   period: Period;
-  onAddLabel?: (label: string) => void;
-  onRemoveLabel?: (label: string) => void;
 };
 
 export function SuiteDetailPanel({
@@ -50,8 +47,6 @@ export function SuiteDetailPanel({
   onRun,
   isRunning = false,
   period,
-  onAddLabel,
-  onRemoveLabel,
 }: SuiteDetailPanelProps) {
   const targets = (() => {
     try {
@@ -60,7 +55,11 @@ export function SuiteDetailPanel({
       return [];
     }
   })();
-  const jobCount =
+  // Active job count excludes archived scenarios/targets.
+  // We don't know which are archived without a query, so we use the suite's
+  // raw counts only for the header stats. The RunHistoryPanel gets the actual
+  // per-batch count from the data (via event-sourcing queueRun projections).
+  const headerJobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
 
   const [liveStats, setLiveStats] = useState<RunHistoryStats | null>(null);
@@ -71,16 +70,9 @@ export function SuiteDetailPanel({
       <Box paddingX={6} paddingY={4}>
         <HStack justify="space-between" align="start">
           <VStack align="start" gap={1}>
-            <HStack gap={2} flexWrap="wrap" alignItems="center">
-              <Text fontSize="xl" fontWeight="bold">
-                {suite.name}
-              </Text>
-              <TagList
-                labels={suite.labels}
-                onRemove={onRemoveLabel ? (label) => onRemoveLabel(label) : undefined}
-                onAdd={onAddLabel}
-              />
-            </HStack>
+            <Text fontSize="xl" fontWeight="bold">
+              {suite.name}
+            </Text>
             {suite.description && (
               <Text fontSize="sm" color="fg.muted">
                 {suite.description}
@@ -130,7 +122,7 @@ export function SuiteDetailPanel({
               />
               <StatPill
                 icon={<Layers size={14} />}
-                value={jobCount}
+                value={headerJobCount}
                 label="executions"
                 colorScheme="gray"
               />
@@ -160,7 +152,7 @@ export function SuiteDetailPanel({
               />
               <StatPill
                 icon={<Layers size={14} />}
-                value={jobCount}
+                value={headerJobCount}
                 label="executions"
                 colorScheme="gray"
               />
@@ -176,7 +168,6 @@ export function SuiteDetailPanel({
         scenarioSetId={getSuiteSetId(suite.id)}
         onStatsReady={setLiveStats}
         period={period}
-        expectedJobCount={jobCount}
         isRunStarting={isRunning}
       />
     </VStack>
@@ -255,12 +246,12 @@ export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
           <EmptyState.Indicator>
             <FolderOpen size={32} />
           </EmptyState.Indicator>
-          <EmptyState.Title>No suite selected</EmptyState.Title>
+          <EmptyState.Title>No run plan selected</EmptyState.Title>
           <EmptyState.Description>
-            Select a suite from the sidebar or create a new one
+            Select a run plan from the sidebar or create a new one
           </EmptyState.Description>
           <Button colorPalette="blue" onClick={onNewSuite}>
-            <Plus size={16} /> New Suite
+            <Plus size={16} /> New Run Plan
           </Button>
         </EmptyState.Content>
       </EmptyState.Root>

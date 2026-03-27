@@ -44,6 +44,7 @@ function makeExternalSet(
   return {
     scenarioSetId: "nightly-regression",
     passedCount: 10,
+    failedCount: 0,
     totalCount: 10,
     lastRunTimestamp: Date.now() - 30 * 60 * 1000,
     ...overrides,
@@ -145,7 +146,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     });
 
     describe("when all runs pass in an external set", () => {
-      it("displays checkmark status icon", () => {
+      it("displays 100% pass rate", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -158,13 +159,13 @@ describe("<SuiteSidebar/> External Sets", () => {
 
         const items = screen.getAllByTestId("external-set-list-item");
         expect(
-          within(items[0]!).getByTestId("status-icon-pass"),
+          within(items[0]!).getByText("100%"),
         ).toBeInTheDocument();
       });
     });
 
     describe("when some runs fail in an external set", () => {
-      it("displays error status icon", () => {
+      it("displays pass rate reflecting failures", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -177,7 +178,7 @@ describe("<SuiteSidebar/> External Sets", () => {
 
         const items = screen.getAllByTestId("external-set-list-item");
         expect(
-          within(items[0]!).getByTestId("status-icon-fail"),
+          within(items[0]!).getByText("70%"),
         ).toBeInTheDocument();
       });
     });
@@ -306,7 +307,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         expect(
           screen.queryByTestId("external-sets-header"),
         ).not.toBeInTheDocument();
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
     });
   });

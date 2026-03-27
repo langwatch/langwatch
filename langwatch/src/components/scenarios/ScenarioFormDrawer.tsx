@@ -1,7 +1,7 @@
-import { Grid, GridItem, Heading } from "@chakra-ui/react";
+import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { UseFormReturn } from "react-hook-form";
+import { type UseFormReturn, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { useDrawerRunCallbacks } from "../../hooks/useDrawerRunCallbacks";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -11,9 +11,10 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
-import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { TypedAgent } from "../../server/agents/agent.repository";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
+import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
@@ -130,7 +131,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to create scenario",
         description: error.message,
@@ -150,7 +151,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     onError: (error) => {
       // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to update scenario",
         description: error.message,
@@ -323,16 +324,24 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </Grid>
         </Drawer.Body>
         {/* Bottom Bar */}
-        <Drawer.Footer borderTopWidth="1px" justifyContent="flex-end">
-          <SaveAndRunMenu
-            selectedTarget={selectedTarget}
-            onTargetChange={handleTargetChange}
-            onSaveAndRun={handleSaveAndRun}
-            onSaveWithoutRunning={handleSaveWithoutRunning}
-            onCreateAgent={handleCreateAgent}
-            onCreatePrompt={() => setPromptDrawerOpen(true)}
-            isLoading={isSubmitting}
-          />
+        <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
+          {formInstance && (
+            <FooterLabels form={formInstance} />
+          )}
+          <HStack gap={2} flexShrink={0}>
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <SaveAndRunMenu
+              selectedTarget={selectedTarget}
+              onTargetChange={handleTargetChange}
+              onSaveAndRun={handleSaveAndRun}
+              onSaveWithoutRunning={handleSaveWithoutRunning}
+              onCreateAgent={handleCreateAgent}
+              onCreatePrompt={() => setPromptDrawerOpen(true)}
+              isLoading={isSubmitting}
+            />
+          </HStack>
         </Drawer.Footer>
       </Drawer.Content>
 
@@ -359,5 +368,24 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }}
       />
     </Drawer.Root>
+  );
+}
+
+function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
+  const labels = useWatch({ control: form.control, name: "labels" });
+
+  return (
+    <HStack gap={2} flex={1} overflow="hidden" flexWrap="wrap">
+      <Text fontSize="xs" fontWeight="medium" color="fg.muted" flexShrink={0}>
+        Labels
+      </Text>
+      <TagList
+        labels={labels}
+        onRemove={(_label, index) =>
+          form.setValue("labels", labels.filter((_, i) => i !== index))
+        }
+        onAdd={(label) => form.setValue("labels", [...labels, label])}
+      />
+    </HStack>
   );
 }

@@ -52,7 +52,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("passed (1/1)")).toBeInTheDocument();
+      expect(screen.getByText("Passed (1/1)")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
@@ -145,7 +145,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (1/3)")).toBeInTheDocument();
+      expect(screen.getByText("Failed (1/3)")).toBeInTheDocument();
     });
   });
 
@@ -168,7 +168,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
+      expect(screen.getByText("Failed (2/3)")).toBeInTheDocument();
     });
   });
 
@@ -186,7 +186,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("passed")).toBeInTheDocument();
+      expect(screen.getByText("Passed")).toBeInTheDocument();
     });
   });
 
@@ -204,8 +204,8 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("running")).toBeInTheDocument();
-      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      expect(screen.getByText("Running")).toBeInTheDocument();
+      expect(screen.queryByText(/Passed/)).not.toBeInTheDocument();
     });
   });
 
@@ -223,7 +223,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("stalled")).toBeInTheDocument();
+      expect(screen.getByText("Stalled")).toBeInTheDocument();
     });
   });
 
@@ -241,7 +241,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("cancelled")).toBeInTheDocument();
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
     });
   });
 

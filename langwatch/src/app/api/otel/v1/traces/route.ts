@@ -5,6 +5,7 @@ import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root"
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { readBody } from "../../decompressBody";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
@@ -139,13 +140,18 @@ async function handleTracesRequest(req: NextRequest) {
 
       span.setAttribute("langwatch.project.id", project.id);
 
-      const body = await req.arrayBuffer();
+      const body = await readBody(req);
+
+      const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
 
       // Handle empty body gracefully - protobuf decode throws on empty input.
       // OTEL SDKs may send empty requests during shutdown/flush cycles.
       if (body.byteLength === 0) {
         logger.debug("Received empty trace request, ignoring");
-        return NextResponse.json({ message: "No traces to process" });
+        return NextResponse.json({
+          message: "No traces to process",
+          partialSuccess: emptyPartialSuccess,
+        });
       }
 
       let traceRequest: IExportTraceServiceRequest;
@@ -191,15 +197,23 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
+      let collectionResult: { rejectedSpans: number; errorMessage: string } | undefined;
       if (project.featureEventSourcingTraceIngestion) {
-        await getApp().traces.collection.handleOtlpTraceRequest(
-          project.id,
-          traceRequest,
-          project.piiRedactionLevel,
-        );
+        collectionResult =
+          await getApp().traces.collection.handleOtlpTraceRequest(
+            project.id,
+            traceRequest,
+            project.piiRedactionLevel,
+          );
       }
       if (project.disableElasticSearchTraceWriting) {
-        return NextResponse.json({ message: "Trace received successfully." });
+        return NextResponse.json({
+          message: "Trace received successfully.",
+          partialSuccess: {
+            rejectedSpans: collectionResult?.rejectedSpans ?? 0,
+            errorMessage: collectionResult?.errorMessage ?? "",
+          },
+        });
       }
 
       const tracesForCollection =
@@ -272,7 +286,10 @@ async function handleTracesRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
-        return NextResponse.json({ message: "No changes" });
+        return NextResponse.json({
+          message: "No changes",
+          partialSuccess: emptyPartialSuccess,
+        });
       }
 
       await tracer.withActiveSpan(
@@ -283,7 +300,13 @@ async function handleTracesRequest(req: NextRequest) {
         },
       );
 
-      return NextResponse.json({ message: "Trace received successfully." });
+      return NextResponse.json({
+        message: "Trace received successfully.",
+        partialSuccess: {
+          rejectedSpans: collectionResult?.rejectedSpans ?? 0,
+          errorMessage: collectionResult?.errorMessage ?? "",
+        },
+      });
     },
   );
 }

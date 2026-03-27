@@ -1,0 +1,88 @@
+---
+title: Infra Monitoring
+description: Set up Grafana and Prometheus for LangWatch infra monitoring to track system health in large-scale agent testing setups.
+---
+
+## Installation with Monitoring
+
+For monitoring setup, you'll need to add the `metricsApiKey` and `prometheus.enabled=true` to the values.yaml file.
+
+### Access Grafana
+LangWatch includes integrated Prometheus monitoring for observability. The monitoring is built into the main LangWatch chart and can be enabled with a simple configuration.
+
+### Quick Setup
+
+```bash
+# Generate all required secrets including metrics key
+export NEXTAUTH_SECRET=$(openssl rand -base64 32)
+export API_TOKEN_JWT_SECRET=$(openssl rand -base64 32)
+export CRON_API_KEY=$(openssl rand -base64 32)
+export METRICS_API_KEY=$(openssl rand -base64 32)  # ← Required for monitoring
+
+# Deploy LangWatch with monitoring enabled
+helm install langwatch ./langwatch \
+  --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
+  --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
+  --set app.env.BASE_HOST="http://localhost:5560" \
+  --set app.env.NEXTAUTH_URL="http://localhost:5560" \
+  --set app.env.CRON_API_KEY=$CRON_API_KEY \
+  --set global.monitoring.enabled=true \
+  --set global.monitoring.metricsApiKey=$METRICS_API_KEY \
+  --set prometheus.enabled=true
+```
+
+### Access Prometheus
+
+```bash
+# Port forward for development
+kubectl port-forward svc/langwatch-prometheus 9090:9090
+```
+
+Access Prometheus at: http://localhost:9090
+
+### What Gets Monitored
+
+- **LangWatch App**: Main application metrics (port 5560)
+- **LangWatch Workers**: Worker metrics (port 2999)
+- **Kubernetes Infrastructure**: Node and container metrics via cAdvisor
+
+### Prometheus Configuration
+
+The Prometheus configuration can be customized through the `prometheus` section in values.yaml:
+
+```yaml
+prometheus:
+  enabled: false # Set to true to enable
+  image:
+    repository: quay.io/prometheus/prometheus
+    tag: "v3.0.1"
+  service:
+    type: ClusterIP # Change to LoadBalancer for external access
+    port: 9090
+  storage:
+    enabled: true
+    size: 6Gi
+    storageClass: "" # Use default storage class
+  retention: 60d
+  rbac:
+    enabled: true
+```
+
+### LangWatch Pod Annotations
+
+For Prometheus to discover your LangWatch pods, ensure they have the correct annotations:
+
+```yaml
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "5560" # For main app
+    prometheus.io/path: "/metrics" # For workers with custom paths
+```
+
+### LangWatch Dashboard
+
+You can find the LangWatch dashboard template [here](/langwatch-dashboard.json).
+
+![Grafana](/images/monitoring.png)
+

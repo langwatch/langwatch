@@ -1,4 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
+import type { ClickHouseClient } from "@clickhouse/client";
+import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
@@ -25,6 +27,9 @@ import { NullOrganizationRepository } from "./organizations/repositories/organiz
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
+import { DspyStepService } from "./dspy-steps/dspy-step.service";
+import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
+import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
@@ -61,11 +66,11 @@ import { OrganizationRepository } from "../repositories/organization.repository"
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 
 export function initializeWebApp(): App {
@@ -82,10 +87,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const { prisma } = require("../db") as { prisma: PrismaClient; };
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
-  const clickhouse = createClickHouseClientFromConfig({
-    url: config.clickhouseUrl,
-    enabled: config.enableClickhouse,
-  });
+  const clickhouseEnabled = !!(config.enableClickhouse && config.clickhouseUrl) || isClickHouseEnabled();
+
+  // Resolver: given a tenantId (projectId), returns the right ClickHouse client
+  const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
+    const client = await getClickHouseClientForProject(tenantId);
+    if (!client) throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+    return client;
+  };
+
   const redis = config.skipRedis ? null : createRedisConnectionFromConfig({
     url: config.redisUrl,
     clusterEndpoints: config.redisClusterEndpoints,
@@ -96,32 +106,32 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const traceSummary = traced(
     new TraceSummaryService(
-      clickhouse ? new TraceSummaryClickHouseRepository(clickhouse) : new NullTraceSummaryRepository(),
+      clickhouseEnabled ? new TraceSummaryClickHouseRepository(resolveClickHouseClient) : new NullTraceSummaryRepository(),
     ),
     "TraceSummaryService",
   );
   const spanStorage = traced(
     new SpanStorageService(
-      clickhouse ? new SpanStorageClickHouseRepository(clickhouse) : new NullSpanStorageRepository(),
+      clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
     ),
     "SpanStorageService",
   );
   const logRecordStorage = traced(
     new LogRecordStorageService(
-      clickhouse ? new LogRecordStorageClickHouseRepository(clickhouse) : new NullLogRecordStorageRepository(),
+      clickhouseEnabled ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient) : new NullLogRecordStorageRepository(),
     ),
     "LogRecordStorageService",
   );
   const metricRecordStorage = traced(
     new MetricRecordStorageService(
-      clickhouse ? new MetricRecordStorageClickHouseRepository(clickhouse) : new NullMetricRecordStorageRepository(),
+      clickhouseEnabled ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient) : new NullMetricRecordStorageRepository(),
     ),
     "MetricRecordStorageService",
   );
 
   const evaluationRuns = traced(
     new EvaluationRunService(
-      clickhouse ? new EvaluationRunClickHouseRepository(clickhouse) : new NullEvaluationRunRepository(),
+      clickhouseEnabled ? new EvaluationRunClickHouseRepository(resolveClickHouseClient) : new NullEvaluationRunRepository(),
     ),
     "EvaluationRunService",
   );
@@ -140,8 +150,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const evaluationExecution = traced(
     new EvaluationExecutionService({
       traceService,
-      projectService: projects,
-      costChecker: createCostChecker(prisma),
       modelEnvResolver: createDefaultModelEnvResolver(),
       langevalsClient: config.langevalsEndpoint
         ? new LangEvalsHttpClient(config.langevalsEndpoint)
@@ -151,7 +159,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationExecutionService",
   );
 
-  const simulationReads = SimulationRunService.create(clickhouse);
+  const dspySteps = traced(
+    new DspyStepService(
+      clickhouseEnabled ? new DspyStepClickHouseRepository(resolveClickHouseClient) : new NullDspyStepRepository(),
+    ),
+    "DspyStepService",
+  );
+  const simulationReads = SimulationRunService.create(clickhouseEnabled ? resolveClickHouseClient : null);
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const evaluations = {
@@ -170,6 +184,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     eventUsageService,
     planResolver,
     orgRepo,
+    simulationReads,
+    clickhouseEnabled,
   );
 
   const planProvider = config.isSaas
@@ -214,8 +230,17 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
 
+  const nurturing = config.customerIoApiKey
+    ? NurturingService.create({
+        config: {
+          customerIoApiKey: config.customerIoApiKey,
+          customerIoRegion: config.customerIoRegion,
+        },
+      })
+    : undefined;
+
   const es = new EventSourcing({
-    clickhouse: clickhouse ?? void 0,
+    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
     enabled: config.enableEventSourcing !== false,
     isSaas: config.isSaas,
@@ -225,7 +250,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const registry = new PipelineRegistry({
     eventSourcing: es,
     prisma,
-    clickhouse,
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     broadcast,
     projects,
     monitors,
@@ -237,7 +262,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const commands = registry.registerAll();
 
   const suiteRunService = SuiteRunService.create({
-    clickhouse,
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
   });
@@ -279,10 +304,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     name: string;
     close: () => Promise<void>;
   }> = [];
-  if (clickhouse) {
+  if (clickhouseEnabled) {
+    const { clearCustomClientCache } = require("~/server/clickhouse/clickhouseClient");
+    const { closeClickHouseClient } = require("~/server/clickhouse/client");
     gracefulCloseables.push({
       name: "clickhouse",
-      close: () => clickhouse.close(),
+      close: async () => { await clearCustomClientCache(); await closeClickHouseClient(); },
     });
   }
   if (redis) {
@@ -329,6 +356,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     traces,
     evaluations,
+    dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
     organizations,
@@ -338,6 +366,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     planProvider,
     subscription,
     notifications,
+    nurturing,
     usageLimits,
     commands,
     _eventSourcing: es,
@@ -395,8 +424,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       runs: traced(new EvaluationRunService(new NullEvaluationRunRepository()), "EvaluationRunService"),
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
+    dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     simulations: { runs: SimulationRunService.create(null) },
-    suiteRuns: { runs: SuiteRunService.create({ clickhouse: null, startSuiteRun: noop, queueSimulationRun: noop }) },
+    suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,
     projects: nullProjects,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
@@ -406,15 +436,18 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new EventUsageService(),
       async () => FREE_PLAN,
       null,
+      SimulationRunService.create(null),
+      false,
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,
     }),
     subscription: undefined,
     notifications: NotificationService.createNull(),
+    nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop } satisfies AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
@@ -435,6 +468,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageEnd: noop,
         finishRun: noop,
         deleteRun: noop,
+        updateRunMetrics: noop,
       } as AppCommands["simulations"],
       suiteRuns: {
         startSuiteRun: noop,

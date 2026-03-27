@@ -1,22 +1,21 @@
+# Complementary stub for sdk-javascript-ci.yml
+# Job names and paths-ignore MUST mirror the real workflow's jobs and paths.
 name: sdk-javascript-ci
 
 on:
   pull_request:
     paths-ignore:
       - "typescript-sdk/**"
+      - ".github/workflows/sdk-javascript-ci.yml"
+      - ".github/.release-please-manifest.json"
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "no modifications, skipping tests"
-        
-  typecheck:
+      - run: echo "no modifications, skipping ci"
+
+  e2e:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "no modifications, skipping typecheck"
-        
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "no modifications, skipping build"
+      - run: echo "no modifications, skipping e2e"

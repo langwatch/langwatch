@@ -1,0 +1,138 @@
+---
+title: Programmatic Access
+sidebarTitle: Programmatic Access
+description: Fetch datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+---
+
+You can fetch datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
+
+## Fetching a Dataset
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+# Initialize the SDK
+langwatch.setup()
+
+# Fetch dataset by slug or ID
+dataset = langwatch.dataset.get_dataset("your-dataset-slug")
+
+# Convert to pandas DataFrame for easy manipulation
+df = dataset.to_pandas()
+
+print(df.head())
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Fetch dataset by slug or ID
+const dataset = await langwatch.datasets.get("your-dataset-slug");
+
+// Access entries
+for (const entry of dataset.entries) {
+  console.log(entry.entry);
+}
+```
+  </Tab>
+</Tabs>
+
+## Using with Evaluations
+
+Datasets are commonly used to run offline evaluations against your LLM or agent.
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Fetch dataset
+df = langwatch.dataset.get_dataset("your-dataset-slug").to_pandas()
+
+# Initialize evaluation
+evaluation = langwatch.experiment.init("my-evaluation")
+
+for index, row in evaluation.loop(df.iterrows()):
+    # Run your LLM/agent
+    output = my_llm(row["input"])
+    
+    # Log evaluation metrics
+    evaluation.log("response_quality", index=index, score=0.9)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Fetch dataset
+const dataset = await langwatch.datasets.get("your-dataset-slug");
+
+// Initialize evaluation
+const evaluation = await langwatch.experiments.init("my-evaluation");
+
+await evaluation.run(
+  dataset.entries.map((e) => e.entry),
+  async ({ item, index }) => {
+    // Run your LLM/agent
+    const output = await myLLM(item.input);
+    
+    // Log evaluation metrics
+    evaluation.log("response_quality", { index, score: 0.9 });
+  },
+  { concurrency: 4 }
+);
+```
+  </Tab>
+</Tabs>
+
+## Dataset Entry Structure
+
+Each dataset entry contains:
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique identifier for the entry |
+| `entry` | The actual data (e.g., `input`, `expected_output`, `contexts`) |
+| `datasetId` | ID of the parent dataset |
+| `projectId` | ID of the project |
+| `createdAt` | Timestamp of creation |
+| `updatedAt` | Timestamp of last update |
+
+## Typed Datasets (TypeScript)
+
+You can define types for your dataset entries for better type safety:
+
+```typescript
+type MyDatasetEntry = {
+  input: string;
+  expected_output: string;
+  contexts?: string[];
+};
+
+const dataset = await langwatch.datasets.get<MyDatasetEntry>("my-dataset");
+
+// Now entry.entry is typed as MyDatasetEntry
+for (const entry of dataset.entries) {
+  console.log(entry.entry.input);  // Typed as string
+  console.log(entry.entry.expected_output);  // Typed as string
+}
+```
+
+## Finding Your Dataset Slug
+
+You can find the dataset slug in the LangWatch UI:
+
+1. Go to the **Datasets** page
+2. Click on your dataset
+3. The slug is shown in the URL: `app.langwatch.ai/{project}/datasets/{slug}`
+
+You can also use the dataset ID (starting with `dataset_`) which is shown in the dataset details.

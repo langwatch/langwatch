@@ -19,11 +19,10 @@ import {
 } from "../api/routers/modelProviders.utils";
 import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
-import { getClickHouseClient } from "../clickhouse/client";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { getPayloadSizeHistogram } from "../metrics";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
@@ -45,27 +44,13 @@ export const clusterTopicsForProject = async (
 ): Promise<void> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { team: true },
   });
   if (!project) {
     throw new Error("Project not found");
   }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    logger.info(
-      { projectId },
-      "skipping clustering for project as monthly limit has been reached",
-    );
-  }
 
   const clickhouse = project.featureClickHouseDataSourceTraces
-    ? getClickHouseClient()
+    ? await getClickHouseClientForProject(projectId)
     : null;
 
   const { totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount } =
@@ -357,7 +342,7 @@ async function fetchTracesFromClickHouse(
         SubTopicId,
         toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
       FROM (
-        SELECT *
+        SELECT TraceId, ComputedInput, TopicId, SubTopicId, OccurredAt, UpdatedAt
         FROM trace_summaries
         WHERE ${whereClause}
         ORDER BY TraceId, UpdatedAt DESC

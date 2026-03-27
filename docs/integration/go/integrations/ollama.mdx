@@ -1,0 +1,83 @@
+---
+title: Ollama (Local Models) Integration
+sidebarTitle: Ollama (Local)
+description: Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
+keywords: go, golang, ollama, local llm, instrumentation, langwatch, openai-compatible
+---
+
+LangWatch supports tracing local models served by Ollama through its OpenAI-compatible endpoint.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY` environment variable before running. Ollama runs locally so no API key is needed for the model.
+</Info>
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	"github.com/openai/openai-go"
+	oaioption "github.com/openai/openai-go/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up LangWatch exporter
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+
+	// Create Ollama client via OpenAI-compatible API
+	client := openai.NewClient(
+		oaioption.WithBaseURL(os.Getenv("OLLAMA_BASE_URL")),
+		oaioption.WithAPIKey("ollama"), // Ollama doesn't require a real key
+		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureOutput(),
+			otelopenai.WithGenAISystem("ollama"),
+		)),
+	)
+
+	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: "openai/gpt-5",
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant."),
+			openai.UserMessage("Hello, Ollama!"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("Chat completion failed: %v", err)
+	}
+
+	log.Printf("Response: %s", response.Choices[0].Message.Content)
+}
+```
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Ollama applications

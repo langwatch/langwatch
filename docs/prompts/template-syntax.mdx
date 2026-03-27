@@ -1,0 +1,286 @@
+---
+title: "Template Syntax"
+description: "Reference for the Liquid template syntax supported in LangWatch prompts: variables, conditionals, loops, filters, and more."
+---
+
+LangWatch prompts use [Liquid](https://liquidjs.com/) as their template language. Liquid gives you variables, conditionals, loops, and filters so you can build dynamic prompts without custom code.
+
+Templates are rendered when you call `compile()` in the Python or TypeScript SDK, or when the platform executes a prompt on your behalf.
+
+## Variables
+
+Use double curly braces to insert dynamic values into your prompt.
+
+```liquid
+Hello, {{ user_name }}! You have {{ message_count }} new messages.
+```
+
+When compiled with `{ user_name: "Alice", message_count: 3 }`, this produces:
+
+```text
+Hello, Alice! You have 3 new messages.
+```
+
+### Accessing nested properties
+
+Dot notation lets you reach into objects:
+
+```liquid
+Customer: {{ user.name }} ({{ user.email }})
+```
+
+### Available variables
+
+The variables available depend on how you invoke the prompt:
+
+| Context | Variables |
+|---------|-----------|
+| **SDK `compile()`** | Any key-value pairs you pass in |
+| **Prompt Playground** | Values set in the Variables tab |
+| **Optimization Studio** | Node inputs defined in the workflow |
+| **Scenario adapters** | `input`, `messages`, and adapter-specific fields |
+
+## Conditionals
+
+Control which parts of a prompt appear based on runtime values.
+
+### if / elsif / else
+
+```liquid
+{% if tone == "formal" %}Dear {{ user_name }},{% elsif tone == "friendly" %}Hey {{ user_name }}!{% else %}Hello,{% endif %}
+
+How can I help you today?
+```
+
+Compiled with `{ tone: "formal", user_name: "Dr. Smith" }`:
+
+```text
+Dear Dr. Smith,
+
+How can I help you today?
+```
+
+### unless
+
+`unless` is the inverse of `if` -- the block renders when the condition is **false**.
+
+```liquid
+{% unless context %}Answer the question using only your general knowledge.{% endunless %}
+```
+
+### Operators
+
+| Operator | Meaning |
+|----------|---------|
+| `==` | Equal |
+| `!=` | Not equal |
+| `>` | Greater than |
+| `<` | Less than |
+| `>=` | Greater than or equal |
+| `<=` | Less than or equal |
+| `contains` | String contains substring, or array contains element |
+| `and` | Both conditions true |
+| `or` | Either condition true |
+
+```liquid
+{% if input contains "refund" %}You handle refunds.{% else %}You are a general assistant.{% endif %}
+```
+
+## Loops
+
+Iterate over arrays with `for`.
+
+```liquid
+Consider these topics:
+{% for topic in topics %}- {{ topic }}
+{% endfor %}
+```
+
+Compiled with `{ topics: ["AI safety", "Alignment", "Governance"] }`:
+
+```text
+Consider these topics:
+- AI safety
+- Alignment
+- Governance
+```
+
+### Comma-separated lists
+
+Use `forloop.last` to avoid a trailing separator:
+
+```liquid
+Topics: {% for item in topics %}{{ item }}{% unless forloop.last %}, {% endunless %}{% endfor %}
+```
+
+Produces: `Topics: AI, ML, NLP`
+
+### Loop variables
+
+Inside a `for` block, these variables are available:
+
+| Variable | Description |
+|----------|-------------|
+| `forloop.index` | Current iteration (1-based) |
+| `forloop.index0` | Current iteration (0-based) |
+| `forloop.first` | `true` on the first iteration |
+| `forloop.last` | `true` on the last iteration |
+| `forloop.length` | Total number of items |
+
+### Nested loops and conditionals
+
+Loops and conditionals compose freely:
+
+```liquid
+{% for user in users %}{% if user.active %}{{ user.name }}: {{ user.role }}
+{% endif %}{% endfor %}
+```
+
+## Filters
+
+Filters transform a value. Chain them with the pipe character (`|`).
+
+```liquid
+{{ name | upcase }}
+{{ description | truncate: 50 }}
+{{ tags | join: ", " }}
+```
+
+### String filters
+
+| Filter | Example | Result |
+|--------|---------|--------|
+| `upcase` | `{{ "alice" \| upcase }}` | `ALICE` |
+| `downcase` | `{{ "HELLO" \| downcase }}` | `hello` |
+| `capitalize` | `{{ "hello world" \| capitalize }}` | `Hello world` |
+| `truncate` | `{{ "A long sentence" \| truncate: 10 }}` | `A long ...` |
+| `strip` | `{{ "  hi  " \| strip }}` | `hi` |
+| `replace` | `{{ "Hello" \| replace: "Hello", "Hi" }}` | `Hi` |
+| `append` | `{{ "hello" \| append: " world" }}` | `hello world` |
+| `prepend` | `{{ "world" \| prepend: "hello " }}` | `hello world` |
+| `split` | `{{ "a,b,c" \| split: "," }}` | array `["a","b","c"]` |
+
+### Array filters
+
+| Filter | Example | Result |
+|--------|---------|--------|
+| `join` | `{{ tags \| join: ", " }}` | `ai, ml` |
+| `first` | `{{ items \| first }}` | First element |
+| `last` | `{{ items \| last }}` | Last element |
+| `size` | `{{ items \| size }}` | Number of elements |
+| `sort` | `{{ items \| sort }}` | Sorted array |
+| `reverse` | `{{ items \| reverse }}` | Reversed array |
+
+### Other filters
+
+| Filter | Example | Result |
+|--------|---------|--------|
+| `default` | `{{ name \| default: "User" }}` | `User` when name is empty |
+| `json` | `{{ data \| json }}` | JSON-encoded string |
+
+<Note>
+  **Truncate behavior differs between SDKs.** In the TypeScript SDK (LiquidJS), `truncate: N` outputs N characters of content then appends `"..."`. In the Python SDK (python-liquid), `truncate: N` means N total characters including the `"..."` suffix. Keep this in mind if you rely on exact output length.
+</Note>
+
+## Assignment
+
+Create local variables within the template using `assign`.
+
+```liquid
+{% assign greeting = "Hello" %}{% assign formatted_name = name | capitalize %}{{ greeting }}, {{ formatted_name }}!
+```
+
+Compiled with `{ name: "alice" }`:
+
+```text
+Hello, Alice!
+```
+
+Assigned variables are local to the template -- they do not need to be passed in and will not appear as required input variables.
+
+## Comments
+
+Use comment tags for notes that should not appear in the rendered output.
+
+```liquid
+{% comment %}
+  This section is only included for premium users.
+  TODO: add tier-based routing.
+{% endcomment %}
+{% if is_premium %}You have access to advanced features.{% endif %}
+```
+
+## Practical examples
+
+### Conditional system prompt
+
+Adapt the system message based on user input:
+
+```liquid
+{% if input contains "refund" %}
+You are a refund specialist. Follow the company refund policy strictly.
+{% elsif input contains "billing" %}
+You are a billing assistant. You can look up invoices and payment history.
+{% else %}
+You are a general customer support agent. Be helpful and concise.
+{% endif %}
+
+The customer said: {{ input }}
+```
+
+### Few-shot examples from a list
+
+Build few-shot examples dynamically:
+
+```liquid
+You are a sentiment classifier. Classify the sentiment as positive, negative, or neutral.
+
+{% for example in examples %}
+Input: {{ example.text }}
+Sentiment: {{ example.label }}
+{% endfor %}
+Input: {{ input }}
+Sentiment:
+```
+
+### Context-aware RAG prompt
+
+Include retrieved context only when it exists:
+
+```liquid
+{% if context %}Use the following context to answer the question:
+
+{% for doc in context %}[{{ forloop.index }}] {{ doc }}
+{% endfor %}
+{% endif %}Question: {{ question }}
+```
+
+### Multi-language greeting
+
+```liquid
+{% if lang == "en" %}Hello{% elsif lang == "es" %}Hola{% elsif lang == "fr" %}Bonjour{% else %}Hi{% endif %}, {{ user_name }}!
+```
+
+## Strict vs. lenient compilation
+
+The SDKs offer two compilation modes:
+
+- **`compile()`** -- Lenient. Undefined variables resolve to empty strings and missing conditions evaluate to false. Useful for optional fields.
+- **`compileStrict()`** (TypeScript) / **`compile_strict()`** (Python) -- Strict. Throws a `PromptCompilationError` if any variable used in the template is not provided. Use this to catch typos and missing data early.
+
+```python
+# Python - strict mode catches missing variables
+prompt.compile_strict(name="Alice")  # raises PromptCompilationError if template uses {{ email }}
+```
+
+```typescript
+// TypeScript - strict mode catches missing variables
+prompt.compileStrict({ name: "Alice" }); // throws PromptCompilationError if template uses {{ email }}
+```
+
+## Further reading
+
+- [Get Started with Prompts](/prompt-management/getting-started) -- Create and use your first prompt
+- [Prompt Playground](/prompt-management/prompt-playground) -- Edit and test prompts interactively
+- [Data Model](/prompt-management/data-model) -- Prompt structure and variable types
+- [Liquid documentation](https://liquidjs.com/) -- Full Liquid language reference

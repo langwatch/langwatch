@@ -16,7 +16,7 @@ import { useMemo } from "react";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
-import { RunSummaryCounts } from "./RunSummaryCounts";
+import { RunMetricsSummary } from "./RunMetricsSummary";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -28,6 +28,8 @@ type GroupRowProps = {
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   viewMode?: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 export function GroupRow({
@@ -38,6 +40,8 @@ export function GroupRow({
   onScenarioRunClick,
   resolveTargetName,
   viewMode = "grid",
+  onCancelRun,
+  cancellingJobId,
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
@@ -83,7 +87,7 @@ export function GroupRow({
           &middot;
         </Text>
         <Box flexShrink={0}>
-          <RunSummaryCounts summary={summary} />
+          <RunMetricsSummary summary={summary} />
         </Box>
         <Box flex={1} />
         <Text fontSize="xs" color="fg.muted" flexShrink={0}>
@@ -101,6 +105,8 @@ export function GroupRow({
               resolveTargetName={resolveTargetName}
               onScenarioRunClick={onScenarioRunClick}
               viewMode={viewMode}
+              onCancelRun={onCancelRun}
+              cancellingJobId={cancellingJobId}
             />
           ))}
           {group.scenarioRuns.length === 0 && (

@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Select } from "~/components/ui/select";
@@ -156,6 +157,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         });
       },
       onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Failed to generate license",
           description: error.message,
@@ -494,7 +496,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
             <Select.Trigger width="full">
               <Select.ValueText placeholder="Select plan type" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover">
+            <Select.Content paddingY={2}>
               {planTypeCollection.items.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   {item.label}
@@ -517,7 +519,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
             <Select.Trigger width="full">
               <Select.ValueText placeholder="Select usage unit" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover">
+            <Select.Content paddingY={2}>
               {usageUnitCollection.items.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   {item.label}

@@ -1,0 +1,48 @@
+---
+title: Elasticsearch
+description: Set up Elasticsearch for LangWatch Hybrid deployments to enable scalable search and analysis of traces and agent evaluations.
+---
+
+### Introduction
+
+This guide walks you through the process of preparing your environment for LangWatch's hybrid deployment. It uses your own Elasticsearch cluster for search and indexing. The instructions cover setup on Elastic Cloud.
+> A screen-sharing session with LangWatch is strongly recommended to ensure everything is working as expected.
+
+---
+
+### Step-by-Step Setup Instructions
+
+#### Elasticsearch Setup (Required)
+
+LangWatch relies on Elasticsearch (or OpenSearch) for core functionality such as log indexing, analytics, and querying.
+
+#### Create an Elasticsearch Cluster
+
+- Go to **Elastic Cloud** on GCP or your preferred Elasticsearch provider.
+- Create a new deployment with the following specs:
+
+  - **Version:** 8.x (recommended)  
+  - **Template:** Search optimized  
+  - **Storage:** 45GB  
+  - **Availability Zones:** 2  
+
+#### After the deployment completes:
+
+- Save the **Elasticsearch Endpoint** (e.g., `https://your-elasticsearch-host:9200`)
+- Near **API Keys**, click **(+ New)** to create a new API key:
+  - Name it something like `langwatch-api-key`
+  - Assign **full access permissions**
+  - **Copy the encoded API key**
+
+---
+
+#### Required Values for Deployment:
+
+- **Elasticsearch URL**
+- **API Key** with full permissions
+
+> Once you have these, add them to your account on the **LangWatch settings page**, as shown in the image below.
+
+![Elasticsearch Setup](/images/settings-hybrid.png)
+
+> If using OpenSearch instead of Elastic Cloud, the setup steps are similar—just ensure the endpoint and API key/token support write and search operations.

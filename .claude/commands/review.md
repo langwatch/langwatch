@@ -13,7 +13,7 @@ Perform a comprehensive code review based on change content.
    - Always invoke **pii-reviewer** for security scan (secrets, PII, sensitive data)
 
 3. **Post-review**:
-   - Check if any ADRs in `docs/adr/` need updating based on the changes
+   - Check if any ADRs in `dev/docs/adr/` need updating based on the changes
    - Verify PR description is still accurate and update if needed
 
 ## Notes

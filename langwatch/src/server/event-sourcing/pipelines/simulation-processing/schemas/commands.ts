@@ -9,6 +9,7 @@ export const queueRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
@@ -21,6 +22,7 @@ export const startRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
@@ -67,6 +69,17 @@ export const textMessageEndCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
+
+export const updateRunMetricsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  traceId: z.string(),
+  totalCost: z.number(),
+  roleCosts: z.record(z.string(), z.number()),
+  roleLatencies: z.record(z.string(), z.number()),
+  occurredAt: z.number(),
+});
+export type UpdateRunMetricsCommandData = z.infer<typeof updateRunMetricsCommandDataSchema>;
 
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),

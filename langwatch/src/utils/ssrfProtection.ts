@@ -473,7 +473,7 @@ export function createSSRFValidator(config: SSRFConfig) {
         "DNS resolution failed during SSRF check - blocking request",
       );
       throw new Error(
-        "Unable to resolve hostname. Please verify the URL is correct and the server is reachable.",
+        `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
       );
     }
 
@@ -490,7 +490,7 @@ export function createSSRFValidator(config: SSRFConfig) {
         "No DNS records found - blocking request",
       );
       throw new Error(
-        "Unable to resolve hostname. Please verify the URL is correct.",
+        `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
       );
     }
 

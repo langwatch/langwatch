@@ -32,7 +32,7 @@ export class SimulationFacade {
     });
   }
 
-  private async isClickHouseEnabled(projectId: string): Promise<boolean> {
+  async isClickHouseReadEnabled(projectId: string): Promise<boolean> {
     if (!this.deps.chService) return false;
     return this.deps.projects.isFeatureEnabled(projectId, "featureClickHouseDataSourceSimulations");
   }
@@ -52,7 +52,7 @@ export class SimulationFacade {
     chCall: (ch: SimulationRunService) => Promise<T>;
     esCall: () => Promise<T>;
   }): Promise<T> {
-    if (await this.isClickHouseEnabled(projectId)) {
+    if (await this.isClickHouseReadEnabled(projectId)) {
       return chCall(this.deps.chService!);
     }
     return esCall();
@@ -160,6 +160,8 @@ export class SimulationFacade {
 
   async getExternalSetSummaries(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     return this.routeRead({
       projectId: params.projectId,

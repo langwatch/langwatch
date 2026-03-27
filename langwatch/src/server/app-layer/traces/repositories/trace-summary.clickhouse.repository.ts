@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
@@ -13,11 +13,15 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
-type ClickHouseSummaryWriteRecord = WithDateWrites<
-  ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt"
->;
-
+/**
+ * Read-side record type — intentionally excludes ScenarioRoleCosts,
+ * ScenarioRoleLatencies, and ScenarioRoleSpans.
+ *
+ * WHY: These Map(String, ...) columns were added after millions of rows already
+ * existed. When ClickHouse reads old merged parts it materializes default empty
+ * maps for every row in the granule, causing OOM kills. The trace-side reactor
+ * uses fold state instead, so these values are never needed on the read path.
+ */
 interface ClickHouseSummaryRecord {
   ProjectionId: string;
   TenantId: string;
@@ -51,8 +55,21 @@ interface ClickHouseSummaryRecord {
   HasAnnotation: number | null;
 }
 
+/** Write-side record extends the read type with ScenarioRole Map columns.
+ *  Single-row inserts are fine — only reads across old merged parts OOM. */
+interface ClickHouseSummaryWriteExtended extends ClickHouseSummaryRecord {
+  ScenarioRoleCosts: Record<string, number>;
+  ScenarioRoleLatencies: Record<string, number>;
+  ScenarioRoleSpans: Record<string, string>;
+}
+
+type ClickHouseSummaryWriteRecord = WithDateWrites<
+  ClickHouseSummaryWriteExtended,
+  "OccurredAt" | "CreatedAt" | "UpdatedAt"
+>;
+
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
     EventUtils.validateTenantId(
@@ -67,6 +84,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     );
 
     try {
+      const client = await this.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -74,7 +92,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -102,7 +120,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId,
@@ -191,6 +210,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       hasAnnotation:
         record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
       attributes: record.Attributes ?? {},
+      // Hardcoded to empty — see ClickHouseSummaryRecord comment for OOM rationale.
+      scenarioRoleCosts: {},
+      scenarioRoleLatencies: {},
+      scenarioRoleSpans: {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -215,10 +238,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs: data.timeToFirstTokenMs,
-      TimeToLastTokenMs: data.timeToLastTokenMs,
-      TotalDurationMs: data.totalDurationMs,
-      TokensPerSecond: data.tokensPerSecond,
+      TimeToFirstTokenMs: data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
+      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+      TotalDurationMs: Math.round(data.totalDurationMs),
+      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
       SpanCount: data.spanCount,
       ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
       ContainsOKStatus: data.containsOKStatus ? 1 : 0,
@@ -235,6 +258,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       SubTopicId: data.subTopicId,
       HasAnnotation:
         data.hasAnnotation != null ? (data.hasAnnotation ? 1 : 0) : null,
+      ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
+      ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
+      ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
     };
   }
 }

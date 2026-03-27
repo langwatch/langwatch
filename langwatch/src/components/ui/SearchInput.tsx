@@ -20,6 +20,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, InputProps>(
             <Search size={14} aria-label="Search" role="img" />
           </span>
         }
+        startOffset="2px"
       >
         <Input ref={ref} role="searchbox" {...props} />
       </InputGroup>

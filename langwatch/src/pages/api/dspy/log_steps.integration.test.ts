@@ -1,19 +1,16 @@
 import type { Project } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../../server/db";
-import {
-  DSPY_STEPS_INDEX,
-  dspyStepIndexId,
-  esClient,
-} from "../../../server/elasticsearch";
-import type {
-  DSPyStep,
-  DSPyStepRESTParams,
-} from "../../../server/experiments/types";
+import type { DSPyStepRESTParams } from "../../../server/experiments/types";
 import { getTestProject } from "../../../utils/testUtils";
 import handler from "./log_steps";
+import { globalForApp, resetApp } from "../../../server/app-layer/app";
+import { createTestApp } from "../../../server/app-layer/presets";
+import { DspyStepService } from "../../../server/app-layer/dspy-steps/dspy-step.service";
+import { DspyStepClickHouseRepository } from "../../../server/app-layer/dspy-steps/repositories/dspy-step.clickhouse.repository";
+import { createClickHouseClientFromConfig } from "../../../server/app-layer/clients/clickhouse.factory";
 
 const sampleDSPyStep: DSPyStepRESTParams = {
   experiment_slug: "sample-experiment",
@@ -128,12 +125,14 @@ const sampleDSPyStepSecondExampleAndLLMCall: DSPyStepRESTParams = {
   },
 };
 
-// Skip when running with testcontainers only (requires PostgreSQL + Elasticsearch)
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("Log Steps API Endpoint", () => {
+describe("Log Steps API Endpoint", () => {
   let project: Project;
+
+  const clickhouse = createClickHouseClientFromConfig({
+    url: process.env.CLICKHOUSE_URL,
+    enabled: true,
+  })!;
+  const dspySteps = new DspyStepService(new DspyStepClickHouseRepository(async () => clickhouse!));
 
   beforeAll(async () => {
     project = await getTestProject("dspy-log-steps");
@@ -149,18 +148,20 @@ describe.skipIf(isTestcontainersOnly)("Log Steps API Endpoint", () => {
       },
     });
 
-    const client = await esClient({ test: true });
-    await client.deleteByQuery({
-      index: DSPY_STEPS_INDEX.alias,
-      query: {
-        match: {
-          project_id: project.id,
-        },
-      },
+    globalForApp.__langwatch_app = createTestApp({
+      dspySteps: { steps: dspySteps },
     });
+
+    // Clean up any existing ClickHouse data
+    await dspySteps.deleteByExperiment({ tenantId: project.id, experimentId: "any" }).catch(() => {});
   });
 
-  test("should create experiment and insert DSPyStep into Elasticsearch, appending the examples and llm_calls together, without duplication, and updating the score", async () => {
+  afterAll(async () => {
+    resetApp();
+    await clickhouse?.close();
+  });
+
+  test("creates experiment and inserts DSPy step, appending examples and llm_calls without duplication, and updating the score", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
       createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
@@ -187,20 +188,16 @@ describe.skipIf(isTestcontainersOnly)("Log Steps API Endpoint", () => {
     });
     expect(experiment).not.toBeNull();
 
-    const client = await esClient({ test: true });
-    const indexedStep = await client.get<DSPyStep>({
-      index: DSPY_STEPS_INDEX.alias,
-      id: dspyStepIndexId({
-        projectId: project.id,
-        runId: sampleDSPyStep.run_id,
-        index: sampleDSPyStep.index,
-      }),
+    const step = await dspySteps.getStep({
+      tenantId: project.id,
+      experimentId: experiment!.id,
+      runId: sampleDSPyStep.run_id,
+      stepIndex: sampleDSPyStep.index,
     });
-    expect(indexedStep).not.toBeNull();
-    expect(indexedStep._source?.score).toEqual(0.6);
-    expect(indexedStep._source?.examples).toHaveLength(2);
 
-    expect(indexedStep._source?.llm_calls[0]?.model).toEqual("gpt-4o");
-    expect(indexedStep._source?.llm_calls[0]?.cost).toBeGreaterThan(0);
+    expect(step.score).toEqual(0.6);
+    expect(step.examples).toHaveLength(2);
+    expect(step.llmCalls[0]?.model).toEqual("gpt-4o");
+    expect(step.llmCalls[0]?.cost).toBeGreaterThan(0);
   });
 });

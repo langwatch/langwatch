@@ -39,6 +39,18 @@ The issue is the source of truth for requirements and acceptance criteria.
 
 Be aware of context size. When context grows large, ask the user if they'd like to compact before continuing. Agents work in isolated forks and return summaries.
 
+## PR Lifecycle (Push Early, Draft Early)
+
+Every implementation — bug fix or feature — follows this PR lifecycle:
+
+1. **First commit → push + draft PR immediately.** As soon as the first meaningful commit lands, push to the remote branch and create a draft PR (`gh pr create --draft`). Include the issue number in the body for linking. This makes work visible early.
+2. **Push incrementally.** After each subsequent commit (fix, review feedback, etc.), push to keep the remote up to date.
+3. **Mark ready when done.** Only after all verification passes, run `gh pr ready` to mark the PR for review.
+
+Do NOT wait until the end to create the PR. The draft PR is created right after the first commit, not at completion.
+
+---
+
 ## Bug Detection
 
 Before starting any workflow, classify the issue as a **bug** or **feature**:
@@ -66,6 +78,12 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
   - Make the fix
   - Verify the test passes
 
+**Choose the right test level for the regression test.** "Reproduces the bug" means the test triggers the same failure mode the user reported — not just inspecting generated output:
+- If the bug is a **runtime crash or query error**: the test must execute the code path that crashes (integration test). A unit test asserting string output does NOT reproduce a runtime crash.
+- If the bug is **wrong output or wrong behavior**: a unit test checking output may be sufficient.
+- If the bug is a **UI rendering issue**: a browser test is needed.
+- **Rule of thumb:** if the bug report says "X crashes/errors at runtime," the regression test must execute X and observe the crash. String-level assertions on generated code are supplementary, not primary.
+
 > **Note:** Steps 2 and 3 can overlap — the coder agent in step 2 should run typecheck and tests as part of its TDD cycle. Step 3 is the orchestrator's verification.
 
 ### 3. Verify
@@ -86,10 +104,8 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
 - If verification fails → invoke `/code` with findings, re-run `/browser-test`
   - Max 2 iterations, then escalate to user
 
-### 6. Commit, PR, and Drive to Green
-- Create a conventional commit for all changes and push to remote
-- Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
-- Include the issue number in the PR body for linking
+### 6. Finalize and Mark Ready
+- Mark PR as ready for review: `gh pr ready`
 - Invoke `/drive-pr --once` to fix any CI failures and address review comments
 
 ### 7. Verify and Finish
@@ -100,12 +116,13 @@ Before reporting done, run through this checklist. **Every item must pass** — 
 - [ ] All tasks in the task list are marked `completed`
 - [ ] `git status` is clean — no uncommitted changes
 - [ ] `git push` is up to date with remote — no unpushed commits
-- [ ] PR exists and is linked to the issue
+- [ ] Draft PR was created after first commit and is now marked ready
 
 **Quality:**
 - [ ] `pnpm typecheck` passes
 - [ ] All relevant tests pass (`pnpm test:unit`, `pnpm test:integration`)
 - [ ] Regression test exists for the bug fix
+- [ ] Regression test level matches the failure mode (runtime crash → integration test, not unit test checking strings)
 
 **PR completeness:**
 - [ ] PR description includes what the bug was and how it was fixed
@@ -211,10 +228,8 @@ If ANY check fails:
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
-### 10. Commit, PR, and Drive to Green
-- Create a conventional commit for all changes and push to remote
-- Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
-- Include the issue number in the PR body for linking
+### 10. Finalize and Mark Ready
+- Mark PR as ready for review: `gh pr ready`
 - Invoke `/drive-pr --once` to fix any CI failures and address review comments
 
 ### 11. Verify and Finish
@@ -226,7 +241,7 @@ Before reporting done, run through this checklist. **Every item must pass** — 
 - [ ] Self-check (step 9) passed
 - [ ] `git status` is clean — no uncommitted changes
 - [ ] `git push` is up to date with remote — no unpushed commits
-- [ ] PR exists and is linked to the issue
+- [ ] Draft PR was created after first commit and is now marked ready
 
 **Quality:**
 - [ ] `pnpm typecheck` passes

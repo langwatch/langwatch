@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 
@@ -71,7 +71,7 @@ export async function collectUsageStats(instanceId: string) {
     }),
   ]);
 
-  const clickhouse = getClickHouseClient();
+  const clickhouse = await getClickHouseClientForOrganization(organizationId);
 
   const totalTraces = await getTraceCount(projects, clickhouse);
   const totalScenarioEvents = await getScenariosCount(projects, clickhouse);

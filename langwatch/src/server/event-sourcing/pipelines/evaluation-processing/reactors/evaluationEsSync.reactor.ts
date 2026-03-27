@@ -76,6 +76,7 @@ export function createEvaluationEsSyncReactor(
         passed: foldState.passed ?? null,
         label: foldState.label ?? null,
         details: foldState.details ?? null,
+        inputs: foldState.inputs ?? null,
         ...(foldState.error && {
           error: { has_error: true, message: foldState.error, stacktrace: [] },
         }),

@@ -13,6 +13,7 @@ import {
   isSimulationMessageSnapshotEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunMetricsUpdatedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
   isSimulationTextMessageEndEvent,
@@ -52,6 +53,7 @@ export interface SimulationRunStateData {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   Messages: SimulationMessageRow[];
   TraceIds: string[];
   Verdict: string | null;
@@ -60,6 +62,10 @@ export interface SimulationRunStateData {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: number | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
+  TraceMetrics: Record<string, { totalCost: number; roleCosts: Record<string, number>; roleLatencies: Record<string, number> }>;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -82,6 +88,7 @@ function init(): SimulationRunStateData {
     Status: "PENDING",
     Name: null,
     Description: null,
+    Metadata: null,
     Messages: [],
     TraceIds: [],
     Verdict: null,
@@ -90,6 +97,10 @@ function init(): SimulationRunStateData {
     UnmetCriteria: [],
     Error: null,
     DurationMs: null,
+    TotalCost: null,
+    RoleCosts: {},
+    RoleLatencies: {},
+    TraceMetrics: {},
     StartedAt: null,
     QueuedAt: null,
     CreatedAt: Date.now(),
@@ -114,8 +125,9 @@ function apply(
       Name: event.data.name ?? null,
       Status: "QUEUED",
       Description: event.data.description ?? null,
+      Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       QueuedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -128,9 +140,10 @@ function apply(
       ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
+      Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -159,7 +172,7 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -194,7 +207,7 @@ function apply(
       Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -248,7 +261,7 @@ function apply(
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: updatedMessages,
       TraceIds: traceIds,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -279,7 +292,43 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: event.occurredAt,
+    };
+  }
+
+  if (isSimulationRunMetricsUpdatedEvent(event)) {
+    // Store per-trace breakdown, then recompute aggregates
+    const traceMetrics = {
+      ...state.TraceMetrics,
+      [event.data.traceId]: {
+        totalCost: event.data.totalCost,
+        roleCosts: event.data.roleCosts,
+        roleLatencies: event.data.roleLatencies,
+      },
+    };
+
+    // Aggregate across all traces: collect individual values into arrays
+    let totalCost = 0;
+    const roleCosts: Record<string, number[]> = {};
+    const roleLatencies: Record<string, number[]> = {};
+
+    for (const entry of Object.values(traceMetrics)) {
+      totalCost += entry.totalCost;
+      for (const [role, cost] of Object.entries(entry.roleCosts)) {
+        (roleCosts[role] ??= []).push(cost);
+      }
+      for (const [role, latency] of Object.entries(entry.roleLatencies)) {
+        (roleLatencies[role] ??= []).push(latency);
+      }
+    }
+
+    return {
+      ...state,
+      TraceMetrics: traceMetrics,
+      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+      RoleCosts: roleCosts,
+      RoleLatencies: roleLatencies,
+      UpdatedAt: event.occurredAt,
     };
   }
 
@@ -287,8 +336,8 @@ function apply(
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      ArchivedAt: Date.now(),
-      UpdatedAt: Date.now(),
+      ArchivedAt: event.occurredAt,
+      UpdatedAt: event.occurredAt,
     };
   }
 

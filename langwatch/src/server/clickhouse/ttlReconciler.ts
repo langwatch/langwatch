@@ -32,6 +32,12 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 30,
   },
   {
+    table: "dspy_steps",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_DSPY_STEPS_TABLE_HOT_DAYS",
+    hardcodedDefault: 4500,
+  },
+  {
     table: "evaluation_runs",
     ttlColumn: "ScheduledAt",
     envVar: "TIERED_EVALUATION_RUNS_TABLE_HOT_DAYS",

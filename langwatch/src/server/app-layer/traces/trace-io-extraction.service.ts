@@ -320,6 +320,55 @@ function shouldExcludeSpan(span: NormalizedSpan): boolean {
   return type === "evaluation" || type === "guardrail";
 }
 
+/**
+ * Common keys that wrap a single text value in JSON payloads from various
+ * frameworks (LangChain, Haystack, Flowise, Optimization Studio, etc.).
+ * Order matters: first match wins.
+ */
+const COMMON_TEXT_KEYS = [
+  "text",
+  "input",
+  "question",
+  "user_query",
+  "query",
+  "message",
+  "input_value",
+  "output",
+  "answer",
+  "content",
+  "prompt",
+] as const;
+
+/**
+ * Extracts a human-readable text representation from a plain JSON object
+ * that is NOT message-shaped (no role/content structure).
+ *
+ * Handles common wrapper patterns like `{ input: "hello" }` or
+ * `{ question: "what is 2+2?" }` that are used by various frameworks.
+ */
+function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
+  for (const key of COMMON_TEXT_KEYS) {
+    const val = obj[key];
+    if (val === undefined) continue;
+    if (typeof val === "string") return val;
+    if (typeof val === "number" || typeof val === "boolean") return String(val);
+    // Nested object with a known key (e.g. { inputs: { input: "hello" } })
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      const nested = extractTextFromPlainJson(val as Record<string, unknown>);
+      if (nested) return nested;
+    }
+  }
+
+  // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
+  const wrapper = obj.inputs ?? obj.outputs;
+  if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
+    const nested = extractTextFromPlainJson(wrapper as Record<string, unknown>);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
 function messagesToText(
   messages: unknown,
   mode: "input" | "output" = "output",
@@ -353,5 +402,14 @@ function messagesToText(
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
-  return extractMessageContentText(messages);
+  // Try message-shaped extraction first (content, parts, text, value)
+  const messageText = extractMessageContentText(messages);
+  if (messageText) return messageText;
+
+  // Fall back to common JSON wrapper keys (input, question, query, etc.)
+  if (typeof messages === "object" && messages !== null) {
+    return extractTextFromPlainJson(messages as Record<string, unknown>);
+  }
+
+  return null;
 }

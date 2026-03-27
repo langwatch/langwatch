@@ -67,6 +67,8 @@ export interface SimulationRepository {
 
   getExternalSetSummaries(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ExternalSetSummary[]>;
 
   getRunDataForAllSuites(params: {
@@ -81,6 +83,14 @@ export interface SimulationRepository {
   getAllRunIdsForProject(params: {
     projectId: string;
   }): Promise<string[]>;
+
+  /**
+   * Returns distinct external (non-internal) scenario set IDs across the given projects.
+   * Used for cross-org counting of scenario sets for limit enforcement.
+   */
+  getDistinctExternalSetIds(params: {
+    projectIds: string[];
+  }): Promise<Set<string>>;
 }
 
 export class NullSimulationRepository implements SimulationRepository {
@@ -126,5 +136,9 @@ export class NullSimulationRepository implements SimulationRepository {
 
   async getAllRunIdsForProject(): Promise<string[]> {
     return [];
+  }
+
+  async getDistinctExternalSetIds(): Promise<Set<string>> {
+    return new Set();
   }
 }

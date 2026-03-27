@@ -8,6 +8,7 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
+import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
@@ -19,6 +20,7 @@ import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { UsageService } from "./usage/usage.service";
 
@@ -40,6 +42,9 @@ export interface AppDependencies {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
   };
+  dspySteps: {
+    steps: DspyStepService;
+  };
   simulations: {
     runs: SimulationRunService;
   };
@@ -53,6 +58,7 @@ export interface AppDependencies {
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
   notifications: NotificationService;
+  nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   commands: AppCommands;
 

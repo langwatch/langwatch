@@ -31,6 +31,7 @@ import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/util
 import { slugify } from "~/utils/slugify";
 import { getApp } from "~/server/app-layer/app";
 import { trackServerEvent } from "~/server/posthog";
+import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -633,6 +634,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
+        includeDeactivated: z.boolean().optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:view"))
@@ -651,6 +653,9 @@ export const organizationRouter = createTRPCRouter({
         },
         include: {
           members: {
+            ...(!input.includeDeactivated
+              ? { where: { user: { deactivatedAt: null } } }
+              : {}),
             include: {
               user: {
                 include: {
@@ -971,6 +976,15 @@ export const organizationRouter = createTRPCRouter({
           event: "team_member_invited",
           properties: { inviteCount: createdRecords.length },
         });
+
+        const memberCount = organization.members.length + createdRecords.length;
+        for (const record of createdRecords) {
+          fireTeamMemberInvitedNurturing({
+            userId: ctx.session.user.id,
+            teamMemberCount: memberCount,
+            role: record.invite.role,
+          });
+        }
       }
 
       const invites = await Promise.all(
@@ -1460,12 +1474,10 @@ export const organizationRouter = createTRPCRouter({
         });
       });
 
-      const project = await prisma.project.findFirst({
-        where: { teamId: invite.teamIds.split(",")[0] },
-        select: { slug: true },
-      });
+      const inviteService = InviteService.create(prisma);
+      const projectSlug = await inviteService.findLandingProjectSlug(invite);
 
-      return { success: true, invite, project };
+      return { success: true, invite, project: projectSlug ? { slug: projectSlug } : null };
     }),
   updateTeamMemberRole: protectedProcedure
     .input(
@@ -1827,6 +1839,7 @@ export const organizationRouter = createTRPCRouter({
 
       const users = await prisma.user.findMany({
         where: {
+          deactivatedAt: null,
           orgMemberships: {
             some: {
               organizationId: input.organizationId,
@@ -2136,7 +2149,7 @@ export const organizationRouter = createTRPCRouter({
         endDate: z.number().optional(), // End date timestamp (milliseconds)
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

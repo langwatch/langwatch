@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
@@ -16,9 +16,9 @@ import {
 export class SimulationRunService {
   constructor(readonly repository: SimulationRepository) {}
 
-  static create(clickhouse: ClickHouseClient | null): SimulationRunService {
-    const repo = clickhouse
-      ? new SimulationClickHouseRepository(clickhouse)
+  static create(resolveClient: ClickHouseClientResolver | null): SimulationRunService {
+    const repo = resolveClient
+      ? new SimulationClickHouseRepository(resolveClient)
       : new NullSimulationRepository();
     return traced(new SimulationRunService(repo), "SimulationRunService");
   }
@@ -81,7 +81,7 @@ export class SimulationRunService {
     return this.repository.getBatchRunCountForScenarioSet(params);
   }
 
-  async getExternalSetSummaries(params: { projectId: string }): Promise<ExternalSetSummary[]> {
+  async getExternalSetSummaries(params: { projectId: string; startDate?: number; endDate?: number }): Promise<ExternalSetSummary[]> {
     return this.repository.getExternalSetSummaries(params);
   }
 
@@ -98,5 +98,13 @@ export class SimulationRunService {
 
   async getAllRunIdsForProject(params: { projectId: string }): Promise<string[]> {
     return this.repository.getAllRunIdsForProject(params);
+  }
+
+  /**
+   * Returns distinct external (non-internal) scenario set IDs across the given projects.
+   * Used by UsageService for cross-org scenario set limit enforcement.
+   */
+  async getDistinctExternalSetIds(params: { projectIds: string[] }): Promise<Set<string>> {
+    return this.repository.getDistinctExternalSetIds(params);
   }
 }

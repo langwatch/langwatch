@@ -25,7 +25,6 @@ import {
 } from "../../../../server/experiments/types.generated";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
 import { createLogger } from "../../../../utils/logger/server";
-import { safeTruncate } from "../../../../utils/truncate";
 import { findOrCreateExperiment } from "../../experiment/init";
 
 /** Valid target types for validation */
@@ -250,24 +249,8 @@ const processBatchEvaluation = async (
     experiment_id: experiment.id,
     project_id: project.id,
     targets: processedTargets,
-    dataset:
-      param.dataset?.map((entry) => ({
-        ...entry,
-        ...(entry.entry ? { entry: safeTruncate(entry.entry, 32 * 1024) } : {}),
-        ...(entry.predicted
-          ? { predicted: safeTruncate(entry.predicted, 32 * 1024) }
-          : {}),
-      })) ?? [],
-    evaluations:
-      param.evaluations?.map((evaluation) => ({
-        ...evaluation,
-        ...(evaluation.inputs
-          ? { inputs: safeTruncate(evaluation.inputs, 32 * 1024) }
-          : {}),
-        ...(evaluation.details
-          ? { details: safeTruncate(evaluation.details, 32 * 1024) }
-          : {}),
-      })) ?? [],
+    dataset: param.dataset ?? [],
+    evaluations: param.evaluations ?? [],
     timestamps: {
       ...param.timestamps,
       created_at: param.timestamps?.created_at ?? new Date().getTime(),
@@ -408,10 +391,9 @@ const dispatchToClickHouse = async (
   batchEvaluation: ESBatchEvaluation,
 ) => {
   const { run_id: runId } = batchEvaluation;
+  const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
   try {
-    const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
-
     // Critical: await the start command so the run exists in CH
     await getApp().experimentRuns.startExperimentRun({
       tenantId: project.id,
@@ -444,6 +426,7 @@ const dispatchToClickHouse = async (
         duration: entry.duration ?? undefined,
         error: entry.error ?? undefined,
         traceId: entry.trace_id ?? undefined,
+        targets,
         occurredAt: Date.now(),
       }).catch((err) => {
         logger.warn(

@@ -29,7 +29,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       },
     });
 
-    const repository = new EventRepositoryClickHouse(client);
+    const repository = new EventRepositoryClickHouse(async () => client);
     const rows = await repository.getEventRecords("tenant", "agg", "id");
 
     expect(rows[0]?.EventPayload).toEqual({
@@ -47,7 +47,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       }),
     );
 
-    const repository = new EventRepositoryClickHouse(client);
+    const repository = new EventRepositoryClickHouse(async () => client);
     const rows = await repository.getEventRecords("tenant", "agg", "id");
 
     expect(rows[0]?.EventPayload).toEqual(

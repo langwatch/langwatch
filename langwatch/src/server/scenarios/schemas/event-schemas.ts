@@ -45,7 +45,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
   batchRunId: batchRunIdSchema,
   scenarioId: scenarioIdSchema,
   scenarioRunId: scenarioRunIdSchema,
-  scenarioSetId: z.string().optional().default("default"),
+  scenarioSetId: z.string().optional().default("default").transform((v) => v || "default"),
 });
 
 /**

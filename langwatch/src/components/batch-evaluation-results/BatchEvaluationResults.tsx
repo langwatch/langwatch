@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import {
@@ -33,6 +34,7 @@ import {
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
+import { getRunDisplayName } from "./getRunDisplayName";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   type BatchEvaluationData,
@@ -66,6 +68,8 @@ export function BatchEvaluationResults({
   selectedRunId: externalSelectedRunId,
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
+  const { isLiteMember } = useLiteMemberGuard();
+
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
 
@@ -248,12 +252,19 @@ export function BatchEvaluationResults({
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
-  // Map runId to human-readable name (commit message or runId)
+  // Map runId to human-readable name (commit message or "Run #N")
+  // Sort chronologically so fallback "Run #N" numbering is stable
   const runNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const run of sidebarRuns) {
-      map[run.runId] = run.workflowVersion?.commitMessage ?? run.runId;
-    }
+    const sorted = [...sidebarRuns].sort(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
+    sorted.forEach((run, index) => {
+      map[run.runId] = getRunDisplayName({
+        commitMessage: run.workflowVersion?.commitMessage,
+        index,
+      });
+    });
     return map;
   }, [sidebarRuns]);
 
@@ -474,14 +485,16 @@ export function BatchEvaluationResults({
               onToggle={toggleColumn}
             />
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDownloadCSV}
-            disabled={!isDownloadCSVEnabled}
-          >
-            <Download size={16} /> Export to CSV
-          </Button>
+          {!isLiteMember && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownloadCSV}
+              disabled={!isDownloadCSVEnabled}
+            >
+              <Download size={16} /> Export to CSV
+            </Button>
+          )}
           {experiment?.workflowId && (
             <Link
               target="_blank"

@@ -7,6 +7,7 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { createLogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { createMetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -24,7 +25,10 @@ export interface TraceProcessingPipelineDeps {
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+  customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -35,7 +39,7 @@ export interface TraceProcessingPipelineDeps {
  * individual spans to the stored_spans table (map projection).
  */
 export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
-  return definePipeline<TraceProcessingEvent>()
+  let builder = definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
     .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({
@@ -53,10 +57,23 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
-    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
+    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
+    .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+
+  if (deps.customerIoTraceSyncReactor) {
+    builder = builder.withReactor(
+      "traceSummary",
+      "customerIoTraceSync",
+      deps.customerIoTraceSyncReactor,
+    );
+  }
+
+  return builder
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
+    .withCommand("resolveOrigin", ResolveOriginCommand)
     .build();
 }

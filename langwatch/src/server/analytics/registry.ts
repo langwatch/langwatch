@@ -503,7 +503,7 @@ export const analyticsMetrics = {
           );
 
         return {
-          [`${index}__event_score_${aggregation}_${key}_${subkey}`]: {
+          [`${index}__event_details_${aggregation}_${key}_${subkey}`]: {
             nested: {
               path: "events",
             },
@@ -550,7 +550,7 @@ export const analyticsMetrics = {
         key,
         subkey,
       ) => {
-        return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
+        return `${index}__event_details_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
       quickwitSupport: false,
     },
@@ -600,7 +600,7 @@ export const analyticsMetrics = {
     evaluation_pass_rate: {
       label: "Evaluation Pass Rate",
       colorSet: "tealTones",
-      format: "0.00a",
+      format: "0%",
       increaseIs: "good",
       allowedAggregations: allAggregationTypes.filter(
         (agg) => agg != "cardinality" && agg != "terms",

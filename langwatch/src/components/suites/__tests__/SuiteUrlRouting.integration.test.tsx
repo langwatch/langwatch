@@ -13,6 +13,19 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "connected",
+    isConnected: true,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: false,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  }),
+}));
+
 const mockPush = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
 
@@ -106,6 +119,12 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
   },
 }));
@@ -139,7 +158,7 @@ vi.mock("~/components/suites/SuiteDetailPanel", () => ({
   SuiteDetailPanel: ({ suite }: { suite: { name: string } }) => (
     <div data-testid="suite-detail-panel">{suite.name} details</div>
   ),
-  SuiteEmptyState: () => <div data-testid="suite-empty-state">No suite selected</div>,
+  SuiteEmptyState: () => <div data-testid="suite-empty-state">No run plan selected</div>,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

@@ -1,0 +1,312 @@
+---
+title: Finetuning Agents with GRPO
+description: Learn how to enhance the performance of agentic systems by fine-tuning them with Generalized Reinforcement from Preference Optimization (GRPO).
+keywords:
+  [
+    finetuning agents,
+    GRPO,
+    reinforcement learning,
+    preference optimization,
+    query rewriting,
+    retrieval systems,
+  ]
+---
+
+In this cookbook, we'll explore how to enhance the performance of agentic systems by fine-tuning them with Generalized Reinforcement from Preference Optimization (GRPO). Specifically, we'll focus on query rewriting - a critical component in retrieval systems that transforms vague user questions into more effective search queries.
+
+What makes this approach particularly exciting is that we'll be using a smaller model - Qwen 1.7B - rather than relying on massive models like GPT-5. This demonstrates how GRPO can unlock impressive capabilities from more efficient, cost-effective models that can run locally or on modest hardware.
+
+GRPO, as implemented in DSPy, is a powerful technique that generalizes popular online reinforcement learning algorithms, enabling more effective learning from interactions. By applying GRPO to query rewriting with smaller models, we can systematically improve retrieval performance without the computational and financial costs of larger models.
+
+In this notebook, we'll walk through:
+
+1. Setting up a DSPy environment with the Qwen 1.7B model
+2. Creating a simple query rewriting agent for retrieval
+3. Defining a reward function based on retrieval success
+4. Fine-tuning the query rewriter with GRPO
+5. Evaluating the performance improvements
+
+By the end, you'll understand how to apply GRPO to optimize query rewriting using smaller models, achieving better performance without relying on massive models or extensive manual prompt engineering.
+
+## Requirements
+
+Before we begin, ensure you have the necessary packages. If you're running this in an environment where `dspy` and its dependencies are not yet installed, you might need to install them. For this notebook, the key libraries are `dspy` and potentially others for data handling or specific model interactions.
+
+```bash
+%pip install dspy bm25s PyStemmer git+https://github.com/Ziems/arbor.git git+https://github.com/stanfordnlp/dspy.git@refs/pull/8171/head
+```
+
+## Set up
+
+First, let's configure our environment. This involves connecting to an AI model provider. In this example, we'll set up a connection to a local Arbor server, which will act as our Reinforcement Learning (RL) server. This server handles inference and RL requests over HTTP. We'll also specify and load the Qwen3-1.7B model.
+
+```python
+import dspy
+from dspy.clients.lm_local_arbor import ArborProvider
+
+# Connect to local Arbor server
+port = 7453
+local_lm_name = "Qwen/Qwen3-1.7B"
+
+local_lm = dspy.LM(
+    model=f"openai/arbor:{local_lm_name}",
+    provider=ArborProvider(),
+    temperature=0.7,
+    api_base=f"http://localhost:{port}/v1/",
+    api_key="arbor",
+)
+
+dspy.configure(lm=local_lm)
+```
+
+## Load Dataset
+
+With our environment configured, the next step is to load a dataset. For this example, we'll use a dataset containing questions about GPT research papers (GPT-1, GPT-2, GPT-3, GPT-4). Each example contains a query and its expected answer.
+
+DSPy works with examples in a specific format, so we'll convert our raw data into `dspy.Example` objects. Each example will have a question as input and the expected answer for evaluation. We'll split our dataset into training, validation, and test sets to properly evaluate our approach.
+
+The training set will be used to optimize our agent, the validation set to tune parameters and monitor progress, and the test set for final evaluation.
+
+```python
+import json
+import random
+
+# Load the dataset from a JSON file
+ds = json.load(open("../data/evalset/evalset.json"))
+document_chunks = list({doc["document"] for doc in ds})
+
+# Convert to DSPy Examples
+examples = [
+    dspy.Example(question=ex["query"], answers=[ex["answer"]]).with_inputs("question")
+    for ex in ds
+    if ex["answer"].strip()
+]
+
+# Shuffle for randomness and reproducibility
+random.seed(42)
+random.shuffle(examples)
+
+# Split into train, validation, and test sets
+trainset = examples[:100]
+devset = examples[100:150]
+testset = examples[150:200]
+
+print(f"Train size: {len(trainset)}, Dev size: {len(devset)}, Test size: {len(testset)}")
+```
+
+```text
+Train size: 100, Dev size: 50, Test size: 50
+```
+
+## Implement Search Functionality
+
+Before building our agent, we need to implement the search functionality that will retrieve relevant documents based on a query. In a real-world application, this might connect to a vector database or search engine.
+
+For this example, we'll create a simple search function that simulates document retrieval from our corpus of GPT research papers. The function will:
+
+1. Take a query string and number of results (k) as input
+2. Tokenize and embed the query
+3. Retrieve the k most relevant documents based on embedding similarity
+4. Return the list of retrieved documents
+
+This search function will be used by our agent to find information relevant to user questions.
+
+```python
+import bm25s
+import Stemmer
+
+#corpus = [f"{ex.inputs()['question']} | {ans}" for ex in trainset for ans in ex.answers]
+corpus = document_chunks
+stemmer = Stemmer.Stemmer("english")
+corpus_tokens = bm25s.tokenize(corpus, stopwords="en", stemmer=stemmer)
+retriever = bm25s.BM25(k1=0.9, b=0.4)
+retriever.index(corpus_tokens)
+
+# BM25 Search Wrapper
+def search(query: str, k: int = 3):
+    tokens = bm25s.tokenize(query, stopwords="en", stemmer=stemmer, show_progress=False)
+    results, scores = retriever.retrieve(tokens, k=k, n_threads=1, show_progress=False)
+    run = {corpus[doc]: float(score) for doc, score in zip(results[0], scores[0])}
+    return list(run.keys())
+```
+
+## Building the Agent
+
+Now we'll create our agent using DSPy's module system. Our agent will be a simple query rewriter that takes a user question, rewrites it to be more specific and search-friendly, and then retrieves relevant documents.
+
+The agent consists of two main components:
+
+1. A query rewriting module that uses Chain-of-Thought reasoning to improve the original question
+2. A document retrieval step that uses our search function to find relevant information
+
+This simple agent will serve as our baseline before optimization with GRPO.
+
+```python
+# DSPy Module for Query Rewriting
+class QueryRewriter(dspy.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.rewrite = dspy.ChainOfThought(
+            dspy.Signature(
+                "question -> rewritten_query",
+                "Rewrite the vague user question into a more specific search query."
+            )
+        )
+        self.rewrite.set_lm(dspy.settings.lm)
+
+    def forward(self, question):
+        rewritten_query = self.rewrite(question=question).rewritten_query
+        retrieved_docs = search(rewritten_query, k=3)
+        return dspy.Prediction(rewritten_query=rewritten_query, retrieved_docs=retrieved_docs)
+```
+
+## Defining the Reward Function
+
+For GRPO to work effectively, we need to define a reward function that evaluates the performance of our agent. This function will determine how well the agent is doing and guide the optimization process.
+
+In our case, we'll use a simple reward function that checks if any of the retrieved documents contain the expected answer. This binary reward (0 or 1) will indicate whether the agent successfully found the information needed to answer the user's question.
+
+For this example, we'll keep it simple with a binary reward based on exact substring matching.
+
+```python
+import re
+# Reward Function
+def contains_answer(example, pred, trace=None):
+    docs = [doc.lower() for doc in pred.retrieved_docs]
+    answers = [ans.lower() for ans in example.answers]
+
+    def normalize(text):
+        return re.sub(r"[^a-z0-9]", " ", text.lower()).split()
+
+    for answer in answers:
+        answer_tokens = set(normalize(answer))
+        for doc in docs:
+            doc_tokens = set(normalize(doc))
+            if len(answer_tokens & doc_tokens) / len(answer_tokens) > 0.75:  # 75% token overlap
+                return 1.0
+    return 0.0
+
+# Recall Score
+def recall_score(example, pred, trace=None):
+    print("QUESTION:", example.inputs())
+    print("ANSWERS:", example.answers)
+    print("RETRIEVED:", pred.retrieved_docs)
+    predictions = [doc.lower() for doc in pred.retrieved_docs]
+    labels = [answer.lower() for answer in example.answers]
+    if not labels:
+        return 0.0
+    hits = sum(any(label in doc for doc in predictions) for label in labels)
+    return hits / len(labels)
+```
+
+## Evaluating the Baseline Agent
+
+Before optimizing our agent, we need to establish a baseline performance. This will help us measure the improvement achieved through GRPO.
+
+We'll use DSPy's evaluation framework to test our agent on the validation set. The evaluation will:
+
+1. Run the agent on each example in the validation set
+2. Apply our reward function to measure performance
+3. Calculate the average reward across all examples
+
+This baseline score will serve as our reference point for improvement.
+
+```python
+# Baseline Eval
+program = QueryRewriter()
+evaluate = dspy.Evaluate(devset=devset, metric=contains_answer, num_threads=4, display_progress=True)
+baseline_result = evaluate(program)
+
+print(f"\nBaseline Performance: {baseline_result:.2f}")
+```
+
+```text
+Baseline Performance: 28.00
+```
+
+## Optimizing with GRPO
+
+Now that we have our baseline agent and evaluation metric, we can apply GRPO to optimize the agent's performance. GRPO works by:
+
+1. Sampling multiple outputs from the agent for each input
+2. Evaluating each output using our reward function
+3. Using the rewards to update the model's parameters through reinforcement learning
+
+The key parameters for GRPO include:
+
+- `update_interval`: How often to update the model
+- `num_samples_per_input`: How many different outputs to generate for each input
+- `num_train_steps`: Total number of training steps
+- `beta`: Controls the trade-off between optimizing for rewards and staying close to the original model
+
+We'll configure these parameters and run the optimization process.
+
+## Evaluating the Optimized Agent
+
+After optimizing our agent with GRPO, we need to evaluate its performance to see how much it has improved. We'll use the same evaluation framework as before, but now with our optimized agent.
+
+We'll also compare the baseline and optimized agents on a specific example to see the differences in their behavior. This will help us understand how GRPO has changed the agent's query rewriting strategy.
+
+```python
+from dspy.teleprompt.grpo import GRPO
+
+# Configure GRPO parameters
+train_kwargs = {
+    "update_interval": 3,
+    "per_device_train_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "temperature": 0.7,
+    "beta": 0.04,
+    "learning_rate": 1e-5,
+    "gradient_checkpointing": True,
+    "gradient_checkpointing_kwargs": {"use_reentrant": False},
+    "bf16": True,
+    "lr_scheduler_type": "constant_with_warmup",
+    "max_prompt_length": 512,
+    "max_completion_length": 128,
+    "scale_rewards": True,
+    "max_grad_norm": 0.5,
+    "lora": True,
+}
+
+# Initialize the GRPO compiler
+compiler = GRPO(
+    metric=contains_answer,
+    multitask=True,
+    num_dspy_examples_per_grpo_step=4,
+    num_samples_per_input=8,
+    exclude_demos=True,
+    num_train_steps=100,
+    num_threads=24,
+    use_train_as_val=False,
+    num_steps_for_val=10,
+    train_kwargs=train_kwargs,
+    report_train_scores=False,
+)
+
+print("Starting GRPO optimization. This may take some time...")
+optimized_program = compiler.compile(student=program, trainset=trainset, valset=devset)
+print("Optimization complete!")
+
+# Evaluate the optimized program
+optimized_result = evaluate(optimized_program)
+
+print(f"\nBaseline Performance: {baseline_result:.2f}")
+print(f"Optimized Performance: {optimized_result:.2f}")
+```
+
+```text
+Baseline Performance: 28.00
+Optimized Performance: 26.00
+```
+
+## Conclusion
+
+In this cookbook, we explored how to apply GRPO to optimize an LLM-based agent for query rewriting using a compact model like Qwen 1.7B. While the baseline performance was modest (28%), the GRPO-optimized agent did not show an improvement in this short run (26%).
+
+This result highlights an important consideration: meaningful improvements with reinforcement learning methods like GRPO often require longer training durations and possibly more diverse training data. In our experiment, training was conducted on 8×A100 GPUs for approximately 2 hours, which likely wasn’t sufficient time for the model to fully benefit from the GRPO optimization process.
+
+That said, the infrastructure and methodology are solid. GRPO offers a systematic approach to improving agent behavior through preference-based feedback, and with extended training time or further reward shaping, it's reasonable to expect more substantial performance gains.
+
+For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/finetuning-agents-grpo.ipynb).

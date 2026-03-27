@@ -118,7 +118,7 @@ export const CustomModelInputSection = ({
               Add
             </Button>
           </Menu.Trigger>
-          <Menu.Content zIndex="popover">
+          <Menu.Content>
             <Menu.Item
               value="add-model"
               onClick={() => setAddModelDialogOpen(true)}

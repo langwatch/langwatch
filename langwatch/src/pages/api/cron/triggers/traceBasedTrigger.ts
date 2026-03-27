@@ -57,13 +57,28 @@ export const processTraceBasedTrigger = async (
     projectId,
     filters: parsedFilters,
     updatedAt: lastRunAt,
+    pageSize: 500,
     startDate: Date.now() - 1000 * 60 * 60 * 24,
     endDate: Date.now(),
   };
 
   const traceService = TraceService.create(prisma);
   const protections = await getProtectionsForProject(prisma, { projectId });
-  const traces = await traceService.getAllTracesForProject(input, protections);
+
+  const allGroups: TraceGroups["groups"] = [];
+  let scrollId: string | undefined;
+
+  do {
+    const result = await traceService.getAllTracesForProject(
+      input,
+      protections,
+      { scrollId },
+    );
+    allGroups.push(...result.groups);
+    scrollId = result.scrollId ?? undefined;
+  } while (scrollId && allGroups.length < 10_000);
+
+  const traces: TraceGroups = { groups: allGroups };
 
   const tracesToSend = await getTracesToSend(
     traces,

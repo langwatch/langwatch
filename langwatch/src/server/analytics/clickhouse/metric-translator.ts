@@ -448,35 +448,20 @@ function translatePerformanceMetric(
         params: {},
       };
 
-    case "performance.tokens_per_second": {
-      // Calculate per-span TPS matching ES behavior:
-      // ES computes TPS for each LLM span individually, then averages them.
-      // Only include spans that have output_tokens > 0 (ES returns null for 0 tokens)
-      // TPS = output_tokens / (DurationMs / 1000)
-      //
-      // Note: Uses canonical OTel attribute name (gen_ai.usage.output_tokens)
-      // which is canonicalized from legacy gen_ai.usage.completion_tokens
-      requiredJoins.push("stored_spans");
-      const outputTokens = `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`;
-      const spanTps = `${outputTokens} / nullIf(${ss}.DurationMs / 1000.0, 0)`;
-      const hasTokens = `${outputTokens} > 0 AND ${ss}.DurationMs > 0`;
-
-      if (isPercentileAggregation(aggregation)) {
-        const percentile = percentileToPercent[aggregation];
-        return {
-          selectExpression: `quantileExactIf(${percentile})(${spanTps}, ${hasTokens}) AS ${alias}`,
-          alias,
-          requiredJoins,
-          params: {},
-        };
-      }
+    case "performance.tokens_per_second":
+      // Uses pre-aggregated TokensPerSecond from trace_summaries.
+      // Avoids joining stored_spans and reading SpanAttributes (a Map column
+      // that includes large LLM prompt/completion text), which caused OOM.
       return {
-        selectExpression: `${getConditionalAggregation(aggregation)}(${spanTps}, ${hasTokens}) AS ${alias}`,
+        selectExpression: translateSimpleAggregation(
+          `${ts}.TokensPerSecond`,
+          aggregation,
+          alias,
+        ),
         alias,
         requiredJoins,
         params: {},
       };
-    }
 
     case "spans.metrics.prompt_tokens":
       // Span-level prompt tokens (for grouping by span-level attributes like model)

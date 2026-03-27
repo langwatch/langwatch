@@ -1,3 +1,4 @@
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
@@ -26,6 +27,7 @@ import type {
 import {
   isLogRecordReceivedEvent,
   isMetricRecordReceivedEvent,
+  isOriginResolvedEvent,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
@@ -176,12 +178,12 @@ function computeSpanCost({
   promptTokens: number;
   completionTokens: number;
 }): number {
-  const inputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
-  const outputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
-  if (typeof inputRate === "number" || typeof outputRate === "number") {
+  const numInputRate = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]);
+  const numOutputRate = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]);
+  if (numInputRate !== null || numOutputRate !== null) {
     return (
-      promptTokens * (typeof inputRate === "number" ? inputRate : 0) +
-      completionTokens * (typeof outputRate === "number" ? outputRate : 0)
+      promptTokens * (numInputRate ?? 0) +
+      completionTokens * (numOutputRate ?? 0)
     );
   }
 
@@ -197,8 +199,8 @@ function computeSpanCost({
     }
   }
 
-  const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
-  if (typeof spanCost === "number" && spanCost > 0) return spanCost;
+  const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
+  if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
   if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {
     const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
@@ -223,10 +225,8 @@ function extractTokenMetrics(span: NormalizedSpan) {
   const attrs = span.spanAttributes;
   const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
   const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-  const promptTokens =
-    typeof inputTokens === "number" && inputTokens > 0 ? inputTokens : 0;
-  const completionTokens =
-    typeof outputTokens === "number" && outputTokens > 0 ? outputTokens : 0;
+  const promptTokens = Math.max(0, coerceToNumber(inputTokens) ?? 0);
+  const completionTokens = Math.max(0, coerceToNumber(outputTokens) ?? 0);
 
   return {
     promptTokens,
@@ -237,7 +237,7 @@ function extractTokenMetrics(span: NormalizedSpan) {
       promptTokens,
       completionTokens,
     }),
-    estimated: attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true,
+    estimated: attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true || attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === "true",
   };
 }
 
@@ -317,9 +317,13 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
   for (const [key, value] of Object.entries(resourceAttrs)) {
     if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
-    if (typeof value === "string") result[key] = value;
+    // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
+    const normalizedKey = key.startsWith("langwatch.metadata.")
+      ? key.replace("langwatch.metadata.", "metadata.")
+      : key;
+    if (typeof value === "string") result[normalizedKey] = value;
     else if (typeof value === "number" || typeof value === "boolean")
-      result[key] = String(value);
+      result[normalizedKey] = String(value);
   }
 
   for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
@@ -329,6 +333,9 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
   const origin = stringAttr(spanAttrs, "langwatch.origin");
   if (origin) result["langwatch.origin"] = origin;
+
+  const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
+  if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
 
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
   if (typeof labels === "string") result["langwatch.labels"] = labels;
@@ -466,6 +473,12 @@ function hoistOrigin(
       }
     } else if (state.attributes["langwatch.origin"]) {
       mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    } else if (mergedAttributes["sdk.name"]) {
+      // SDK heuristic: sdk.name present but no explicit origin and no
+      // legacy markers → old SDK that doesn't tag origin. Old SDK
+      // evaluations/simulations are already caught by legacy rules above,
+      // so what's left must be a regular application trace.
+      mergedAttributes["langwatch.origin"] = "application";
     }
   }
 }
@@ -760,6 +773,73 @@ function accumulateAttributes({
   return merged;
 }
 
+// ─── Per-role cost/latency ────────────────────────────────────────────
+
+function resolveEffectiveRole({
+  span,
+  scenarioRoleSpans,
+}: {
+  span: NormalizedSpan;
+  scenarioRoleSpans: Record<string, string>;
+}): string | undefined {
+  const directRole = span.spanAttributes["scenario.role"];
+  if (typeof directRole === "string" && directRole !== "") return directRole;
+
+  // Walk up the parent chain via the scenarioRoleSpans map
+  let parentId = span.parentSpanId;
+  while (parentId) {
+    const parentRole = scenarioRoleSpans[parentId];
+    if (parentRole) return parentRole;
+    break;
+  }
+
+  return undefined;
+}
+
+function accumulateRoleCostLatency({
+  state,
+  span,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}): Pick<TraceSummaryData, "scenarioRoleCosts" | "scenarioRoleLatencies" | "scenarioRoleSpans"> {
+  const scenarioRoleSpans = { ...(state.scenarioRoleSpans ?? {}) };
+
+  // Record this span's role if it has one
+  const directRole = span.spanAttributes["scenario.role"];
+  if (typeof directRole === "string" && directRole !== "") {
+    scenarioRoleSpans[span.spanId] = directRole;
+  } else if (span.parentSpanId && scenarioRoleSpans[span.parentSpanId]) {
+    // Propagate parent role to this span so grandchildren can look it up
+    scenarioRoleSpans[span.spanId] = scenarioRoleSpans[span.parentSpanId]!;
+  }
+
+  const effectiveRole = resolveEffectiveRole({ span, scenarioRoleSpans });
+
+  let scenarioRoleCosts = state.scenarioRoleCosts ?? {};
+  let scenarioRoleLatencies = state.scenarioRoleLatencies ?? {};
+
+  if (effectiveRole) {
+    const spanCost = extractTokenMetrics(span).cost;
+    scenarioRoleCosts = {
+      ...scenarioRoleCosts,
+      [effectiveRole]: (scenarioRoleCosts[effectiveRole] ?? 0) + spanCost,
+    };
+
+    // Only accumulate latency for the span that directly carries the role,
+    // not for child spans (which would double-count nested durations)
+    if (typeof directRole === "string" && directRole !== "") {
+      const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
+      scenarioRoleLatencies = {
+        ...scenarioRoleLatencies,
+        [effectiveRole]: (scenarioRoleLatencies[effectiveRole] ?? 0) + spanDurationMs,
+      };
+    }
+  }
+
+  return { scenarioRoleCosts, scenarioRoleLatencies, scenarioRoleSpans };
+}
+
 // ─── Main composition ───────────────────────────────────────────────
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
@@ -795,6 +875,11 @@ export function applySpanToSummary({
       ? [...new Set([...state.models, ...newModels])].sort()
       : state.models;
 
+  // Track span-to-role mapping and accumulate per-role cost/latency.
+  // Roles are set on agent spans, but costs live on child LLM spans.
+  // We resolve each span's effective role by walking up the parent chain.
+  const roleAccumulation = accumulateRoleCostLatency({ state, span });
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -811,6 +896,7 @@ export function applySpanToSummary({
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
     attributes,
+    ...roleAccumulation,
   };
 }
 
@@ -850,7 +936,10 @@ export function createTraceSummaryFoldProjection({
         subTopicId: null,
         hasAnnotation: null,
         attributes: {},
-        occurredAt: Date.now(),
+        scenarioRoleCosts: {},
+        scenarioRoleLatencies: {},
+        scenarioRoleSpans: {},
+        occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -962,6 +1051,22 @@ export function createTraceSummaryFoldProjection({
           traceId: state.traceId || event.data.traceId,
           timeToFirstTokenMs,
           attributes: mergedAttributes,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isOriginResolvedEvent(event)) {
+        const currentOrigin = state.attributes["langwatch.origin"];
+        if (currentOrigin) {
+          // Explicit origin already set — do not override
+          return state;
+        }
+        return {
+          ...state,
+          attributes: {
+            ...state.attributes,
+            "langwatch.origin": event.data.origin,
+          },
           updatedAt: Date.now(),
         };
       }

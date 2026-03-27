@@ -44,6 +44,7 @@ import type {
   TypedAgent,
 } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 const DEFAULT_CODE = `import dspy
 
@@ -206,6 +207,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating agent",
         description: error.message,

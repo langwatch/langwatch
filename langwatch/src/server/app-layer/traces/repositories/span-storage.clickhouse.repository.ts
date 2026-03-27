@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
@@ -177,7 +177,7 @@ interface ClickHouseSpanRecord {
 }
 
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertSpan(span: SpanInsertData): Promise<void> {
     EventUtils.validateTenantId(
@@ -186,8 +186,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
+      const client = await this.resolveClient(span.tenantId);
       const record = this.toClickHouseRecord(span);
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -214,7 +215,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             SpanId,
@@ -342,7 +344,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             SpanId AS event_id,

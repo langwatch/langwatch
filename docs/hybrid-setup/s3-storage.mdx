@@ -1,0 +1,50 @@
+---
+title: S3 Storage
+description: Configure S3 storage for LangWatch Hybrid deployments to store traces, evaluations, and AI agent testing datasets.
+---
+
+### S3-Compatible Object Storage Setup
+
+LangWatch stores dataset records in an S3-compatible bucket. You may use **AWS S3**, **GCP Storage with interoperability**, or **custom endpoints** (e.g., MinIO, Cloudflare R2).
+
+### Required Configuration
+
+- **S3 Endpoint** (e.g., `https://s3.amazonaws.com` or a custom endpoint)
+- **Access Key ID**
+- **Secret Access Key**
+- **Bucket Name** (e.g., `langwatch-logs-yourcompany`)
+
+Ensure your S3 credentials have the following permissions:
+
+- `s3:PutObject`
+- `s3:GetObject`
+- `s3:ListBucket`
+
+---
+
+### 🟦 Using Google Cloud Storage with S3 API (GCP Users)
+
+If you are using **Google Cloud Storage**, you can enable S3-compatible access by turning on interoperability settings:
+
+1. Go to your project in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Navigate to **Cloud Storage > Settings > Interoperability** tab.
+3. **Enable Interoperability access**.
+4. Create an **Access Key** and **Secret Key**.
+5. Use the following endpoint: https://storage.googleapis.com
+
+
+📘 **See the full guide here:**  
+👉 [GCP Interoperability Setup](https://cloud.google.com/storage/docs/interoperability)
+
+You can now use these credentials and endpoint just like standard S3 keys.
+
+---
+
+### 🔧 Add Credentials to LangWatch
+
+Once you have your credentials and endpoint:
+
+- Go to the **LangWatch settings page**.
+- Add them to your account at either the **project level** or **organization level**.
+
+![S3 Setup](/images/settings-hybrid.png)

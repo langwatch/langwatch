@@ -3,7 +3,7 @@
  *
  * Integration tests for SuiteDetailPanel and SuiteEmptyState components.
  *
- * Tests the suite header (name, labels, description), stats bar (scenario count,
+ * Tests the suite header (name, description), stats bar (scenario count,
  * target count, repeat count, executions), and empty state display.
  *
  * @see specs/suites/suite-workflow.feature - "Repeat count appears in suite stats bar"
@@ -44,6 +44,12 @@ vi.mock("~/utils/api", () => ({
     scenarios: {
       getSuiteRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
     agents: {
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
@@ -53,20 +59,6 @@ vi.mock("~/utils/api", () => ({
     },
     suites: {},
   },
-}));
-
-vi.mock("~/hooks/useSSESubscription", () => ({
-  useSSESubscription: vi.fn(),
-}));
-
-vi.mock("~/hooks/usePageVisibility", () => ({
-  usePageVisibility: () => true,
-}));
-
-vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({
-    openDrawer: vi.fn(),
-  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -174,7 +166,7 @@ describe("<SuiteDetailPanel/>", () => {
       expect(screen.getByText("Core test scenarios")).toBeInTheDocument();
     });
 
-    it("displays labels as tag pills", () => {
+    it("does not display labels as tag pills", () => {
       render(
         <SuiteDetailPanel
           suite={makeSuite({ labels: ["critical", "billing"] })}
@@ -185,45 +177,8 @@ describe("<SuiteDetailPanel/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("critical")).toBeInTheDocument();
-      expect(screen.getByText("billing")).toBeInTheDocument();
-    });
-  });
-
-  describe("given a suite with labels and onAddLabel provided", () => {
-    it("displays a + add button after the tags", () => {
-      render(
-        <SuiteDetailPanel
-          suite={makeSuite({ labels: ["ci"] })}
-          onEdit={vi.fn()}
-          onRun={vi.fn()}
-          period={defaultPeriod}
-          onAddLabel={vi.fn()}
-          onRemoveLabel={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByText("+ add")).toBeInTheDocument();
-    });
-
-    it("opens an inline text input when + add is clicked", async () => {
-      const user = userEvent.setup();
-
-      render(
-        <SuiteDetailPanel
-          suite={makeSuite({ labels: ["ci"] })}
-          onEdit={vi.fn()}
-          onRun={vi.fn()}
-          period={defaultPeriod}
-          onAddLabel={vi.fn()}
-          onRemoveLabel={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      await user.click(screen.getByText("+ add"));
-      expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
+      expect(screen.queryByText("critical")).not.toBeInTheDocument();
+      expect(screen.queryByText("billing")).not.toBeInTheDocument();
     });
   });
 
@@ -370,11 +325,11 @@ describe("<SuiteEmptyState/>", () => {
     );
 
     expect(
-      screen.getByText("Select a suite from the sidebar or create a new one"),
+      screen.getByText("Select a run plan from the sidebar or create a new one"),
     ).toBeInTheDocument();
   });
 
-  describe("when New Suite button is clicked", () => {
+  describe("when New Run Plan button is clicked", () => {
     it("calls onNewSuite", async () => {
       const user = userEvent.setup();
       const onNewSuite = vi.fn();
@@ -388,7 +343,7 @@ describe("<SuiteEmptyState/>", () => {
         },
       );
 
-      await user.click(screen.getByText("New Suite"));
+      await user.click(screen.getByText("New Run Plan"));
       expect(onNewSuite).toHaveBeenCalledOnce();
     });
   });

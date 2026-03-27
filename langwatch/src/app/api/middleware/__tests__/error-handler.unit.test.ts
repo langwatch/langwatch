@@ -52,16 +52,16 @@ describe("handleError()", () => {
       );
     });
 
-    it("does not include limitType, current, or max in response body", async () => {
+    it("includes meta fields in the response body", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
 
       const res = await app.request("/");
 
       const body = await res.json();
-      expect(body).not.toHaveProperty("limitType");
-      expect(body).not.toHaveProperty("current");
-      expect(body).not.toHaveProperty("max");
+      expect(body).toHaveProperty("limitType", "prompts");
+      expect(body).toHaveProperty("current", 5);
+      expect(body).toHaveProperty("max", 5);
     });
   });
 });

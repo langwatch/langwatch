@@ -18,6 +18,7 @@ import {
   Collapsible,
   HStack,
   Input,
+  Skeleton,
   Text,
   Textarea,
   VStack,
@@ -38,7 +39,6 @@ import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
-import { TagList } from "../ui/TagList";
 import { useArchivedItemsResolution } from "./useArchivedItemsResolution";
 import { useSuiteRunMutation } from "./useSuiteRunMutation";
 import { ScenarioPicker } from "./ScenarioPicker";
@@ -81,7 +81,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const onRunRequested = callbacks?.onRunRequested;
 
   // Fetch suite data when editing
-  const { data: suite } = api.suites.getById.useQuery(
+  const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
     { projectId: project?.id ?? "", id: suiteId ?? "" },
     { enabled: !!project && !!suiteId && isOpen },
   );
@@ -103,7 +103,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   );
 
   const isEditMode = !!suiteId;
-  const title = isEditMode ? "Edit Suite" : "New Suite";
+  const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
 
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
@@ -132,14 +132,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onSaved?.(data);
       closeDrawer();
       toaster.create({
-        title: "Suite created",
+        title: "Run plan created",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to create suite",
+        title: "Failed to create run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -157,14 +157,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onSaved?.(data);
       closeDrawer();
       toaster.create({
-        title: "Suite updated",
+        title: "Run plan updated",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to update suite",
+        title: "Failed to update run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -250,6 +250,18 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         </Drawer.Header>
 
         <Drawer.Body>
+          {isEditMode && isSuiteLoading ? (
+            <VStack gap={4} align="stretch">
+              <Skeleton height="20px" width="60px" />
+              <Skeleton height="40px" />
+              <Skeleton height="20px" width="80px" />
+              <Skeleton height="80px" />
+              <Skeleton height="20px" width="70px" />
+              <Skeleton height="120px" />
+              <Skeleton height="20px" width="60px" />
+              <Skeleton height="120px" />
+            </VStack>
+          ) : (
           <VStack gap={4} align="stretch">
             {/* Name */}
             <VStack align="start" gap={1}>
@@ -257,7 +269,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 Name *
               </Text>
               <Input
-                placeholder="e.g., Critical Path Suite"
+                placeholder="e.g., Critical Path Run Plan"
                 {...form.register("name")}
                 borderColor={errors.name ? "red.500" : undefined}
               />
@@ -277,25 +289,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 placeholder="Core journeys that must pass before deploy"
                 {...form.register("description")}
                 rows={2}
-              />
-            </VStack>
-
-            {/* Labels */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Labels
-              </Text>
-              <TagList
-                labels={suiteForm.labels}
-                onRemove={(_label, index) =>
-                  form.setValue(
-                    "labels",
-                    suiteForm.labels.filter((_, i) => i !== index)
-                  )
-                }
-                onAdd={(label) =>
-                  form.setValue("labels", [...suiteForm.labels, label])
-                }
               />
             </VStack>
 
@@ -410,6 +403,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               </Collapsible.Content>
             </Collapsible.Root>
           </VStack>
+          )}
         </Drawer.Body>
 
         <Drawer.Footer>

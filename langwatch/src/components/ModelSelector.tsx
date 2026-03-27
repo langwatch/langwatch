@@ -202,13 +202,17 @@ export const ModelSelector = React.memo(function ModelSelector({
   );
 
   useEffect(() => {
-    const highlightedItem = modelCollection.items.find(
+    const highlightedItem = allFilteredModels.find(
       (item) => item.value === highlightedValue,
     );
     if (!highlightedItem) {
-      setHighlightedValue(modelCollection.items[0]?.value ?? null);
+      const firstValue = allFilteredModels[0]?.value ?? null;
+      if (firstValue !== highlightedValue) {
+        setHighlightedValue(firstValue);
+      }
     }
-  }, [highlightedValue, modelCollection.items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelSearch]);
 
   return (
     <Select.Root
@@ -244,7 +248,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
-      <Select.Content zIndex="1600">
+      <Select.Content>
         <Field.Root asChild>
           <Box position="sticky" top={0} zIndex="1">
             <InputGroup

@@ -121,6 +121,10 @@ export function OptimizeModalContent({
     deselectAllNodes,
     setOpenResultsPanelRequest,
     default_llm,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+    checkCanCommitNewVersion,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -130,6 +134,10 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }) => ({
       workflowId,
       getWorkflow,
@@ -138,6 +146,10 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -180,7 +192,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions, canSaveNewVersion, versionToBeEvaluated } =
+  const { versions } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
@@ -189,6 +201,7 @@ export function OptimizeModalContent({
       }>,
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
+  const canSave = checkCanCommitNewVersion();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startOptimizationExecution } = useOptimizationExecution();
@@ -213,8 +226,6 @@ export function OptimizeModalContent({
     async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
-
       if (!train.length) {
         return;
       }
@@ -233,7 +244,9 @@ export function OptimizeModalContent({
         return;
       }
 
-      if (canSaveNewVersion) {
+      let versionId: string | undefined;
+
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -245,6 +258,8 @@ export function OptimizeModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
           toaster.create({
             title: "Version saved",
             description: "New version has been saved successfully",
@@ -258,6 +273,8 @@ export function OptimizeModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
@@ -279,13 +296,15 @@ export function OptimizeModalContent({
       setHasStarted(true);
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       getWorkflow,
       project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       startOptimizationExecution,
       train.length,
-      versionToBeEvaluated.id,
       versions,
       workflowId,
     ],
@@ -489,7 +508,7 @@ export function OptimizeModalContent({
                 disabled={!!isDisabled}
               >
                 <CheckSquare size={16} />
-                {canSaveNewVersion
+                {canSave
                   ? "Save & Run Optimization"
                   : "Run Optimization"}
               </Button>
@@ -533,7 +552,7 @@ const OptimizerSelect = ({
       <Select.Trigger>
         <Select.ValueText placeholder="Select optimizer" />
       </Select.Trigger>
-      <Select.Content zIndex="popover">
+      <Select.Content>
         {optimizerOptions.map((option) => (
           <Select.Item item={option} key={option.value}>
             <VStack align="start" width="full">
