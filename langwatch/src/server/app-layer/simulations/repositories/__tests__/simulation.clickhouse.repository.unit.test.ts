@@ -38,5 +38,43 @@ describe("SimulationClickHouseRepository", () => {
         expect(resolver).not.toHaveBeenCalled();
       });
     });
+
+    describe("when ClickHouse returns both empty-string and 'default' ScenarioSetId", () => {
+      it("normalizes empty string to 'default' and returns one distinct set", async () => {
+        const jsonFn = vi.fn().mockResolvedValue([
+          { ScenarioSetId: "" },
+          { ScenarioSetId: "default" },
+        ]);
+        const queryFn = vi.fn().mockResolvedValue({ json: jsonFn });
+        const mockClient = { query: queryFn } as unknown as ClickHouseClient;
+        const resolver = vi.fn().mockResolvedValue(mockClient);
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        const result = await repo.getDistinctExternalSetIds({
+          projectIds: ["project-1"],
+        });
+
+        expect(result).toEqual(new Set(["default"]));
+        expect(result.size).toBe(1);
+      });
+    });
+
+    describe("when ClickHouse returns only empty-string ScenarioSetId", () => {
+      it("normalizes empty string to 'default'", async () => {
+        const jsonFn = vi.fn().mockResolvedValue([
+          { ScenarioSetId: "" },
+        ]);
+        const queryFn = vi.fn().mockResolvedValue({ json: jsonFn });
+        const mockClient = { query: queryFn } as unknown as ClickHouseClient;
+        const resolver = vi.fn().mockResolvedValue(mockClient);
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        const result = await repo.getDistinctExternalSetIds({
+          projectIds: ["project-1"],
+        });
+
+        expect(result).toEqual(new Set(["default"]));
+      });
+    });
   });
 });

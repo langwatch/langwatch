@@ -809,7 +809,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const rows = await this.queryRows<{ ScenarioSetId: string }>(
-      `SELECT DISTINCT ScenarioSetId
+      `SELECT DISTINCT IF(ScenarioSetId = '', 'default', ScenarioSetId) AS ScenarioSetId
        FROM (
          SELECT ScenarioSetId, ArchivedAt
          FROM ${TABLE_NAME}
@@ -822,7 +822,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       { tenantId: firstProjectId, projectIds },
     );
 
-    return new Set(rows.map((r) => r.ScenarioSetId));
+    return new Set(
+      rows.map((r) => (r.ScenarioSetId === "" ? "default" : r.ScenarioSetId)),
+    );
   }
 
   // ---- Cursor helpers ----
