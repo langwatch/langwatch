@@ -13,7 +13,7 @@ import {
   isSimulationMessageSnapshotEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
-  isSimulationRunMetricsUpdatedEvent,
+  isSimulationRunMetricsComputedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
   isSimulationTextMessageEndEvent,
@@ -296,7 +296,7 @@ function apply(
     };
   }
 
-  if (isSimulationRunMetricsUpdatedEvent(event)) {
+  if (isSimulationRunMetricsComputedEvent(event)) {
     // Store per-trace breakdown, then recompute aggregates
     const traceMetrics = {
       ...state.TraceMetrics,

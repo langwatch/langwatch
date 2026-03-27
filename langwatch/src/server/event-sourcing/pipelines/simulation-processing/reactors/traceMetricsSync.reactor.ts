@@ -3,35 +3,28 @@ import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createTenantId } from "../../../domain/tenantId";
 import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "../schemas/events";
-import {
-  isSimulationTextMessageEndEvent,
-  isSimulationMessageSnapshotEvent,
-  isSimulationRunFinishedEvent,
-} from "../schemas/typeGuards";
-import type { UpdateRunMetricsCommandData } from "../schemas/commands";
+import { isSimulationRunFinishedEvent } from "../schemas/typeGuards";
+import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 
 const logger = createLogger(
   "langwatch:simulation-processing:trace-metrics-sync",
 );
 
 export interface TraceMetricsSyncReactorDeps {
-  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  updateRunMetrics: (data: UpdateRunMetricsCommandData) => Promise<void>;
+  computeRunMetrics: (data: ComputeRunMetricsCommandData) => Promise<void>;
 }
 
 /**
- * Simulation-side reactor: when a scenario message with trace_id arrives,
- * reads the trace summary and propagates per-role cost/latency metrics
- * to the simulation run.
+ * Simulation-side reactor: on RunFinished, dispatches computeRunMetrics
+ * (pull mode) for any traces that don't have metrics yet.
  *
- * The trace summary fold accumulates roleCosts/roleLatencies by walking the
- * parent span chain (roles live on agent spans, costs on child LLM spans).
- * This reactor reads the completed summary and dispatches updateRunMetrics.
+ * This handles the case where traces arrived before the simulation events
+ * and were already processed by the trace pipeline. The command reads
+ * the trace summary itself (pull-based).
+ *
+ * For traces not yet available, the command schedules a deferred retry.
  */
 export function createTraceMetricsSyncReactor(
   deps: TraceMetricsSyncReactorDeps,
@@ -43,14 +36,7 @@ export function createTraceMetricsSyncReactor(
       event: SimulationProcessingEvent,
       context: ReactorContext<SimulationRunStateData>,
     ): Promise<void> {
-      // Only fire on events that bring trace IDs
-      if (
-        !isSimulationTextMessageEndEvent(event) &&
-        !isSimulationMessageSnapshotEvent(event) &&
-        !isSimulationRunFinishedEvent(event)
-      ) {
-        return;
-      }
+      if (!isSimulationRunFinishedEvent(event)) return;
 
       const { tenantId, foldState } = context;
       const traceIds = foldState.TraceIds;
@@ -64,42 +50,22 @@ export function createTraceMetricsSyncReactor(
         if (foldState.TraceMetrics[traceId]) continue;
 
         try {
-          const traceSummary = await deps.traceSummaryStore.get(
-            traceId,
-            { tenantId: createTenantId(tenantId), aggregateId: traceId },
-          );
-
-          if (!traceSummary) {
-            // Trace hasn't arrived yet — trace-side reactor will handle it
-            continue;
-          }
-
-          const roleCosts = traceSummary.scenarioRoleCosts ?? {};
-          const roleLatencies = traceSummary.scenarioRoleLatencies ?? {};
-
-          // Only dispatch if there's actual metric data
-          if (Object.keys(roleCosts).length === 0 && traceSummary.totalCost === null) {
-            continue;
-          }
-
           logger.debug(
             { traceId, tenantId, scenarioRunId },
-            "Propagating trace metrics from trace summary to simulation run",
+            "Dispatching computeRunMetrics (pull mode) for missing trace metrics",
           );
 
-          await deps.updateRunMetrics({
+          await deps.computeRunMetrics({
             tenantId,
             scenarioRunId,
             traceId,
-            totalCost: traceSummary.totalCost ?? 0,
-            roleCosts,
-            roleLatencies,
+            retryCount: 0,
             occurredAt: Date.now(),
           });
         } catch (error) {
           logger.warn(
             { traceId, tenantId, scenarioRunId, error },
-            "Failed to read trace summary for metrics sync, skipping",
+            "Failed to dispatch computeRunMetrics for trace, skipping",
           );
         }
       }

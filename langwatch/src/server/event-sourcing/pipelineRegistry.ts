@@ -30,6 +30,11 @@ import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-pro
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
+  createComputeRunMetricsCommandClass,
+  COMPUTE_METRICS_RETRY_DELAY_MS,
+} from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
+import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
+import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "./pipelines/simulation-processing/repositories";
@@ -213,16 +218,16 @@ export class PipelineRegistry {
 
     // Late-bound reference for simulation metrics sync reactor.
     // The simulation pipeline is registered after the trace pipeline,
-    // so updateRunMetrics is wired after simulation pipeline registration.
-    let simUpdateRunMetrics: ((data: any) => Promise<void>) | null = null;
+    // so computeRunMetrics is wired after simulation pipeline registration.
+    let simComputeRunMetrics: ((data: any) => Promise<void>) | null = null;
 
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
-      updateRunMetrics: async (data) => {
-        if (!simUpdateRunMetrics) {
-          logger.warn("simulation updateRunMetrics not yet initialized, skipping");
+      computeRunMetrics: async (data) => {
+        if (!simComputeRunMetrics) {
+          logger.warn("simulation computeRunMetrics not yet initialized, skipping");
           return;
         }
-        return simUpdateRunMetrics(data);
+        return simComputeRunMetrics(data);
       },
     });
 
@@ -306,14 +311,14 @@ export class PipelineRegistry {
       pipeline: tracePipeline,
       traceSummaryStore,
       /**
-       * Wires late-bound simulation updateRunMetrics into the trace-side
+       * Wires late-bound simulation computeRunMetrics into the trace-side
        * simulationMetricsSync reactor. Called after the simulation
        * pipeline is registered.
        */
       wireSimulationDeps: (deps: {
-        updateRunMetrics: (data: any) => Promise<void>;
+        computeRunMetrics: (data: any) => Promise<void>;
       }) => {
-        simUpdateRunMetrics = deps.updateRunMetrics;
+        simComputeRunMetrics = deps.computeRunMetrics;
       },
     };
   }
@@ -352,17 +357,30 @@ export class PipelineRegistry {
       completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
     });
 
-    // Late-bound: updateRunMetrics dispatches back to self (same pipeline)
-    let selfUpdateRunMetrics: ((data: any) => Promise<void>) | null = null;
+    // Late-bound: computeRunMetrics dispatches back to self (same pipeline)
+    let selfComputeRunMetrics: ((data: any) => Promise<void>) | null = null;
 
-    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
+    // Late-bound: deferred retry dispatcher
+    let scheduleRetryDispatcher: ((payload: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
+
+    const ComputeRunMetricsCommand = createComputeRunMetricsCommandClass({
       traceSummaryStore,
-      updateRunMetrics: async (data: any) => {
-        if (!selfUpdateRunMetrics) {
-          logger.warn("updateRunMetrics self-dispatcher not yet initialized, skipping");
+      scheduleRetry: async (payload) => {
+        if (!scheduleRetryDispatcher) {
+          logger.warn("scheduleRetry dispatcher not yet initialized, skipping");
           return;
         }
-        return selfUpdateRunMetrics(data);
+        return scheduleRetryDispatcher(payload);
+      },
+    });
+
+    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
+      computeRunMetrics: async (data: any) => {
+        if (!selfComputeRunMetrics) {
+          logger.warn("computeRunMetrics self-dispatcher not yet initialized, skipping");
+          return;
+        }
+        return selfComputeRunMetrics(data);
       },
     });
 
@@ -372,16 +390,61 @@ export class PipelineRegistry {
         snapshotUpdateBroadcastReactor,
         suiteRunSyncReactor,
         traceMetricsSyncReactor,
+        ComputeRunMetricsCommand,
       }),
     );
 
     // Wire late-bound self-dispatcher
     const simCommands = mapCommands(simulationPipeline.commands);
-    selfUpdateRunMetrics = simCommands.updateRunMetrics;
+    selfComputeRunMetrics = simCommands.computeRunMetrics;
+
+    // Wire deferred retry job
+    const retryJobId = (payload: ComputeRunMetricsCommandData) =>
+      `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
+
+    const retryQueue = simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
+      name: "deferredComputeRunMetrics",
+      process: async (payload) => {
+        await simCommands.computeRunMetrics(payload);
+      },
+      delay: COMPUTE_METRICS_RETRY_DELAY_MS,
+      deduplication: {
+        makeId: retryJobId,
+        extend: false,
+        replace: true,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.scenario_run_id": payload.scenarioRunId,
+        "deferred.trace_id": payload.traceId,
+        "deferred.retry_count": payload.retryCount,
+      }),
+    });
+
+    if (retryQueue) {
+      scheduleRetryDispatcher = (payload) => retryQueue.send(payload);
+    } else {
+      // Fallback: event sourcing disabled, use in-memory setTimeout
+      scheduleRetryDispatcher = async (payload: ComputeRunMetricsCommandData) => {
+        const timer = setTimeout(async () => {
+          try {
+            await simCommands.computeRunMetrics(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, scenarioRunId: payload.scenarioRunId, traceId: payload.traceId, error },
+              "Deferred compute metrics retry failed",
+            );
+          }
+        }, COMPUTE_METRICS_RETRY_DELAY_MS);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+      };
+    }
 
     // Wire the trace-side simulationMetricsSync reactor's late-bound deps
     wireSimulationDeps({
-      updateRunMetrics: simCommands.updateRunMetrics,
+      computeRunMetrics: simCommands.computeRunMetrics,
     });
 
     return simulationPipeline;

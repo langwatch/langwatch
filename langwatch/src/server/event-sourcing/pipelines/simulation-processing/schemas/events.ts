@@ -122,23 +122,24 @@ export const SimulationTextMessageEndEventSchema = EventSchema.extend({
 export type SimulationTextMessageEndEvent = z.infer<typeof SimulationTextMessageEndEventSchema>;
 
 /**
- * MetricsUpdated event - emitted when cost/latency metrics are computed from traces.
+ * MetricsComputed event - emitted when cost/latency metrics are computed from traces.
+ * Carries per-trace metrics via ECST (Event-Carried State Transfer).
  */
-const simulationRunMetricsUpdatedEventDataSchema = z.object({
+const simulationRunMetricsComputedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   traceId: z.string(),
   totalCost: z.number(),
   roleCosts: z.record(z.string(), z.number()),
   roleLatencies: z.record(z.string(), z.number()),
 });
-export type SimulationRunMetricsUpdatedEventData = z.infer<typeof simulationRunMetricsUpdatedEventDataSchema>;
+export type SimulationRunMetricsComputedEventData = z.infer<typeof simulationRunMetricsComputedEventDataSchema>;
 
-export const SimulationRunMetricsUpdatedEventSchema = EventSchema.extend({
-  type: z.literal(SIMULATION_RUN_EVENT_TYPES.METRICS_UPDATED),
-  version: z.literal(SIMULATION_EVENT_VERSIONS.METRICS_UPDATED),
-  data: simulationRunMetricsUpdatedEventDataSchema,
+export const SimulationRunMetricsComputedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED),
+  data: simulationRunMetricsComputedEventDataSchema,
 });
-export type SimulationRunMetricsUpdatedEvent = z.infer<typeof SimulationRunMetricsUpdatedEventSchema>;
+export type SimulationRunMetricsComputedEvent = z.infer<typeof SimulationRunMetricsComputedEventSchema>;
 
 /**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
@@ -165,7 +166,7 @@ export type SimulationProcessingEvent =
   | SimulationTextMessageStartEvent
   | SimulationTextMessageEndEvent
   | SimulationRunFinishedEvent
-  | SimulationRunMetricsUpdatedEvent
+  | SimulationRunMetricsComputedEvent
   | SimulationRunDeletedEvent;
 
 export {
@@ -176,6 +177,6 @@ export {
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
   isSimulationRunStartedEvent,
-  isSimulationRunMetricsUpdatedEvent,
+  isSimulationRunMetricsComputedEvent,
 } from "./typeGuards";
 

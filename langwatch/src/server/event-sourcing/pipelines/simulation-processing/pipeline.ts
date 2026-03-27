@@ -8,7 +8,6 @@ import { QueueRunCommand } from "./commands/queueRun.command";
 import { StartRunCommand } from "./commands/startRun.command";
 import { TextMessageStartCommand } from "./commands/textMessageStart.command";
 import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
-import { UpdateRunMetricsCommand } from "./commands/updateRunMetrics.command";
 import { createSimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
@@ -17,6 +16,13 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  ComputeRunMetricsCommand: {
+    new (): any;
+    readonly schema: any;
+    getAggregateId(payload: any): string;
+    getSpanAttributes?(payload: any): Record<string, string | number | boolean>;
+    makeJobId(payload: any): string;
+  };
   customerIoSimulationSyncReactor?: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
 }
 
@@ -36,6 +42,7 @@ export interface SimulationProcessingPipelineDeps {
  * - messageSnapshot: Emits SimulationMessageSnapshotEvent for message updates
  * - finishRun: Emits SimulationRunFinishedEvent when run completes
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
+ * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
 export function createSimulationProcessingPipeline(deps: SimulationProcessingPipelineDeps) {
   let builder = definePipeline<SimulationProcessingEvent>()
@@ -64,6 +71,11 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
-    .withCommand("updateRunMetrics", UpdateRunMetricsCommand)
+    .withCommand("computeRunMetrics", deps.ComputeRunMetricsCommand, {
+      deduplication: {
+        makeId: deps.ComputeRunMetricsCommand.makeJobId,
+        ttlMs: 60_000,
+      },
+    })
     .build();
 }
