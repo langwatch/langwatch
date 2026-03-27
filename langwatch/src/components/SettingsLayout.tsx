@@ -42,28 +42,34 @@ export default function SettingsLayout({
           )}
           <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
           <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
-          <MenuLink href="/settings/secrets">Secrets</MenuLink>
-          <MenuLink href={`/${project?.slug}/automations`}>Automations</MenuLink>
+          {!isLiteMember && (
+            <MenuLink href="/settings/secrets">Secrets</MenuLink>
+          )}
+          {!isLiteMember && (
+            <MenuLink href={`/${project?.slug}/automations`}>Automations</MenuLink>
+          )}
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
           <MenuLink href="/settings/members" includePath="members">
             Members
           </MenuLink>
-          {isEnterprise && (
+          {isEnterprise && !isLiteMember && (
             <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
           )}
-          {isEnterprise && hasPermission("organization:manage") && (
+          {isEnterprise && !isLiteMember && hasPermission("organization:manage") && (
             <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
           )}
 
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores
           </MenuLink>
-          <MenuLink href="/settings/topic-clustering">
-            Topic Clustering
-          </MenuLink>
+          {!isLiteMember && (
+            <MenuLink href="/settings/topic-clustering">
+              Topic Clustering
+            </MenuLink>
+          )}
           <MenuLink href="/settings/authentication">Authentication</MenuLink>
-          {isEnterprise && (
+          {isEnterprise && !isLiteMember && (
             <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
           )}
           {!isLiteMember && (
