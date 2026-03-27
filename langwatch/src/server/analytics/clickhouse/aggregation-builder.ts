@@ -238,6 +238,11 @@ const groupByExpressions: Partial<
     handlesUnknown: true,
   }),
 
+  // NOTE: handlesUnknown is intentionally NOT set here.
+  // When groupByKey is present the IF expression uses '' as the sentinel for
+  // non-matching rows, which must be filtered by HAVING group_key != ''.
+  // Setting handlesUnknown: true would suppress that HAVING clause and leak
+  // non-matching '' rows into results.
   "evaluations.evaluation_label": (groupByKey) => ({
     column: groupByKey
       ? `if(${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed', COALESCE(${tableAliases.evaluation_runs}.Label, 'unknown'), '')`

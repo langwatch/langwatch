@@ -542,42 +542,45 @@ describe("aggregation-builder", () => {
         expect(result.params).not.toHaveProperty("groupByKey");
       });
 
-      it("maps NULL labels to 'unknown' bucket when groupByKey is set", () => {
-        const input = {
-          ...baseInput,
-          groupBy: "evaluations.evaluation_label",
-          groupByKey: "evaluatorA",
-          series: [
-            {
-              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
-              aggregation: "cardinality" as const,
-            },
-          ],
-        };
-        const result = buildTimeseriesQuery(input);
+      describe("when Label IS NULL (score-only evaluator) with groupByKey", () => {
+        it("maps NULL labels to 'unknown' bucket so rows are not silently dropped by HAVING", () => {
+          const input = {
+            ...baseInput,
+            groupBy: "evaluations.evaluation_label",
+            groupByKey: "evaluatorA",
+            series: [
+              {
+                metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+                aggregation: "cardinality" as const,
+              },
+            ],
+          };
+          const result = buildTimeseriesQuery(input);
 
-        // COALESCE must appear inside the conditional to map NULL labels → 'unknown'
-        // so that score-only evaluators (Passed=NULL) are not silently dropped by HAVING
-        expect(result.sql).toContain("COALESCE");
-        expect(result.sql).toMatch(/COALESCE\(.*Label.*'unknown'\)/s);
+          // COALESCE must appear inside the IF to map NULL labels → 'unknown'.
+          // Without COALESCE, if(match, NULL, '') returns NULL; HAVING group_key != ''
+          // evaluates NULL != '' as NULL (not TRUE) and silently drops the row.
+          expect(result.sql).toMatch(/COALESCE\(.*Label.*'unknown'\)/s);
+        });
       });
 
-      it("maps NULL labels to 'unknown' bucket when no groupByKey", () => {
-        const input = {
-          ...baseInput,
-          groupBy: "evaluations.evaluation_label",
-          series: [
-            {
-              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
-              aggregation: "cardinality" as const,
-            },
-          ],
-        };
-        const result = buildTimeseriesQuery(input);
+      describe("when Label IS NULL (score-only evaluator) without groupByKey", () => {
+        it("maps NULL labels to 'unknown' bucket so rows are not silently dropped by HAVING", () => {
+          const input = {
+            ...baseInput,
+            groupBy: "evaluations.evaluation_label",
+            series: [
+              {
+                metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+                aggregation: "cardinality" as const,
+              },
+            ],
+          };
+          const result = buildTimeseriesQuery(input);
 
-        // Without groupByKey, the group_key expression must still COALESCE NULL labels
-        expect(result.sql).toContain("COALESCE");
-        expect(result.sql).toMatch(/COALESCE\(.*Label.*'unknown'\)/s);
+          // COALESCE must appear in the bare column expression to map NULL labels → 'unknown'.
+          expect(result.sql).toMatch(/COALESCE\(.*Label.*'unknown'\)/s);
+        });
       });
     });
   });
