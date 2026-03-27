@@ -17,6 +17,7 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import SettingsLayout from "../SettingsLayout";
 import { PageLayout } from "../ui/layouts/PageLayout";
 
@@ -240,7 +241,8 @@ function ActionsMenu({
                     });
                     void llmModelCosts.refetch();
                   },
-                  onError: () => {
+                  onError: (error) => {
+                    if (isHandledByGlobalHandler(error)) return;
                     toaster.create({
                       title: "Error",
                       description: "Error deleting LLM model cost",
