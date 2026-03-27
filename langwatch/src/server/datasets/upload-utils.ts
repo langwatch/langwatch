@@ -1,8 +1,5 @@
 import Papa from "papaparse";
-import {
-  getSafeColumnName,
-  isReservedColumnName,
-} from "~/components/datasets/utils/reservedColumns";
+import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";
 import type { DatasetColumns } from "./types";
 
 /**
