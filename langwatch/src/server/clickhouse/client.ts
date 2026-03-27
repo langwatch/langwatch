@@ -6,7 +6,7 @@ import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 const logger = createLogger("langwatch:clickhouse:client");
 
 let clickHouseClient: ClickHouseClient | null = null;
-let clickHouseWriteClient: ClickHouseClient | null = null;
+let clickHousePrimaryReplicaClient: ClickHouseClient | null = null;
 
 /**
  * Checks if ClickHouse should be skipped.
@@ -71,8 +71,8 @@ function getClickHouseClient(): ClickHouseClient | null {
  * Fold stores use this for read-after-write consistency — in replicated setups,
  * reading from the same node that wrote avoids replication lag entirely.
  */
-function getClickHouseWriteClient(): ClickHouseClient | null {
-  if (!clickHouseWriteClient && !shouldSkipClickHouse()) {
+function getClickHousePrimaryReplicaClient(): ClickHouseClient | null {
+  if (!clickHousePrimaryReplicaClient && !shouldSkipClickHouse()) {
     const masterUrl = process.env.CLICKHOUSE_PRIMARY_REPLICA_URL;
     if (!masterUrl) {
       // No write URL configured — use the shared client (single-node or dev)
@@ -101,12 +101,12 @@ function getClickHouseWriteClient(): ClickHouseClient | null {
       },
     });
 
-    clickHouseWriteClient = wrapWithDefaultSettings(
+    clickHousePrimaryReplicaClient = wrapWithDefaultSettings(
       createResilientClickHouseClient({ client: raw }),
     );
   }
 
-  return clickHouseWriteClient;
+  return clickHousePrimaryReplicaClient;
 }
 
 export async function closeClickHouseClient(): Promise<void> {
@@ -114,12 +114,12 @@ export async function closeClickHouseClient(): Promise<void> {
     await clickHouseClient.close();
     clickHouseClient = null;
   }
-  if (clickHouseWriteClient) {
-    await clickHouseWriteClient.close();
-    clickHouseWriteClient = null;
+  if (clickHousePrimaryReplicaClient) {
+    await clickHousePrimaryReplicaClient.close();
+    clickHousePrimaryReplicaClient = null;
   }
 }
 
 // Internal access for clickhouseClient.ts — the only allowed consumer
 export { getClickHouseClient as _getSharedClickHouseClient };
-export { getClickHouseWriteClient as _getWriteClickHouseClient };
+export { getClickHousePrimaryReplicaClient as _getPrimaryReplicaClickHouseClient };
