@@ -56,7 +56,7 @@ for stem in $DOCS_ORDER; do
     content=$(escape_for_template_literal < "$file")
     printf '  %s: `%s`,\n\n' "$key" "$content" >> "$OUT"
   else
-    echo "WARNING: Missing file or key for $stem" >&2
+    echo "ERROR: Missing file or key for $stem" >&2; exit 1
   fi
 done
 
@@ -82,7 +82,7 @@ for stem in $PLATFORM_ORDER; do
     content=$(escape_for_template_literal < "$file")
     printf '  %s: `%s`,\n\n' "$key" "$content" >> "$OUT"
   else
-    echo "WARNING: Missing platform file or key for $stem" >&2
+    echo "ERROR: Missing platform file or key for $stem" >&2; exit 1
   fi
 done
 

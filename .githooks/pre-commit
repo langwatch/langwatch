@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Auto-regenerate derived docs files when their sources change.
 
 # Check if any staged files match skill sources
@@ -11,6 +12,6 @@ fi
 # Check if any staged files are under docs/ — always regenerate llms.txt (generation is fast)
 if git diff --cached --name-only | grep -qE '^docs/'; then
   echo "pre-commit: Regenerating llms.txt..."
-  cd docs && node llms.txt.sh && cd ..
+  (cd docs && node llms.txt.sh)
   git add docs/llms.txt docs/llms-full.txt
 fi
