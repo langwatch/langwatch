@@ -6,6 +6,7 @@ import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 const logger = createLogger("langwatch:clickhouse:client");
 
 let clickHouseClient: ClickHouseClient | null = null;
+let clickHouseMasterClient: ClickHouseClient | null = null;
 
 /**
  * Checks if ClickHouse should be skipped.
@@ -63,12 +64,62 @@ function getClickHouseClient(): ClickHouseClient | null {
   return clickHouseClient;
 }
 
+/**
+ * Get or create a ClickHouse client that always connects to the master node.
+ *
+ * Uses CLICKHOUSE_MASTER_URL if set, otherwise falls back to CLICKHOUSE_URL.
+ * Fold stores use this for read-after-write consistency — in replicated setups,
+ * reading from the same node that wrote avoids replication lag entirely.
+ */
+function getClickHouseMasterClient(): ClickHouseClient | null {
+  if (!clickHouseMasterClient && !shouldSkipClickHouse()) {
+    const masterUrl = process.env.CLICKHOUSE_MASTER_URL;
+    if (!masterUrl) {
+      // No master URL configured — use the shared client (single-node or dev)
+      return getClickHouseClient();
+    }
+
+    let url: URL | string = masterUrl;
+    try {
+      url = new URL(masterUrl);
+    } catch (error) {
+      logger.warn(
+        { error },
+        "ClickHouse master URL was not a valid URL, it will still be set, but may not work as expected.",
+      );
+    }
+
+    const raw = createClient({
+      url,
+      clickhouse_settings: {
+        date_time_input_format: "best_effort",
+      },
+      max_open_connections: 10,
+      keep_alive: {
+        enabled: true,
+        idle_socket_ttl: 1500,
+      },
+    });
+
+    clickHouseMasterClient = wrapWithDefaultSettings(
+      createResilientClickHouseClient({ client: raw }),
+    );
+  }
+
+  return clickHouseMasterClient;
+}
+
 export async function closeClickHouseClient(): Promise<void> {
   if (clickHouseClient) {
     await clickHouseClient.close();
     clickHouseClient = null;
   }
+  if (clickHouseMasterClient) {
+    await clickHouseMasterClient.close();
+    clickHouseMasterClient = null;
+  }
 }
 
 // Internal access for clickhouseClient.ts — the only allowed consumer
 export { getClickHouseClient as _getSharedClickHouseClient };
+export { getClickHouseMasterClient as _getMasterClickHouseClient };

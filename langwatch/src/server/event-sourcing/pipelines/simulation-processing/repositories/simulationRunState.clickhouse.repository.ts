@@ -190,14 +190,13 @@ export class SimulationRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
             toUnixTimestamp64Milli(LastSnapshotOccurredAt) AS LastSnapshotOccurredAt
-          FROM ${TABLE_NAME} FINAL
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
           ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
         query_params: { tenantId: context.tenantId, scenarioRunId },
         format: "JSONEachRow",
-        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSimulationRunRecord>();
@@ -271,16 +270,8 @@ export class SimulationRunStateRepositoryClickHouse<
         values: [projectionRecord],
         format: "JSONEachRow",
         clickhouse_settings: {
-          // Synchronous insert (no async batching) + quorum write.
-          // Fold stores need read-after-write consistency: without quorum,
-          // a subsequent store.get() on a replica may return stale state,
-          // causing the fold to overwrite fields (e.g. ScenarioSetId lost,
-          // Status reverted from SUCCESS to IN_PROGRESS).
-          // select_sequential_consistency on reads only works when writes
-          // use insert_quorum with insert_quorum_parallel disabled.
-          async_insert: 0,
-          insert_quorum: "auto",
-          insert_quorum_parallel: "0",
+          async_insert: 1,
+          wait_for_async_insert: 1,
         },
       });
 
