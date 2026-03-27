@@ -274,15 +274,14 @@ export const app = new Hono<{ Variables: Variables }>()
         result = await service.getDatasetWithRecords({
           slugOrId,
           projectId: project.id,
+          limitMb: MAX_LIMIT_MB,
         });
       } catch (error) {
         return mapDatasetNotFoundError(error);
       }
 
-      const { dataset, records } = result;
-
-      const responseSize = JSON.stringify(records).length;
-      if (responseSize > MAX_LIMIT_MB * 1024 * 1024) {
+      const { dataset, records, truncated } = result;
+      if (truncated) {
         throw new BadRequestError(
           `Dataset size exceeds ${MAX_LIMIT_MB}MB limit`,
         );
