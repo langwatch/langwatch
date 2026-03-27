@@ -1323,12 +1323,14 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests an allowed view permission via project", () => {
+    describe("when EXTERNAL user requests an allowed permission via project", () => {
       it.each([
         "project:view",
         "analytics:view",
         "traces:view",
         "annotations:view",
+        "annotations:create",
+        "annotations:update",
         "evaluations:view",
         "datasets:view",
         "workflows:view",
@@ -1380,12 +1382,14 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests an allowed view permission via team", () => {
+    describe("when EXTERNAL user requests an allowed permission via team", () => {
       it.each([
         "project:view",
         "analytics:view",
         "traces:view",
         "annotations:view",
+        "annotations:create",
+        "annotations:update",
         "evaluations:view",
         "datasets:view",
         "workflows:view",
@@ -1618,12 +1622,14 @@ describe("RBAC Integration Tests", () => {
     });
 
     describe("when EXTERNAL_MEMBER_PERMISSIONS constant is defined", () => {
-      it("matches the VIEWER role permission set exactly", () => {
+      it("includes view permissions plus annotation create and update", () => {
         expect(EXTERNAL_MEMBER_PERMISSIONS).toEqual([
           "project:view",
           "analytics:view",
           "traces:view",
           "annotations:view",
+          "annotations:create",
+          "annotations:update",
           "evaluations:view",
           "datasets:view",
           "workflows:view",

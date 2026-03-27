@@ -104,26 +104,16 @@ describe("<CurrentDrawer/>", () => {
         setupOrganizationRole(OrganizationUserRole.EXTERNAL);
       });
 
-      it("does not render the trace details drawer", () => {
-        const { queryByTestId } = render(<CurrentDrawer />);
+      it("renders the trace details drawer", () => {
+        const { getByTestId } = render(<CurrentDrawer />);
 
-        expect(queryByTestId("trace-details-drawer")).toBeNull();
+        expect(getByTestId("trace-details-drawer")).toBeTruthy();
       });
 
-      it("opens the lite member restriction modal", () => {
+      it("does not open the restriction modal", () => {
         render(<CurrentDrawer />);
 
-        expect(mockOpenLiteMemberRestriction).toHaveBeenCalledWith({
-          resource: "traces",
-        });
-      });
-
-      it("clears the drawer URL params", () => {
-        render(<CurrentDrawer />);
-
-        expect(mockPush).toHaveBeenCalled();
-        const pushUrl = mockPush.mock.calls[0]?.[0] as string;
-        expect(pushUrl).not.toContain("drawer");
+        expect(mockOpenLiteMemberRestriction).not.toHaveBeenCalled();
       });
     });
 
