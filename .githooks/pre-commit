@@ -1,0 +1,16 @@
+#!/bin/bash
+# Auto-regenerate derived docs files when their sources change.
+
+# Check if any staged files match skill sources
+if git diff --cached --name-only | grep -qE '^skills/.*\.md$|^skills/_shared/'; then
+  echo "pre-commit: Regenerating prompts-data.jsx from skill sources..."
+  bash docs/scripts/sync-prompts.sh
+  git add docs/snippets/prompts-data.jsx
+fi
+
+# Check if any staged files are under docs/ — always regenerate llms.txt (generation is fast)
+if git diff --cached --name-only | grep -qE '^docs/'; then
+  echo "pre-commit: Regenerating llms.txt..."
+  cd docs && node llms.txt.sh && cd ..
+  git add docs/llms.txt docs/llms-full.txt
+fi
