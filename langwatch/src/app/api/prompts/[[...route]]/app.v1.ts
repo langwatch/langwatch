@@ -92,6 +92,93 @@ app.get(
   },
 );
 
+// Assign label to a prompt version
+const assignLabelResponseSchema = z.object({
+  configId: z.string(),
+  versionId: z.string(),
+  label: z.string(),
+  updatedAt: z.date(),
+});
+
+app.put(
+  "/:id{.+?}/labels/:label",
+  describeRoute({
+    description:
+      'Assign a label (e.g. "production", "staging") to a specific prompt version',
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(assignLabelResponseSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+      422: {
+        description: "Invalid label or version",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ versionId: z.string() })),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id, label } = c.req.param();
+    const { versionId } = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, promptId: id, label, versionId },
+      "Assigning label to prompt version",
+    );
+
+    try {
+      const config = await service.repository.getPromptByIdOrHandle({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
+      if (!config) {
+        throw new HTTPException(404, {
+          message: `Prompt not found: ${id}`,
+        });
+      }
+
+      const result = await service.assignLabel({
+        configId: config.id,
+        versionId,
+        label,
+        projectId: project.id,
+      });
+
+      logger.info(
+        { projectId: project.id, configId: config.id, label, versionId },
+        "Successfully assigned label to prompt version",
+      );
+
+      return c.json(
+        assignLabelResponseSchema.parse({
+          configId: result.configId,
+          versionId: result.versionId,
+          label: result.label,
+          updatedAt: result.updatedAt,
+        }),
+      );
+    } catch (error: unknown) {
+      if (error instanceof LabelValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+  },
+);
+
 // Get versions
 app.get(
   "/:id{.+?}/versions",
