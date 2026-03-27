@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
-import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
-import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
-import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
-import { modelProviders } from "../../modelProviders/registry";
+import { providerDefaultBaseUrls } from "../../features/onboarding/regions/model-providers/registry";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { ModelProviderRepository } from "./modelProvider.repository";
+import { modelProviders } from "./registry";
 
 /** Validation result returned by all validation functions */
 export type ValidationResult = { valid: boolean; error?: string };
