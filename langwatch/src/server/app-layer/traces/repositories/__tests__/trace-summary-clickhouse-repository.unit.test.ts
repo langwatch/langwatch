@@ -81,41 +81,7 @@ describe("TraceSummaryClickHouseRepository", () => {
         const resolver = vi.fn().mockResolvedValue(client);
         const repo = new TraceSummaryClickHouseRepository(resolver);
 
-        await repo.upsert(
-          {
-            traceId: "trace-1",
-            spanCount: 1,
-            totalDurationMs: 100,
-            computedIOSchemaVersion: "v1",
-            computedInput: null,
-            computedOutput: null,
-            timeToFirstTokenMs: null,
-            timeToLastTokenMs: null,
-            tokensPerSecond: null,
-            containsErrorStatus: false,
-            containsOKStatus: true,
-            errorMessage: null,
-            models: [],
-            totalCost: null,
-            tokensEstimated: false,
-            totalPromptTokenCount: null,
-            totalCompletionTokenCount: null,
-            outputFromRootSpan: true,
-            outputSpanEndTimeMs: 1100,
-            blockedByGuardrail: false,
-            topicId: null,
-            subTopicId: null,
-            hasAnnotation: null,
-            attributes: {},
-            scenarioRoleCosts: { agent: 0.05 },
-            scenarioRoleLatencies: { agent: 200 },
-            scenarioRoleSpans: { agent: "span-1" },
-            occurredAt: 1000,
-            createdAt: 1000,
-            updatedAt: 1000,
-          },
-          "tenant-1",
-        );
+        await repo.upsert(makeSummaryData(), "tenant-1");
 
         const insertedValues = insertFn.mock.calls[0]![0].values[0];
         expect(insertedValues.ScenarioRoleCosts).toEqual({ agent: 0.05 });
@@ -123,5 +89,123 @@ describe("TraceSummaryClickHouseRepository", () => {
         expect(insertedValues.ScenarioRoleSpans).toEqual({ agent: "span-1" });
       });
     });
+
+    describe("when timing values have sub-millisecond precision", () => {
+      it("rounds float TimeToFirstTokenMs to integer", async () => {
+        const { client, insertFn } = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new TraceSummaryClickHouseRepository(resolver);
+
+        await repo.upsert(
+          makeSummaryData({ timeToFirstTokenMs: 1234.781078338623 }),
+          "tenant-1",
+        );
+
+        const record = insertFn.mock.calls[0]![0].values[0];
+        expect(record.TimeToFirstTokenMs).toBe(1235);
+        expect(Number.isInteger(record.TimeToFirstTokenMs)).toBe(true);
+      });
+
+      it("rounds float TimeToLastTokenMs to integer", async () => {
+        const { client, insertFn } = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new TraceSummaryClickHouseRepository(resolver);
+
+        await repo.upsert(
+          makeSummaryData({ timeToLastTokenMs: 5678.123456789 }),
+          "tenant-1",
+        );
+
+        const record = insertFn.mock.calls[0]![0].values[0];
+        expect(record.TimeToLastTokenMs).toBe(5678);
+        expect(Number.isInteger(record.TimeToLastTokenMs)).toBe(true);
+      });
+
+      it("rounds float TotalDurationMs to integer", async () => {
+        const { client, insertFn } = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new TraceSummaryClickHouseRepository(resolver);
+
+        await repo.upsert(
+          makeSummaryData({ totalDurationMs: 9999.500001 }),
+          "tenant-1",
+        );
+
+        const record = insertFn.mock.calls[0]![0].values[0];
+        expect(record.TotalDurationMs).toBe(10000);
+        expect(Number.isInteger(record.TotalDurationMs)).toBe(true);
+      });
+
+      it("rounds float TokensPerSecond to integer", async () => {
+        const { client, insertFn } = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new TraceSummaryClickHouseRepository(resolver);
+
+        await repo.upsert(
+          makeSummaryData({ tokensPerSecond: 42.7 }),
+          "tenant-1",
+        );
+
+        const record = insertFn.mock.calls[0]![0].values[0];
+        expect(record.TokensPerSecond).toBe(43);
+        expect(Number.isInteger(record.TokensPerSecond)).toBe(true);
+      });
+
+      it("preserves null for nullable timing fields", async () => {
+        const { client, insertFn } = makeMockClient();
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new TraceSummaryClickHouseRepository(resolver);
+
+        await repo.upsert(
+          makeSummaryData({
+            timeToFirstTokenMs: null,
+            timeToLastTokenMs: null,
+            tokensPerSecond: null,
+          }),
+          "tenant-1",
+        );
+
+        const record = insertFn.mock.calls[0]![0].values[0];
+        expect(record.TimeToFirstTokenMs).toBeNull();
+        expect(record.TimeToLastTokenMs).toBeNull();
+        expect(record.TokensPerSecond).toBeNull();
+      });
+    });
   });
 });
+
+function makeSummaryData(overrides: Partial<Parameters<TraceSummaryClickHouseRepository["upsert"]>[0]> = {}) {
+  return {
+    traceId: "trace-1",
+    spanCount: 1,
+    totalDurationMs: 100,
+    computedIOSchemaVersion: "v1",
+    computedInput: null,
+    computedOutput: null,
+    timeToFirstTokenMs: null,
+    timeToLastTokenMs: null,
+    tokensPerSecond: null,
+    containsErrorStatus: false,
+    containsOKStatus: true,
+    errorMessage: null,
+    models: [],
+    totalCost: null,
+    tokensEstimated: false,
+    totalPromptTokenCount: null,
+    totalCompletionTokenCount: null,
+    outputFromRootSpan: true,
+    outputSpanEndTimeMs: 1100,
+    blockedByGuardrail: false,
+    topicId: null,
+    subTopicId: null,
+    hasAnnotation: null,
+    attributes: {},
+    scenarioRoleCosts: { agent: 0.05 },
+    scenarioRoleLatencies: { agent: 200 },
+    scenarioRoleSpans: { agent: "span-1" },
+    occurredAt: 1000,
+    createdAt: 1000,
+    updatedAt: 1000,
+    ...overrides,
+  };
+}
