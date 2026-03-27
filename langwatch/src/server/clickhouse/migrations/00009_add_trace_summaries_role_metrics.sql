@@ -4,8 +4,7 @@
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
   ADD COLUMN IF NOT EXISTS ScenarioRoleCosts Map(String, Float64),
   ADD COLUMN IF NOT EXISTS ScenarioRoleLatencies Map(String, Float64),
-  ADD COLUMN IF NOT EXISTS ScenarioRoleSpans Map(String, String),
-  ADD COLUMN IF NOT EXISTS SpanCosts Map(String, Float64);
+  ADD COLUMN IF NOT EXISTS ScenarioRoleSpans Map(String, String);
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
 
