@@ -1,5 +1,8 @@
 import type { Prisma, PrismaClient, PromptVersionLabel } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:prompt-version-labels");
 
 const VALID_LABELS = ["production", "staging"] as const;
 type ValidLabel = (typeof VALID_LABELS)[number];
@@ -25,6 +28,7 @@ export class PromptVersionLabelRepository {
    */
   validateLabel(label: string): asserts label is ValidLabel {
     if (!VALID_LABELS.includes(label as ValidLabel)) {
+      logger.warn({ label }, "Invalid label name rejected");
       throw new LabelValidationError(
         `Invalid label "${label}". Only "production" and "staging" are allowed.`,
       );
@@ -55,6 +59,7 @@ export class PromptVersionLabelRepository {
     });
 
     if (!version) {
+      logger.warn({ versionId, configId, projectId }, "Version does not belong to prompt config");
       throw new LabelValidationError(
         "Version does not belong to this prompt config",
       );
@@ -91,7 +96,7 @@ export class PromptVersionLabelRepository {
       tx,
     });
 
-    return await client.promptVersionLabel.upsert({
+    const result = await client.promptVersionLabel.upsert({
       where: {
         projectId,
         configId_label: { configId, label },
@@ -110,6 +115,10 @@ export class PromptVersionLabelRepository {
         updatedById: userId ?? null,
       },
     });
+
+    logger.info({ configId, versionId, label, projectId }, "Label assigned to prompt version");
+
+    return result;
   }
 
   /**
@@ -124,12 +133,16 @@ export class PromptVersionLabelRepository {
     label: string;
     projectId: string;
   }): Promise<PromptVersionLabel | null> {
-    return await this.prisma.promptVersionLabel.findFirst({
+    const result = await this.prisma.promptVersionLabel.findFirst({
       where: {
         configId,
         label,
         projectId,
       },
     });
+
+    logger.info({ configId, label }, "Label lookup completed");
+
+    return result;
   }
 }

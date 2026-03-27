@@ -5,6 +5,7 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
+import { createLogger } from "~/utils/logger";
 import {
   deriveResponseFormatFromOutputs,
   type inputsSchema,
@@ -33,6 +34,8 @@ import {
   transformCamelToSnake,
   transformSnakeToCamel,
 } from "./transformToDbFormat";
+
+const logger = createLogger("langwatch:prompt-service");
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -155,6 +158,10 @@ export class PromptService {
     const { idOrHandle, projectId } = params;
 
     if (params.label && (params.version !== undefined || params.versionId !== undefined)) {
+      logger.warn(
+        { idOrHandle, label: params.label, version: params.version, versionId: params.versionId },
+        "Mutual exclusion: cannot specify both version/versionId and label",
+      );
       throw new Error(
         "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
       );
