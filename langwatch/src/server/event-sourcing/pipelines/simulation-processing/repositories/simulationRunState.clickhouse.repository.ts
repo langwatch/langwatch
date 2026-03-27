@@ -276,8 +276,11 @@ export class SimulationRunStateRepositoryClickHouse<
           // a subsequent store.get() on a replica may return stale state,
           // causing the fold to overwrite fields (e.g. ScenarioSetId lost,
           // Status reverted from SUCCESS to IN_PROGRESS).
+          // select_sequential_consistency on reads only works when writes
+          // use insert_quorum with insert_quorum_parallel disabled.
           async_insert: 0,
-          insert_quorum: "2",
+          insert_quorum: "auto",
+          insert_quorum_parallel: "0",
         },
       });
 
