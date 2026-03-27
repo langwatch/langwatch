@@ -2071,6 +2071,12 @@
                       "1.0"
                     ]
                   },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "scope": {
                     "type": "string",
                     "enum": [

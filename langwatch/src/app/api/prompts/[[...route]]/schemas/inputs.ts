@@ -43,7 +43,6 @@ export const updatePromptInputSchema = createPromptInputSchema
   .omit({
     scope: true,
     handle: true,
-    labels: true,
   })
   .merge(
     z.strictObject({
