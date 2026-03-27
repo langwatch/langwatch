@@ -1,20 +1,20 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
-import { DatasetService } from "../../../../server/datasets/dataset.service";
-import { prisma } from "../../../../server/db";
-import { slugify } from "../../../../utils/slugify";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
   resourceLimitMiddleware,
 } from "../../middleware";
+import {
+  type DatasetServiceMiddlewareVariables,
+  datasetServiceMiddleware,
+} from "../../middleware/dataset-service";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
@@ -31,33 +31,7 @@ import { buildStandardSuccessResponse } from "./utils";
 
 patchZodOpenapi();
 
-type Variables = AuthMiddlewareVariables;
-
-const getService = () => DatasetService.create(prisma);
-
-/**
- * Resolves a dataset by slug or id within a project.
- * @throws {NotFoundError} if not found
- */
-async function resolveDataset({
-  slugOrId,
-  projectId,
-}: {
-  slugOrId: string;
-  projectId: string;
-}) {
-  const dataset = await prisma.dataset.findFirst({
-    where: {
-      projectId,
-      archivedAt: null,
-      OR: [{ slug: slugOrId }, { id: slugOrId }],
-    },
-  });
-  if (!dataset) {
-    throw new NotFoundError("Dataset not found");
-  }
-  return dataset;
-}
+type Variables = AuthMiddlewareVariables & DatasetServiceMiddlewareVariables;
 
 // -- Validation schemas for new endpoints --
 
@@ -94,16 +68,16 @@ const deleteRecordsSchema = z.object({
  * Used on endpoints where the feature spec requires 422 Unprocessable Entity.
  */
 function validationHook(
-  result: { success: boolean; error?: { issues: unknown[] } },
-  c: { json: (body: unknown, status: number) => unknown },
-): unknown | undefined {
+  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
+  c: { json: (body: unknown, status: number) => Response },
+): Response | undefined {
   if (!result.success) {
+    const issue = result.error?.issues?.[0];
     return c.json(
       {
         error: "Unprocessable Entity",
-        message: result.error?.issues?.[0]
-          ? JSON.stringify(result.error.issues[0])
-          : "Validation failed",
+        message: issue?.message ?? "Validation failed",
+        path: issue?.path,
       },
       422,
     );
@@ -111,11 +85,23 @@ function validationHook(
   return undefined;
 }
 
+/**
+ * Maps DatasetNotFoundError from the service layer to the HTTP NotFoundError.
+ * The service throws domain errors; the route handler translates them to HTTP errors.
+ */
+function mapDatasetNotFoundError(error: unknown): never {
+  if (error instanceof Error && error.name === "DatasetNotFoundError") {
+    throw new NotFoundError("Dataset not found");
+  }
+  throw error;
+}
+
 export const app = new Hono<{ Variables: Variables }>()
   .basePath("/api/dataset")
   .use(tracerMiddleware({ name: "dataset" }))
   .use(loggerMiddleware())
   .use(authMiddleware)
+  .use(datasetServiceMiddleware)
   .onError(handleDatasetError)
 
   // ── List Datasets (paginated) ──────────────────────────────────
@@ -128,40 +114,15 @@ export const app = new Hono<{ Variables: Variables }>()
     async (c) => {
       const project = c.get("project");
       const { page, limit } = c.req.valid("query");
-      const skip = (page - 1) * limit;
+      const service = c.get("datasetService");
 
-      const [datasets, total] = await Promise.all([
-        prisma.dataset.findMany({
-          where: { projectId: project.id, archivedAt: null },
-          orderBy: { createdAt: "desc" },
-          include: { _count: { select: { datasetRecords: true } } },
-          skip,
-          take: limit,
-        }),
-        prisma.dataset.count({
-          where: { projectId: project.id, archivedAt: null },
-        }),
-      ]);
-
-      const data = datasets.map((d: { id: string; name: string; slug: string; columnTypes: unknown; createdAt: Date; updatedAt: Date; _count: { datasetRecords: number } }) => ({
-        id: d.id,
-        name: d.name,
-        slug: d.slug,
-        columnTypes: d.columnTypes,
-        createdAt: d.createdAt,
-        updatedAt: d.updatedAt,
-        recordCount: d._count.datasetRecords,
-      }));
-
-      return c.json({
-        data,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
+      const result = await service.listDatasets({
+        projectId: project.id,
+        page,
+        limit,
       });
+
+      return c.json(result);
     },
   )
 
@@ -176,8 +137,8 @@ export const app = new Hono<{ Variables: Variables }>()
     async (c) => {
       const project = c.get("project");
       const { name, columnTypes } = c.req.valid("json");
+      const service = c.get("datasetService");
 
-      const service = getService();
       try {
         const dataset = await service.upsertDataset({
           projectId: project.id,
@@ -240,16 +201,16 @@ export const app = new Hono<{ Variables: Variables }>()
       const { slug } = c.req.param();
       const project = c.get("project");
       const { entries } = c.req.valid("json");
+      const service = c.get("datasetService");
 
-      const dataset = await prisma.dataset.findFirst({
-        where: {
+      let dataset;
+      try {
+        dataset = await service.getBySlugOrId({
+          slugOrId: slug,
           projectId: project.id,
-          archivedAt: null,
-          OR: [{ slug }, { id: slug }],
-        },
-      });
-      if (!dataset) {
-        throw new NotFoundError("Dataset not found");
+        });
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
       }
 
       const columns = Object.fromEntries(
@@ -306,23 +267,21 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       const project = c.get("project");
+      const service = c.get("datasetService");
 
-      const dataset = await prisma.dataset.findFirst({
-        where: {
+      let result;
+      try {
+        result = await service.getDatasetWithRecords({
+          slugOrId,
           projectId: project.id,
-          archivedAt: null,
-          OR: [{ slug: slugOrId }, { id: slugOrId }],
-        },
-      });
-      if (!dataset) {
-        throw new NotFoundError("Dataset not found");
+        });
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
       }
 
-      const datasetRecords = await prisma.datasetRecord.findMany({
-        where: { datasetId: dataset.id, projectId: project.id },
-      });
+      const { dataset, records } = result;
 
-      const responseSize = JSON.stringify(datasetRecords).length;
+      const responseSize = JSON.stringify(records).length;
       if (responseSize > MAX_LIMIT_MB * 1024 * 1024) {
         throw new BadRequestError(
           `Dataset size exceeds ${MAX_LIMIT_MB}MB limit`,
@@ -336,7 +295,7 @@ export const app = new Hono<{ Variables: Variables }>()
         columnTypes: dataset.columnTypes,
         createdAt: dataset.createdAt,
         updatedAt: dataset.updatedAt,
-        data: datasetRecords,
+        data: records,
       });
     },
   )
@@ -352,13 +311,17 @@ export const app = new Hono<{ Variables: Variables }>()
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const body = c.req.valid("json");
+      const service = c.get("datasetService");
 
-      const dataset = await resolveDataset({
-        slugOrId,
-        projectId: project.id,
-      });
-
-      const service = getService();
+      let dataset;
+      try {
+        dataset = await service.getBySlugOrId({
+          slugOrId,
+          projectId: project.id,
+        });
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
+      }
 
       try {
         const updated = await service.upsertDataset({
@@ -405,26 +368,17 @@ export const app = new Hono<{ Variables: Variables }>()
     async (c) => {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
+      const service = c.get("datasetService");
 
-      const dataset = await resolveDataset({
-        slugOrId,
-        projectId: project.id,
-      });
-
-      const slug = slugify(dataset.name);
-
-      await prisma.dataset.update({
-        where: {
-          id: dataset.id,
+      try {
+        const result = await service.archiveDataset({
+          slugOrId,
           projectId: project.id,
-        },
-        data: {
-          slug: `${slug}-archived-${nanoid()}`,
-          archivedAt: new Date(),
-        },
-      });
-
-      return c.json({ id: dataset.id, archived: true });
+        });
+        return c.json(result);
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
+      }
     },
   )
 
@@ -439,34 +393,19 @@ export const app = new Hono<{ Variables: Variables }>()
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const { page, limit } = c.req.valid("query");
-      const skip = (page - 1) * limit;
+      const service = c.get("datasetService");
 
-      const dataset = await resolveDataset({
-        slugOrId,
-        projectId: project.id,
-      });
-
-      const [records, total] = await Promise.all([
-        prisma.datasetRecord.findMany({
-          where: { datasetId: dataset.id, projectId: project.id },
-          orderBy: { createdAt: "asc" },
-          skip,
-          take: limit,
-        }),
-        prisma.datasetRecord.count({
-          where: { datasetId: dataset.id, projectId: project.id },
-        }),
-      ]);
-
-      return c.json({
-        data: records,
-        pagination: {
+      try {
+        const result = await service.listRecords({
+          slugOrId,
+          projectId: project.id,
           page,
           limit,
-          total,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
+        });
+        return c.json(result);
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
+      }
     },
   )
 
@@ -481,34 +420,20 @@ export const app = new Hono<{ Variables: Variables }>()
       const { slugOrId, recordId } = c.req.param();
       const project = c.get("project");
       const { entry } = c.req.valid("json");
+      const service = c.get("datasetService");
 
-      const dataset = await resolveDataset({
-        slugOrId,
-        projectId: project.id,
-      });
-
-      // Upsert: try to find existing record, update or create
-      const existingRecord = await prisma.datasetRecord.findUnique({
-        where: { id: recordId, projectId: project.id },
-      });
-
-      if (existingRecord) {
-        const updated = await prisma.datasetRecord.update({
-          where: { id: recordId, projectId: project.id },
-          data: { entry },
-        });
-        return c.json(updated);
-      }
-
-      const created = await prisma.datasetRecord.create({
-        data: {
-          id: recordId,
-          entry,
-          datasetId: dataset.id,
+      try {
+        const { record, created } = await service.upsertRecord({
+          slugOrId,
           projectId: project.id,
-        },
-      });
-      return c.json(created, 201);
+          recordId,
+          entry,
+        });
+
+        return c.json(record, created ? 201 : 200);
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
+      }
     },
   )
 
@@ -523,24 +448,23 @@ export const app = new Hono<{ Variables: Variables }>()
       const { slugOrId } = c.req.param();
       const project = c.get("project");
       const { recordIds } = c.req.valid("json");
+      const service = c.get("datasetService");
 
-      const dataset = await resolveDataset({
-        slugOrId,
-        projectId: project.id,
-      });
-
-      const { count } = await prisma.datasetRecord.deleteMany({
-        where: {
-          id: { in: recordIds },
-          datasetId: dataset.id,
+      let result;
+      try {
+        result = await service.deleteRecords({
+          slugOrId,
           projectId: project.id,
-        },
-      });
+          recordIds,
+        });
+      } catch (error) {
+        return mapDatasetNotFoundError(error);
+      }
 
-      if (count === 0) {
+      if (result.count === 0) {
         throw new NotFoundError("No matching records found");
       }
 
-      return c.json({ deletedCount: count });
+      return c.json({ deletedCount: result.count });
     },
   );

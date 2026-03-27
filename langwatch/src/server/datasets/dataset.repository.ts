@@ -1,4 +1,4 @@
-import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
+import type { Dataset, DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety
@@ -142,5 +142,68 @@ export class DatasetRepository {
       where: { projectId: input.projectId },
       select: { slug: true },
     });
+  }
+
+  /**
+   * Finds a dataset by slug or id within a project, excluding archived datasets.
+   */
+  async findBySlugOrId(input: {
+    slugOrId: string;
+    projectId: string;
+  }): Promise<Dataset | null> {
+    return await this.prisma.dataset.findFirst({
+      where: {
+        projectId: input.projectId,
+        archivedAt: null,
+        OR: [{ slug: input.slugOrId }, { id: input.slugOrId }],
+      },
+    });
+  }
+
+  /**
+   * Lists non-archived datasets for a project with pagination and record counts.
+   */
+  async listPaginated(input: {
+    projectId: string;
+    skip: number;
+    take: number;
+  }): Promise<{
+    datasets: Array<Dataset & { _count: { datasetRecords: number } }>;
+    total: number;
+  }> {
+    const where = { projectId: input.projectId, archivedAt: null };
+
+    const [datasets, total] = await Promise.all([
+      this.prisma.dataset.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { datasetRecords: true } } },
+        skip: input.skip,
+        take: input.take,
+      }),
+      this.prisma.dataset.count({ where }),
+    ]);
+
+    return { datasets, total };
+  }
+
+  /**
+   * Finds a dataset with all its records.
+   */
+  async findWithRecords(input: {
+    datasetId: string;
+    projectId: string;
+  }): Promise<{ dataset: Dataset; records: DatasetRecord[] } | null> {
+    const dataset = await this.prisma.dataset.findFirst({
+      where: { id: input.datasetId, projectId: input.projectId },
+    });
+
+    if (!dataset) return null;
+
+    const records = await this.prisma.datasetRecord.findMany({
+      where: { datasetId: input.datasetId, projectId: input.projectId },
+    });
+
+    return { dataset, records };
   }
 }

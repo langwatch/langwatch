@@ -14,6 +14,27 @@ import type {
 } from "./types";
 
 /**
+ * Result type for paginated dataset listings.
+ */
+export type ListDatasetsResult = {
+  data: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    columnTypes: unknown;
+    createdAt: Date;
+    updatedAt: Date;
+    recordCount: number;
+  }>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+/**
  * Service input types for business operations
  */
 export type UpsertDatasetParams = {
@@ -388,6 +409,208 @@ export class DatasetService {
       index++;
     }
   }
+  /**
+   * Resolves a dataset by slug or id within a project.
+   * Only returns non-archived datasets.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   */
+  async getBySlugOrId(params: {
+    slugOrId: string;
+    projectId: string;
+  }) {
+    const dataset = await this.repository.findBySlugOrId(params);
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+    return dataset;
+  }
+
+  /**
+   * Lists non-archived datasets for a project with pagination and record counts.
+   */
+  async listDatasets(params: {
+    projectId: string;
+    page: number;
+    limit: number;
+  }): Promise<ListDatasetsResult> {
+    const { projectId, page, limit } = params;
+    const skip = (page - 1) * limit;
+
+    const { datasets, total } = await this.repository.listPaginated({
+      projectId,
+      skip,
+      take: limit,
+    });
+
+    return {
+      data: datasets.map((d) => ({
+        id: d.id,
+        name: d.name,
+        slug: d.slug,
+        columnTypes: d.columnTypes,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+        recordCount: d._count.datasetRecords,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Archives a dataset (soft-delete) by setting archivedAt and mutating its slug.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   */
+  async archiveDataset(params: {
+    slugOrId: string;
+    projectId: string;
+  }) {
+    const dataset = await this.getBySlugOrId(params);
+    const slug = this.generateSlug(dataset.name);
+
+    await this.repository.update({
+      id: dataset.id,
+      projectId: params.projectId,
+      data: {
+        slug: `${slug}-archived-${nanoid()}`,
+        archivedAt: new Date(),
+      },
+    });
+
+    return { id: dataset.id, archived: true as const };
+  }
+
+  /**
+   * Lists records for a dataset with pagination.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   */
+  async listRecords(params: {
+    slugOrId: string;
+    projectId: string;
+    page: number;
+    limit: number;
+  }) {
+    const dataset = await this.getBySlugOrId({
+      slugOrId: params.slugOrId,
+      projectId: params.projectId,
+    });
+
+    const skip = (params.page - 1) * params.limit;
+    const { records, total } = await this.recordRepository.listPaginated({
+      datasetId: dataset.id,
+      projectId: params.projectId,
+      skip,
+      take: params.limit,
+    });
+
+    return {
+      data: records,
+      pagination: {
+        page: params.page,
+        limit: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+      },
+    };
+  }
+
+  /**
+   * Upserts a record within a dataset: updates if it exists, creates if it doesn't.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   * @returns `{ record, created }` where created indicates if a new record was made
+   */
+  async upsertRecord(params: {
+    slugOrId: string;
+    projectId: string;
+    recordId: string;
+    entry: Prisma.InputJsonValue;
+  }) {
+    const dataset = await this.getBySlugOrId({
+      slugOrId: params.slugOrId,
+      projectId: params.projectId,
+    });
+
+    const existing = await this.recordRepository.findOne({
+      id: params.recordId,
+      datasetId: dataset.id,
+      projectId: params.projectId,
+    });
+
+    if (existing) {
+      const updated = await this.recordRepository.updateEntry({
+        id: params.recordId,
+        datasetId: dataset.id,
+        projectId: params.projectId,
+        entry: params.entry,
+      });
+      return { record: updated, created: false };
+    }
+
+    const created = await this.recordRepository.create({
+      id: params.recordId,
+      datasetId: dataset.id,
+      projectId: params.projectId,
+      entry: params.entry,
+    });
+    return { record: created, created: true };
+  }
+
+  /**
+   * Batch deletes records from a dataset.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   * @returns the count of deleted records
+   */
+  async deleteRecords(params: {
+    slugOrId: string;
+    projectId: string;
+    recordIds: string[];
+  }) {
+    const dataset = await this.getBySlugOrId({
+      slugOrId: params.slugOrId,
+      projectId: params.projectId,
+    });
+
+    const { count } = await this.recordRepository.deleteMany({
+      recordIds: params.recordIds,
+      datasetId: dataset.id,
+      projectId: params.projectId,
+    });
+
+    return { count };
+  }
+
+  /**
+   * Gets a dataset with all its records, resolving by slug or id.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   */
+  async getDatasetWithRecords(params: {
+    slugOrId: string;
+    projectId: string;
+  }) {
+    const dataset = await this.getBySlugOrId(params);
+
+    const result = await this.repository.findWithRecords({
+      datasetId: dataset.id,
+      projectId: params.projectId,
+    });
+
+    if (!result) {
+      throw new DatasetNotFoundError();
+    }
+
+    return result;
+  }
+
   /**
    * Copies a dataset to a target project.
    * Handles name conflicts by appending a suffix.
