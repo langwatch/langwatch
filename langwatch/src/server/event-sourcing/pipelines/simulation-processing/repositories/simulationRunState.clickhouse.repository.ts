@@ -270,7 +270,15 @@ export class SimulationRunStateRepositoryClickHouse<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: {
+          // Synchronous insert (no async batching) + quorum write.
+          // Fold stores need read-after-write consistency: without quorum,
+          // a subsequent store.get() on a replica may return stale state,
+          // causing the fold to overwrite fields (e.g. ScenarioSetId lost,
+          // Status reverted from SUCCESS to IN_PROGRESS).
+          async_insert: 0,
+          insert_quorum: "2",
+        },
       });
 
     } catch (error) {
