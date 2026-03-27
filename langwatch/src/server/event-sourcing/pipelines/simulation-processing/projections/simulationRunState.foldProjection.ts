@@ -111,6 +111,28 @@ function init(): SimulationRunStateData {
   };
 }
 
+/**
+ * Monotonic UpdatedAt for ReplacingMergeTree correctness.
+ *
+ * Each new row MUST have a strictly higher UpdatedAt than the previous
+ * state so it always wins the merge. Without this, two events with the
+ * same occurredAt (e.g. SDK sends message_snapshot and finished with
+ * identical timestamps) produce rows with equal UpdatedAt, and the
+ * merge picks non-deterministically — potentially discarding the
+ * finished row.
+ *
+ * For most handlers: use the event's natural timestamp when it's
+ * already higher, otherwise advance by +1.
+ *
+ * For metrics_computed: ALWAYS use +1 because its occurredAt is
+ * server-generated (ECST reactor, 60s delay) and would jump far
+ * ahead of the finished event's timestamp, causing the stale
+ * metrics row to permanently win.
+ */
+function nextUpdatedAt(state: SimulationRunStateData, event: SimulationProcessingEvent): number {
+  return Math.max(event.occurredAt, state.UpdatedAt + 1);
+}
+
 function apply(
   state: SimulationRunStateData,
   event: SimulationProcessingEvent,
@@ -127,7 +149,7 @@ function apply(
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       QueuedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
@@ -143,7 +165,7 @@ function apply(
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
@@ -172,7 +194,7 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
@@ -207,7 +229,7 @@ function apply(
       Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
@@ -261,7 +283,7 @@ function apply(
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: updatedMessages,
       TraceIds: traceIds,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
@@ -292,7 +314,7 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
@@ -328,14 +350,8 @@ function apply(
       TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
       RoleCosts: roleCosts,
       RoleLatencies: roleLatencies,
-      // Use state.UpdatedAt + 1 instead of event.occurredAt.
-      // metrics_computed events are generated server-side (ECST reactor,
-      // 60s delay) with occurredAt = Date.now(), which is much higher than
-      // the user-sent finished event's occurredAt. In ReplacingMergeTree,
-      // the row with highest UpdatedAt wins the merge — if metrics has
-      // higher UpdatedAt, it permanently overwrites the finished row.
-      // Incrementing from state ensures monotonic ordering without jumping
-      // ahead of the finished event's timestamp.
+      // Always +1 for metrics_computed — its occurredAt is server-generated
+      // (ECST reactor, 60s delay) and would jump far ahead of finished.
       UpdatedAt: state.UpdatedAt + 1,
     };
   }
@@ -345,7 +361,7 @@ function apply(
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       ArchivedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 

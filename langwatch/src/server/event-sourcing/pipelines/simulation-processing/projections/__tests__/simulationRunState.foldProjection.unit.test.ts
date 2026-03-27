@@ -221,7 +221,8 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("IN_PROGRESS");
       expect(state.StartedAt).toBe(1000);
       expect(state.CreatedAt).toBe(FAKE_NOW);
-      expect(state.UpdatedAt).toBe(1000); // event.occurredAt
+      // UpdatedAt is monotonic: max(event.occurredAt, state.UpdatedAt + 1)
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(1000);
     });
   });
 
@@ -240,7 +241,8 @@ describe("simulationRunStateFoldProjection", () => {
         { Id: "", Role: "assistant", Content: "hi", TraceId: "", Rest: "" },
       ]);
       expect(state.TraceIds).toEqual(["trace-1", "trace-2"]);
-      expect(state.UpdatedAt).toBe(2000); // MessageSnapshot occurredAt
+      // UpdatedAt is monotonic: always advances
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(2000);
     });
 
     it("updates Status when provided", () => {
@@ -279,7 +281,8 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Messages).toEqual([
         { Id: "", Role: "user", Content: "second", TraceId: "", Rest: "" },
       ]);
-      expect(state.UpdatedAt).toBe(2000); // newer snapshot's occurredAt (older ignored)
+      // UpdatedAt stays at the newer snapshot's level (older was ignored)
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(2000);
     });
   });
 
@@ -372,7 +375,7 @@ describe("simulationRunStateFoldProjection", () => {
       ]);
 
       expect(state.ArchivedAt).toBe(4000); // RunDeleted occurredAt
-      expect(state.UpdatedAt).toBe(4000); // RunDeleted occurredAt
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(4000);
     });
   });
 
@@ -386,7 +389,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Messages).toEqual([
         { Id: "msg-1", Role: "user", Content: "", TraceId: "", Rest: "" },
       ]);
-      expect(state.UpdatedAt).toBe(1500); // TextMessageStart occurredAt
+      expect(state.UpdatedAt).toBeGreaterThanOrEqual(1500);
     });
 
     it("transitions PENDING to IN_PROGRESS", () => {
