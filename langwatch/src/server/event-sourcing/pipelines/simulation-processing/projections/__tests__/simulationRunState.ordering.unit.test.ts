@@ -191,21 +191,6 @@ describe("simulation run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
   const projection = createSimulationRunStateFoldProjection({ store });
 
-  // Events that can be reordered after started.
-  // In production: started is always first, finished always after snapshot.
-  // metrics_computed can interleave anywhere.
-  const afterStarted: SimulationProcessingEvent[] = [
-    createMessageSnapshotEvent(5000),
-    createFinishedEvent(5200),
-    createMetricsComputedEvent("trace-1", 65000),
-    createMetricsComputedEvent("trace-2", 65100),
-  ];
-
-  const started = createStartedEvent(1000);
-
-  // Generate all permutations of the post-started events, prepend started
-  const allPerms = permutations(afterStarted).map(perm => [started, ...perm]);
-
   function assertCorrectFinalState(state: SimulationRunStateData, label: string) {
     expect(state.Status, `${label}: Status must be SUCCESS`).toBe("SUCCESS");
     expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();
@@ -213,15 +198,57 @@ describe("simulation run fold — event ordering invariants", () => {
     expect(state.BatchRunId, `${label}: BatchRunId must be preserved`).toBe("batch-1");
     expect(state.ScenarioId, `${label}: ScenarioId must be preserved`).toBe("scenario-1");
     expect(state.Verdict, `${label}: Verdict must be set`).toBe("success");
+    // Metrics must always be preserved regardless of ordering
+    expect(state.TotalCost, `${label}: TotalCost must be computed`).toBeGreaterThan(0);
+    expect(Object.keys(state.RoleCosts).length, `${label}: RoleCosts must have entries`).toBeGreaterThan(0);
+    expect(Object.keys(state.RoleLatencies).length, `${label}: RoleLatencies must have entries`).toBeGreaterThan(0);
   }
 
-  describe(`when started is first, then ${afterStarted.length} events in all ${allPerms.length} orderings`, () => {
-    it.each(allPerms.map((perm, i) => ({
-      name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
-      perm,
-    })))("$name → final state is correct", async ({ name, perm }) => {
-      const state = await processFold(perm, store, projection);
-      assertCorrectFinalState(state, name);
+  // --- Distinct timestamps (finished > snapshot) ---
+  describe("when snapshot and finished have distinct timestamps", () => {
+    const started = createStartedEvent(1000);
+    const afterStarted: SimulationProcessingEvent[] = [
+      createMessageSnapshotEvent(5000),
+      createFinishedEvent(5200),
+      createMetricsComputedEvent("trace-1", 65000),
+      createMetricsComputedEvent("trace-2", 65100),
+    ];
+
+    const allPerms = permutations(afterStarted).map(perm => [started, ...perm]);
+
+    describe(`when started is first, then ${afterStarted.length} events in all ${allPerms.length} orderings`, () => {
+      it.each(allPerms.map((perm, i) => ({
+        name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+        perm,
+      })))("$name → final state is correct", async ({ name, perm }) => {
+        const state = await processFold(perm, store, projection);
+        assertCorrectFinalState(state, name);
+      });
+    });
+  });
+
+  // --- Identical timestamps (production pattern: SDK sends snapshot and
+  // finished with the same occurredAt) ---
+  describe("when snapshot and finished have identical occurredAt (production SDK pattern)", () => {
+    const SAME_TS = 5000;
+    const started = createStartedEvent(1000);
+    const afterStarted: SimulationProcessingEvent[] = [
+      createMessageSnapshotEvent(SAME_TS),
+      createFinishedEvent(SAME_TS),
+      createMetricsComputedEvent("trace-1", 65000),
+      createMetricsComputedEvent("trace-2", 65100),
+    ];
+
+    const allPerms = permutations(afterStarted).map(perm => [started, ...perm]);
+
+    describe(`when started is first, then ${afterStarted.length} events in all ${allPerms.length} orderings`, () => {
+      it.each(allPerms.map((perm, i) => ({
+        name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+        perm,
+      })))("$name → final state is correct", async ({ name, perm }) => {
+        const state = await processFold(perm, store, projection);
+        assertCorrectFinalState(state, name);
+      });
     });
   });
 
@@ -229,20 +256,19 @@ describe("simulation run fold — event ordering invariants", () => {
   describe("when processing in production-observed orderings", () => {
     it("started → snapshot → finished → metrics × 2 (happy path)", async () => {
       const state = await processFold([
-        started,
+        createStartedEvent(1000),
         createMessageSnapshotEvent(5000),
-        createFinishedEvent(5200),
+        createFinishedEvent(5000),
         createMetricsComputedEvent("trace-1", 65000),
         createMetricsComputedEvent("trace-2", 65100),
       ], store, projection);
       assertCorrectFinalState(state, "happy path");
-      expect(state.TotalCost).toBeGreaterThan(0);
     });
 
     it("started → finished → snapshot → metrics × 2 (finished before snapshot)", async () => {
       const state = await processFold([
-        started,
-        createFinishedEvent(5200),
+        createStartedEvent(1000),
+        createFinishedEvent(5000),
         createMessageSnapshotEvent(5000),
         createMetricsComputedEvent("trace-1", 65000),
         createMetricsComputedEvent("trace-2", 65100),
@@ -252,10 +278,10 @@ describe("simulation run fold — event ordering invariants", () => {
 
     it("started → metrics → snapshot → finished → metrics (metrics interleaved)", async () => {
       const state = await processFold([
-        started,
+        createStartedEvent(1000),
         createMetricsComputedEvent("trace-1", 65000),
         createMessageSnapshotEvent(5000),
-        createFinishedEvent(5200),
+        createFinishedEvent(5000),
         createMetricsComputedEvent("trace-2", 65100),
       ], store, projection);
       assertCorrectFinalState(state, "metrics interleaved");
@@ -266,9 +292,9 @@ describe("simulation run fold — event ordering invariants", () => {
   describe("when duplicate delayed metrics arrive after finished", () => {
     it("preserves SUCCESS with all metrics applied", async () => {
       const state = await processFold([
-        started,
+        createStartedEvent(1000),
         createMessageSnapshotEvent(5000),
-        createFinishedEvent(5200),
+        createFinishedEvent(5000),
         createMetricsComputedEvent("trace-1", 65000),
         createMetricsComputedEvent("trace-2", 65100),
         // Duplicate ECST fire
@@ -276,7 +302,6 @@ describe("simulation run fold — event ordering invariants", () => {
         createMetricsComputedEvent("trace-2", 125100),
       ], store, projection);
       assertCorrectFinalState(state, "duplicate delayed metrics");
-      expect(state.TotalCost).toBeGreaterThan(0);
     });
   });
 });
