@@ -7,15 +7,11 @@ import {
 } from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import {
-  estimateCost,
-  matchingLLMModelCost,
-} from "~/server/background/workers/collector/cost";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   TRACE_PROCESSING_EVENT_TYPES,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
@@ -165,60 +161,6 @@ function extractModelsFromSpan(span: NormalizedSpan): string[] {
     span.spanAttributes[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
     span.spanAttributes[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
   ].filter((m): m is string => typeof m === "string" && m !== "");
-}
-
-function computeSpanCost({
-  attrs,
-  model,
-  promptTokens,
-  completionTokens,
-}: {
-  attrs: NormalizedAttributes;
-  model: string | undefined;
-  promptTokens: number;
-  completionTokens: number;
-}): number {
-  const numInputRate = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]);
-  const numOutputRate = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]);
-  if (numInputRate !== null || numOutputRate !== null) {
-    return (
-      promptTokens * (numInputRate ?? 0) +
-      completionTokens * (numOutputRate ?? 0)
-    );
-  }
-
-  if (model && (promptTokens > 0 || completionTokens > 0)) {
-    const matched = matchingLLMModelCost(model, getStaticModelCosts());
-    if (matched) {
-      const computed = estimateCost({
-        llmModelCost: matched,
-        inputTokens: promptTokens,
-        outputTokens: completionTokens,
-      });
-      if (computed !== undefined && computed > 0) return computed;
-    }
-  }
-
-  const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
-  if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
-
-  if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {
-    const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (
-      rawOutput &&
-      typeof rawOutput === "object" &&
-      !Array.isArray(rawOutput)
-    ) {
-      const costObj = (rawOutput as Record<string, unknown>).cost as
-        | { amount?: number; currency?: string }
-        | undefined;
-      if (costObj?.currency === "USD" && typeof costObj.amount === "number") {
-        return costObj.amount;
-      }
-    }
-  }
-
-  return 0;
 }
 
 function extractTokenMetrics(span: NormalizedSpan) {
