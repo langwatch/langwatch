@@ -8,7 +8,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { ScenarioEventType, Verdict } from "./scenario-event.enums";
 import { scenarioEventSchema } from "./schemas";
 import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
-import { expandSetIdFilter } from "./internal-set-id";
+import { DEFAULT_SET_ID, expandSetIdFilter } from "./internal-set-id";
 import type {
   ScenarioEvent,
   ScenarioMessageSnapshotEvent,
@@ -494,7 +494,7 @@ export class ScenarioEventRepository {
         // old rows may have scenarioSetId="" while new rows have "default".
         const mergedMap = new Map<string, { scenarioCount: number; lastRunAt: number }>();
         for (const bucket of setBuckets) {
-          const key = bucket.key === "" ? "default" : bucket.key;
+          const key = bucket.key === "" ? DEFAULT_SET_ID : bucket.key;
           const existing = mergedMap.get(key);
           if (existing) {
             mergedMap.set(key, {

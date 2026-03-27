@@ -168,6 +168,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
        FROM (
          SELECT
+           -- 'default' must match DEFAULT_SET_ID from internal-set-id.ts
            IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
            UpdatedAt,
            ArchivedAt
@@ -765,7 +766,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
          FROM (
            SELECT
-             IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
+             -- 'default' must match DEFAULT_SET_ID from internal-set-id.ts
+           IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
              BatchRunId,
              Status,
              CreatedAt,
