@@ -98,6 +98,7 @@ export default function OptimizationStudio() {
     onNodesDelete,
     onEdgesChange,
     onConnect,
+    setIsDraggingNode,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
@@ -115,6 +116,7 @@ export default function OptimizationStudio() {
         onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
+        setIsDraggingNode: state.setIsDraggingNode,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
@@ -308,6 +310,13 @@ export default function OptimizationStudio() {
                                   },
                                 });
                               }
+                            }}
+                            selectNodesOnDrag={false}
+                            onNodeDragStart={() => {
+                              setIsDraggingNode(true);
+                            }}
+                            onNodeDragStop={() => {
+                              setIsDraggingNode(false);
                             }}
                             onPaneClick={() => {
                               if (currentDrawer) closeDrawer();
