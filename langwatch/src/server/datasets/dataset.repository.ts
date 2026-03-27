@@ -187,23 +187,4 @@ export class DatasetRepository {
     return { datasets, total };
   }
 
-  /**
-   * Finds a dataset with all its records.
-   */
-  async findWithRecords(input: {
-    datasetId: string;
-    projectId: string;
-  }): Promise<{ dataset: Dataset; records: DatasetRecord[] } | null> {
-    const dataset = await this.prisma.dataset.findFirst({
-      where: { id: input.datasetId, projectId: input.projectId },
-    });
-
-    if (!dataset) return null;
-
-    const records = await this.prisma.datasetRecord.findMany({
-      where: { datasetId: input.datasetId, projectId: input.projectId },
-    });
-
-    return { dataset, records };
-  }
 }
