@@ -1,13 +1,8 @@
-import type {
-  LlmPromptConfigLabel,
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import type { Prisma, PrismaClient, PromptVersionLabel } from "@prisma/client";
 import { nanoid } from "nanoid";
 
-/** Valid characters for label names: lowercase alphanumeric, hyphens, underscores */
-const LABEL_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+const VALID_LABELS = ["production", "staging"] as const;
+type ValidLabel = (typeof VALID_LABELS)[number];
 
 export class LabelValidationError extends Error {
   constructor(message: string) {
@@ -16,45 +11,22 @@ export class LabelValidationError extends Error {
   }
 }
 
-export class LabelNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LabelNotFoundError";
-  }
-}
-
-export class LabelConflictError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LabelConflictError";
-  }
-}
-
 /**
- * Repository for managing LLM Prompt Config Labels.
- * Labels are named pointers to specific prompt versions (e.g., "production", "staging").
+ * Repository for managing prompt version labels.
+ * Labels are named pointers (production, staging) to specific prompt versions.
+ * Only two labels are allowed: "production" and "staging".
+ * "latest" is resolved at query time (highest version number), never stored.
  */
-export class LlmConfigLabelRepository {
+export class PromptVersionLabelRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Validates a label name. Must be non-empty, lowercase alphanumeric with hyphens/underscores.
-   * "latest" is reserved and cannot be used.
+   * Validates that a label is one of the two allowed values.
    */
-  validateLabelName(name: string): void {
-    if (!name || name.trim().length === 0) {
-      throw new LabelValidationError("Label name must be a non-empty string");
-    }
-
-    if (name === "latest") {
+  validateLabel(label: string): asserts label is ValidLabel {
+    if (!VALID_LABELS.includes(label as ValidLabel)) {
       throw new LabelValidationError(
-        '"latest" is a reserved label and cannot be stored in the database',
-      );
-    }
-
-    if (!LABEL_NAME_PATTERN.test(name)) {
-      throw new LabelValidationError(
-        `Label name "${name}" is invalid. Must be lowercase alphanumeric with hyphens or underscores, starting with a letter or number.`,
+        `Invalid label "${label}". Only "production" and "staging" are allowed.`,
       );
     }
   }
@@ -90,24 +62,25 @@ export class LlmConfigLabelRepository {
   }
 
   /**
-   * Create a new label for a prompt config.
+   * Assign a label to a specific version.
+   * If the label already exists for the config, it is reassigned (upsert).
    */
-  async create({
+  async assignLabel({
     configId,
-    name,
     versionId,
+    label,
     projectId,
-    createdById,
+    userId,
     tx,
   }: {
     configId: string;
-    name: string;
     versionId: string;
+    label: string;
     projectId: string;
-    createdById?: string;
+    userId?: string;
     tx?: Prisma.TransactionClient;
-  }): Promise<LlmPromptConfigLabel> {
-    this.validateLabelName(name);
+  }): Promise<PromptVersionLabel> {
+    this.validateLabel(label);
 
     const client = tx ?? this.prisma;
 
@@ -118,178 +91,45 @@ export class LlmConfigLabelRepository {
       tx,
     });
 
-    try {
-      return await client.llmPromptConfigLabel.create({
-        data: {
-          id: this.generateLabelId(),
-          configId,
-          name,
-          versionId,
-          projectId,
-          createdById: createdById ?? null,
-          updatedById: createdById ?? null,
-        },
-      });
-    } catch (error: unknown) {
-      if (
-        error instanceof PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        throw new LabelConflictError(
-          `Label "${name}" already exists for this prompt`,
-        );
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Get a label by config ID and name.
-   */
-  async getByConfigAndName({
-    configId,
-    name,
-    projectId,
-  }: {
-    configId: string;
-    name: string;
-    projectId: string;
-  }): Promise<LlmPromptConfigLabel | null> {
-    return await this.prisma.llmPromptConfigLabel.findFirst({
+    return await client.promptVersionLabel.upsert({
       where: {
-        configId,
-        name,
         projectId,
+        configId_label: { configId, label },
       },
-    });
-  }
-
-  /**
-   * List all labels for a prompt config.
-   */
-  async listByConfig({
-    configId,
-    projectId,
-  }: {
-    configId: string;
-    projectId: string;
-  }): Promise<LlmPromptConfigLabel[]> {
-    return await this.prisma.llmPromptConfigLabel.findMany({
-      where: {
+      create: {
+        id: `label_${nanoid()}`,
         configId,
-        projectId,
-      },
-      orderBy: { name: "asc" },
-    });
-  }
-
-  /**
-   * Update a label to point to a different version.
-   */
-  async update({
-    configId,
-    name,
-    versionId,
-    projectId,
-    updatedById,
-  }: {
-    configId: string;
-    name: string;
-    versionId: string;
-    projectId: string;
-    updatedById?: string;
-  }): Promise<LlmPromptConfigLabel> {
-    await this.validateVersionBelongsToConfig({
-      versionId,
-      configId,
-      projectId,
-    });
-
-    const label = await this.getByConfigAndName({ configId, name, projectId });
-
-    if (!label) {
-      throw new LabelNotFoundError(
-        `Label "${name}" not found for this prompt`,
-      );
-    }
-
-    return await this.prisma.llmPromptConfigLabel.update({
-      where: { id: label.id, projectId },
-      data: {
         versionId,
-        updatedById: updatedById ?? null,
+        label,
+        projectId,
+        createdById: userId ?? null,
+        updatedById: userId ?? null,
+      },
+      update: {
+        versionId,
+        updatedById: userId ?? null,
       },
     });
   }
 
   /**
-   * Delete a label by config ID and name.
+   * Get a label by config ID and label name.
    */
-  async delete({
+  async getByConfigAndLabel({
     configId,
-    name,
+    label,
     projectId,
   }: {
     configId: string;
-    name: string;
+    label: string;
     projectId: string;
-  }): Promise<void> {
-    const label = await this.getByConfigAndName({ configId, name, projectId });
-
-    if (!label) {
-      throw new LabelNotFoundError(
-        `Label "${name}" not found for this prompt`,
-      );
-    }
-
-    await this.prisma.llmPromptConfigLabel.delete({
-      where: { id: label.id, projectId },
+  }): Promise<PromptVersionLabel | null> {
+    return await this.prisma.promptVersionLabel.findFirst({
+      where: {
+        configId,
+        label,
+        projectId,
+      },
     });
-  }
-
-  /**
-   * Create built-in labels (production, staging) for a newly created prompt.
-   */
-  async createBuiltInLabels({
-    configId,
-    versionId,
-    projectId,
-    createdById,
-    tx,
-  }: {
-    configId: string;
-    versionId: string;
-    projectId: string;
-    createdById?: string;
-    tx?: Prisma.TransactionClient;
-  }): Promise<void> {
-    const client = tx ?? this.prisma;
-
-    await client.llmPromptConfigLabel.createMany({
-      data: [
-        {
-          id: this.generateLabelId(),
-          configId,
-          name: "production",
-          versionId,
-          projectId,
-          createdById: createdById ?? null,
-          updatedById: createdById ?? null,
-        },
-        {
-          id: this.generateLabelId(),
-          configId,
-          name: "staging",
-          versionId,
-          projectId,
-          createdById: createdById ?? null,
-          updatedById: createdById ?? null,
-        },
-      ],
-    });
-  }
-
-  private generateLabelId(): string {
-    return `label_${nanoid()}`;
   }
 }

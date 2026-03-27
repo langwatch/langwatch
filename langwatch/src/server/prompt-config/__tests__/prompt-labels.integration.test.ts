@@ -6,7 +6,7 @@ import { projectFactory } from "~/factories/project.factory";
 import { PromptService } from "../prompt.service";
 import { NotFoundError } from "../errors";
 
-describe("Feature: Prompt labels", () => {
+describe("Feature: Prompt version labels", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
@@ -39,7 +39,7 @@ describe("Feature: Prompt labels", () => {
   });
 
   afterEach(async () => {
-    await prisma.llmPromptConfigLabel.deleteMany({
+    await prisma.promptVersionLabel.deleteMany({
       where: { projectId: testProject.id },
     });
     await prisma.llmPromptConfigVersion.deleteMany({
@@ -84,30 +84,78 @@ describe("Feature: Prompt labels", () => {
       versions.push(updated);
     }
 
-    return { prompt: versions[versions.length - 1]!, allVersions: versions };
+    const latest = versions[versions.length - 1];
+    if (!latest) throw new Error("test setup failed: no versions created");
+
+    return { prompt: latest, allVersions: versions };
   }
 
-  // --- Data Model ---
+  // --- Assignment ---
 
-  describe("Creating a label pointing to a specific version", () => {
-    it("creates a label record with the correct name and versionId", async () => {
+  describe("Assigning a label to a specific version", () => {
+    it("creates a PromptVersionLabel record with configId, label, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
         versionCount: 3,
       });
 
-      const v2 = allVersions[1]!;
+      const firstVersion = allVersions[0];
+      if (!firstVersion) throw new Error("test setup failed: missing version 0");
+      const configId = firstVersion.id;
+      const v2 = allVersions[1];
+      if (!v2) throw new Error("test setup failed: missing version 1");
 
-      const label = await service.createLabel({
-        configId: v2.id,
-        name: "custom-release",
+      const label = await service.assignLabel({
+        configId,
         versionId: v2.versionId,
+        label: "production",
         projectId: testProject.id,
       });
 
-      expect(label.name).toBe("custom-release");
+      expect(label.label).toBe("production");
       expect(label.versionId).toBe(v2.versionId);
-      expect(label.configId).toBe(v2.id);
+      expect(label.configId).toBe(configId);
+    });
+  });
+
+  describe("Reassigning a label to a different version", () => {
+    it("returns the new version when fetching by label", async () => {
+      const { allVersions } = await createPromptWithVersions({
+        handle: `pizza-prompt-${nanoid()}`,
+        versionCount: 3,
+      });
+
+      const firstVersion = allVersions[0];
+      if (!firstVersion) throw new Error("test setup failed: missing version 0");
+      const configId = firstVersion.id;
+      const v2 = allVersions[1];
+      if (!v2) throw new Error("test setup failed: missing version 1");
+      const v3 = allVersions[2];
+      if (!v3) throw new Error("test setup failed: missing version 2");
+
+      // Assign production to v2
+      await service.assignLabel({
+        configId,
+        versionId: v2.versionId,
+        label: "production",
+        projectId: testProject.id,
+      });
+
+      // Reassign production to v3
+      await service.assignLabel({
+        configId,
+        versionId: v3.versionId,
+        label: "production",
+        projectId: testProject.id,
+      });
+
+      const result = await service.getPromptByIdOrHandle({
+        idOrHandle: configId,
+        projectId: testProject.id,
+        label: "production",
+      });
+
+      expect(result?.version).toBe(3);
     });
   });
 
@@ -123,98 +171,45 @@ describe("Feature: Prompt labels", () => {
         versionCount: 5,
       });
 
-      // The built-in "production" labels are already created.
-      // Update them to point to specific versions.
-      const pizzaV2 = pizzaVersions[1]!;
-      await service.updateLabel({
-        configId: pizzaV2.id,
-        name: "production",
+      const pizzaFirst = pizzaVersions[0];
+      if (!pizzaFirst) throw new Error("test setup failed: missing pizza version 0");
+      const pizzaConfigId = pizzaFirst.id;
+      const pizzaV2 = pizzaVersions[1];
+      if (!pizzaV2) throw new Error("test setup failed: missing pizza version 1");
+      const emailFirst = emailVersions[0];
+      if (!emailFirst) throw new Error("test setup failed: missing email version 0");
+      const emailConfigId = emailFirst.id;
+      const emailV5 = emailVersions[4];
+      if (!emailV5) throw new Error("test setup failed: missing email version 4");
+
+      await service.assignLabel({
+        configId: pizzaConfigId,
         versionId: pizzaV2.versionId,
+        label: "production",
         projectId: testProject.id,
       });
 
-      const emailV5 = emailVersions[4]!;
-      await service.updateLabel({
-        configId: emailV5.id,
-        name: "production",
+      await service.assignLabel({
+        configId: emailConfigId,
         versionId: emailV5.versionId,
+        label: "production",
         projectId: testProject.id,
       });
 
-      // Fetch via label
       const pizzaResult = await service.getPromptByIdOrHandle({
-        idOrHandle: pizzaV2.id,
+        idOrHandle: pizzaConfigId,
         projectId: testProject.id,
         label: "production",
       });
 
       const emailResult = await service.getPromptByIdOrHandle({
-        idOrHandle: emailV5.id,
+        idOrHandle: emailConfigId,
         projectId: testProject.id,
         label: "production",
       });
 
       expect(pizzaResult?.version).toBe(2);
       expect(emailResult?.version).toBe(5);
-    });
-  });
-
-  // --- Built-in Label Lifecycle ---
-
-  describe("Built-in labels are created with a new prompt", () => {
-    it("creates production and staging labels pointing to v1", async () => {
-      const prompt = await service.createPrompt({
-        projectId: testProject.id,
-        organizationId: testOrganization.id,
-        handle: `new-prompt-${nanoid()}`,
-        prompt: "You are a helpful assistant",
-        model: "openai/gpt-5",
-      });
-
-      const labels = await service.listLabels({
-        configId: prompt.id,
-        projectId: testProject.id,
-      });
-
-      expect(labels).toHaveLength(2);
-
-      const productionLabel = labels.find((l) => l.name === "production");
-      const stagingLabel = labels.find((l) => l.name === "staging");
-
-      expect(productionLabel).toBeDefined();
-      expect(stagingLabel).toBeDefined();
-      expect(productionLabel?.versionId).toBe(prompt.versionId);
-      expect(stagingLabel?.versionId).toBe(prompt.versionId);
-    });
-  });
-
-  // --- Update ---
-
-  describe("Updating a label to point to a different version", () => {
-    it("returns the new version when fetching by label", async () => {
-      const { allVersions } = await createPromptWithVersions({
-        handle: `pizza-prompt-${nanoid()}`,
-        versionCount: 3,
-      });
-
-      const promptId = allVersions[0]!.id;
-      const v3 = allVersions[2]!;
-
-      // Update production to point to v3
-      await service.updateLabel({
-        configId: promptId,
-        name: "production",
-        versionId: v3.versionId,
-        projectId: testProject.id,
-      });
-
-      const result = await service.getPromptByIdOrHandle({
-        idOrHandle: promptId,
-        projectId: testProject.id,
-        label: "production",
-      });
-
-      expect(result?.version).toBe(3);
     });
   });
 
@@ -227,107 +222,35 @@ describe("Feature: Prompt labels", () => {
         versionCount: 3,
       });
 
-      const promptId = allVersions[0]!.id;
-      const v2 = allVersions[1]!;
-      const v3 = allVersions[2]!;
+      const firstVersion = allVersions[0];
+      if (!firstVersion) throw new Error("test setup failed: missing version 0");
+      const configId = firstVersion.id;
+      const v2 = allVersions[1];
+      if (!v2) throw new Error("test setup failed: missing version 1");
+      const v3 = allVersions[2];
+      if (!v3) throw new Error("test setup failed: missing version 2");
 
-      // Update production to v2, staging to v3
-      await service.updateLabel({
-        configId: promptId,
-        name: "production",
+      await service.assignLabel({
+        configId,
         versionId: v2.versionId,
+        label: "production",
         projectId: testProject.id,
       });
 
-      await service.updateLabel({
-        configId: promptId,
-        name: "staging",
+      await service.assignLabel({
+        configId,
         versionId: v3.versionId,
+        label: "staging",
         projectId: testProject.id,
       });
 
       const result = await service.getPromptByIdOrHandle({
-        idOrHandle: promptId,
+        idOrHandle: configId,
         projectId: testProject.id,
         label: "production",
       });
 
       expect(result?.version).toBe(2);
-    });
-  });
-
-  // --- CRUD ---
-
-  describe("Listing all labels for a prompt", () => {
-    it("returns all labels for the prompt", async () => {
-      const { allVersions } = await createPromptWithVersions({
-        handle: `pizza-prompt-${nanoid()}`,
-        versionCount: 3,
-      });
-
-      const promptId = allVersions[0]!.id;
-      const v2 = allVersions[1]!;
-      const v3 = allVersions[2]!;
-
-      // Update built-in labels
-      await service.updateLabel({
-        configId: promptId,
-        name: "production",
-        versionId: v2.versionId,
-        projectId: testProject.id,
-      });
-
-      await service.updateLabel({
-        configId: promptId,
-        name: "staging",
-        versionId: v3.versionId,
-        projectId: testProject.id,
-      });
-
-      const labels = await service.listLabels({
-        configId: promptId,
-        projectId: testProject.id,
-      });
-
-      const labelNames = labels.map((l) => l.name);
-      expect(labelNames).toContain("production");
-      expect(labelNames).toContain("staging");
-    });
-  });
-
-  describe("Deleting a custom label", () => {
-    it("removes the label", async () => {
-      const { allVersions } = await createPromptWithVersions({
-        handle: `pizza-prompt-${nanoid()}`,
-        versionCount: 3,
-      });
-
-      const promptId = allVersions[0]!.id;
-      const v3 = allVersions[2]!;
-
-      // Create a custom label
-      await service.createLabel({
-        configId: promptId,
-        name: "canary",
-        versionId: v3.versionId,
-        projectId: testProject.id,
-      });
-
-      // Delete it
-      await service.deleteLabel({
-        configId: promptId,
-        name: "canary",
-        projectId: testProject.id,
-      });
-
-      // Verify it's gone
-      const labels = await service.listLabels({
-        configId: promptId,
-        projectId: testProject.id,
-      });
-      const canaryLabel = labels.find((l) => l.name === "canary");
-
-      expect(canaryLabel).toBeUndefined();
     });
   });
 
@@ -375,7 +298,7 @@ describe("Feature: Prompt labels", () => {
 
   // --- Error Handling ---
 
-  describe("Fetching with a nonexistent label", () => {
+  describe("Fetching with an unassigned label", () => {
     it("throws a not-found error", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,
@@ -389,17 +312,14 @@ describe("Feature: Prompt labels", () => {
         service.getPromptByIdOrHandle({
           idOrHandle: prompt.id,
           projectId: testProject.id,
-          label: "canary",
+          label: "production",
         }),
-      ).rejects.toThrow(NotFoundError);
-
-      await expect(
-        service.getPromptByIdOrHandle({
-          idOrHandle: prompt.id,
-          projectId: testProject.id,
-          label: "canary",
+      ).rejects.toThrow(
+        expect.objectContaining({
+          name: "NotFoundError",
+          message: expect.stringContaining('Label "production" not found'),
         }),
-      ).rejects.toThrow('Label "canary" not found');
+      );
     });
   });
 });

@@ -1,4 +1,4 @@
-Feature: Prompt labels
+Feature: Prompt version labels
   As a LangWatch user
   I want to assign labels like "production" and "staging" to specific prompt versions
   So that I can control which version is served in each environment without changing code
@@ -6,46 +6,41 @@ Feature: Prompt labels
   Background:
     Given I am logged into project "my-project"
 
-  # --- Data Model ---
+  # --- Assignment ---
 
   @integration
-  Scenario: Creating a label pointing to a specific version
+  Scenario: Assigning a label to a specific version
     Given a prompt "pizza-prompt" with versions v1, v2, v3
-    When I create a label "production" pointing to v2
-    Then a label record exists with name "production" and versionId pointing to v2
+    When I assign "production" to v2
+    Then a PromptVersionLabel record exists with configId, label "production", and versionId pointing to v2
 
-  @unit
-  Scenario: Label names are unique per prompt
-    Given a prompt "pizza-prompt" with a label "production" pointing to v1
-    When I try to create another label "production" on "pizza-prompt"
-    Then the operation fails with a uniqueness error
+  @integration
+  Scenario: Reassigning a label to a different version
+    Given a prompt "pizza-prompt" with "production" assigned to v2
+    When I reassign "production" to v3
+    Then fetching with label "production" returns v3
 
   @integration
   Scenario: Labels are scoped to their own prompt
-    Given a prompt "pizza-prompt" with a label "production" pointing to v2
-    And a prompt "email-prompt" with a label "production" pointing to v5
+    Given a prompt "pizza-prompt" with "production" assigned to v2
+    And a prompt "email-prompt" with "production" assigned to v5
     When I fetch the "production" label for "pizza-prompt"
     Then I receive version v2
     When I fetch the "production" label for "email-prompt"
     Then I receive version v5
 
-  # --- Built-in Label Lifecycle ---
+  # --- Hardcoded Labels ---
 
-  @integration
-  Scenario: Built-in labels are created with a new prompt
-    When I create a new prompt "new-prompt"
-    Then it has a "production" label pointing to v1
-    And it has a "staging" label pointing to v1
+  @unit
+  Scenario: Only production and staging are valid labels
+    When I try to assign "canary" to a version
+    Then the operation fails with a validation error
+    When I assign "production" to a version
+    Then the operation succeeds
+    When I assign "staging" to a version
+    Then the operation succeeds
 
-  # --- Update ---
-
-  @integration
-  Scenario: Updating a label to point to a different version
-    Given a prompt "pizza-prompt" with "production" pointing to v2
-    When I update "production" to point to v3
-    Then fetching with label "production" returns v3
-
-  # --- Fetch by Label (API) ---
+  # --- Fetch by Label ---
 
   @e2e
   Scenario: Fetching a prompt by label returns the labeled version
@@ -67,35 +62,24 @@ Feature: Prompt labels
     When I call getByIdOrHandle with label "production"
     Then I receive version v2
 
-  # --- CRUD ---
+  # --- Mutual Exclusion ---
 
   @integration
-  Scenario: Listing all labels for a prompt
-    Given "pizza-prompt" has production=v2, staging=v3
-    When I list labels for "pizza-prompt"
-    Then I receive labels "production" and "staging"
-
-  @integration
-  Scenario: Deleting a custom label
-    Given "pizza-prompt" has a custom label "canary" pointing to v3
-    When I delete the "canary" label
-    Then the label no longer exists
+  Scenario: Fetching with both version and label is rejected
+    Given a prompt "pizza-prompt" exists
+    When I call getByIdOrHandle with both version and label
+    Then the operation fails with a bad request error
 
   # --- Error Handling ---
 
   @integration
-  Scenario: Fetching with a nonexistent label returns an error
-    Given a prompt "pizza-prompt" exists
-    When I call GET /api/prompts/pizza-prompt?label=canary
-    Then I receive a not-found error for label "canary"
+  Scenario: Fetching with an unassigned label returns an error
+    Given a prompt "pizza-prompt" with no labels assigned
+    When I call GET /api/prompts/pizza-prompt?label=production
+    Then I receive a not-found error for label "production"
 
   @unit
-  Scenario: Label name must be a non-empty string
-    When I try to create a label with an empty name
-    Then the operation fails with a validation error
-
-  @unit
-  Scenario: Label must reference a valid version of the same prompt
+  Scenario: Label must reference a version belonging to the same prompt
     Given a prompt "pizza-prompt" with versions v1, v2
-    When I try to create a label pointing to a version from a different prompt
+    When I try to assign "production" pointing to a version from a different prompt
     Then the operation fails with a validation error

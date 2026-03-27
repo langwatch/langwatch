@@ -77,8 +77,8 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
-    labelsCreated           LlmPromptConfigLabel[]   @relation("labelCreatedBy")
-    labelsUpdated           LlmPromptConfigLabel[]   @relation("labelUpdatedBy")
+    labelsCreated           PromptVersionLabel[]   @relation("labelCreatedBy")
+    labelsUpdated           PromptVersionLabel[]   @relation("labelUpdatedBy")
 
 }
 
@@ -940,7 +940,7 @@ model LlmPromptConfig {
     versions LlmPromptConfigVersion[] @relation("Versions")
 
     // Relation to labels (e.g., "production", "staging")
-    labels LlmPromptConfigLabel[] @relation("Labels")
+    labels PromptVersionLabel[] @relation("Labels")
 
     @@unique([handle], map: "LlmPromptConfig_handle_key")
     @@index([projectId])
@@ -967,7 +967,7 @@ model LlmPromptConfigVersion {
     projectId String
 
     // Labels pointing to this version
-    labels LlmPromptConfigLabel[]
+    labels PromptVersionLabel[]
 
     @@unique([configId, version]) // Each version number must be unique per config
     @@index([configId])
@@ -975,22 +975,22 @@ model LlmPromptConfigVersion {
     @@index([createdAt]) // Index important for finding the latest efficiently
 }
 
-model LlmPromptConfigLabel {
+model PromptVersionLabel {
     id          String   @id @default(nanoid())
     configId    String
     config      LlmPromptConfig        @relation("Labels", fields: [configId], references: [id], onDelete: Cascade)
-    name        String
     versionId   String
     version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+    label       String
     projectId   String
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
     createdById String?
     createdBy   User?    @relation("labelCreatedBy", fields: [createdById], references: [id])
     updatedById String?
     updatedBy   User?    @relation("labelUpdatedBy", fields: [updatedById], references: [id])
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @default(now()) @updatedAt
 
-    @@unique([configId, name])
+    @@unique([configId, label])
     @@index([configId])
     @@index([versionId])
     @@index([projectId])

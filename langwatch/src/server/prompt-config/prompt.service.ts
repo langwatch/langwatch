@@ -22,7 +22,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
-import { LlmConfigLabelRepository } from "./repositories/llm-config-label.repository";
+import { PromptVersionLabelRepository } from "./repositories/llm-config-label.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -104,12 +104,12 @@ export type VersionedPrompt = {
 export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
-  private readonly labelRepository: LlmConfigLabelRepository;
+  readonly labelRepository: PromptVersionLabelRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
-    this.labelRepository = new LlmConfigLabelRepository(prisma);
+    this.labelRepository = new PromptVersionLabelRepository(prisma);
   }
 
   /**
@@ -177,9 +177,9 @@ export class PromptService {
         return null;
       }
 
-      const label = await this.labelRepository.getByConfigAndName({
+      const label = await this.labelRepository.getByConfigAndLabel({
         configId: config.id,
-        name: params.label,
+        label: params.label,
         projectId,
       });
 
@@ -383,16 +383,6 @@ export class PromptService {
           }
         : undefined,
     });
-
-    // Create built-in labels (production, staging) pointing to the initial version
-    if (config.latestVersion) {
-      await this.labelRepository.createBuiltInLabels({
-        configId: config.id,
-        versionId: config.latestVersion.id,
-        projectId: params.projectId,
-        createdById: params.authorId,
-      });
-    }
 
     return this.transformToVersionedPrompt(config);
   }
@@ -1061,23 +1051,14 @@ export class PromptService {
 
   // --- Label operations ---
 
-  /** Create a label for a prompt config. */
-  async createLabel(params: Parameters<LlmConfigLabelRepository["create"]>[0]) {
-    return this.labelRepository.create(params);
-  }
-
-  /** List all labels for a prompt config. */
-  async listLabels(params: Parameters<LlmConfigLabelRepository["listByConfig"]>[0]) {
-    return this.labelRepository.listByConfig(params);
-  }
-
-  /** Update a label to point to a different version. */
-  async updateLabel(params: Parameters<LlmConfigLabelRepository["update"]>[0]) {
-    return this.labelRepository.update(params);
-  }
-
-  /** Delete a label by config ID and name. */
-  async deleteLabel(params: Parameters<LlmConfigLabelRepository["delete"]>[0]) {
-    return this.labelRepository.delete(params);
+  /** Assign (or reassign) a label to a specific prompt version. */
+  async assignLabel(params: {
+    configId: string;
+    versionId: string;
+    label: string;
+    projectId: string;
+    userId?: string;
+  }) {
+    return this.labelRepository.assignLabel(params);
   }
 }

@@ -1,20 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { Prisma, type PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import {
-  LlmConfigLabelRepository,
+  PromptVersionLabelRepository,
   LabelValidationError,
-  LabelConflictError,
 } from "../llm-config-label.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
-    llmPromptConfigLabel: {
-      create: vi.fn(),
+    promptVersionLabel: {
+      upsert: vi.fn(),
       findFirst: vi.fn(),
-      findMany: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      createMany: vi.fn(),
     },
     llmPromptConfigVersion: {
       findFirst: vi.fn(),
@@ -23,119 +18,152 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   } as unknown as PrismaClient;
 }
 
-describe("LlmConfigLabelRepository", () => {
-  describe("validateLabelName()", () => {
-    describe("when label name is empty", () => {
-      it("throws a validation error", () => {
-        const repo = new LlmConfigLabelRepository(makeMockPrisma());
+describe("PromptVersionLabelRepository", () => {
+  describe("validateLabel()", () => {
+    describe("when label is 'production'", () => {
+      it("does not throw", () => {
+        const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabelName("")).toThrow(LabelValidationError);
-        expect(() => repo.validateLabelName("")).toThrow(
-          "Label name must be a non-empty string",
+        expect(() => repo.validateLabel("production")).not.toThrow();
+      });
+    });
+
+    describe("when label is 'staging'", () => {
+      it("does not throw", () => {
+        const repo = new PromptVersionLabelRepository(makeMockPrisma());
+
+        expect(() => repo.validateLabel("staging")).not.toThrow();
+      });
+    });
+
+    describe("when label is 'canary'", () => {
+      it("throws a validation error", () => {
+        const repo = new PromptVersionLabelRepository(makeMockPrisma());
+
+        expect(() => repo.validateLabel("canary")).toThrow(
+          expect.objectContaining({
+            name: "LabelValidationError",
+            message: expect.stringContaining(
+              'Only "production" and "staging" are allowed',
+            ),
+          }),
         );
       });
     });
 
-    describe("when label name is only whitespace", () => {
+    describe("when label is 'latest'", () => {
       it("throws a validation error", () => {
-        const repo = new LlmConfigLabelRepository(makeMockPrisma());
+        const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabelName("   ")).toThrow(
+        expect(() => repo.validateLabel("latest")).toThrow(
           LabelValidationError,
         );
       });
     });
 
-    describe('when label name is "latest"', () => {
+    describe("when label is an arbitrary string", () => {
       it("throws a validation error", () => {
-        const repo = new LlmConfigLabelRepository(makeMockPrisma());
+        const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabelName("latest")).toThrow(
+        expect(() => repo.validateLabel("custom-release")).toThrow(
           LabelValidationError,
         );
-        expect(() => repo.validateLabelName("latest")).toThrow(
-          '"latest" is a reserved label',
-        );
-      });
-    });
-
-    describe("when label name contains uppercase characters", () => {
-      it("throws a validation error", () => {
-        const repo = new LlmConfigLabelRepository(makeMockPrisma());
-
-        expect(() => repo.validateLabelName("Production")).toThrow(
-          LabelValidationError,
-        );
-      });
-    });
-
-    describe("when label name is valid", () => {
-      it("does not throw for simple names", () => {
-        const repo = new LlmConfigLabelRepository(makeMockPrisma());
-
-        expect(() => repo.validateLabelName("production")).not.toThrow();
-        expect(() => repo.validateLabelName("staging")).not.toThrow();
-        expect(() => repo.validateLabelName("canary")).not.toThrow();
-        expect(() => repo.validateLabelName("v2-release")).not.toThrow();
-        expect(() =>
-          repo.validateLabelName("my_custom_label"),
-        ).not.toThrow();
       });
     });
   });
 
-  describe("create()", () => {
+  describe("assignLabel()", () => {
     describe("when version does not belong to the prompt", () => {
       it("throws a validation error", async () => {
         const prisma = makeMockPrisma();
         (
           prisma.llmPromptConfigVersion.findFirst as ReturnType<typeof vi.fn>
         ).mockResolvedValue(null);
-        const repo = new LlmConfigLabelRepository(prisma);
+        const repo = new PromptVersionLabelRepository(prisma);
 
         await expect(
-          repo.create({
+          repo.assignLabel({
             configId: "config-1",
-            name: "production",
             versionId: "version-from-other-prompt",
+            label: "production",
             projectId: "project-1",
           }),
-        ).rejects.toThrow(LabelValidationError);
-        await expect(
-          repo.create({
-            configId: "config-1",
-            name: "production",
-            versionId: "version-from-other-prompt",
-            projectId: "project-1",
+        ).rejects.toThrow(
+          expect.objectContaining({
+            name: "LabelValidationError",
+            message: expect.stringContaining(
+              "Version does not belong to this prompt config",
+            ),
           }),
-        ).rejects.toThrow("Version does not belong to this prompt config");
+        );
       });
     });
 
-    describe("when label already exists for the prompt", () => {
-      it("throws a conflict error", async () => {
+    describe("when label is invalid", () => {
+      it("throws a validation error without hitting the database", async () => {
+        const prisma = makeMockPrisma();
+        const repo = new PromptVersionLabelRepository(prisma);
+
+        await expect(
+          repo.assignLabel({
+            configId: "config-1",
+            versionId: "v1",
+            label: "canary",
+            projectId: "project-1",
+          }),
+        ).rejects.toThrow(LabelValidationError);
+
+        expect(
+          prisma.llmPromptConfigVersion.findFirst,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when label and version are valid", () => {
+      it("calls upsert with correct parameters", async () => {
         const prisma = makeMockPrisma();
         (
           prisma.llmPromptConfigVersion.findFirst as ReturnType<typeof vi.fn>
         ).mockResolvedValue({ id: "v1", configId: "config-1" });
+        const mockLabel = {
+          id: "label_abc",
+          configId: "config-1",
+          versionId: "v1",
+          label: "production",
+          projectId: "project-1",
+        };
         (
-          prisma.llmPromptConfigLabel.create as ReturnType<typeof vi.fn>
-        ).mockRejectedValue(
-          new Prisma.PrismaClientKnownRequestError(
-            "Unique constraint failed on the fields: (`configId`,`name`,`projectId`)",
-            { code: "P2002", clientVersion: "5.0.0" },
-          ),
-        );
-        const repo = new LlmConfigLabelRepository(prisma);
+          prisma.promptVersionLabel.upsert as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(mockLabel);
+        const repo = new PromptVersionLabelRepository(prisma);
 
-        await expect(
-          repo.create({
-            configId: "config-1",
-            name: "production",
-            versionId: "v1",
+        const result = await repo.assignLabel({
+          configId: "config-1",
+          versionId: "v1",
+          label: "production",
+          projectId: "project-1",
+          userId: "user-1",
+        });
+
+        expect(result).toEqual(mockLabel);
+        expect(prisma.promptVersionLabel.upsert).toHaveBeenCalledWith({
+          where: {
             projectId: "project-1",
+            configId_label: { configId: "config-1", label: "production" },
+          },
+          create: expect.objectContaining({
+            configId: "config-1",
+            versionId: "v1",
+            label: "production",
+            projectId: "project-1",
+            createdById: "user-1",
+            updatedById: "user-1",
           }),
-        ).rejects.toThrow(LabelConflictError);
+          update: {
+            versionId: "v1",
+            updatedById: "user-1",
+          },
+        });
       });
     });
   });

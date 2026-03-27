@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-27
 
-**Status:** Accepted
+**Status:** Accepted (revised)
 
 ## Context
 
@@ -14,44 +14,87 @@ Three options were considered:
 
 2. **Labels as tags on `LlmPromptConfigVersion`** — a string array column on the version table. Simple, but "one version per label per prompt" is hard to enforce at the DB level, and moving a label requires updating two rows.
 
-3. **Separate `LlmPromptConfigLabel` table** — a dedicated join table with `configId`, `name`, `versionId`, and a unique constraint on `(configId, name)`.
+3. **Separate `PromptVersionLabel` table** — a dedicated join table with `configId`, `versionId`, `label`, and a unique constraint on `(configId, label)`.
 
 ## Decision
 
-We will use a separate `LlmPromptConfigLabel` table (option 3).
+We use a single `PromptVersionLabel` table (option 3) with a hardcoded label vocabulary.
 
-The `latest` concept is NOT stored as a label. It is resolved at query time by selecting the version with the highest version number. Only explicitly assigned labels like `production` and `staging` are persisted.
+### Key design rules
 
-Built-in labels (`production`, `staging`) are created automatically when a new prompt is created, both pointing to the first version. The migration seeds these for all existing prompts.
+- **Only two valid labels: `production` and `staging`** — validated in the repository layer, not in the database. This keeps the schema simple and avoids a label-definition table.
+- **No `latest` in DB** — resolved at query time by selecting the version with the highest version number. Only explicitly assigned labels are persisted.
+- **No label CRUD endpoints** — only assign and reassign via a single `assignLabel` mutation with upsert semantics.
+- **No archiving** — reassignment updates the existing row (upsert on `configId_label`).
+- **No built-in label seeding** — labels are not auto-created when a prompt is created. They are only created when explicitly assigned.
+- **Unique constraint: `(configId, label)`** — one version per label per prompt.
+- **Audit fields: `createdById`, `updatedById`** — nullable, track who assigned/reassigned.
+
+### Model
+
+```prisma
+model PromptVersionLabel {
+  id          String   @id @default(nanoid())
+  configId    String
+  config      LlmPromptConfig        @relation(fields: [configId], references: [id], onDelete: Cascade)
+  versionId   String
+  version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  label       String   // "production" or "staging" — validated in code
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  createdById String?
+  updatedById String?
+
+  @@unique([configId, label])
+  @@index([configId])
+  @@index([versionId])
+  @@index([projectId])
+}
+```
 
 ## Rationale / Trade-offs
 
 The separate table was chosen because:
 
-- **DB-enforced uniqueness** via `UNIQUE(configId, name)` prevents duplicate labels without application logic.
-- **Extensibility** — future features like custom labels, per-label RBAC, and label audit trails are straightforward to add without schema changes.
+- **DB-enforced uniqueness** via `UNIQUE(configId, label)` prevents duplicate labels without application logic.
 - **Query flexibility** — "which prompts have production pointing to version X?" is a simple WHERE clause, not a JSON path query.
+- **Referential integrity** — FK constraints on both `configId` and `versionId` with cascade delete.
 
-The JSON column approach was simpler but traded away referential integrity and queryability. Since labels will have RBAC rules (who can create/move labels) and may grow in number, the relational model is a better foundation.
+Hardcoding the label vocabulary (production, staging) in code avoids over-engineering. Custom labels can be added later by widening the validation, no schema change required.
 
-Not storing `latest` avoids a maintenance burden — auto-updating a label row on every version save adds transaction complexity for something that's trivially derived from `ORDER BY version DESC LIMIT 1`.
+Not storing `latest` avoids a maintenance burden — auto-updating a label row on every version save adds transaction complexity for something trivially derived from `ORDER BY version DESC LIMIT 1`.
 
-Labels are scoped to a prompt via `configId` rather than having a direct `projectId` column. Multitenancy is enforced transitively through the config's project ownership, which is the existing pattern for version-level data.
+## Revision History
 
-## Audit Trail
+**v2 (2026-03-27):** Simplified from the original design:
+- Renamed table from `LlmPromptConfigLabel` to `PromptVersionLabel`
+- Renamed `name` column to `label` for clarity
+- Removed label CRUD endpoints (createLabel, listLabels, updateLabel, deleteLabel) — replaced with single `assignLabel` upsert
+- Removed built-in label auto-seeding on prompt creation
+- Removed `LabelConflictError` and `LabelNotFoundError` (upsert eliminates conflicts; `NotFoundError` covers not-found)
+- Hardcoded valid labels to `production` and `staging` only (was open-ended with regex validation)
 
-Each label record includes `createdById` and `updatedById` fields (nullable, referencing User). These track who created and last moved a label, directly on the table rather than in a separate audit log. This is sufficient for accountability ("who promoted v3 to production?") without the complexity of a full event-sourcing audit trail.
+## Deferred Scope
 
-Fields are nullable because the migration seed and system-initiated label creation (e.g., built-in labels on prompt creation) may not have a user context.
+The following are explicitly deferred to future issues:
+
+- **Label definition table (`PromptLabel`)** — a project/org-scoped table defining available labels (slug, display name, description). Needed when custom label creation is introduced.
+- **Label CRUD** — create, edit, archive label definitions. Blocked on the definition table.
+- **RBAC** — per-label permissions (who can assign/reassign). See #2713.
+- **Archiving** — soft delete on both definitions and assignments. Not needed while labels are hardcoded constants.
+- **Scoping** — project vs org-level label definitions. Not relevant until the definition table exists.
+- **Label description field** — nice-to-have on the definition table.
+
+When custom labels are introduced, the `PromptVersionLabel.label` column will become a FK to the definition table, and the code-level validation will be replaced by a DB lookup.
 
 ## Consequences
 
-- A new Prisma model and migration are required.
-- All label CRUD goes through dedicated service methods and tRPC endpoints.
+- A single Prisma model and migration are required.
+- Label assignment goes through `assignLabel` (upsert semantics) in the service and a single tRPC mutation.
 - The REST API and tRPC `getByIdOrHandle` accept a `label` parameter; `version`/`versionId` and `label` are mutually exclusive.
 - SDK updates to pass `label` parameters are a separate concern (not covered by this ADR).
-- RBAC for label management (who can create/move/delete labels) is a separate concern requiring its own issue and ADR.
-- Future label features (custom labels, RBAC, full audit log) build on this table without schema changes.
+- Future label features (custom labels, RBAC) build on this table by widening the validation or adding permissions.
 
 ## References
 
