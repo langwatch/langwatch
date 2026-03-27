@@ -67,13 +67,13 @@ function getClickHouseClient(): ClickHouseClient | null {
 /**
  * Get or create a ClickHouse client pinned to the write (primary) replica.
  *
- * Uses CLICKHOUSE_WRITE_URL if set, otherwise falls back to CLICKHOUSE_URL.
+ * Uses CLICKHOUSE_PRIMARY_REPLICA_URL if set, otherwise falls back to CLICKHOUSE_URL.
  * Fold stores use this for read-after-write consistency — in replicated setups,
  * reading from the same node that wrote avoids replication lag entirely.
  */
 function getClickHouseWriteClient(): ClickHouseClient | null {
   if (!clickHouseWriteClient && !shouldSkipClickHouse()) {
-    const masterUrl = process.env.CLICKHOUSE_WRITE_URL;
+    const masterUrl = process.env.CLICKHOUSE_PRIMARY_REPLICA_URL;
     if (!masterUrl) {
       // No write URL configured — use the shared client (single-node or dev)
       return getClickHouseClient();

@@ -98,7 +98,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   // Write resolver: routes fold store reads/writes to the primary replica.
   // In replicated setups, this avoids replication lag for read-after-write.
-  // Falls back to the shared client when CLICKHOUSE_WRITE_URL is not set.
+  // Falls back to the shared client when CLICKHOUSE_PRIMARY_REPLICA_URL is not set.
   const resolveWriteClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
     const client = await getWriteClickHouseClientForProject(tenantId);
     if (!client) throw new Error(`ClickHouse master not available for tenant ${tenantId}`);

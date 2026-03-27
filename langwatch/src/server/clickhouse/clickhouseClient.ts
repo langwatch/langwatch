@@ -162,7 +162,7 @@ export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./clien
 
 /**
  * Returns the write (primary) ClickHouse client for fold store operations.
- * Uses CLICKHOUSE_WRITE_URL if configured, otherwise falls back to the shared client.
+ * Uses CLICKHOUSE_PRIMARY_REPLICA_URL if configured, otherwise falls back to the shared client.
  *
  * Fold stores need read-after-write consistency. In replicated setups, routing
  * both reads and writes to the primary replica avoids replication lag entirely.
