@@ -15,6 +15,14 @@ import type {
   DatasetRecordEntry,
   DatasetRecordInput,
 } from "./types";
+import {
+  convertRowsToColumnTypes,
+  detectFileFormat,
+  MAX_FILE_SIZE_BYTES,
+  MAX_ROWS_LIMIT,
+  parseFileContent,
+  renameReservedColumns,
+} from "./upload-utils";
 
 /**
  * Result type for paginated dataset listings.
@@ -665,5 +673,235 @@ export class DatasetService {
     });
 
     return newDataset;
+  }
+
+  /**
+   * Uploads a file to an existing dataset.
+   *
+   * Parses the file, validates columns match, converts types, and creates records.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   * @throws {UploadValidationError} if columns don't match, file too large, too many rows, etc.
+   */
+  async uploadToExistingDataset(params: {
+    slugOrId: string;
+    projectId: string;
+    filename: string;
+    content: string;
+    fileSize: number;
+  }) {
+    const { slugOrId, projectId, filename, content, fileSize } = params;
+
+    // Validate file size
+    if (fileSize > MAX_FILE_SIZE_BYTES) {
+      throw new UploadValidationError(
+        `File size exceeds the maximum limit of 25MB`,
+        "file_too_large",
+      );
+    }
+
+    // Detect format and parse
+    const format = detectFileFormat(filename);
+    const { headers, rows } = parseFileContent({ content, format });
+
+    // Validate non-empty
+    if (rows.length === 0) {
+      throw new UploadValidationError(
+        "File contains no data rows",
+        "empty_file",
+      );
+    }
+
+    // Validate row limit
+    if (rows.length > MAX_ROWS_LIMIT) {
+      throw new UploadValidationError(
+        `File contains ${rows.length} rows, which exceeds the maximum limit of ${MAX_ROWS_LIMIT}`,
+        "row_limit_exceeded",
+      );
+    }
+
+    // Resolve dataset
+    const dataset = await this.getBySlugOrId({ slugOrId, projectId });
+    const datasetColumns = dataset.columnTypes as DatasetColumns;
+
+    // Validate columns match
+    const expectedColumns = new Set(datasetColumns.map((c) => c.name));
+    const uploadedColumns = new Set(headers);
+
+    const missingColumns = [...uploadedColumns].filter(
+      (c) => !expectedColumns.has(c),
+    );
+    const extraColumns = [...expectedColumns].filter(
+      (c) => !uploadedColumns.has(c),
+    );
+
+    if (missingColumns.length > 0 || extraColumns.length > 0) {
+      const parts: string[] = [];
+      if (missingColumns.length > 0) {
+        parts.push(
+          `unexpected columns: ${missingColumns.join(", ")}`,
+        );
+      }
+      if (extraColumns.length > 0) {
+        parts.push(`missing columns: ${extraColumns.join(", ")}`);
+      }
+      throw new UploadValidationError(
+        `Uploaded columns do not match the dataset schema. ${parts.join("; ")}`,
+        "column_mismatch",
+      );
+    }
+
+    // Convert types
+    const convertedRows = convertRowsToColumnTypes(rows, datasetColumns);
+
+    // Create records
+    const now = Date.now();
+    const datasetRecords: DatasetRecordInput[] = convertedRows.map(
+      (row, index) => ({
+        id: `${now}-${index}`,
+        ...row,
+      }),
+    );
+
+    await createManyDatasetRecords({
+      datasetId: dataset.id,
+      projectId,
+      datasetRecords,
+    });
+
+    return {
+      datasetId: dataset.id,
+      recordsCreated: datasetRecords.length,
+    };
+  }
+
+  /**
+   * Creates a new dataset from an uploaded file.
+   *
+   * Parses the file, infers columns (all as "string"), renames reserved columns,
+   * creates the dataset and records.
+   *
+   * @throws {DatasetConflictError} if slug conflicts
+   * @throws {UploadValidationError} if file too large, too many rows, etc.
+   */
+  async createDatasetFromUpload(params: {
+    projectId: string;
+    name: string;
+    filename: string;
+    content: string;
+    fileSize: number;
+  }) {
+    const { projectId, name, filename, content, fileSize } = params;
+
+    // Validate file size
+    if (fileSize > MAX_FILE_SIZE_BYTES) {
+      throw new UploadValidationError(
+        `File size exceeds the maximum limit of 25MB`,
+        "file_too_large",
+      );
+    }
+
+    // Detect format and parse
+    const format = detectFileFormat(filename);
+    const { headers, rows } = parseFileContent({ content, format });
+
+    // Validate non-empty
+    if (rows.length === 0) {
+      throw new UploadValidationError(
+        "File contains no data rows",
+        "empty_file",
+      );
+    }
+
+    // Validate row limit
+    if (rows.length > MAX_ROWS_LIMIT) {
+      throw new UploadValidationError(
+        `File contains ${rows.length} rows, which exceeds the maximum limit of ${MAX_ROWS_LIMIT}`,
+        "row_limit_exceeded",
+      );
+    }
+
+    // Rename reserved columns
+    const renamedHeaders = renameReservedColumns(headers);
+
+    // Build column rename mapping
+    const renameMap = new Map<string, string>();
+    headers.forEach((original, i) => {
+      if (original !== renamedHeaders[i]) {
+        renameMap.set(original, renamedHeaders[i]!);
+      }
+    });
+
+    // Apply renames to rows if needed
+    const renamedRows =
+      renameMap.size > 0
+        ? rows.map((row) => {
+            const newRow: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(row)) {
+              const newKey = renameMap.get(key) ?? key;
+              newRow[newKey] = value;
+            }
+            return newRow;
+          })
+        : rows;
+
+    // Infer column types (all as "string")
+    const columnTypes: DatasetColumns = renamedHeaders.map((h) => ({
+      name: h,
+      type: "string" as const,
+    }));
+
+    // Create the dataset via existing method
+    const now = Date.now();
+    const datasetRecords: DatasetRecordInput[] = renamedRows.map(
+      (row, index) => ({
+        id: `${now}-${index}`,
+        ...row,
+      }),
+    );
+
+    const dataset = await this.createNewDataset({
+      projectId,
+      name,
+      columnTypes,
+      datasetRecords,
+    });
+
+    return {
+      id: dataset.id,
+      name: dataset.name,
+      slug: dataset.slug,
+      columnTypes: dataset.columnTypes,
+      createdAt: dataset.createdAt,
+      updatedAt: dataset.updatedAt,
+      recordsCreated: datasetRecords.length,
+    };
+  }
+}
+
+/**
+ * Error thrown for upload validation failures (column mismatch, file too large, etc.)
+ * Uses a `kind` field for safe cross-boundary identification.
+ */
+export class UploadValidationError extends Error {
+  readonly kind:
+    | "column_mismatch"
+    | "file_too_large"
+    | "row_limit_exceeded"
+    | "empty_file"
+    | "unsupported_format";
+
+  constructor(
+    message: string,
+    kind:
+      | "column_mismatch"
+      | "file_too_large"
+      | "row_limit_exceeded"
+      | "empty_file"
+      | "unsupported_format",
+  ) {
+    super(message);
+    this.name = "UploadValidationError";
+    this.kind = kind;
   }
 }
