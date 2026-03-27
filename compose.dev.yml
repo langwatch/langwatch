@@ -40,8 +40,7 @@ services:
       POSTGRES_DB: mydb
       POSTGRES_USER: prisma
       POSTGRES_PASSWORD: prisma
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # No host port - accessed via docker network as "postgres:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
