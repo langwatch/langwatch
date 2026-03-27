@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,14 +19,14 @@ T = TypeVar("T", bound="GetApiPromptsResponse200ItemDemonstrations")
 class GetApiPromptsResponse200ItemDemonstrations:
     """
     Attributes:
-        id (str | Unset):
-        name (str | Unset):
-        inline (GetApiPromptsResponse200ItemDemonstrationsInline | Unset):
+        id (Union[Unset, str]):
+        name (Union[Unset, str]):
+        inline (Union[Unset, GetApiPromptsResponse200ItemDemonstrationsInline]):
     """
 
-    id: str | Unset = UNSET
-    name: str | Unset = UNSET
-    inline: GetApiPromptsResponse200ItemDemonstrationsInline | Unset = UNSET
+    id: Union[Unset, str] = UNSET
+    name: Union[Unset, str] = UNSET
+    inline: Union[Unset, "GetApiPromptsResponse200ItemDemonstrationsInline"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,7 +34,7 @@ class GetApiPromptsResponse200ItemDemonstrations:
 
         name = self.name
 
-        inline: dict[str, Any] | Unset = UNSET
+        inline: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.inline, Unset):
             inline = self.inline.to_dict()
 
@@ -64,7 +62,7 @@ class GetApiPromptsResponse200ItemDemonstrations:
         name = d.pop("name", UNSET)
 
         _inline = d.pop("inline", UNSET)
-        inline: GetApiPromptsResponse200ItemDemonstrationsInline | Unset
+        inline: Union[Unset, GetApiPromptsResponse200ItemDemonstrationsInline]
         if isinstance(_inline, Unset):
             inline = UNSET
         else:

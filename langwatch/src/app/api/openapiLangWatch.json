@@ -366,7 +366,7 @@
                       "properties": {
                         "value": {
                           "type": "string",
-                          "example": "Hey there! \ud83d\udc4b\ud83d\ude0a"
+                          "example": "Hey there! 👋😊"
                         }
                       }
                     },
@@ -585,14 +585,14 @@
                                     },
                                     "content": {
                                       "type": "string",
-                                      "example": "Hey there! \ud83d\udc4b\ud83d\ude0a"
+                                      "example": "Hey there! 👋😊"
                                     }
                                   }
                                 },
                                 "example": [
                                   {
                                     "role": "assistant",
-                                    "content": "Hey there! \ud83d\udc4b\ud83d\ude0a"
+                                    "content": "Hey there! 👋😊"
                                   }
                                 ]
                               }
@@ -1353,6 +1353,15 @@
             "schema": {
               "type": "integer",
               "minimum": 0
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "description": "Fetch the version pointed to by this label (e.g., \"production\", \"staging\")",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -6434,6 +6443,267 @@
                       "batchRunId",
                       "scenarioId",
                       "scenarioRunId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TEXT_MESSAGE_START"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "messageIndex": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "messageId",
+                      "role"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TEXT_MESSAGE_END"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "traceId": {
+                        "type": "string"
+                      },
+                      "messageIndex": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "messageId",
+                      "role"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TEXT_MESSAGE_CONTENT"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "delta": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "messageId",
+                      "delta"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TOOL_CALL_START"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "toolCallName": {
+                        "type": "string"
+                      },
+                      "parentMessageId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "toolCallId",
+                      "toolCallName"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TOOL_CALL_ARGS"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "delta": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "toolCallId",
+                      "delta"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TOOL_CALL_END"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "toolCallId"
                     ]
                   }
                 ]

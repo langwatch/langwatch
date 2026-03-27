@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,15 +19,15 @@ class PostApiScenarioEventsBodyType1ResultsType0:
         verdict (PostApiScenarioEventsBodyType1ResultsType0Verdict):
         met_criteria (list[str]):
         unmet_criteria (list[str]):
-        reasoning (str | Unset):
-        error (str | Unset):
+        reasoning (Union[Unset, str]):
+        error (Union[Unset, str]):
     """
 
     verdict: PostApiScenarioEventsBodyType1ResultsType0Verdict
     met_criteria: list[str]
     unmet_criteria: list[str]
-    reasoning: str | Unset = UNSET
-    error: str | Unset = UNSET
+    reasoning: Union[Unset, str] = UNSET
+    error: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

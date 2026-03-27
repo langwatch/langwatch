@@ -13,7 +13,6 @@ class PostApiAnalyticsTimeseriesBodyGroupBy(str, Enum):
     METADATA_SPAN_TYPE = "metadata.span_type"
     METADATA_THREAD_ID = "metadata.thread_id"
     METADATA_USER_ID = "metadata.user_id"
-    SENTIMENT_INPUT_SENTIMENT = "sentiment.input_sentiment"
     SENTIMENT_THUMBS_UP_DOWN = "sentiment.thumbs_up_down"
     TOPICS_TOPICS = "topics.topics"
 

@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -37,51 +35,51 @@ class PostApiPromptsByIdSyncBodyConfigData:
     """
     Attributes:
         prompt (str):
-        outputs (list[PostApiPromptsByIdSyncBodyConfigDataOutputsItem]):
+        outputs (list['PostApiPromptsByIdSyncBodyConfigDataOutputsItem']):
         model (str):
-        messages (list[PostApiPromptsByIdSyncBodyConfigDataMessagesItem] | Unset):
-        inputs (list[PostApiPromptsByIdSyncBodyConfigDataInputsItem] | Unset):
-        temperature (float | Unset):
-        max_tokens (float | Unset):
-        top_p (float | Unset):
-        frequency_penalty (float | Unset):
-        presence_penalty (float | Unset):
-        seed (float | Unset):
-        top_k (float | Unset):
-        min_p (float | Unset):
-        repetition_penalty (float | Unset):
-        reasoning (str | Unset):
-        reasoning_effort (str | Unset):
-        thinking_level (str | Unset):
-        effort (str | Unset):
-        verbosity (str | Unset):
-        demonstrations (PostApiPromptsByIdSyncBodyConfigDataDemonstrations | Unset):
-        prompting_technique (PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique | Unset):
-        response_format (PostApiPromptsByIdSyncBodyConfigDataResponseFormat | Unset):
+        messages (Union[Unset, list['PostApiPromptsByIdSyncBodyConfigDataMessagesItem']]):
+        inputs (Union[Unset, list['PostApiPromptsByIdSyncBodyConfigDataInputsItem']]):
+        temperature (Union[Unset, float]):
+        max_tokens (Union[Unset, float]):
+        top_p (Union[Unset, float]):
+        frequency_penalty (Union[Unset, float]):
+        presence_penalty (Union[Unset, float]):
+        seed (Union[Unset, float]):
+        top_k (Union[Unset, float]):
+        min_p (Union[Unset, float]):
+        repetition_penalty (Union[Unset, float]):
+        reasoning (Union[Unset, str]):
+        reasoning_effort (Union[Unset, str]):
+        thinking_level (Union[Unset, str]):
+        effort (Union[Unset, str]):
+        verbosity (Union[Unset, str]):
+        demonstrations (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataDemonstrations]):
+        prompting_technique (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique]):
+        response_format (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataResponseFormat]):
     """
 
     prompt: str
-    outputs: list[PostApiPromptsByIdSyncBodyConfigDataOutputsItem]
+    outputs: list["PostApiPromptsByIdSyncBodyConfigDataOutputsItem"]
     model: str
-    messages: list[PostApiPromptsByIdSyncBodyConfigDataMessagesItem] | Unset = UNSET
-    inputs: list[PostApiPromptsByIdSyncBodyConfigDataInputsItem] | Unset = UNSET
-    temperature: float | Unset = UNSET
-    max_tokens: float | Unset = UNSET
-    top_p: float | Unset = UNSET
-    frequency_penalty: float | Unset = UNSET
-    presence_penalty: float | Unset = UNSET
-    seed: float | Unset = UNSET
-    top_k: float | Unset = UNSET
-    min_p: float | Unset = UNSET
-    repetition_penalty: float | Unset = UNSET
-    reasoning: str | Unset = UNSET
-    reasoning_effort: str | Unset = UNSET
-    thinking_level: str | Unset = UNSET
-    effort: str | Unset = UNSET
-    verbosity: str | Unset = UNSET
-    demonstrations: PostApiPromptsByIdSyncBodyConfigDataDemonstrations | Unset = UNSET
-    prompting_technique: PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique | Unset = UNSET
-    response_format: PostApiPromptsByIdSyncBodyConfigDataResponseFormat | Unset = UNSET
+    messages: Union[Unset, list["PostApiPromptsByIdSyncBodyConfigDataMessagesItem"]] = UNSET
+    inputs: Union[Unset, list["PostApiPromptsByIdSyncBodyConfigDataInputsItem"]] = UNSET
+    temperature: Union[Unset, float] = UNSET
+    max_tokens: Union[Unset, float] = UNSET
+    top_p: Union[Unset, float] = UNSET
+    frequency_penalty: Union[Unset, float] = UNSET
+    presence_penalty: Union[Unset, float] = UNSET
+    seed: Union[Unset, float] = UNSET
+    top_k: Union[Unset, float] = UNSET
+    min_p: Union[Unset, float] = UNSET
+    repetition_penalty: Union[Unset, float] = UNSET
+    reasoning: Union[Unset, str] = UNSET
+    reasoning_effort: Union[Unset, str] = UNSET
+    thinking_level: Union[Unset, str] = UNSET
+    effort: Union[Unset, str] = UNSET
+    verbosity: Union[Unset, str] = UNSET
+    demonstrations: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataDemonstrations"] = UNSET
+    prompting_technique: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique"] = UNSET
+    response_format: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -94,14 +92,14 @@ class PostApiPromptsByIdSyncBodyConfigData:
 
         model = self.model
 
-        messages: list[dict[str, Any]] | Unset = UNSET
+        messages: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.messages, Unset):
             messages = []
             for messages_item_data in self.messages:
                 messages_item = messages_item_data.to_dict()
                 messages.append(messages_item)
 
-        inputs: list[dict[str, Any]] | Unset = UNSET
+        inputs: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.inputs, Unset):
             inputs = []
             for inputs_item_data in self.inputs:
@@ -136,15 +134,15 @@ class PostApiPromptsByIdSyncBodyConfigData:
 
         verbosity = self.verbosity
 
-        demonstrations: dict[str, Any] | Unset = UNSET
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
-        prompting_technique: dict[str, Any] | Unset = UNSET
+        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
-        response_format: dict[str, Any] | Unset = UNSET
+        response_format: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
@@ -231,23 +229,19 @@ class PostApiPromptsByIdSyncBodyConfigData:
 
         model = d.pop("model")
 
+        messages = []
         _messages = d.pop("messages", UNSET)
-        messages: list[PostApiPromptsByIdSyncBodyConfigDataMessagesItem] | Unset = UNSET
-        if _messages is not UNSET:
-            messages = []
-            for messages_item_data in _messages:
-                messages_item = PostApiPromptsByIdSyncBodyConfigDataMessagesItem.from_dict(messages_item_data)
+        for messages_item_data in _messages or []:
+            messages_item = PostApiPromptsByIdSyncBodyConfigDataMessagesItem.from_dict(messages_item_data)
 
-                messages.append(messages_item)
+            messages.append(messages_item)
 
+        inputs = []
         _inputs = d.pop("inputs", UNSET)
-        inputs: list[PostApiPromptsByIdSyncBodyConfigDataInputsItem] | Unset = UNSET
-        if _inputs is not UNSET:
-            inputs = []
-            for inputs_item_data in _inputs:
-                inputs_item = PostApiPromptsByIdSyncBodyConfigDataInputsItem.from_dict(inputs_item_data)
+        for inputs_item_data in _inputs or []:
+            inputs_item = PostApiPromptsByIdSyncBodyConfigDataInputsItem.from_dict(inputs_item_data)
 
-                inputs.append(inputs_item)
+            inputs.append(inputs_item)
 
         temperature = d.pop("temperature", UNSET)
 
@@ -278,21 +272,21 @@ class PostApiPromptsByIdSyncBodyConfigData:
         verbosity = d.pop("verbosity", UNSET)
 
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: PostApiPromptsByIdSyncBodyConfigDataDemonstrations | Unset
+        demonstrations: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataDemonstrations]
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:
             demonstrations = PostApiPromptsByIdSyncBodyConfigDataDemonstrations.from_dict(_demonstrations)
 
         _prompting_technique = d.pop("prompting_technique", UNSET)
-        prompting_technique: PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique | Unset
+        prompting_technique: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique]
         if isinstance(_prompting_technique, Unset):
             prompting_technique = UNSET
         else:
             prompting_technique = PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique.from_dict(_prompting_technique)
 
         _response_format = d.pop("response_format", UNSET)
-        response_format: PostApiPromptsByIdSyncBodyConfigDataResponseFormat | Unset
+        response_format: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataResponseFormat]
         if isinstance(_response_format, Unset):
             response_format = UNSET
         else:

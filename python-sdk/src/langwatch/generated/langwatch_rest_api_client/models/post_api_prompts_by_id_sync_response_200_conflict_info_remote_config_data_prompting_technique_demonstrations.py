@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,17 +19,17 @@ T = TypeVar("T", bound="PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfi
 class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations:
     """
     Attributes:
-        id (str | Unset):
-        name (str | Unset):
-        inline (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInline |
-            Unset):
+        id (Union[Unset, str]):
+        name (Union[Unset, str]):
+        inline (Union[Unset,
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInline]):
     """
 
-    id: str | Unset = UNSET
-    name: str | Unset = UNSET
-    inline: (
-        PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInline | Unset
-    ) = UNSET
+    id: Union[Unset, str] = UNSET
+    name: Union[Unset, str] = UNSET
+    inline: Union[
+        Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInline"
+    ] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,7 +37,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
 
         name = self.name
 
-        inline: dict[str, Any] | Unset = UNSET
+        inline: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.inline, Unset):
             inline = self.inline.to_dict()
 
@@ -67,9 +65,9 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
         name = d.pop("name", UNSET)
 
         _inline = d.pop("inline", UNSET)
-        inline: (
-            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInline | Unset
-        )
+        inline: Union[
+            Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInline
+        ]
         if isinstance(_inline, Unset):
             inline = UNSET
         else:

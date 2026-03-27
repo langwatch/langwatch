@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,23 +22,23 @@ class PostApiPromptsByIdSyncResponse200:
     """
     Attributes:
         action (PostApiPromptsByIdSyncResponse200Action):
-        prompt (PostApiPromptsByIdSyncResponse200Prompt | Unset):
-        conflict_info (PostApiPromptsByIdSyncResponse200ConflictInfo | Unset):
+        prompt (Union[Unset, PostApiPromptsByIdSyncResponse200Prompt]):
+        conflict_info (Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfo]):
     """
 
     action: PostApiPromptsByIdSyncResponse200Action
-    prompt: PostApiPromptsByIdSyncResponse200Prompt | Unset = UNSET
-    conflict_info: PostApiPromptsByIdSyncResponse200ConflictInfo | Unset = UNSET
+    prompt: Union[Unset, "PostApiPromptsByIdSyncResponse200Prompt"] = UNSET
+    conflict_info: Union[Unset, "PostApiPromptsByIdSyncResponse200ConflictInfo"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         action = self.action.value
 
-        prompt: dict[str, Any] | Unset = UNSET
+        prompt: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.prompt, Unset):
             prompt = self.prompt.to_dict()
 
-        conflict_info: dict[str, Any] | Unset = UNSET
+        conflict_info: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.conflict_info, Unset):
             conflict_info = self.conflict_info.to_dict()
 
@@ -69,14 +67,14 @@ class PostApiPromptsByIdSyncResponse200:
         action = PostApiPromptsByIdSyncResponse200Action(d.pop("action"))
 
         _prompt = d.pop("prompt", UNSET)
-        prompt: PostApiPromptsByIdSyncResponse200Prompt | Unset
+        prompt: Union[Unset, PostApiPromptsByIdSyncResponse200Prompt]
         if isinstance(_prompt, Unset):
             prompt = UNSET
         else:
             prompt = PostApiPromptsByIdSyncResponse200Prompt.from_dict(_prompt)
 
         _conflict_info = d.pop("conflictInfo", UNSET)
-        conflict_info: PostApiPromptsByIdSyncResponse200ConflictInfo | Unset
+        conflict_info: Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfo]
         if isinstance(_conflict_info, Unset):
             conflict_info = UNSET
         else:

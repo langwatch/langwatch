@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,30 +22,30 @@ T = TypeVar("T", bound="Trace")
 class Trace:
     """
     Attributes:
-        trace_id (str | Unset):
-        project_id (str | Unset):
-        timestamps (Timestamps | Unset):
-        input_ (Input | Unset):
-        output (Output | Unset):
-        metadata (Metadata | Unset):
-        metrics (Metrics | Unset):
-        indexing_md5s (list[str] | Unset):
-        error (None | str | Unset):
-        evaluations (list[Evaluation] | Unset):
-        contexts (list[Any] | Unset):
+        trace_id (Union[Unset, str]):
+        project_id (Union[Unset, str]):
+        timestamps (Union[Unset, Timestamps]):
+        input_ (Union[Unset, Input]):
+        output (Union[Unset, Output]):
+        metadata (Union[Unset, Metadata]):
+        metrics (Union[Unset, Metrics]):
+        indexing_md5s (Union[Unset, list[str]]):
+        error (Union[None, Unset, str]):
+        evaluations (Union[Unset, list['Evaluation']]):
+        contexts (Union[Unset, list[Any]]):
     """
 
-    trace_id: str | Unset = UNSET
-    project_id: str | Unset = UNSET
-    timestamps: Timestamps | Unset = UNSET
-    input_: Input | Unset = UNSET
-    output: Output | Unset = UNSET
-    metadata: Metadata | Unset = UNSET
-    metrics: Metrics | Unset = UNSET
-    indexing_md5s: list[str] | Unset = UNSET
-    error: None | str | Unset = UNSET
-    evaluations: list[Evaluation] | Unset = UNSET
-    contexts: list[Any] | Unset = UNSET
+    trace_id: Union[Unset, str] = UNSET
+    project_id: Union[Unset, str] = UNSET
+    timestamps: Union[Unset, "Timestamps"] = UNSET
+    input_: Union[Unset, "Input"] = UNSET
+    output: Union[Unset, "Output"] = UNSET
+    metadata: Union[Unset, "Metadata"] = UNSET
+    metrics: Union[Unset, "Metrics"] = UNSET
+    indexing_md5s: Union[Unset, list[str]] = UNSET
+    error: Union[None, Unset, str] = UNSET
+    evaluations: Union[Unset, list["Evaluation"]] = UNSET
+    contexts: Union[Unset, list[Any]] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,44 +53,44 @@ class Trace:
 
         project_id = self.project_id
 
-        timestamps: dict[str, Any] | Unset = UNSET
+        timestamps: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.timestamps, Unset):
             timestamps = self.timestamps.to_dict()
 
-        input_: dict[str, Any] | Unset = UNSET
+        input_: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.input_, Unset):
             input_ = self.input_.to_dict()
 
-        output: dict[str, Any] | Unset = UNSET
+        output: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.output, Unset):
             output = self.output.to_dict()
 
-        metadata: dict[str, Any] | Unset = UNSET
+        metadata: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.metadata, Unset):
             metadata = self.metadata.to_dict()
 
-        metrics: dict[str, Any] | Unset = UNSET
+        metrics: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.metrics, Unset):
             metrics = self.metrics.to_dict()
 
-        indexing_md5s: list[str] | Unset = UNSET
+        indexing_md5s: Union[Unset, list[str]] = UNSET
         if not isinstance(self.indexing_md5s, Unset):
             indexing_md5s = self.indexing_md5s
 
-        error: None | str | Unset
+        error: Union[None, Unset, str]
         if isinstance(self.error, Unset):
             error = UNSET
         else:
             error = self.error
 
-        evaluations: list[dict[str, Any]] | Unset = UNSET
+        evaluations: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.evaluations, Unset):
             evaluations = []
             for evaluations_item_data in self.evaluations:
                 evaluations_item = evaluations_item_data.to_dict()
                 evaluations.append(evaluations_item)
 
-        contexts: list[Any] | Unset = UNSET
+        contexts: Union[Unset, list[Any]] = UNSET
         if not isinstance(self.contexts, Unset):
             contexts = self.contexts
 
@@ -139,35 +137,35 @@ class Trace:
         project_id = d.pop("project_id", UNSET)
 
         _timestamps = d.pop("timestamps", UNSET)
-        timestamps: Timestamps | Unset
+        timestamps: Union[Unset, Timestamps]
         if isinstance(_timestamps, Unset):
             timestamps = UNSET
         else:
             timestamps = Timestamps.from_dict(_timestamps)
 
         _input_ = d.pop("input", UNSET)
-        input_: Input | Unset
+        input_: Union[Unset, Input]
         if isinstance(_input_, Unset):
             input_ = UNSET
         else:
             input_ = Input.from_dict(_input_)
 
         _output = d.pop("output", UNSET)
-        output: Output | Unset
+        output: Union[Unset, Output]
         if isinstance(_output, Unset):
             output = UNSET
         else:
             output = Output.from_dict(_output)
 
         _metadata = d.pop("metadata", UNSET)
-        metadata: Metadata | Unset
+        metadata: Union[Unset, Metadata]
         if isinstance(_metadata, Unset):
             metadata = UNSET
         else:
             metadata = Metadata.from_dict(_metadata)
 
         _metrics = d.pop("metrics", UNSET)
-        metrics: Metrics | Unset
+        metrics: Union[Unset, Metrics]
         if isinstance(_metrics, Unset):
             metrics = UNSET
         else:
@@ -175,23 +173,21 @@ class Trace:
 
         indexing_md5s = cast(list[str], d.pop("indexing_md5s", UNSET))
 
-        def _parse_error(data: object) -> None | str | Unset:
+        def _parse_error(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         error = _parse_error(d.pop("error", UNSET))
 
+        evaluations = []
         _evaluations = d.pop("evaluations", UNSET)
-        evaluations: list[Evaluation] | Unset = UNSET
-        if _evaluations is not UNSET:
-            evaluations = []
-            for evaluations_item_data in _evaluations:
-                evaluations_item = Evaluation.from_dict(evaluations_item_data)
+        for evaluations_item_data in _evaluations or []:
+            evaluations_item = Evaluation.from_dict(evaluations_item_data)
 
-                evaluations.append(evaluations_item)
+            evaluations.append(evaluations_item)
 
         contexts = cast(list[Any], d.pop("contexts", UNSET))
 

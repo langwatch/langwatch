@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,12 +13,12 @@ T = TypeVar("T", bound="PatchApiAnnotationsIdResponse200")
 class PatchApiAnnotationsIdResponse200:
     """
     Attributes:
-        status (str | Unset):
-        message (str | Unset):
+        status (Union[Unset, str]):
+        message (Union[Unset, str]):
     """
 
-    status: str | Unset = UNSET
-    message: str | Unset = UNSET
+    status: Union[Unset, str] = UNSET
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

@@ -4,6 +4,12 @@ from .annotation import Annotation
 from .dataset_post_entries import DatasetPostEntries
 from .dataset_post_entries_entries_item import DatasetPostEntriesEntriesItem
 from .delete_api_annotations_id_response_200 import DeleteApiAnnotationsIdResponse200
+from .delete_api_evaluators_by_id_response_200 import DeleteApiEvaluatorsByIdResponse200
+from .delete_api_evaluators_by_id_response_400 import DeleteApiEvaluatorsByIdResponse400
+from .delete_api_evaluators_by_id_response_401 import DeleteApiEvaluatorsByIdResponse401
+from .delete_api_evaluators_by_id_response_404 import DeleteApiEvaluatorsByIdResponse404
+from .delete_api_evaluators_by_id_response_422 import DeleteApiEvaluatorsByIdResponse422
+from .delete_api_evaluators_by_id_response_500 import DeleteApiEvaluatorsByIdResponse500
 from .delete_api_prompts_by_id_response_200 import DeleteApiPromptsByIdResponse200
 from .delete_api_prompts_by_id_response_400 import DeleteApiPromptsByIdResponse400
 from .delete_api_prompts_by_id_response_401 import DeleteApiPromptsByIdResponse401
@@ -430,15 +436,6 @@ from .post_api_analytics_timeseries_body_filters_metadata_value_type_2 import (
 from .post_api_analytics_timeseries_body_filters_metadata_value_type_2_additional_property import (
     PostApiAnalyticsTimeseriesBodyFiltersMetadataValueType2AdditionalProperty,
 )
-from .post_api_analytics_timeseries_body_filters_sentiment_input_sentiment_type_1 import (
-    PostApiAnalyticsTimeseriesBodyFiltersSentimentInputSentimentType1,
-)
-from .post_api_analytics_timeseries_body_filters_sentiment_input_sentiment_type_2 import (
-    PostApiAnalyticsTimeseriesBodyFiltersSentimentInputSentimentType2,
-)
-from .post_api_analytics_timeseries_body_filters_sentiment_input_sentiment_type_2_additional_property import (
-    PostApiAnalyticsTimeseriesBodyFiltersSentimentInputSentimentType2AdditionalProperty,
-)
 from .post_api_analytics_timeseries_body_filters_spans_model_type_1 import (
     PostApiAnalyticsTimeseriesBodyFiltersSpansModelType1,
 )
@@ -483,6 +480,15 @@ from .post_api_analytics_timeseries_body_filters_traces_error_type_2 import (
 )
 from .post_api_analytics_timeseries_body_filters_traces_error_type_2_additional_property import (
     PostApiAnalyticsTimeseriesBodyFiltersTracesErrorType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_filters_traces_origin_type_1 import (
+    PostApiAnalyticsTimeseriesBodyFiltersTracesOriginType1,
+)
+from .post_api_analytics_timeseries_body_filters_traces_origin_type_2 import (
+    PostApiAnalyticsTimeseriesBodyFiltersTracesOriginType2,
+)
+from .post_api_analytics_timeseries_body_filters_traces_origin_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodyFiltersTracesOriginType2AdditionalProperty,
 )
 from .post_api_analytics_timeseries_body_group_by import PostApiAnalyticsTimeseriesBodyGroupBy
 from .post_api_analytics_timeseries_body_series_item import PostApiAnalyticsTimeseriesBodySeriesItem
@@ -652,15 +658,6 @@ from .post_api_analytics_timeseries_body_series_item_filters_metadata_value_type
 from .post_api_analytics_timeseries_body_series_item_filters_metadata_value_type_2_additional_property import (
     PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty,
 )
-from .post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_1 import (
-    PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1,
-)
-from .post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_2 import (
-    PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2,
-)
-from .post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_2_additional_property import (
-    PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2AdditionalProperty,
-)
 from .post_api_analytics_timeseries_body_series_item_filters_spans_model_type_1 import (
     PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1,
 )
@@ -705,6 +702,15 @@ from .post_api_analytics_timeseries_body_series_item_filters_traces_error_type_2
 )
 from .post_api_analytics_timeseries_body_series_item_filters_traces_error_type_2_additional_property import (
     PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_1 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2AdditionalProperty,
 )
 from .post_api_analytics_timeseries_body_series_item_metric import PostApiAnalyticsTimeseriesBodySeriesItemMetric
 from .post_api_analytics_timeseries_body_series_item_pipeline import PostApiAnalyticsTimeseriesBodySeriesItemPipeline
@@ -989,6 +995,10 @@ from .post_api_prompts_response_422 import PostApiPromptsResponse422
 from .post_api_prompts_response_500 import PostApiPromptsResponse500
 from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
+from .post_api_scenario_events_body_type_0_metadata_langwatch import PostApiScenarioEventsBodyType0MetadataLangwatch
+from .post_api_scenario_events_body_type_0_metadata_langwatch_target_type import (
+    PostApiScenarioEventsBodyType0MetadataLangwatchTargetType,
+)
 from .post_api_scenario_events_body_type_1 import PostApiScenarioEventsBodyType1
 from .post_api_scenario_events_body_type_1_results_type_0 import PostApiScenarioEventsBodyType1ResultsType0
 from .post_api_scenario_events_body_type_1_results_type_0_verdict import (
@@ -997,11 +1007,19 @@ from .post_api_scenario_events_body_type_1_results_type_0_verdict import (
 from .post_api_scenario_events_body_type_1_status import PostApiScenarioEventsBodyType1Status
 from .post_api_scenario_events_body_type_2 import PostApiScenarioEventsBodyType2
 from .post_api_scenario_events_body_type_2_messages_item import PostApiScenarioEventsBodyType2MessagesItem
+from .post_api_scenario_events_body_type_3 import PostApiScenarioEventsBodyType3
+from .post_api_scenario_events_body_type_4 import PostApiScenarioEventsBodyType4
+from .post_api_scenario_events_body_type_4_message import PostApiScenarioEventsBodyType4Message
+from .post_api_scenario_events_body_type_5 import PostApiScenarioEventsBodyType5
+from .post_api_scenario_events_body_type_6 import PostApiScenarioEventsBodyType6
+from .post_api_scenario_events_body_type_7 import PostApiScenarioEventsBodyType7
+from .post_api_scenario_events_body_type_8 import PostApiScenarioEventsBodyType8
 from .post_api_scenario_events_response_201 import PostApiScenarioEventsResponse201
 from .post_api_scenario_events_response_400 import PostApiScenarioEventsResponse400
 from .post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
 from .post_api_scenario_events_response_422 import PostApiScenarioEventsResponse422
 from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
+from .post_api_scenarios_body import PostApiScenariosBody
 from .post_api_trace_id_share_response_200 import PostApiTraceIdShareResponse200
 from .post_api_trace_id_unshare_response_200 import PostApiTraceIdUnshareResponse200
 from .post_api_traces_search_body import PostApiTracesSearchBody
@@ -1160,15 +1178,6 @@ from .post_api_traces_search_body_filters_metadata_value_type_2 import PostApiTr
 from .post_api_traces_search_body_filters_metadata_value_type_2_additional_property import (
     PostApiTracesSearchBodyFiltersMetadataValueType2AdditionalProperty,
 )
-from .post_api_traces_search_body_filters_sentiment_input_sentiment_type_1 import (
-    PostApiTracesSearchBodyFiltersSentimentInputSentimentType1,
-)
-from .post_api_traces_search_body_filters_sentiment_input_sentiment_type_2 import (
-    PostApiTracesSearchBodyFiltersSentimentInputSentimentType2,
-)
-from .post_api_traces_search_body_filters_sentiment_input_sentiment_type_2_additional_property import (
-    PostApiTracesSearchBodyFiltersSentimentInputSentimentType2AdditionalProperty,
-)
 from .post_api_traces_search_body_filters_spans_model_type_1 import PostApiTracesSearchBodyFiltersSpansModelType1
 from .post_api_traces_search_body_filters_spans_model_type_2 import PostApiTracesSearchBodyFiltersSpansModelType2
 from .post_api_traces_search_body_filters_spans_model_type_2_additional_property import (
@@ -1197,6 +1206,11 @@ from .post_api_traces_search_body_filters_traces_error_type_1 import PostApiTrac
 from .post_api_traces_search_body_filters_traces_error_type_2 import PostApiTracesSearchBodyFiltersTracesErrorType2
 from .post_api_traces_search_body_filters_traces_error_type_2_additional_property import (
     PostApiTracesSearchBodyFiltersTracesErrorType2AdditionalProperty,
+)
+from .post_api_traces_search_body_filters_traces_origin_type_1 import PostApiTracesSearchBodyFiltersTracesOriginType1
+from .post_api_traces_search_body_filters_traces_origin_type_2 import PostApiTracesSearchBodyFiltersTracesOriginType2
+from .post_api_traces_search_body_filters_traces_origin_type_2_additional_property import (
+    PostApiTracesSearchBodyFiltersTracesOriginType2AdditionalProperty,
 )
 from .post_api_traces_search_body_format import PostApiTracesSearchBodyFormat
 from .post_api_traces_search_response_200 import PostApiTracesSearchResponse200
@@ -1233,6 +1247,17 @@ from .post_index_response_200_scope import PostIndexResponse200Scope
 from .post_index_response_400 import PostIndexResponse400
 from .post_index_response_401 import PostIndexResponse401
 from .post_index_response_500 import PostIndexResponse500
+from .put_api_evaluators_by_id_body import PutApiEvaluatorsByIdBody
+from .put_api_evaluators_by_id_body_config import PutApiEvaluatorsByIdBodyConfig
+from .put_api_evaluators_by_id_response_200 import PutApiEvaluatorsByIdResponse200
+from .put_api_evaluators_by_id_response_200_config_type_0 import PutApiEvaluatorsByIdResponse200ConfigType0
+from .put_api_evaluators_by_id_response_200_fields_item import PutApiEvaluatorsByIdResponse200FieldsItem
+from .put_api_evaluators_by_id_response_200_output_fields_item import PutApiEvaluatorsByIdResponse200OutputFieldsItem
+from .put_api_evaluators_by_id_response_400 import PutApiEvaluatorsByIdResponse400
+from .put_api_evaluators_by_id_response_401 import PutApiEvaluatorsByIdResponse401
+from .put_api_evaluators_by_id_response_404 import PutApiEvaluatorsByIdResponse404
+from .put_api_evaluators_by_id_response_422 import PutApiEvaluatorsByIdResponse422
+from .put_api_evaluators_by_id_response_500 import PutApiEvaluatorsByIdResponse500
 from .put_api_prompts_by_id_body import PutApiPromptsByIdBody
 from .put_api_prompts_by_id_body_inputs_item import PutApiPromptsByIdBodyInputsItem
 from .put_api_prompts_by_id_body_inputs_item_type import PutApiPromptsByIdBodyInputsItemType
@@ -1292,6 +1317,7 @@ from .put_api_prompts_by_id_response_404 import PutApiPromptsByIdResponse404
 from .put_api_prompts_by_id_response_409 import PutApiPromptsByIdResponse409
 from .put_api_prompts_by_id_response_422 import PutApiPromptsByIdResponse422
 from .put_api_prompts_by_id_response_500 import PutApiPromptsByIdResponse500
+from .put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from .search_request import SearchRequest
 from .search_request_filters import SearchRequestFilters
 from .search_response import SearchResponse
@@ -1303,6 +1329,12 @@ __all__ = (
     "DatasetPostEntries",
     "DatasetPostEntriesEntriesItem",
     "DeleteApiAnnotationsIdResponse200",
+    "DeleteApiEvaluatorsByIdResponse200",
+    "DeleteApiEvaluatorsByIdResponse400",
+    "DeleteApiEvaluatorsByIdResponse401",
+    "DeleteApiEvaluatorsByIdResponse404",
+    "DeleteApiEvaluatorsByIdResponse422",
+    "DeleteApiEvaluatorsByIdResponse500",
     "DeleteApiPromptsByIdResponse200",
     "DeleteApiPromptsByIdResponse400",
     "DeleteApiPromptsByIdResponse401",
@@ -1531,9 +1563,6 @@ __all__ = (
     "PostApiAnalyticsTimeseriesBodyFiltersMetadataValueType1",
     "PostApiAnalyticsTimeseriesBodyFiltersMetadataValueType2",
     "PostApiAnalyticsTimeseriesBodyFiltersMetadataValueType2AdditionalProperty",
-    "PostApiAnalyticsTimeseriesBodyFiltersSentimentInputSentimentType1",
-    "PostApiAnalyticsTimeseriesBodyFiltersSentimentInputSentimentType2",
-    "PostApiAnalyticsTimeseriesBodyFiltersSentimentInputSentimentType2AdditionalProperty",
     "PostApiAnalyticsTimeseriesBodyFiltersSpansModelType1",
     "PostApiAnalyticsTimeseriesBodyFiltersSpansModelType2",
     "PostApiAnalyticsTimeseriesBodyFiltersSpansModelType2AdditionalProperty",
@@ -1549,6 +1578,9 @@ __all__ = (
     "PostApiAnalyticsTimeseriesBodyFiltersTracesErrorType1",
     "PostApiAnalyticsTimeseriesBodyFiltersTracesErrorType2",
     "PostApiAnalyticsTimeseriesBodyFiltersTracesErrorType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodyFiltersTracesOriginType1",
+    "PostApiAnalyticsTimeseriesBodyFiltersTracesOriginType2",
+    "PostApiAnalyticsTimeseriesBodyFiltersTracesOriginType2AdditionalProperty",
     "PostApiAnalyticsTimeseriesBodyGroupBy",
     "PostApiAnalyticsTimeseriesBodySeriesItem",
     "PostApiAnalyticsTimeseriesBodySeriesItemAggregation",
@@ -1607,9 +1639,6 @@ __all__ = (
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty",
-    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1",
-    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2",
-    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2AdditionalProperty",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2AdditionalProperty",
@@ -1625,6 +1654,9 @@ __all__ = (
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2AdditionalProperty",
     "PostApiAnalyticsTimeseriesBodySeriesItemMetric",
     "PostApiAnalyticsTimeseriesBodySeriesItemPipeline",
     "PostApiAnalyticsTimeseriesBodySeriesItemPipelineAggregation",
@@ -1762,17 +1794,27 @@ __all__ = (
     "PostApiPromptsResponse500",
     "PostApiScenarioEventsBodyType0",
     "PostApiScenarioEventsBodyType0Metadata",
+    "PostApiScenarioEventsBodyType0MetadataLangwatch",
+    "PostApiScenarioEventsBodyType0MetadataLangwatchTargetType",
     "PostApiScenarioEventsBodyType1",
     "PostApiScenarioEventsBodyType1ResultsType0",
     "PostApiScenarioEventsBodyType1ResultsType0Verdict",
     "PostApiScenarioEventsBodyType1Status",
     "PostApiScenarioEventsBodyType2",
     "PostApiScenarioEventsBodyType2MessagesItem",
+    "PostApiScenarioEventsBodyType3",
+    "PostApiScenarioEventsBodyType4",
+    "PostApiScenarioEventsBodyType4Message",
+    "PostApiScenarioEventsBodyType5",
+    "PostApiScenarioEventsBodyType6",
+    "PostApiScenarioEventsBodyType7",
+    "PostApiScenarioEventsBodyType8",
     "PostApiScenarioEventsResponse201",
     "PostApiScenarioEventsResponse400",
     "PostApiScenarioEventsResponse401",
     "PostApiScenarioEventsResponse422",
     "PostApiScenarioEventsResponse500",
+    "PostApiScenariosBody",
     "PostApiTraceIdShareResponse200",
     "PostApiTraceIdUnshareResponse200",
     "PostApiTracesSearchBody",
@@ -1831,9 +1873,6 @@ __all__ = (
     "PostApiTracesSearchBodyFiltersMetadataValueType1",
     "PostApiTracesSearchBodyFiltersMetadataValueType2",
     "PostApiTracesSearchBodyFiltersMetadataValueType2AdditionalProperty",
-    "PostApiTracesSearchBodyFiltersSentimentInputSentimentType1",
-    "PostApiTracesSearchBodyFiltersSentimentInputSentimentType2",
-    "PostApiTracesSearchBodyFiltersSentimentInputSentimentType2AdditionalProperty",
     "PostApiTracesSearchBodyFiltersSpansModelType1",
     "PostApiTracesSearchBodyFiltersSpansModelType2",
     "PostApiTracesSearchBodyFiltersSpansModelType2AdditionalProperty",
@@ -1849,6 +1888,9 @@ __all__ = (
     "PostApiTracesSearchBodyFiltersTracesErrorType1",
     "PostApiTracesSearchBodyFiltersTracesErrorType2",
     "PostApiTracesSearchBodyFiltersTracesErrorType2AdditionalProperty",
+    "PostApiTracesSearchBodyFiltersTracesOriginType1",
+    "PostApiTracesSearchBodyFiltersTracesOriginType2",
+    "PostApiTracesSearchBodyFiltersTracesOriginType2AdditionalProperty",
     "PostApiTracesSearchBodyFormat",
     "PostApiTracesSearchResponse200",
     "PostApiTracesSearchResponse200Pagination",
@@ -1880,6 +1922,17 @@ __all__ = (
     "PostIndexResponse400",
     "PostIndexResponse401",
     "PostIndexResponse500",
+    "PutApiEvaluatorsByIdBody",
+    "PutApiEvaluatorsByIdBodyConfig",
+    "PutApiEvaluatorsByIdResponse200",
+    "PutApiEvaluatorsByIdResponse200ConfigType0",
+    "PutApiEvaluatorsByIdResponse200FieldsItem",
+    "PutApiEvaluatorsByIdResponse200OutputFieldsItem",
+    "PutApiEvaluatorsByIdResponse400",
+    "PutApiEvaluatorsByIdResponse401",
+    "PutApiEvaluatorsByIdResponse404",
+    "PutApiEvaluatorsByIdResponse422",
+    "PutApiEvaluatorsByIdResponse500",
     "PutApiPromptsByIdBody",
     "PutApiPromptsByIdBodyInputsItem",
     "PutApiPromptsByIdBodyInputsItemType",
@@ -1919,6 +1972,7 @@ __all__ = (
     "PutApiPromptsByIdResponse409",
     "PutApiPromptsByIdResponse422",
     "PutApiPromptsByIdResponse500",
+    "PutApiScenariosByIdBody",
     "SearchRequest",
     "SearchRequestFilters",
     "SearchResponse",

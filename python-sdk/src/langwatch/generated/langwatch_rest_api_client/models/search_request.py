@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,30 +19,30 @@ T = TypeVar("T", bound="SearchRequest")
 class SearchRequest:
     """
     Attributes:
-        query (str | Unset):
-        start_date (datetime.datetime | Unset):
-        end_date (datetime.datetime | Unset):
-        page_size (int | Unset):  Example: 1000.
-        scroll_id (str | Unset):  Example: 123.
-        filters (SearchRequestFilters | Unset):
+        query (Union[Unset, str]):
+        start_date (Union[Unset, datetime.datetime]):
+        end_date (Union[Unset, datetime.datetime]):
+        page_size (Union[Unset, int]):  Example: 1000.
+        scroll_id (Union[Unset, str]):  Example: 123.
+        filters (Union[Unset, SearchRequestFilters]):
     """
 
-    query: str | Unset = UNSET
-    start_date: datetime.datetime | Unset = UNSET
-    end_date: datetime.datetime | Unset = UNSET
-    page_size: int | Unset = UNSET
-    scroll_id: str | Unset = UNSET
-    filters: SearchRequestFilters | Unset = UNSET
+    query: Union[Unset, str] = UNSET
+    start_date: Union[Unset, datetime.datetime] = UNSET
+    end_date: Union[Unset, datetime.datetime] = UNSET
+    page_size: Union[Unset, int] = UNSET
+    scroll_id: Union[Unset, str] = UNSET
+    filters: Union[Unset, "SearchRequestFilters"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         query = self.query
 
-        start_date: str | Unset = UNSET
+        start_date: Union[Unset, str] = UNSET
         if not isinstance(self.start_date, Unset):
             start_date = self.start_date.isoformat()
 
-        end_date: str | Unset = UNSET
+        end_date: Union[Unset, str] = UNSET
         if not isinstance(self.end_date, Unset):
             end_date = self.end_date.isoformat()
 
@@ -52,7 +50,7 @@ class SearchRequest:
 
         scroll_id = self.scroll_id
 
-        filters: dict[str, Any] | Unset = UNSET
+        filters: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.filters, Unset):
             filters = self.filters.to_dict()
 
@@ -82,14 +80,14 @@ class SearchRequest:
         query = d.pop("query", UNSET)
 
         _start_date = d.pop("startDate", UNSET)
-        start_date: datetime.datetime | Unset
+        start_date: Union[Unset, datetime.datetime]
         if isinstance(_start_date, Unset):
             start_date = UNSET
         else:
             start_date = isoparse(_start_date)
 
         _end_date = d.pop("endDate", UNSET)
-        end_date: datetime.datetime | Unset
+        end_date: Union[Unset, datetime.datetime]
         if isinstance(_end_date, Unset):
             end_date = UNSET
         else:
@@ -100,7 +98,7 @@ class SearchRequest:
         scroll_id = d.pop("scrollId", UNSET)
 
         _filters = d.pop("filters", UNSET)
-        filters: SearchRequestFilters | Unset
+        filters: Union[Unset, SearchRequestFilters]
         if isinstance(_filters, Unset):
             filters = UNSET
         else:
