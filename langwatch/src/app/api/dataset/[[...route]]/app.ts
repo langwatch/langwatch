@@ -6,10 +6,6 @@ import { z } from "zod";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
-import {
-  DatasetConflictError,
-  DatasetNotFoundError,
-} from "../../../../server/datasets/errors";
 import { DatasetService } from "../../../../server/datasets/dataset.service";
 import { prisma } from "../../../../server/db";
 import { slugify } from "../../../../utils/slugify";
@@ -90,14 +86,17 @@ const updateRecordSchema = z.object({
 });
 
 const deleteRecordsSchema = z.object({
-  recordIds: z.array(z.string()).min(1, "recordIds is required"),
+  recordIds: z.array(z.string()).min(1, "recordIds is required").max(1000, "Maximum 1000 records per batch delete"),
 });
 
 /**
  * Validation hook that returns 422 instead of the default 400 for Zod validation errors.
  * Used on endpoints where the feature spec requires 422 Unprocessable Entity.
  */
-function validationHook(result: { success: boolean; error?: { issues: unknown[] } }, c: { json: (body: unknown, status: number) => Response }) {
+function validationHook(
+  result: { success: boolean; error?: { issues: unknown[] } },
+  c: { json: (body: unknown, status: number) => unknown },
+): unknown | undefined {
   if (!result.success) {
     return c.json(
       {
@@ -109,6 +108,7 @@ function validationHook(result: { success: boolean; error?: { issues: unknown[] 
       422,
     );
   }
+  return undefined;
 }
 
 export const app = new Hono<{ Variables: Variables }>()
@@ -172,7 +172,7 @@ export const app = new Hono<{ Variables: Variables }>()
       description: "Create a new dataset",
     }),
     resourceLimitMiddleware("datasets"),
-    zValidator("json", createDatasetSchema, validationHook as any),
+    zValidator("json", createDatasetSchema, validationHook),
     async (c) => {
       const project = c.get("project");
       const { name, columnTypes } = c.req.valid("json");
@@ -197,7 +197,7 @@ export const app = new Hono<{ Variables: Variables }>()
           201,
         );
       } catch (error) {
-        if (error instanceof DatasetConflictError) {
+        if (error instanceof Error && error.name === "DatasetConflictError") {
           return c.json(
             {
               error: "Conflict",
@@ -244,6 +244,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const dataset = await prisma.dataset.findFirst({
         where: {
           projectId: project.id,
+          archivedAt: null,
           OR: [{ slug }, { id: slug }],
         },
       });
@@ -378,7 +379,7 @@ export const app = new Hono<{ Variables: Variables }>()
           updatedAt: updated.updatedAt,
         });
       } catch (error) {
-        if (error instanceof DatasetConflictError) {
+        if (error instanceof Error && error.name === "DatasetConflictError") {
           return c.json(
             {
               error: "Conflict",
@@ -387,7 +388,7 @@ export const app = new Hono<{ Variables: Variables }>()
             409,
           );
         }
-        if (error instanceof DatasetNotFoundError) {
+        if (error instanceof Error && error.name === "DatasetNotFoundError") {
           throw new NotFoundError("Dataset not found");
         }
         throw error;
@@ -517,7 +518,7 @@ export const app = new Hono<{ Variables: Variables }>()
     describeRoute({
       description: "Delete records from a dataset by IDs",
     }),
-    zValidator("json", deleteRecordsSchema, validationHook as any),
+    zValidator("json", deleteRecordsSchema, validationHook),
     async (c) => {
       const { slugOrId } = c.req.param();
       const project = c.get("project");
