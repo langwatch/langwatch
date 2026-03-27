@@ -48,11 +48,10 @@ export type EvaluatorWithFields = Evaluator & {
  * Standard output fields for built-in evaluators.
  * All built-in evaluators produce these fields.
  */
-const STANDARD_EVALUATOR_OUTPUT_FIELDS: EvaluatorField[] = [
+export const STANDARD_EVALUATOR_OUTPUT_FIELDS: EvaluatorField[] = [
   { identifier: "passed", type: "bool" },
   { identifier: "score", type: "float" },
   { identifier: "label", type: "str" },
-  { identifier: "details", type: "str" },
 ];
 
 // ============================================================================
