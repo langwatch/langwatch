@@ -802,42 +802,68 @@ function accumulateRoleCostLatency({
 }: {
   state: TraceSummaryData;
   span: NormalizedSpan;
-}): Pick<TraceSummaryData, "scenarioRoleCosts" | "scenarioRoleLatencies" | "scenarioRoleSpans"> {
+}): Pick<TraceSummaryData, "scenarioRoleCosts" | "scenarioRoleLatencies" | "scenarioRoleSpans" | "spanCosts"> {
   const scenarioRoleSpans = { ...(state.scenarioRoleSpans ?? {}) };
+  const spanCosts = { ...(state.spanCosts ?? {}) };
+
+  // Track this span's cost and parent for retroactive role assignment
+  const spanCost = extractTokenMetrics(span).cost;
+  if (spanCost > 0) {
+    spanCosts[span.spanId] = spanCost;
+  }
+
+  // Record parent relationship for all spans (even if role unknown yet)
+  if (span.parentSpanId) {
+    // Store parent mapping as negative-prefixed entry (hack to avoid another Map column)
+    // "_parent:childId" -> parentId
+    spanCosts[`_parent:${span.spanId}`] = 0; // placeholder
+    scenarioRoleSpans[`_parent:${span.spanId}`] = span.parentSpanId;
+  }
 
   // Record this span's role if it has one
   const directRole = span.spanAttributes["scenario.role"];
-  if (typeof directRole === "string" && directRole !== "") {
+  const isNewRoleSpan = typeof directRole === "string" && directRole !== "";
+
+  if (isNewRoleSpan) {
     scenarioRoleSpans[span.spanId] = directRole;
+    // Propagate role to all existing spans that are descendants of this span
+    for (const key of Object.keys(scenarioRoleSpans)) {
+      if (key.startsWith("_parent:")) {
+        const childId = key.slice("_parent:".length);
+        const parentId = scenarioRoleSpans[key]!;
+        if (parentId === span.spanId && !scenarioRoleSpans[childId]) {
+          scenarioRoleSpans[childId] = directRole;
+        }
+      }
+    }
   } else if (span.parentSpanId && scenarioRoleSpans[span.parentSpanId]) {
-    // Propagate parent role to this span so grandchildren can look it up
     scenarioRoleSpans[span.spanId] = scenarioRoleSpans[span.parentSpanId]!;
   }
 
-  const effectiveRole = resolveEffectiveRole({ span, scenarioRoleSpans });
-
-  let scenarioRoleCosts = state.scenarioRoleCosts ?? {};
-  let scenarioRoleLatencies = state.scenarioRoleLatencies ?? {};
-
-  if (effectiveRole) {
-    const spanCost = extractTokenMetrics(span).cost;
-    scenarioRoleCosts = {
-      ...scenarioRoleCosts,
-      [effectiveRole]: (scenarioRoleCosts[effectiveRole] ?? 0) + spanCost,
-    };
-
-    // Only accumulate latency for the span that directly carries the role,
-    // not for child spans (which would double-count nested durations)
-    if (typeof directRole === "string" && directRole !== "") {
-      const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
-      scenarioRoleLatencies = {
-        ...scenarioRoleLatencies,
-        [effectiveRole]: (scenarioRoleLatencies[effectiveRole] ?? 0) + spanDurationMs,
-      };
+  // Recompute ALL role costs from spanCosts + scenarioRoleSpans.
+  // This handles the case where child LLM spans arrive before their
+  // parent agent span — when the parent arrives and propagates its role,
+  // all children's costs are retroactively assigned.
+  const scenarioRoleCosts: Record<string, number> = {};
+  for (const [sid, cost] of Object.entries(spanCosts)) {
+    if (sid.startsWith("_parent:")) continue; // skip parent mappings
+    const role = scenarioRoleSpans[sid];
+    if (role && !role.startsWith("_parent:") && cost > 0) {
+      scenarioRoleCosts[role] = (scenarioRoleCosts[role] ?? 0) + cost;
     }
   }
 
-  return { scenarioRoleCosts, scenarioRoleLatencies, scenarioRoleSpans };
+  // Latency: only from spans that directly carry the role attribute
+  let scenarioRoleLatencies = state.scenarioRoleLatencies ?? {};
+  if (isNewRoleSpan) {
+    const spanDurationMs = span.endTimeUnixMs - span.startTimeUnixMs;
+    scenarioRoleLatencies = {
+      ...scenarioRoleLatencies,
+      [directRole]: (scenarioRoleLatencies[directRole] ?? 0) + spanDurationMs,
+    };
+  }
+
+  return { scenarioRoleCosts, scenarioRoleLatencies, scenarioRoleSpans, spanCosts };
 }
 
 // ─── Main composition ───────────────────────────────────────────────
@@ -939,6 +965,7 @@ export function createTraceSummaryFoldProjection({
         scenarioRoleCosts: {},
         scenarioRoleLatencies: {},
         scenarioRoleSpans: {},
+        spanCosts: {},
         occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),

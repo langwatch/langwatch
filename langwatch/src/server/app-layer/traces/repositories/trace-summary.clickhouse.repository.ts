@@ -52,6 +52,7 @@ interface ClickHouseSummaryRecord {
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
+  SpanCosts: Record<string, number>;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
@@ -142,7 +143,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             HasAnnotation,
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
-            ScenarioRoleSpans
+            ScenarioRoleSpans,
+            SpanCosts
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -202,6 +204,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
       scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
+      spanCosts: record.SpanCosts ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -249,6 +252,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
+      SpanCosts: data.spanCosts ?? {},
     };
   }
 }

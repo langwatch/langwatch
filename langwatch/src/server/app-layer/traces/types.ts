@@ -79,6 +79,8 @@ export const traceSummaryDataSchema = z.object({
   scenarioRoleCosts: z.record(z.string(), z.number()).optional(),
   scenarioRoleLatencies: z.record(z.string(), z.number()).optional(),
   scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
+  /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
+  spanCosts: z.record(z.string(), z.number()).optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

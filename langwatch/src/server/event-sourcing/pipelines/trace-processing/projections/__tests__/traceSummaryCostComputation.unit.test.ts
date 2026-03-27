@@ -547,6 +547,68 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
     });
   });
 
+  describe("given child LLM spans arrive BEFORE their parent agent span", () => {
+    describe("when the agent span arrives after LLM spans", () => {
+      it("retroactively assigns LLM costs to the agent role", () => {
+        // This reproduces the real production ordering where OTel exports
+        // child spans before parent spans complete
+        const llmSpan1 = createTestSpan({
+          spanId: "llm-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 1100,
+          endTimeUnixMs: 3100,
+          durationMs: 2000,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.usage.input_tokens": 42,
+            "gen_ai.usage.output_tokens": 10,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        const llmSpan2 = createTestSpan({
+          spanId: "llm-2",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 3200,
+          endTimeUnixMs: 5000,
+          durationMs: 1800,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.usage.input_tokens": 79,
+            "gen_ai.usage.output_tokens": 52,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        // Agent span arrives LAST
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: null,
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 5000,
+          durationMs: 4000,
+          spanAttributes: {
+            "scenario.role": "Agent",
+          },
+        });
+
+        let state = createInitState();
+        // Process in out-of-order: LLM children first, agent parent last
+        state = applySpanToSummary({ state, span: llmSpan1 });
+        state = applySpanToSummary({ state, span: llmSpan2 });
+        state = applySpanToSummary({ state, span: agentSpan });
+
+        // LLM1 cost: 42 * 0.000005 + 10 * 0.000015 = 0.00021 + 0.00015 = 0.00036
+        // LLM2 cost: 79 * 0.000005 + 52 * 0.000015 = 0.000395 + 0.00078 = 0.001175
+        const expectedCost = 0.00036 + 0.001175;
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(expectedCost, 6);
+        expect(state.scenarioRoleLatencies?.["Agent"]).toBe(4000);
+      });
+    });
+  });
+
   describe("given a trace without scenario roles", () => {
     describe("when spans have no scenario.role attribute", () => {
       it("leaves scenarioRoleCosts and scenarioRoleLatencies empty", () => {
