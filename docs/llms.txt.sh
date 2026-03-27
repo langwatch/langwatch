@@ -248,13 +248,13 @@ function processImports(content, filePath) {
 // Process each include path
 includePaths.forEach(includePath => {
   try {
-    // Create a find command to locate the files
-    let findCmd = `find . -type f -path "./${includePath}" 2>/dev/null || echo ""`;
+    // Create a find command to locate the files (sort for stable cross-platform ordering)
+    let findCmd = `find . -type f -path "./${includePath}" 2>/dev/null | sort`;
 
     // Add exclude patterns if any
     if (excludePaths.length > 0) {
       excludePaths.forEach(excludePath => {
-        findCmd += ` | grep -v "${excludePath}"`;
+        findCmd += ` | grep -Fv "${excludePath}"`;
       });
     }
 
