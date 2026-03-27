@@ -1,7 +1,7 @@
 ARG LAMBDA_ADAPTER_IMAGE=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1
 FROM ${LAMBDA_ADAPTER_IMAGE} AS lambda-adapter
 
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 COPY --from=lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
