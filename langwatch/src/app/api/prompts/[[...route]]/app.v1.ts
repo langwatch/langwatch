@@ -13,6 +13,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { prisma } from "~/server/db";
 import { NotFoundError } from "~/server/prompt-config/errors";
+import { LabelValidationError } from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
@@ -138,6 +139,93 @@ app.get(
   },
 );
 
+// Assign label to a prompt version
+const assignLabelResponseSchema = z.object({
+  configId: z.string(),
+  versionId: z.string(),
+  label: z.string(),
+  updatedAt: z.date(),
+});
+
+app.put(
+  "/:id{.+?}/labels/:label",
+  describeRoute({
+    description:
+      'Assign a label (e.g. "production", "staging") to a specific prompt version',
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(assignLabelResponseSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+      422: {
+        description: "Invalid label or version",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ versionId: z.string() })),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id, label } = c.req.param();
+    const { versionId } = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, promptId: id, label, versionId },
+      "Assigning label to prompt version",
+    );
+
+    try {
+      const config = await service.repository.getPromptByIdOrHandle({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
+      if (!config) {
+        throw new HTTPException(404, {
+          message: `Prompt not found: ${id}`,
+        });
+      }
+
+      const result = await service.assignLabel({
+        configId: config.id,
+        versionId,
+        label,
+        projectId: project.id,
+      });
+
+      logger.info(
+        { projectId: project.id, configId: config.id, label, versionId },
+        "Successfully assigned label to prompt version",
+      );
+
+      return c.json(
+        assignLabelResponseSchema.parse({
+          configId: result.configId,
+          versionId: result.versionId,
+          label: result.label,
+          updatedAt: result.updatedAt,
+        }),
+      );
+    } catch (error: unknown) {
+      if (error instanceof LabelValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+  },
+);
+
 // Get prompt by ID
 app.get(
   "/:id{.+}",
@@ -237,7 +325,7 @@ app.post(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const data = c.req.valid("json");
+    const { labels, ...data } = c.req.valid("json");
 
     logger.info(
       {
@@ -245,6 +333,7 @@ app.post(
         scope: data.scope,
         projectId: project.id,
         organizationId: organization.id,
+        labels,
       },
       "Creating new prompt with initial version",
     );
@@ -261,6 +350,22 @@ app.post(
         "Successfully created prompt with initial version",
       );
 
+      if (labels && labels.length > 0) {
+        for (const label of labels) {
+          await service.assignLabel({
+            configId: newConfig.id,
+            versionId: newConfig.versionId,
+            label,
+            projectId: project.id,
+          });
+        }
+
+        logger.info(
+          { promptId: newConfig.id, labels },
+          "Assigned labels to initial version",
+        );
+      }
+
       afterPromptCreated({
         prisma,
         projectId: project.id,
@@ -269,6 +374,11 @@ app.post(
       return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
+      if (error instanceof LabelValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
       handlePossibleConflictError(error, data.scope);
 
       // Re-throw other errors to be handled by the error middleware

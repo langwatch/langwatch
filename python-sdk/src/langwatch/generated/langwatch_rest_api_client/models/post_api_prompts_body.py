@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 
@@ -32,6 +32,7 @@ class PostApiPromptsBody:
         inputs (Union[Unset, list['PostApiPromptsBodyInputsItem']]):
         outputs (Union[Unset, list['PostApiPromptsBodyOutputsItem']]):
         schema_version (Union[Unset, PostApiPromptsBodySchemaVersion]):
+        labels (Union[Unset, list[str]]):
     """
 
     handle: str
@@ -46,6 +47,7 @@ class PostApiPromptsBody:
     inputs: Union[Unset, list["PostApiPromptsBodyInputsItem"]] = UNSET
     outputs: Union[Unset, list["PostApiPromptsBodyOutputsItem"]] = UNSET
     schema_version: Union[Unset, PostApiPromptsBodySchemaVersion] = UNSET
+    labels: Union[Unset, list[str]] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -91,6 +93,10 @@ class PostApiPromptsBody:
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
+        labels: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = self.labels
+
         field_dict: dict[str, Any] = {}
         field_dict.update(
             {
@@ -119,6 +125,8 @@ class PostApiPromptsBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
+        if labels is not UNSET:
+            field_dict["labels"] = labels
 
         return field_dict
 
@@ -178,6 +186,8 @@ class PostApiPromptsBody:
         else:
             schema_version = PostApiPromptsBodySchemaVersion(_schema_version)
 
+        labels = cast(list[str], d.pop("labels", UNSET))
+
         post_api_prompts_body = cls(
             handle=handle,
             scope=scope,
@@ -191,6 +201,7 @@ class PostApiPromptsBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
+            labels=labels,
         )
 
         return post_api_prompts_body

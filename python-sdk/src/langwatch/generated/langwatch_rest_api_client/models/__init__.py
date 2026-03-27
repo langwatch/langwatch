@@ -1268,6 +1268,13 @@ from .put_api_prompts_by_id_body_outputs_item_json_schema import PutApiPromptsBy
 from .put_api_prompts_by_id_body_outputs_item_type import PutApiPromptsByIdBodyOutputsItemType
 from .put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
+from .put_api_prompts_by_id_labels_by_label_body import PutApiPromptsByIdLabelsByLabelBody
+from .put_api_prompts_by_id_labels_by_label_response_200 import PutApiPromptsByIdLabelsByLabelResponse200
+from .put_api_prompts_by_id_labels_by_label_response_400 import PutApiPromptsByIdLabelsByLabelResponse400
+from .put_api_prompts_by_id_labels_by_label_response_401 import PutApiPromptsByIdLabelsByLabelResponse401
+from .put_api_prompts_by_id_labels_by_label_response_404 import PutApiPromptsByIdLabelsByLabelResponse404
+from .put_api_prompts_by_id_labels_by_label_response_422 import PutApiPromptsByIdLabelsByLabelResponse422
+from .put_api_prompts_by_id_labels_by_label_response_500 import PutApiPromptsByIdLabelsByLabelResponse500
 from .put_api_prompts_by_id_response_200 import PutApiPromptsByIdResponse200
 from .put_api_prompts_by_id_response_200_demonstrations import PutApiPromptsByIdResponse200Demonstrations
 from .put_api_prompts_by_id_response_200_demonstrations_inline import PutApiPromptsByIdResponse200DemonstrationsInline
@@ -1943,6 +1950,13 @@ __all__ = (
     "PutApiPromptsByIdBodyOutputsItemType",
     "PutApiPromptsByIdBodySchemaVersion",
     "PutApiPromptsByIdBodyScope",
+    "PutApiPromptsByIdLabelsByLabelBody",
+    "PutApiPromptsByIdLabelsByLabelResponse200",
+    "PutApiPromptsByIdLabelsByLabelResponse400",
+    "PutApiPromptsByIdLabelsByLabelResponse401",
+    "PutApiPromptsByIdLabelsByLabelResponse404",
+    "PutApiPromptsByIdLabelsByLabelResponse422",
+    "PutApiPromptsByIdLabelsByLabelResponse500",
     "PutApiPromptsByIdResponse200",
     "PutApiPromptsByIdResponse200Demonstrations",
     "PutApiPromptsByIdResponse200DemonstrationsInline",

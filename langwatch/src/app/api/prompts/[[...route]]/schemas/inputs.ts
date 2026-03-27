@@ -35,12 +35,15 @@ export const createPromptInputSchema = z.strictObject({
   inputs: z.array(inputsSchema).optional(),
   outputs: z.array(outputsSchema).optional(),
   schemaVersion: schemaVersionSchema.optional(),
+  /** Labels to assign to the initial version (e.g. ["production", "staging"]) */
+  labels: z.array(z.string()).optional(),
 });
 
 export const updatePromptInputSchema = createPromptInputSchema
   .omit({
     scope: true,
     handle: true,
+    labels: true,
   })
   .merge(
     z.strictObject({
