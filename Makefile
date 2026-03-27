@@ -12,30 +12,30 @@ COMPOSE = docker compose -f compose.dev.yml
 
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
-	@cp .githooks/post-checkout .git/hooks/post-checkout 2>/dev/null || true
+	@git config core.hooksPath .githooks 2>/dev/null || true
 
 # Minimal: postgres + redis + app (no opensearch)
-dev: setup-hooks
+dev:
 	$(COMPOSE) up
 
 # + opensearch (for traces/search features)
-dev-search: setup-hooks
+dev-search:
 	$(COMPOSE) --profile search up
 
 # + NLP service + langevals (for evaluations)
-dev-nlp: setup-hooks
+dev-nlp:
 	$(COMPOSE) --profile nlp up
 
 # + scenario worker + bullboard + NLP (no opensearch needed)
-dev-scenarios: setup-hooks
+dev-scenarios:
 	$(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
-dev-test: setup-hooks
+dev-test:
 	$(COMPOSE) --profile test up
 
 # Everything
-dev-full: setup-hooks
+dev-full:
 	$(COMPOSE) --profile full up
 
 # Stop all services
@@ -89,7 +89,7 @@ quickstart:
 # Port info saved to .dev-port for agent/skill discovery.
 
 # Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
-dev-up: setup-hooks
+dev-up:
 	@./scripts/dev-up.sh $(PROFILE)
 
 # Stop isolated instance
