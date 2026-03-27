@@ -164,8 +164,8 @@ describe("internal-set-id utilities", () => {
     });
 
     describe("when scenarioSetId is empty string", () => {
-      it("returns only empty string", () => {
-        expect(expandSetIdFilter("")).toEqual([""]);
+      it("returns both 'default' and empty string for backwards compatibility", () => {
+        expect(expandSetIdFilter("")).toEqual(["default", ""]);
       });
     });
   });

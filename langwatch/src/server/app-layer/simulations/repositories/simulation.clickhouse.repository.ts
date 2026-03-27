@@ -163,18 +163,24 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
     }>(
       `SELECT
-        ScenarioSetId,
+        NormalizedSetId AS ScenarioSetId,
         toString(count(*)) AS ScenarioCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
        FROM (
-         SELECT ${DEDUP_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         SELECT
+           IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
+           UpdatedAt,
+           ArchivedAt
+         FROM (
+           SELECT ${DEDUP_COLUMNS}
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+           ORDER BY ScenarioRunId, UpdatedAt DESC
+           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
        )
        WHERE ArchivedAt IS NULL
-       GROUP BY ScenarioSetId
+       GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId },
     );
@@ -744,32 +750,40 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
     }>(
       `SELECT
-        ScenarioSetId,
+        NormalizedSetId AS ScenarioSetId,
         toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
         toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
         toString(argMax(FailCount, MaxCreatedAtMs)) AS FailCount,
         toString(max(MaxCreatedAtMs)) AS LastRunAt
        FROM (
          SELECT
-           ScenarioSetId,
+           NormalizedSetId,
            BatchRunId,
            count() AS RunCount,
            countIf(Status = 'SUCCESS') AS PassCount,
            countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
            toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
          FROM (
-           SELECT ${DEDUP_COLUMNS}
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND NOT startsWith(ScenarioSetId, '__internal__')
-           ORDER BY ScenarioRunId, UpdatedAt DESC
-           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+           SELECT
+             IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
+             BatchRunId,
+             Status,
+             CreatedAt,
+             ArchivedAt
+           FROM (
+             SELECT ${DEDUP_COLUMNS}
+             FROM ${TABLE_NAME}
+             WHERE TenantId = {tenantId:String}
+               AND NOT startsWith(ScenarioSetId, '__internal__')
+             ORDER BY ScenarioRunId, UpdatedAt DESC
+             LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+           )
          )
          WHERE ArchivedAt IS NULL
-         GROUP BY ScenarioSetId, BatchRunId
+         GROUP BY NormalizedSetId, BatchRunId
          ${havingClause}
        )
-       GROUP BY ScenarioSetId
+       GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId, ...dateFilter.params },
     );

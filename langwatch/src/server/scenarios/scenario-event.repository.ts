@@ -490,13 +490,30 @@ export class ScenarioEventRepository {
 
         span.setAttribute("result.count", setBuckets.length);
 
-        return setBuckets.map((bucket) => {
-          return {
-            scenarioSetId: bucket.key,
-            scenarioCount: bucket.unique_scenario_count.value,
-            lastRunAt: bucket.latest_run_timestamp.value,
-          };
-        });
+        // Normalize "" to "default" and merge counts for backwards-compatibility:
+        // old rows may have scenarioSetId="" while new rows have "default".
+        const mergedMap = new Map<string, { scenarioCount: number; lastRunAt: number }>();
+        for (const bucket of setBuckets) {
+          const key = bucket.key === "" ? "default" : bucket.key;
+          const existing = mergedMap.get(key);
+          if (existing) {
+            mergedMap.set(key, {
+              scenarioCount: existing.scenarioCount + bucket.unique_scenario_count.value,
+              lastRunAt: Math.max(existing.lastRunAt, bucket.latest_run_timestamp.value),
+            });
+          } else {
+            mergedMap.set(key, {
+              scenarioCount: bucket.unique_scenario_count.value,
+              lastRunAt: bucket.latest_run_timestamp.value,
+            });
+          }
+        }
+
+        return Array.from(mergedMap.entries()).map(([scenarioSetId, data]) => ({
+          scenarioSetId,
+          scenarioCount: data.scenarioCount,
+          lastRunAt: data.lastRunAt,
+        }));
       },
     );
   }
