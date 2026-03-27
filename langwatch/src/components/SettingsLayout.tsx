@@ -3,7 +3,6 @@ import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useActivePlan } from "~/hooks/useActivePlan";
-import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PageLayout } from "./ui/layouts/PageLayout";
@@ -18,7 +17,6 @@ export default function SettingsLayout({
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
   const { isEnterprise } = useActivePlan();
-  const { isLiteMember } = useLiteMemberGuard();
 
   return (
     <DashboardLayout compactMenu>
@@ -37,9 +35,7 @@ export default function SettingsLayout({
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
-          {!isLiteMember && (
-            <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
-          )}
+          <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
           <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
           <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
           <MenuLink href="/settings/secrets">Secrets</MenuLink>
@@ -66,11 +62,9 @@ export default function SettingsLayout({
           {isEnterprise && (
             <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
           )}
-          {!isLiteMember && (
-            <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
-          )}
-          {isSaaS && !isLiteMember && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
-          {!isSaaS && !isLiteMember && <MenuLink href="/settings/license">License</MenuLink>}
+          <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
+          {isSaaS && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
+          {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}
         </VStack>
         <Container maxWidth="1280px" padding={4} paddingBottom={16}>
           {children}

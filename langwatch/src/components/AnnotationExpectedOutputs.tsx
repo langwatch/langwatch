@@ -36,6 +36,7 @@ export const AnnotationExpectedOutputs = ({
             <Text fontWeight="500">Suggest output:</Text>
             <Textarea
               width="full"
+              backgroundColor="white"
               value={expectedOutput ?? ""}
               placeholder="Enter your expected output here..."
               onClick={(e) => {
@@ -79,6 +80,7 @@ export const AnnotationExpectedOutputs = ({
                     {commentState.expectedOutputAction === "edit" &&
                     annotationId === annotation.id ? (
                       <Textarea
+                        backgroundColor="white"
                         value={
                           commentState.expectedOutputAction === "edit"
                             ? (expectedOutput ?? "")
