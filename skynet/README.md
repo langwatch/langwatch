@@ -31,7 +31,7 @@ The dashboard will be available at `http://localhost:6380`.
 | `SKYNET_USERNAME` | — | Basic auth username (optional, no auth if unset) |
 | `SKYNET_PASSWORD` | — | Basic auth password (optional, no auth if unset) |
 | `SKYNET_SKIP_AUTH` | — | Set to `1` to disable auth for local development |
-| `BULLBOARD_PORT` | `6380` | Server port |
+| `SKYNET_PORT` | `6380` | Server port |
 
 ## Architecture
 
