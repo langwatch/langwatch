@@ -9,17 +9,16 @@ import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { createTenantId } from "../../../domain/tenantId";
 
 const logger = createLogger(
   "langwatch:trace-processing:evaluation-trigger-reactor",
 );
 
-/** Delay (ms) before the deferred evaluation check fires */
+/** Delay (ms) before the deferred origin resolution fires */
 const DEFERRED_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 
-export type DeferredEvaluationPayload = {
+export type DeferredOriginPayload = {
+  id: string;       // traceId — used as staged job ID for debuggability
   tenantId: string;
   traceId: string;
   occurredAt: number;
@@ -29,8 +28,7 @@ export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
   evaluation: (data: ExecuteEvaluationCommandData, options?: QueueSendOptions<ExecuteEvaluationCommandData>) => Promise<void>;
   resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>;
-  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  scheduleDeferred: (payload: DeferredEvaluationPayload) => Promise<void>;
+  scheduleDeferred: (payload: DeferredOriginPayload) => Promise<void>;
 }
 
 /**
@@ -84,9 +82,10 @@ export function createEvaluationTriggerReactor(
         // LangWatch SDK info — schedule a deferred check.
         logger.debug(
           { tenantId, traceId },
-          "No origin resolved, scheduling deferred evaluation check",
+          "No origin resolved, scheduling deferred origin resolution",
         );
         await deps.scheduleDeferred({
+          id: traceId,
           tenantId,
           traceId,
           occurredAt: event.occurredAt,
@@ -101,66 +100,40 @@ export function createEvaluationTriggerReactor(
 }
 
 /**
- * Creates the deferred evaluation check handler.
+ * Creates the deferred origin resolution handler.
  *
- * This handler is called after a 5-minute delay for traces that had no origin
- * and no SDK info at normal debounce time. It re-reads the fold state from
- * the projection store (not the captured state) to see if an origin was set
- * in the meantime.
+ * Fires after a 5-minute delay for pure OTEL traces that had no origin
+ * at normal debounce time. Unconditionally dispatches a resolveOrigin
+ * command with origin="application" — the command's idempotency key
+ * and the fold projection's no-override guard handle duplicates.
+ *
+ * The resulting OriginResolvedEvent flows through:
+ *   fold (sets origin if absent) → evaluationTrigger reactor → dispatchEvaluations()
  */
-export function createDeferredEvaluationHandler(deps: EvaluationTriggerReactorDeps) {
-  return async (payload: DeferredEvaluationPayload): Promise<void> => {
-    const { tenantId, traceId, occurredAt } = payload;
-
-    // Re-read fold state from the projection store (fresh, not captured)
-    const foldState = await deps.traceSummaryStore.get(traceId, { tenantId: createTenantId(tenantId), aggregateId: traceId });
-    if (!foldState) {
-      logger.debug(
-        { tenantId, traceId },
-        "Deferred check: fold state not found, skipping",
-      );
-      return;
-    }
-
-    const attrs = foldState.attributes ?? {};
-    const origin = attrs["langwatch.origin"];
-
-    // If origin is still empty after 5 min, persist "application" via event sourcing.
-    if (!origin) {
-      await deps.resolveOrigin({
-        tenantId,
-        traceId,
-        origin: "application",
-        reason: "deferred_fallback",
-        occurredAt,
-      });
-
-      // Update local copy so dispatchEvaluations sees the origin
-      attrs["langwatch.origin"] = "application";
-      foldState.attributes = attrs;
-
-      logger.debug(
-        { tenantId, traceId },
-        "Deferred check: no origin after 5 min, dispatched resolveOrigin command",
-      );
-    } else {
-      logger.debug(
-        { tenantId, traceId, origin },
-        "Deferred check: origin now set, dispatching with it",
-      );
-    }
-
-    // Dispatch — precondition matchers handle filtering by origin
-    await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt });
+export function createDeferredOriginHandler(
+  resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>,
+) {
+  return async (payload: DeferredOriginPayload): Promise<void> => {
+    logger.debug(
+      { tenantId: payload.tenantId, traceId: payload.traceId },
+      "Deferred origin resolution: dispatching resolveOrigin command",
+    );
+    await resolveOrigin({
+      tenantId: payload.tenantId,
+      traceId: payload.traceId,
+      origin: "application",
+      reason: "deferred_fallback",
+      occurredAt: payload.occurredAt,
+    });
   };
 }
 
-/** Dedup key for deferred evaluation checks */
-export function makeDeferredJobId(payload: DeferredEvaluationPayload): string {
-  return `deferred-eval-trigger:${payload.tenantId}:${payload.traceId}`;
+/** Dedup key for deferred origin resolution jobs */
+export function makeDeferredJobId(payload: DeferredOriginPayload): string {
+  return `deferred-origin:${payload.tenantId}:${payload.traceId}`;
 }
 
-/** Delay for deferred evaluation checks */
+/** Delay for deferred origin resolution */
 export { DEFERRED_CHECK_DELAY_MS };
 
 // ---------------------------------------------------------------------------
@@ -246,7 +219,16 @@ async function dispatchEvaluations({
                 ttlMs: monitor.threadIdleTimeout! * 1000,
               },
             }
-          : undefined;
+          : {
+              deduplication: {
+                makeId: makeJobId,
+                // 6 min — outlasts the 5-min deferred origin resolution window
+                // so that if the reactor fires twice (once from a late span,
+                // once from the deferred OriginResolvedEvent), the second
+                // dispatch is squashed by the dedup key.
+                ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
+              },
+            };
 
       await deps.evaluation(payload, sendOptions);
     } catch (error) {
