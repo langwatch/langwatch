@@ -213,8 +213,9 @@ export const NewWorkflowModal = ({
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                borderStyle={isDragging ? "dashed" : undefined}
-                borderColor={isDragging ? "blue.500" : undefined}
+                {...(isDragging
+                  ? { borderStyle: "dashed", borderColor: "blue.500" }
+                  : {})}
               >
                 <input
                   ref={fileInputRef}
