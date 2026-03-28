@@ -15,8 +15,8 @@ import { makeExperimentRunKey } from "./utils/compositeKey";
  */
 
 export const StartExperimentRunCommand = defineCommand({
-  commandType: "lw.experiment_run.start" as const,
-  eventType: "lw.experiment_run.started" as const,
+  commandType: "lw.experiment_run.start",
+  eventType: "lw.experiment_run.started",
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: experimentRunStartedEventDataSchema,
@@ -31,8 +31,8 @@ export const StartExperimentRunCommand = defineCommand({
 });
 
 export const RecordTargetResultCommand = defineCommand({
-  commandType: "lw.experiment_run.record_target_result" as const,
-  eventType: "lw.experiment_run.target_result" as const,
+  commandType: "lw.experiment_run.record_target_result",
+  eventType: "lw.experiment_run.target_result",
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: targetResultEventDataSchema,
@@ -48,8 +48,8 @@ export const RecordTargetResultCommand = defineCommand({
 });
 
 export const RecordEvaluatorResultCommand = defineCommand({
-  commandType: "lw.experiment_run.record_evaluator_result" as const,
-  eventType: "lw.experiment_run.evaluator_result" as const,
+  commandType: "lw.experiment_run.record_evaluator_result",
+  eventType: "lw.experiment_run.evaluator_result",
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: evaluatorResultEventDataSchema,
@@ -65,8 +65,8 @@ export const RecordEvaluatorResultCommand = defineCommand({
 });
 
 export const CompleteExperimentRunCommand = defineCommand({
-  commandType: "lw.experiment_run.complete" as const,
-  eventType: "lw.experiment_run.completed" as const,
+  commandType: "lw.experiment_run.complete",
+  eventType: "lw.experiment_run.completed",
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: experimentRunCompletedEventDataSchema,

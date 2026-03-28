@@ -2,7 +2,7 @@ import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
-import type { EvaluationCostRecorder } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 
 import type { TraceSummaryData } from "../app-layer/traces/types";

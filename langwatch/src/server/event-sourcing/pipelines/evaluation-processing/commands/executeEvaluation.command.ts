@@ -8,6 +8,7 @@ import {
 import { extractErrorMessage } from "../../../../../utils/captureError";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
+import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
 import {
@@ -35,22 +36,6 @@ import type {
 const logger = createLogger(
   "langwatch:evaluation-processing:execute-evaluation",
 );
-
-/**
- * Interface for recording evaluation costs.
- * Extracted from the command to remove the direct Prisma dependency.
- */
-export interface EvaluationCostRecorder {
-  recordCost(params: {
-    projectId: string;
-    isGuardrail: boolean;
-    evaluatorName: string;
-    evaluatorId: string;
-    traceId: string;
-    amount: number;
-    currency: string;
-  }): Promise<string>;
-}
 
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
@@ -320,5 +305,3 @@ function emitReported(
   return [event];
 }
 
-/** Re-export makeJobId for backward compatibility with existing tests. */
-export const makeJobId = ExecuteEvaluationCommand.makeJobId;
