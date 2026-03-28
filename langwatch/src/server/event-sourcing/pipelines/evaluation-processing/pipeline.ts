@@ -7,18 +7,13 @@ import {
   CompleteEvaluationCommand,
   ReportEvaluationCommand,
 } from "./commands";
+import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
-  ExecuteEvaluationCommand: {
-    new (): any;
-    readonly schema: any;
-    getAggregateId(payload: any): string;
-    getSpanAttributes?(payload: any): Record<string, string | number | boolean>;
-    makeJobId(payload: any): string;
-  };
+  executeEvaluationCommand: ExecuteEvaluationCommand;
   esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
   customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
 }
@@ -53,10 +48,10 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
   }
 
   return builder
-    .withCommand("executeEvaluation", deps.ExecuteEvaluationCommand, {
+    .withCommandInstance("executeEvaluation", ExecuteEvaluationCommand, deps.executeEvaluationCommand, {
       delay: 30_000,
       deduplication: {
-        makeId: deps.ExecuteEvaluationCommand.makeJobId,
+        makeId: ExecuteEvaluationCommand.makeJobId,
         ttlMs: 30_000,
       },
     })

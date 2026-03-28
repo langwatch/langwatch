@@ -1,11 +1,9 @@
-import type { PrismaClient } from "@prisma/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { prepareLitellmParams } from "~/server/api/routers/modelProviders.utils";
-import { getProjectEmbeddingsModel } from "~/server/embeddings";
-import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
+import type { EvaluationCostRecorder } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import type { OrganizationService } from "../app-layer/organizations/organization.service";
 
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -14,11 +12,9 @@ import type { EvaluationExecutionService } from "../app-layer/evaluations/evalua
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
-import { LogRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/log-record-storage.clickhouse.repository";
-import { NullLogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
-import { MetricRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/metric-record-storage.clickhouse.repository";
-import { NullMetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
-import { TraceSummaryClickHouseRepository } from "../app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
+import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 
@@ -32,43 +28,34 @@ import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-pro
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
-  createComputeRunMetricsCommandClass,
+  ComputeRunMetricsCommand,
   COMPUTE_METRICS_RETRY_DELAY_MS,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "./pipelines/simulation-processing/repositories";
+import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
-import {
-  SuiteRunStateRepositoryClickHouse,
-  SuiteRunStateRepositoryMemory,
-} from "./pipelines/suite-run-processing/repositories";
+import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
-import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
+import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
-import { createExecuteEvaluationCommandClass } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
-import {
-  ExperimentRunStateRepositoryClickHouse,
-  ExperimentRunStateRepositoryMemory,
-} from "./pipelines/experiment-run-processing/repositories";
+import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
@@ -84,15 +71,31 @@ import {
 } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
+import type { AppendStore } from "./projections/mapProjection.types";
+import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
+/**
+ * Pre-constructed repositories, resolved at the composition root (presets.ts).
+ * The registry consumes these directly — no ClickHouse client resolution here.
+ */
+export interface PipelineRepositories {
+  suiteRunState: SuiteRunStateRepository;
+  /** Primary replica for read-after-write consistency. */
+  simulationRunState: SimulationRunStateRepository;
+  /** Primary replica for read-after-write consistency. */
+  experimentRunState: ExperimentRunStateRepository;
+  /** Primary replica for read-after-write consistency. */
+  traceSummaryFold: TraceSummaryRepository;
+  logRecordStorage: LogRecordStorageRepository;
+  metricRecordStorage: MetricRecordStorageRepository;
+  experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+}
+
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
-  prisma: PrismaClient;
-  resolveClickHouseClient: ClickHouseClientResolver | null;
-  /** Primary replica client for fold stores (read-after-write consistency). Falls back to resolveClickHouseClient. */
-  resolvePrimaryReplicaClickHouseClient?: ClickHouseClientResolver | null;
+  repositories: PipelineRepositories;
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
@@ -104,7 +107,10 @@ export interface PipelineRegistryDeps {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
   };
+  organizations: OrganizationService;
   esSync: EvaluationEsSyncReactorDeps;
+  costRecorder: EvaluationCostRecorder;
+  billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
 }
 
@@ -113,7 +119,7 @@ export interface PipelineRegistryDeps {
  *
  * Creates store adapters, builds reactors and command classes, then registers
  * all pipelines with the EventSourcing runtime. Pipelines receive only
- * store interfaces and pre-built artifacts — never raw deps like prisma.
+ * store interfaces and pre-built artifacts — never raw deps like prisma or ClickHouse clients.
  */
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
@@ -146,11 +152,12 @@ export class PipelineRegistry {
   }
 
   private registerEvaluationPipeline() {
-    const ExecuteEvaluationCommand = createExecuteEvaluationCommandClass({
-      prisma: this.deps.prisma,
+    const executeEvaluationCommand = new ExecuteEvaluationCommand({
+      monitors: this.deps.monitors,
       spanStorage: this.deps.traces.spans,
       traceEvents: this.deps.traces.spans,
       evaluationExecution: this.deps.evaluations.execution,
+      costRecorder: this.deps.costRecorder,
     });
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
@@ -160,7 +167,7 @@ export class PipelineRegistry {
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
-        ExecuteEvaluationCommand,
+        executeEvaluationCommand,
         esSyncReactor,
       }),
     );
@@ -171,14 +178,7 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    // Use primary replica for the fold store to avoid replication lag.
-    // The shared TraceSummaryService.repository goes through the NLB
-    // (random replica), which causes stale reads during fold processing.
-    const foldClientResolver = this.deps.resolvePrimaryReplicaClickHouseClient ?? this.deps.resolveClickHouseClient;
-    const traceSummaryFoldRepo = foldClientResolver
-      ? new TraceSummaryClickHouseRepository(foldClientResolver)
-      : this.deps.traces.summary.repository;
-    const traceSummaryStore = new TraceSummaryStore(traceSummaryFoldRepo);
+    const traceSummaryStore = new TraceSummaryStore(this.deps.repositories.traceSummaryFold);
 
     // Late-bound reference to the trace pipeline's resolveOrigin command.
     // The reactor deps closure captures this; the actual dispatcher is set
@@ -242,24 +242,11 @@ export class PipelineRegistry {
       },
     });
 
-    if (!this.deps.resolveClickHouseClient) {
-      logger.warn(
-        "ClickHouse client resolver not provided, log and metric record writes will be no-ops using NullRepository implementations",
-      );
-    }
-
-    const logRecordRepo = this.deps.resolveClickHouseClient
-      ? new LogRecordStorageClickHouseRepository(this.deps.resolveClickHouseClient)
-      : new NullLogRecordStorageRepository();
-    const metricRecordRepo = this.deps.resolveClickHouseClient
-      ? new MetricRecordStorageClickHouseRepository(this.deps.resolveClickHouseClient)
-      : new NullMetricRecordStorageRepository();
-
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
-        logRecordAppendStore: new LogRecordAppendStore(logRecordRepo),
-        metricRecordAppendStore: new MetricRecordAppendStore(metricRecordRepo),
+        logRecordAppendStore: new LogRecordAppendStore(this.deps.repositories.logRecordStorage),
+        metricRecordAppendStore: new MetricRecordAppendStore(this.deps.repositories.metricRecordStorage),
         traceSummaryStore,
         evaluationTriggerReactor,
         customEvaluationSyncReactor,
@@ -335,14 +322,10 @@ export class PipelineRegistry {
   }
 
   private registerSuiteRunPipeline() {
-    const repository = this.deps.resolveClickHouseClient
-      ? new SuiteRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
-      : new SuiteRunStateRepositoryMemory();
-
     return this.deps.eventSourcing.register(
       createSuiteRunProcessingPipeline({
         suiteRunStateFoldStore: new RepositoryFoldStore<SuiteRunStateData>(
-          repository,
+          this.deps.repositories.suiteRunState,
           SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
         ),
       }),
@@ -354,12 +337,8 @@ export class PipelineRegistry {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
   }) {
-    const foldClientResolver = this.deps.resolvePrimaryReplicaClickHouseClient ?? this.deps.resolveClickHouseClient;
-    const repository = foldClientResolver
-      ? new SimulationRunStateRepositoryClickHouse(foldClientResolver)
-      : new SimulationRunStateRepositoryMemory();
     const simulationRunStore = new RepositoryFoldStore<SimulationRunStateData>(
-      repository,
+      this.deps.repositories.simulationRunState,
       SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
     );
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
@@ -381,7 +360,7 @@ export class PipelineRegistry {
     // Late-bound: deferred retry dispatcher
     let scheduleRetryDispatcher: ((payload: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
 
-    const ComputeRunMetricsCommand = createComputeRunMetricsCommandClass({
+    const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
       scheduleRetry: async (payload) => {
         if (!scheduleRetryDispatcher) {
@@ -408,7 +387,7 @@ export class PipelineRegistry {
         snapshotUpdateBroadcastReactor,
         suiteRunSyncReactor,
         traceMetricsSyncReactor,
-        ComputeRunMetricsCommand,
+        computeRunMetricsCommand,
       }),
     );
 
@@ -469,8 +448,9 @@ export class PipelineRegistry {
   }
 
   private registerBillingReportingPipeline() {
-    const ReportUsageForMonthCommand = createReportUsageForMonthCommandClass({
-      prisma: this.deps.prisma,
+    const reportUsageForMonthCommand = new ReportUsageForMonthCommand({
+      organizations: this.deps.organizations,
+      billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
       queryBillableEventsTotal,
       selfDispatch: (data) => {
@@ -483,24 +463,17 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createBillingReportingPipeline({
-        ReportUsageForMonthCommand,
+        reportUsageForMonthCommand,
       }),
     );
   }
 
   private registerExperimentRunPipeline() {
-    const foldClientResolver = this.deps.resolvePrimaryReplicaClickHouseClient ?? this.deps.resolveClickHouseClient;
-    const repository = foldClientResolver
-      ? new ExperimentRunStateRepositoryClickHouse(foldClientResolver)
-      : new ExperimentRunStateRepositoryMemory();
-
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore:
-          createExperimentRunStateFoldStore(repository),
-        experimentRunItemAppendStore: createExperimentRunItemAppendStore(
-          this.deps.resolveClickHouseClient,
-        ),
+          createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+        experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,
           repository: createElasticsearchBatchEvaluationRepository(),

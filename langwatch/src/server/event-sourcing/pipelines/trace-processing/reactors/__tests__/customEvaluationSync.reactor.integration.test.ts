@@ -22,16 +22,18 @@ import { EventRepositoryClickHouse } from "../../../../stores/repositories/event
 import { mapCommands } from "../../../../mapCommands";
 import { RecordSpanCommand } from "../../commands/recordSpanCommand";
 import { AssignTopicCommand } from "../../commands/assignTopicCommand";
-import { createSpanStorageMapProjection } from "../../projections/spanStorage.mapProjection";
+import { SpanStorageMapProjection } from "../../projections/spanStorage.mapProjection";
 import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import { SpanAppendStore } from "../../projections/spanStorage.store";
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "../customEvaluationSync.reactor";
-import { StartEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/startEvaluation.command";
-import { CompleteEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/completeEvaluation.command";
-import { ReportEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/reportEvaluation.command";
+import {
+  StartEvaluationCommand,
+  CompleteEvaluationCommand,
+  ReportEvaluationCommand,
+} from "../../../../pipelines/evaluation-processing/commands";
 import { EvaluationRunFoldProjection } from "../../../../pipelines/evaluation-processing/projections";
 import { EvaluationRunStore } from "../../../../pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationProcessingEvent } from "../../../../pipelines/evaluation-processing/schemas/events";
@@ -198,7 +200,7 @@ describe.skipIf(!hasTestcontainers)(
         )
         .withMapProjection(
           "spanStorage",
-          createSpanStorageMapProjection({
+          new SpanStorageMapProjection({
             store: spanAppendStore,
           }) as any,
         )

@@ -3,7 +3,7 @@ export type {
   ExperimentRunStateData,
 } from "./experimentRunState.foldProjection";
 export { ExperimentRunStateFoldProjection } from "./experimentRunState.foldProjection";
-export { createExperimentRunResultStorageMapProjection } from "./experimentRunResultStorage.mapProjection";
+export { ExperimentRunResultStorageMapProjection } from "./experimentRunResultStorage.mapProjection";
 export type { ClickHouseExperimentRunResultRecord } from "./experimentRunResultStorage.mapProjection";
 export { createExperimentRunStateFoldStore } from "./experimentRunState.store";
 export { createExperimentRunItemAppendStore } from "./experimentRunResultStorage.store";

@@ -20,6 +20,7 @@ describe("OrganizationService", () => {
     getPricingModel: vi.fn(),
     getStripeCustomerId: vi.fn(),
     findNameById: vi.fn(),
+    getOrganizationForBilling: vi.fn(),
   };
 
   let service: OrganizationService;

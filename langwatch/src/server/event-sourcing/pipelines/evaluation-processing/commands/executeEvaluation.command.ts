@@ -1,6 +1,4 @@
 import { generate } from "@langwatch/ksuid";
-import type { PrismaClient } from "@prisma/client";
-import { CostReferenceType, CostType } from "@prisma/client";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,
@@ -11,6 +9,7 @@ import { extractErrorMessage } from "../../../../../utils/captureError";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
+import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
 import {
   evaluatePreconditions,
   buildPreconditionTraceDataFromCommand,
@@ -37,11 +36,28 @@ const logger = createLogger(
   "langwatch:evaluation-processing:execute-evaluation",
 );
 
+/**
+ * Interface for recording evaluation costs.
+ * Extracted from the command to remove the direct Prisma dependency.
+ */
+export interface EvaluationCostRecorder {
+  recordCost(params: {
+    projectId: string;
+    isGuardrail: boolean;
+    evaluatorName: string;
+    evaluatorId: string;
+    traceId: string;
+    amount: number;
+    currency: string;
+  }): Promise<string>;
+}
+
 export interface ExecuteEvaluationCommandDeps {
-  prisma: PrismaClient;
+  monitors: MonitorService;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
+  costRecorder: EvaluationCostRecorder;
 }
 
 const SCHEMA = defineCommandSchema(
@@ -50,222 +66,213 @@ const SCHEMA = defineCommandSchema(
   "Command to execute a single evaluation",
 );
 
-function getAggregateId(payload: ExecuteEvaluationCommandData): string {
-  return payload.evaluationId;
-}
-
-function getSpanAttributes(
-  payload: ExecuteEvaluationCommandData,
-): Record<string, string | number | boolean> {
-  return {
-    "payload.evaluation.id": payload.evaluationId,
-    "payload.evaluator.id": payload.evaluatorId,
-    "payload.evaluator.type": payload.evaluatorType,
-    "payload.trace.id": payload.traceId,
-  };
-}
-
-export function makeJobId(payload: ExecuteEvaluationCommandData): string {
-  if (
-    payload.threadIdleTimeout &&
-    payload.threadIdleTimeout > 0 &&
-    payload.threadId
-  ) {
-    return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
-  }
-  return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
-}
-
 /**
- * Factory that returns a CommandHandlerClass for executing evaluations.
- *
- * The returned class closes over deps so the framework can instantiate it
- * with `new ()` (zero-arg constructor) as required by `withCommand`.
+ * Command handler for executing evaluations.
  *
  * Sampling + preconditions + execution -> emits a single EvaluationReportedEvent.
  * Results are persisted to CH via the evaluationRun fold projection.
  * Deduped by traceId + evaluatorId (makeJobId), delayed 30s.
+ *
+ * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
-export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationCommandDeps) {
-  return class ExecuteEvaluationCommand implements CommandHandler<
-    Command<ExecuteEvaluationCommandData>,
-    EvaluationProcessingEvent
-  > {
-    static readonly schema = SCHEMA;
-    static readonly getAggregateId = getAggregateId;
-    static readonly getSpanAttributes = getSpanAttributes;
-    static readonly makeJobId = makeJobId;
+export class ExecuteEvaluationCommand implements CommandHandler<
+  Command<ExecuteEvaluationCommandData>,
+  EvaluationProcessingEvent
+> {
+  static readonly schema = SCHEMA;
 
-    async handle(
-      command: Command<ExecuteEvaluationCommandData>,
-    ): Promise<EvaluationProcessingEvent[]> {
-      const { tenantId, data } = command;
+  constructor(private readonly deps: ExecuteEvaluationCommandDeps) {}
 
+  static getAggregateId(payload: ExecuteEvaluationCommandData): string {
+    return payload.evaluationId;
+  }
+
+  static getSpanAttributes(
+    payload: ExecuteEvaluationCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.evaluation.id": payload.evaluationId,
+      "payload.evaluator.id": payload.evaluatorId,
+      "payload.evaluator.type": payload.evaluatorType,
+      "payload.trace.id": payload.traceId,
+    };
+  }
+
+  static makeJobId(payload: ExecuteEvaluationCommandData): string {
+    if (
+      payload.threadIdleTimeout &&
+      payload.threadIdleTimeout > 0 &&
+      payload.threadId
+    ) {
+      return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
+    }
+    return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
+  }
+
+  async handle(
+    command: Command<ExecuteEvaluationCommandData>,
+  ): Promise<EvaluationProcessingEvent[]> {
+    const { tenantId, data } = command;
+
+    logger.debug(
+      {
+        tenantId: tenantId,
+        evaluationId: data.evaluationId,
+        evaluatorId: data.evaluatorId,
+        traceId: data.traceId,
+      },
+      "Handling execute evaluation command",
+    );
+
+    // 1. Fetch monitor via service
+    const monitor = await this.deps.monitors.getMonitorById({
+      projectId: tenantId,
+      monitorId: data.evaluatorId,
+    });
+    if (!monitor) {
+      logger.warn(
+        { tenantId: tenantId, evaluatorId: data.evaluatorId },
+        "Monitor not found — skipping evaluation",
+      );
+      return emitReported(data, tenantId, {
+        status: "skipped",
+        details: "Monitor not found",
+      });
+    }
+
+    // 2. Sampling
+    if (Math.random() > monitor.sample) {
       logger.debug(
+        {
+          tenantId: tenantId,
+          evaluatorId: data.evaluatorId,
+          sample: monitor.sample,
+        },
+        "Evaluation excluded by sampling",
+      );
+      return [];
+    }
+
+    // 3. Read spans from CH, check evaluator required fields + preconditions
+    const spans = await this.deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
+
+    // Check evaluator required fields first
+    const requiredFieldsMet = checkEvaluatorRequiredFields({
+      evaluatorType: monitor.checkType,
+      spans,
+    });
+    if (!requiredFieldsMet) {
+      logger.debug(
+        {
+          tenantId: tenantId,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+        },
+        "Evaluator required fields not met — skipping evaluation",
+      );
+      return [];
+    }
+
+    // Then check user-configured preconditions
+    const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
+
+    // Fetch events on demand if any preconditions reference event fields
+    let events: PreconditionTraceData["events"] = null;
+    if (preconditionsNeedEvents(preconditions)) {
+      const traceEvents = await this.deps.traceEvents.getEventsByTraceId({
+        tenantId,
+        traceId: data.traceId,
+      });
+      events = traceEvents.map((e) => ({
+        event_type: e.event_type,
+        metrics: e.metrics ?? [],
+        event_details: e.event_details ?? [],
+      }));
+    }
+
+    const traceData = buildPreconditionTraceDataFromCommand({ data, spans, events });
+    const preconditionsMet = evaluatePreconditions({
+      traceData,
+      preconditions,
+    });
+
+    if (!preconditionsMet) {
+      logger.debug(
+        {
+          tenantId: tenantId,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+        },
+        "Preconditions not met — skipping evaluation",
+      );
+      return []; // No events — preconditions didn't match
+    }
+
+    // 4. Run evaluation via app-layer service
+    const settings = monitor.evaluator?.config
+      ? ((monitor.evaluator.config as Record<string, any>).settings ??
+        monitor.parameters)
+      : monitor.parameters;
+
+    const workflowId =
+      monitor.evaluator?.type === "workflow"
+        ? monitor.evaluator.workflowId
+        : undefined;
+
+    try {
+      const result = await this.deps.evaluationExecution.executeForTrace({
+        projectId: tenantId,
+        traceId: data.traceId,
+        evaluatorType: data.evaluatorType,
+        settings: settings as Record<string, any>,
+        mappings: monitor.mappings as MappingState | null,
+        level: monitor.level as "trace" | "thread",
+        workflowId,
+      });
+
+      // 5. Record cost via service
+      let costId: string | null = null;
+      if (result.status === "processed" && result.cost) {
+        costId = await this.deps.costRecorder.recordCost({
+          projectId: tenantId,
+          isGuardrail: !!data.isGuardrail,
+          evaluatorName: data.evaluatorName ?? data.evaluatorType,
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+          amount: result.cost.amount,
+          currency: result.cost.currency,
+        });
+      }
+
+      // 6. Emit single reported event — fold projection persists to CH
+      return emitReported(data, tenantId, {
+        status: result.status,
+        score: result.score,
+        passed: result.passed,
+        label: result.label,
+        details: result.details,
+        inputs: result.inputs ?? null,
+        costId,
+      });
+    } catch (error) {
+      logger.error(
         {
           tenantId: tenantId,
           evaluationId: data.evaluationId,
           evaluatorId: data.evaluatorId,
           traceId: data.traceId,
+          error: error instanceof Error ? error.message : String(error),
         },
-        "Handling execute evaluation command",
+        "Evaluation execution failed",
       );
 
-      // 1. Fetch monitor from Prisma
-      const monitor = await deps.prisma.monitor.findUnique({
-        where: { id: data.evaluatorId, projectId: tenantId },
-        include: { evaluator: true },
+      return emitReported(data, tenantId, {
+        status: "error",
+        error: extractErrorMessage(error),
+        errorDetails: error instanceof Error ? error.stack ?? null : null,
       });
-      if (!monitor) {
-        logger.warn(
-          { tenantId: tenantId, evaluatorId: data.evaluatorId },
-          "Monitor not found — skipping evaluation",
-        );
-        return emitReported(data, tenantId, {
-          status: "skipped",
-          details: "Monitor not found",
-        });
-      }
-
-      // 2. Sampling
-      if (Math.random() > monitor.sample) {
-        logger.debug(
-          {
-            tenantId: tenantId,
-            evaluatorId: data.evaluatorId,
-            sample: monitor.sample,
-          },
-          "Evaluation excluded by sampling",
-        );
-        return [];
-      }
-
-      // 3. Read spans from CH, check evaluator required fields + preconditions
-      const spans = await deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
-
-      // Check evaluator required fields first
-      const requiredFieldsMet = checkEvaluatorRequiredFields({
-        evaluatorType: monitor.checkType,
-        spans,
-      });
-      if (!requiredFieldsMet) {
-        logger.debug(
-          {
-            tenantId: tenantId,
-            evaluatorId: data.evaluatorId,
-            traceId: data.traceId,
-          },
-          "Evaluator required fields not met — skipping evaluation",
-        );
-        return [];
-      }
-
-      // Then check user-configured preconditions
-      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
-
-      // Fetch events on demand if any preconditions reference event fields
-      let events: PreconditionTraceData["events"] = null;
-      if (preconditionsNeedEvents(preconditions)) {
-        const traceEvents = await deps.traceEvents.getEventsByTraceId({
-          tenantId,
-          traceId: data.traceId,
-        });
-        events = traceEvents.map((e) => ({
-          event_type: e.event_type,
-          metrics: e.metrics ?? [],
-          event_details: e.event_details ?? [],
-        }));
-      }
-
-      const traceData = buildPreconditionTraceDataFromCommand({ data, spans, events });
-      const preconditionsMet = evaluatePreconditions({
-        traceData,
-        preconditions,
-      });
-
-      if (!preconditionsMet) {
-        logger.debug(
-          {
-            tenantId: tenantId,
-            evaluatorId: data.evaluatorId,
-            traceId: data.traceId,
-          },
-          "Preconditions not met — skipping evaluation",
-        );
-        return []; // No events — preconditions didn't match
-      }
-
-      // 4. Run evaluation via app-layer service
-      const settings = monitor.evaluator?.config
-        ? ((monitor.evaluator.config as Record<string, any>).settings ??
-          monitor.parameters)
-        : monitor.parameters;
-
-      const workflowId =
-        monitor.evaluator?.type === "workflow"
-          ? monitor.evaluator.workflowId
-          : undefined;
-
-      try {
-        const result = await deps.evaluationExecution.executeForTrace({
-          projectId: tenantId,
-          traceId: data.traceId,
-          evaluatorType: data.evaluatorType,
-          settings: settings as Record<string, any>,
-          mappings: monitor.mappings as MappingState | null,
-          level: monitor.level as "trace" | "thread",
-          workflowId,
-        });
-
-        // 5. Create cost row
-        let costId: string | null = null;
-        if (result.status === "processed" && result.cost) {
-          costId = generate(KSUID_RESOURCES.COST).toString();
-          await deps.prisma.cost.create({
-            data: {
-              id: costId,
-              projectId: tenantId,
-              costType: data.isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
-              costName: data.evaluatorName ?? data.evaluatorType,
-              referenceType: CostReferenceType.CHECK,
-              referenceId: data.evaluatorId,
-              amount: result.cost.amount,
-              currency: result.cost.currency,
-              extraInfo: { trace_id: data.traceId },
-            },
-          });
-        }
-
-        // 6. Emit single reported event — fold projection persists to CH
-        return emitReported(data, tenantId, {
-          status: result.status,
-          score: result.score,
-          passed: result.passed,
-          label: result.label,
-          details: result.details,
-          inputs: result.inputs ?? null,
-          costId,
-        });
-      } catch (error) {
-        logger.error(
-          {
-            tenantId: tenantId,
-            evaluationId: data.evaluationId,
-            evaluatorId: data.evaluatorId,
-            traceId: data.traceId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Evaluation execution failed",
-        );
-
-        return emitReported(data, tenantId, {
-          status: "error",
-          error: extractErrorMessage(error),
-          errorDetails: error instanceof Error ? error.stack ?? null : null,
-        });
-      }
     }
-  };
+  }
 }
 
 function emitReported(
@@ -312,3 +319,6 @@ function emitReported(
 
   return [event];
 }
+
+/** Re-export makeJobId for backward compatibility with existing tests. */
+export const makeJobId = ExecuteEvaluationCommand.makeJobId;

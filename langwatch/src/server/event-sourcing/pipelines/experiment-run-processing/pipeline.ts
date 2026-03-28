@@ -8,7 +8,7 @@ import {
   RecordEvaluatorResultCommand,
   CompleteExperimentRunCommand,
 } from "./commands";
-import { createExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
+import { ExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
 import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
@@ -46,7 +46,7 @@ export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcess
     .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
       store: deps.experimentRunStateFoldStore,
     }))
-    .withMapProjection("experimentRunResultStorage", createExperimentRunResultStorageMapProjection({
+    .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
       store: deps.experimentRunItemAppendStore,
     }));
 

@@ -33,7 +33,7 @@ import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
 import { AssignTopicCommand } from "../trace-processing/commands/assignTopicCommand";
-import { createSpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
+import { SpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
 import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
@@ -148,7 +148,7 @@ describe.skipIf(!hasTestcontainers)(
         )
         .withMapProjection(
           "spanStorage",
-          createSpanStorageMapProjection({ store: spanAppendStore }) as any,
+          new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
         .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
         .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
