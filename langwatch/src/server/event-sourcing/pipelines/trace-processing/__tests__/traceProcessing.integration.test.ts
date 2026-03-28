@@ -20,7 +20,7 @@ import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
-import { createSpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
+import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
@@ -127,7 +127,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     .withName(pipelineName)
     .withAggregateType("trace" as AggregateType)
     .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
-    .withMapProjection("spanStorage", createSpanStorageMapProjection({ store: spanAppendStore }) as any)
+    .withMapProjection("spanStorage", new SpanStorageMapProjection({ store: spanAppendStore }) as any)
     .withCommand("recordSpan", RecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)
     .build();

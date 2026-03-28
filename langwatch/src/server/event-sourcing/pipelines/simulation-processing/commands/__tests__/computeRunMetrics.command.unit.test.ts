@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createComputeRunMetricsCommandClass } from "../computeRunMetrics.command";
+import { ComputeRunMetricsCommand } from "../computeRunMetrics.command";
 import type { ComputeRunMetricsDeps } from "../computeRunMetrics.command";
 import type { ComputeRunMetricsCommandData } from "../../schemas/commands";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -69,7 +69,7 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
   };
 }
 
-describe("computeRunMetrics command", () => {
+describe("ComputeRunMetricsCommand", () => {
   describe("when trace summary exists but has no metrics yet", () => {
     it("schedules a deferred retry instead of silently returning", async () => {
       const deps = makeDeps({
@@ -85,8 +85,7 @@ describe("computeRunMetrics command", () => {
         },
       });
 
-      const CommandClass = createComputeRunMetricsCommandClass(deps);
-      const handler = new CommandClass();
+      const handler = new ComputeRunMetricsCommand(deps);
       const cmd = makeCommand({ retryCount: 0 });
 
       const events = await handler.handle(cmd as any);
@@ -111,8 +110,7 @@ describe("computeRunMetrics command", () => {
         },
       });
 
-      const CommandClass = createComputeRunMetricsCommandClass(deps);
-      const handler = new CommandClass();
+      const handler = new ComputeRunMetricsCommand(deps);
       const cmd = makeCommand({ retryCount: 3 });
 
       const events = await handler.handle(cmd as any);
@@ -137,8 +135,7 @@ describe("computeRunMetrics command", () => {
         },
       });
 
-      const CommandClass = createComputeRunMetricsCommandClass(deps);
-      const handler = new CommandClass();
+      const handler = new ComputeRunMetricsCommand(deps);
       const cmd = makeCommand();
 
       const events = await handler.handle(cmd as any);
@@ -158,8 +155,7 @@ describe("computeRunMetrics command", () => {
     it("emits event directly without reading store", async () => {
       const deps = makeDeps();
 
-      const CommandClass = createComputeRunMetricsCommandClass(deps);
-      const handler = new CommandClass();
+      const handler = new ComputeRunMetricsCommand(deps);
       const cmd = makeCommand({
         metrics: {
           totalCost: 0.005,

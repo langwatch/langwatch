@@ -14,11 +14,13 @@ import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
-import { CompleteExperimentRunCommand } from "../commands/completeExperimentRun.command";
-import { RecordEvaluatorResultCommand } from "../commands/recordEvaluatorResult.command";
-import { RecordTargetResultCommand } from "../commands/recordTargetResult.command";
-import { StartExperimentRunCommand } from "../commands/startExperimentRun.command";
-import { createExperimentRunResultStorageMapProjection } from "../projections/experimentRunResultStorage.mapProjection";
+import {
+  StartExperimentRunCommand,
+  RecordTargetResultCommand,
+  RecordEvaluatorResultCommand,
+  CompleteExperimentRunCommand,
+} from "../commands";
+import { ExperimentRunResultStorageMapProjection } from "../projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "../projections/experimentRunState.foldProjection";
 import { ExperimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
 import { ExperimentRunStateRepositoryClickHouse } from "../repositories";
@@ -86,7 +88,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
     .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
       store: experimentRunStateFoldStore,
     }) as any)
-    .withMapProjection("experimentRunResultStorage", createExperimentRunResultStorageMapProjection({
+    .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
       store: experimentRunItemAppendStore,
     }) as any)
     .withCommand("startExperimentRun", StartExperimentRunCommand as any)

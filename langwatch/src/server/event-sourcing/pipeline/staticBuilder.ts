@@ -4,8 +4,10 @@ import type {
   StaticPipelineDefinition
 } from "..";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
+import type { CommandHandler } from "../commands/command";
 import type {
   CommandHandlerClass,
+  CommandHandlerClassStatic,
   ExtractCommandHandlerPayload,
 } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
@@ -101,6 +103,7 @@ export class StaticPipelineBuilderWithNameAndType<
   private commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, any>;
+    handlerInstance?: any;
     options?: CommandHandlerOptions;
   }> = [];
   private foldReactors = new Map<
@@ -235,7 +238,8 @@ export class StaticPipelineBuilderWithNameAndType<
   }
 
   /**
-   * Register a command handler class.
+   * Register a command handler class (zero-arg constructor).
+   * The framework will instantiate the handler via `new handlerClass()`.
    *
    * @param name - Unique name for this command handler within the pipeline
    * @param handlerClass - The command handler class to register
@@ -271,6 +275,60 @@ export class StaticPipelineBuilderWithNameAndType<
       RegisteredProjections,
       | RegisteredCommands
       | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
+      FoldNames,
+      MapNames
+    >;
+  }
+
+  /**
+   * Register a pre-constructed command handler instance.
+   * Use this for complex commands that require constructor DI (dependencies injected
+   * at construction time). The class is still needed for its static properties
+   * (schema, getAggregateId, etc.), but the instance is used instead of `new handlerClass()`.
+   *
+   * @param name - Unique name for this command handler within the pipeline
+   * @param handlerClass - The command handler class (provides static properties)
+   * @param instance - Pre-constructed handler instance
+   * @param options - Optional configuration
+   * @returns Builder instance for method chaining
+   */
+  withCommandInstance<
+    TStatic extends CommandHandlerClassStatic<any, any>,
+    Name extends string,
+  >(
+    name: Name,
+    handlerClass: TStatic,
+    instance: CommandHandler<any, any>,
+    options?: CommandHandlerOptions,
+  ): StaticPipelineBuilderWithNameAndType<
+    EventType,
+    RegisteredProjections,
+    | RegisteredCommands
+    | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
+    FoldNames,
+    MapNames
+  > {
+    if (this.commands.some((c) => c.name === name)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Command handler with name "${name}" already exists`,
+        { commandHandlerName: name },
+      );
+    }
+
+    // Cast TStatic to CommandHandlerClass for storage — the static properties match,
+    // and the zero-arg constructor won't be called since handlerInstance is provided.
+    this.commands.push({
+      name,
+      handlerClass: handlerClass as unknown as CommandHandlerClass<any, any, any>,
+      handlerInstance: instance,
+      options,
+    });
+    return this as StaticPipelineBuilderWithNameAndType<
+      EventType,
+      RegisteredProjections,
+      | RegisteredCommands
+      | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
       FoldNames,
       MapNames
     >;

@@ -2,24 +2,12 @@ import type { z } from "zod";
 import type { AnyEventSchema } from "./abstractFoldProjection";
 import type { AppendStore, MapProjectionOptions } from "./mapProjection.types";
 import {
+  type EventTypeOf,
   type StripPrefix,
   type DotSnakeToPascal,
   type UnionToIntersection,
   eventTypeToMapHandlerName,
 } from "./eventTypeTransforms";
-
-// ---------------------------------------------------------------------------
-// Schema → event type extraction (shared with fold)
-// ---------------------------------------------------------------------------
-
-/** Extract the literal event type string from a Zod schema's output type. */
-type EventTypeOf<S> = S extends z.ZodType<
-  { type: infer T extends string },
-  any,
-  any
->
-  ? T
-  : never;
 
 // ---------------------------------------------------------------------------
 // Map handler name derivation

@@ -10,6 +10,7 @@ import {
   FinishRunCommand,
   DeleteRunCommand,
 } from "./commands";
+import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
 import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
@@ -18,13 +19,7 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
-  ComputeRunMetricsCommand: {
-    new (): any;
-    readonly schema: any;
-    getAggregateId(payload: any): string;
-    getSpanAttributes?(payload: any): Record<string, string | number | boolean>;
-    makeJobId(payload: any): string;
-  };
+  computeRunMetricsCommand: ComputeRunMetricsCommand;
   customerIoSimulationSyncReactor?: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
 }
 
@@ -73,9 +68,9 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
-    .withCommand("computeRunMetrics", deps.ComputeRunMetricsCommand, {
+    .withCommandInstance("computeRunMetrics", ComputeRunMetricsCommand, deps.computeRunMetricsCommand, {
       deduplication: {
-        makeId: deps.ComputeRunMetricsCommand.makeJobId,
+        makeId: ComputeRunMetricsCommand.makeJobId,
         ttlMs: 60_000,
       },
     })

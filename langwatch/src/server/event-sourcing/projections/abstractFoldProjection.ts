@@ -4,6 +4,7 @@ import type {
   FoldProjectionStore,
 } from "./foldProjection.types";
 import {
+  type EventTypeOf,
   type StripPrefix,
   type DotSnakeToPascal,
   type UnionToIntersection,
@@ -18,15 +19,6 @@ import {
 export type AnyEventSchema = z.ZodObject<
   { type: z.ZodLiteral<string> } & z.ZodRawShape
 >;
-
-/** Extract the literal event type string from a Zod schema's output type. */
-type EventTypeOf<S> = S extends z.ZodType<
-  { type: infer T extends string },
-  any,
-  any
->
-  ? T
-  : never;
 
 // ---------------------------------------------------------------------------
 // Schema tuple → handler interface

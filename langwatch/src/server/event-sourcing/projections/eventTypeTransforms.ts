@@ -3,6 +3,21 @@
  * Used by both AbstractFoldProjection and AbstractMapProjection.
  */
 
+import type { z } from "zod";
+
+// ---------------------------------------------------------------------------
+// Schema → event type extraction
+// ---------------------------------------------------------------------------
+
+/** Extract the literal event type string from a Zod schema's output type. */
+export type EventTypeOf<S> = S extends z.ZodType<
+  { type: infer T extends string },
+  any,
+  any
+>
+  ? T
+  : never;
+
 // ---------------------------------------------------------------------------
 // Type-level string transforms
 // ---------------------------------------------------------------------------

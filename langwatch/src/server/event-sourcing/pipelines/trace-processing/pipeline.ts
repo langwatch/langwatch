@@ -8,9 +8,9 @@ import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
-import { createLogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
-import { createMetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
-import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
+import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
+import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
+import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
@@ -45,13 +45,13 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({
       store: deps.traceSummaryStore,
     }))
-    .withMapProjection("spanStorage", createSpanStorageMapProjection({
+    .withMapProjection("spanStorage", new SpanStorageMapProjection({
       store: deps.spanAppendStore,
     }))
-    .withMapProjection("logRecordStorage", createLogRecordStorageMapProjection({
+    .withMapProjection("logRecordStorage", new LogRecordStorageMapProjection({
       store: deps.logRecordAppendStore,
     }))
-    .withMapProjection("metricRecordStorage", createMetricRecordStorageMapProjection({
+    .withMapProjection("metricRecordStorage", new MetricRecordStorageMapProjection({
       store: deps.metricRecordAppendStore,
     }))
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)

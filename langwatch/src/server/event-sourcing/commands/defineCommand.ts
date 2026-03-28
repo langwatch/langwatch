@@ -114,5 +114,10 @@ export function defineCommand<
     }
   }
 
+  // Cast required: TypeScript cannot unify a class expression's constructor signature
+  // with the intersection type `CommandHandlerClassStatic & (new () => CommandHandler)`.
+  // The inner class structurally satisfies DefinedCommandClass but TS needs the
+  // intermediate `unknown` to bridge the nominal gap between class literals and
+  // intersection constructor types.
   return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType>;
 }
