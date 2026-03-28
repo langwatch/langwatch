@@ -46,18 +46,25 @@ export interface AppConfig {
   disableTokenization?: boolean;
 }
 
-/** Reads config from createEnvConfig() — the ONE place that owns the schema. */
-export function createAppConfigFromEnv(overrides?: {
+/**
+ * Creates AppConfig by merging secrets (from provider) with
+ * non-secret config (from env vars). Secrets take precedence over env vars.
+ */
+export function createAppConfig({
+  secrets,
+  processRole,
+}: {
+  secrets: Record<string, string>;
   processRole?: ProcessRole;
 }): AppConfig {
   const env = createEnvConfig();
 
   return {
     nodeEnv: env.NODE_ENV,
-    databaseUrl: env.DATABASE_URL,
-    clickhouseUrl: env.CLICKHOUSE_URL,
+    databaseUrl: secrets.DATABASE_URL ?? env.DATABASE_URL,
+    clickhouseUrl: secrets.CLICKHOUSE_URL ?? env.CLICKHOUSE_URL,
     enableClickhouse: env.ENABLE_CLICKHOUSE,
-    redisUrl: env.REDIS_URL,
+    redisUrl: secrets.REDIS_URL ?? env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     baseHost: env.BASE_HOST,
@@ -67,12 +74,19 @@ export function createAppConfigFromEnv(overrides?: {
     hubspotPortalId: env.HUBSPOT_PORTAL_ID,
     hubspotReachedLimitFormId: env.HUBSPOT_REACHED_LIMIT_FORM_ID,
     hubspotFormId: env.HUBSPOT_FORM_ID,
-    customerIoApiKey: env.CUSTOMER_IO_API_KEY,
+    customerIoApiKey: secrets.CUSTOMER_IO_API_KEY ?? env.CUSTOMER_IO_API_KEY,
     customerIoRegion: env.CUSTOMER_IO_REGION,
     enableEventSourcing: env.ENABLE_EVENT_SOURCING,
-    processRole: overrides?.processRole,
+    processRole,
     isSaas: env.IS_SAAS,
     skipRedis: env.SKIP_REDIS,
     disableTokenization: process.env.DISABLE_TOKENIZATION === "true",
   };
+}
+
+/** Backward-compat: creates config from env vars only (no secrets provider). */
+export function createAppConfigFromEnv(overrides?: {
+  processRole?: ProcessRole;
+}): AppConfig {
+  return createAppConfig({ secrets: {}, processRole: overrides?.processRole });
 }

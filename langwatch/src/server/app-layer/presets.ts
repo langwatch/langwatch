@@ -12,7 +12,8 @@ import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
-import { createAppConfigFromEnv, type AppConfig, type ProcessRole } from "./config";
+import { createAppConfig, type AppConfig, type ProcessRole } from "./config";
+import { createSecretsProvider, loadAppSecrets } from "./secrets/secrets";
 import type { AppDependencies } from "./dependencies";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
@@ -74,19 +75,23 @@ import { TraceService } from "../traces/trace.service";
 import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 
-export function initializeWebApp(): App {
+export async function initializeWebApp(): Promise<App> {
   return initializeDefaultApp({ processRole: "web" });
 }
 
-export function initializeWorkerApp(): App {
+export async function initializeWorkerApp(): Promise<App> {
   return initializeDefaultApp({ processRole: "worker" });
 }
 
-export function initializeDefaultApp(options?: { processRole?: ProcessRole }): App {
+export async function initializeDefaultApp(options?: { processRole?: ProcessRole }): Promise<App> {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
   const { prisma } = require("../db") as { prisma: PrismaClient; };
-  const config = createAppConfigFromEnv({ processRole: options?.processRole });
+
+  const provider = createSecretsProvider();
+  const environment = process.env.ENVIRONMENT ?? "local";
+  const secrets = await loadAppSecrets({ provider, environment });
+  const config = createAppConfig({ secrets, processRole: options?.processRole });
 
   const clickhouseEnabled = !!(config.enableClickhouse && config.clickhouseUrl) || isClickHouseEnabled();
 

@@ -6,27 +6,29 @@ import { createLogger } from "./utils/logger/server";
 loadEnvConfig(process.cwd());
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
-const { initializeWorkerApp } = require("./server/app-layer/presets") as {
-  initializeWorkerApp: () => void;
-};
-initializeWorkerApp();
-
 const logger = createLogger("langwatch:workers");
 
-logger.info("starting");
+async function main() {
+  const { initializeWorkerApp } = await import("./server/app-layer/presets");
+  await initializeWorkerApp();
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require("./server/background/worker")
-  .start(void 0, 15 * 60 * 1000)
-  .catch((error: Error) => {
-    if (error instanceof WorkersRestart) {
-      logger.info({ error }, "worker restart");
-      process.exit(0);
-    }
+  logger.info("starting");
 
-    logger.error({ error }, "error running worker");
-    process.exit(1);
-  });
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("./server/background/worker")
+    .start(void 0, 15 * 60 * 1000)
+    .catch((error: Error) => {
+      if (error instanceof WorkersRestart) {
+        logger.info({ error }, "worker restart");
+        process.exit(0);
+      }
+
+      logger.error({ error }, "error running worker");
+      process.exit(1);
+    });
+}
+
+void main();
 
 // Global error handlers for uncaught exceptions and unhandled promise rejections
 process.on("uncaughtException", (err) => {

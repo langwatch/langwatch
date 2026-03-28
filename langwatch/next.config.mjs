@@ -98,6 +98,7 @@ const config = {
     "@aws-sdk/client-cloudwatch-logs",
     "@aws-sdk/client-s3",
     "@aws-sdk/client-ses",
+    "@aws-sdk/client-secrets-manager",
   ],
 
   experimental: {

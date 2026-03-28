@@ -6,6 +6,6 @@ export async function register() {
     await import("./instrumentation.node");
 
     const { initializeWebApp } = await import("./server/app-layer/presets");
-    initializeWebApp();
+    await initializeWebApp();
   }
 }
