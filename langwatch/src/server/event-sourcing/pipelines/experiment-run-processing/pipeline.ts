@@ -2,10 +2,12 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { CompleteExperimentRunCommand } from "./commands/completeExperimentRun.command";
-import { RecordEvaluatorResultCommand } from "./commands/recordEvaluatorResult.command";
-import { RecordTargetResultCommand } from "./commands/recordTargetResult.command";
-import { StartExperimentRunCommand } from "./commands/startExperimentRun.command";
+import {
+  StartExperimentRunCommand,
+  RecordTargetResultCommand,
+  RecordEvaluatorResultCommand,
+  CompleteExperimentRunCommand,
+} from "./commands";
 import { createExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
 import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";

@@ -3,31 +3,12 @@ import type {
   FoldProjectionOptions,
   FoldProjectionStore,
 } from "./foldProjection.types";
-
-// ---------------------------------------------------------------------------
-// Type-level string transforms
-// ---------------------------------------------------------------------------
-
-/** Strip `lw.obs.` or `lw.` prefix from an event type string. */
-type StripPrefix<S extends string> = S extends `lw.obs.${infer R}`
-  ? R
-  : S extends `lw.${infer R}`
-    ? R
-    : S;
-
-/** `"foo_bar"` → `"FooBar"` */
-type SnakeToPascal<S extends string> = S extends `${infer H}_${infer T}`
-  ? `${Capitalize<H>}${SnakeToPascal<T>}`
-  : Capitalize<S>;
-
-/** `"suite_run.item_started"` → `"SuiteRunItemStarted"` */
-type DotSnakeToPascal<S extends string> = S extends `${infer H}.${infer T}`
-  ? `${SnakeToPascal<H>}${DotSnakeToPascal<T>}`
-  : SnakeToPascal<S>;
-
-/** Full derivation: `"lw.suite_run.started"` → `"handleSuiteRunStarted"` */
-type HandlerName<EventTypeStr extends string> =
-  `handle${DotSnakeToPascal<StripPrefix<EventTypeStr>>}`;
+import {
+  type StripPrefix,
+  type DotSnakeToPascal,
+  type UnionToIntersection,
+  eventTypeToHandlerName,
+} from "./eventTypeTransforms";
 
 // ---------------------------------------------------------------------------
 // Schema → event type extraction
@@ -54,11 +35,9 @@ type EventTypeOf<S> = S extends z.ZodType<
 /** All possible timestamp keys. Forbidden in `initState()` return type. */
 type AllTimestampKeys = "CreatedAt" | "UpdatedAt" | "createdAt" | "updatedAt";
 
-type UnionToIntersection<U> = (
-  U extends unknown ? (k: U) => void : never
-) extends (k: infer I) => void
-  ? I
-  : never;
+/** Full derivation: `"lw.suite_run.started"` → `"handleSuiteRunStarted"` */
+type HandlerName<EventTypeStr extends string> =
+  `handle${DotSnakeToPascal<StripPrefix<EventTypeStr>>}`;
 
 /**
  * Derives required handler methods from an array of Zod event schemas.
@@ -85,30 +64,6 @@ export type FoldEventHandlers<
       : never;
   }[number]
 >;
-
-// ---------------------------------------------------------------------------
-// Runtime string transform (mirrors the type-level transform)
-// ---------------------------------------------------------------------------
-
-function eventTypeToHandlerName(eventType: string): string {
-  const stripped = eventType.startsWith("lw.obs.")
-    ? eventType.slice(7)
-    : eventType.startsWith("lw.")
-      ? eventType.slice(3)
-      : eventType;
-
-  const pascal = stripped
-    .split(".")
-    .map((segment) =>
-      segment
-        .split("_")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(""),
-    )
-    .join("");
-
-  return `handle${pascal}`;
-}
 
 // ---------------------------------------------------------------------------
 // Abstract base class
