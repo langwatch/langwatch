@@ -95,6 +95,18 @@ function init(): ExperimentRunStateData {
   };
 }
 
+/**
+ * Monotonic UpdatedAt for ReplacingMergeTree correctness.
+ *
+ * Experiment events are bulk-inserted (all at the same CreatedAt) and
+ * processed rapidly. Multiple rows can get identical Date.now() values.
+ * ReplacingMergeTree then picks non-deterministically, potentially
+ * discarding the completed row (with FinishedAt).
+ */
+function nextUpdatedAt(state: ExperimentRunStateData): number {
+  return Math.max(Date.now(), state.UpdatedAt + 1);
+}
+
 function apply(
   state: ExperimentRunStateData,
   event: ExperimentRunProcessingEvent,
@@ -108,7 +120,7 @@ function apply(
       Total: Math.max(state.Total, event.data.total),
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       StartedAt: state.StartedAt ?? event.occurredAt,
-      UpdatedAt: Date.now(),
+      UpdatedAt: nextUpdatedAt(state),
     };
   }
 
@@ -142,7 +154,7 @@ function apply(
       TotalCost: totalCost,
       TotalDurationMs: totalDurationMs,
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
-      UpdatedAt: Date.now(),
+      UpdatedAt: nextUpdatedAt(state),
     };
   }
 
@@ -176,7 +188,7 @@ function apply(
       TotalCost: totalCost,
       AvgScoreBps: avgScoreBps,
       PassRateBps: passRateBps,
-      UpdatedAt: Date.now(),
+      UpdatedAt: nextUpdatedAt(state),
     };
   }
 
@@ -185,7 +197,7 @@ function apply(
       ...state,
       FinishedAt: event.data.finishedAt ?? null,
       StoppedAt: event.data.stoppedAt ?? null,
-      UpdatedAt: Date.now(),
+      UpdatedAt: nextUpdatedAt(state),
     };
   }
 

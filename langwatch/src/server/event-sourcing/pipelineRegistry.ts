@@ -480,8 +480,9 @@ export class PipelineRegistry {
   }
 
   private registerExperimentRunPipeline() {
-    const repository = this.deps.resolveClickHouseClient
-      ? new ExperimentRunStateRepositoryClickHouse(this.deps.resolveClickHouseClient)
+    const foldClientResolver = this.deps.resolvePrimaryReplicaClickHouseClient ?? this.deps.resolveClickHouseClient;
+    const repository = foldClientResolver
+      ? new ExperimentRunStateRepositoryClickHouse(foldClientResolver)
       : new ExperimentRunStateRepositoryMemory();
 
     return this.deps.eventSourcing.register(
