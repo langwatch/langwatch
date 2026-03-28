@@ -192,7 +192,15 @@ export abstract class AbstractFoldProjection<
       this._dispatchMap = {};
       for (const schema of this.events) {
         const eventType = schema.shape.type.value;
-        this._dispatchMap[eventType] = eventTypeToHandlerName(eventType);
+        const handlerName = eventTypeToHandlerName(eventType);
+
+        if (typeof this[handlerName as keyof this] !== "function") {
+          throw new Error(
+            `${this.name}: event "${eventType}" requires method ${handlerName}() but it does not exist`,
+          );
+        }
+
+        this._dispatchMap[eventType] = handlerName;
       }
     }
     return this._dispatchMap;

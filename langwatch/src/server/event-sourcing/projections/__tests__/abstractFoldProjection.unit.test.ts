@@ -163,6 +163,15 @@ describe("AbstractFoldProjection", () => {
 
       expect(result.UpdatedAt).toBe(5000); // max(5000, 1000 + 1) = 5000
     });
+
+    it("bumps UpdatedAt even when handler returns state unchanged", () => {
+      const state = projection.init();
+      const event: ResetEvent = { type: "test.reset" };
+
+      const result = projection.apply(state, event);
+
+      expect(result.UpdatedAt).toBeGreaterThan(state.UpdatedAt);
+    });
   });
 
   describe("when applying an unknown event", () => {
