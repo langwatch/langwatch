@@ -34,8 +34,8 @@ export function SyncedChatInput({
     triggerSubmit,
   } = usePromptPlaygroundChatSync();
   const tabId = useTabId();
-  const totalTabCount = useDraggableTabsBrowserStore((state) =>
-    state.windows.reduce((count, window) => count + window.tabs.length, 0),
+  const windowCount = useDraggableTabsBrowserStore(
+    (state) => state.windows.length,
   );
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
@@ -155,7 +155,7 @@ export function SyncedChatInput({
           position="relative"
         >
           {/* Bottom left - Sync checkbox (shows on hover, only if multiple tabs) */}
-          {totalTabCount > 1 && (
+          {windowCount > 1 && (
             <ChatSyncCheckbox
               position="absolute"
               left="50%"
