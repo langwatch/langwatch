@@ -317,13 +317,11 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
   for (const [key, value] of Object.entries(resourceAttrs)) {
     if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
-    // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
-    const normalizedKey = key.startsWith("langwatch.metadata.")
-      ? key.replace("langwatch.metadata.", "metadata.")
-      : key;
-    if (typeof value === "string") result[normalizedKey] = value;
+    // Skip langwatch.metadata.* and langwatch.trace.* — handled after span attrs for precedence
+    if (key.startsWith("langwatch.metadata.") || key.startsWith("langwatch.trace.")) continue;
+    if (typeof value === "string") result[key] = value;
     else if (typeof value === "number" || typeof value === "boolean")
-      result[normalizedKey] = String(value);
+      result[key] = String(value);
   }
 
   for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
@@ -354,6 +352,19 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
       result[key] =
         typeof value === "object" ? JSON.stringify(value) : String(value);
     }
+  }
+
+  // langwatch.metadata.* and langwatch.trace.* resource attrs — highest priority,
+  // overrides blob-hoisted span attrs for correct subkey > blob precedence
+  for (const [key, value] of Object.entries(resourceAttrs)) {
+    let bareKey: string | undefined;
+    if (key.startsWith("langwatch.metadata.")) bareKey = key.slice("langwatch.metadata.".length);
+    else if (key.startsWith("langwatch.trace.")) bareKey = key.slice("langwatch.trace.".length);
+    if (!bareKey) continue;
+    const metadataKey = "metadata." + bareKey;
+    if (typeof value === "string") result[metadataKey] = value;
+    else if (typeof value === "number" || typeof value === "boolean")
+      result[metadataKey] = String(value);
   }
 
   return result;
