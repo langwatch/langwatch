@@ -42,7 +42,7 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     blockedByGuardrail: false,
     topicId: null,
     subTopicId: null,
-    hasAnnotation: null,
+    annotationIds: [],
     attributes: {},
     scenarioRoleCosts: { Agent: 0.001 },
     scenarioRoleLatencies: { Agent: 500 },

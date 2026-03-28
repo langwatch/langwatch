@@ -1362,6 +1362,7 @@ export class ClickHouseTraceService {
                 ts.TopicId AS ts_TopicId,
                 ts.SubTopicId AS ts_SubTopicId,
                 ts.HasAnnotation AS ts_HasAnnotation,
+                ts.AnnotationIds AS ts_AnnotationIds,
                 ts.ComputedInput AS ts_ComputedInput,
                 ts.ComputedOutput AS ts_ComputedOutput,
                 ts.Attributes AS ts_Attributes,
@@ -1449,7 +1450,7 @@ export class ClickHouseTraceService {
       blockedByGuardrail: false,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
-      hasAnnotation: row.ts_HasAnnotation,
+      annotationIds: row.ts_AnnotationIds ?? [],
       attributes: row.ts_Attributes,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
@@ -1574,6 +1575,7 @@ export class ClickHouseTraceService {
           TopicId AS ts_TopicId,
           SubTopicId AS ts_SubTopicId,
           HasAnnotation AS ts_HasAnnotation,
+          AnnotationIds AS ts_AnnotationIds,
           Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
@@ -1720,7 +1722,7 @@ export class ClickHouseTraceService {
       blockedByGuardrail: false,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
-      hasAnnotation: row.ts_HasAnnotation,
+      annotationIds: row.ts_AnnotationIds ?? [],
       attributes: row.ts_Attributes,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
@@ -1933,6 +1935,7 @@ interface TraceSummaryRow {
   ts_TopicId: string | null;
   ts_SubTopicId: string | null;
   ts_HasAnnotation: boolean | null;
+  ts_AnnotationIds: string[];
   ts_Attributes: Record<string, string>;
   ts_OccurredAt: number;
   ts_CreatedAt: number;

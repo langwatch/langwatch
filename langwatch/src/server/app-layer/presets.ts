@@ -491,7 +491,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop } satisfies AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,

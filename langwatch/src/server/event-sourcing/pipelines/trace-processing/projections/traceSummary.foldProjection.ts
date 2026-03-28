@@ -25,6 +25,9 @@ import type {
   LogRecordReceivedEvent,
   MetricRecordReceivedEvent,
   OriginResolvedEvent,
+  AnnotationAddedEvent,
+  AnnotationRemovedEvent,
+  AnnotationsBulkSyncedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -32,6 +35,9 @@ import {
   logRecordReceivedEventSchema,
   metricRecordReceivedEventSchema,
   originResolvedEventSchema,
+  annotationAddedEventSchema,
+  annotationRemovedEventSchema,
+  annotationsBulkSyncedEventSchema,
 } from "../schemas/events";
 import type { NormalizedAttributes, NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
@@ -912,6 +918,9 @@ const traceSummaryEvents = [
   logRecordReceivedEventSchema,
   metricRecordReceivedEventSchema,
   originResolvedEventSchema,
+  annotationAddedEventSchema,
+  annotationRemovedEventSchema,
+  annotationsBulkSyncedEventSchema,
 ] as const;
 
 /**
@@ -960,7 +969,7 @@ export class TraceSummaryFoldProjection
       blockedByGuardrail: false,
       topicId: null,
       subTopicId: null,
-      hasAnnotation: null,
+      annotationIds: [],
       attributes: {},
       scenarioRoleCosts: {},
       scenarioRoleLatencies: {},
@@ -1100,5 +1109,33 @@ export class TraceSummaryFoldProjection
         "langwatch.origin": event.data.origin,
       },
     };
+  }
+
+  handleTraceAnnotationAdded(
+    event: AnnotationAddedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    const ids = state.annotationIds;
+    if (ids.includes(event.data.annotationId)) return state;
+    return { ...state, annotationIds: [...ids, event.data.annotationId] };
+  }
+
+  handleTraceAnnotationRemoved(
+    event: AnnotationRemovedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return {
+      ...state,
+      annotationIds: state.annotationIds.filter(
+        (id) => id !== event.data.annotationId,
+      ),
+    };
+  }
+
+  handleTraceAnnotationsBulkSynced(
+    event: AnnotationsBulkSyncedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return { ...state, annotationIds: event.data.annotationIds };
   }
 }

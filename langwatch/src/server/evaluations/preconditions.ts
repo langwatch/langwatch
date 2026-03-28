@@ -324,7 +324,7 @@ export function buildPreconditionTraceDataFromTrace({
       .map((span) => (span as LLMSpan).model)
       .filter((model): model is string => typeof model === "string" && model !== ""),
     customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
-    hasAnnotation: null, // Not available in legacy collector path
+    annotationIds: [], // Not available in legacy collector path
     events: events?.map((e) => ({
       event_type: e.event_type,
       metrics: e.metrics ?? [],
@@ -367,7 +367,7 @@ export function buildPreconditionTraceDataFromCommand({
             typeof model === "string" && model !== "",
         ),
     customMetadata: data.customMetadata ?? null,
-    hasAnnotation: null, // Not available at command time
+    annotationIds: [], // Not available at command time
     events: events ?? null,
   };
 }

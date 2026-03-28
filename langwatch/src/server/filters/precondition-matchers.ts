@@ -26,7 +26,7 @@ export interface PreconditionTraceData {
   spanTypes?: string[] | null;
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
-  hasAnnotation?: boolean | null;
+  annotationIds?: string[];
   events?: Array<{
     event_type: string;
     metrics: Array<{ key: string; value: number }>;
@@ -128,8 +128,8 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
 
   // Annotation fields
   "annotations.hasAnnotation": (data) =>
-    data.hasAnnotation != null
-      ? data.hasAnnotation
+    data.annotationIds != null
+      ? data.annotationIds.length > 0
         ? "true"
         : "false"
       : null,

@@ -30,7 +30,7 @@ function makeTraceData(
     spanTypes: undefined,
     spanModels: undefined,
     customMetadata: undefined,
-    hasAnnotation: undefined,
+    annotationIds: undefined,
     ...overrides,
   };
 }
@@ -261,18 +261,18 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
   describe("annotations.hasAnnotation matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["annotations.hasAnnotation"]!;
 
-    it("returns 'true' when hasAnnotation is true", () => {
-      expect(matcher(makeTraceData({ hasAnnotation: true }), "")).toBe("true");
+    it("returns 'true' when annotationIds is non-empty", () => {
+      expect(matcher(makeTraceData({ annotationIds: ["ann-1"] }), "")).toBe("true");
     });
 
-    it("returns 'false' when hasAnnotation is false", () => {
-      expect(matcher(makeTraceData({ hasAnnotation: false }), "")).toBe(
+    it("returns 'false' when annotationIds is empty", () => {
+      expect(matcher(makeTraceData({ annotationIds: [] }), "")).toBe(
         "false",
       );
     });
 
-    it("returns null when hasAnnotation is null", () => {
-      expect(matcher(makeTraceData({ hasAnnotation: null }), "")).toBeNull();
+    it("returns null when annotationIds is undefined", () => {
+      expect(matcher(makeTraceData({ annotationIds: undefined }), "")).toBeNull();
     });
   });
 
