@@ -19,8 +19,8 @@ import { apiFetch, apiPost } from "../../hooks/useApi.ts";
 import { ANTI_FLICKER_DURATION_MS, DEFAULT_GROUPS_DISPLAY_LIMIT, SEARCH_DEBOUNCE_MS } from "../../../shared/constants.ts";
 import { CopyButton } from "../CopyButton.tsx";
 import { normalizeErrorMessage } from "../../../shared/normalizeErrorMessage.ts";
-
-type StatusFilter = "all" | "ok" | "blocked" | "stale" | "active";
+import { matchesStatusFilter } from "./matchesStatusFilter.ts";
+import type { StatusFilter } from "./matchesStatusFilter.ts";
 
 const AGE_THRESHOLD_OPTIONS = [
   { label: "Any age", value: null },
@@ -643,16 +643,6 @@ interface GroupsTableProps {
   onStartUnblockSession?: (config: UnblockSessionConfig) => void;
 }
 
-/** Stale is a subset of blocked (isStaleBlock implies isBlocked), so "blocked" excludes stale groups. */
-export function matchesStatusFilter(g: GroupInfo, filter: StatusFilter): boolean {
-  switch (filter) {
-    case "all": return true;
-    case "ok": return !g.isBlocked && !g.isStaleBlock;
-    case "blocked": return g.isBlocked && !g.isStaleBlock;
-    case "stale": return g.isStaleBlock;
-    case "active": return g.hasActiveJob && !g.isBlocked;
-  }
-}
 
 export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cycleSort, pipelineFilter, errorFilter, onStartUnblockSession }: GroupsTableProps) {
   const [search, setSearch] = useState("");

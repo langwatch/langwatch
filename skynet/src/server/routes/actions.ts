@@ -102,7 +102,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       }
 
       const result = await service.retryBlocked({ queueName, groupId, jobId });
-      res.json({ ok: true, retried: result.retried, unblocked: result.unblocked });
+      res.json({ ok: true, wasBlocked: result.wasBlocked });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "retry-blocked error" });
       res.status(500).json({ error: "Internal error" });

@@ -109,10 +109,10 @@ export class GroupQueueActionService {
     queueName: string;
     groupId: string;
     jobId: string;
-  }): Promise<{ retried: boolean; unblocked: boolean }> {
+  }): Promise<{ wasBlocked: boolean }> {
     const { wasBlocked } = await this.unblockGroup({ queueName, groupId });
 
-    return { retried: wasBlocked, unblocked: wasBlocked };
+    return { wasBlocked };
   }
 
   async pauseKey({
