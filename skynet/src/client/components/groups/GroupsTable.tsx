@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Box, Table, Thead, Tbody, Tr, Th, Td, Text, Badge, HStack, VStack, Code,
-  Input, Button, Collapse, useDisclosure, Tooltip, useToast,
+  Input, Button, Select, Collapse, useDisclosure, Tooltip, useToast,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton,
   AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader,
   AlertDialogBody, AlertDialogFooter,
@@ -643,7 +643,8 @@ interface GroupsTableProps {
   onStartUnblockSession?: (config: UnblockSessionConfig) => void;
 }
 
-function matchesStatusFilter(g: GroupInfo, filter: StatusFilter): boolean {
+/** Stale is a subset of blocked (isStaleBlock implies isBlocked), so "blocked" excludes stale groups. */
+export function matchesStatusFilter(g: GroupInfo, filter: StatusFilter): boolean {
   switch (filter) {
     case "all": return true;
     case "ok": return !g.isBlocked && !g.isStaleBlock;
@@ -768,25 +769,24 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
             );
           })}
         </HStack>
-        <Box
-          as="select"
+        <Select
+          size="sm"
           bg="#060a12"
           border="1px solid"
           borderColor="rgba(0, 240, 255, 0.25)"
           color="#b0c4d8"
           borderRadius="2px"
           fontSize="xs"
-          px={2}
-          py={1}
-          h="32px"
           textTransform="uppercase"
           letterSpacing="0.05em"
+          w="auto"
+          minW="100px"
           sx={{
             option: { bg: "#0a0e17", color: "#b0c4d8" },
-            _focus: { borderColor: "#00f0ff", boxShadow: "0 0 8px rgba(0, 240, 255, 0.2)", outline: "none" },
           }}
+          _focus={{ borderColor: "#00f0ff", boxShadow: "0 0 8px rgba(0, 240, 255, 0.2)" }}
           value={ageThresholdMs === null ? "" : String(ageThresholdMs)}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+          onChange={(e) => {
             setAgeThresholdMs(e.target.value === "" ? null : Number(e.target.value));
           }}
         >
@@ -795,7 +795,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
               {opt.label}
             </option>
           ))}
-        </Box>
+        </Select>
       </HStack>
 
       {sortedQueues.map((queue) => (
