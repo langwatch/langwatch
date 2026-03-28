@@ -159,7 +159,7 @@ describe("buildPipelineTree", () => {
   });
 });
 
-describe("aggregateJobNameCounters", () => {
+describe("aggregateJobNameCounters()", () => {
   describe("when single queue and single job name", () => {
     it("reads completed and failed from adjacent pipeline slots", () => {
       const result = aggregateJobNameCounters({

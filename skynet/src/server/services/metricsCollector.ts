@@ -322,7 +322,13 @@ export class MetricsCollector {
     }
     this.currentPhases = phases;
 
-    // Build per-jobName metrics with live throughput from Redis counters
+    this.currentJobNameMetrics = await this.computeJobNameThroughput(queues, elapsed);
+
+    return { newCompleted, newFailed };
+  }
+
+  /** Read per-job-name Redis counters and compute throughput rates. */
+  private async computeJobNameThroughput(queues: QueueInfo[], elapsed: number): Promise<JobNameMetrics[]> {
     const jobNameCounts = this.buildJobNameCounts(queues);
 
     // Deduplicate job names — multiple pipelines may share the same jobName,
@@ -345,18 +351,15 @@ export class MetricsCollector {
       ? await jobNameCounterPipeline.exec()
       : [];
 
-    // Aggregate per-jobName (not per-compositeKey) to avoid double-counting
     const jobNameTotals = aggregateJobNameCounters({
       jobNameCounterKeys: dedupedJobNames.map((jn) => ({ compositeKey: jn, jobName: jn })),
       jobNameCounterResults: dedupedJobNames.length > 0 ? jobNameCounterResults as Array<[Error | null, unknown]> | null : null,
       queueCount: this.groupQueueNames.length,
     });
 
-    const jobNameMetrics: JobNameMetrics[] = [];
+    const metrics: JobNameMetrics[] = [];
     for (const [compositeKey, counts] of jobNameCounts) {
       const jobName = compositeKey.split("::")[1] ?? compositeKey;
-      const pipelineName = counts.pipelineName;
-      const phase = counts.phase;
 
       const totals = jobNameTotals.get(jobName) ?? { completed: 0, failed: 0 };
       const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
@@ -377,10 +380,10 @@ export class MetricsCollector {
       peak.failedPerSec = Math.max(peak.failedPerSec, failedPerSec);
       this.peakJobNames.set(compositeKey, peak);
 
-      jobNameMetrics.push({
+      metrics.push({
         jobName,
-        pipelineName,
-        phase,
+        pipelineName: counts.pipelineName,
+        phase: counts.phase,
         pending: counts.pending,
         active: counts.active,
         completedPerSec,
@@ -393,9 +396,7 @@ export class MetricsCollector {
         peakLatencyP99Ms: peak.latencyP99Ms,
       });
     }
-    this.currentJobNameMetrics = jobNameMetrics;
-
-    return { newCompleted, newFailed };
+    return metrics;
   }
 
   private async restoreState(): Promise<void> {

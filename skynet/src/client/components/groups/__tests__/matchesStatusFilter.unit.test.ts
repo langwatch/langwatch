@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesStatusFilter } from "../GroupsTable.tsx";
+import { matchesStatusFilter } from "../matchesStatusFilter.ts";
 import type { GroupInfo } from "../../../../shared/types.ts";
 
 function makeGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
