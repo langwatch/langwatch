@@ -18,6 +18,7 @@ import { LogRecordStorageClickHouseRepository } from "../app-layer/traces/reposi
 import { NullLogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import { MetricRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/metric-record-storage.clickhouse.repository";
 import { NullMetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import { TraceSummaryClickHouseRepository } from "../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 
@@ -167,9 +168,14 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const traceSummaryStore = new TraceSummaryStore(
-      this.deps.traces.summary.repository,
-    );
+    // Use primary replica for the fold store to avoid replication lag.
+    // The shared TraceSummaryService.repository goes through the NLB
+    // (random replica), which causes stale reads during fold processing.
+    const foldClientResolver = this.deps.resolvePrimaryReplicaClickHouseClient ?? this.deps.resolveClickHouseClient;
+    const traceSummaryFoldRepo = foldClientResolver
+      ? new TraceSummaryClickHouseRepository(foldClientResolver)
+      : this.deps.traces.summary.repository;
+    const traceSummaryStore = new TraceSummaryStore(traceSummaryFoldRepo);
 
     // Late-bound reference to the trace pipeline's resolveOrigin command.
     // The reactor deps closure captures this; the actual dispatcher is set
