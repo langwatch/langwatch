@@ -88,11 +88,16 @@ export abstract class AbstractFoldProjection<
 
   /**
    * Maps runtime `event.type` strings to handler method names on this class.
-   * Values are constrained to valid handler names derived from EventMap keys.
+   *
+   * Values must be both:
+   * 1. A valid handler name from EventMap (`handle${keyof EventMap}`)
+   * 2. An actual key on the concrete class (`keyof this`)
+   *
+   * This means a typo or missing handler method fails at compile time.
    */
   protected abstract readonly eventTypeMap: Record<
     string,
-    `handle${Extract<keyof EventMap, string>}`
+    `handle${Extract<keyof EventMap, string>}` & keyof this
   >;
 
   /**
@@ -139,19 +144,13 @@ export abstract class AbstractFoldProjection<
     const handlerName = this.eventTypeMap[event.type];
     if (!handlerName) return state;
 
-    const handler = this[handlerName as keyof this];
-    if (typeof handler !== "function") {
-      if (process.env.NODE_ENV !== "production") {
-        throw new Error(
-          `${this.name}: eventTypeMap routes "${event.type}" to "${handlerName}" but it is not a function`,
-        );
-      }
-      return state;
-    }
-
-    const newState = (
-      handler as (e: EventMap[keyof EventMap], s: State) => State
-    ).call(this, event, state);
+    // handlerName is keyof this (enforced by the eventTypeMap type),
+    // so the method is guaranteed to exist at compile time.
+    const handler = this[handlerName] as (
+      e: EventMap[keyof EventMap],
+      s: State,
+    ) => State;
+    const newState = handler.call(this, event, state);
     const nextUpdatedAt = Math.max(Date.now(), state[this.updatedAtKey] + 1);
     return { ...newState, [this.updatedAtKey]: nextUpdatedAt } as State;
   }
