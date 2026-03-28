@@ -139,30 +139,31 @@ function eventTypeToHandlerName(eventType: string): string {
  *
  * **Timestamp management:**
  * - `initState()` returns state WITHOUT timestamp fields (type-enforced)
- * - `init()` adds timestamps automatically
+ * - `init()` adds timestamps automatically (PascalCase by default)
  * - `apply()` auto-sets monotonic updatedAt: `Math.max(Date.now(), prev + 1)`
- *
- * For camelCase timestamps, pass `'createdAt'` and `'updatedAt'` as CK/UK.
+ * - For camelCase: override `timestampStyle` to `"camel"`
  */
 export abstract class AbstractFoldProjection<
-  State extends Record<CK | UK, number>,
+  State,
   Schemas extends readonly AnyEventSchema[],
-  CK extends string = "CreatedAt",
-  UK extends string = "UpdatedAt",
 > {
   abstract readonly name: string;
   abstract readonly version: string;
   abstract readonly store: FoldProjectionStore<State>;
 
-  protected readonly createdAtKey: CK;
-  protected readonly updatedAtKey: UK;
+  /**
+   * Timestamp field naming convention. Override to `"camel"` for
+   * states with `createdAt`/`updatedAt` instead of `CreatedAt`/`UpdatedAt`.
+   * @default `"pascal"`
+   */
+  protected readonly timestampStyle: "pascal" | "camel" = "pascal";
 
-  constructor({
-    createdAtKey,
-    updatedAtKey,
-  }: { createdAtKey?: CK; updatedAtKey?: UK } = {}) {
-    this.createdAtKey = createdAtKey ?? ("CreatedAt" as CK);
-    this.updatedAtKey = updatedAtKey ?? ("UpdatedAt" as UK);
+  private get ck(): string {
+    return this.timestampStyle === "camel" ? "createdAt" : "CreatedAt";
+  }
+
+  private get uk(): string {
+    return this.timestampStyle === "camel" ? "updatedAt" : "UpdatedAt";
   }
 
   /**
@@ -212,8 +213,8 @@ export abstract class AbstractFoldProjection<
     const now = Date.now();
     return {
       ...this.initState(),
-      [this.createdAtKey]: now,
-      [this.updatedAtKey]: now,
+      [this.ck]: now,
+      [this.uk]: now,
     } as State;
   }
 
@@ -233,8 +234,8 @@ export abstract class AbstractFoldProjection<
       s: State,
     ) => State;
     const newState = handler.call(this, event, state);
-    const prevUpdatedAt: number = state[this.updatedAtKey];
+    const prevUpdatedAt = (state as Record<string, number>)[this.uk] ?? 0;
     const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
-    return { ...newState, [this.updatedAtKey]: nextUpdatedAt } as State;
+    return { ...newState, [this.uk]: nextUpdatedAt } as State;
   }
 }

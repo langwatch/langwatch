@@ -922,17 +922,18 @@ const traceSummaryEvents = [
  * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
  */
 export class TraceSummaryFoldProjection
-  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents, "createdAt", "updatedAt">
+  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents>
   implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
 {
   readonly name = "traceSummary";
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceSummaryData>;
+  protected override readonly timestampStyle = "camel" as const;
 
   protected readonly events = traceSummaryEvents;
 
   constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
+    super();
     this.store = deps.store;
   }
 

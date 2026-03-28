@@ -75,12 +75,7 @@ type CamelEvent = z.infer<typeof CamelEventSchema>;
 const camelEvents = [CamelEventSchema] as const;
 
 class CamelFoldProjection
-  extends AbstractFoldProjection<
-    CamelState,
-    typeof camelEvents,
-    "createdAt",
-    "updatedAt"
-  >
+  extends AbstractFoldProjection<CamelState, typeof camelEvents>
   implements FoldEventHandlers<typeof camelEvents, CamelState>
 {
   readonly name = "camel";
@@ -89,12 +84,9 @@ class CamelFoldProjection
     store: async () => {},
     get: async () => null,
   };
+  protected override readonly timestampStyle = "camel" as const;
 
   protected readonly events = camelEvents;
-
-  constructor() {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
-  }
 
   protected initState() {
     return { name: "" };
