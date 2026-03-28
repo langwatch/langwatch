@@ -976,6 +976,12 @@ export function createTraceSummaryFoldProjection({
       state: TraceSummaryData,
       event: TraceProcessingEvent,
     ): TraceSummaryData {
+      // Monotonic UpdatedAt for ReplacingMergeTree correctness.
+      // Multiple spans can process within the same millisecond, producing
+      // rows with identical Date.now(). The merge then picks
+      // non-deterministically, potentially discarding rows with role data.
+      const nextUpdatedAt = Math.max(Date.now(), state.updatedAt + 1);
+
       if (isSpanReceivedEvent(event)) {
         const normalizedSpan =
           spanNormalizationPipelineService.normalizeSpanReceived(
@@ -989,7 +995,7 @@ export function createTraceSummaryFoldProjection({
         return {
           ...applySpanToSummary({ state, span: normalizedSpan }),
           createdAt: state.createdAt,
-          updatedAt: Date.now(),
+          updatedAt: nextUpdatedAt,
         };
       }
 
@@ -998,7 +1004,7 @@ export function createTraceSummaryFoldProjection({
           ...state,
           topicId: event.data.topicId ?? state.topicId,
           subTopicId: event.data.subtopicId ?? state.subTopicId,
-          updatedAt: Date.now(),
+          updatedAt: nextUpdatedAt,
         };
       }
 
@@ -1050,7 +1056,7 @@ export function createTraceSummaryFoldProjection({
           computedOutput,
           outputSpanEndTimeMs,
           attributes: mergedAttributes,
-          updatedAt: Date.now(),
+          updatedAt: nextUpdatedAt,
         };
       }
 
@@ -1078,7 +1084,7 @@ export function createTraceSummaryFoldProjection({
           traceId: state.traceId || event.data.traceId,
           timeToFirstTokenMs,
           attributes: mergedAttributes,
-          updatedAt: Date.now(),
+          updatedAt: nextUpdatedAt,
         };
       }
 
@@ -1094,7 +1100,7 @@ export function createTraceSummaryFoldProjection({
             ...state.attributes,
             "langwatch.origin": event.data.origin,
           },
-          updatedAt: Date.now(),
+          updatedAt: nextUpdatedAt,
         };
       }
 
