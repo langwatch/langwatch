@@ -812,11 +812,10 @@ function accumulateRoleCostLatency({
     spanCosts[span.spanId] = spanCost;
   }
 
-  // Record parent relationship for all spans (even if role unknown yet)
+  // Record parent relationship for retroactive role propagation.
+  // Only stored in scenarioRoleSpans — not in spanCosts (which would
+  // bloat the Map column with zero-value entries for every span).
   if (span.parentSpanId) {
-    // Store parent mapping as negative-prefixed entry (hack to avoid another Map column)
-    // "_parent:childId" -> parentId
-    spanCosts[`_parent:${span.spanId}`] = 0; // placeholder
     scenarioRoleSpans[`_parent:${span.spanId}`] = span.parentSpanId;
   }
 
