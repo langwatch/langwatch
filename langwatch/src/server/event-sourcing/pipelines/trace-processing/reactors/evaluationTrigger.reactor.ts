@@ -3,50 +3,30 @@ import type { MonitorService } from "~/server/app-layer/monitors/monitor.service
 import type { QueueSendOptions } from "../../../queues";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
-import type { ResolveOriginCommandData } from "../schemas/commands";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
+import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
 
 const logger = createLogger(
   "langwatch:trace-processing:evaluation-trigger-reactor",
 );
 
-/** Delay (ms) before the deferred origin resolution fires */
-const DEFERRED_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 minutes
-
-export type DeferredOriginPayload = {
-  id: string;       // traceId — used as staged job ID for debuggability
-  tenantId: string;
-  traceId: string;
-  occurredAt: number;
-};
-
 export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
   evaluation: (data: ExecuteEvaluationCommandData, options?: QueueSendOptions<ExecuteEvaluationCommandData>) => Promise<void>;
-  resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>;
-  scheduleDeferred: (payload: DeferredOriginPayload) => Promise<void>;
 }
 
 /**
- * Reads the resolved origin from the fold state attributes.
+ * Dispatches evaluation commands for traces that have a resolved origin.
  *
- * By the time the reactor fires, the fold projection has already resolved
- * origin from: explicit span attributes → legacy markers → SDK heuristic.
- * The only case where origin is still absent is pure OTEL traces with no
- * LangWatch SDK info — those need a 5-min deferred check.
- *
- * Returns:
- * - The origin string when `langwatch.origin` is set (explicit or inferred by fold)
- * - `null` when no origin could be determined (needs deferred check)
+ * Fires on every trace event (via traceSummary fold). If origin is absent,
+ * returns early — the originGate reactor handles deferred resolution.
+ * Once origin is present, iterates all enabled ON_MESSAGE monitors and
+ * sends an executeEvaluation command per monitor.
  */
-export function resolveOrigin(attrs: Record<string, string>): string | null {
-  return attrs["langwatch.origin"] ?? null;
-}
-
 export function createEvaluationTriggerReactor(
   deps: EvaluationTriggerReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
@@ -73,68 +53,14 @@ export function createEvaluationTriggerReactor(
 
       const attrs = foldState.attributes ?? {};
 
-      // Phase 1: Origin resolution
-      const resolvedOrigin = resolveOrigin(attrs);
-
-      if (resolvedOrigin === null) {
-        // No origin even after fold projection ran all heuristics (explicit,
-        // legacy markers, SDK heuristic). This is a pure OTEL trace with no
-        // LangWatch SDK info — schedule a deferred check.
-        logger.debug(
-          { tenantId, traceId },
-          "No origin resolved, scheduling deferred origin resolution",
-        );
-        await deps.scheduleDeferred({
-          id: traceId,
-          tenantId,
-          traceId,
-          occurredAt: event.occurredAt,
-        });
-        return;
-      }
+      // Guard: origin not yet resolved — originGate reactor handles deferred resolution
+      if (!attrs["langwatch.origin"]) return;
 
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
       await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt: event.occurredAt });
     },
   };
 }
-
-/**
- * Creates the deferred origin resolution handler.
- *
- * Fires after a 5-minute delay for pure OTEL traces that had no origin
- * at normal debounce time. Unconditionally dispatches a resolveOrigin
- * command with origin="application" — the command's idempotency key
- * and the fold projection's no-override guard handle duplicates.
- *
- * The resulting OriginResolvedEvent flows through:
- *   fold (sets origin if absent) → evaluationTrigger reactor → dispatchEvaluations()
- */
-export function createDeferredOriginHandler(
-  resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>,
-) {
-  return async (payload: DeferredOriginPayload): Promise<void> => {
-    logger.debug(
-      { tenantId: payload.tenantId, traceId: payload.traceId },
-      "Deferred origin resolution: dispatching resolveOrigin command",
-    );
-    await resolveOrigin({
-      tenantId: payload.tenantId,
-      traceId: payload.traceId,
-      origin: "application",
-      reason: "deferred_fallback",
-      occurredAt: payload.occurredAt,
-    });
-  };
-}
-
-/** Dedup key for deferred origin resolution jobs */
-export function makeDeferredJobId(payload: DeferredOriginPayload): string {
-  return `deferred-origin:${payload.tenantId}:${payload.traceId}`;
-}
-
-/** Delay for deferred origin resolution */
-export { DEFERRED_CHECK_DELAY_MS };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -221,7 +147,7 @@ async function dispatchEvaluations({
             }
           : {
               deduplication: {
-                makeId: makeJobId,
+                makeId: ExecuteEvaluationCommand.makeJobId,
                 // 6 min — outlasts the 5-min deferred origin resolution window
                 // so that if the reactor fires twice (once from a late span,
                 // once from the deferred OriginResolvedEvent), the second

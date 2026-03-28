@@ -5,9 +5,9 @@ import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
-  DEFERRED_CHECK_DELAY_MS,
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
+import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
 
 function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {
@@ -73,8 +73,6 @@ function createDeps(overrides: Partial<EvaluationTriggerReactorDeps> = {}): Eval
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([]),
     } as any,
     evaluation: vi.fn().mockResolvedValue(undefined),
-    resolveOrigin: vi.fn().mockResolvedValue(undefined),
-    scheduleDeferred: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
