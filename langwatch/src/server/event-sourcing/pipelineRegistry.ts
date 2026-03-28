@@ -26,7 +26,8 @@ import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-proce
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
+import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
+import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
@@ -40,7 +41,9 @@ import {
   SimulationRunStateRepositoryMemory,
 } from "./pipelines/simulation-processing/repositories";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
-import { createSuiteRunStateFoldStore } from "./pipelines/suite-run-processing/projections/suiteRunState.store";
+import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
+import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import {
   SuiteRunStateRepositoryClickHouse,
   SuiteRunStateRepositoryMemory,
@@ -338,7 +341,10 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createSuiteRunProcessingPipeline({
-        suiteRunStateFoldStore: createSuiteRunStateFoldStore(repository),
+        suiteRunStateFoldStore: new RepositoryFoldStore<SuiteRunStateData>(
+          repository,
+          SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+        ),
       }),
     );
   }
@@ -352,7 +358,10 @@ export class PipelineRegistry {
     const repository = foldClientResolver
       ? new SimulationRunStateRepositoryClickHouse(foldClientResolver)
       : new SimulationRunStateRepositoryMemory();
-    const simulationRunStore = createSimulationRunStateFoldStore(repository);
+    const simulationRunStore = new RepositoryFoldStore<SimulationRunStateData>(
+      repository,
+      SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+    );
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
       {
         broadcast: this.deps.broadcast,

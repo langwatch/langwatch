@@ -2,9 +2,11 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
-import { ReportEvaluationCommand } from "./commands/reportEvaluation.command";
-import { StartEvaluationCommand } from "./commands/startEvaluation.command";
+import {
+  StartEvaluationCommand,
+  CompleteEvaluationCommand,
+  ReportEvaluationCommand,
+} from "./commands";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 

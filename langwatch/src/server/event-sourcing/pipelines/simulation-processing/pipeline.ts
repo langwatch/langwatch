@@ -1,13 +1,15 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { DeleteRunCommand } from "./commands/deleteRun.command";
-import { FinishRunCommand } from "./commands/finishRun.command";
-import { MessageSnapshotCommand } from "./commands/messageSnapshot.command";
-import { QueueRunCommand } from "./commands/queueRun.command";
-import { StartRunCommand } from "./commands/startRun.command";
-import { TextMessageStartCommand } from "./commands/textMessageStart.command";
-import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
+import {
+  QueueRunCommand,
+  StartRunCommand,
+  MessageSnapshotCommand,
+  TextMessageStartCommand,
+  TextMessageEndCommand,
+  FinishRunCommand,
+  DeleteRunCommand,
+} from "./commands";
 import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 

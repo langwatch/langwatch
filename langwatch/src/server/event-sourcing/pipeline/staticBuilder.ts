@@ -100,7 +100,7 @@ export class StaticPipelineBuilderWithNameAndType<
   >();
   private commands: Array<{
     name: string;
-    handlerClass: CommandHandlerClass<any, any, EventType>;
+    handlerClass: CommandHandlerClass<any, any, any>;
     options?: CommandHandlerOptions;
   }> = [];
   private foldReactors = new Map<
@@ -243,7 +243,7 @@ export class StaticPipelineBuilderWithNameAndType<
    * @returns Builder instance for method chaining
    */
   withCommand<
-    handlerClass extends CommandHandlerClass<any, any, EventType>,
+    handlerClass extends CommandHandlerClass<any, any, any>,
     Name extends string,
   >(
     name: Name,
