@@ -159,7 +159,8 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // metadata JSON object. Consume the blob with take() and hoist every
     // field so downstream code uses canonical keys only.
     // ─────────────────────────────────────────────────────────────────────────
-    const metadata = attrs.take("metadata") ?? attrs.take("langwatch.metadata");
+    const metadata = attrs.take("metadata") ?? attrs.take("langwatch.metadata")
+      ?? attrs.take("trace") ?? attrs.take("langwatch.trace");
     if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
         const parsedObj = metadata as Record<string, unknown>;
         // Extract labels if not already set
@@ -224,6 +225,28 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           typeof metadata === "string" ? metadata : safeStringify(metadata),
         );
         ctx.recordRule(`${this.id}:metadata._raw`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Metadata subkeys — consume langwatch.metadata.*, langwatch.trace.*,
+    // and trace.* subkeys and normalize to metadata.{bareKey}.
+    // Uses setAttr (not setAttrIfAbsent) so subkeys override blob fields.
+    // ─────────────────────────────────────────────────────────────────────────
+    const METADATA_SUBKEY_PREFIXES = [
+      "langwatch.metadata.",
+      "langwatch.trace.",
+      "trace.",
+    ] as const;
+    for (const prefix of METADATA_SUBKEY_PREFIXES) {
+      for (const { key, value } of attrs.takeByPrefix(prefix)) {
+        const bareKey = key.slice(prefix.length);
+        if (bareKey && value !== null && value !== undefined) {
+          ctx.setAttr(
+            `metadata.${bareKey}`,
+            typeof value === "string" ? value : safeStringify(value),
+          );
+        }
+      }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
