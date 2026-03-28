@@ -9,6 +9,8 @@ import { normalizeErrorMessage } from "../../shared/normalizeErrorMessage.ts";
 
 const REDIS_STATE_KEY = "skynet:state";
 const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
+/** Prefix for per-job-name keys in prevCompleted/prevFailed maps to avoid collisions with queue-level keys */
+const JOB_NAME_COUNTER_PREFIX = "jn:";
 
 interface PersistedMetricsState {
   version: 2;
@@ -338,21 +340,11 @@ export class MetricsCollector {
       ? await jobNameCounterPipeline.exec()
       : [];
 
-    // Aggregate per-job-name counters across all queues
-    const jobNameTotals = new Map<string, { completed: number; failed: number }>();
-    if (jobNameCounterResults) {
-      for (let i = 0; i < jobNameCounterKeys.length; i++) {
-        const { compositeKey } = jobNameCounterKeys[i]!;
-        let completed = 0;
-        let failed = 0;
-        for (let q = 0; q < this.groupQueueNames.length; q++) {
-          const baseIdx = (i * this.groupQueueNames.length + q) * 2;
-          completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
-          failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
-        }
-        jobNameTotals.set(compositeKey, { completed, failed });
-      }
-    }
+    const jobNameTotals = aggregateJobNameCounters({
+      jobNameCounterKeys,
+      jobNameCounterResults: jobNameCounterKeys.length > 0 ? jobNameCounterResults as Array<[Error | null, unknown]> | null : null,
+      queueCount: this.groupQueueNames.length,
+    });
 
     const jobNameMetrics: JobNameMetrics[] = [];
     for (const [compositeKey, counts] of jobNameCounts) {
@@ -361,7 +353,7 @@ export class MetricsCollector {
       const phase = counts.phase;
 
       const totals = jobNameTotals.get(compositeKey) ?? { completed: 0, failed: 0 };
-      const prevKey = `jn:${compositeKey}`;
+      const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
       const prevC = this.prevCompleted.get(prevKey) ?? 0;
       const prevF = this.prevFailed.get(prevKey) ?? 0;
 
@@ -674,6 +666,34 @@ export function buildPipelineTree({ queues, seedKeys = [] }: { queues: QueueInfo
 
   tree.sort((a, b) => a.name.localeCompare(b.name));
   return tree;
+}
+
+/** Aggregate per-job-name counters from Redis pipeline results across multiple queues. */
+export function aggregateJobNameCounters({
+  jobNameCounterKeys,
+  jobNameCounterResults,
+  queueCount,
+}: {
+  jobNameCounterKeys: Array<{ compositeKey: string; jobName: string }>;
+  jobNameCounterResults: Array<[Error | null, unknown]> | null;
+  queueCount: number;
+}): Map<string, { completed: number; failed: number }> {
+  const totals = new Map<string, { completed: number; failed: number }>();
+  if (!jobNameCounterResults) return totals;
+
+  for (let i = 0; i < jobNameCounterKeys.length; i++) {
+    const { compositeKey } = jobNameCounterKeys[i]!;
+    let completed = 0;
+    let failed = 0;
+    for (let q = 0; q < queueCount; q++) {
+      const baseIdx = (i * queueCount + q) * 2;
+      completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
+      failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
+    }
+    totals.set(compositeKey, { completed, failed });
+  }
+
+  return totals;
 }
 
 const EMPTY_PHASE = { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 } as const;
