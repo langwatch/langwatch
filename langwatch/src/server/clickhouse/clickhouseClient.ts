@@ -2,7 +2,7 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
-import { _getSharedClickHouseClient, _getPrimaryReplicaClickHouseClient } from "./client";
+import { _getSharedClickHouseClient } from "./client";
 import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:routing");
@@ -24,14 +24,12 @@ export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseC
  *   CLICKHOUSE_URL__acme__dv0uZFgPfenFvzg2qKNQa=http://default:pass@acme-ch:8123/langwatch
  */
 const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
-const PRIVATE_CH_PRIMARY_REPLICA_ENV_PREFIX = "CLICKHOUSE_PRIMARY_REPLICA_URL__";
 
 /**
  * Map of orgId → connectionUrl, parsed from env vars at module load.
  * Zero runtime overhead — no DB queries, no decryption.
  */
 const privateClickHouseUrls = parsePrivateEnvVars(PRIVATE_CH_ENV_PREFIX, "ClickHouse");
-const privatePrimaryReplicaUrls = parsePrivateEnvVars(PRIVATE_CH_PRIMARY_REPLICA_ENV_PREFIX, "ClickHouse primary replica");
 
 function parsePrivateEnvVars(prefix: string, label: string): Map<string, string> {
   const map = new Map<string, string>();
@@ -162,46 +160,6 @@ export function isClickHouseEnabled(): boolean {
 /** Re-export for infrastructure-only use (metrics collection, not tenant data). */
 export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
 
-/**
- * Returns the write (primary) ClickHouse client for fold store operations.
- * Uses CLICKHOUSE_PRIMARY_REPLICA_URL if configured, otherwise falls back to the shared client.
- *
- * Fold stores need read-after-write consistency. In replicated setups, routing
- * both reads and writes to the primary replica avoids replication lag entirely.
- */
-export async function getPrimaryReplicaClickHouseClientForProject(
-  projectId: string,
-): Promise<ClickHouseClient | null> {
-  let orgId = projectOrgCache.get(projectId);
-  if (!orgId) {
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    if (!project) {
-      throw new Error(
-        `Cannot resolve ClickHouse client: project "${projectId}" not found.`,
-      );
-    }
-    orgId = project.team.organizationId;
-    projectOrgCache.set(projectId, orgId);
-  }
-
-  // Check for private primary replica URL first
-  const privatePrimaryUrl = privatePrimaryReplicaUrls.get(orgId);
-  if (privatePrimaryUrl) {
-    return getOrCreateCustomClient(`${orgId}:primary`, privatePrimaryUrl);
-  }
-
-  // Fall back to regular private URL (single-node or no primary configured)
-  const privateUrl = privateClickHouseUrls.get(orgId);
-  if (privateUrl) {
-    return getOrCreateCustomClient(orgId, privateUrl);
-  }
-
-  // Shared instance — use primary replica client
-  return _getPrimaryReplicaClickHouseClient();
-}
 
 /**
  * Returns a cached ClickHouse client for the given org and URL,

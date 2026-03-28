@@ -1,9 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { getClickHouseClientForProject, getPrimaryReplicaClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
+import { EventRepositoryClickHouse } from "../event-sourcing/stores/repositories/eventRepositoryClickHouse";
+import { EventRepositoryMemory } from "../event-sourcing/stores/repositories/eventRepositoryMemory";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
@@ -103,14 +105,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     return client;
   };
 
-  // Primary replica resolver: routes fold store reads/writes to a single node.
-  // In replicated setups, this avoids replication lag for read-after-write.
-  // Falls back to the shared client when CLICKHOUSE_PRIMARY_REPLICA_URL is not set.
-  const resolvePrimaryReplicaClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
-    const client = await getPrimaryReplicaClickHouseClientForProject(tenantId);
-    if (!client) throw new Error(`ClickHouse master not available for tenant ${tenantId}`);
-    return client;
-  };
 
   const redis = config.skipRedis ? null : createRedisConnectionFromConfig({
     url: config.redisUrl,
@@ -264,19 +258,18 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
-  const primaryReplicaResolver = clickhouseEnabled ? resolvePrimaryReplicaClickHouseClient : null;
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
       ? new SuiteRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SuiteRunStateRepositoryMemory(),
-    simulationRunState: primaryReplicaResolver
-      ? new SimulationRunStateRepositoryClickHouse(primaryReplicaResolver)
+    simulationRunState: clickhouseEnabled
+      ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
-    experimentRunState: primaryReplicaResolver
-      ? new ExperimentRunStateRepositoryClickHouse(primaryReplicaResolver)
+    experimentRunState: clickhouseEnabled
+      ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new ExperimentRunStateRepositoryMemory(),
-    traceSummaryFold: primaryReplicaResolver
-      ? new TraceSummaryClickHouseRepository(primaryReplicaResolver)
+    traceSummaryFold: clickhouseEnabled
+      ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
       : traceSummary.repository,
     logRecordStorage: clickhouseEnabled
       ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
@@ -289,9 +282,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
   };
 
+  const eventRepository = clickhouseEnabled
+    ? new EventRepositoryClickHouse(resolveClickHouseClient)
+    : new EventRepositoryMemory();
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
+    redis: redis!,
+    eventRepository,
     broadcast,
     projects,
     monitors,
