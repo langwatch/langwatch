@@ -2,14 +2,17 @@
  * Lua script to atomically unblock a group.
  * Mirrors complete.lua: clears blocked + active state, recalculates
  * ready score so the dispatcher can pick the group up immediately.
- * Also clears any stored error info for the group.
+ * Error info is intentionally preserved so Skynet can show the last
+ * error while the group retries. The error key is cleaned up when
+ * the group's next job succeeds (COMPLETE_LUA) or when the group
+ * is drained / moved to DLQ.
  *
  * KEYS[1] = {queueName}:gq:blocked                 (set)
  * KEYS[2] = {queueName}:gq:group:{groupId}:active  (string)
  * KEYS[3] = {queueName}:gq:group:{groupId}:jobs    (sorted set)
  * KEYS[4] = {queueName}:gq:ready                   (sorted set)
  * KEYS[5] = {queueName}:gq:signal                  (list)
- * KEYS[6] = {queueName}:gq:group:{groupId}:error   (hash)
+ * KEYS[6] = {queueName}:gq:group:{groupId}:error   (hash — NOT deleted)
  * ARGV[1] = groupId
  *
  * Returns: 1 = was blocked and unblocked, 0 = was not blocked
@@ -20,14 +23,12 @@ local activeKey  = KEYS[2]
 local jobsKey    = KEYS[3]
 local readyKey   = KEYS[4]
 local signalKey  = KEYS[5]
-local errorKey   = KEYS[6]
 local groupId    = ARGV[1]
 
 local wasBlocked = redis.call("SREM", blockedKey, groupId)
 
 if wasBlocked > 0 then
   redis.call("DEL", activeKey)
-  redis.call("DEL", errorKey)
 
   local pendingCount = redis.call("ZCARD", jobsKey)
   if pendingCount > 0 then
@@ -55,19 +56,21 @@ return wasBlocked
  * KEYS[5] = {queueName}:gq:blocked                 (set)
  * KEYS[6] = {queueName}:gq:signal                  (list)
  * KEYS[7] = {queueName}:gq:group:{groupId}:error   (hash)
+ * KEYS[8] = {queueName}:gq:stats:total-pending     (string counter)
  * ARGV[1] = groupId
  *
  * Returns: number of jobs removed
  */
 export const DRAIN_GROUP_LUA = `
-local jobsKey    = KEYS[1]
-local dataKey    = KEYS[2]
-local activeKey  = KEYS[3]
-local readyKey   = KEYS[4]
-local blockedKey = KEYS[5]
-local signalKey  = KEYS[6]
-local errorKey   = KEYS[7]
-local groupId    = ARGV[1]
+local jobsKey         = KEYS[1]
+local dataKey         = KEYS[2]
+local activeKey       = KEYS[3]
+local readyKey        = KEYS[4]
+local blockedKey      = KEYS[5]
+local signalKey       = KEYS[6]
+local errorKey        = KEYS[7]
+local totalPendingKey = KEYS[8]
+local groupId         = ARGV[1]
 
 local count = redis.call("ZCARD", jobsKey)
 
@@ -79,6 +82,11 @@ redis.call("ZREM", readyKey, groupId)
 redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
+
+-- Decrement total pending counter by drained jobs
+if count > 0 then
+  redis.call("DECRBY", totalPendingKey, count)
+end
 
 return count
 `;

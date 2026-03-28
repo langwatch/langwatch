@@ -1,15 +1,17 @@
 import { useRef, useMemo } from "react";
-import { Box, Flex, Text, VStack, Badge, Code, Collapse, useDisclosure } from "@chakra-ui/react";
-import { ChevronRightIcon, ChevronDownIcon } from "@chakra-ui/icons";
+import { Box, Flex, Text, VStack, Badge, Code, Collapse, useDisclosure, Button, HStack } from "@chakra-ui/react";
+import { ChevronRightIcon, ChevronDownIcon, SmallCloseIcon } from "@chakra-ui/icons";
 import { useNavigate } from "react-router-dom";
 import type { ErrorCluster } from "../../../shared/types.ts";
 
 interface ErrorRowProps {
   cluster: ErrorCluster;
   queueName: string | null;
+  isSelected?: boolean;
+  onFilterClick?: (normalizedMessage: string) => void;
 }
 
-function ErrorRow({ cluster, queueName }: ErrorRowProps) {
+function ErrorRow({ cluster, queueName, isSelected, onFilterClick }: ErrorRowProps) {
   const { isOpen, onToggle } = useDisclosure();
   const navigate = useNavigate();
 
@@ -19,20 +21,27 @@ function ErrorRow({ cluster, queueName }: ErrorRowProps) {
     navigate(`/groups/${encodeURIComponent(groupId)}${qs}`);
   };
 
+  const handleFilterClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onFilterClick?.(cluster.normalizedMessage);
+  };
+
   return (
     <Box
       border="1px solid"
-      borderColor="rgba(255, 0, 51, 0.15)"
+      borderColor={isSelected ? "rgba(255, 0, 51, 0.5)" : "rgba(255, 0, 51, 0.15)"}
       borderRadius="2px"
       overflow="hidden"
       w="100%"
+      bg={isSelected ? "rgba(255, 0, 51, 0.08)" : "transparent"}
+      transition="all 0.2s"
     >
       <Flex
         px={3}
         py={2}
         cursor="pointer"
         onClick={onToggle}
-        _hover={{ bg: "rgba(255, 0, 51, 0.04)" }}
+        _hover={{ bg: isSelected ? "rgba(255, 0, 51, 0.1)" : "rgba(255, 0, 51, 0.04)" }}
         userSelect="none"
         gap={3}
         align="center"
@@ -82,6 +91,22 @@ function ErrorRow({ cluster, queueName }: ErrorRowProps) {
             {cluster.normalizedMessage}
           </Text>
         </Box>
+        {onFilterClick && (
+          <Badge
+            as="button"
+            bg={isSelected ? "rgba(255, 0, 51, 0.3)" : "rgba(255, 0, 51, 0.1)"}
+            color="#ff6666"
+            fontSize="9px"
+            borderRadius="2px"
+            cursor="pointer"
+            flexShrink={0}
+            _hover={{ bg: "rgba(255, 0, 51, 0.25)", color: "#ff0033" }}
+            onClick={handleFilterClick}
+            textTransform="uppercase"
+          >
+            {isSelected ? "Filtered" : "Filter"}
+          </Badge>
+        )}
       </Flex>
       <Collapse in={isOpen}>
         <Box px={3} pb={3} overflow="hidden">
@@ -137,9 +162,11 @@ interface TopErrorsPanelProps {
   queueName: string | null;
   onPause?: () => void;
   onResume?: () => void;
+  selectedErrorFilter?: string | null;
+  onErrorFilterChange?: (normalizedMessage: string | null) => void;
 }
 
-export function TopErrorsPanel({ errors, queueName, onPause, onResume }: TopErrorsPanelProps) {
+export function TopErrorsPanel({ errors, queueName, onPause, onResume, selectedErrorFilter, onErrorFilterChange }: TopErrorsPanelProps) {
   // Stabilize ordering: once we've seen an error, keep its position.
   // This prevents rows from jumping around every 2s refresh.
   const orderRef = useRef<string[]>([]);
@@ -191,19 +218,45 @@ export function TopErrorsPanel({ errors, queueName, onPause, onResume }: TopErro
       onMouseEnter={onPause}
       onMouseLeave={onResume}
     >
-      <Text
-        fontSize="xs"
-        color="#ff0033"
-        fontWeight="600"
-        textTransform="uppercase"
-        letterSpacing="0.15em"
-        mb={3}
-      >
-        // Top Errors ({stableErrors.reduce((sum, e) => sum + e.count, 0)} blocked groups)
-      </Text>
+      <HStack mb={3} justify="space-between" align="center">
+        <Text
+          fontSize="xs"
+          color="#ff0033"
+          fontWeight="600"
+          textTransform="uppercase"
+          letterSpacing="0.15em"
+        >
+          // Top Errors ({stableErrors.reduce((sum, e) => sum + e.count, 0)} blocked groups)
+        </Text>
+        {selectedErrorFilter && onErrorFilterChange && (
+          <Button
+            size="xs"
+            variant="outline"
+            color="#ff0033"
+            borderColor="rgba(255, 0, 51, 0.3)"
+            borderRadius="2px"
+            _hover={{ borderColor: "#ff0033", boxShadow: "0 0 8px rgba(255, 0, 51, 0.3)" }}
+            onClick={() => onErrorFilterChange(null)}
+            leftIcon={<SmallCloseIcon />}
+            textTransform="uppercase"
+            letterSpacing="0.05em"
+            fontSize="9px"
+          >
+            Clear Filter
+          </Button>
+        )}
+      </HStack>
       <VStack spacing={2} align="stretch">
         {stableErrors.map((cluster) => (
-          <ErrorRow key={`${cluster.pipelineName ?? ""}::${cluster.normalizedMessage}`} cluster={cluster} queueName={queueName} />
+          <ErrorRow
+            key={`${cluster.pipelineName ?? ""}::${cluster.normalizedMessage}`}
+            cluster={cluster}
+            queueName={queueName}
+            isSelected={selectedErrorFilter === cluster.normalizedMessage}
+            onFilterClick={onErrorFilterChange ? (msg) => {
+              onErrorFilterChange(selectedErrorFilter === msg ? null : msg);
+            } : undefined}
+          />
         ))}
       </VStack>
     </Box>

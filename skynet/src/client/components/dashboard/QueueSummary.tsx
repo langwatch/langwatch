@@ -4,8 +4,8 @@ import type { QueueInfo } from "../../../shared/types.ts";
 export function QueueSummary({ queue }: { queue: QueueInfo }) {
   return (
     <HStack spacing={2}>
-      <Badge bg="badge.neutral" color="badge.neutral.text" fontSize="11px" borderRadius="2px">{queue.totalPendingJobs} jobs</Badge>
-      <Badge bg="badge.pending" color="badge.pending.text" fontSize="11px" borderRadius="2px">{queue.pendingGroupCount} pending</Badge>
+      <Badge bg="badge.neutral" color="badge.neutral.text" fontSize="11px" borderRadius="2px">{queue.totalPendingJobs} pending jobs</Badge>
+      <Badge bg="badge.pending" color="badge.pending.text" fontSize="11px" borderRadius="2px">{queue.pendingGroupCount} groups</Badge>
       {queue.blockedGroupCount > 0 && (
         <Badge bg="badge.blocked" color="badge.blocked.text" fontSize="11px" borderRadius="2px">{queue.blockedGroupCount} blocked</Badge>
       )}

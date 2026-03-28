@@ -23,7 +23,7 @@ interface ChartMouseEvent {
 }
 
 const SERIES = [
-  { key: "stagedPerSec", label: "Staged/s", color: "#00f0ff", gradientId: "stagedGrad" },
+  { key: "ingestedPerSec", label: "Ingested/s", color: "#00f0ff", gradientId: "ingestedGrad" },
   { key: "completedPerSec", label: "Completed/s", color: "#00ff41", gradientId: "completedGrad" },
   { key: "failedPerSec", label: "Failed/s", color: "#ff0033", gradientId: "failedGrad" },
   { key: "pendingCount", label: "Pending", color: "#8866ff", gradientId: "pendingGrad" },

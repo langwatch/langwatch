@@ -143,7 +143,7 @@ export function StatCards({ data }: { data: DashboardData }) {
   return (
     <Box mb={6}>
       <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-        <StatCard label="Done/s" color={data.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}>
+        <StatCard label="Completed/s" color={data.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}>
           <ValueWithPeak
             value={formatRate(data.completedPerSec)}
             peak={formatRate(data.peakCompletedPerSec)}
@@ -166,11 +166,11 @@ export function StatCards({ data }: { data: DashboardData }) {
             </Text>
           )}
         </StatCard>
-        <StatCard label="Staged/s" color={data.throughputStagedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}>
+        <StatCard label="Ingested/s" color={data.throughputIngestedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}>
           <ValueWithPeak
-            value={formatRate(data.throughputStagedPerSec)}
-            peak={formatRate(data.peakStagedPerSec)}
-            color={data.throughputStagedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}
+            value={formatRate(data.throughputIngestedPerSec)}
+            peak={formatRate(data.peakIngestedPerSec)}
+            color={data.throughputIngestedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}
           />
         </StatCard>
       </SimpleGrid>

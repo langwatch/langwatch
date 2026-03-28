@@ -2,7 +2,6 @@ import { Router } from "express";
 import type IORedis from "ioredis";
 import type { MetricsCollector } from "../services/metricsCollector.ts";
 import { stripHashTag } from "../services/queueDiscovery.ts";
-import { getCompletedJobsForGroup } from "../services/bullmqService.ts";
 import { analyzeBlockedGroups } from "../services/blockedGroupAnalyzer.ts";
 
 export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, getGroupQueueNames: () => string[]): Router {
@@ -188,37 +187,6 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
         }
       } catch (err) {
         console.error("Live Redis lookup failed for group:", groupId, err);
-      }
-    }
-
-    // Group has genuinely completed/drained — try to find completed BullMQ jobs
-    if (queueName) {
-      try {
-        const completedJobs = await getCompletedJobsForGroup(redis, queueName, groupId);
-        if (completedJobs.length > 0) {
-          res.json({
-            groupId,
-            queueName,
-            displayName: stripHashTag(queueName),
-            pendingJobs: 0,
-            hasActiveJob: false,
-            activeJobId: null,
-            isBlocked: false,
-            isStaleBlock: false,
-            pipelineName: null,
-            jobType: null,
-            jobName: null,
-            errorMessage: null,
-            errorStack: null,
-            errorTimestamp: null,
-            retryCount: null,
-            status: "completed",
-            completedJobs,
-          });
-          return;
-        }
-      } catch (err) {
-        console.error("Completed jobs lookup failed for group:", groupId, err);
       }
     }
 
