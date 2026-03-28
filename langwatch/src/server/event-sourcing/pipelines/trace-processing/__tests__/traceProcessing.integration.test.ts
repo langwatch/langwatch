@@ -22,7 +22,7 @@ import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
 import { createSpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import { createTraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 import { SpanAppendStore } from "../projections/spanStorage.store";
@@ -126,7 +126,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("trace" as AggregateType)
-    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
+    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
     .withMapProjection("spanStorage", createSpanStorageMapProjection({ store: spanAppendStore }) as any)
     .withCommand("recordSpan", RecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)

@@ -4,15 +4,18 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import {
-  EXPERIMENT_RUN_EVENT_TYPES,
-  EXPERIMENT_RUN_PROJECTION_VERSIONS,
-} from "../schemas/constants";
+import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   ExperimentRunStartedEvent,
   TargetResultEvent,
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
+} from "../schemas/events";
+import {
+  experimentRunStartedEventSchema,
+  targetResultEventSchema,
+  evaluatorResultEventSchema,
+  experimentRunCompletedEventSchema,
 } from "../schemas/events";
 
 /**
@@ -75,38 +78,29 @@ function mergeTargetsJson(
   return JSON.stringify(Array.from(byId.values()));
 }
 
-/**
- * Event map — single source of truth for which events this projection handles.
- * Keys become handler method names: `handle${Key}`.
- */
-type ExperimentRunEventMap = {
-  ExperimentRunStarted: ExperimentRunStartedEvent;
-  TargetResult: TargetResultEvent;
-  EvaluatorResult: EvaluatorResultEvent;
-  ExperimentRunCompleted: ExperimentRunCompletedEvent;
-};
+const experimentRunEvents = [
+  experimentRunStartedEventSchema,
+  targetResultEventSchema,
+  evaluatorResultEventSchema,
+  experimentRunCompletedEventSchema,
+] as const;
 
 /**
  * Type-safe fold projection for experiment run state.
  *
- * - `implements FoldEventHandlers` enforces a handler exists for every event in the map
- * - `eventTypeMap` routes runtime event.type strings to the correct handler
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.experiment_run.started"` -> `handleExperimentRunStarted`)
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class ExperimentRunStateFoldProjection
-  extends AbstractFoldProjection<ExperimentRunStateData, ExperimentRunEventMap>
-  implements FoldEventHandlers<ExperimentRunEventMap, ExperimentRunStateData>
+  extends AbstractFoldProjection<ExperimentRunStateData, typeof experimentRunEvents>
+  implements FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
 {
   readonly name = "experimentRunState";
   readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<ExperimentRunStateData>;
 
-  protected readonly eventTypeMap = {
-    [EXPERIMENT_RUN_EVENT_TYPES.STARTED]: "handleExperimentRunStarted",
-    [EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT]: "handleTargetResult",
-    [EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT]: "handleEvaluatorResult",
-    [EXPERIMENT_RUN_EVENT_TYPES.COMPLETED]: "handleExperimentRunCompleted",
-  } as const;
+  protected readonly events = experimentRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<ExperimentRunStateData> }) {
     super();
@@ -152,7 +146,7 @@ export class ExperimentRunStateFoldProjection
     };
   }
 
-  handleTargetResult(
+  handleExperimentRunTargetResult(
     event: TargetResultEvent,
     state: ExperimentRunStateData,
   ): ExperimentRunStateData {
@@ -188,7 +182,7 @@ export class ExperimentRunStateFoldProjection
     };
   }
 
-  handleEvaluatorResult(
+  handleExperimentRunEvaluatorResult(
     event: EvaluatorResultEvent,
     state: ExperimentRunStateData,
   ): ExperimentRunStateData {

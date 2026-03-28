@@ -5,15 +5,18 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import {
-  EVALUATION_EVENT_TYPES,
-  EVALUATION_PROJECTION_VERSIONS,
-} from "../schemas/constants";
+import { EVALUATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   EvaluationScheduledEvent,
   EvaluationStartedEvent,
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
+} from "../schemas/events";
+import {
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
 } from "../schemas/events";
 
 export type { EvaluationRunData };
@@ -25,22 +28,18 @@ export interface EvaluationRun extends Projection<EvaluationRunData> {
   data: EvaluationRunData;
 }
 
-/**
- * Event map — single source of truth for which events this projection handles.
- * Keys become handler method names: `handle${Key}`.
- */
-type EvaluationRunEventMap = {
-  EvaluationScheduled: EvaluationScheduledEvent;
-  EvaluationStarted: EvaluationStartedEvent;
-  EvaluationCompleted: EvaluationCompletedEvent;
-  EvaluationReported: EvaluationReportedEvent;
-};
+const evaluationRunEvents = [
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+] as const;
 
 /**
  * Type-safe fold projection for evaluation run state.
  *
- * - `implements FoldEventHandlers` enforces a handler exists for every event in the map
- * - `eventTypeMap` routes runtime event.type strings to the correct handler
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.evaluation.scheduled"` -> `handleEvaluationScheduled`)
  * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
  *
  * Events are applied in order:
@@ -50,19 +49,14 @@ type EvaluationRunEventMap = {
  * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export class EvaluationRunFoldProjection
-  extends AbstractFoldProjection<EvaluationRunData, EvaluationRunEventMap, "createdAt", "updatedAt">
-  implements FoldEventHandlers<EvaluationRunEventMap, EvaluationRunData>
+  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents, "createdAt", "updatedAt">
+  implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
 {
   readonly name = "evaluationRun";
   readonly version = EVALUATION_PROJECTION_VERSIONS.STATE;
   readonly store: FoldProjectionStore<EvaluationRunData>;
 
-  protected readonly eventTypeMap = {
-    [EVALUATION_EVENT_TYPES.SCHEDULED]: "handleEvaluationScheduled",
-    [EVALUATION_EVENT_TYPES.STARTED]: "handleEvaluationStarted",
-    [EVALUATION_EVENT_TYPES.COMPLETED]: "handleEvaluationCompleted",
-    [EVALUATION_EVENT_TYPES.REPORTED]: "handleEvaluationReported",
-  } as const;
+  protected readonly events = evaluationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
     super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });

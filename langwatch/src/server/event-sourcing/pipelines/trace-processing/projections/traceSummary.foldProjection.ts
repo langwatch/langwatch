@@ -17,15 +17,7 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
-import {
-  TRACE_PROCESSING_EVENT_TYPES,
-  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-  SPAN_RECEIVED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
-  LOG_RECORD_RECEIVED_EVENT_TYPE,
-  METRIC_RECORD_RECEIVED_EVENT_TYPE,
-  ORIGIN_RESOLVED_EVENT_TYPE,
-} from "../schemas/constants";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type {
   LogRecordReceivedEventData,
   SpanReceivedEvent,
@@ -33,6 +25,13 @@ import type {
   LogRecordReceivedEvent,
   MetricRecordReceivedEvent,
   OriginResolvedEvent,
+} from "../schemas/events";
+import {
+  spanReceivedEventSchema,
+  topicAssignedEventSchema,
+  logRecordReceivedEventSchema,
+  metricRecordReceivedEventSchema,
+  originResolvedEventSchema,
 } from "../schemas/events";
 import type { NormalizedAttributes, NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
@@ -907,40 +906,30 @@ export function applySpanToSummary({
   };
 }
 
-/**
- * Event map — single source of truth for which events this projection handles.
- * Keys become handler method names: `handle${Key}`.
- */
-type TraceSummaryEventMap = {
-  SpanReceived: SpanReceivedEvent;
-  TopicAssigned: TopicAssignedEvent;
-  LogRecordReceived: LogRecordReceivedEvent;
-  MetricRecordReceived: MetricRecordReceivedEvent;
-  OriginResolved: OriginResolvedEvent;
-};
+const traceSummaryEvents = [
+  spanReceivedEventSchema,
+  topicAssignedEventSchema,
+  logRecordReceivedEventSchema,
+  metricRecordReceivedEventSchema,
+  originResolvedEventSchema,
+] as const;
 
 /**
  * Type-safe fold projection for trace summary state.
  *
- * - `implements FoldEventHandlers` enforces a handler exists for every event in the map
- * - `eventTypeMap` routes runtime event.type strings to the correct handler
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.obs.trace.span_received"` -> `handleTraceSpanReceived`)
  * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
  */
 export class TraceSummaryFoldProjection
-  extends AbstractFoldProjection<TraceSummaryData, TraceSummaryEventMap, "createdAt", "updatedAt">
-  implements FoldEventHandlers<TraceSummaryEventMap, TraceSummaryData>
+  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents, "createdAt", "updatedAt">
+  implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
 {
   readonly name = "traceSummary";
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceSummaryData>;
 
-  protected readonly eventTypeMap = {
-    [SPAN_RECEIVED_EVENT_TYPE]: "handleSpanReceived",
-    [TOPIC_ASSIGNED_EVENT_TYPE]: "handleTopicAssigned",
-    [LOG_RECORD_RECEIVED_EVENT_TYPE]: "handleLogRecordReceived",
-    [METRIC_RECORD_RECEIVED_EVENT_TYPE]: "handleMetricRecordReceived",
-    [ORIGIN_RESOLVED_EVENT_TYPE]: "handleOriginResolved",
-  } as const;
+  protected readonly events = traceSummaryEvents;
 
   constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {
     super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
@@ -981,7 +970,7 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  handleSpanReceived(
+  handleTraceSpanReceived(
     event: SpanReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
@@ -1000,7 +989,7 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  handleTopicAssigned(
+  handleTraceTopicAssigned(
     event: TopicAssignedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
@@ -1011,7 +1000,7 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  handleLogRecordReceived(
+  handleTraceLogRecordReceived(
     event: LogRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
@@ -1065,7 +1054,7 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  handleMetricRecordReceived(
+  handleTraceMetricRecordReceived(
     event: MetricRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
@@ -1095,7 +1084,7 @@ export class TraceSummaryFoldProjection
     };
   }
 
-  handleOriginResolved(
+  handleTraceOriginResolved(
     event: OriginResolvedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {

@@ -5,10 +5,7 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import {
-  SIMULATION_RUN_EVENT_TYPES,
-  SIMULATION_PROJECTION_VERSIONS,
-} from "../schemas/constants";
+import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
@@ -18,6 +15,16 @@ import type {
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunDeletedEvent,
+} from "../schemas/events";
+import {
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunDeletedEventSchema,
 } from "../schemas/events";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 
@@ -79,46 +86,33 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
   data: SimulationRunStateData;
 }
 
-/**
- * Event map — single source of truth for which events this projection handles.
- * Keys become handler method names: `handle${Key}`.
- */
-type SimulationRunEventMap = {
-  SimulationRunQueued: SimulationRunQueuedEvent;
-  SimulationRunStarted: SimulationRunStartedEvent;
-  SimulationMessageSnapshot: SimulationMessageSnapshotEvent;
-  SimulationTextMessageStart: SimulationTextMessageStartEvent;
-  SimulationTextMessageEnd: SimulationTextMessageEndEvent;
-  SimulationRunFinished: SimulationRunFinishedEvent;
-  SimulationRunMetricsComputed: SimulationRunMetricsComputedEvent;
-  SimulationRunDeleted: SimulationRunDeletedEvent;
-};
+const simulationRunEvents = [
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunDeletedEventSchema,
+] as const;
 
 /**
  * Type-safe fold projection for simulation run state.
  *
- * - `implements FoldEventHandlers` enforces a handler exists for every event in the map
- * - `eventTypeMap` routes runtime event.type strings to the correct handler
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.simulation_run.queued"` -> `handleSimulationRunQueued`)
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class SimulationRunStateFoldProjection
-  extends AbstractFoldProjection<SimulationRunStateData, SimulationRunEventMap>
-  implements FoldEventHandlers<SimulationRunEventMap, SimulationRunStateData>
+  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
+  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
 {
   readonly name = "simulationRunState";
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<SimulationRunStateData>;
 
-  protected readonly eventTypeMap = {
-    [SIMULATION_RUN_EVENT_TYPES.QUEUED]: "handleSimulationRunQueued",
-    [SIMULATION_RUN_EVENT_TYPES.STARTED]: "handleSimulationRunStarted",
-    [SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT]: "handleSimulationMessageSnapshot",
-    [SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START]: "handleSimulationTextMessageStart",
-    [SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END]: "handleSimulationTextMessageEnd",
-    [SIMULATION_RUN_EVENT_TYPES.FINISHED]: "handleSimulationRunFinished",
-    [SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED]: "handleSimulationRunMetricsComputed",
-    [SIMULATION_RUN_EVENT_TYPES.DELETED]: "handleSimulationRunDeleted",
-  } as const;
+  protected readonly events = simulationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<SimulationRunStateData> }) {
     super();
@@ -191,7 +185,7 @@ export class SimulationRunStateFoldProjection
     };
   }
 
-  handleSimulationMessageSnapshot(
+  handleSimulationRunMessageSnapshot(
     event: SimulationMessageSnapshotEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
@@ -222,7 +216,7 @@ export class SimulationRunStateFoldProjection
     };
   }
 
-  handleSimulationTextMessageStart(
+  handleSimulationRunTextMessageStart(
     event: SimulationTextMessageStartEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
@@ -259,7 +253,7 @@ export class SimulationRunStateFoldProjection
     };
   }
 
-  handleSimulationTextMessageEnd(
+  handleSimulationRunTextMessageEnd(
     event: SimulationTextMessageEndEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
