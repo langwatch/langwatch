@@ -487,20 +487,20 @@ function hoistSource(
   state: TraceSummaryData,
   span: NormalizedSpan,
   mergedAttributes: Record<string, string>,
-  spanAttributes: Record<string, string>,
 ): void {
   const isRootSpan = !span.parentSpanId;
-  const explicitSource = spanAttributes["langwatch.source"];
+  const explicitSource =
+    span.spanAttributes["langwatch.origin.source"] as string | undefined;
   if (typeof explicitSource === "string" && explicitSource !== "") {
     if (isRootSpan) {
-      mergedAttributes["langwatch.source"] = explicitSource;
-    } else if (!state.attributes["langwatch.source"]) {
-      mergedAttributes["langwatch.source"] = explicitSource;
+      mergedAttributes["langwatch.origin.source"] = explicitSource;
+    } else if (!state.attributes["langwatch.origin.source"]) {
+      mergedAttributes["langwatch.origin.source"] = explicitSource;
     } else {
-      mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+      mergedAttributes["langwatch.origin.source"] = state.attributes["langwatch.origin.source"];
     }
-  } else if (state.attributes["langwatch.source"]) {
-    mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+  } else if (state.attributes["langwatch.origin.source"]) {
+    mergedAttributes["langwatch.origin.source"] = state.attributes["langwatch.origin.source"];
   }
 }
 
@@ -753,7 +753,7 @@ function accumulateAttributes({
 
   stripLegacyMarkers(merged);
   hoistOrigin(state, span, merged);
-  hoistSource(state, span, merged, spanAttrs);
+  hoistSource(state, span, merged);
 
   merged["langwatch.reserved.output_source"] = outputSource;
 
