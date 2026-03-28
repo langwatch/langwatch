@@ -967,6 +967,9 @@ export class TraceSummaryFoldProjection
       scenarioRoleLatencies: {},
       scenarioRoleSpans: {},
       spanCosts: {},
+      // Sentinel: 0 means "no spans received yet". The timing function uses
+      // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
+      // here would break Math.min logic — wall-clock time >> span startTimeUnixMs.
       occurredAt: 0,
     };
   }
