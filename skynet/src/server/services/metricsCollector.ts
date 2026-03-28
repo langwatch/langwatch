@@ -13,7 +13,7 @@ const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
 const JOB_NAME_COUNTER_PREFIX = "jn:";
 
 interface PersistedMetricsState {
-  version: 2;
+  version: 3;
   savedAt: number;
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
@@ -325,24 +325,30 @@ export class MetricsCollector {
     // Build per-jobName metrics with live throughput from Redis counters
     const jobNameCounts = this.buildJobNameCounts(queues);
 
-    // Discover per-job-name counter keys via SCAN (only job names we already know from group data)
+    // Deduplicate job names — multiple pipelines may share the same jobName,
+    // and Redis counters are keyed by jobName only (not pipeline::jobName).
+    const uniqueJobNames = new Set<string>();
+    for (const [compositeKey] of jobNameCounts) {
+      uniqueJobNames.add(compositeKey.split("::")[1] ?? compositeKey);
+    }
+
     const jobNameCounterPipeline = this.redis.pipeline();
-    const jobNameCounterKeys: Array<{ compositeKey: string; jobName: string }> = [];
-    for (const [compositeKey, counts] of jobNameCounts) {
-      const jobName = compositeKey.split("::")[1] ?? compositeKey;
+    const dedupedJobNames: string[] = [];
+    for (const jobName of uniqueJobNames) {
       for (const queueName of this.groupQueueNames) {
         jobNameCounterPipeline.get(`${queueName}:gq:stats:completed:${jobName}`);
         jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
       }
-      jobNameCounterKeys.push({ compositeKey, jobName });
+      dedupedJobNames.push(jobName);
     }
-    const jobNameCounterResults = jobNameCounterKeys.length > 0
+    const jobNameCounterResults = dedupedJobNames.length > 0
       ? await jobNameCounterPipeline.exec()
       : [];
 
+    // Aggregate per-jobName (not per-compositeKey) to avoid double-counting
     const jobNameTotals = aggregateJobNameCounters({
-      jobNameCounterKeys,
-      jobNameCounterResults: jobNameCounterKeys.length > 0 ? jobNameCounterResults as Array<[Error | null, unknown]> | null : null,
+      jobNameCounterKeys: dedupedJobNames.map((jn) => ({ compositeKey: jn, jobName: jn })),
+      jobNameCounterResults: dedupedJobNames.length > 0 ? jobNameCounterResults as Array<[Error | null, unknown]> | null : null,
       queueCount: this.groupQueueNames.length,
     });
 
@@ -352,7 +358,7 @@ export class MetricsCollector {
       const pipelineName = counts.pipelineName;
       const phase = counts.phase;
 
-      const totals = jobNameTotals.get(compositeKey) ?? { completed: 0, failed: 0 };
+      const totals = jobNameTotals.get(jobName) ?? { completed: 0, failed: 0 };
       const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
       const prevC = this.prevCompleted.get(prevKey) ?? 0;
       const prevF = this.prevFailed.get(prevKey) ?? 0;
@@ -398,7 +404,7 @@ export class MetricsCollector {
       if (!raw) return;
 
       const state: PersistedMetricsState = JSON.parse(raw);
-      if (state.version !== 2) {
+      if (state.version !== 3) {
         console.log("Discarding stale metrics state (version mismatch), starting fresh");
         return;
       }
@@ -434,7 +440,7 @@ export class MetricsCollector {
 
   private async persistState(): Promise<void> {
     const state: PersistedMetricsState = {
-      version: 2,
+      version: 3,
       savedAt: Date.now(),
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
