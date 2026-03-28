@@ -4,7 +4,7 @@ import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   applySpanToSummary,
-  createTraceSummaryFoldProjection,
+  TraceSummaryFoldProjection,
   type TraceSummaryData,
 } from "../traceSummary.foldProjection";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
@@ -12,7 +12,7 @@ import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors
 const PARTIAL_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
 const SKIPPED_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
 
-const traceSummaryProjection = createTraceSummaryFoldProjection({
+const traceSummaryProjection = new TraceSummaryFoldProjection({
   store: { store: async () => {}, get: async () => null },
 });
 

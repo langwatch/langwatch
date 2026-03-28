@@ -15,7 +15,7 @@ import type {
     SimulationTextMessageStartEvent,
 } from "../../schemas/events";
 import {
-    createSimulationRunStateFoldProjection,
+    SimulationRunStateFoldProjection,
     type SimulationRunStateData,
 } from "../simulationRunState.foldProjection";
 
@@ -24,7 +24,7 @@ const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const foldProjection = createSimulationRunStateFoldProjection({ store: noopStore });
+const foldProjection = new SimulationRunStateFoldProjection({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

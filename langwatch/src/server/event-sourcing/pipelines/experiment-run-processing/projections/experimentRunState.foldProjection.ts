@@ -1,12 +1,18 @@
 import type { Projection } from "../../../";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES, EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
-import type { ExperimentRunProcessingEvent } from "../schemas/events";
 import {
-	isEvaluatorResultEvent,
-	isExperimentRunCompletedEvent,
-	isExperimentRunStartedEvent,
-	isTargetResultEvent,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "../../../projections/abstractFoldProjection";
+import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import {
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_PROJECTION_VERSIONS,
+} from "../schemas/constants";
+import type {
+  ExperimentRunStartedEvent,
+  TargetResultEvent,
+  EvaluatorResultEvent,
+  ExperimentRunCompletedEvent,
 } from "../schemas/events";
 
 /**
@@ -14,7 +20,7 @@ import {
  * Matches the experiment_runs ClickHouse table schema.
  *
  * This is both the fold state and the stored data — one type, not two.
- * `apply()` does all computation using simple counters (no Sets/arrays).
+ * Handlers do all computation using simple counters (no Sets/arrays).
  * Store is a dumb read/write layer.
  */
 export interface ExperimentRunStateData {
@@ -69,49 +75,72 @@ function mergeTargetsJson(
   return JSON.stringify(Array.from(byId.values()));
 }
 
-function init(): ExperimentRunStateData {
-  return {
-    RunId: "",
-    ExperimentId: "",
-    WorkflowVersionId: null,
-    Total: 0,
-    Progress: 0,
-    CompletedCount: 0,
-    FailedCount: 0,
-    TotalCost: null,
-    TotalDurationMs: null,
-    AvgScoreBps: null,
-    PassRateBps: null,
-    Targets: "[]",
-    CreatedAt: Date.now(),
-    UpdatedAt: Date.now(),
-    StartedAt: null,
-    FinishedAt: null,
-    StoppedAt: null,
-    TotalScoreSum: 0,
-    ScoreCount: 0,
-    PassedCount: 0,
-    GradedCount: 0,
-  };
-}
+/**
+ * Event map — single source of truth for which events this projection handles.
+ * Keys become handler method names: `handle${Key}`.
+ */
+type ExperimentRunEventMap = {
+  ExperimentRunStarted: ExperimentRunStartedEvent;
+  TargetResult: TargetResultEvent;
+  EvaluatorResult: EvaluatorResultEvent;
+  ExperimentRunCompleted: ExperimentRunCompletedEvent;
+};
 
 /**
- * Monotonic UpdatedAt for ReplacingMergeTree correctness.
+ * Type-safe fold projection for experiment run state.
  *
- * Experiment events are bulk-inserted (all at the same CreatedAt) and
- * processed rapidly. Multiple rows can get identical Date.now() values.
- * ReplacingMergeTree then picks non-deterministically, potentially
- * discarding the completed row (with FinishedAt).
+ * - `implements FoldEventHandlers` enforces a handler exists for every event in the map
+ * - `eventTypeMap` routes runtime event.type strings to the correct handler
+ * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
-function nextUpdatedAt(state: ExperimentRunStateData): number {
-  return Math.max(Date.now(), state.UpdatedAt + 1);
-}
+export class ExperimentRunStateFoldProjection
+  extends AbstractFoldProjection<ExperimentRunStateData, ExperimentRunEventMap>
+  implements FoldEventHandlers<ExperimentRunEventMap, ExperimentRunStateData>
+{
+  readonly name = "experimentRunState";
+  readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
+  readonly store: FoldProjectionStore<ExperimentRunStateData>;
 
-function apply(
-  state: ExperimentRunStateData,
-  event: ExperimentRunProcessingEvent,
-): ExperimentRunStateData {
-  if (isExperimentRunStartedEvent(event)) {
+  protected readonly eventTypeMap = {
+    [EXPERIMENT_RUN_EVENT_TYPES.STARTED]: "handleExperimentRunStarted",
+    [EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT]: "handleTargetResult",
+    [EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT]: "handleEvaluatorResult",
+    [EXPERIMENT_RUN_EVENT_TYPES.COMPLETED]: "handleExperimentRunCompleted",
+  } as const;
+
+  constructor(deps: { store: FoldProjectionStore<ExperimentRunStateData> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return {
+      RunId: "",
+      ExperimentId: "",
+      WorkflowVersionId: null,
+      Total: 0,
+      Progress: 0,
+      CompletedCount: 0,
+      FailedCount: 0,
+      TotalCost: null,
+      TotalDurationMs: null,
+      AvgScoreBps: null,
+      PassRateBps: null,
+      Targets: "[]",
+      StartedAt: null,
+      FinishedAt: null,
+      StoppedAt: null,
+      TotalScoreSum: 0,
+      ScoreCount: 0,
+      PassedCount: 0,
+      GradedCount: 0,
+    };
+  }
+
+  handleExperimentRunStarted(
+    event: ExperimentRunStartedEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
     return {
       ...state,
       RunId: event.data.runId,
@@ -120,11 +149,13 @@ function apply(
       Total: Math.max(state.Total, event.data.total),
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       StartedAt: state.StartedAt ?? event.occurredAt,
-      UpdatedAt: nextUpdatedAt(state),
     };
   }
 
-  if (isTargetResultEvent(event)) {
+  handleTargetResult(
+    event: TargetResultEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
     let completedCount = state.CompletedCount;
     let failedCount = state.FailedCount;
 
@@ -154,11 +185,13 @@ function apply(
       TotalCost: totalCost,
       TotalDurationMs: totalDurationMs,
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
-      UpdatedAt: nextUpdatedAt(state),
     };
   }
 
-  if (isEvaluatorResultEvent(event)) {
+  handleEvaluatorResult(
+    event: EvaluatorResultEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
     let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, GradedCount: gradedCount, TotalCost: totalCost } = state;
 
     if (event.data.status === "processed") {
@@ -188,37 +221,17 @@ function apply(
       TotalCost: totalCost,
       AvgScoreBps: avgScoreBps,
       PassRateBps: passRateBps,
-      UpdatedAt: nextUpdatedAt(state),
     };
   }
 
-  if (isExperimentRunCompletedEvent(event)) {
+  handleExperimentRunCompleted(
+    event: ExperimentRunCompletedEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
     return {
       ...state,
       FinishedAt: event.data.finishedAt ?? null,
       StoppedAt: event.data.stoppedAt ?? null,
-      UpdatedAt: nextUpdatedAt(state),
     };
   }
-
-  return state;
-}
-
-/**
- * Creates FoldProjection definition for experiment run state.
- *
- * Fold state = stored data. Uses simple counters instead of Sets/arrays
- * so state round-trips through the store without loss.
- */
-export function createExperimentRunStateFoldProjection(deps: {
-  store: FoldProjectionStore<ExperimentRunStateData>;
-}): FoldProjectionDefinition<ExperimentRunStateData, ExperimentRunProcessingEvent> {
-  return {
-    name: "experimentRunState",
-    version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
-    eventTypes: EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
-    init,
-    apply,
-    store: deps.store,
-  };
 }

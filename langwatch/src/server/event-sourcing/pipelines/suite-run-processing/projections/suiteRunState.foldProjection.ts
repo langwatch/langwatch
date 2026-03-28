@@ -84,7 +84,7 @@ export class SuiteRunStateFoldProjection
     this.store = deps.store;
   }
 
-  init(): SuiteRunStateData {
+  protected initState() {
     return {
       SuiteRunId: "",
       BatchRunId: "",
@@ -97,8 +97,6 @@ export class SuiteRunStateFoldProjection
       FailedCount: 0,
       Progress: 0,
       PassRateBps: null,
-      CreatedAt: Date.now(),
-      UpdatedAt: Date.now(),
       StartedAt: null,
       FinishedAt: null,
       PassedCount: 0,

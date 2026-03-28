@@ -5,7 +5,7 @@ import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
 import { ReportEvaluationCommand } from "./commands/reportEvaluation.command";
 import { StartEvaluationCommand } from "./commands/startEvaluation.command";
-import { createEvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
+import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 
 export interface EvaluationProcessingPipelineDeps {
@@ -37,7 +37,7 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
   let builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
-    .withFoldProjection("evaluationRun", createEvaluationRunFoldProjection({
+    .withFoldProjection("evaluationRun", new EvaluationRunFoldProjection({
       store: deps.evalRunStore,
     }))
     .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor);

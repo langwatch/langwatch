@@ -8,7 +8,7 @@ import { QueueRunCommand } from "./commands/queueRun.command";
 import { StartRunCommand } from "./commands/startRun.command";
 import { TextMessageStartCommand } from "./commands/textMessageStart.command";
 import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
-import { createSimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
+import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
 export interface SimulationProcessingPipelineDeps {
@@ -48,7 +48,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
   let builder = definePipeline<SimulationProcessingEvent>()
     .withName("simulation_processing")
     .withAggregateType("simulation_run")
-    .withFoldProjection("simulationRunState", createSimulationRunStateFoldProjection({
+    .withFoldProjection("simulationRunState", new SimulationRunStateFoldProjection({
       store: deps.simulationRunStore,
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)

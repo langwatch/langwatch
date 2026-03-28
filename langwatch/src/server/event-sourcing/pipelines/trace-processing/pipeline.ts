@@ -11,7 +11,7 @@ import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { createLogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { createMetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
-import { createTraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedMetricRecord } from "./schemas/metricRecords";
@@ -42,7 +42,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
   let builder = definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
-    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({
+    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({
       store: deps.traceSummaryStore,
     }))
     .withMapProjection("spanStorage", createSpanStorageMapProjection({

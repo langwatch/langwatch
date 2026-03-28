@@ -24,7 +24,7 @@ import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRep
 import { CompleteEvaluationCommand } from "../commands/completeEvaluation.command";
 import { StartEvaluationCommand } from "../commands/startEvaluation.command";
 import type { EvaluationRun } from "../projections";
-import { createEvaluationRunFoldProjection } from "../projections";
+import { EvaluationRunFoldProjection } from "../projections";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import { EvaluationRunStore } from "../projections/evaluationRun.store";
 
@@ -167,7 +167,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     .withCommand("completeEvaluation", CompleteEvaluationCommand as any)
     .withFoldProjection(
       "evaluationRun",
-      createEvaluationRunFoldProjection({ store: evalRunStore }) as any,
+      new EvaluationRunFoldProjection({ store: evalRunStore }) as any,
     )
     .build();
 

@@ -34,7 +34,7 @@ import { EventRepositoryClickHouse } from "../../stores/repositories/eventReposi
 import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
 import { AssignTopicCommand } from "../trace-processing/commands/assignTopicCommand";
 import { createSpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
-import { createTraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
 import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
@@ -144,7 +144,7 @@ describe.skipIf(!hasTestcontainers)(
         .withAggregateType("trace" as AggregateType)
         .withFoldProjection(
           "traceSummary",
-          createTraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+          new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
         )
         .withMapProjection(
           "spanStorage",
