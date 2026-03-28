@@ -140,7 +140,14 @@ export abstract class AbstractFoldProjection<
     if (!handlerName) return state;
 
     const handler = this[handlerName as keyof this];
-    if (typeof handler !== "function") return state;
+    if (typeof handler !== "function") {
+      if (process.env.NODE_ENV !== "production") {
+        throw new Error(
+          `${this.name}: eventTypeMap routes "${event.type}" to "${handlerName}" but it is not a function`,
+        );
+      }
+      return state;
+    }
 
     const newState = (
       handler as (e: EventMap[keyof EventMap], s: State) => State

@@ -221,7 +221,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("IN_PROGRESS");
       expect(state.StartedAt).toBe(1000);
       expect(state.CreatedAt).toBe(FAKE_NOW);
-      // UpdatedAt is monotonic: max(event.occurredAt, state.UpdatedAt + 1)
+      // UpdatedAt is monotonic: max(Date.now(), state.UpdatedAt + 1)
       expect(state.UpdatedAt).toBeGreaterThanOrEqual(1000);
     });
   });
