@@ -228,9 +228,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Get dedup config
     let dedupId = "";
     let dedupTtlMs = 0;
+    let shouldExtend = true;
+    let shouldReplace = true;
     if (dedup) {
       dedupId = dedup.makeId(payload).replaceAll(":", ".");
       dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
+      shouldExtend = dedup.extend !== false;
+      shouldReplace = dedup.replace !== false;
     }
 
     // Attach context metadata to the payload
@@ -256,6 +260,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       dedupId,
       dedupTtlMs,
       jobDataJson: JSON.stringify(payloadWithContext),
+      shouldExtend,
+      shouldReplace,
     });
 
     if (isNew) {
@@ -297,6 +303,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const contextMetadata = getJobContextMetadata();
     const now = Date.now();
 
+    const shouldExtend = dedup ? dedup.extend !== false : true;
+    const shouldReplace = dedup ? dedup.replace !== false : true;
+
     const jobsToStage = payloads.map((payload, index) => {
       const groupId = this.groupKey(payload);
       const stagedJobId = this.generateStagedJobId(payload);
@@ -323,6 +332,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         dedupId,
         dedupTtlMs,
         jobDataJson: JSON.stringify(payloadWithContext),
+        shouldExtend,
+        shouldReplace,
       };
     });
 
