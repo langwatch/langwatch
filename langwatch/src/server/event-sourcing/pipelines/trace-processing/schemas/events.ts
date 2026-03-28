@@ -3,6 +3,9 @@ import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
 import {
+  ANNOTATION_ADDED_EVENT_TYPE,
+  ANNOTATION_REMOVED_EVENT_TYPE,
+  ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_RECORD_RECEIVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
@@ -217,6 +220,118 @@ export function isOriginResolvedEvent(
 }
 
 /**
+ * Zod schema for AnnotationAddedEvent metadata.
+ */
+export const annotationAddedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for AnnotationAddedEvent data.
+ */
+export const annotationAddedEventDataSchema = z.object({
+  annotationId: z.string(),
+});
+
+export const annotationAddedEventSchema = EventSchema.extend({
+  type: z.literal(ANNOTATION_ADDED_EVENT_TYPE),
+  data: annotationAddedEventDataSchema,
+  metadata: annotationAddedEventMetadataSchema,
+});
+
+export type AnnotationAddedEventData = z.infer<
+  typeof annotationAddedEventDataSchema
+>;
+export type AnnotationAddedEvent = z.infer<typeof annotationAddedEventSchema>;
+
+/**
+ * Type guard for AnnotationAddedEvent.
+ */
+export function isAnnotationAddedEvent(
+  event: TraceProcessingEvent,
+): event is AnnotationAddedEvent {
+  return event.type === ANNOTATION_ADDED_EVENT_TYPE;
+}
+
+/**
+ * Zod schema for AnnotationRemovedEvent metadata.
+ */
+export const annotationRemovedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for AnnotationRemovedEvent data.
+ */
+export const annotationRemovedEventDataSchema = z.object({
+  annotationId: z.string(),
+});
+
+export const annotationRemovedEventSchema = EventSchema.extend({
+  type: z.literal(ANNOTATION_REMOVED_EVENT_TYPE),
+  data: annotationRemovedEventDataSchema,
+  metadata: annotationRemovedEventMetadataSchema,
+});
+
+export type AnnotationRemovedEventData = z.infer<
+  typeof annotationRemovedEventDataSchema
+>;
+export type AnnotationRemovedEvent = z.infer<
+  typeof annotationRemovedEventSchema
+>;
+
+/**
+ * Type guard for AnnotationRemovedEvent.
+ */
+export function isAnnotationRemovedEvent(
+  event: TraceProcessingEvent,
+): event is AnnotationRemovedEvent {
+  return event.type === ANNOTATION_REMOVED_EVENT_TYPE;
+}
+
+/**
+ * Zod schema for AnnotationsBulkSyncedEvent metadata.
+ */
+export const annotationsBulkSyncedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for AnnotationsBulkSyncedEvent data.
+ */
+export const annotationsBulkSyncedEventDataSchema = z.object({
+  annotationIds: z.array(z.string()),
+});
+
+export const annotationsBulkSyncedEventSchema = EventSchema.extend({
+  type: z.literal(ANNOTATIONS_BULK_SYNCED_EVENT_TYPE),
+  data: annotationsBulkSyncedEventDataSchema,
+  metadata: annotationsBulkSyncedEventMetadataSchema,
+});
+
+export type AnnotationsBulkSyncedEventData = z.infer<
+  typeof annotationsBulkSyncedEventDataSchema
+>;
+export type AnnotationsBulkSyncedEvent = z.infer<
+  typeof annotationsBulkSyncedEventSchema
+>;
+
+/**
+ * Type guard for AnnotationsBulkSyncedEvent.
+ */
+export function isAnnotationsBulkSyncedEvent(
+  event: TraceProcessingEvent,
+): event is AnnotationsBulkSyncedEvent {
+  return event.type === ANNOTATIONS_BULK_SYNCED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
@@ -224,4 +339,7 @@ export type TraceProcessingEvent =
   | TopicAssignedEvent
   | LogRecordReceivedEvent
   | MetricRecordReceivedEvent
-  | OriginResolvedEvent;
+  | OriginResolvedEvent
+  | AnnotationAddedEvent
+  | AnnotationRemovedEvent
+  | AnnotationsBulkSyncedEvent;
