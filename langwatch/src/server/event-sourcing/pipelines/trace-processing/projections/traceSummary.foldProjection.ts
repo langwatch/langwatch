@@ -816,7 +816,6 @@ function accumulateRoleCostLatency({
   if (span.parentSpanId) {
     // Store parent mapping as negative-prefixed entry (hack to avoid another Map column)
     // "_parent:childId" -> parentId
-    spanCosts[`_parent:${span.spanId}`] = 0; // placeholder
     scenarioRoleSpans[`_parent:${span.spanId}`] = span.parentSpanId;
   }
 

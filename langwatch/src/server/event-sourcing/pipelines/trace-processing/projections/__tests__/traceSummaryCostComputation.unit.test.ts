@@ -632,4 +632,37 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
       });
     });
   });
+
+  describe("given spans with parent relationships", () => {
+    describe("when the fold processes spans with costs and parents", () => {
+      it("does not store _parent: entries in spanCosts", () => {
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: null,
+          spanAttributes: { "scenario.role": "Agent" },
+        });
+
+        const llmSpan = createTestSpan({
+          spanId: "llm-1",
+          parentSpanId: "agent-1",
+          spanAttributes: {
+            "gen_ai.usage.input_tokens": 100,
+            "gen_ai.usage.output_tokens": 50,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: agentSpan });
+        state = applySpanToSummary({ state, span: llmSpan });
+
+        const parentKeys = Object.keys(state.spanCosts ?? {}).filter(k => k.startsWith("_parent:"));
+        expect(parentKeys).toHaveLength(0);
+
+        // Parent mappings belong in scenarioRoleSpans, not spanCosts
+        expect(state.scenarioRoleSpans?.["_parent:llm-1"]).toBe("agent-1");
+      });
+    });
+  });
 });
