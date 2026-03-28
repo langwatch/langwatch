@@ -24,7 +24,7 @@ const logger = createLogger(
 );
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 10_000;
+export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
 
 export interface ComputeRunMetricsDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
@@ -184,4 +184,3 @@ export class ComputeRunMetricsCommand
   }
 }
 
-export { RETRY_DELAY_MS as COMPUTE_METRICS_RETRY_DELAY_MS };

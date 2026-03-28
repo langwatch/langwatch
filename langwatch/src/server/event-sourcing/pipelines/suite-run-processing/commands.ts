@@ -14,8 +14,8 @@ import {
  */
 
 export const StartSuiteRunCommand = defineCommand({
-  commandType: "lw.suite_run.start" as const,
-  eventType: "lw.suite_run.started" as const,
+  commandType: "lw.suite_run.start",
+  eventType: "lw.suite_run.started",
   eventVersion: "2026-03-01",
   aggregateType: "suite_run",
   schema: suiteRunStartedEventDataSchema,
@@ -30,8 +30,8 @@ export const StartSuiteRunCommand = defineCommand({
 });
 
 export const RecordSuiteRunItemStartedCommand = defineCommand({
-  commandType: "lw.suite_run.record_item_started" as const,
-  eventType: "lw.suite_run.item_started" as const,
+  commandType: "lw.suite_run.record_item_started",
+  eventType: "lw.suite_run.item_started",
   eventVersion: "2026-03-01",
   aggregateType: "suite_run",
   schema: suiteRunItemStartedEventDataSchema,
@@ -45,8 +45,8 @@ export const RecordSuiteRunItemStartedCommand = defineCommand({
 });
 
 export const CompleteSuiteRunItemCommand = defineCommand({
-  commandType: "lw.suite_run.complete_item" as const,
-  eventType: "lw.suite_run.item_completed" as const,
+  commandType: "lw.suite_run.complete_item",
+  eventType: "lw.suite_run.item_completed",
   eventVersion: "2026-03-01",
   aggregateType: "suite_run",
   schema: suiteRunItemCompletedEventDataSchema,
