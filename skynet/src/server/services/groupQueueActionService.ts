@@ -112,7 +112,7 @@ export class GroupQueueActionService {
   }): Promise<{ retried: boolean; unblocked: boolean }> {
     const { wasBlocked } = await this.unblockGroup({ queueName, groupId });
 
-    return { retried: true, unblocked: wasBlocked };
+    return { retried: wasBlocked, unblocked: wasBlocked };
   }
 
   async pauseKey({

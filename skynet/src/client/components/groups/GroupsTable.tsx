@@ -746,6 +746,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
             return (
               <Button
                 key={key}
+                aria-pressed={isActive}
                 size="sm"
                 variant={isActive ? "solid" : "outline"}
                 color={isActive ? "#0a0e17" : color}
@@ -770,6 +771,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
           })}
         </HStack>
         <Select
+          aria-label="Filter groups by oldest job age"
           size="sm"
           bg="#060a12"
           border="1px solid"

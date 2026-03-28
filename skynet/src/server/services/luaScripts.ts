@@ -83,8 +83,8 @@ redis.call("SREM", blockedKey, groupId)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
--- Decrement total pending counter by drained jobs
-if count > 0 then
+-- Decrement total pending counter by drained jobs (only if counter exists to avoid negative on legacy queues)
+if count > 0 and redis.call("EXISTS", totalPendingKey) == 1 then
   redis.call("DECRBY", totalPendingKey, count)
 end
 
