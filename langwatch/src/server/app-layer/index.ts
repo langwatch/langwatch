@@ -10,7 +10,7 @@ export type { SerializedDomainError } from "./domain-error";
 export { traced } from "./tracing";
 
 // Config
-export { createAppConfigFromEnv } from "./config";
+export { createAppConfig } from "./config";
 export type { AppConfig } from "./config";
 
 // Dependencies

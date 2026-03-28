@@ -22,24 +22,26 @@ describe("AwsSecretsProvider", () => {
     mockSend.mockReset();
   });
 
-  it("returns secret string", async () => {
-    mockSend.mockResolvedValue({ SecretString: '{"DB":"url"}' });
-    const provider = new AwsSecretsProvider();
-    expect(await provider.get("langwatch/dev/app")).toBe('{"DB":"url"}');
-  });
+  describe("when secret exists", () => {
+    it("returns the secret string", async () => {
+      mockSend.mockResolvedValue({ SecretString: '{"DB":"url"}' });
+      const provider = new AwsSecretsProvider();
+      expect(await provider.get("langwatch/dev/app")).toBe('{"DB":"url"}');
+    });
 
-  it("passes the secret ID to GetSecretValueCommand", async () => {
-    mockSend.mockResolvedValue({ SecretString: "{}" });
-    const provider = new AwsSecretsProvider();
-    await provider.get("langwatch/dev/app");
-    expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ SecretId: "langwatch/dev/app" }),
-      expect.anything()
-    );
+    it("passes the secret ID to GetSecretValueCommand", async () => {
+      mockSend.mockResolvedValue({ SecretString: "{}" });
+      const provider = new AwsSecretsProvider();
+      await provider.get("langwatch/dev/app");
+      expect(mockSend).toHaveBeenCalledWith(
+        expect.objectContaining({ SecretId: "langwatch/dev/app" }),
+        expect.anything()
+      );
+    });
   });
 
   describe("when secret has no string value", () => {
-    it("throws", async () => {
+    it("throws with descriptive message", async () => {
       mockSend.mockResolvedValue({ SecretString: undefined });
       const provider = new AwsSecretsProvider();
       await expect(provider.get("langwatch/dev/app")).rejects.toThrow(
@@ -49,7 +51,7 @@ describe("AwsSecretsProvider", () => {
   });
 
   describe("when request times out", () => {
-    it("wraps error with SSO hint", async () => {
+    it("wraps error with SSO login hint", async () => {
       const err = new Error("timeout");
       err.name = "TimeoutError";
       mockSend.mockRejectedValue(err);
@@ -59,7 +61,7 @@ describe("AwsSecretsProvider", () => {
   });
 
   describe("when abort signal fires", () => {
-    it("wraps error with SSO hint", async () => {
+    it("wraps error with SSO login hint", async () => {
       const err = new Error("aborted");
       err.name = "AbortError";
       mockSend.mockRejectedValue(err);
@@ -69,7 +71,7 @@ describe("AwsSecretsProvider", () => {
   });
 
   describe("when credentials are missing", () => {
-    it("wraps error with SSO hint", async () => {
+    it("wraps error with SSO login hint", async () => {
       const err = new Error("no creds");
       err.name = "CredentialsProviderError";
       mockSend.mockRejectedValue(err);
@@ -79,7 +81,7 @@ describe("AwsSecretsProvider", () => {
   });
 
   describe("when an unknown error occurs", () => {
-    it("rethrows the original error", async () => {
+    it("rethrows the original error unchanged", async () => {
       const err = new Error("something else");
       err.name = "SomeOtherError";
       mockSend.mockRejectedValue(err);

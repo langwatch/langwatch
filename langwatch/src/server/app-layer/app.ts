@@ -79,9 +79,15 @@ export class App {
 }
 
 // Global access, thx turbopacc
-export const globalForApp = globalThis as unknown as { __langwatch_app: App | null };
+export const globalForApp = globalThis as unknown as {
+  __langwatch_app: App | null;
+  __langwatch_app_promise: Promise<App> | null;
+};
 if (globalForApp.__langwatch_app === void 0) {
   globalForApp.__langwatch_app = null;
+}
+if (globalForApp.__langwatch_app_promise === void 0) {
+  globalForApp.__langwatch_app_promise = null;
 }
 
 export function initializeApp(deps: AppDependencies): App {
@@ -100,4 +106,5 @@ export function getApp(): App {
 
 export function resetApp(): void {
   globalForApp.__langwatch_app = null;
+  globalForApp.__langwatch_app_promise = null;
 }

@@ -85,7 +85,13 @@ export async function initializeWorkerApp(): Promise<App> {
 
 export async function initializeDefaultApp(options?: { processRole?: ProcessRole }): Promise<App> {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
+  if (globalForApp.__langwatch_app_promise) return globalForApp.__langwatch_app_promise;
 
+  globalForApp.__langwatch_app_promise = doInitializeDefaultApp(options);
+  return globalForApp.__langwatch_app_promise;
+}
+
+async function doInitializeDefaultApp(options?: { processRole?: ProcessRole }): Promise<App> {
   const { prisma } = require("../db") as { prisma: PrismaClient; };
 
   const provider = createSecretsProvider();
@@ -359,7 +365,7 @@ export async function initializeDefaultApp(options?: { processRole?: ProcessRole
     planProvider,
   });
 
-  return initializeApp({
+  const app = initializeApp({
     config,
     broadcast,
     traces,
@@ -380,6 +386,9 @@ export async function initializeDefaultApp(options?: { processRole?: ProcessRole
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
   });
+
+  globalForApp.__langwatch_app_promise = null;
+  return app;
 }
 
 /** Tests — noop commands, null-backed services. */

@@ -6,7 +6,7 @@ const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
 };
 
-// Memoize so double calls (env.mjs root + createAppConfigFromEnv) only validate once
+// Memoize so double calls (env.mjs root + createAppConfig) only validate once
 /** @type {ReturnType<typeof import("@t3-oss/env-nextjs").createEnv> | null} */
 let _env = null;
 

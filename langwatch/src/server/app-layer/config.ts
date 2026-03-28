@@ -84,9 +84,3 @@ export function createAppConfig({
   };
 }
 
-/** Backward-compat: creates config from env vars only (no secrets provider). */
-export function createAppConfigFromEnv(overrides?: {
-  processRole?: ProcessRole;
-}): AppConfig {
-  return createAppConfig({ secrets: {}, processRole: overrides?.processRole });
-}

@@ -1,3 +1,7 @@
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:secrets");
+
 export interface SecretsProvider {
   get(secretId: string): Promise<string>;
 }
@@ -67,12 +71,27 @@ export async function loadAppSecrets({
   }
 
   const secretPath = `langwatch/${environment}/app`;
-  console.log(`[secrets] Fetching from AWS SM: "${secretPath}"`);
+  logger.info({ secretPath }, "Fetching secrets from AWS SM");
 
   const raw = await provider.get(secretPath);
-  const parsed = JSON.parse(raw) as Record<string, string>;
-  const count = Object.keys(parsed).length;
-  console.log(`[secrets] Loaded ${count} secrets from "${secretPath}"`);
+  const parsed: unknown = JSON.parse(raw);
 
-  return parsed;
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `[secrets] Expected JSON object from "${secretPath}", got ${typeof parsed}`
+    );
+  }
+  for (const [key, value] of Object.entries(parsed)) {
+    if (typeof value !== "string") {
+      throw new Error(
+        `[secrets] Key "${key}" in "${secretPath}" is not a string`
+      );
+    }
+  }
+
+  const secrets = parsed as Record<string, string>;
+  const count = Object.keys(secrets).length;
+  logger.info({ secretPath, count }, "Loaded secrets from AWS SM");
+
+  return secrets;
 }

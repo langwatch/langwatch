@@ -26,14 +26,14 @@ export class AwsSecretsProvider implements SecretsProvider {
       }
       return response.SecretString;
     } catch (err: unknown) {
-      const error = err as Error & { name: string };
-      if (error.name === "TimeoutError" || error.name === "AbortError") {
+      if (!(err instanceof Error)) throw err;
+      if (err.name === "TimeoutError" || err.name === "AbortError") {
         throw new Error(
           `[secrets] Timed out fetching "${secretId}" after ${FETCH_TIMEOUT_MS}ms. ` +
             `Your AWS SSO session may have expired — try: aws sso login`
         );
       }
-      if (error.name === "CredentialsProviderError") {
+      if (err.name === "CredentialsProviderError") {
         throw new Error(
           `[secrets] AWS credentials not found. ` +
             `Run "aws sso login" or configure your AWS profile. ` +
