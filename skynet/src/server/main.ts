@@ -4,7 +4,6 @@ import { DEFAULT_PORT, QUEUE_DISCOVERY_INTERVAL_MS } from "../shared/constants.t
 import { getRedis } from "./services/redis.ts";
 import { discoverQueueNames, isGroupQueue } from "./services/queueDiscovery.ts";
 import { MetricsCollector } from "./services/metricsCollector.ts";
-import { evictStaleQueueCache } from "./services/bullmqService.ts";
 import { SSEManager } from "./sse/sseManager.ts";
 import { createApp } from "./app.ts";
 
@@ -46,7 +45,6 @@ async function main() {
       currentQueueNames = names;
       currentGroupQueueNames = currentQueueNames.filter(isGroupQueue);
       metrics.updateGroupQueueNames(currentGroupQueueNames);
-      evictStaleQueueCache(currentQueueNames);
     } catch (err) {
       console.error("Queue discovery error:", err);
     }
@@ -57,7 +55,6 @@ async function main() {
     sseManager,
     metrics,
     getGroupQueueNames: () => currentGroupQueueNames,
-    getQueueNames: () => currentQueueNames,
   });
 
   app.listen(PORT, () => {

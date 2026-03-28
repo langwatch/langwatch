@@ -5,7 +5,7 @@ import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SE
 
 import { scanGroupQueues } from "./groupQueueScanner.ts";
 import { getRedisInfo, type RedisInfo } from "./redis.ts";
-import { normalizeErrorMessage } from "./blockedGroupAnalyzer.ts";
+import { normalizeErrorMessage } from "../../shared/normalizeErrorMessage.ts";
 
 const REDIS_STATE_KEY = "skynet:state";
 const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
@@ -15,7 +15,7 @@ interface PersistedMetricsState {
   savedAt: number;
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
-  peakStagedPerSec: number;
+  peakIngestedPerSec: number;
   peakLatencyP50Ms: number;
   peakLatencyP99Ms: number;
   peakPhases: Record<string, { completedPerSec: number; failedPerSec: number; latencyP50Ms: number; latencyP99Ms: number }>;
@@ -32,7 +32,7 @@ export class MetricsCollector {
   private lastTotalInFlight = 0;
   private lastTimestamp = Date.now();
   private hasBaseline = false;
-  private currentStagedPerSec = 0;
+  private currentIngestedPerSec = 0;
   private currentCompletedPerSec = 0;
   private currentFailedPerSec = 0;
   private currentPhases: DashboardData["phases"] = emptyPhases();
@@ -40,7 +40,7 @@ export class MetricsCollector {
   private currentLatencyP99Ms = 0;
   private peakCompletedPerSec = 0;
   private peakFailedPerSec = 0;
-  private peakStagedPerSec = 0;
+  private peakIngestedPerSec = 0;
   private peakLatencyP50Ms = 0;
   private peakLatencyP99Ms = 0;
   private peakPhases: Record<string, { completedPerSec: number; failedPerSec: number; latencyP50Ms: number; latencyP99Ms: number }> = {
@@ -152,14 +152,14 @@ export class MetricsCollector {
       totalGroups,
       blockedGroups,
       totalPendingJobs,
-      throughputStagedPerSec: this.currentStagedPerSec,
+      throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
       totalFailed: this.latestTotalFailed,
       completedPerSec: this.currentCompletedPerSec,
       failedPerSec: this.currentFailedPerSec,
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
-      peakStagedPerSec: this.peakStagedPerSec,
+      peakIngestedPerSec: this.peakIngestedPerSec,
       redisMemoryUsed: redisInfo.usedMemoryHuman,
       redisMemoryPeak: redisInfo.peakMemoryHuman,
       redisMemoryUsedBytes: redisInfo.usedMemoryBytes,
@@ -320,16 +320,64 @@ export class MetricsCollector {
     }
     this.currentPhases = phases;
 
-    // Build per-jobName metrics (pending/active from group scan, no throughput)
+    // Build per-jobName metrics with live throughput from Redis counters
     const jobNameCounts = this.buildJobNameCounts(queues);
+
+    // Discover per-job-name counter keys via SCAN (only job names we already know from group data)
+    const jobNameCounterPipeline = this.redis.pipeline();
+    const jobNameCounterKeys: Array<{ compositeKey: string; jobName: string }> = [];
+    for (const [compositeKey, counts] of jobNameCounts) {
+      const jobName = compositeKey.split("::")[1] ?? compositeKey;
+      for (const queueName of this.groupQueueNames) {
+        jobNameCounterPipeline.get(`${queueName}:gq:stats:completed:${jobName}`);
+        jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
+      }
+      jobNameCounterKeys.push({ compositeKey, jobName });
+    }
+    const jobNameCounterResults = jobNameCounterKeys.length > 0
+      ? await jobNameCounterPipeline.exec()
+      : [];
+
+    // Aggregate per-job-name counters across all queues
+    const jobNameTotals = new Map<string, { completed: number; failed: number }>();
+    if (jobNameCounterResults) {
+      for (let i = 0; i < jobNameCounterKeys.length; i++) {
+        const { compositeKey } = jobNameCounterKeys[i]!;
+        let completed = 0;
+        let failed = 0;
+        for (let q = 0; q < this.groupQueueNames.length; q++) {
+          const baseIdx = (i * this.groupQueueNames.length + q) * 2;
+          completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
+          failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
+        }
+        jobNameTotals.set(compositeKey, { completed, failed });
+      }
+    }
+
     const jobNameMetrics: JobNameMetrics[] = [];
-    for (const [key, counts] of jobNameCounts) {
-      const jobName = key.split("::")[1] ?? key;
+    for (const [compositeKey, counts] of jobNameCounts) {
+      const jobName = compositeKey.split("::")[1] ?? compositeKey;
       const pipelineName = counts.pipelineName;
       const phase = counts.phase;
 
-      const peak = this.peakJobNames.get(key) ?? { completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0 };
-      this.peakJobNames.set(key, peak);
+      const totals = jobNameTotals.get(compositeKey) ?? { completed: 0, failed: 0 };
+      const prevKey = `jn:${compositeKey}`;
+      const prevC = this.prevCompleted.get(prevKey) ?? 0;
+      const prevF = this.prevFailed.get(prevKey) ?? 0;
+
+      let completedPerSec = 0;
+      let failedPerSec = 0;
+      if (this.prevCompleted.has(prevKey) && elapsed > 0) {
+        completedPerSec = Math.max(0, totals.completed - prevC) / elapsed;
+        failedPerSec = Math.max(0, totals.failed - prevF) / elapsed;
+      }
+      this.prevCompleted.set(prevKey, totals.completed);
+      this.prevFailed.set(prevKey, totals.failed);
+
+      const peak = this.peakJobNames.get(compositeKey) ?? { completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0 };
+      peak.completedPerSec = Math.max(peak.completedPerSec, completedPerSec);
+      peak.failedPerSec = Math.max(peak.failedPerSec, failedPerSec);
+      this.peakJobNames.set(compositeKey, peak);
 
       jobNameMetrics.push({
         jobName,
@@ -337,8 +385,8 @@ export class MetricsCollector {
         phase,
         pending: counts.pending,
         active: counts.active,
-        completedPerSec: 0,
-        failedPerSec: 0,
+        completedPerSec,
+        failedPerSec,
         latencyP50Ms: 0,
         latencyP99Ms: 0,
         peakCompletedPerSec: peak.completedPerSec,
@@ -365,7 +413,7 @@ export class MetricsCollector {
 
       this.peakCompletedPerSec = state.peakCompletedPerSec;
       this.peakFailedPerSec = state.peakFailedPerSec;
-      this.peakStagedPerSec = state.peakStagedPerSec;
+      this.peakIngestedPerSec = state.peakIngestedPerSec;
       this.peakLatencyP50Ms = state.peakLatencyP50Ms;
       this.peakLatencyP99Ms = state.peakLatencyP99Ms;
 
@@ -398,7 +446,7 @@ export class MetricsCollector {
       savedAt: Date.now(),
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
-      peakStagedPerSec: this.peakStagedPerSec,
+      peakIngestedPerSec: this.peakIngestedPerSec,
       peakLatencyP50Ms: this.peakLatencyP50Ms,
       peakLatencyP99Ms: this.peakLatencyP99Ms,
       peakPhases: this.peakPhases,
@@ -486,12 +534,12 @@ export class MetricsCollector {
         this.currentCompletedPerSec = Math.round((newCompleted / elapsed) * 100) / 100;
         this.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
 
-        const stagedDelta = (totalInFlight - this.lastTotalInFlight) + newCompleted + newFailed;
-        this.currentStagedPerSec = Math.round((Math.max(0, stagedDelta) / elapsed) * 100) / 100;
+        const ingestedDelta = (totalInFlight - this.lastTotalInFlight) + newCompleted + newFailed;
+        this.currentIngestedPerSec = Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
 
         this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, this.currentCompletedPerSec);
         this.peakFailedPerSec = Math.max(this.peakFailedPerSec, this.currentFailedPerSec);
-        this.peakStagedPerSec = Math.max(this.peakStagedPerSec, this.currentStagedPerSec);
+        this.peakIngestedPerSec = Math.max(this.peakIngestedPerSec, this.currentIngestedPerSec);
       }
 
       this.lastTotalInFlight = totalInFlight;
@@ -505,7 +553,7 @@ export class MetricsCollector {
 
       this.throughputBuffer.push({
         timestamp: now,
-        stagedPerSec: this.currentStagedPerSec,
+        ingestedPerSec: this.currentIngestedPerSec,
         completedPerSec: this.currentCompletedPerSec,
         failedPerSec: this.currentFailedPerSec,
         pendingCount: totalPending,

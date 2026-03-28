@@ -27,6 +27,7 @@ interface Props {
 
 export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sortDir, cycleSort, onStartUnblockSession }: Props) {
   const [pipelineFilter, setPipelineFilter] = useState<string | null>(null);
+  const [errorFilter, setErrorFilter] = useState<string | null>(null);
 
   const queueNames = useMemo(() => data.queues.map((q) => q.name), [data.queues]);
 
@@ -98,6 +99,8 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
             queueName={data.queues[0]?.name ?? null}
             onPause={onPause}
             onResume={onResume}
+            selectedErrorFilter={errorFilter}
+            onErrorFilterChange={setErrorFilter}
           />
         </Box>
       )}
@@ -119,6 +122,7 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
         sortDir={sortDir}
         cycleSort={cycleSort}
         pipelineFilter={pipelineFilter}
+        errorFilter={errorFilter}
         onStartUnblockSession={onStartUnblockSession}
       />
       <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={4} mb={6} mt={6}>

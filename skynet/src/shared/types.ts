@@ -43,7 +43,7 @@ export interface QueueSummaryInfo {
 
 export interface ThroughputPoint {
   timestamp: number;
-  stagedPerSec: number;
+  ingestedPerSec: number;
   completedPerSec: number;
   failedPerSec: number;
   pendingCount: number;
@@ -91,14 +91,14 @@ export interface DashboardData {
   totalGroups: number;
   blockedGroups: number;
   totalPendingJobs: number;
-  throughputStagedPerSec: number;
+  throughputIngestedPerSec: number;
   totalCompleted: number;
   totalFailed: number;
   completedPerSec: number;
   failedPerSec: number;
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
-  peakStagedPerSec: number;
+  peakIngestedPerSec: number;
   redisMemoryUsed: string;
   redisMemoryPeak: string;
   redisMemoryUsedBytes: number;
@@ -147,62 +147,6 @@ export interface GroupDetailData {
   errorStack: string | null;
   errorTimestamp: number | null;
   retryCount: number | null;
-}
-
-export interface FailedJob {
-  id: string;
-  name: string;
-  data: Record<string, unknown>;
-  failedReason: string;
-  stacktrace: string[];
-  attemptsMade: number;
-  timestamp: number;
-  finishedOn: number | null;
-  queueName: string;
-  queueDisplayName: string;
-  pipelineName: string | null;
-  jobType: string | null;
-  jobName: string | null;
-}
-
-export type BullMQJobState = "waiting" | "active" | "completed" | "failed" | "delayed";
-
-export interface BullMQJob {
-  id: string;
-  name: string;
-  queueName: string;
-  queueDisplayName: string;
-  state: BullMQJobState;
-  data: Record<string, unknown>;
-  returnvalue: unknown | null;
-  failedReason: string | null;
-  stacktrace: string[];
-  attemptsMade: number;
-  timestamp: number;
-  processedOn: number | null;
-  finishedOn: number | null;
-  delay: number;
-  progress: number | string;
-  opts: Record<string, unknown>;
-}
-
-export interface BullMQJobsPage {
-  jobs: BullMQJob[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-  state: BullMQJobState;
-}
-
-export interface BullMQQueueInfo {
-  name: string;
-  displayName: string;
-  waiting: number;
-  active: number;
-  completed: number;
-  failed: number;
-  delayed: number;
 }
 
 export interface ErrorCluster {

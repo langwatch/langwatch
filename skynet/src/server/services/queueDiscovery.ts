@@ -17,7 +17,7 @@ export async function discoverQueueNames(redis: IORedis): Promise<string[]> {
   // COUNT 50000 reduces roundtrips on large keyspaces (826K+ keys → ~17 iterations vs ~1650 with COUNT 500).
   const names = new Set<string>();
 
-  // Discover BullMQ queues via meta keys (bull:{queueName}:meta — one per queue, avoids matching all job keys)
+  // Discover queues via meta keys (bull:{queueName}:meta — one per queue, avoids matching all job keys)
   let cursor = "0";
   do {
     const [nextCursor, keys] = await redis.scan(cursor, "MATCH", "bull:*:meta", "COUNT", 50000);
