@@ -4,10 +4,11 @@ import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
-  createDeferredEvaluationHandler,
+  createDeferredOriginHandler,
   resolveOrigin,
+  DEFERRED_CHECK_DELAY_MS,
   type EvaluationTriggerReactorDeps,
-  type DeferredEvaluationPayload,
+  type DeferredOriginPayload,
 } from "../evaluationTrigger.reactor";
 
 function createFoldState(
@@ -85,10 +86,6 @@ function createDeps(
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),
     resolveOrigin: vi.fn().mockResolvedValue(undefined),
-    traceSummaryStore: {
-      get: vi.fn().mockResolvedValue(null),
-      store: vi.fn().mockResolvedValue(undefined),
-    },
     scheduleDeferred: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -223,7 +220,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has no origin and no sdk.name (pure OTEL)", () => {
-    it("schedules a deferred check and does not dispatch evaluations", async () => {
+    it("schedules deferred origin resolution with traceId as id", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({ attributes: {} });
@@ -233,6 +230,7 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
       expect(deps.scheduleDeferred).toHaveBeenCalledWith({
+        id: "trace-1",
         tenantId: "tenant-1",
         traceId: "trace-1",
         occurredAt: expect.any(Number),
@@ -273,116 +271,63 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.resolveOrigin).not.toHaveBeenCalled();
     });
   });
+
+  describe("when trace-level eval is dispatched", () => {
+    it("uses 6-minute dedup TTL to outlast deferred origin window", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createEvent(), createContext(state));
+
+      const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(options).toBeDefined();
+      expect(options!.deduplication).toBeDefined();
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      // No delay override — uses command default
+      expect(options!.delay).toBeUndefined();
+    });
+  });
 });
 
-describe("createDeferredEvaluationHandler()", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(Date.now());
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  describe("when fold state still has no origin after 5 minutes", () => {
-    it("dispatches resolveOrigin command with reason 'deferred_fallback' and dispatches evaluations", async () => {
-      const deps = createDeps();
-      const foldState = createFoldState({ attributes: {} });
-      vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(foldState);
-
-      const handler = createDeferredEvaluationHandler(deps);
-      const payload: DeferredEvaluationPayload = {
+describe("createDeferredOriginHandler()", () => {
+  describe("when called", () => {
+    it("dispatches resolveOrigin command unconditionally", async () => {
+      const resolveOriginFn = vi.fn().mockResolvedValue(undefined);
+      const handler = createDeferredOriginHandler(resolveOriginFn);
+      const payload: DeferredOriginPayload = {
+        id: "trace-1",
         tenantId: "tenant-1",
         traceId: "trace-1",
-        occurredAt: Date.now(),
+        occurredAt: 1234567890,
       };
 
       await handler(payload);
 
-      expect(deps.traceSummaryStore.get).toHaveBeenCalledWith(
-        "trace-1",
-        { tenantId: "tenant-1", aggregateId: "trace-1" },
-      );
-      // Verify origin is persisted via event sourcing (not direct store)
-      expect(deps.resolveOrigin).toHaveBeenCalledWith({
+      expect(resolveOriginFn).toHaveBeenCalledWith({
         tenantId: "tenant-1",
         traceId: "trace-1",
         origin: "application",
         reason: "deferred_fallback",
-        occurredAt: expect.any(Number),
+        occurredAt: 1234567890,
       });
-      expect(deps.traceSummaryStore.store).not.toHaveBeenCalled();
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
-      expect(deps.evaluation).toHaveBeenCalledTimes(1);
-      // Verify the evaluation payload has origin stamped as "application"
-      const callArgs = vi.mocked(deps.evaluation).mock.calls[0]!;
-      expect(callArgs[0]).toMatchObject({ origin: "application" });
     });
   });
 
-  describe("when fold state acquired non-application origin", () => {
-    it("dispatches with the acquired origin and does not call resolveOrigin", async () => {
-      const deps = createDeps();
-      const foldState = createFoldState({
-        attributes: { "langwatch.origin": "evaluation" },
-      });
-      vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(foldState);
-
-      const handler = createDeferredEvaluationHandler(deps);
-      const payload: DeferredEvaluationPayload = {
+  describe("when resolveOrigin throws", () => {
+    it("propagates the error", async () => {
+      const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
+      const handler = createDeferredOriginHandler(resolveOriginFn);
+      const payload: DeferredOriginPayload = {
+        id: "trace-1",
         tenantId: "tenant-1",
         traceId: "trace-1",
-        occurredAt: Date.now(),
+        occurredAt: 1234567890,
       };
 
-      await handler(payload);
-
-      expect(deps.traceSummaryStore.get).toHaveBeenCalled();
-      expect(deps.resolveOrigin).not.toHaveBeenCalled();
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
-      expect(deps.evaluation).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("when fold state acquired explicit application origin", () => {
-    it("dispatches evaluations", async () => {
-      const deps = createDeps();
-      const foldState = createFoldState({
-        attributes: { "langwatch.origin": "application" },
-      });
-      vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(foldState);
-
-      const handler = createDeferredEvaluationHandler(deps);
-      const payload: DeferredEvaluationPayload = {
-        tenantId: "tenant-1",
-        traceId: "trace-1",
-        occurredAt: Date.now(),
-      };
-
-      await handler(payload);
-
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
-      expect(deps.evaluation).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("when fold state is not found", () => {
-    it("skips silently", async () => {
-      const deps = createDeps();
-      vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(null);
-
-      const handler = createDeferredEvaluationHandler(deps);
-      const payload: DeferredEvaluationPayload = {
-        tenantId: "tenant-1",
-        traceId: "trace-1",
-        occurredAt: Date.now(),
-      };
-
-      await handler(payload);
-
-      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
-      expect(deps.evaluation).not.toHaveBeenCalled();
+      await expect(handler(payload)).rejects.toThrow("command failed");
     });
   });
 });

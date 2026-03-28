@@ -464,7 +464,12 @@ export class GroupStagingScripts {
   /**
    * Stage a job into a group's pending queue.
    *
-   * @returns true if a new job was staged, false if an existing job was replaced (dedup)
+   * When dedup is active and the old job is still in staging, squashes in place
+   * (reuses the existing stagedJobId, conditionally updates score/data per
+   * shouldExtend/shouldReplace). When the old job was already dispatched, the
+   * stale dedup key is cleaned up and the new job is staged as genuinely new.
+   *
+   * @returns true if a new job was staged, false if squashed onto an existing job (dedup)
    */
   async stage({
     stagedJobId,
