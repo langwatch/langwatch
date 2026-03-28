@@ -4,14 +4,16 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import {
-  SUITE_RUN_EVENT_TYPES,
-  SUITE_RUN_PROJECTION_VERSIONS,
-} from "../schemas/constants";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   SuiteRunStartedEvent,
   SuiteRunItemStartedEvent,
   SuiteRunItemCompletedEvent,
+} from "../schemas/events";
+import {
+  SuiteRunStartedEventSchema,
+  SuiteRunItemStartedEventSchema,
+  SuiteRunItemCompletedEventSchema,
 } from "../schemas/events";
 
 /**
@@ -48,36 +50,28 @@ export interface SuiteRunState extends Projection<SuiteRunStateData> {
   data: SuiteRunStateData;
 }
 
-/**
- * Event map — single source of truth for which events this projection handles.
- * Keys become handler method names: `handle${Key}`.
- */
-type SuiteRunEventMap = {
-  SuiteRunStarted: SuiteRunStartedEvent;
-  SuiteRunItemStarted: SuiteRunItemStartedEvent;
-  SuiteRunItemCompleted: SuiteRunItemCompletedEvent;
-};
+const suiteRunEvents = [
+  SuiteRunStartedEventSchema,
+  SuiteRunItemStartedEventSchema,
+  SuiteRunItemCompletedEventSchema,
+] as const;
 
 /**
  * Type-safe fold projection for suite run state.
  *
- * - `implements FoldEventHandlers` enforces a handler exists for every event in the map
- * - `eventTypeMap` routes runtime event.type strings to the correct handler
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.suite_run.started"` → `handleSuiteRunStarted`)
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class SuiteRunStateFoldProjection
-  extends AbstractFoldProjection<SuiteRunStateData, SuiteRunEventMap>
-  implements FoldEventHandlers<SuiteRunEventMap, SuiteRunStateData>
+  extends AbstractFoldProjection<SuiteRunStateData, typeof suiteRunEvents>
+  implements FoldEventHandlers<typeof suiteRunEvents, SuiteRunStateData>
 {
   readonly name = "suiteRunState";
   readonly version = SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<SuiteRunStateData>;
 
-  protected readonly eventTypeMap = {
-    [SUITE_RUN_EVENT_TYPES.STARTED]: "handleSuiteRunStarted",
-    [SUITE_RUN_EVENT_TYPES.ITEM_STARTED]: "handleSuiteRunItemStarted",
-    [SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED]: "handleSuiteRunItemCompleted",
-  } as const;
+  protected readonly events = suiteRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<SuiteRunStateData> }) {
     super();

@@ -1,10 +1,26 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { z } from "zod";
 import {
   AbstractFoldProjection,
+  type AnyEventSchema,
   type FoldEventHandlers,
-  type DispatchableEvent,
 } from "../abstractFoldProjection";
 import type { FoldProjectionStore } from "../foldProjection.types";
+
+// --- Test Zod schemas (mimic real event schemas) ---
+
+const IncrementedEventSchema = z.object({
+  type: z.literal("test.incremented"),
+  amount: z.number(),
+});
+type IncrementedEvent = z.infer<typeof IncrementedEventSchema>;
+
+const ResetEventSchema = z.object({
+  type: z.literal("test.reset"),
+});
+type ResetEvent = z.infer<typeof ResetEventSchema>;
+
+const testEvents = [IncrementedEventSchema, ResetEventSchema] as const;
 
 // --- Test fixtures ---
 
@@ -15,44 +31,30 @@ interface TestState {
   UpdatedAt: number;
 }
 
-type IncrementedEvent = DispatchableEvent & {
-  type: "test.incremented";
-  amount: number;
-};
-type ResetEvent = DispatchableEvent & { type: "test.reset" };
-
-type TestEventMap = {
-  Incremented: IncrementedEvent;
-  Reset: ResetEvent;
-};
-
 const noopStore: FoldProjectionStore<TestState> = {
   store: async () => {},
   get: async () => null,
 };
 
 class TestFoldProjection
-  extends AbstractFoldProjection<TestState, TestEventMap>
-  implements FoldEventHandlers<TestEventMap, TestState>
+  extends AbstractFoldProjection<TestState, typeof testEvents>
+  implements FoldEventHandlers<typeof testEvents, TestState>
 {
   readonly name = "test";
   readonly version = "2026-01-01";
   readonly store = noopStore;
 
-  protected readonly eventTypeMap = {
-    "test.incremented": "handleIncremented",
-    "test.reset": "handleReset",
-  } as const;
+  protected readonly events = testEvents;
 
   protected initState() {
     return { value: "", count: 0 };
   }
 
-  handleIncremented(event: IncrementedEvent, state: TestState): TestState {
+  handleTestIncremented(event: IncrementedEvent, state: TestState): TestState {
     return { ...state, count: state.count + event.amount };
   }
 
-  handleReset(_event: ResetEvent, state: TestState): TestState {
+  handleTestReset(_event: ResetEvent, state: TestState): TestState {
     return { ...state, count: 0, value: "reset" };
   }
 }
@@ -65,12 +67,21 @@ interface CamelState {
   updatedAt: number;
 }
 
-type CamelEvent = DispatchableEvent & { type: "camel.happened" };
-type CamelEventMap = { Happened: CamelEvent };
+const CamelEventSchema = z.object({
+  type: z.literal("test.camel_happened"),
+});
+type CamelEvent = z.infer<typeof CamelEventSchema>;
+
+const camelEvents = [CamelEventSchema] as const;
 
 class CamelFoldProjection
-  extends AbstractFoldProjection<CamelState, CamelEventMap, "createdAt", "updatedAt">
-  implements FoldEventHandlers<CamelEventMap, CamelState>
+  extends AbstractFoldProjection<
+    CamelState,
+    typeof camelEvents,
+    "createdAt",
+    "updatedAt"
+  >
+  implements FoldEventHandlers<typeof camelEvents, CamelState>
 {
   readonly name = "camel";
   readonly version = "2026-01-01";
@@ -79,9 +90,7 @@ class CamelFoldProjection
     get: async () => null,
   };
 
-  protected readonly eventTypeMap = {
-    "camel.happened": "handleHappened",
-  } as const;
+  protected readonly events = camelEvents;
 
   constructor() {
     super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
@@ -91,7 +100,10 @@ class CamelFoldProjection
     return { name: "" };
   }
 
-  handleHappened(_event: CamelEvent, state: CamelState): CamelState {
+  handleTestCamelHappened(
+    _event: CamelEvent,
+    state: CamelState,
+  ): CamelState {
     return { ...state, name: "happened" };
   }
 }
@@ -164,16 +176,15 @@ describe("AbstractFoldProjection", () => {
   describe("when applying an unknown event", () => {
     it("returns state unchanged", () => {
       const state = projection.init();
-      const event = { type: "unknown.event" } as IncrementedEvent;
 
-      const result = projection.apply(state, event);
+      const result = projection.apply(state, { type: "unknown.event" });
 
       expect(result).toBe(state);
     });
   });
 
   describe("when eventTypes is accessed", () => {
-    it("derives from eventTypeMap keys", () => {
+    it("derives from event schemas", () => {
       expect(projection.eventTypes).toEqual([
         "test.incremented",
         "test.reset",
@@ -193,9 +204,8 @@ describe("AbstractFoldProjection", () => {
     it("produces monotonic updatedAt on apply", () => {
       const camel = new CamelFoldProjection();
       const state = camel.init();
-      const event: CamelEvent = { type: "camel.happened" };
 
-      const result = camel.apply(state, event);
+      const result = camel.apply(state, { type: "test.camel_happened" });
 
       expect(result.updatedAt).toBe(1001);
       expect(result.name).toBe("happened");
