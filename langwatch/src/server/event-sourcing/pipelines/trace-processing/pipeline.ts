@@ -23,6 +23,7 @@ export interface TraceProcessingPipelineDeps {
   logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
@@ -55,6 +56,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withMapProjection("metricRecordStorage", new MetricRecordStorageMapProjection({
       store: deps.metricRecordAppendStore,
     }))
+    .withReactor("traceSummary", "originGate", deps.originGateReactor)
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
