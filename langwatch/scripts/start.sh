@@ -14,8 +14,35 @@ if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 
+wait_for_postgres() {
+  if [ -n "$DATABASE_URL" ]; then
+    echo "Waiting for database to be ready..."
+    db_ready=false
+    for i in $(seq 1 30); do
+      if node -e "
+        const url = new URL(process.env.DATABASE_URL.replace('postgresql://', 'http://'));
+        const net = require('net');
+        const s = net.connect({host: url.hostname, port: url.port || 5432}, () => { s.end(); process.exit(0); });
+        s.on('error', () => process.exit(1));
+        setTimeout(() => process.exit(1), 2000);
+      " 2>/dev/null; then
+        echo "Database is reachable"
+        db_ready=true
+        break
+      fi
+      echo "Database not ready yet, retrying in 2s... ($i/30)"
+      sleep 2
+    done
+    if [ "$db_ready" != "true" ]; then
+      echo "Database was not reachable after 30 attempts; aborting startup."
+      exit 1
+    fi
+  fi
+}
+
 START_QUICKWIT_COMMAND=""
 if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEARCH_NODE_URL" ] && [[ "$ELASTICSEARCH_NODE_URL" =~ ^quickwit:// ]]); then
+  wait_for_postgres
   START_QUICKWIT_COMMAND="pnpm run start:quickwit"
   START_APP_COMMAND="./scripts/wait-for-quickwit.sh && pnpm run start:prepare:db && pnpm run start:app"
   RUNTIME_ENV="$RUNTIME_ENV RUST_LOG=error"
@@ -25,7 +52,8 @@ if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEAR
     pnpm run setup:quickwit
   fi
 else
- pnpm run start:prepare:db
+  wait_for_postgres
+  pnpm run start:prepare:db
 fi
 
 COMMANDS=()
