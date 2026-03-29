@@ -685,7 +685,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
-        any(ScenarioSetId) AS ScenarioSetId
+        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS ScenarioSetId -- Must match DEFAULT_SET_ID from internal-set-id.ts
        FROM (
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
