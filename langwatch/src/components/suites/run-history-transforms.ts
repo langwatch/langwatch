@@ -11,7 +11,6 @@ import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/in
 import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
-export type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
