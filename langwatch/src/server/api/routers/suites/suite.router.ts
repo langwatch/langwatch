@@ -13,7 +13,7 @@ import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
-import type { SuiteRunSummary } from "~/components/suites/run-history-transforms";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 

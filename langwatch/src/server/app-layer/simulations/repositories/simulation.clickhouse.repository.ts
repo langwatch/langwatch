@@ -733,17 +733,44 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return { changed: true, lastUpdatedAt, runs, scenarioSetIds, nextCursor, hasMore };
   }
 
-  async getExternalSetSummaries({
-    projectId,
-    startDate,
-    endDate,
-  }: {
+  async getExternalSetSummaries(params: {
     projectId: string;
     startDate?: number;
     endDate?: number;
   }): Promise<ExternalSetSummary[]> {
+    return this.getSetSummaries({ ...params, filter: "external" });
+  }
+
+  async getInternalSuiteSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]> {
+    return this.getSetSummaries({ ...params, filter: "internal-suites" });
+  }
+
+  private async getSetSummaries({
+    projectId,
+    startDate,
+    endDate,
+    filter,
+  }: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    filter: "external" | "internal-suites";
+  }): Promise<ExternalSetSummary[]> {
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
+
+    const wherePredicate = filter === "external"
+      ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+      : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
+
+    // External sets normalize empty ScenarioSetId to 'default'
+    const selectId = filter === "external"
+      ? "IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId"
+      : "ScenarioSetId AS NormalizedSetId";
 
     const rows = await this.queryRows<{
       ScenarioSetId: string;
@@ -767,18 +794,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
            toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
          FROM (
-           SELECT
-             -- 'default' must match DEFAULT_SET_ID from internal-set-id.ts
-           IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
-             BatchRunId,
-             Status,
-             CreatedAt,
-             ArchivedAt
+           SELECT ${selectId}, BatchRunId, Status, CreatedAt, ArchivedAt
            FROM (
              SELECT ${DEDUP_COLUMNS}
              FROM ${TABLE_NAME}
              WHERE TenantId = {tenantId:String}
-               AND NOT startsWith(ScenarioSetId, '__internal__')
+               ${wherePredicate}
              ORDER BY ScenarioRunId, UpdatedAt DESC
              LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
            )
@@ -788,65 +809,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          ${havingClause}
        )
        GROUP BY NormalizedSetId
-       ORDER BY LastRunAt DESC`,
-      { tenantId: projectId, ...dateFilter.params },
-    );
-
-    return rows.map((row) => ({
-      scenarioSetId: row.ScenarioSetId,
-      passedCount: Number(row.PassCount),
-      failedCount: Number(row.FailCount),
-      totalCount: Number(row.TotalCount),
-      lastRunTimestamp: Number(row.LastRunAt),
-    }));
-  }
-
-  async getInternalSuiteSummaries({
-    projectId,
-    startDate,
-    endDate,
-  }: {
-    projectId: string;
-    startDate?: number;
-    endDate?: number;
-  }): Promise<ExternalSetSummary[]> {
-    const dateFilter = buildDateHavingFilter({ startDate, endDate });
-    const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
-
-    const rows = await this.queryRows<{
-      ScenarioSetId: string;
-      TotalCount: string;
-      PassCount: string;
-      FailCount: string;
-      LastRunAt: string;
-    }>(
-      `SELECT
-        ScenarioSetId,
-        toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
-        toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
-        toString(argMax(FailCount, MaxCreatedAtMs)) AS FailCount,
-        toString(max(MaxCreatedAtMs)) AS LastRunAt
-       FROM (
-         SELECT
-           ScenarioSetId,
-           BatchRunId,
-           count() AS RunCount,
-           countIf(Status = 'SUCCESS') AS PassCount,
-           countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
-           toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
-         FROM (
-           SELECT ${DEDUP_COLUMNS}
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND startsWith(ScenarioSetId, '__internal__')
-           ORDER BY ScenarioRunId, UpdatedAt DESC
-           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
-         WHERE ArchivedAt IS NULL
-         GROUP BY ScenarioSetId, BatchRunId
-         ${havingClause}
-       )
-       GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId, ...dateFilter.params },
     );

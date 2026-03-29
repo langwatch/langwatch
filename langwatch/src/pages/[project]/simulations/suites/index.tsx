@@ -25,7 +25,7 @@ import {
 } from "~/components/suites/SuiteDetailPanel";
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
-import type { SuiteRunSummary } from "~/components/suites/run-history-transforms";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { useRunSuite } from "~/components/suites/useRunSuite";
 import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import {
