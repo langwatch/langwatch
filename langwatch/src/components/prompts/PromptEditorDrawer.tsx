@@ -408,9 +408,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         });
       }
 
-    } else if (!promptId && modelMetadata) {
-      // New prompt - use defaults with model's max tokens
-      // Wait for modelMetadata to be loaded before initializing
+    } else if ((!promptId || (!promptQuery.data && !promptQuery.isLoading)) && modelMetadata) {
+      // New prompt OR prompt referenced by ID but not found in DB (e.g. after
+      // importing a workflow from another project). Use defaults with model's
+      // max tokens, merging initialLocalConfig if available.
       const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
       const defaultModelMetadata = modelMetadata[defaultModel];
       const maxTokens = getMaxTokenLimit(defaultModelMetadata);
@@ -501,6 +502,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   }, [
     isOpen,
     promptQuery.data,
+    promptQuery.isLoading,
     promptId,
     props.initialLocalConfig,
     methods,
