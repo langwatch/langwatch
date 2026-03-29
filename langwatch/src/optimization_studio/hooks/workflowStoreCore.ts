@@ -798,6 +798,15 @@ export const store = (
         ...currentNode.data,
         name: newName,
         execution_state: undefined,
+        ...(currentNode.type === "code" && currentNode.data.parameters
+          ? {
+              parameters: updateCodeClassName(
+                currentNode.data.parameters as Field[],
+                currentNode.id,
+                newId,
+              ),
+            }
+          : {}),
       },
     };
     set({
