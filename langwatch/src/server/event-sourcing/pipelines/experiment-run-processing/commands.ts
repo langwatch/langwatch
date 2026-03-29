@@ -37,6 +37,7 @@ export const RecordTargetResultCommand = defineCommand({
   aggregateType: "experiment_run",
   schema: targetResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
   idempotencyKey: (d) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
@@ -54,6 +55,7 @@ export const RecordEvaluatorResultCommand = defineCommand({
   aggregateType: "experiment_run",
   schema: evaluatorResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
+  groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
   idempotencyKey: (d) => `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
