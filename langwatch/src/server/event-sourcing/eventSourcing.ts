@@ -523,18 +523,14 @@ function buildServiceOptions<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
 >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>) {
+  // Pass class instances directly — do NOT spread.
+  // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
   const foldProjections = Array.from(definition.foldProjections.values()).map(
-    ({ definition: fold, options }) => ({
-      ...fold,
-      options: options ?? fold.options,
-    }),
+    ({ definition: fold }) => fold,
   );
 
   const mapProjections = Array.from(definition.mapProjections.values()).map(
-    ({ definition: mapProj, options }) => ({
-      ...mapProj,
-      options: options ?? mapProj.options,
-    }),
+    ({ definition: mapProj }) => mapProj,
   );
 
   const commandRegistrations =
