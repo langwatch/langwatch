@@ -26,7 +26,7 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   useDrawer,
   useDrawerParams,
@@ -69,6 +69,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+  /** Tracks whether the current save is a "save and run" flow.
+   *  When true, the mutation-level onSuccess skips its normal
+   *  close/toast behavior — the per-call onSuccess handles it. */
+  const saveAndRunRef = useRef(false);
   const params = useDrawerParams();
   const utils = api.useContext();
 
@@ -129,6 +133,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const createMutation = api.suites.create.useMutation({
     onSuccess: (data) => {
       void utils.suites.getAll.invalidate();
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
       onSaved?.(data);
       closeDrawer();
       toaster.create({
@@ -138,6 +148,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       });
     },
     onError: (err) => {
+      saveAndRunRef.current = false;
       toaster.create({
         title: "Failed to create run plan",
         description: err.message,
@@ -154,6 +165,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         projectId: project?.id ?? "",
         id: data.id,
       });
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
       onSaved?.(data);
       closeDrawer();
       toaster.create({
@@ -163,6 +180,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       });
     },
     onError: (err) => {
+      saveAndRunRef.current = false;
       toaster.create({
         title: "Failed to update run plan",
         description: err.message,
@@ -197,7 +215,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       if (!project) return;
       const payload = buildMutationPayload(data, project.id);
 
+      saveAndRunRef.current = true;
       const onSuccess = (saved: SimulationSuite) => {
+        saveAndRunRef.current = false;
         closeDrawer();
         if (onRunRequested) {
           onRunRequested(saved);
@@ -220,6 +240,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       updateMutation,
       closeDrawer,
       onRunRequested,
+      runMutation,
+      idempotencyKey,
     ],
   );
 
