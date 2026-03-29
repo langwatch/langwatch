@@ -57,7 +57,6 @@ Always navigate to docs links using the .md extension for better readability.
 - [Python SDK API Reference](https://langwatch.ai/docs/integration/python/reference.md): Use the LangWatch Python SDK API reference to implement tracing, events, and evaluation logic for AI agent testing workflows.
 - [Manual Instrumentation](https://langwatch.ai/docs/integration/python/tutorials/manual-instrumentation.md): Learn manual instrumentation with the LangWatch Python SDK for full control over tracing, evaluations, and agent testing.
 - [OpenTelemetry Migration](https://langwatch.ai/docs/integration/python/tutorials/open-telemetry.md): Integrate LangWatch with existing OpenTelemetry setups to enhance tracing, analysis, and agent evaluation workflows.
-- [Capturing Evaluations & Guardrails](https://langwatch.ai/docs/integration/python/tutorials/capturing-evaluations-guardrails.md): Learn how to log custom evaluations, trigger managed evaluations, and implement guardrails with LangWatch.
 
 ### TypeScript
 
@@ -76,8 +75,6 @@ Always navigate to docs links using the .md extension for better readability.
 
 - [OpenTelemetry Integration Guide](https://langwatch.ai/docs/integration/opentelemetry/guide.md): Integrate OpenTelemetry with LangWatch to collect LLM spans from any language for unified AI agent evaluation data.
 - [Metadata and Labels](https://langwatch.ai/docs/integration/metadata-and-labels.md): Add custom metadata, user IDs, conversation threads, and labels to your traces for filtering, analytics, and debugging.
-- [RAG Context Tracking](https://langwatch.ai/docs/integration/rags-context-tracking.md): Track RAG documents used in LLM applications with LangWatch to improve transparency and AI agent evaluation accuracy.
-- [Using LangWatch with OpenTelemetry](https://langwatch.ai/docs/integration/tutorials/open-telemetry.md): Learn how to integrate LangWatch with your existing OpenTelemetry setup in Python and TypeScript.
 
 ### Tutorials
 
@@ -111,6 +108,12 @@ Always navigate to docs links using the .md extension for better readability.
 - [Tracking Conversations](https://langwatch.ai/docs/integration/python/tutorials/tracking-conversations.md): Group related traces into conversations using thread_id so you can view and evaluate entire chat sessions in LangWatch.
 - [Tracking Conversations](https://langwatch.ai/docs/integration/typescript/tutorials/tracking-conversations.md): Group related traces into conversations using thread_id so you can view and evaluate entire chat sessions in LangWatch.
 
+#### Evaluations & Guardrails
+
+- [Capturing Evaluations & Guardrails](https://langwatch.ai/docs/integration/python/tutorials/capturing-evaluations-guardrails.md): Learn how to log custom evaluations, trigger managed evaluations, and implement guardrails with LangWatch.
+
+- [Combining the SDK with OpenTelemetry Spans](https://langwatch.ai/docs/integration/tutorials/open-telemetry.md): Learn how to integrate LangWatch with your existing OpenTelemetry setup in Python and TypeScript.
+
 ## Frameworks
 
 ### LangChain
@@ -142,7 +145,6 @@ Always navigate to docs links using the .md extension for better readability.
 - [SmolAgents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/smolagents.md): Add SmolAgents tracing with LangWatch to analyze behaviors, detect errors, and improve AI agent testing accuracy.
 - [Google Agent Development Kit (ADK) Instrumentation](https://langwatch.ai/docs/integration/python/integrations/google-ai.md): Integrate Google ADK agents into LangWatch to trace actions, tools, and interactions for structured AI agent evaluations.
 - [Other OpenTelemetry Instrumentors](https://langwatch.ai/docs/integration/python/integrations/other.md): Use any OpenTelemetry-compatible instrumentor with LangWatch to standardize tracing and centralize AI agent testing observability.
-- [OpenClaw Integration](https://langwatch.ai/docs/integration/openclaw.md): Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
 
 ## Model Providers
 
@@ -183,6 +185,7 @@ Always navigate to docs links using the .md extension for better readability.
 ## Tools
 
 - [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Monitor Claude Code usage with LangWatch using OpenTelemetry traces
+- [OpenClaw Integration](https://langwatch.ai/docs/integration/openclaw.md): Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
 
 ## No-Code Platforms
 
@@ -241,7 +244,6 @@ Always navigate to docs links using the .md extension for better readability.
 - [View images in datasets](https://langwatch.ai/docs/datasets/dataset-images.md): View image datasets in LangWatch to support multimodal evaluations and agent testing scenarios.
 
 - [Annotations](https://langwatch.ai/docs/features/annotations.md): Use annotations in LangWatch for expert labeling, trace review, and structured evaluation workflows for AI agent testing.
-- [Batch Evaluations](https://langwatch.ai/docs/features/batch-evaluations.md)
 
 ## Prompt Management
 

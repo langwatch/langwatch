@@ -158,8 +158,7 @@
                   "datasets/dataset-images"
                 ]
               },
-              "features/annotations",
-              "features/batch-evaluations"
+              "features/annotations"
             ]
           },
           {
@@ -271,8 +270,7 @@
                   "integration/python/guide",
                   "integration/python/reference",
                   "integration/python/tutorials/manual-instrumentation",
-                  "integration/python/tutorials/open-telemetry",
-                  "integration/python/tutorials/capturing-evaluations-guardrails"
+                  "integration/python/tutorials/open-telemetry"
                 ]
               },
               {
@@ -298,8 +296,6 @@
               },
               "integration/opentelemetry/guide",
               "integration/metadata-and-labels",
-              "integration/rags-context-tracking",
-              "integration/tutorials/open-telemetry",
               {
                 "group": "Tutorials",
                 "pages": [
@@ -344,7 +340,14 @@
                       "integration/python/tutorials/tracking-conversations",
                       "integration/typescript/tutorials/tracking-conversations"
                     ]
-                  }
+                  },
+                  {
+                    "group": "Evaluations & Guardrails",
+                    "pages": [
+                      "integration/python/tutorials/capturing-evaluations-guardrails"
+                    ]
+                  },
+                  "integration/tutorials/open-telemetry"
                 ]
               }
             ]
@@ -384,8 +387,7 @@
               "integration/python/integrations/instructor",
               "integration/python/integrations/smolagents",
               "integration/python/integrations/google-ai",
-              "integration/python/integrations/other",
-              "integration/openclaw"
+              "integration/python/integrations/other"
             ]
           },
           {
@@ -438,7 +440,8 @@
           {
             "group": "Tools",
             "pages": [
-              "integration/tools/integrations/claude-code"
+              "integration/tools/integrations/claude-code",
+              "integration/openclaw"
             ]
           },
           {
@@ -788,6 +791,14 @@
     {
       "source": "/skills/manual",
       "destination": "/integration/quick-start"
+    },
+    {
+      "source": "/features/batch-evaluations",
+      "destination": "/evaluations/experiments/sdk"
+    },
+    {
+      "source": "/integration/rags-context-tracking",
+      "destination": "/integration/python/tutorials/capturing-rag"
     }
   ]
 }
