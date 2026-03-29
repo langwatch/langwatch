@@ -15,7 +15,7 @@ import type {
     SimulationTextMessageStartEvent,
 } from "../../schemas/events";
 import {
-    createSimulationRunStateFoldProjection,
+    SimulationRunStateFoldProjection,
     type SimulationRunStateData,
 } from "../simulationRunState.foldProjection";
 
@@ -24,7 +24,7 @@ const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const foldProjection = createSimulationRunStateFoldProjection({ store: noopStore });
+const foldProjection = new SimulationRunStateFoldProjection({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
@@ -221,7 +221,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("IN_PROGRESS");
       expect(state.StartedAt).toBe(1000);
       expect(state.CreatedAt).toBe(FAKE_NOW);
-      // UpdatedAt is monotonic: max(event.occurredAt, state.UpdatedAt + 1)
+      // UpdatedAt is monotonic: max(Date.now(), state.UpdatedAt + 1)
       expect(state.UpdatedAt).toBeGreaterThanOrEqual(1000);
     });
   });

@@ -1,24 +1,31 @@
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import type { Projection } from "../../../";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "../../../projections/abstractFoldProjection";
+import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "../../../projections/foldProjection.types";
+  SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
+  SimulationMessageSnapshotEvent,
+  SimulationTextMessageStartEvent,
+  SimulationTextMessageEndEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunDeletedEvent,
+} from "../schemas/events";
 import {
-  SIMULATION_PROCESSING_EVENT_TYPES,
-  SIMULATION_PROJECTION_VERSIONS,
-} from "../schemas/constants";
-import type { SimulationProcessingEvent } from "../schemas/events";
-import {
-  isSimulationMessageSnapshotEvent,
-  isSimulationRunDeletedEvent,
-  isSimulationRunFinishedEvent,
-  isSimulationRunMetricsComputedEvent,
-  isSimulationRunQueuedEvent,
-  isSimulationRunStartedEvent,
-  isSimulationTextMessageEndEvent,
-  isSimulationTextMessageStartEvent,
-} from "../schemas/typeGuards";
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunDeletedEventSchema,
+} from "../schemas/events";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
@@ -43,7 +50,7 @@ export interface SimulationMessageRow {
  * Matches the simulation_runs ClickHouse table schema.
  *
  * This is both the fold state and the stored data -- one type, not two.
- * `apply()` does all computation. Store is a dumb read/write layer.
+ * Handlers do all computation. Store is a dumb read/write layer.
  */
 export interface SimulationRunStateData {
   ScenarioRunId: string;
@@ -79,65 +86,73 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
   data: SimulationRunStateData;
 }
 
-function init(): SimulationRunStateData {
-  return {
-    ScenarioRunId: "",
-    ScenarioId: "",
-    BatchRunId: "",
-    ScenarioSetId: "",
-    Status: "PENDING",
-    Name: null,
-    Description: null,
-    Metadata: null,
-    Messages: [],
-    TraceIds: [],
-    Verdict: null,
-    Reasoning: null,
-    MetCriteria: [],
-    UnmetCriteria: [],
-    Error: null,
-    DurationMs: null,
-    TotalCost: null,
-    RoleCosts: {},
-    RoleLatencies: {},
-    TraceMetrics: {},
-    StartedAt: null,
-    QueuedAt: null,
-    CreatedAt: Date.now(),
-    UpdatedAt: Date.now(),
-    FinishedAt: null,
-    ArchivedAt: null,
-    LastSnapshotOccurredAt: 0,
-  };
-}
+const simulationRunEvents = [
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunDeletedEventSchema,
+] as const;
 
 /**
- * Monotonic UpdatedAt for ReplacingMergeTree correctness.
+ * Type-safe fold projection for simulation run state.
  *
- * Each new row MUST have a strictly higher UpdatedAt than the previous
- * state so it always wins the merge. Without this, two events with the
- * same occurredAt (e.g. SDK sends message_snapshot and finished with
- * identical timestamps) produce rows with equal UpdatedAt, and the
- * merge picks non-deterministically — potentially discarding the
- * finished row.
- *
- * For most handlers: use the event's natural timestamp when it's
- * already higher, otherwise advance by +1.
- *
- * For metrics_computed: ALWAYS use +1 because its occurredAt is
- * server-generated (ECST reactor, 60s delay) and would jump far
- * ahead of the finished event's timestamp, causing the stale
- * metrics row to permanently win.
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.simulation_run.queued"` -> `handleSimulationRunQueued`)
+ * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
-function nextUpdatedAt(state: SimulationRunStateData, event: SimulationProcessingEvent): number {
-  return Math.max(event.occurredAt, state.UpdatedAt + 1);
-}
+export class SimulationRunStateFoldProjection
+  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
+  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
+{
+  readonly name = "simulationRunState";
+  readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
+  readonly store: FoldProjectionStore<SimulationRunStateData>;
 
-function apply(
-  state: SimulationRunStateData,
-  event: SimulationProcessingEvent,
-): SimulationRunStateData {
-  if (isSimulationRunQueuedEvent(event)) {
+  protected readonly events = simulationRunEvents;
+
+  constructor(deps: { store: FoldProjectionStore<SimulationRunStateData> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return {
+      ScenarioRunId: "",
+      ScenarioId: "",
+      BatchRunId: "",
+      ScenarioSetId: "",
+      Status: "PENDING",
+      Name: null,
+      Description: null,
+      Metadata: null,
+      Messages: [],
+      TraceIds: [],
+      Verdict: null,
+      Reasoning: null,
+      MetCriteria: [],
+      UnmetCriteria: [],
+      Error: null,
+      DurationMs: null,
+      TotalCost: null,
+      RoleCosts: {},
+      RoleLatencies: {},
+      TraceMetrics: {},
+      StartedAt: null,
+      QueuedAt: null,
+      FinishedAt: null,
+      ArchivedAt: null,
+      LastSnapshotOccurredAt: 0,
+    };
+  }
+
+  handleSimulationRunQueued(
+    event: SimulationRunQueuedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     return {
       ...state,
       ScenarioRunId: event.data.scenarioRunId,
@@ -149,11 +164,13 @@ function apply(
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       QueuedAt: event.occurredAt,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
-  if (isSimulationRunStartedEvent(event)) {
+  handleSimulationRunStarted(
+    event: SimulationRunStartedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
@@ -165,11 +182,13 @@ function apply(
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
-  if (isSimulationMessageSnapshotEvent(event)) {
+  handleSimulationRunMessageSnapshot(
+    event: SimulationMessageSnapshotEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     // Out-of-order protection: ignore snapshots older than the latest applied
     if (event.occurredAt <= state.LastSnapshotOccurredAt) return state;
 
@@ -194,11 +213,13 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
-  if (isSimulationTextMessageStartEvent(event)) {
+  handleSimulationRunTextMessageStart(
+    event: SimulationTextMessageStartEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     // Idempotency: skip if message already exists
     if (state.Messages.some((m) => m.Id === event.data.messageId)) return state;
 
@@ -229,11 +250,13 @@ function apply(
       Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
-  if (isSimulationTextMessageEndEvent(event)) {
+  handleSimulationRunTextMessageEnd(
+    event: SimulationTextMessageEndEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     const existingIndex = state.Messages.findIndex(
       (m) => m.Id === event.data.messageId,
     );
@@ -283,11 +306,13 @@ function apply(
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: updatedMessages,
       TraceIds: traceIds,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
-  if (isSimulationRunFinishedEvent(event)) {
+  handleSimulationRunFinished(
+    event: SimulationRunFinishedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
 
@@ -314,11 +339,13 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
 
-  if (isSimulationRunMetricsComputedEvent(event)) {
+  handleSimulationRunMetricsComputed(
+    event: SimulationRunMetricsComputedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     // Store per-trace breakdown, then recompute aggregates
     const traceMetrics = {
       ...state.TraceMetrics,
@@ -350,41 +377,17 @@ function apply(
       TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
       RoleCosts: roleCosts,
       RoleLatencies: roleLatencies,
-      // Always +1 for metrics_computed — its occurredAt is server-generated
-      // (ECST reactor, 60s delay) and would jump far ahead of finished.
-      UpdatedAt: state.UpdatedAt + 1,
     };
   }
 
-  if (isSimulationRunDeletedEvent(event)) {
+  handleSimulationRunDeleted(
+    event: SimulationRunDeletedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       ArchivedAt: event.occurredAt,
-      UpdatedAt: nextUpdatedAt(state, event),
     };
   }
-
-  return state;
-}
-
-/**
- * Creates FoldProjection definition for simulation run state.
- *
- * Fold state = stored data. Pure state transitions, no side effects.
- */
-export function createSimulationRunStateFoldProjection(deps: {
-  store: FoldProjectionStore<SimulationRunStateData>;
-}): FoldProjectionDefinition<
-  SimulationRunStateData,
-  SimulationProcessingEvent
-> {
-  return {
-    name: "simulationRunState",
-    version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-    eventTypes: SIMULATION_PROCESSING_EVENT_TYPES,
-    init,
-    apply,
-    store: deps.store,
-  };
 }

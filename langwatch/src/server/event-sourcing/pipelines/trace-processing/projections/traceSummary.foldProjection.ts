@@ -11,25 +11,27 @@ import {
   estimateCost,
   matchingLLMModelCost,
 } from "~/server/background/workers/collector/cost";
-import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "~/server/event-sourcing/projections";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
-  TRACE_PROCESSING_EVENT_TYPES,
-  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-} from "../schemas/constants";
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "~/server/event-sourcing/projections/abstractFoldProjection";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type {
   LogRecordReceivedEventData,
-  TraceProcessingEvent,
+  SpanReceivedEvent,
+  TopicAssignedEvent,
+  LogRecordReceivedEvent,
+  MetricRecordReceivedEvent,
+  OriginResolvedEvent,
 } from "../schemas/events";
 import {
-  isLogRecordReceivedEvent,
-  isMetricRecordReceivedEvent,
-  isOriginResolvedEvent,
-  isSpanReceivedEvent,
-  isTopicAssignedEvent,
+  spanReceivedEventSchema,
+  topicAssignedEventSchema,
+  logRecordReceivedEventSchema,
+  metricRecordReceivedEventSchema,
+  originResolvedEventSchema,
 } from "../schemas/events";
 import type { NormalizedAttributes, NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
@@ -775,27 +777,6 @@ function accumulateAttributes({
 
 // ─── Per-role cost/latency ────────────────────────────────────────────
 
-function resolveEffectiveRole({
-  span,
-  scenarioRoleSpans,
-}: {
-  span: NormalizedSpan;
-  scenarioRoleSpans: Record<string, string>;
-}): string | undefined {
-  const directRole = span.spanAttributes["scenario.role"];
-  if (typeof directRole === "string" && directRole !== "") return directRole;
-
-  // Walk up the parent chain via the scenarioRoleSpans map
-  let parentId = span.parentSpanId;
-  while (parentId) {
-    const parentRole = scenarioRoleSpans[parentId];
-    if (parentRole) return parentRole;
-    break;
-  }
-
-  return undefined;
-}
-
 function accumulateRoleCostLatency({
   state,
   span,
@@ -925,187 +906,203 @@ export function applySpanToSummary({
   };
 }
 
-export function createTraceSummaryFoldProjection({
-  store,
-}: {
-  store: FoldProjectionStore<TraceSummaryData>;
-}): FoldProjectionDefinition<TraceSummaryData, TraceProcessingEvent> {
-  return {
-    name: "traceSummary",
-    version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-    eventTypes: TRACE_PROCESSING_EVENT_TYPES,
+const traceSummaryEvents = [
+  spanReceivedEventSchema,
+  topicAssignedEventSchema,
+  logRecordReceivedEventSchema,
+  metricRecordReceivedEventSchema,
+  originResolvedEventSchema,
+] as const;
 
-    init(): TraceSummaryData {
-      return {
-        traceId: "",
-        spanCount: 0,
-        totalDurationMs: 0,
-        computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
-        computedInput: null,
-        computedOutput: null,
-        timeToFirstTokenMs: null,
-        timeToLastTokenMs: null,
-        tokensPerSecond: null,
-        containsErrorStatus: false,
-        containsOKStatus: false,
-        errorMessage: null,
-        models: [],
-        totalCost: null,
-        tokensEstimated: false,
-        totalPromptTokenCount: null,
-        totalCompletionTokenCount: null,
-        outputFromRootSpan: false,
-        outputSpanEndTimeMs: 0,
-        blockedByGuardrail: false,
-        topicId: null,
-        subTopicId: null,
-        hasAnnotation: null,
-        attributes: {},
-        scenarioRoleCosts: {},
-        scenarioRoleLatencies: {},
-        scenarioRoleSpans: {},
-        spanCosts: {},
-        occurredAt: 0,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-    },
+/**
+ * Type-safe fold projection for trace summary state.
+ *
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.obs.trace.span_received"` -> `handleTraceSpanReceived`)
+ * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
+ */
+export class TraceSummaryFoldProjection
+  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents>
+  implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
+{
+  readonly name = "traceSummary";
+  readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
+  readonly store: FoldProjectionStore<TraceSummaryData>;
+  protected override readonly timestampStyle = "camel" as const;
 
-    apply(
-      state: TraceSummaryData,
-      event: TraceProcessingEvent,
-    ): TraceSummaryData {
-      // Monotonic UpdatedAt for ReplacingMergeTree correctness.
-      // Multiple spans can process within the same millisecond, producing
-      // rows with identical Date.now(). The merge then picks
-      // non-deterministically, potentially discarding rows with role data.
-      const nextUpdatedAt = Math.max(Date.now(), state.updatedAt + 1);
+  protected readonly events = traceSummaryEvents;
 
-      if (isSpanReceivedEvent(event)) {
-        const normalizedSpan =
-          spanNormalizationPipelineService.normalizeSpanReceived(
-            event.tenantId,
-            event.data.span,
-            event.data.resource,
-            event.data.instrumentationScope,
-          );
-        enrichRagContextIds(normalizedSpan);
+  constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {
+    super();
+    this.store = deps.store;
+  }
 
-        return {
-          ...applySpanToSummary({ state, span: normalizedSpan }),
-          createdAt: state.createdAt,
-          updatedAt: nextUpdatedAt,
-        };
-      }
+  protected initState() {
+    return {
+      traceId: "",
+      spanCount: 0,
+      totalDurationMs: 0,
+      computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: false,
+      errorMessage: null,
+      models: [],
+      totalCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: null,
+      totalCompletionTokenCount: null,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      topicId: null,
+      subTopicId: null,
+      hasAnnotation: null,
+      attributes: {},
+      scenarioRoleCosts: {},
+      scenarioRoleLatencies: {},
+      scenarioRoleSpans: {},
+      spanCosts: {},
+      // Sentinel: 0 means "no spans received yet". The timing function uses
+      // occurredAt > 0 to decide first-span vs min-of-existing. Using Date.now()
+      // here would break Math.min logic — wall-clock time >> span startTimeUnixMs.
+      occurredAt: 0,
+    };
+  }
 
-      if (isTopicAssignedEvent(event)) {
-        return {
-          ...state,
-          topicId: event.data.topicId ?? state.topicId,
-          subTopicId: event.data.subtopicId ?? state.subTopicId,
-          updatedAt: nextUpdatedAt,
-        };
-      }
+  handleTraceSpanReceived(
+    event: SpanReceivedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    const normalizedSpan =
+      spanNormalizationPipelineService.normalizeSpanReceived(
+        event.tenantId,
+        event.data.span,
+        event.data.resource,
+        event.data.instrumentationScope,
+      );
+    enrichRagContextIds(normalizedSpan);
 
-      if (isLogRecordReceivedEvent(event)) {
-        const mergedAttributes = { ...state.attributes };
-        const logCount = parseInt(
-          mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
-          10,
-        );
-        mergedAttributes["langwatch.reserved.log_record_count"] = String(
-          logCount + 1,
-        );
+    return {
+      ...applySpanToSummary({ state, span: normalizedSpan }),
+      createdAt: state.createdAt,
+    };
+  }
 
-        let computedInput = state.computedInput;
-        let computedOutput = state.computedOutput;
-        let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
-        const currentOutputSource =
-          state.attributes["langwatch.reserved.output_source"] ??
+  handleTraceTopicAssigned(
+    event: TopicAssignedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return {
+      ...state,
+      topicId: event.data.topicId ?? state.topicId,
+      subTopicId: event.data.subtopicId ?? state.subTopicId,
+    };
+  }
+
+  handleTraceLogRecordReceived(
+    event: LogRecordReceivedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    const mergedAttributes = { ...state.attributes };
+    const logCount = parseInt(
+      mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
+      10,
+    );
+    mergedAttributes["langwatch.reserved.log_record_count"] = String(
+      logCount + 1,
+    );
+
+    let computedInput = state.computedInput;
+    let computedOutput = state.computedOutput;
+    let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
+    const currentOutputSource =
+      state.attributes["langwatch.reserved.output_source"] ??
+      OUTPUT_SOURCE.INFERRED;
+
+    const logIO = extractIOFromLogRecord(event.data);
+
+    if (logIO.input !== null && computedInput === null) {
+      computedInput = logIO.input;
+    }
+
+    if (logIO.output !== null) {
+      if (
+        shouldOverrideOutput({
+          isRoot: false,
+          outputFromRoot: state.outputFromRootSpan,
+          isExplicit: false,
+          currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+          endTime: event.data.timeUnixMs,
+          currentEndTime: outputSpanEndTimeMs,
+        })
+      ) {
+        computedOutput = logIO.output;
+        outputSpanEndTimeMs = event.data.timeUnixMs;
+        mergedAttributes["langwatch.reserved.output_source"] =
           OUTPUT_SOURCE.INFERRED;
-
-        const logIO = extractIOFromLogRecord(event.data);
-
-        if (logIO.input !== null && computedInput === null) {
-          computedInput = logIO.input;
-        }
-
-        if (logIO.output !== null) {
-          if (
-            shouldOverrideOutput({
-              isRoot: false,
-              outputFromRoot: state.outputFromRootSpan,
-              isExplicit: false,
-              currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-              endTime: event.data.timeUnixMs,
-              currentEndTime: outputSpanEndTimeMs,
-            })
-          ) {
-            computedOutput = logIO.output;
-            outputSpanEndTimeMs = event.data.timeUnixMs;
-            mergedAttributes["langwatch.reserved.output_source"] =
-              OUTPUT_SOURCE.INFERRED;
-          }
-        }
-
-        return {
-          ...state,
-          traceId: state.traceId || event.data.traceId,
-          computedInput,
-          computedOutput,
-          outputSpanEndTimeMs,
-          attributes: mergedAttributes,
-          updatedAt: nextUpdatedAt,
-        };
       }
+    }
 
-      if (isMetricRecordReceivedEvent(event)) {
-        let timeToFirstTokenMs = state.timeToFirstTokenMs;
-        if (event.data.metricName === "gen_ai.server.time_to_first_token") {
-          const ttftMs = event.data.value * 1000;
-          timeToFirstTokenMs =
-            timeToFirstTokenMs === null
-              ? ttftMs
-              : Math.min(timeToFirstTokenMs, ttftMs);
-        }
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      computedInput,
+      computedOutput,
+      outputSpanEndTimeMs,
+      attributes: mergedAttributes,
+    };
+  }
 
-        const mergedAttributes = { ...state.attributes };
-        const metricCount = parseInt(
-          mergedAttributes["langwatch.reserved.metric_record_count"] ?? "0",
-          10,
-        );
-        mergedAttributes["langwatch.reserved.metric_record_count"] = String(
-          metricCount + 1,
-        );
+  handleTraceMetricRecordReceived(
+    event: MetricRecordReceivedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    let timeToFirstTokenMs = state.timeToFirstTokenMs;
+    if (event.data.metricName === "gen_ai.server.time_to_first_token") {
+      const ttftMs = event.data.value * 1000;
+      timeToFirstTokenMs =
+        timeToFirstTokenMs === null
+          ? ttftMs
+          : Math.min(timeToFirstTokenMs, ttftMs);
+    }
 
-        return {
-          ...state,
-          traceId: state.traceId || event.data.traceId,
-          timeToFirstTokenMs,
-          attributes: mergedAttributes,
-          updatedAt: nextUpdatedAt,
-        };
-      }
+    const mergedAttributes = { ...state.attributes };
+    const metricCount = parseInt(
+      mergedAttributes["langwatch.reserved.metric_record_count"] ?? "0",
+      10,
+    );
+    mergedAttributes["langwatch.reserved.metric_record_count"] = String(
+      metricCount + 1,
+    );
 
-      if (isOriginResolvedEvent(event)) {
-        const currentOrigin = state.attributes["langwatch.origin"];
-        if (currentOrigin) {
-          // Explicit origin already set — do not override
-          return state;
-        }
-        return {
-          ...state,
-          attributes: {
-            ...state.attributes,
-            "langwatch.origin": event.data.origin,
-          },
-          updatedAt: nextUpdatedAt,
-        };
-      }
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      timeToFirstTokenMs,
+      attributes: mergedAttributes,
+    };
+  }
 
+  handleTraceOriginResolved(
+    event: OriginResolvedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    const currentOrigin = state.attributes["langwatch.origin"];
+    if (currentOrigin) {
+      // Explicit origin already set — do not override
       return state;
-    },
-
-    store,
-  };
+    }
+    return {
+      ...state,
+      attributes: {
+        ...state.attributes,
+        "langwatch.origin": event.data.origin,
+      },
+    };
+  }
 }

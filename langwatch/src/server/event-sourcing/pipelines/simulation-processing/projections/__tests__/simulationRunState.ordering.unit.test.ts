@@ -29,7 +29,7 @@ import type {
   SimulationRunStartedEvent,
 } from "../../schemas/events";
 import {
-  createSimulationRunStateFoldProjection,
+  SimulationRunStateFoldProjection,
   type SimulationRunStateData,
 } from "../simulationRunState.foldProjection";
 
@@ -149,7 +149,7 @@ function createMetricsComputedEvent(
 async function processFold(
   events: SimulationProcessingEvent[],
   store: FoldProjectionStore<SimulationRunStateData> & { clear: () => void },
-  projection: ReturnType<typeof createSimulationRunStateFoldProjection>,
+  projection: SimulationRunStateFoldProjection,
 ): Promise<SimulationRunStateData> {
   const ctx: ProjectionStoreContext = {
     aggregateId: "run-1",
@@ -189,7 +189,7 @@ function eventLabel(e: SimulationProcessingEvent): string {
 
 describe("simulation run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
-  const projection = createSimulationRunStateFoldProjection({ store });
+  const projection = new SimulationRunStateFoldProjection({ store });
 
   function assertCorrectFinalState(state: SimulationRunStateData, label: string) {
     expect(state.Status, `${label}: Status must be SUCCESS`).toBe("SUCCESS");

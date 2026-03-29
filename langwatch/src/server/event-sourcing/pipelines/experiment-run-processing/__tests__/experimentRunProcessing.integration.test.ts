@@ -20,7 +20,7 @@ import { RecordTargetResultCommand } from "../commands/recordTargetResult.comman
 import { StartExperimentRunCommand } from "../commands/startExperimentRun.command";
 import { createExperimentRunResultStorageMapProjection } from "../projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "../projections/experimentRunState.foldProjection";
-import { createExperimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
+import { ExperimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
 import { ExperimentRunStateRepositoryClickHouse } from "../repositories";
 import { createExperimentRunStateFoldStore } from "../projections/experimentRunState.store";
 import { createExperimentRunItemAppendStore } from "../projections/experimentRunResultStorage.store";
@@ -83,7 +83,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
   const pipelineDefinition = definePipeline<ExperimentRunProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("experiment_run" as AggregateType)
-    .withFoldProjection("experimentRunState", createExperimentRunStateFoldProjection({
+    .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
       store: experimentRunStateFoldStore,
     }) as any)
     .withMapProjection("experimentRunResultStorage", createExperimentRunResultStorageMapProjection({

@@ -4,11 +4,11 @@ import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   applySpanToSummary,
-  createTraceSummaryFoldProjection,
+  TraceSummaryFoldProjection,
   type TraceSummaryData,
 } from "../traceSummary.foldProjection";
 
-const traceSummaryProjection = createTraceSummaryFoldProjection({
+const traceSummaryProjection = new TraceSummaryFoldProjection({
   store: { store: async () => {}, get: async () => null },
 });
 

@@ -11,7 +11,7 @@ import type {
   SuiteRunItemCompletedEvent,
 } from "../../schemas/events";
 import {
-  createSuiteRunStateFoldProjection,
+  SuiteRunStateFoldProjection,
   type SuiteRunStateData,
 } from "../suiteRunState.foldProjection";
 
@@ -19,7 +19,7 @@ const noopStore: FoldProjectionStore<SuiteRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const projection = createSuiteRunStateFoldProjection({ store: noopStore });
+const projection = new SuiteRunStateFoldProjection({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

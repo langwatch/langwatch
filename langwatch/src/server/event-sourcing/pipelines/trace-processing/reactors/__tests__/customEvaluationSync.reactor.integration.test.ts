@@ -23,7 +23,7 @@ import { mapCommands } from "../../../../mapCommands";
 import { RecordSpanCommand } from "../../commands/recordSpanCommand";
 import { AssignTopicCommand } from "../../commands/assignTopicCommand";
 import { createSpanStorageMapProjection } from "../../projections/spanStorage.mapProjection";
-import { createTraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import { SpanAppendStore } from "../../projections/spanStorage.store";
@@ -32,7 +32,7 @@ import { createCustomEvaluationSyncReactor } from "../customEvaluationSync.react
 import { StartEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/startEvaluation.command";
 import { CompleteEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/completeEvaluation.command";
 import { ReportEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/reportEvaluation.command";
-import { createEvaluationRunFoldProjection } from "../../../../pipelines/evaluation-processing/projections";
+import { EvaluationRunFoldProjection } from "../../../../pipelines/evaluation-processing/projections";
 import { EvaluationRunStore } from "../../../../pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationProcessingEvent } from "../../../../pipelines/evaluation-processing/schemas/events";
 
@@ -154,7 +154,7 @@ describe.skipIf(!hasTestcontainers)(
         .withCommand("reportEvaluation", ReportEvaluationCommand as any)
         .withFoldProjection(
           "evaluationRun",
-          createEvaluationRunFoldProjection({ store: evalRunStore }) as any,
+          new EvaluationRunFoldProjection({ store: evalRunStore }) as any,
         )
         .build();
       const registeredEvalPipeline =
@@ -192,7 +192,7 @@ describe.skipIf(!hasTestcontainers)(
         .withAggregateType("trace" as AggregateType)
         .withFoldProjection(
           "traceSummary",
-          createTraceSummaryFoldProjection({
+          new TraceSummaryFoldProjection({
             store: traceSummaryStore,
           }) as any,
         )

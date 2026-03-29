@@ -29,7 +29,7 @@ import type {
   ExperimentRunCompletedEvent,
 } from "../../schemas/events";
 import {
-  createExperimentRunStateFoldProjection,
+  ExperimentRunStateFoldProjection,
   type ExperimentRunStateData,
 } from "../experimentRunState.foldProjection";
 
@@ -160,7 +160,7 @@ function createCompletedEvent(
 async function processFold(
   events: ExperimentRunProcessingEvent[],
   store: FoldProjectionStore<ExperimentRunStateData> & { clear: () => void },
-  projection: ReturnType<typeof createExperimentRunStateFoldProjection>,
+  projection: ExperimentRunStateFoldProjection,
 ): Promise<ExperimentRunStateData> {
   const ctx: ProjectionStoreContext = {
     aggregateId: "run-1",
@@ -203,7 +203,7 @@ function eventLabel(e: ExperimentRunProcessingEvent): string {
 
 describe("experiment run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
-  const projection = createExperimentRunStateFoldProjection({ store });
+  const projection = new ExperimentRunStateFoldProjection({ store });
 
   function assertCorrectFinalState(
     state: ExperimentRunStateData,
