@@ -391,10 +391,6 @@ function MainPanel({
   period: Period;
   suiteNameMap: Map<string, string>;
 }) {
-  if (isLoading) {
-    return null;
-  }
-
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
@@ -428,6 +424,11 @@ function MainPanel({
         period={period}
       />
     );
+  }
+
+  // Suite slug specified but suite object not yet loaded — wait for suites.getAll
+  if (isLoading) {
+    return null;
   }
 
   return <SuiteEmptyState onNewSuite={onNewSuite} />;
