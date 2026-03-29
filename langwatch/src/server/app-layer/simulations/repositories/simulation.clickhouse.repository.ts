@@ -801,6 +801,65 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }));
   }
 
+  async getInternalSuiteSummaries({
+    projectId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]> {
+    const dateFilter = buildDateHavingFilter({ startDate, endDate });
+    const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
+
+    const rows = await this.queryRows<{
+      ScenarioSetId: string;
+      TotalCount: string;
+      PassCount: string;
+      FailCount: string;
+      LastRunAt: string;
+    }>(
+      `SELECT
+        ScenarioSetId,
+        toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
+        toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
+        toString(argMax(FailCount, MaxCreatedAtMs)) AS FailCount,
+        toString(max(MaxCreatedAtMs)) AS LastRunAt
+       FROM (
+         SELECT
+           ScenarioSetId,
+           BatchRunId,
+           count() AS RunCount,
+           countIf(Status = 'SUCCESS') AS PassCount,
+           countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
+           toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
+         FROM (
+           SELECT ${DEDUP_COLUMNS}
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+             AND startsWith(ScenarioSetId, '__internal__')
+           ORDER BY ScenarioRunId, UpdatedAt DESC
+           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
+         WHERE ArchivedAt IS NULL
+         GROUP BY ScenarioSetId, BatchRunId
+         ${havingClause}
+       )
+       GROUP BY ScenarioSetId
+       ORDER BY LastRunAt DESC`,
+      { tenantId: projectId, ...dateFilter.params },
+    );
+
+    return rows.map((row) => ({
+      scenarioSetId: row.ScenarioSetId,
+      passedCount: Number(row.PassCount),
+      failedCount: Number(row.FailCount),
+      totalCount: Number(row.TotalCount),
+      lastRunTimestamp: Number(row.LastRunAt),
+    }));
+  }
+
   async getAllRunIdsForProject({
     projectId,
   }: {
