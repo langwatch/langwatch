@@ -118,7 +118,8 @@
                       "evaluations/experiments/ui/llm-as-a-judge"
                     ]
                   },
-                  "evaluations/experiments/ci-cd"
+                  "evaluations/experiments/ci-cd",
+                  "evaluations/experiments/multimodal-evaluation"
                 ]
               },
               {
@@ -239,6 +240,13 @@
               },
               "integration/code-examples"
             ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "support",
+              "status"
+            ]
           }
         ]
       },
@@ -273,7 +281,9 @@
                   "integration/typescript/reference",
                   "integration/typescript/tutorials/filtering-spans",
                   "integration/typescript/tutorials/manual-instrumentation",
-                  "integration/typescript/tutorials/opentelemetry-migration"
+                  "integration/typescript/tutorials/opentelemetry-migration",
+                  "integration/typescript/tutorials/debugging-typescript",
+                  "integration/typescript/tutorials/semantic-conventions"
                 ]
               },
               {
@@ -285,6 +295,7 @@
                 ]
               },
               "integration/opentelemetry/guide",
+              "integration/metadata-and-labels",
               {
                 "group": "Tutorials",
                 "pages": [
@@ -322,7 +333,21 @@
                       "integration/python/tutorials/tracking-tool-calls",
                       "integration/typescript/tutorials/tracking-tool-calls"
                     ]
-                  }
+                  },
+                  {
+                    "group": "Tracking Conversations",
+                    "pages": [
+                      "integration/python/tutorials/tracking-conversations",
+                      "integration/typescript/tutorials/tracking-conversations"
+                    ]
+                  },
+                  {
+                    "group": "Evaluations & Guardrails",
+                    "pages": [
+                      "integration/python/tutorials/capturing-evaluations-guardrails"
+                    ]
+                  },
+                  "integration/tutorials/open-telemetry"
                 ]
               }
             ]
@@ -361,7 +386,8 @@
               "integration/python/integrations/promptflow",
               "integration/python/integrations/instructor",
               "integration/python/integrations/smolagents",
-              "integration/python/integrations/google-ai"
+              "integration/python/integrations/google-ai",
+              "integration/python/integrations/other"
             ]
           },
           {
@@ -387,6 +413,7 @@
                 "group": "Microsoft Azure",
                 "pages": [
                   "integration/python/integrations/azure-ai",
+                  "integration/python/integrations/open-ai-azure",
                   "integration/typescript/integrations/azure",
                   "integration/go/integrations/azure-openai"
                 ]
@@ -408,6 +435,13 @@
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
               "integration/go/integrations/openrouter"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "integration/tools/integrations/claude-code",
+              "integration/openclaw"
             ]
           },
           {
@@ -561,6 +595,15 @@
               "api-reference/evaluators/summarization-score",
               "api-reference/evaluators/valid-format-evaluator",
               "api-reference/evaluators/lingua-language-detection"
+            ]
+          },
+          {
+            "group": "Saved Evaluators",
+            "pages": [
+              "api-reference/saved-evaluators/overview",
+              "api-reference/saved-evaluators/get-evaluators",
+              "api-reference/saved-evaluators/get-evaluator",
+              "api-reference/saved-evaluators/create-evaluator"
             ]
           }
         ]
@@ -748,6 +791,14 @@
     {
       "source": "/skills/manual",
       "destination": "/integration/quick-start"
+    },
+    {
+      "source": "/features/batch-evaluations",
+      "destination": "/evaluations/experiments/sdk"
+    },
+    {
+      "source": "/integration/rags-context-tracking",
+      "destination": "/integration/python/tutorials/capturing-rag"
     }
   ]
 }

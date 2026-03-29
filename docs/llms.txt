@@ -65,6 +65,8 @@ Always navigate to docs links using the .md extension for better readability.
 - [Filtering Spans in TypeScript](https://langwatch.ai/docs/integration/typescript/tutorials/filtering-spans.md): Filter which spans are exported to LangWatch using presets or explicit criteria.
 - [Manual Instrumentation](https://langwatch.ai/docs/integration/typescript/tutorials/manual-instrumentation.md): Use LangWatch TypeScript manual instrumentation for fine-grained tracing control during AI agent testing.
 - [OpenTelemetry Migration](https://langwatch.ai/docs/integration/typescript/tutorials/opentelemetry-migration.md): Migrate from OpenTelemetry to LangWatch while preserving custom tracing to support more advanced AI agent testing.
+- [Debugging and Troubleshooting](https://langwatch.ai/docs/integration/typescript/tutorials/debugging-typescript.md): Debug TypeScript SDK integrations with LangWatch to fix tracing gaps, evaluation mismatches, and agent testing issues.
+- [Semantic Conventions](https://langwatch.ai/docs/integration/typescript/tutorials/semantic-conventions.md): Learn about OpenTelemetry semantic conventions and LangWatch's custom attributes for consistent observability
 
 ### Go
 
@@ -72,6 +74,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Go SDK API Reference](https://langwatch.ai/docs/integration/go/reference.md): Complete API reference for the LangWatch Go SDK, including core functions, OpenAI instrumentation, and span types.
 
 - [OpenTelemetry Integration Guide](https://langwatch.ai/docs/integration/opentelemetry/guide.md): Integrate OpenTelemetry with LangWatch to collect LLM spans from any language for unified AI agent evaluation data.
+- [Metadata and Labels](https://langwatch.ai/docs/integration/metadata-and-labels.md): Add custom metadata, user IDs, conversation threads, and labels to your traces for filtering, analytics, and debugging.
 
 ### Tutorials
 
@@ -99,6 +102,17 @@ Always navigate to docs links using the .md extension for better readability.
 
 - [Tracking Tool Calls](https://langwatch.ai/docs/integration/python/tutorials/tracking-tool-calls.md): Track tool calls in Python-based agent applications with LangWatch to improve debugging and evaluation completeness.
 - [Tracking Tool Calls](https://langwatch.ai/docs/integration/typescript/tutorials/tracking-tool-calls.md): Track tool calls in TypeScript/JavaScript agent applications with LangWatch to improve debugging and evaluation completeness.
+
+#### Tracking Conversations
+
+- [Tracking Conversations](https://langwatch.ai/docs/integration/python/tutorials/tracking-conversations.md): Group related traces into conversations using thread_id so you can view and evaluate entire chat sessions in LangWatch.
+- [Tracking Conversations](https://langwatch.ai/docs/integration/typescript/tutorials/tracking-conversations.md): Group related traces into conversations using thread_id so you can view and evaluate entire chat sessions in LangWatch.
+
+#### Evaluations & Guardrails
+
+- [Capturing Evaluations & Guardrails](https://langwatch.ai/docs/integration/python/tutorials/capturing-evaluations-guardrails.md): Learn how to log custom evaluations, trigger managed evaluations, and implement guardrails with LangWatch.
+
+- [Combining the SDK with OpenTelemetry Spans](https://langwatch.ai/docs/integration/tutorials/open-telemetry.md): Learn how to integrate LangWatch with your existing OpenTelemetry setup in Python and TypeScript.
 
 ## Frameworks
 
@@ -130,6 +144,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Instructor AI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/instructor.md): Instrument Instructor AI with LangWatch to track structured outputs, detect errors, and enhance AI agent testing workflows.
 - [SmolAgents Instrumentation](https://langwatch.ai/docs/integration/python/integrations/smolagents.md): Add SmolAgents tracing with LangWatch to analyze behaviors, detect errors, and improve AI agent testing accuracy.
 - [Google Agent Development Kit (ADK) Instrumentation](https://langwatch.ai/docs/integration/python/integrations/google-ai.md): Integrate Google ADK agents into LangWatch to trace actions, tools, and interactions for structured AI agent evaluations.
+- [Other OpenTelemetry Instrumentors](https://langwatch.ai/docs/integration/python/integrations/other.md): Use any OpenTelemetry-compatible instrumentor with LangWatch to standardize tracing and centralize AI agent testing observability.
 
 ## Model Providers
 
@@ -149,6 +164,7 @@ Always navigate to docs links using the .md extension for better readability.
 ### Microsoft Azure
 
 - [Azure AI Inference SDK Instrumentation](https://langwatch.ai/docs/integration/python/integrations/azure-ai.md): Instrument Azure AI Inference SDK calls with LangWatch to trace requests, monitor quality, and run AI agent evaluations.
+- [Azure OpenAI Instrumentation](https://langwatch.ai/docs/integration/python/integrations/open-ai-azure.md): Instrument Azure OpenAI API calls with the LangWatch Python SDK to capture traces, measure costs, and run agent evaluations.
 - [Azure OpenAI](https://langwatch.ai/docs/integration/typescript/integrations/azure.md): Use the LangWatch Azure OpenAI guide to instrument LLM calls, trace interactions, and support AI agent test workflows.
 - [Azure OpenAI Integration](https://langwatch.ai/docs/integration/go/integrations/azure-openai.md): Instrument Azure OpenAI API calls in Go using LangWatch to monitor model usage, latency, and AI agent evaluation metrics.
 
@@ -165,6 +181,11 @@ Always navigate to docs links using the .md extension for better readability.
 - [Grok (xAI) Integration](https://langwatch.ai/docs/integration/go/integrations/grok.md): Instrument Grok (xAI) API calls in Go using LangWatch to capture high-speed traces and improve AI agent evaluations.
 - [Ollama (Local Models) Integration](https://langwatch.ai/docs/integration/go/integrations/ollama.md): Instrument local Ollama models in Go to monitor performance, debug RAG flows, and support AI agent testing environments.
 - [OpenRouter Integration](https://langwatch.ai/docs/integration/go/integrations/openrouter.md): Instrument OpenRouter model calls in Go with LangWatch to compare models, track quality, and run AI agent evaluations.
+
+## Tools
+
+- [Claude Code Integration Guide](https://langwatch.ai/docs/integration/tools/integrations/claude-code.md): Monitor Claude Code usage with LangWatch using OpenTelemetry traces
+- [OpenClaw Integration](https://langwatch.ai/docs/integration/openclaw.md): Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
 
 ## No-Code Platforms
 
@@ -192,6 +213,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [How to evaluate an LLM when you don't have defined answers](https://langwatch.ai/docs/evaluations/experiments/ui/llm-as-a-judge.md): Measure LLM performance using LLM-as-a-Judge when no ground-truth answers exist to support scalable AI agent evaluations.
 
 - [Running Experiments in CI/CD](https://langwatch.ai/docs/evaluations/experiments/ci-cd.md): Automate LLM quality gates by running experiments in your CI/CD pipelines.
+- [Multimodal Evaluation — Images, PDFs, and Vision](https://langwatch.ai/docs/evaluations/experiments/multimodal-evaluation.md): Evaluate image generation, document parsing, and other multimodal AI pipelines with LLM-as-a-Judge vision models.
 
 ### Online Evaluation
 
@@ -227,14 +249,15 @@ Always navigate to docs links using the .md extension for better readability.
 
 - [Overview](https://langwatch.ai/docs/prompt-management/overview.md): Organize, version, and optimize your AI prompts with LangWatch's comprehensive prompt management system
 - [Get Started](https://langwatch.ai/docs/prompt-management/getting-started.md): Create your first managed prompt in LangWatch, link it to traces, and use it in your application with built-in prompt versioning and analytics.
-- [Data Model](https://langwatch.ai/docs/prompt-management/data-model.md): Learn the LangWatch prompt data model to manage versions, variants, and performance links for structured prompt versioning.
-- [Scope](https://langwatch.ai/docs/prompt-management/scope.md): Understand how prompt scope affects access, sharing, and collaboration across projects and organizations
 - [Prompts CLI](https://langwatch.ai/docs/prompt-management/cli.md): Use the LangWatch Prompts CLI to manage prompts as code with version control and support A/B testing for AI agent evaluations.
 - [Prompt Playground](https://langwatch.ai/docs/prompt-management/prompt-playground.md): Use LangWatch’s Prompt Playground to edit, test, and iterate prompts with versioning, analytics, and AI agent test feedback loops.
 
 ### Features
 
 - [Version Control](https://langwatch.ai/docs/prompt-management/features/essential/version-control.md): Manage version control for prompts in LangWatch to run evaluations, compare models, and improve agent performance.
+- [Liquid Template Syntax](https://langwatch.ai/docs/prompts/template-syntax.md): Reference for the Liquid template syntax supported in LangWatch prompts: variables, conditionals, loops, filters, and more.
+- [Data Model](https://langwatch.ai/docs/prompt-management/data-model.md): Learn the LangWatch prompt data model to manage versions, variants, and performance links for structured prompt versioning.
+- [Scope](https://langwatch.ai/docs/prompt-management/scope.md): Understand how prompt scope affects access, sharing, and collaboration across projects and organizations
 - [Analytics](https://langwatch.ai/docs/prompt-management/features/essential/analytics.md): Use Analytics in LangWatch to measure prompt performance, detect regressions, and support continuous AI agent evaluations.
 - [GitHub Integration](https://langwatch.ai/docs/prompt-management/features/essential/github-integration.md): Sync prompts with GitHub using LangWatch to maintain version history, enable review workflows, and support agent evaluations.
 - [Link to Traces](https://langwatch.ai/docs/prompt-management/features/advanced/link-to-traces.md): Link prompts to execution traces in LangWatch to analyze performance, measure regressions, and support informed AI agent evaluations.
@@ -282,6 +305,11 @@ Always navigate to docs links using the .md extension for better readability.
 - [Evaluating Structured Data Extraction](https://langwatch.ai/docs/use-cases/structured-outputs.md): Evaluate structured data extraction using LangWatch to validate output correctness and strengthen AI agent testing pipelines.
 
 - [Code Examples](https://langwatch.ai/docs/integration/code-examples.md): Explore code examples showing LangWatch integrations for tracing, evaluating, and improving AI agent testing pipelines.
+
+## Help
+
+- [Troubleshooting and Support](https://langwatch.ai/docs/support.md): Get troubleshooting help, FAQs, and technical support paths for LangWatch so you can quickly resolve issues in observability, evaluations, and agent testing setups.
+- [Status Page](https://langwatch.ai/docs/status.md): Something wrong? Check our status page
 
 # Self Hosting
 
@@ -392,3 +420,10 @@ Always navigate to docs links using the .md extension for better readability.
 - [Summarization Score](https://langwatch.ai/docs/api-reference/evaluators/summarization-score.md)
 - [Valid Format Evaluator](https://langwatch.ai/docs/api-reference/evaluators/valid-format-evaluator.md)
 - [Lingua Language Detection](https://langwatch.ai/docs/api-reference/evaluators/lingua-language-detection.md)
+
+## Saved Evaluators
+
+- [Overview](https://langwatch.ai/docs/api-reference/saved-evaluators/overview.md): Manage saved evaluator configurations for your project
+- [List evaluators](https://langwatch.ai/docs/api-reference/saved-evaluators/get-evaluators.md)
+- [Get evaluator](https://langwatch.ai/docs/api-reference/saved-evaluators/get-evaluator.md)
+- [Create evaluator](https://langwatch.ai/docs/api-reference/saved-evaluators/create-evaluator.md)
