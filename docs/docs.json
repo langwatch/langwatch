@@ -118,7 +118,8 @@
                       "evaluations/experiments/ui/llm-as-a-judge"
                     ]
                   },
-                  "evaluations/experiments/ci-cd"
+                  "evaluations/experiments/ci-cd",
+                  "evaluations/experiments/multimodal-evaluation"
                 ]
               },
               {
@@ -157,7 +158,8 @@
                   "datasets/dataset-images"
                 ]
               },
-              "features/annotations"
+              "features/annotations",
+              "features/batch-evaluations"
             ]
           },
           {
@@ -239,6 +241,13 @@
               },
               "integration/code-examples"
             ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "support",
+              "status"
+            ]
           }
         ]
       },
@@ -262,7 +271,8 @@
                   "integration/python/guide",
                   "integration/python/reference",
                   "integration/python/tutorials/manual-instrumentation",
-                  "integration/python/tutorials/open-telemetry"
+                  "integration/python/tutorials/open-telemetry",
+                  "integration/python/tutorials/capturing-evaluations-guardrails"
                 ]
               },
               {
@@ -273,7 +283,9 @@
                   "integration/typescript/reference",
                   "integration/typescript/tutorials/filtering-spans",
                   "integration/typescript/tutorials/manual-instrumentation",
-                  "integration/typescript/tutorials/opentelemetry-migration"
+                  "integration/typescript/tutorials/opentelemetry-migration",
+                  "integration/typescript/tutorials/debugging-typescript",
+                  "integration/typescript/tutorials/semantic-conventions"
                 ]
               },
               {
@@ -285,6 +297,9 @@
                 ]
               },
               "integration/opentelemetry/guide",
+              "integration/metadata-and-labels",
+              "integration/rags-context-tracking",
+              "integration/tutorials/open-telemetry",
               {
                 "group": "Tutorials",
                 "pages": [
@@ -321,6 +336,13 @@
                     "pages": [
                       "integration/python/tutorials/tracking-tool-calls",
                       "integration/typescript/tutorials/tracking-tool-calls"
+                    ]
+                  },
+                  {
+                    "group": "Tracking Conversations",
+                    "pages": [
+                      "integration/python/tutorials/tracking-conversations",
+                      "integration/typescript/tutorials/tracking-conversations"
                     ]
                   }
                 ]
@@ -361,7 +383,9 @@
               "integration/python/integrations/promptflow",
               "integration/python/integrations/instructor",
               "integration/python/integrations/smolagents",
-              "integration/python/integrations/google-ai"
+              "integration/python/integrations/google-ai",
+              "integration/python/integrations/other",
+              "integration/openclaw"
             ]
           },
           {
@@ -387,6 +411,7 @@
                 "group": "Microsoft Azure",
                 "pages": [
                   "integration/python/integrations/azure-ai",
+                  "integration/python/integrations/open-ai-azure",
                   "integration/typescript/integrations/azure",
                   "integration/go/integrations/azure-openai"
                 ]
@@ -408,6 +433,12 @@
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
               "integration/go/integrations/openrouter"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "integration/tools/integrations/claude-code"
             ]
           },
           {
@@ -561,6 +592,15 @@
               "api-reference/evaluators/summarization-score",
               "api-reference/evaluators/valid-format-evaluator",
               "api-reference/evaluators/lingua-language-detection"
+            ]
+          },
+          {
+            "group": "Saved Evaluators",
+            "pages": [
+              "api-reference/saved-evaluators/overview",
+              "api-reference/saved-evaluators/get-evaluators",
+              "api-reference/saved-evaluators/get-evaluator",
+              "api-reference/saved-evaluators/create-evaluator"
             ]
           }
         ]
