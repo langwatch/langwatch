@@ -35,14 +35,9 @@ function createMockRedis() {
   return {
     data,
     get: vi.fn(async (key: string) => data.get(key)?.value ?? null),
-    set: vi.fn(async (key: string, value: string, modeOrEx: string, ttl: number, nx?: string) => {
-      if (nx === "NX" && data.has(key)) return null;
+    set: vi.fn(async (key: string, value: string, _mode: string, ttl: number) => {
       data.set(key, { value, ttl });
       return "OK";
-    }),
-    del: vi.fn(async (key: string) => {
-      data.delete(key);
-      return 1;
     }),
   };
 }
@@ -89,11 +84,7 @@ describe("RedisCachedFoldStore", () => {
 
         expect(result).toEqual({ count: 1, name: "from-ch" });
         expect(inner.getCalls).toHaveLength(1);
-        // Only the lock SET should have been called, not a cache SET
-        const cacheSetCalls = redis.set.mock.calls.filter(
-          (call: any[]) => !String(call[0]).startsWith("fold:lock:"),
-        );
-        expect(cacheSetCalls).toHaveLength(0);
+        expect(redis.set).not.toHaveBeenCalled();
       });
     });
   });
