@@ -1,3 +1,4 @@
+import type { Redis, Cluster } from "ioredis";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -35,6 +36,7 @@ import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-proces
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
+import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -55,6 +57,7 @@ import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-process
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
+import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
@@ -96,6 +99,7 @@ export interface PipelineRepositories {
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   repositories: PipelineRepositories;
+  redis: Redis | Cluster;
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
@@ -123,6 +127,15 @@ export interface PipelineRegistryDeps {
  */
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
+
+  private cachedFoldStore<State>(
+    inner: FoldProjectionStore<State>,
+    keyPrefix: string,
+  ): RedisCachedFoldStore<State> {
+    return new RedisCachedFoldStore<State>(inner, this.deps.redis as any, {
+      keyPrefix,
+    });
+  }
 
   registerAll() {
     // TODO: Customer.io reactors are implemented but not yet registered.
@@ -178,7 +191,10 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const traceSummaryStore = new TraceSummaryStore(this.deps.repositories.traceSummaryFold);
+    const traceSummaryStore = this.cachedFoldStore<TraceSummaryData>(
+      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      "trace_summaries",
+    );
 
     // Late-bound reference to the trace pipeline's resolveOrigin command.
     // The reactor deps closure captures this; the actual dispatcher is set
@@ -322,12 +338,17 @@ export class PipelineRegistry {
   }
 
   private registerSuiteRunPipeline() {
+    const suiteRunStore = this.cachedFoldStore<SuiteRunStateData>(
+      new RepositoryFoldStore<SuiteRunStateData>(
+        this.deps.repositories.suiteRunState,
+        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+      "suite_runs",
+    );
+
     return this.deps.eventSourcing.register(
       createSuiteRunProcessingPipeline({
-        suiteRunStateFoldStore: new RepositoryFoldStore<SuiteRunStateData>(
-          this.deps.repositories.suiteRunState,
-          SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-        ),
+        suiteRunStateFoldStore: suiteRunStore,
       }),
     );
   }
@@ -337,9 +358,12 @@ export class PipelineRegistry {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
   }) {
-    const simulationRunStore = new RepositoryFoldStore<SimulationRunStateData>(
-      this.deps.repositories.simulationRunState,
-      SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+    const simulationRunStore = this.cachedFoldStore<SimulationRunStateData>(
+      new RepositoryFoldStore<SimulationRunStateData>(
+        this.deps.repositories.simulationRunState,
+        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+      "simulation_runs",
     );
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
       {
@@ -469,10 +493,14 @@ export class PipelineRegistry {
   }
 
   private registerExperimentRunPipeline() {
+    const experimentRunStore = this.cachedFoldStore<ExperimentRunStateData>(
+      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+      "experiment_runs",
+    );
+
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
-        experimentRunStateFoldStore:
-          createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+        experimentRunStateFoldStore: experimentRunStore,
         experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,
