@@ -155,12 +155,16 @@ export class EventSourcedQueueProcessorMemory<
       return;
     }
 
+    // Remove dedup entry when job leaves staging — new sends with the same
+    // dedup ID should create a genuinely new job, not squash onto a job
+    // that's already being processed (same TOCTOU fix as GroupQueue Lua).
+    if (job.deduplicationId) {
+      this.pendingJobsByDeduplicationId.delete(job.deduplicationId);
+    }
+
     this.activeCount++;
     void this.processJob(job).finally(() => {
       this.activeCount--;
-      if (job.deduplicationId) {
-        this.pendingJobsByDeduplicationId.delete(job.deduplicationId);
-      }
       // Try to process next job
       this.tryProcessNext();
     });
