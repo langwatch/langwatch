@@ -24,6 +24,11 @@ import {
 const migrations: Record<string, any> = importedMigrations;
 
 export default async function execute() {
+  if (env.DISABLE_ELASTIC_SEARCH) {
+    console.log("Skipping Elasticsearch migrations (DISABLE_ELASTIC_SEARCH is set)");
+    return;
+  }
+
   if (env.IS_QUICKWIT) {
     return quickwitMigrate();
   }
