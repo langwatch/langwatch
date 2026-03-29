@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import * as providerValidation from "~/server/modelProviders/providerValidation";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -252,7 +253,7 @@ describe("Model Providers API", () => {
     });
 
     describe("when given an invalid provider", () => {
-      it("returns 400", async () => {
+      it("returns 404", async () => {
         const res = await helpers.api.put(
           "/api/model-providers/nonexistent-provider",
           {
@@ -260,7 +261,7 @@ describe("Model Providers API", () => {
           },
         );
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(404);
       });
     });
   });
@@ -457,9 +458,13 @@ describe("Model Providers API", () => {
 
     describe("when validating with an invalid API key", () => {
       it("returns valid false with error message", async () => {
-        const fetchSpy = vi
-          .spyOn(globalThis, "fetch")
-          .mockResolvedValueOnce(new Response(null, { status: 401 }));
+        const validateSpy = vi
+          .spyOn(providerValidation, "validateProviderApiKey")
+          .mockResolvedValueOnce({
+            valid: false,
+            error:
+              "Invalid API key. Please check your API key and try again.",
+          });
 
         const res = await helpers.api.post(
           "/api/model-providers/openai/validate",
@@ -473,7 +478,7 @@ describe("Model Providers API", () => {
         expect(body.valid).toBe(false);
         expect(body.error).toBeDefined();
 
-        fetchSpy.mockRestore();
+        validateSpy.mockRestore();
       });
     });
   });

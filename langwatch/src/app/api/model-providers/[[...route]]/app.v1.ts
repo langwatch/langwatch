@@ -1,3 +1,4 @@
+import type { MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -33,6 +34,18 @@ type Variables = ModelProviderServiceMiddlewareVariables &
   AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
+/**
+ * Validates that the `:provider` route param exists in the model provider registry.
+ * Throws NotFoundError if the provider is unknown.
+ */
+const requireRegistryProvider: MiddlewareHandler = async (c, next) => {
+  const provider = c.req.param("provider");
+  if (!provider || !(provider in modelProviders)) {
+    throw new NotFoundError(`Provider "${provider}" not found in registry`);
+  }
+  await next();
+};
+
 export const app = new Hono<{
   Variables: Variables;
 }>().basePath("/");
@@ -40,6 +53,10 @@ export const app = new Hono<{
 // Middleware
 app.use("/*", organizationMiddleware);
 app.use("/*", modelProviderServiceMiddleware);
+
+// Validate provider param for all /:provider routes
+app.use("/:provider", requireRegistryProvider);
+app.use("/:provider/*", requireRegistryProvider);
 
 // List all model providers
 app.get(
@@ -181,10 +198,6 @@ app.get(
     const project = c.get("project");
     const { provider } = c.req.param();
 
-    if (!(provider in modelProviders)) {
-      throw new NotFoundError(`Provider "${provider}" not found in registry`);
-    }
-
     logger.info(
       { projectId: project.id, provider },
       "Getting single model provider",
@@ -227,10 +240,6 @@ app.delete(
     const service = c.get("modelProviderService");
     const project = c.get("project");
     const { provider } = c.req.param();
-
-    if (!(provider in modelProviders)) {
-      throw new NotFoundError(`Provider "${provider}" not found in registry`);
-    }
 
     logger.info(
       { projectId: project.id, provider },
@@ -278,10 +287,6 @@ app.post(
     const project = c.get("project");
     const { provider } = c.req.param();
     const { customKeys } = c.req.valid("json");
-
-    if (!(provider in modelProviders)) {
-      throw new NotFoundError(`Provider "${provider}" not found in registry`);
-    }
 
     logger.info(
       { projectId: project.id, provider },
