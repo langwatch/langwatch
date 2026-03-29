@@ -117,10 +117,10 @@ export function mapAttributesToMetadata(
   ]);
 
   for (const [key, value] of Object.entries(attributes)) {
-    if (!knownKeys.has(key)) {
-      // Store as custom metadata
-      metadata[key] = value;
-    }
+    if (knownKeys.has(key)) continue;
+    // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
+    const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
+    if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 
   return metadata;
