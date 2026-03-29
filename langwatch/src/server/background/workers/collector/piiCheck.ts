@@ -335,6 +335,90 @@ export const presidioClearPII = async (
   }
 };
 
+/**
+ * Batch version of presidioClearPII that sends multiple texts in a single
+ * HTTP request, reducing the number of lambda invocations.
+ *
+ * @returns Array of anonymized strings (null when text was unchanged).
+ */
+export const batchPresidioClearPII = async (
+  texts: string[],
+  piiRedactionLevel: PIIRedactionLevel,
+): Promise<(string | null)[]> => {
+  if (texts.length === 0) return [];
+
+  getPiiChecksCounter("presidio").inc();
+  const timeout = 60_000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  const startTime = performance.now();
+
+  // Truncate each text to the Presidio limit; track remainders for reassembly.
+  const truncated = texts.map((t) => ({
+    input: t.slice(0, 250_000),
+    remaining: t.slice(250_000),
+  }));
+
+  const response = await fetch(
+    `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: truncated.map((t) => ({ input: t.input })),
+        settings: {
+          entities: Object.fromEntries(
+            (piiRedactionLevel === "ESSENTIAL"
+              ? essentialInfoTypes
+              : strictInfoTypes
+            ).presidio.map((name) => [name.toLowerCase(), true]),
+          ),
+          min_threshold: 0.5,
+        },
+        env: {},
+      }),
+      signal: controller.signal,
+    },
+  );
+
+  clearTimeout(timeoutId);
+
+  const duration = performance.now() - startTime;
+  evaluationDurationHistogram
+    .labels("presidio/pii_detection")
+    .observe(duration);
+
+  if (!response.ok) {
+    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
+    throw new Error(await response.text());
+  }
+
+  const rawResults = await response.json();
+  if (!Array.isArray(rawResults) || rawResults.length !== truncated.length) {
+    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
+    throw new Error(
+      `Unexpected batch response: expected ${truncated.length} results, got ${
+        Array.isArray(rawResults) ? rawResults.length : "non-array"
+      }`,
+    );
+  }
+  const results = rawResults as BatchEvaluationResult;
+
+  return truncated.map((entry, i) => {
+    const result = results[i]!;
+    getEvaluationStatusCounter("presidio/pii_detection", result.status).inc();
+
+    if (result.status === "error") {
+      throw new Error(result.details);
+    }
+    if (result.status === "processed" && result.raw_response?.anonymized) {
+      return result.raw_response.anonymized + entry.remaining;
+    }
+    return null;
+  });
+};
+
 export type PIICheckOptions = {
   piiRedactionLevel: PIIRedactionLevel;
   enforced?: boolean;
