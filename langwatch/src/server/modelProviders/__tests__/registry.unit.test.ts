@@ -382,6 +382,7 @@ describe("Model Provider Definitions", () => {
     expect(modelProviders).toHaveProperty("gemini");
     expect(modelProviders).toHaveProperty("azure");
     expect(modelProviders).toHaveProperty("bedrock");
+    expect(modelProviders).toHaveProperty("minimax");
   });
 
   it("each provider has required fields", () => {
@@ -516,6 +517,150 @@ describe("Parameter Constraints", () => {
         min: 0,
         max: 1,
       });
+    });
+  });
+
+  describe("MiniMax provider constraints", () => {
+    it("returns constraints for MiniMax models", () => {
+      const constraints = getParameterConstraints("minimax/minimax-m2.7");
+
+      expect(constraints).toBeDefined();
+      expect(constraints?.temperature).toEqual({ min: 0, max: 1 });
+    });
+
+    it("returns constraints for MiniMax M2.5 models", () => {
+      const constraints = getParameterConstraints("minimax/minimax-m2.5");
+
+      expect(constraints).toBeDefined();
+      expect(constraints?.temperature?.max).toBe(1);
+    });
+
+    it("has temperature constraint defined", () => {
+      expect(modelProviders.minimax.parameterConstraints).toBeDefined();
+      expect(
+        modelProviders.minimax.parameterConstraints?.temperature,
+      ).toEqual({
+        min: 0,
+        max: 1,
+      });
+    });
+  });
+});
+
+describe("MiniMax Provider", () => {
+  describe("provider definition", () => {
+    it("has correct name", () => {
+      expect(modelProviders.minimax.name).toBe("MiniMax");
+    });
+
+    it("uses MINIMAX_API_KEY", () => {
+      expect(modelProviders.minimax.apiKey).toBe("MINIMAX_API_KEY");
+    });
+
+    it("has no custom endpoint", () => {
+      expect(modelProviders.minimax.endpointKey).toBeUndefined();
+    });
+
+    it("has enabledSince date", () => {
+      expect(modelProviders.minimax.enabledSince).toBeInstanceOf(Date);
+    });
+  });
+
+  describe("keysSchema validation", () => {
+    it("accepts valid API key", () => {
+      const result = modelProviders.minimax.keysSchema.safeParse({
+        MINIMAX_API_KEY: "test-key-123",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects empty API key", () => {
+      const result = modelProviders.minimax.keysSchema.safeParse({
+        MINIMAX_API_KEY: "",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects missing API key", () => {
+      const result = modelProviders.minimax.keysSchema.safeParse({});
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("model registry", () => {
+    it("includes MiniMax models in the registry", () => {
+      const providers = getAllProviders();
+      expect(providers).toContain("minimax");
+    });
+
+    it("has M2.7 model in the registry", () => {
+      const model = getModelById("minimax/minimax-m2.7");
+      expect(model).toBeDefined();
+      expect(model?.name).toBe("MiniMax: MiniMax M2.7");
+      expect(model?.provider).toBe("minimax");
+      expect(model?.mode).toBe("chat");
+      expect(model?.contextLength).toBe(1000000);
+    });
+
+    it("has M2.7-highspeed model in the registry", () => {
+      const model = getModelById("minimax/minimax-m2.7-highspeed");
+      expect(model).toBeDefined();
+      expect(model?.name).toBe("MiniMax: MiniMax M2.7 Highspeed");
+      expect(model?.provider).toBe("minimax");
+      expect(model?.mode).toBe("chat");
+    });
+
+    it("has M2.5 model in the registry", () => {
+      const model = getModelById("minimax/minimax-m2.5");
+      expect(model).toBeDefined();
+      expect(model?.provider).toBe("minimax");
+    });
+
+    it("returns MiniMax chat model options", () => {
+      const options = getProviderModelOptions("minimax", "chat");
+      expect(options.length).toBeGreaterThan(0);
+      const values = options.map((o) => o.value);
+      expect(values).toContain("minimax-m2.7");
+      expect(values).toContain("minimax-m2.7-highspeed");
+    });
+
+    it("returns all MiniMax models via getModelsForProvider", () => {
+      const models = getModelsForProvider("minimax");
+      expect(models.length).toBeGreaterThanOrEqual(8);
+      expect(models.every((m) => m.provider === "minimax")).toBe(true);
+    });
+
+    it("M2.7 model has valid pricing", () => {
+      const model = getModelById("minimax/minimax-m2.7");
+      expect(model?.pricing.inputCostPerToken).toBeGreaterThan(0);
+      expect(model?.pricing.outputCostPerToken).toBeGreaterThan(0);
+    });
+
+    it("M2.7-highspeed has lower pricing than M2.7", () => {
+      const m27 = getModelById("minimax/minimax-m2.7");
+      const m27hs = getModelById("minimax/minimax-m2.7-highspeed");
+      expect(m27hs?.pricing.outputCostPerToken).toBeLessThan(
+        m27?.pricing.outputCostPerToken ?? 0,
+      );
+    });
+
+    it("M2.7 model supports temperature parameter", () => {
+      const model = getModelById("minimax/minimax-m2.7");
+      expect(model?.supportedParameters).toContain("temperature");
+    });
+
+    it("MiniMax models appear in allLitellmModels", () => {
+      expect(allLitellmModels["minimax/minimax-m2.7"]).toBeDefined();
+      expect(allLitellmModels["minimax/minimax-m2.7"]?.mode).toBe("chat");
+      expect(allLitellmModels["minimax/minimax-m2.7-highspeed"]).toBeDefined();
+    });
+
+    it("getModelMetadata returns metadata for MiniMax M2.7", () => {
+      const metadata = getModelMetadata("minimax/minimax-m2.7");
+      expect(metadata).not.toBeNull();
+      expect(metadata?.contextLength).toBe(1000000);
+      expect(metadata?.supportedParameters).toContain("temperature");
+      expect(metadata?.pricing.inputCostPerToken).toBeGreaterThan(0);
     });
   });
 });

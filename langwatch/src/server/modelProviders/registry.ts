@@ -282,6 +282,19 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  minimax: {
+    name: "MiniMax",
+    apiKey: "MINIMAX_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      MINIMAX_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2025-01-01"),
+    // MiniMax API requires temperature in (0, 1] range
+    parameterConstraints: {
+      temperature: { min: 0, max: 1 },
+    },
+  },
 } satisfies Record<string, ModelProviderDefinition>;
 
 // ============================================================================
