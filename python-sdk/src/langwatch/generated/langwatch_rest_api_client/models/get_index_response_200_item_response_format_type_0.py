@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -28,7 +26,7 @@ class GetIndexResponse200ItemResponseFormatType0:
     """
 
     type_: GetIndexResponse200ItemResponseFormatType0Type
-    json_schema: GetIndexResponse200ItemResponseFormatType0JsonSchema
+    json_schema: "GetIndexResponse200ItemResponseFormatType0JsonSchema"
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

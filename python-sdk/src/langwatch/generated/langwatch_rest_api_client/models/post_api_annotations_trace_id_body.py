@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,14 +13,14 @@ T = TypeVar("T", bound="PostApiAnnotationsTraceIdBody")
 class PostApiAnnotationsTraceIdBody:
     """
     Attributes:
-        comment (str | Unset):
-        is_thumbs_up (bool | Unset):
-        email (str | Unset):
+        comment (Union[Unset, str]):
+        is_thumbs_up (Union[Unset, bool]):
+        email (Union[Unset, str]):
     """
 
-    comment: str | Unset = UNSET
-    is_thumbs_up: bool | Unset = UNSET
-    email: str | Unset = UNSET
+    comment: Union[Unset, str] = UNSET
+    is_thumbs_up: Union[Unset, bool] = UNSET
+    email: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

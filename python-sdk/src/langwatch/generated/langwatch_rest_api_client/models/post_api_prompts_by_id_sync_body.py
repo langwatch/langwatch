@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -20,13 +18,13 @@ class PostApiPromptsByIdSyncBody:
     """
     Attributes:
         config_data (PostApiPromptsByIdSyncBodyConfigData):
-        local_version (float | Unset):
-        commit_message (str | Unset):
+        local_version (Union[Unset, float]):
+        commit_message (Union[Unset, str]):
     """
 
-    config_data: PostApiPromptsByIdSyncBodyConfigData
-    local_version: float | Unset = UNSET
-    commit_message: str | Unset = UNSET
+    config_data: "PostApiPromptsByIdSyncBodyConfigData"
+    local_version: Union[Unset, float] = UNSET
+    commit_message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

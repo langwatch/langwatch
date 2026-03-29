@@ -5,6 +5,7 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
+import { createLogger } from "~/utils/logger";
 import {
   deriveResponseFormatFromOutputs,
   type inputsSchema,
@@ -15,6 +16,7 @@ import {
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
+import { LabelValidationError } from "./repositories/llm-config-label.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
@@ -22,6 +24,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
+import { PromptVersionLabelRepository } from "./repositories/llm-config-label.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -32,6 +35,8 @@ import {
   transformCamelToSnake,
   transformSnakeToCamel,
 } from "./transformToDbFormat";
+
+const logger = createLogger("langwatch:prompt-service");
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -103,10 +108,12 @@ export type VersionedPrompt = {
 export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
+  readonly labelRepository: PromptVersionLabelRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
+    this.labelRepository = new PromptVersionLabelRepository(prisma);
   }
 
   /**
@@ -146,18 +153,60 @@ export class PromptService {
     version?: number;
     organizationId?: string;
     versionId?: string;
+    /** Optional: fetch the version pointed to by this label */
+    label?: string;
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
+
+    if (params.label && (params.version !== undefined || params.versionId !== undefined)) {
+      logger.warn(
+        { idOrHandle, label: params.label, version: params.version, versionId: params.versionId },
+        "Mutual exclusion: cannot specify both version/versionId and label",
+      );
+      throw new LabelValidationError(
+        "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
+      );
+    }
+
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(projectId));
+
+    // If a label is provided, resolve it to a versionId
+    let resolvedVersionId = params.versionId;
+    if (params.label) {
+      const config = await this.repository.getPromptByIdOrHandle({
+        idOrHandle,
+        projectId,
+        organizationId,
+      });
+
+      if (!config) {
+        return null;
+      }
+
+      const label = await this.labelRepository.getByConfigAndLabel({
+        configId: config.id,
+        label: params.label,
+        projectId,
+      });
+
+      if (!label) {
+        throw new NotFoundError(
+          `Label "${params.label}" not found for prompt "${idOrHandle}"`,
+        );
+      }
+
+      resolvedVersionId = label.versionId;
+    }
+
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
       {
         idOrHandle,
         projectId,
         organizationId,
         version: params.version,
-        versionId: params.versionId,
+        versionId: resolvedVersionId,
       },
     );
 
@@ -1006,5 +1055,18 @@ export class PromptService {
       projectId: params.projectId,
       organizationId,
     });
+  }
+
+  // --- Label operations ---
+
+  /** Assign (or reassign) a label to a specific prompt version. */
+  async assignLabel(params: {
+    configId: string;
+    versionId: string;
+    label: string;
+    projectId: string;
+    userId?: string;
+  }) {
+    return this.labelRepository.assignLabel(params);
   }
 }

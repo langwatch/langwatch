@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -22,12 +20,12 @@ T = TypeVar("T", bound="PostApiAnalyticsTimeseriesResponse200")
 class PostApiAnalyticsTimeseriesResponse200:
     """
     Attributes:
-        current_period (list[PostApiAnalyticsTimeseriesResponse200CurrentPeriodItem]):
-        previous_period (list[PostApiAnalyticsTimeseriesResponse200PreviousPeriodItem]):
+        current_period (list['PostApiAnalyticsTimeseriesResponse200CurrentPeriodItem']):
+        previous_period (list['PostApiAnalyticsTimeseriesResponse200PreviousPeriodItem']):
     """
 
-    current_period: list[PostApiAnalyticsTimeseriesResponse200CurrentPeriodItem]
-    previous_period: list[PostApiAnalyticsTimeseriesResponse200PreviousPeriodItem]
+    current_period: list["PostApiAnalyticsTimeseriesResponse200CurrentPeriodItem"]
+    previous_period: list["PostApiAnalyticsTimeseriesResponse200PreviousPeriodItem"]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

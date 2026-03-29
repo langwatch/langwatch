@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,13 +17,13 @@ class PostEvaluationsV3RunResponse200:
         run_id (str): Unique identifier for this run
         status (PostEvaluationsV3RunResponse200Status): Initial status of the run
         total (int): Total number of cells to execute
-        run_url (str | Unset): URL to view the run in LangWatch
+        run_url (Union[Unset, str]): URL to view the run in LangWatch
     """
 
     run_id: str
     status: PostEvaluationsV3RunResponse200Status
     total: int
-    run_url: str | Unset = UNSET
+    run_url: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

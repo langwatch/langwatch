@@ -1,6 +1,5 @@
 from http import HTTPStatus
-from typing import Any
-from urllib.parse import quote
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -14,26 +13,24 @@ from ...models.put_api_prompts_by_id_response_404 import PutApiPromptsByIdRespon
 from ...models.put_api_prompts_by_id_response_409 import PutApiPromptsByIdResponse409
 from ...models.put_api_prompts_by_id_response_422 import PutApiPromptsByIdResponse422
 from ...models.put_api_prompts_by_id_response_500 import PutApiPromptsByIdResponse500
-from ...types import UNSET, Response, Unset
+from ...types import Response
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PutApiPromptsByIdBody | Unset = UNSET,
+    body: PutApiPromptsByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/api/prompts/{id}".format(
-            id=quote(str(id), safe=""),
-        ),
+        "url": f"/api/prompts/{id}",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _body = body.to_dict()
 
+    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -41,52 +38,46 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PutApiPromptsByIdResponse200
-    | PutApiPromptsByIdResponse400
-    | PutApiPromptsByIdResponse401
-    | PutApiPromptsByIdResponse404
-    | PutApiPromptsByIdResponse409
-    | PutApiPromptsByIdResponse422
-    | PutApiPromptsByIdResponse500
-    | None
-):
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[
+    Union[
+        PutApiPromptsByIdResponse200,
+        PutApiPromptsByIdResponse400,
+        PutApiPromptsByIdResponse401,
+        PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
+        PutApiPromptsByIdResponse500,
+    ]
+]:
     if response.status_code == 200:
         response_200 = PutApiPromptsByIdResponse200.from_dict(response.json())
 
         return response_200
-
     if response.status_code == 400:
         response_400 = PutApiPromptsByIdResponse400.from_dict(response.json())
 
         return response_400
-
     if response.status_code == 401:
         response_401 = PutApiPromptsByIdResponse401.from_dict(response.json())
 
         return response_401
-
     if response.status_code == 404:
         response_404 = PutApiPromptsByIdResponse404.from_dict(response.json())
 
         return response_404
-
     if response.status_code == 409:
         response_409 = PutApiPromptsByIdResponse409.from_dict(response.json())
 
         return response_409
-
     if response.status_code == 422:
         response_422 = PutApiPromptsByIdResponse422.from_dict(response.json())
 
         return response_422
-
     if response.status_code == 500:
         response_500 = PutApiPromptsByIdResponse500.from_dict(response.json())
 
         return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -94,15 +85,17 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
-    PutApiPromptsByIdResponse200
-    | PutApiPromptsByIdResponse400
-    | PutApiPromptsByIdResponse401
-    | PutApiPromptsByIdResponse404
-    | PutApiPromptsByIdResponse409
-    | PutApiPromptsByIdResponse422
-    | PutApiPromptsByIdResponse500
+    Union[
+        PutApiPromptsByIdResponse200,
+        PutApiPromptsByIdResponse400,
+        PutApiPromptsByIdResponse401,
+        PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
+        PutApiPromptsByIdResponse500,
+    ]
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -115,29 +108,31 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsByIdBody | Unset = UNSET,
+    client: Union[AuthenticatedClient, Client],
+    body: PutApiPromptsByIdBody,
 ) -> Response[
-    PutApiPromptsByIdResponse200
-    | PutApiPromptsByIdResponse400
-    | PutApiPromptsByIdResponse401
-    | PutApiPromptsByIdResponse404
-    | PutApiPromptsByIdResponse409
-    | PutApiPromptsByIdResponse422
-    | PutApiPromptsByIdResponse500
+    Union[
+        PutApiPromptsByIdResponse200,
+        PutApiPromptsByIdResponse400,
+        PutApiPromptsByIdResponse401,
+        PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
+        PutApiPromptsByIdResponse500,
+    ]
 ]:
     """Update a prompt
 
     Args:
         id (str):
-        body (PutApiPromptsByIdBody | Unset):
+        body (PutApiPromptsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiPromptsByIdResponse200 | PutApiPromptsByIdResponse400 | PutApiPromptsByIdResponse401 | PutApiPromptsByIdResponse404 | PutApiPromptsByIdResponse409 | PutApiPromptsByIdResponse422 | PutApiPromptsByIdResponse500]
+        Response[Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -155,30 +150,31 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsByIdBody | Unset = UNSET,
-) -> (
-    PutApiPromptsByIdResponse200
-    | PutApiPromptsByIdResponse400
-    | PutApiPromptsByIdResponse401
-    | PutApiPromptsByIdResponse404
-    | PutApiPromptsByIdResponse409
-    | PutApiPromptsByIdResponse422
-    | PutApiPromptsByIdResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+    body: PutApiPromptsByIdBody,
+) -> Optional[
+    Union[
+        PutApiPromptsByIdResponse200,
+        PutApiPromptsByIdResponse400,
+        PutApiPromptsByIdResponse401,
+        PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
+        PutApiPromptsByIdResponse500,
+    ]
+]:
     """Update a prompt
 
     Args:
         id (str):
-        body (PutApiPromptsByIdBody | Unset):
+        body (PutApiPromptsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiPromptsByIdResponse200 | PutApiPromptsByIdResponse400 | PutApiPromptsByIdResponse401 | PutApiPromptsByIdResponse404 | PutApiPromptsByIdResponse409 | PutApiPromptsByIdResponse422 | PutApiPromptsByIdResponse500
+        Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]
     """
 
     return sync_detailed(
@@ -191,29 +187,31 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsByIdBody | Unset = UNSET,
+    client: Union[AuthenticatedClient, Client],
+    body: PutApiPromptsByIdBody,
 ) -> Response[
-    PutApiPromptsByIdResponse200
-    | PutApiPromptsByIdResponse400
-    | PutApiPromptsByIdResponse401
-    | PutApiPromptsByIdResponse404
-    | PutApiPromptsByIdResponse409
-    | PutApiPromptsByIdResponse422
-    | PutApiPromptsByIdResponse500
+    Union[
+        PutApiPromptsByIdResponse200,
+        PutApiPromptsByIdResponse400,
+        PutApiPromptsByIdResponse401,
+        PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
+        PutApiPromptsByIdResponse500,
+    ]
 ]:
     """Update a prompt
 
     Args:
         id (str):
-        body (PutApiPromptsByIdBody | Unset):
+        body (PutApiPromptsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PutApiPromptsByIdResponse200 | PutApiPromptsByIdResponse400 | PutApiPromptsByIdResponse401 | PutApiPromptsByIdResponse404 | PutApiPromptsByIdResponse409 | PutApiPromptsByIdResponse422 | PutApiPromptsByIdResponse500]
+        Response[Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -229,30 +227,31 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PutApiPromptsByIdBody | Unset = UNSET,
-) -> (
-    PutApiPromptsByIdResponse200
-    | PutApiPromptsByIdResponse400
-    | PutApiPromptsByIdResponse401
-    | PutApiPromptsByIdResponse404
-    | PutApiPromptsByIdResponse409
-    | PutApiPromptsByIdResponse422
-    | PutApiPromptsByIdResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+    body: PutApiPromptsByIdBody,
+) -> Optional[
+    Union[
+        PutApiPromptsByIdResponse200,
+        PutApiPromptsByIdResponse400,
+        PutApiPromptsByIdResponse401,
+        PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
+        PutApiPromptsByIdResponse500,
+    ]
+]:
     """Update a prompt
 
     Args:
         id (str):
-        body (PutApiPromptsByIdBody | Unset):
+        body (PutApiPromptsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PutApiPromptsByIdResponse200 | PutApiPromptsByIdResponse400 | PutApiPromptsByIdResponse401 | PutApiPromptsByIdResponse404 | PutApiPromptsByIdResponse409 | PutApiPromptsByIdResponse422 | PutApiPromptsByIdResponse500
+        Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]
     """
 
     return (

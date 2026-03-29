@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,19 +19,19 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200SpansItemOutput")
 class GetApiTraceIdResponse200SpansItemOutput:
     """
     Attributes:
-        type_ (str | Unset):  Example: chat_messages.
-        value (list[GetApiTraceIdResponse200SpansItemOutputValueItem] | Unset):  Example: [{'role': 'assistant',
+        type_ (Union[Unset, str]):  Example: chat_messages.
+        value (Union[Unset, list['GetApiTraceIdResponse200SpansItemOutputValueItem']]):  Example: [{'role': 'assistant',
             'content': 'Hey there! 👋😊'}].
     """
 
-    type_: str | Unset = UNSET
-    value: list[GetApiTraceIdResponse200SpansItemOutputValueItem] | Unset = UNSET
+    type_: Union[Unset, str] = UNSET
+    value: Union[Unset, list["GetApiTraceIdResponse200SpansItemOutputValueItem"]] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_
 
-        value: list[dict[str, Any]] | Unset = UNSET
+        value: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.value, Unset):
             value = []
             for value_item_data in self.value:
@@ -59,14 +57,12 @@ class GetApiTraceIdResponse200SpansItemOutput:
         d = dict(src_dict)
         type_ = d.pop("type", UNSET)
 
+        value = []
         _value = d.pop("value", UNSET)
-        value: list[GetApiTraceIdResponse200SpansItemOutputValueItem] | Unset = UNSET
-        if _value is not UNSET:
-            value = []
-            for value_item_data in _value:
-                value_item = GetApiTraceIdResponse200SpansItemOutputValueItem.from_dict(value_item_data)
+        for value_item_data in _value or []:
+            value_item = GetApiTraceIdResponse200SpansItemOutputValueItem.from_dict(value_item_data)
 
-                value.append(value_item)
+            value.append(value_item)
 
         get_api_trace_id_response_200_spans_item_output = cls(
             type_=type_,

@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,13 +13,13 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200SpansItemInputValueItem")
 class GetApiTraceIdResponse200SpansItemInputValueItem:
     """
     Attributes:
-        role (str | Unset):  Example: system.
-        content (str | Unset):  Example: You are a helpful assistant that only reply in short tweet-like responses,
-            using lots of emojis..
+        role (Union[Unset, str]):  Example: system.
+        content (Union[Unset, str]):  Example: You are a helpful assistant that only reply in short tweet-like
+            responses, using lots of emojis..
     """
 
-    role: str | Unset = UNSET
-    content: str | Unset = UNSET
+    role: Union[Unset, str] = UNSET
+    content: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

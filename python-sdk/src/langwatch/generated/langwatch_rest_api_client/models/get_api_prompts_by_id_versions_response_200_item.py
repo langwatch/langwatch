@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -40,7 +38,7 @@ class GetApiPromptsByIdVersionsResponse200Item:
     """
     Attributes:
         id (str):
-        handle (None | str):
+        handle (Union[None, str]):
         scope (GetApiPromptsByIdVersionsResponse200ItemScope):
         name (str):
         updated_at (str):
@@ -50,21 +48,21 @@ class GetApiPromptsByIdVersionsResponse200Item:
         version (float):
         created_at (str):
         prompt (str):
-        messages (list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem]):
-        inputs (list[GetApiPromptsByIdVersionsResponse200ItemInputsItem]):
-        outputs (list[GetApiPromptsByIdVersionsResponse200ItemOutputsItem]):
+        messages (list['GetApiPromptsByIdVersionsResponse200ItemMessagesItem']):
+        inputs (list['GetApiPromptsByIdVersionsResponse200ItemInputsItem']):
+        outputs (list['GetApiPromptsByIdVersionsResponse200ItemOutputsItem']):
         model (str):
-        author_id (None | str | Unset):
-        commit_message (None | str | Unset):
-        temperature (float | Unset):
-        max_tokens (float | Unset):
-        demonstrations (GetApiPromptsByIdVersionsResponse200ItemDemonstrations | Unset):
-        prompting_technique (GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique | Unset):
-        response_format (GetApiPromptsByIdVersionsResponse200ItemResponseFormat | Unset):
+        author_id (Union[None, Unset, str]):
+        commit_message (Union[None, Unset, str]):
+        temperature (Union[Unset, float]):
+        max_tokens (Union[Unset, float]):
+        demonstrations (Union[Unset, GetApiPromptsByIdVersionsResponse200ItemDemonstrations]):
+        prompting_technique (Union[Unset, GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique]):
+        response_format (Union[Unset, GetApiPromptsByIdVersionsResponse200ItemResponseFormat]):
     """
 
     id: str
-    handle: None | str
+    handle: Union[None, str]
     scope: GetApiPromptsByIdVersionsResponse200ItemScope
     name: str
     updated_at: str
@@ -74,23 +72,23 @@ class GetApiPromptsByIdVersionsResponse200Item:
     version: float
     created_at: str
     prompt: str
-    messages: list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem]
-    inputs: list[GetApiPromptsByIdVersionsResponse200ItemInputsItem]
-    outputs: list[GetApiPromptsByIdVersionsResponse200ItemOutputsItem]
+    messages: list["GetApiPromptsByIdVersionsResponse200ItemMessagesItem"]
+    inputs: list["GetApiPromptsByIdVersionsResponse200ItemInputsItem"]
+    outputs: list["GetApiPromptsByIdVersionsResponse200ItemOutputsItem"]
     model: str
-    author_id: None | str | Unset = UNSET
-    commit_message: None | str | Unset = UNSET
-    temperature: float | Unset = UNSET
-    max_tokens: float | Unset = UNSET
-    demonstrations: GetApiPromptsByIdVersionsResponse200ItemDemonstrations | Unset = UNSET
-    prompting_technique: GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique | Unset = UNSET
-    response_format: GetApiPromptsByIdVersionsResponse200ItemResponseFormat | Unset = UNSET
+    author_id: Union[None, Unset, str] = UNSET
+    commit_message: Union[None, Unset, str] = UNSET
+    temperature: Union[Unset, float] = UNSET
+    max_tokens: Union[Unset, float] = UNSET
+    demonstrations: Union[Unset, "GetApiPromptsByIdVersionsResponse200ItemDemonstrations"] = UNSET
+    prompting_technique: Union[Unset, "GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique"] = UNSET
+    response_format: Union[Unset, "GetApiPromptsByIdVersionsResponse200ItemResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
 
-        handle: None | str
+        handle: Union[None, str]
         handle = self.handle
 
         scope = self.scope.value
@@ -128,13 +126,13 @@ class GetApiPromptsByIdVersionsResponse200Item:
 
         model = self.model
 
-        author_id: None | str | Unset
+        author_id: Union[None, Unset, str]
         if isinstance(self.author_id, Unset):
             author_id = UNSET
         else:
             author_id = self.author_id
 
-        commit_message: None | str | Unset
+        commit_message: Union[None, Unset, str]
         if isinstance(self.commit_message, Unset):
             commit_message = UNSET
         else:
@@ -144,15 +142,15 @@ class GetApiPromptsByIdVersionsResponse200Item:
 
         max_tokens = self.max_tokens
 
-        demonstrations: dict[str, Any] | Unset = UNSET
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
-        prompting_technique: dict[str, Any] | Unset = UNSET
+        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
-        response_format: dict[str, Any] | Unset = UNSET
+        response_format: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
@@ -218,10 +216,10 @@ class GetApiPromptsByIdVersionsResponse200Item:
         d = dict(src_dict)
         id = d.pop("id")
 
-        def _parse_handle(data: object) -> None | str:
+        def _parse_handle(data: object) -> Union[None, str]:
             if data is None:
                 return data
-            return cast(None | str, data)
+            return cast(Union[None, str], data)
 
         handle = _parse_handle(d.pop("handle"))
 
@@ -266,21 +264,21 @@ class GetApiPromptsByIdVersionsResponse200Item:
 
         model = d.pop("model")
 
-        def _parse_author_id(data: object) -> None | str | Unset:
+        def _parse_author_id(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         author_id = _parse_author_id(d.pop("authorId", UNSET))
 
-        def _parse_commit_message(data: object) -> None | str | Unset:
+        def _parse_commit_message(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
 
@@ -289,14 +287,14 @@ class GetApiPromptsByIdVersionsResponse200Item:
         max_tokens = d.pop("maxTokens", UNSET)
 
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: GetApiPromptsByIdVersionsResponse200ItemDemonstrations | Unset
+        demonstrations: Union[Unset, GetApiPromptsByIdVersionsResponse200ItemDemonstrations]
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:
             demonstrations = GetApiPromptsByIdVersionsResponse200ItemDemonstrations.from_dict(_demonstrations)
 
         _prompting_technique = d.pop("promptingTechnique", UNSET)
-        prompting_technique: GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique | Unset
+        prompting_technique: Union[Unset, GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique]
         if isinstance(_prompting_technique, Unset):
             prompting_technique = UNSET
         else:
@@ -305,7 +303,7 @@ class GetApiPromptsByIdVersionsResponse200Item:
             )
 
         _response_format = d.pop("responseFormat", UNSET)
-        response_format: GetApiPromptsByIdVersionsResponse200ItemResponseFormat | Unset
+        response_format: Union[Unset, GetApiPromptsByIdVersionsResponse200ItemResponseFormat]
         if isinstance(_response_format, Unset):
             response_format = UNSET
         else:

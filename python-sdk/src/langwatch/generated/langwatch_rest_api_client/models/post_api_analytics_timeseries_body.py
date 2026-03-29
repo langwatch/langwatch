@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,37 +19,37 @@ T = TypeVar("T", bound="PostApiAnalyticsTimeseriesBody")
 class PostApiAnalyticsTimeseriesBody:
     """
     Attributes:
-        start_date (float | str):
-        end_date (float | str):
-        series (list[PostApiAnalyticsTimeseriesBodySeriesItem]):
+        start_date (Union[float, str]):
+        end_date (Union[float, str]):
+        series (list['PostApiAnalyticsTimeseriesBodySeriesItem']):
         time_zone (str):
-        query (str | Unset):
-        filters (PostApiAnalyticsTimeseriesBodyFilters | Unset):
-        trace_ids (list[str] | Unset):
-        negate_filters (bool | Unset):
-        group_by (PostApiAnalyticsTimeseriesBodyGroupBy | Unset):
-        group_by_key (str | Unset):
-        time_scale (int | Literal['full'] | Unset):
+        query (Union[Unset, str]):
+        filters (Union[Unset, PostApiAnalyticsTimeseriesBodyFilters]):
+        trace_ids (Union[Unset, list[str]]):
+        negate_filters (Union[Unset, bool]):
+        group_by (Union[Unset, PostApiAnalyticsTimeseriesBodyGroupBy]):
+        group_by_key (Union[Unset, str]):
+        time_scale (Union[Literal['full'], Unset, int]):
     """
 
-    start_date: float | str
-    end_date: float | str
-    series: list[PostApiAnalyticsTimeseriesBodySeriesItem]
+    start_date: Union[float, str]
+    end_date: Union[float, str]
+    series: list["PostApiAnalyticsTimeseriesBodySeriesItem"]
     time_zone: str
-    query: str | Unset = UNSET
-    filters: PostApiAnalyticsTimeseriesBodyFilters | Unset = UNSET
-    trace_ids: list[str] | Unset = UNSET
-    negate_filters: bool | Unset = UNSET
-    group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset = UNSET
-    group_by_key: str | Unset = UNSET
-    time_scale: int | Literal["full"] | Unset = UNSET
+    query: Union[Unset, str] = UNSET
+    filters: Union[Unset, "PostApiAnalyticsTimeseriesBodyFilters"] = UNSET
+    trace_ids: Union[Unset, list[str]] = UNSET
+    negate_filters: Union[Unset, bool] = UNSET
+    group_by: Union[Unset, PostApiAnalyticsTimeseriesBodyGroupBy] = UNSET
+    group_by_key: Union[Unset, str] = UNSET
+    time_scale: Union[Literal["full"], Unset, int] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        start_date: float | str
+        start_date: Union[float, str]
         start_date = self.start_date
 
-        end_date: float | str
+        end_date: Union[float, str]
         end_date = self.end_date
 
         series = []
@@ -63,23 +61,23 @@ class PostApiAnalyticsTimeseriesBody:
 
         query = self.query
 
-        filters: dict[str, Any] | Unset = UNSET
+        filters: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.filters, Unset):
             filters = self.filters.to_dict()
 
-        trace_ids: list[str] | Unset = UNSET
+        trace_ids: Union[Unset, list[str]] = UNSET
         if not isinstance(self.trace_ids, Unset):
             trace_ids = self.trace_ids
 
         negate_filters = self.negate_filters
 
-        group_by: str | Unset = UNSET
+        group_by: Union[Unset, str] = UNSET
         if not isinstance(self.group_by, Unset):
             group_by = self.group_by.value
 
         group_by_key = self.group_by_key
 
-        time_scale: int | Literal["full"] | Unset
+        time_scale: Union[Literal["full"], Unset, int]
         if isinstance(self.time_scale, Unset):
             time_scale = UNSET
         else:
@@ -119,13 +117,13 @@ class PostApiAnalyticsTimeseriesBody:
 
         d = dict(src_dict)
 
-        def _parse_start_date(data: object) -> float | str:
-            return cast(float | str, data)
+        def _parse_start_date(data: object) -> Union[float, str]:
+            return cast(Union[float, str], data)
 
         start_date = _parse_start_date(d.pop("startDate"))
 
-        def _parse_end_date(data: object) -> float | str:
-            return cast(float | str, data)
+        def _parse_end_date(data: object) -> Union[float, str]:
+            return cast(Union[float, str], data)
 
         end_date = _parse_end_date(d.pop("endDate"))
 
@@ -141,7 +139,7 @@ class PostApiAnalyticsTimeseriesBody:
         query = d.pop("query", UNSET)
 
         _filters = d.pop("filters", UNSET)
-        filters: PostApiAnalyticsTimeseriesBodyFilters | Unset
+        filters: Union[Unset, PostApiAnalyticsTimeseriesBodyFilters]
         if isinstance(_filters, Unset):
             filters = UNSET
         else:
@@ -152,7 +150,7 @@ class PostApiAnalyticsTimeseriesBody:
         negate_filters = d.pop("negateFilters", UNSET)
 
         _group_by = d.pop("groupBy", UNSET)
-        group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset
+        group_by: Union[Unset, PostApiAnalyticsTimeseriesBodyGroupBy]
         if isinstance(_group_by, Unset):
             group_by = UNSET
         else:
@@ -160,14 +158,14 @@ class PostApiAnalyticsTimeseriesBody:
 
         group_by_key = d.pop("groupByKey", UNSET)
 
-        def _parse_time_scale(data: object) -> int | Literal["full"] | Unset:
+        def _parse_time_scale(data: object) -> Union[Literal["full"], Unset, int]:
             if isinstance(data, Unset):
                 return data
             time_scale_type_0 = cast(Literal["full"], data)
             if time_scale_type_0 != "full":
                 raise ValueError(f"timeScale_type_0 must match const 'full', got '{time_scale_type_0}'")
             return time_scale_type_0
-            return cast(int | Literal["full"] | Unset, data)
+            return cast(Union[Literal["full"], Unset, int], data)
 
         time_scale = _parse_time_scale(d.pop("timeScale", UNSET))
 
