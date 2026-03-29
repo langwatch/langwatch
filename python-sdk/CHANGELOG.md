@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.17.0...python-sdk@v0.17.1) (2026-03-29)
+
+
+### Bug Fixes
+
+* **docs:** broken docs/ references after move to dev/docs/ ([#2650](https://github.com/langwatch/langwatch/issues/2650)) ([5c29d48](https://github.com/langwatch/langwatch/commit/5c29d488704eb6d4cfdfd8c95d982fe716686335))
+* update ~45 broken docs/ references to dev/docs/ after docs move ([5c29d48](https://github.com/langwatch/langwatch/commit/5c29d488704eb6d4cfdfd8c95d982fe716686335)), closes [#2648](https://github.com/langwatch/langwatch/issues/2648)
+
 ## [0.17.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.16.0...python-sdk@v0.17.0) (2026-03-18)
 
 
