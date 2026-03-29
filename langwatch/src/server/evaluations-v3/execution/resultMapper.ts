@@ -84,12 +84,7 @@ export const coercePassed = (value: unknown): boolean | undefined => {
  */
 const isEvaluatorOutput = (
   outputs: Record<string, unknown>,
-): outputs is {
-  passed?: boolean;
-  score?: number;
-  label?: string;
-  details?: string;
-} => {
+): boolean => {
   return "passed" in outputs || "score" in outputs || "label" in outputs;
 };
 
@@ -110,18 +105,16 @@ export const extractTargetOutput = (
 ): unknown => {
   if (!outputs) return undefined;
 
-  // Evaluator-as-target: return the full evaluator result object
-  // Only include keys that have non-null/undefined values
+  // Evaluator-as-target: return all non-null/undefined output fields dynamically.
+  // This avoids hardcoding specific field names (like `details`) which can cause
+  // "sticky" fields that persist even after removal from the End node.
   if (isEvaluatorOutput(outputs)) {
     const result: Record<string, unknown> = {};
-    if (outputs.passed !== undefined && outputs.passed !== null)
-      result.passed = outputs.passed;
-    if (outputs.score !== undefined && outputs.score !== null)
-      result.score = outputs.score;
-    if (outputs.label !== undefined && outputs.label !== null)
-      result.label = outputs.label;
-    if (outputs.details !== undefined && outputs.details !== null)
-      result.details = outputs.details;
+    for (const [key, value] of Object.entries(outputs)) {
+      if (value !== undefined && value !== null) {
+        result[key] = value;
+      }
+    }
     return result;
   }
 
