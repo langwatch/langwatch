@@ -155,6 +155,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   // Build pipeline using static definition with definePipeline + register
@@ -178,6 +179,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
@@ -189,6 +191,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     }
   > & {
     eventStore: EventStoreClickHouse;
+    eventSourcing: EventSourcing;
     pipelineName: string;
     ready: () => Promise<void>;
   };
@@ -297,8 +300,8 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      // Gracefully close pipeline to ensure all BullMQ workers finish
-      await pipeline.service.close();
+      // Gracefully close EventSourcing (including global queue dispatcher)
+      await pipeline.eventSourcing.close();
       // Wait for BullMQ workers to fully shut down and release Redis connections
       // Using 1000ms to ensure all async operations complete
       await new Promise((resolve) => setTimeout(resolve, 1000));

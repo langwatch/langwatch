@@ -28,6 +28,23 @@ import type { OtlpSpan } from "../schemas/otlp";
 import { SpanAppendStore } from "../projections/spanStorage.store";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
 
+/**
+ * Test subclass that provides no-op dependencies to avoid requiring Prisma.
+ * The real RecordSpanCommand lazily requires ~/server/db when no deps are passed.
+ */
+class TestRecordSpanCommand extends RecordSpanCommand {
+  static override readonly schema = RecordSpanCommand.schema;
+
+  constructor() {
+    const noOpDeps: RecordSpanCommandDependencies = {
+      piiRedactionService: { redactSpan: async () => {} },
+      costEnrichmentService: { enrichSpan: async () => {} },
+      tokenEstimationService: { estimateSpanTokens: async () => {} },
+    };
+    super(noOpDeps);
+  }
+}
+
 function generateTestTraceId(): string {
   return `trace-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
@@ -107,6 +124,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   { recordSpan: any; assignTopic: any }
 > & {
   eventStore: EventStoreClickHouse;
+  eventSourcing: EventSourcing;
   pipelineName: string;
   ready: () => Promise<void>;
 } {
@@ -129,6 +147,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository);
@@ -148,6 +167,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     ready: () => pipeline.service.waitUntilReady(),
   } as any;
@@ -337,7 +357,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      await pipeline.service.close();
+      await pipeline.eventSourcing.close();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await cleanupTestDataForTenant(tenantIdString);
     });
@@ -551,6 +571,7 @@ describe.skipIf(!hasTestcontainers)(
           subtopicId,
           subtopicName: "Billing Questions",
           isIncremental: false,
+          occurredAt: Date.now(),
         });
 
         await waitForTopicAssignment(pipeline, traceId, tenantId, topicId);

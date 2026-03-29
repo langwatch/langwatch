@@ -496,11 +496,13 @@ export class EventSourcing {
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
+    processRole?: ProcessRole;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
+      processRole: options.processRole,
     });
 
     es._initialized = true;
