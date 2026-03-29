@@ -241,7 +241,7 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
-        scoreFn: (event: any) => event.createdAt,
+        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
@@ -301,7 +301,7 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
-        scoreFn: (event: any) => event.createdAt,
+        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
         process: async (event: any) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
