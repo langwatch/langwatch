@@ -92,3 +92,10 @@ export type ExternalSetSummary = {
   totalCount: number;
   lastRunTimestamp: number;
 };
+
+export type SuiteRunSummary = {
+  passedCount: number;
+  failedCount: number;
+  totalCount: number;
+  lastRunTimestamp: number | null;
+};

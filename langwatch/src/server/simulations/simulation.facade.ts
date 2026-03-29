@@ -2,7 +2,7 @@ import { getApp } from "~/server/app-layer/app";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
 import { ScenarioEventService } from "../scenarios/scenario-event.service";
-import type { BatchHistoryResult, BatchRunDataResult, ScenarioEvent } from "../scenarios/scenario-event.types";
+import type { BatchHistoryResult, BatchRunDataResult, ExternalSetSummary, ScenarioEvent } from "../scenarios/scenario-event.types";
 
 /**
  * Facade that delegates simulation reads to either ClickHouse or Elasticsearch
@@ -167,6 +167,18 @@ export class SimulationFacade {
       projectId: params.projectId,
       chCall: (ch) => ch.getExternalSetSummaries(params),
       esCall: () => this.deps.esService.getExternalSetSummaries(params),
+    });
+  }
+
+  async getInternalSuiteSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }) {
+    return this.routeRead({
+      projectId: params.projectId,
+      chCall: (ch) => ch.getInternalSuiteSummaries(params),
+      esCall: () => Promise.resolve([] as ExternalSetSummary[]),
     });
   }
 

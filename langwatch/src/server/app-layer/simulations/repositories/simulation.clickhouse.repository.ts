@@ -733,17 +733,44 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return { changed: true, lastUpdatedAt, runs, scenarioSetIds, nextCursor, hasMore };
   }
 
-  async getExternalSetSummaries({
-    projectId,
-    startDate,
-    endDate,
-  }: {
+  async getExternalSetSummaries(params: {
     projectId: string;
     startDate?: number;
     endDate?: number;
   }): Promise<ExternalSetSummary[]> {
+    return this.getSetSummaries({ ...params, filter: "external" });
+  }
+
+  async getInternalSuiteSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]> {
+    return this.getSetSummaries({ ...params, filter: "internal-suites" });
+  }
+
+  private async getSetSummaries({
+    projectId,
+    startDate,
+    endDate,
+    filter,
+  }: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    filter: "external" | "internal-suites";
+  }): Promise<ExternalSetSummary[]> {
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
+
+    const wherePredicate = filter === "external"
+      ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+      : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
+
+    // External sets normalize empty ScenarioSetId to 'default'
+    const selectId = filter === "external"
+      ? "IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId"
+      : "ScenarioSetId AS NormalizedSetId";
 
     const rows = await this.queryRows<{
       ScenarioSetId: string;
@@ -767,18 +794,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
            toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
          FROM (
-           SELECT
-             -- 'default' must match DEFAULT_SET_ID from internal-set-id.ts
-           IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
-             BatchRunId,
-             Status,
-             CreatedAt,
-             ArchivedAt
+           SELECT ${selectId}, BatchRunId, Status, CreatedAt, ArchivedAt
            FROM (
              SELECT ${DEDUP_COLUMNS}
              FROM ${TABLE_NAME}
              WHERE TenantId = {tenantId:String}
-               AND NOT startsWith(ScenarioSetId, '__internal__')
+               ${wherePredicate}
              ORDER BY ScenarioRunId, UpdatedAt DESC
              LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
            )
