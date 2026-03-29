@@ -236,7 +236,12 @@ export const useFilterParams = () => {
     filterCount,
     hasAnyFilters,
     queryOpts: {
-      enabled: !!project && !!startDate && !!endDate,
+      enabled:
+        !!project &&
+        !!startDate &&
+        !isNaN(startDate.getTime()) &&
+        !!endDate &&
+        !isNaN(endDate.getTime()),
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       trpc: {
