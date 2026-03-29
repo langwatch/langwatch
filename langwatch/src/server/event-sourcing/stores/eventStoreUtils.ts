@@ -1,5 +1,7 @@
-import type { AggregateType, Event, EventStoreReadContext } from "../";
-import { createTenantId } from "../";
+import type { AggregateType } from "../domain/aggregateType";
+import { createTenantId } from "../domain/tenantId";
+import type { Event } from "../domain/types";
+import type { EventStoreReadContext } from "./eventStore.types";
 import {
 	ErrorCategory,
 	SecurityError,
