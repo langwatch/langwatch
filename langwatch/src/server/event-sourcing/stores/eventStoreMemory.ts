@@ -1,4 +1,5 @@
-import type { AggregateType, Event } from "../";
+import type { AggregateType } from "../domain/aggregateType";
+import type { Event } from "../domain/types";
 import { ConfigurationError } from "../services/errorHandling";
 import { AbstractEventStore } from "./abstractEventStore";
 import { eventToRecord } from "./eventStoreUtils";
