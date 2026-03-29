@@ -8,7 +8,7 @@ import type { OrganizationService } from "../app-layer/organizations/organizatio
 
 import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "./projections/foldProjection.types";
+import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
@@ -36,18 +36,12 @@ import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-proces
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import { FoldReplayService } from "./projections/foldReplayService";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
-import type { EventRepository } from "./stores/repositories/eventRepository.types";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
-import { TraceSummaryFoldProjection } from "./pipelines/trace-processing/projections/traceSummary.foldProjection";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
-import { SimulationRunStateFoldProjection } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { SuiteRunStateFoldProjection } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import { ExperimentRunStateFoldProjection } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import type { EventSourcing } from "./eventSourcing";
@@ -106,7 +100,6 @@ export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
-  eventRepository: EventRepository;
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
@@ -141,33 +134,6 @@ export class PipelineRegistry {
   ): RedisCachedFoldStore<State> {
     return new RedisCachedFoldStore<State>(inner, this.deps.redis as any, {
       keyPrefix,
-    });
-  }
-
-  /**
-   * Bind replay to a cached fold store using the FoldReplayService.
-   * On ClickHouse write failure, replays all events from event_log
-   * through the projection and writes the final state durably.
-   */
-  private bindReplayToStore<State>(
-    store: RedisCachedFoldStore<State>,
-    innerStore: FoldProjectionStore<State>,
-    projectionGetter: () => FoldProjectionDefinition<State, any>,
-    aggregateType: string,
-    keyPrefix: string,
-  ): void {
-    const replayService = new FoldReplayService(
-      this.deps.eventRepository,
-      this.deps.redis as any,
-    );
-
-    store.bindReplay(async (aggregateId, tenantId) => {
-      await replayService.replay({
-        projection: projectionGetter(),
-        innerStore,
-        request: { aggregateId, aggregateType, tenantId },
-        redisKeyPrefix: keyPrefix,
-      });
     });
   }
 
@@ -225,10 +191,10 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const traceSummaryInnerStore = new TraceSummaryStore(this.deps.repositories.traceSummaryFold);
-    const traceSummaryStore = this.cachedFoldStore<TraceSummaryData>(traceSummaryInnerStore, "trace_summaries");
-    const traceSummaryProjection = new TraceSummaryFoldProjection({ store: traceSummaryStore });
-    this.bindReplayToStore(traceSummaryStore, traceSummaryInnerStore, () => traceSummaryProjection, "trace", "trace_summaries");
+    const traceSummaryStore = this.cachedFoldStore<TraceSummaryData>(
+      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      "trace_summaries",
+    );
 
     // Late-bound reference to the trace pipeline's resolveOrigin command.
     // The reactor deps closure captures this; the actual dispatcher is set
@@ -372,13 +338,13 @@ export class PipelineRegistry {
   }
 
   private registerSuiteRunPipeline() {
-    const suiteRunInnerStore = new RepositoryFoldStore<SuiteRunStateData>(
-      this.deps.repositories.suiteRunState,
-      SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+    const suiteRunStore = this.cachedFoldStore<SuiteRunStateData>(
+      new RepositoryFoldStore<SuiteRunStateData>(
+        this.deps.repositories.suiteRunState,
+        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+      "suite_runs",
     );
-    const suiteRunStore = this.cachedFoldStore<SuiteRunStateData>(suiteRunInnerStore, "suite_runs");
-    const suiteRunProjection = new SuiteRunStateFoldProjection({ store: suiteRunStore });
-    this.bindReplayToStore(suiteRunStore, suiteRunInnerStore, () => suiteRunProjection, "suite_run", "suite_runs");
 
     return this.deps.eventSourcing.register(
       createSuiteRunProcessingPipeline({
@@ -392,13 +358,13 @@ export class PipelineRegistry {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
   }) {
-    const simulationRunInnerStore = new RepositoryFoldStore<SimulationRunStateData>(
-      this.deps.repositories.simulationRunState,
-      SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+    const simulationRunStore = this.cachedFoldStore<SimulationRunStateData>(
+      new RepositoryFoldStore<SimulationRunStateData>(
+        this.deps.repositories.simulationRunState,
+        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+      "simulation_runs",
     );
-    const simulationRunStore = this.cachedFoldStore<SimulationRunStateData>(simulationRunInnerStore, "simulation_runs");
-    const simulationRunProjection = new SimulationRunStateFoldProjection({ store: simulationRunStore });
-    this.bindReplayToStore(simulationRunStore, simulationRunInnerStore, () => simulationRunProjection, "simulation_run", "simulation_runs");
     const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
       {
         broadcast: this.deps.broadcast,
@@ -527,13 +493,10 @@ export class PipelineRegistry {
   }
 
   private registerExperimentRunPipeline() {
-    const experimentRunInnerStore = createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState);
-    const experimentRunStore = new RedisCachedFoldStore<ExperimentRunStateData>(
-      experimentRunInnerStore, this.deps.redis as any,
-      { keyPrefix: "experiment_runs", awaitInnerStore: true },
+    const experimentRunStore = this.cachedFoldStore<ExperimentRunStateData>(
+      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+      "experiment_runs",
     );
-    const experimentRunProjection = new ExperimentRunStateFoldProjection({ store: experimentRunStore });
-    this.bindReplayToStore(experimentRunStore, experimentRunInnerStore, () => experimentRunProjection, "experiment_run", "experiment_runs");
 
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({

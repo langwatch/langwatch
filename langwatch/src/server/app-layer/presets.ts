@@ -4,8 +4,6 @@ import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClie
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
 import { PipelineRegistry, type AppCommands } from "../event-sourcing/pipelineRegistry";
-import { EventRepositoryClickHouse } from "../event-sourcing/stores/repositories/eventRepositoryClickHouse";
-import { EventRepositoryMemory } from "../event-sourcing/stores/repositories/eventRepositoryMemory";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
@@ -282,15 +280,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
   };
 
-  const eventRepository = clickhouseEnabled
-    ? new EventRepositoryClickHouse(resolveClickHouseClient)
-    : new EventRepositoryMemory();
-
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
     redis: redis!,
-    eventRepository,
     broadcast,
     projects,
     monitors,

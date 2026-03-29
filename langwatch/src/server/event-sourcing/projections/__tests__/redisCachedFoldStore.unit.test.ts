@@ -91,7 +91,7 @@ describe("RedisCachedFoldStore", () => {
 
   describe("store()", () => {
     describe("when storing state", () => {
-      it("writes to Redis with TTL then fires inner store without awaiting", async () => {
+      it("writes to CH first then caches in Redis", async () => {
         const redis = createMockRedis();
         const inner = createMockInnerStore();
         const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
@@ -102,40 +102,40 @@ describe("RedisCachedFoldStore", () => {
         const state: TestState = { count: 10, name: "new-state" };
         await store.store(state, TEST_CONTEXT);
 
+        // CH written first
+        expect(inner.storeCalls).toHaveLength(1);
+        expect(inner.storeCalls[0]!.state).toEqual(state);
+
+        // Then Redis cached
         expect(redis.set).toHaveBeenCalledWith(
           "fold:test_table:agg-1",
           JSON.stringify(state),
           "EX",
           30,
         );
-
-        await new Promise((r) => setTimeout(r, 0));
-        expect(inner.storeCalls).toHaveLength(1);
-        expect(inner.storeCalls[0]!.state).toEqual(state);
       });
     });
 
     describe("when inner store write fails", () => {
-      it("calls bound replay function", async () => {
+      it("propagates the error to the caller", async () => {
         const redis = createMockRedis();
         const innerStore: FoldProjectionStore<TestState> = {
           get: vi.fn(),
           store: vi.fn().mockRejectedValue(new Error("CH connection refused")),
         };
-        const replayFn = vi.fn().mockResolvedValue(undefined);
 
         const store = new RedisCachedFoldStore<TestState>(
           innerStore,
           redis as any,
           { keyPrefix: "test_table" },
         );
-        store.bindReplay(replayFn);
 
-        await store.store({ count: 1, name: "test" }, TEST_CONTEXT);
+        await expect(
+          store.store({ count: 1, name: "test" }, TEST_CONTEXT),
+        ).rejects.toThrow("CH connection refused");
 
-        await new Promise((r) => setTimeout(r, 10));
-
-        expect(replayFn).toHaveBeenCalledWith("agg-1", "tenant-1");
+        // Redis should NOT have been updated (CH writes first)
+        expect(redis.set).not.toHaveBeenCalled();
       });
     });
   });

@@ -8,28 +8,23 @@ const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 export interface RedisCachedFoldStoreOptions {
   keyPrefix: string;
   ttlSeconds?: number;
-  /** Await inner CH write instead of fire-and-forget. Use for pipelines with
-   *  getGroupKey where a completion command can race ahead of result commands. */
-  awaitInnerStore?: boolean;
 }
 
 /**
  * Wraps any FoldProjectionStore with a Redis write-through cache.
  *
  * - get(): Redis first, ClickHouse fallback on miss.
- * - store(): Redis SET (commit point) → ClickHouse INSERT fire-and-forget.
- * - On ClickHouse write failure: calls the bound replay function.
+ * - store(): ClickHouse first (throws on failure), then Redis SET (cache).
  *
- * Call `bindReplay()` after pipeline registration to wire the replay
- * (same late-binding pattern as dispatchers in PipelineRegistry).
+ * Ordering guarantees correctness without transactions:
+ * - CH fails → throw → no Redis update → event retried by queue
+ * - CH succeeds, Redis fails → next read falls back to CH
  */
 export class RedisCachedFoldStore<State>
   implements FoldProjectionStore<State>
 {
   private readonly ttlSeconds: number;
   private readonly keyPrefix: string;
-  private readonly awaitInnerStore: boolean;
-  private replayFn: ((aggregateId: string, tenantId: string) => Promise<void>) | null = null;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
@@ -38,15 +33,6 @@ export class RedisCachedFoldStore<State>
   ) {
     this.keyPrefix = options.keyPrefix;
     this.ttlSeconds = options.ttlSeconds ?? 30;
-    this.awaitInnerStore = options.awaitInnerStore ?? false;
-  }
-
-  /**
-   * Late-bind the replay function. Called after pipeline registration
-   * when the projection definition is available for replay.
-   */
-  bindReplay(fn: (aggregateId: string, tenantId: string) => Promise<void>): void {
-    this.replayFn = fn;
   }
 
   async get(
@@ -67,35 +53,19 @@ export class RedisCachedFoldStore<State>
     context: ProjectionStoreContext,
   ): Promise<void> {
     const aggregateId = context.key ?? context.aggregateId;
-    const key = this.redisKey(aggregateId);
 
-    // 1. Commit to Redis (fast, consistent for next fold step)
-    await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
+    // 1. ClickHouse first — throws on failure, event retried by queue
+    await this.inner.store(state, context);
 
-    // 2. Write to inner (ClickHouse) store
-    const chWrite = this.inner.store(state, context).catch((error) => {
-      logger.error(
-        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
-        "ClickHouse write failed, triggering replay from event log",
+    // 2. Redis second — cache for fast reads on next fold step
+    try {
+      const key = this.redisKey(aggregateId);
+      await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
+    } catch (error) {
+      logger.warn(
+        { aggregateId, error: String(error) },
+        "Redis SET failed after CH write — next read will fall back to CH",
       );
-
-      if (!this.replayFn) {
-        logger.error({ aggregateId }, "Cannot replay: bindReplay() not called");
-        return;
-      }
-
-      this.replayFn(aggregateId, String(context.tenantId)).catch((replayError) => {
-        logger.error(
-          { aggregateId, error: String(replayError) },
-          "Fold replay also failed",
-        );
-      });
-    });
-
-    // Await CH write for pipelines with getGroupKey to prevent completion races.
-    // Fire-and-forget for all others (faster, CH catches up async).
-    if (this.awaitInnerStore) {
-      await chWrite;
     }
   }
 
