@@ -8,6 +8,9 @@ const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 export interface RedisCachedFoldStoreOptions {
   keyPrefix: string;
   ttlSeconds?: number;
+  /** Await inner CH write instead of fire-and-forget. Use for pipelines with
+   *  getGroupKey where a completion command can race ahead of result commands. */
+  awaitInnerStore?: boolean;
 }
 
 /**
@@ -25,6 +28,7 @@ export class RedisCachedFoldStore<State>
 {
   private readonly ttlSeconds: number;
   private readonly keyPrefix: string;
+  private readonly awaitInnerStore: boolean;
   private replayFn: ((aggregateId: string, tenantId: string) => Promise<void>) | null = null;
 
   constructor(
@@ -34,6 +38,7 @@ export class RedisCachedFoldStore<State>
   ) {
     this.keyPrefix = options.keyPrefix;
     this.ttlSeconds = options.ttlSeconds ?? 30;
+    this.awaitInnerStore = options.awaitInnerStore ?? false;
   }
 
   /**
@@ -67,8 +72,8 @@ export class RedisCachedFoldStore<State>
     // 1. Commit to Redis (fast, consistent for next fold step)
     await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
 
-    // 2. Fire-and-forget to inner (ClickHouse) store
-    this.inner.store(state, context).catch((error) => {
+    // 2. Write to inner (ClickHouse) store
+    const chWrite = this.inner.store(state, context).catch((error) => {
       logger.error(
         { aggregateId, tenantId: String(context.tenantId), error: String(error) },
         "ClickHouse write failed, triggering replay from event log",
@@ -86,6 +91,12 @@ export class RedisCachedFoldStore<State>
         );
       });
     });
+
+    // Await CH write for pipelines with getGroupKey to prevent completion races.
+    // Fire-and-forget for all others (faster, CH catches up async).
+    if (this.awaitInnerStore) {
+      await chWrite;
+    }
   }
 
   private redisKey(aggregateId: string): string {

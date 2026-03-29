@@ -528,7 +528,10 @@ export class PipelineRegistry {
 
   private registerExperimentRunPipeline() {
     const experimentRunInnerStore = createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState);
-    const experimentRunStore = this.cachedFoldStore<ExperimentRunStateData>(experimentRunInnerStore, "experiment_runs");
+    const experimentRunStore = new RedisCachedFoldStore<ExperimentRunStateData>(
+      experimentRunInnerStore, this.deps.redis as any,
+      { keyPrefix: "experiment_runs", awaitInnerStore: true },
+    );
     const experimentRunProjection = new ExperimentRunStateFoldProjection({ store: experimentRunStore });
     this.bindReplayToStore(experimentRunStore, experimentRunInnerStore, () => experimentRunProjection, "experiment_run", "experiment_runs");
 
