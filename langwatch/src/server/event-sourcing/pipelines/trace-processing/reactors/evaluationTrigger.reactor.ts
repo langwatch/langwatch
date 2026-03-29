@@ -1,7 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import type { QueueSendOptions } from "../../../queues";
-import { makeJobId } from "../../evaluation-processing/commands/executeEvaluation.command";
+import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
@@ -242,7 +242,7 @@ async function dispatchEvaluations({
           ? {
               delay: monitor.threadIdleTimeout! * 1000,
               deduplication: {
-                makeId: makeJobId,
+                makeId: ExecuteEvaluationCommand.makeJobId,
                 ttlMs: monitor.threadIdleTimeout! * 1000,
               },
             }

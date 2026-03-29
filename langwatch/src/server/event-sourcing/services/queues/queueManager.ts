@@ -329,6 +329,8 @@ export class QueueManager<EventType extends Event = Event> {
     commandRegistrations: Array<{
       name: string;
       handlerClass: CommandHandlerClass<any, any, EventType>;
+      /** Pre-constructed instance — when provided, used instead of `new handlerClass()`. */
+      handlerInstance?: CommandHandler<any, EventType>;
       options?: CommandHandlerOptions<Payload>;
     }>,
     storeEvents: (
@@ -362,7 +364,7 @@ export class QueueManager<EventType extends Event = Event> {
       const handlerClass = registration.handlerClass;
       const schema = handlerClass.schema;
       const commandType = schema.type;
-      const handlerInstance = new handlerClass();
+      const handlerInstance = registration.handlerInstance ?? new handlerClass();
 
       const getAggregateId =
         registration.options?.getAggregateId ??

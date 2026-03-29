@@ -1,45 +1,46 @@
 import { SpanNormalizationPipelineService, enrichRagContextIds } from "~/server/app-layer/traces/span-normalization.service";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import type { AppendStore, MapProjectionDefinition } from "../../../projections/mapProjection.types";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
-import type { SpanReceivedEvent } from "../schemas/events";
+import { AbstractMapProjection, type MapEventHandlers } from "../../../projections/abstractMapProjection";
+import type { AppendStore } from "../../../projections/mapProjection.types";
+import { spanReceivedEventSchema, type SpanReceivedEvent } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),
 );
 
+const spanEvents = [spanReceivedEventSchema] as const;
+
 /**
- * Creates a MapProjection definition for span storage.
- *
+ * Map projection that transforms SpanReceivedEvents into NormalizedSpans.
  * Extracts the pure mapping logic from SpanStorageEventHandler.
- * Maps a SpanReceivedEvent to a NormalizedSpan for storage.
  * The framework handles dispatch and persistence via the AppendStore.
  */
-export function createSpanStorageMapProjection({
-  store,
-}: {
-  store: AppendStore<NormalizedSpan>;
-}): MapProjectionDefinition<NormalizedSpan, SpanReceivedEvent> {
-  return {
-    name: "spanStorage",
-    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+export class SpanStorageMapProjection
+  extends AbstractMapProjection<NormalizedSpan, typeof spanEvents>
+  implements MapEventHandlers<typeof spanEvents, NormalizedSpan>
+{
+  readonly name = "spanStorage";
+  readonly store: AppendStore<NormalizedSpan>;
+  protected readonly events = spanEvents;
 
-    options: {
-      groupKeyFn: (event: SpanReceivedEvent) => `span:${event.id}`,
-    },
-
-    map(event: SpanReceivedEvent): NormalizedSpan {
-      const span = spanNormalizationPipelineService.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
-      enrichRagContextIds(span);
-      return span;
-    },
-
-    store,
+  override options = {
+    groupKeyFn: (event: { id: string }) => `span:${event.id}`,
   };
+
+  constructor(deps: { store: AppendStore<NormalizedSpan> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  mapTraceSpanReceived(event: SpanReceivedEvent): NormalizedSpan {
+    const span = spanNormalizationPipelineService.normalizeSpanReceived(
+      event.tenantId,
+      event.data.span,
+      event.data.resource,
+      event.data.instrumentationScope,
+    );
+    enrichRagContextIds(span);
+    return span;
+  }
 }

@@ -7,7 +7,7 @@ export type { SimulationRunStatus, SimulationVerdict } from "./shared";
 /**
  * RunQueued event - emitted when a simulation run is scheduled but not yet started.
  */
-const simulationRunQueuedEventDataSchema = z.object({
+export const simulationRunQueuedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   scenarioId: z.string(),
   batchRunId: z.string(),
@@ -28,7 +28,7 @@ export type SimulationRunQueuedEvent = z.infer<typeof SimulationRunQueuedEventSc
 /**
  * RunStarted event - emitted when a simulation run begins.
  */
-const simulationRunStartedEventDataSchema = z.object({
+export const simulationRunStartedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   scenarioId: z.string(),
   batchRunId: z.string(),
@@ -49,7 +49,7 @@ export type SimulationRunStartedEvent = z.infer<typeof SimulationRunStartedEvent
 /**
  * MessageSnapshot event - emitted when simulation messages are updated.
  */
-const simulationMessageSnapshotEventDataSchema = z.object({
+export const simulationMessageSnapshotEventDataSchema = z.object({
   scenarioRunId: z.string(),
   messages: z.array(simulationMessageSchema),
   traceIds: z.array(z.string()).default([]),
@@ -67,7 +67,7 @@ export type SimulationMessageSnapshotEvent = z.infer<typeof SimulationMessageSna
 /**
  * RunFinished event - emitted when a simulation run completes.
  */
-const simulationRunFinishedEventDataSchema = z.object({
+export const simulationRunFinishedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   results: simulationResultsSchema.optional(),
   durationMs: z.number().optional(),
@@ -85,7 +85,7 @@ export type SimulationRunFinishedEvent = z.infer<typeof SimulationRunFinishedEve
 /**
  * TextMessageStart event - emitted when a message begins (placeholder).
  */
-const simulationTextMessageStartEventDataSchema = z.object({
+export const simulationTextMessageStartEventDataSchema = z.object({
   scenarioRunId: z.string(),
   messageId: z.string(),
   role: z.string(),
@@ -103,7 +103,7 @@ export type SimulationTextMessageStartEvent = z.infer<typeof SimulationTextMessa
 /**
  * TextMessageEnd event - emitted when a message is complete with full content.
  */
-const simulationTextMessageEndEventDataSchema = z.object({
+export const simulationTextMessageEndEventDataSchema = z.object({
   scenarioRunId: z.string(),
   messageId: z.string(),
   role: z.string(),
@@ -125,7 +125,7 @@ export type SimulationTextMessageEndEvent = z.infer<typeof SimulationTextMessage
  * MetricsComputed event - emitted when cost/latency metrics are computed from traces.
  * Carries per-trace metrics via ECST (Event-Carried State Transfer).
  */
-const simulationRunMetricsComputedEventDataSchema = z.object({
+export const simulationRunMetricsComputedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   traceId: z.string(),
   totalCost: z.number(),
@@ -144,7 +144,7 @@ export type SimulationRunMetricsComputedEvent = z.infer<typeof SimulationRunMetr
 /**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
-const simulationRunDeletedEventDataSchema = z.object({
+export const simulationRunDeletedEventDataSchema = z.object({
   scenarioRunId: z.string(),
 });
 export type SimulationRunDeletedEventData = z.infer<typeof simulationRunDeletedEventDataSchema>;

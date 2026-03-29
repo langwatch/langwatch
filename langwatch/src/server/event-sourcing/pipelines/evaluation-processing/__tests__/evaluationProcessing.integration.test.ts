@@ -21,8 +21,10 @@ import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
-import { CompleteEvaluationCommand } from "../commands/completeEvaluation.command";
-import { StartEvaluationCommand } from "../commands/startEvaluation.command";
+import {
+  StartEvaluationCommand,
+  CompleteEvaluationCommand,
+} from "../commands";
 import type { EvaluationRun } from "../projections";
 import { EvaluationRunFoldProjection } from "../projections";
 import type { EvaluationProcessingEvent } from "../schemas/events";
