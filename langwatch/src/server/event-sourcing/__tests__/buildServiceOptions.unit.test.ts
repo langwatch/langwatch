@@ -42,7 +42,7 @@ class TestFoldProjection
     return { count: 0 };
   }
 
-  handleTestItemAdded(state: TestFoldState, _event: TestEvent): TestFoldState {
+  handleTestItemAdded(_event: TestEvent, state: TestFoldState): TestFoldState {
     return { ...state, count: state.count + 1 };
   }
 }
@@ -55,8 +55,8 @@ class TestMapProjection
   readonly store: AppendStore<{ id: string }> = { append: async () => {} };
   protected readonly events = testEvents;
 
-  mapTestItemAdded(): { id: string }[] {
-    return [{ id: "1" }];
+  mapTestItemAdded(_event: TestEvent): { id: string } | null {
+    return { id: "1" };
   }
 }
 
@@ -79,14 +79,14 @@ describe("AbstractFoldProjection and AbstractMapProjection getter preservation",
       const spread = { ...fold };
 
       // This is the bug: spreading loses the prototype getter
-      expect(spread.eventTypes).toBeUndefined();
+      expect((spread as any).eventTypes).toBeUndefined();
     });
 
     it("eventTypes getter is lost on map projection", () => {
       const map = new TestMapProjection();
       const spread = { ...map };
 
-      expect(spread.eventTypes).toBeUndefined();
+      expect((spread as any).eventTypes).toBeUndefined();
     });
   });
 });
