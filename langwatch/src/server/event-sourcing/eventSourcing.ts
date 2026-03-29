@@ -538,6 +538,7 @@ function buildServiceOptions<
       ? definition.commands.map((cmd) => ({
           name: cmd.name,
           handlerClass: cmd.handlerClass,
+          handlerInstance: cmd.handlerInstance,
           options: cmd.options,
         }))
       : undefined;
