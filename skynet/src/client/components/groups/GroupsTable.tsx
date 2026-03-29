@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Box, Table, Thead, Tbody, Tr, Th, Td, Text, Badge, HStack, VStack, Code,
-  Input, Button, Collapse, useDisclosure, Tooltip, useToast,
+  Input, Button, Select, Collapse, useDisclosure, Tooltip, useToast,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton,
   AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader,
   AlertDialogBody, AlertDialogFooter,
@@ -18,6 +18,18 @@ import { useTickingTimeAgo } from "../../hooks/useTickingTimeAgo.ts";
 import { apiFetch, apiPost } from "../../hooks/useApi.ts";
 import { ANTI_FLICKER_DURATION_MS, DEFAULT_GROUPS_DISPLAY_LIMIT, SEARCH_DEBOUNCE_MS } from "../../../shared/constants.ts";
 import { CopyButton } from "../CopyButton.tsx";
+import { normalizeErrorMessage } from "../../../shared/normalizeErrorMessage.ts";
+import { matchesStatusFilter } from "./matchesStatusFilter.ts";
+import type { StatusFilter } from "./matchesStatusFilter.ts";
+
+const AGE_THRESHOLD_OPTIONS = [
+  { label: "Any age", value: null },
+  { label: "> 5m", value: 5 * 60 * 1000 },
+  { label: "> 30m", value: 30 * 60 * 1000 },
+  { label: "> 1h", value: 60 * 60 * 1000 },
+  { label: "> 6h", value: 6 * 60 * 60 * 1000 },
+  { label: "> 24h", value: 24 * 60 * 60 * 1000 },
+] as const;
 
 const flashIncrease = keyframes`
   0% { background-color: rgba(0, 240, 255, 0.15); }
@@ -627,12 +639,15 @@ interface GroupsTableProps {
   sortDir: SortDir;
   cycleSort: (col: SortColumn) => void;
   pipelineFilter?: string | null;
+  errorFilter?: string | null;
   onStartUnblockSession?: (config: UnblockSessionConfig) => void;
 }
 
-export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cycleSort, pipelineFilter, onStartUnblockSession }: GroupsTableProps) {
+
+export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cycleSort, pipelineFilter, errorFilter, onStartUnblockSession }: GroupsTableProps) {
   const [search, setSearch] = useState("");
-  const [showBlockedOnly, setShowBlockedOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [ageThresholdMs, setAgeThresholdMs] = useState<number | null>(null);
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
 
   const filteredQueues = queues.map((queue) => ({
@@ -644,13 +659,16 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
           g.groupId.toLowerCase().includes(term) ||
           (g.pipelineName ?? "").toLowerCase().includes(term) ||
           (g.errorMessage ?? "").toLowerCase().includes(term);
-        // Pipeline filter matches any of: pipelineName, jobType, or jobName
         const matchesPipeline = !pipelineFilter ||
           (g.pipelineName ?? "") === pipelineFilter ||
           (g.jobType ?? "") === pipelineFilter ||
           (g.jobName ?? "") === pipelineFilter;
-        const matchesBlocked = !showBlockedOnly || g.isBlocked;
-        return matchesSearch && matchesPipeline && matchesBlocked;
+        const matchesStatus = matchesStatusFilter(g, statusFilter);
+        const matchesError = !errorFilter ||
+          (g.errorMessage ? normalizeErrorMessage(g.errorMessage) === errorFilter : false);
+        const matchesAge = ageThresholdMs === null ||
+          (Date.now() - (g.oldestJobMs ?? Date.now()) > ageThresholdMs);
+        return matchesSearch && matchesPipeline && matchesStatus && matchesError && matchesAge;
       },
     ),
   })).filter((q) => q.groups.length > 0);
@@ -689,7 +707,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
       onMouseEnter={onPause}
       onMouseLeave={onResume}
     >
-      <HStack mb={4}>
+      <HStack mb={4} flexWrap="wrap" spacing={2}>
         <Input
           placeholder="SEARCH BY GROUP ID, TENANT, AGGREGATE, PIPELINE..."
           size="sm"
@@ -706,25 +724,70 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
           onBlur={onResume}
           maxW="400px"
         />
-        <Button
+        <HStack spacing={1}>
+          {([
+            { key: "all", label: "All", color: "#00f0ff" },
+            { key: "ok", label: "OK", color: "#00ff41" },
+            { key: "blocked", label: "Blocked", color: "#ff0033" },
+            { key: "stale", label: "Stale", color: "#ffaa00" },
+            { key: "active", label: "Active", color: "#00f0ff" },
+          ] as const).map(({ key, label, color }) => {
+            const isActive = statusFilter === key;
+            return (
+              <Button
+                key={key}
+                aria-pressed={isActive}
+                size="sm"
+                variant={isActive ? "solid" : "outline"}
+                color={isActive ? "#0a0e17" : color}
+                bg={isActive ? color : "transparent"}
+                borderColor={`${color}4d`}
+                borderRadius="2px"
+                _hover={{
+                  borderColor: color,
+                  boxShadow: `0 0 8px ${color}4d`,
+                  bg: isActive ? color : `${color}1a`,
+                }}
+                onClick={() => setStatusFilter(key)}
+                textTransform="uppercase"
+                letterSpacing="0.05em"
+                fontSize="xs"
+                px={3}
+                minW="auto"
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </HStack>
+        <Select
+          aria-label="Filter groups by oldest job age"
           size="sm"
-          variant={showBlockedOnly ? "solid" : "outline"}
-          color={showBlockedOnly ? "#0a0e17" : "#ff0033"}
-          bg={showBlockedOnly ? "#ff0033" : "transparent"}
-          borderColor="rgba(255, 0, 51, 0.3)"
+          bg="#060a12"
+          border="1px solid"
+          borderColor="rgba(0, 240, 255, 0.25)"
+          color="#b0c4d8"
           borderRadius="2px"
-          _hover={{
-            borderColor: "#ff0033",
-            boxShadow: "0 0 8px rgba(255, 0, 51, 0.3)",
-            bg: showBlockedOnly ? "#ff3366" : "rgba(255, 0, 51, 0.1)",
-          }}
-          onClick={() => setShowBlockedOnly(!showBlockedOnly)}
+          fontSize="xs"
           textTransform="uppercase"
           letterSpacing="0.05em"
-          fontSize="xs"
+          w="auto"
+          minW="100px"
+          sx={{
+            option: { bg: "#0a0e17", color: "#b0c4d8" },
+          }}
+          _focus={{ borderColor: "#00f0ff", boxShadow: "0 0 8px rgba(0, 240, 255, 0.2)" }}
+          value={ageThresholdMs === null ? "" : String(ageThresholdMs)}
+          onChange={(e) => {
+            setAgeThresholdMs(e.target.value === "" ? null : Number(e.target.value));
+          }}
         >
-          Blocked Only
-        </Button>
+          {AGE_THRESHOLD_OPTIONS.map((opt) => (
+            <option key={opt.label} value={opt.value === null ? "" : String(opt.value)}>
+              {opt.label}
+            </option>
+          ))}
+        </Select>
       </HStack>
 
       {sortedQueues.map((queue) => (
