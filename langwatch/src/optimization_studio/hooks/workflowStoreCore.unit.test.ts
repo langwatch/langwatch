@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import { createStore, type StoreApi } from "zustand";
+import type { Workflow } from "../types/dsl";
 import {
   removeInvalidEdges,
   store as storeCreator,
@@ -521,6 +522,136 @@ describe("workflowStoreCore", () => {
         testStore.getState().setIsDraggingNode(true);
         testStore.getState().setIsDraggingNode(false);
         expect(testStore.getState().isDraggingNode).toBe(false);
+      });
+    });
+  });
+
+  describe("hasPendingChanges", () => {
+    let testStore: StoreApi<WorkflowStore>;
+
+    beforeEach(() => {
+      testStore = createStore<WorkflowStore>(storeCreator as any);
+    });
+
+    describe("when workflow is loaded from DB and autosave baseline is set from normalized state", () => {
+      it("reports no pending changes", () => {
+        const dbDsl = {
+          spec_version: "1.4" as const,
+          name: "My Workflow",
+          icon: "🧩",
+          description: "A test workflow",
+          version: "1.0",
+          nodes: [
+            makeNode({
+              id: "node1",
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+            }),
+          ],
+          edges: [],
+          default_llm: {
+            model: "openai/gpt-5-mini",
+            max_tokens: 2048,
+            temperature: 0,
+            litellm_params: {},
+          },
+          template_adapter: "default",
+          enable_tracing: true,
+          workflow_type: "workflow" as const,
+          state: {},
+        };
+
+        // Simulate the DB load sequence from [workflow].tsx
+        testStore.getState().setAutosavedWorkflow(undefined);
+        testStore.getState().setWorkflow({
+          ...dbDsl,
+          workflow_id: "wf_123",
+          nodes: dbDsl.nodes.map((node: any) => ({
+            ...node,
+            selected: false,
+          })),
+        } as Partial<Workflow>);
+        testStore.getState().setLastCommittedWorkflow(dbDsl as any);
+
+        // Simulate the fix: set autosave baseline from normalized store state
+        const loadedWorkflow = testStore.getState().getWorkflow();
+        testStore.getState().setAutosavedWorkflow(loadedWorkflow);
+
+        expect(testStore.getState().hasPendingChanges()).toBe(false);
+      });
+    });
+
+    describe("when workflow is loaded from DB without setting autosave baseline", () => {
+      it("reports no pending changes because autosavedWorkflow is undefined", () => {
+        const dbDsl = {
+          spec_version: "1.4" as const,
+          name: "My Workflow",
+          icon: "🧩",
+          description: "",
+          version: "1.0",
+          nodes: [makeNode({ id: "node1" })],
+          edges: [],
+          default_llm: {
+            model: "openai/gpt-5-mini",
+            max_tokens: 2048,
+            temperature: 0,
+            litellm_params: {},
+          },
+          template_adapter: "default",
+          enable_tracing: true,
+          workflow_type: "workflow" as const,
+          state: {},
+        };
+
+        // Without the fix: autosavedWorkflow stays undefined
+        testStore.getState().setAutosavedWorkflow(undefined);
+        testStore.getState().setWorkflow({
+          ...dbDsl,
+          workflow_id: "wf_123",
+        } as Partial<Workflow>);
+        testStore.getState().setLastCommittedWorkflow(dbDsl as any);
+
+        // hasPendingChanges returns false when autosavedWorkflow is undefined
+        expect(testStore.getState().hasPendingChanges()).toBe(false);
+      });
+    });
+
+    describe("when autosave baseline is set and user makes a change", () => {
+      it("reports pending changes", () => {
+        const dbDsl = {
+          spec_version: "1.4" as const,
+          name: "My Workflow",
+          icon: "🧩",
+          description: "",
+          version: "1.0",
+          nodes: [makeNode({ id: "node1" })],
+          edges: [],
+          default_llm: {
+            model: "openai/gpt-5-mini",
+            max_tokens: 2048,
+            temperature: 0,
+            litellm_params: {},
+          },
+          template_adapter: "default",
+          enable_tracing: true,
+          workflow_type: "workflow" as const,
+          state: {},
+        };
+
+        // Load from DB with fix applied
+        testStore.getState().setAutosavedWorkflow(undefined);
+        testStore.getState().setWorkflow({
+          ...dbDsl,
+          workflow_id: "wf_123",
+        } as Partial<Workflow>);
+        testStore.getState().setLastCommittedWorkflow(dbDsl as any);
+        const loadedWorkflow = testStore.getState().getWorkflow();
+        testStore.getState().setAutosavedWorkflow(loadedWorkflow);
+
+        // User changes the name
+        testStore.getState().setWorkflow({ name: "Renamed Workflow" });
+
+        expect(testStore.getState().hasPendingChanges()).toBe(true);
       });
     });
   });
