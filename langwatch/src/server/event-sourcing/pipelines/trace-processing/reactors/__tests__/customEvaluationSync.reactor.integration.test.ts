@@ -141,6 +141,7 @@ describe.skipIf(!hasTestcontainers)(
         eventStore,
         clickhouse: async () => clickHouseClient,
         redis: redisConnection,
+        processRole: "worker",
       });
 
       // --- Evaluation pipeline ---

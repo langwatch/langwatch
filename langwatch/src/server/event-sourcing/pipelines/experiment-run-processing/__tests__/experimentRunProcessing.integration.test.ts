@@ -76,6 +76,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   const repository = new ExperimentRunStateRepositoryClickHouse(async () => clickHouseClient);
@@ -102,6 +103,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     ready: () => pipeline.service.waitUntilReady(),
   } as any;
@@ -221,7 +223,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      await pipeline.service.close();
+      await pipeline.eventSourcing.close();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await cleanupTestDataForTenant(tenantIdString);
     });
