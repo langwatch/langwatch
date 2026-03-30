@@ -10,6 +10,7 @@ import {
   matchingLLMModelCost,
   tokenizeAndEstimateCost,
 } from "./cost";
+import { matchModelCostWithFallbacks } from "~/server/app-layer/traces/span-cost-enrichment.service";
 
 const logger = createLogger("langwatch:workers:collector:metrics");
 
@@ -142,7 +143,7 @@ export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
     if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
       const llmModelCost =
-        llmSpan.model && matchingLLMModelCost(llmSpan.model, llmModelCosts);
+        llmSpan.model && matchModelCostWithFallbacks(llmSpan.model, llmModelCosts, matchingLLMModelCost);
 
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};

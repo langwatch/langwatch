@@ -145,6 +145,11 @@ const safeRegexTest = (pattern: string, input: string): boolean => {
   return re !== null && re.test(input);
 };
 
+/**
+ * Low-level model cost matcher — does NOT strip date suffixes or provider subtypes.
+ * Use matchModelCostWithFallbacks() instead for production code.
+ * @internal Exported only for dependency injection in span-cost-enrichment.service.ts
+ */
 export const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],

@@ -8,6 +8,7 @@ import {
   estimateCost,
   matchingLLMModelCost,
 } from "../../../server/background/workers/collector/cost";
+import { matchModelCostWithFallbacks } from "../../../server/app-layer/traces/span-cost-enrichment.service";
 import { prisma } from "../../../server/db";
 import type {
   DSPyLLMCall,
@@ -249,7 +250,7 @@ const extractLLMCallInfo =
     ) {
       const model = call.response?.model;
       const llmModelCost =
-        model && matchingLLMModelCost(call.response.model, llmModelCosts);
+        model && matchModelCostWithFallbacks(call.response.model, llmModelCosts, matchingLLMModelCost);
       const promptTokens = call.response?.usage?.prompt_tokens;
       const completionTokens = call.response?.usage?.completion_tokens;
 
