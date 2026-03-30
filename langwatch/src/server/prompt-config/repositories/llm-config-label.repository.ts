@@ -122,6 +122,21 @@ export class PromptVersionLabelRepository {
   }
 
   /**
+   * Get all labels for a prompt config.
+   */
+  async getLabelsForConfig({
+    configId,
+    projectId,
+  }: {
+    configId: string;
+    projectId: string;
+  }): Promise<PromptVersionLabel[]> {
+    return this.prisma.promptVersionLabel.findMany({
+      where: { configId, projectId },
+    });
+  }
+
+  /**
    * Get a label by config ID and label name.
    */
   async getByConfigAndLabel({

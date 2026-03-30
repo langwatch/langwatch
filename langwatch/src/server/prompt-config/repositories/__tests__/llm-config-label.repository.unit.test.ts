@@ -10,6 +10,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
     promptVersionLabel: {
       upsert: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     llmPromptConfigVersion: {
       findFirst: vi.fn(),
@@ -164,6 +165,62 @@ describe("PromptVersionLabelRepository", () => {
             updatedById: "user-1",
           },
         });
+      });
+    });
+  });
+
+  describe("getLabelsForConfig()", () => {
+    describe("when no labels are assigned", () => {
+      it("returns an empty list", async () => {
+        const prisma = makeMockPrisma();
+        (
+          prisma.promptVersionLabel.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue([]);
+        const repo = new PromptVersionLabelRepository(prisma);
+
+        const result = await repo.getLabelsForConfig({
+          configId: "config-1",
+          projectId: "project-1",
+        });
+
+        expect(result).toEqual([]);
+        expect(prisma.promptVersionLabel.findMany).toHaveBeenCalledWith({
+          where: { configId: "config-1", projectId: "project-1" },
+        });
+      });
+    });
+
+    describe("when labels are assigned", () => {
+      it("returns all labels for the config", async () => {
+        const prisma = makeMockPrisma();
+        const mockLabels = [
+          {
+            id: "label_1",
+            configId: "config-1",
+            versionId: "v2",
+            label: "production",
+            projectId: "project-1",
+          },
+          {
+            id: "label_2",
+            configId: "config-1",
+            versionId: "v3",
+            label: "staging",
+            projectId: "project-1",
+          },
+        ];
+        (
+          prisma.promptVersionLabel.findMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(mockLabels);
+        const repo = new PromptVersionLabelRepository(prisma);
+
+        const result = await repo.getLabelsForConfig({
+          configId: "config-1",
+          projectId: "project-1",
+        });
+
+        expect(result).toEqual(mockLabels);
+        expect(result).toHaveLength(2);
       });
     });
   });

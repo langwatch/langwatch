@@ -867,7 +867,21 @@ export const promptsRouter = createTRPCRouter({
       };
     }),
 
-  // --- Label Assignment ---
+  // --- Label Operations ---
+
+  /**
+   * Get all labels for a prompt config.
+   */
+  getLabelsForConfig: protectedProcedure
+    .input(z.object({ projectId: z.string(), configId: z.string() }))
+    .use(checkProjectPermission("prompts:view"))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return service.getLabelsForConfig({
+        configId: input.configId,
+        projectId: input.projectId,
+      });
+    }),
 
   /**
    * Assign (or reassign) a label to a specific prompt version.
