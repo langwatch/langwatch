@@ -44,20 +44,35 @@ const filterValueSchema: z.ZodType<
   ]),
 );
 
+export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
+export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
+
 // Schema for validating trigger filter JSON structure — rejects unknown fields
 export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
 
-// Lenient variant that strips unknown fields instead of rejecting them.
-// Used on the update path so existing triggers with legacy fields (e.g.
-// service.name) can still be edited — the unknown keys are silently removed.
 const validFilterFields = new Set<string>(filterFieldsEnum.options);
-export const triggerFiltersSchemaLenient = z
-  .record(z.string(), filterValueSchema)
-  .transform((filters) =>
-    Object.fromEntries(
-      Object.entries(filters).filter(([key]) => validFilterFields.has(key)),
-    ),
-  );
+export const triggerFiltersRawSchema = z.record(z.string(), filterValueSchema);
+
+export const isTriggerFilterField = (field: string): field is FilterField =>
+  validFilterFields.has(field);
+
+export const sanitizeTriggerFilters = (
+  filters: Record<string, TriggerFilterValue>,
+) => {
+  const sanitizedFilters: TriggerFilters = {};
+  const unknownFields: string[] = [];
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (isTriggerFilterField(key)) {
+      sanitizedFilters[key] = value;
+      continue;
+    }
+
+    unknownFields.push(key);
+  }
+
+  return { sanitizedFilters, unknownFields };
+};
 
 export type FilterDefinition = {
   name: string;

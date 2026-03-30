@@ -4,8 +4,9 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import {
+  sanitizeTriggerFilters,
   triggerFiltersSchema,
-  triggerFiltersSchemaLenient,
+  triggerFiltersRawSchema,
 } from "../../filters/types";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -244,15 +245,31 @@ export const automationRouter = createTRPCRouter({
       z.object({
         triggerId: z.string(),
         projectId: z.string(),
-        filters: triggerFiltersSchemaLenient,
+        filters: triggerFiltersRawSchema,
       }),
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
+      const { sanitizedFilters, unknownFields } = sanitizeTriggerFilters(
+        input.filters,
+      );
+
+      if (
+        unknownFields.length > 0 &&
+        Object.keys(sanitizedFilters).length === 0 &&
+        Object.keys(input.filters).length > 0
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
+        });
+      }
+
       return ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
         data: {
-          filters: JSON.stringify(input.filters),
+          filters: JSON.stringify(sanitizedFilters),
         },
       });
     }),
