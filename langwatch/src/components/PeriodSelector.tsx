@@ -65,8 +65,6 @@ export const usePeriodSelector = (defaultNDays = 30) => {
     [router.query.endDate, thisHour],
   );
 
-  const daysDifference = getDaysDifference(startDate, endDate);
-
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
       const validEndDate =
@@ -79,7 +77,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
           ? startDate
           : new Date();
 
-      // Prevent inverted date ranges — swap if start is after end
+      // Prevent inverted date ranges — clamp start to end if inverted
       if (validStartDate > validEndDate) {
         validStartDate = validEndDate;
       }
@@ -101,6 +99,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
 
   // Guard against inverted date ranges from query params
   const safeStartDate = startDate > endDate ? endDate : startDate;
+  const daysDifference = getDaysDifference(safeStartDate, endDate);
 
   return {
     period: { startDate: safeStartDate, endDate },

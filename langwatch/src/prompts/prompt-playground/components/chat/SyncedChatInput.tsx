@@ -154,7 +154,7 @@ export function SyncedChatInput({
           padding={2}
           position="relative"
         >
-          {/* Bottom left - Sync checkbox (shows on hover, only if multiple tabs) */}
+          {/* Bottom left - Sync checkbox (shows on hover, only if multiple windows/splits) */}
           {windowCount > 1 && (
             <ChatSyncCheckbox
               position="absolute"
