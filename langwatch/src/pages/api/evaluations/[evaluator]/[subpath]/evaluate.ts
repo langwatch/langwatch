@@ -400,7 +400,7 @@ export async function handleEvaluatorCall(
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
-      details: error instanceof Error ? error.message : "Internal error",
+      details: error instanceof Error ? error.message : typeof error === "string" ? error : "Internal error",
       traceback: [],
     };
   } finally {

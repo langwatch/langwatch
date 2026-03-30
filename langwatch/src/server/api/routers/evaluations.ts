@@ -66,14 +66,28 @@ export const evaluationsRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const result = await runEvaluationForTrace({
-        projectId: input.projectId,
-        traceId: input.traceId,
-        evaluatorType: input.evaluatorType as EvaluatorTypes,
-        settings: input.settings,
-        mappings: input.mappings ?? {},
-        protections,
-      });
+      let result;
+      try {
+        result = await runEvaluationForTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          evaluatorType: input.evaluatorType as EvaluatorTypes,
+          settings: input.settings,
+          mappings: input.mappings ?? {},
+          protections,
+        });
+      } catch (error) {
+        logger.error(
+          { err: error, projectId: input.projectId },
+          "error running evaluation from tRPC",
+        );
+        return {
+          status: "error" as const,
+          error_type: "INTERNAL_ERROR",
+          details: error instanceof Error ? error.message : typeof error === "string" ? error : "Internal error",
+          traceback: [],
+        };
+      }
 
       // Dispatch to evaluation processing pipeline when flag is ON
       if (result) {

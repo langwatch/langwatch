@@ -82,7 +82,7 @@ export async function runEvaluationJob(
     include: { evaluator: true },
   });
   if (!check) {
-    throw `check config ${job.data.check.evaluator_id} not found`;
+    throw new Error(`check config ${job.data.check.evaluator_id} not found`);
   }
 
   const protections = await getProtectionsForProject(prisma, {
@@ -435,7 +435,7 @@ export const runEvaluationForTrace = async ({
     includeSpans: true,
   });
   if (!trace) {
-    throw "trace not found";
+    throw new Error("trace not found");
   }
 
   if (trace.error && !trace.input && !trace.output) {
@@ -531,7 +531,7 @@ export const runEvaluation = async ({
     const provider = model.split("/")[0]!;
     const modelProvider = modelProviders[provider];
     if (!modelProvider) {
-      throw `Provider ${provider} is not configured`;
+      throw new Error(`Provider ${provider} is not configured`);
     }
     if (!modelProvider.enabled) {
       throw new UserConfigError(`Provider ${provider} is not enabled`);
@@ -674,14 +674,14 @@ export const runEvaluation = async ({
       } catch {
         /* this is just a safe json parse fallback */
       }
-      throw `${response.status} ${statusText}`;
+      throw new Error(`${response.status} ${statusText}`);
     }
   }
 
   const raw = ((await response.json()) as BatchEvaluationResult)[0];
   if (!raw) {
     getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
-    throw "Unexpected response: empty results";
+    throw new Error("Unexpected response: empty results");
   }
 
   const result: typeof raw = {
