@@ -48,6 +48,8 @@ export type State = Workflow & {
   playgroundOpen: boolean;
   /** True while the user is dragging a node. Used to suppress drawer opening during drag. */
   isDraggingNode: boolean;
+  /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
+  clickedNodeId: string | null;
 };
 
 export type WorkflowStore = State & {
@@ -124,6 +126,7 @@ export type WorkflowStore = State & {
   ) => void;
   setPlaygroundOpen: (open: boolean) => void;
   setIsDraggingNode: (dragging: boolean) => void;
+  setClickedNodeId: (id: string | null) => void;
   stopWorkflowIfRunning: (message: string | undefined) => void;
   checkIfUnreachableErrorMessage: (message: string | undefined) => void;
 };
@@ -165,6 +168,7 @@ export const initialState: State = {
   openResultsPanelRequest: undefined,
   playgroundOpen: false,
   isDraggingNode: false,
+  clickedNodeId: null,
 };
 
 export const getWorkflow = (state: State) => {
@@ -496,8 +500,12 @@ export const store = (
       );
 
     }
+    const hasDeselection = changes.some(
+      (c) => c.type === "select" && !c.selected,
+    );
     set({
       nodes: applyNodeChanges(changes, get().nodes),
+      ...(hasDeselection ? { clickedNodeId: null } : {}),
     });
   },
   onNodesDelete: () => {
@@ -925,12 +933,14 @@ export const store = (
             ? { ...node, selected: false }
             : node,
       ),
+      clickedNodeId: nodeId,
     });
   },
   deselectAllNodes: () => {
     set({
       nodes: get().nodes.map((node) => ({ ...node, selected: false })),
       workflowSelected: false,
+      clickedNodeId: null,
     });
   },
   setPropertiesExpanded: (expanded: boolean) => {
@@ -952,7 +962,13 @@ export const store = (
     set({ playgroundOpen: open });
   },
   setIsDraggingNode: (dragging: boolean) => {
-    set({ isDraggingNode: dragging });
+    set({
+      isDraggingNode: dragging,
+      ...(dragging ? { clickedNodeId: null } : {}),
+    });
+  },
+  setClickedNodeId: (id: string | null) => {
+    set({ clickedNodeId: id });
   },
   stopWorkflowIfRunning: (message: string | undefined) => {
     get().setWorkflowExecutionState({
