@@ -336,19 +336,20 @@ async function fetchTracesFromClickHouse(
   const result = await clickhouse.query({
     query: `
       SELECT
-        TraceId,
-        ComputedInput,
-        TopicId,
-        SubTopicId,
-        toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
-      FROM (
-        SELECT TraceId, ComputedInput, TopicId, SubTopicId, OccurredAt, UpdatedAt
-        FROM trace_summaries
-        WHERE ${whereClause}
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
-      )
-      ORDER BY OccurredAt DESC, TraceId ASC
+        t.TraceId AS TraceId,
+        t.ComputedInput AS ComputedInput,
+        t.TopicId AS TopicId,
+        t.SubTopicId AS SubTopicId,
+        toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
+      FROM trace_summaries t
+      WHERE ${whereClause}
+        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries
+          WHERE ${whereClause}
+          GROUP BY TenantId, TraceId
+        )
+      ORDER BY t.OccurredAt DESC, t.TraceId ASC
       LIMIT 2000
     `,
     query_params: {

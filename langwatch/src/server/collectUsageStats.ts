@@ -190,14 +190,15 @@ async function getChScenariosCount(
   const result = await clickhouse.query({
     query: `
       SELECT toString(count()) AS Total
-      FROM (
-        SELECT *
-        FROM simulation_runs
-        WHERE TenantId IN ({projectIds:Array(String)})
-        ORDER BY ScenarioRunId, UpdatedAt DESC
-        LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-      )
-      WHERE ArchivedAt IS NULL
+      FROM simulation_runs AS t
+      WHERE t.TenantId IN ({projectIds:Array(String)})
+        AND t.ArchivedAt IS NULL
+        AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+          SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+          FROM simulation_runs
+          WHERE TenantId IN ({projectIds:Array(String)})
+          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+        )
     `,
     query_params: { projectIds },
     format: "JSONEachRow",

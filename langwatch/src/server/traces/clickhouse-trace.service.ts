@@ -1416,21 +1416,29 @@ export class ClickHouseTraceService {
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
                 AND ts.TraceId IN (
-                  SELECT ts.TraceId
-                  FROM trace_summaries ts
-                  WHERE ts.TenantId = {tenantId:String}
-                    AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                    AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                    ${extraFilters}
-                    ${traceIdFilter}
-                    ${searchFilter}
-                    ${cursorCondition}
-                  ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
-                  LIMIT 1 BY ts.TraceId
+                  SELECT s.TraceId
+                  FROM (
+                    SELECT ts.TraceId AS TraceId, max(ts.OccurredAt) AS _oa
+                    FROM trace_summaries ts
+                    WHERE ts.TenantId = {tenantId:String}
+                      AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                      AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                      ${extraFilters}
+                      ${traceIdFilter}
+                      ${searchFilter}
+                      ${cursorCondition}
+                    GROUP BY ts.TraceId
+                  ) s
+                  ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
                   LIMIT {pageSize:UInt32}
                 )
-              ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
-              LIMIT 1 BY ts.TraceId
+                AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                  GROUP BY TenantId, TraceId
+                )
+              ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
             `,
             query_params: {
               ...sharedParams,
@@ -1624,11 +1632,17 @@ export class ClickHouseTraceService {
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND TraceId IN ({traceIds:Array(String)})
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
+        FROM trace_summaries AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId IN ({traceIds:Array(String)})
+          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TenantId, TraceId
+          )
+        ORDER BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
@@ -1660,16 +1674,18 @@ export class ClickHouseTraceService {
           \`Links.TraceId\` AS Links_TraceId,
           \`Links.SpanId\` AS Links_SpanId,
           \`Links.Attributes\` AS Links_Attributes
-        FROM (
-          SELECT *
-          FROM stored_spans
-          WHERE TenantId = {tenantId:String}
-            AND TraceId IN ({traceIds:Array(String)})
-          ORDER BY SpanId, StartTime DESC
-          LIMIT 1 BY TenantId, TraceId, SpanId
-        )
-        ORDER BY TraceId, StartTime ASC
-        LIMIT 200 BY TraceId
+        FROM stored_spans AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId IN ({traceIds:Array(String)})
+          AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
+            SELECT TenantId, TraceId, SpanId, max(StartTime)
+            FROM stored_spans
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TenantId, TraceId, SpanId
+          )
+        ORDER BY t.TraceId, t.StartTime ASC
+        LIMIT 200 BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
