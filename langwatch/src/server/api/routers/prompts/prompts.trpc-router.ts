@@ -16,6 +16,7 @@ import { PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import {
   LabelValidationError,
+  VALID_LABELS,
 } from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -878,7 +879,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
         configId: z.string(),
         versionId: z.string(),
-        label: z.string(),
+        label: z.enum(VALID_LABELS),
       }),
     )
     .use(checkProjectPermission("prompts:update"))
