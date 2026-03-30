@@ -487,21 +487,21 @@ describe("ClickHouseTraceService", () => {
       });
     });
 
-    describe("when query is provided", () => {
-      const setupMocksForQueryTest = () => {
-        const summaryRow = makeSummaryRow("trace-1");
-        mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([{ total: "1" }]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([summaryRow]),
-          })
-          .mockResolvedValueOnce({
-            json: () => Promise.resolve([]),
-          });
-      };
+    const setupMocksForQueryTest = () => {
+      const summaryRow = makeSummaryRow("trace-1");
+      mockClickHouseQuery
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([{ total: "1" }]),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([summaryRow]),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([]),
+        });
+    };
 
+    describe("when query is provided", () => {
       it("includes LIKE clause in count query", async () => {
         setupMocksForQueryTest();
 
@@ -576,6 +576,70 @@ describe("ClickHouseTraceService", () => {
         expect(countCall[0].query_params.searchQuery).toBe(
           "%100\\% success\\_rate%",
         );
+      });
+    });
+
+    describe("when user cannot see input or output", () => {
+      it("returns empty results when searching without I/O access", async () => {
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
+          {
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: false,
+          },
+        );
+
+        expect(result!.groups).toEqual([]);
+        expect(result!.totalHits).toBe(0);
+        expect(mockClickHouseQuery).not.toHaveBeenCalled();
+      });
+
+      it("searches only output when input is hidden", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
+          {
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+          },
+        );
+
+        const countCall = mockClickHouseQuery.mock.calls[0]!;
+        expect(countCall[0].query).toContain(
+          "lower(ifNull(ts.ComputedOutput, '')) LIKE",
+        );
+        expect(countCall[0].query).not.toContain("ComputedInput");
+      });
+
+      it("searches only input when output is hidden", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
+          {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: false,
+          },
+        );
+
+        const countCall = mockClickHouseQuery.mock.calls[0]!;
+        expect(countCall[0].query).toContain(
+          "lower(ifNull(ts.ComputedInput, '')) LIKE",
+        );
+        expect(countCall[0].query).not.toContain("ComputedOutput");
       });
     });
 

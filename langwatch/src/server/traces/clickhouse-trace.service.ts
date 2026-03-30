@@ -1319,8 +1319,27 @@ export class ClickHouseTraceService {
 
         // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
         const effectiveQuery = query && query.length >= 3 ? query : undefined;
+
+        // If the user can't see input/output, searching their content is not allowed
+        if (
+          effectiveQuery &&
+          protections.canSeeCapturedInput === false &&
+          protections.canSeeCapturedOutput === false
+        ) {
+          return { traces: [], totalHits: 0, lastTrace: null };
+        }
+
+        const searchableColumns = [
+          ...(protections.canSeeCapturedInput !== false
+            ? ["lower(ifNull(ts.ComputedInput, ''))"]
+            : []),
+          ...(protections.canSeeCapturedOutput !== false
+            ? ["lower(ifNull(ts.ComputedOutput, ''))"]
+            : []),
+        ];
+
         const searchFilter = effectiveQuery
-          ? " AND (lower(ifNull(ts.ComputedInput, '')) LIKE {searchQuery:String} OR lower(ifNull(ts.ComputedOutput, '')) LIKE {searchQuery:String})"
+          ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
           : "";
 
         // Keyset cursor condition — only for the data query
