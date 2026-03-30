@@ -10,6 +10,7 @@ from langwatch.prompts.prompt_facade import PromptsFacade
 from langwatch.prompts.types import FetchPolicy
 
 
+@pytest.mark.unit
 class TestGetLabelValidation:
     """Unit tests for label validation in get()."""
 

@@ -4,15 +4,12 @@ Integration tests for prompt label support.
 Tests API interaction patterns with mocked HTTP layer.
 """
 import os
-import time
 from pathlib import Path
-from unittest.mock import patch, Mock, call
+from unittest.mock import patch, Mock
 
-import httpx
 import pytest
 
-import langwatch
-from langwatch import FetchPolicy
+from langwatch import prompts, FetchPolicy
 from langwatch.prompts.prompt_facade import PromptsFacade
 from langwatch.prompts.types import PromptData, Message
 
@@ -43,6 +40,7 @@ def _api_response(version: int, version_id: str = "version_123"):
     return mock_response
 
 
+@pytest.mark.integration
 class TestFetchByLabel:
     """Integration tests for fetching prompts by label."""
 
@@ -57,7 +55,7 @@ class TestFetchByLabel:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = _api_response(3)
 
-                    result = langwatch.prompts.get("pizza-prompt", label="production")
+                    result = prompts.get("pizza-prompt", label="production")
 
                     assert result.version == 3
 
@@ -80,7 +78,7 @@ class TestFetchByLabel:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = _api_response(4)
 
-                    result = langwatch.prompts.get("pizza-prompt")
+                    result = prompts.get("pizza-prompt")
 
                     assert result.version == 4
 
@@ -93,6 +91,7 @@ class TestFetchByLabel:
                 os.chdir(original_cwd)
 
 
+@pytest.mark.integration
 class TestCacheIsolation:
     """Integration tests for cache key isolation with labels."""
 
@@ -177,6 +176,7 @@ class TestCacheIsolation:
             assert result2.version == 2
 
 
+@pytest.mark.integration
 class TestLabelWithMaterializedFirst:
     """Integration tests for label + MATERIALIZED_FIRST policy."""
 
@@ -191,7 +191,7 @@ class TestLabelWithMaterializedFirst:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = _api_response(3)
 
-                    result = langwatch.prompts.get(
+                    result = prompts.get(
                         "my-prompt",
                         label="production",
                         fetch_policy=FetchPolicy.MATERIALIZED_FIRST,
@@ -205,6 +205,7 @@ class TestLabelWithMaterializedFirst:
                 os.chdir(original_cwd)
 
 
+@pytest.mark.integration
 class TestErrorPropagation:
     """Integration tests for API error propagation with labels."""
 
@@ -224,12 +225,13 @@ class TestErrorPropagation:
                     mock_request.return_value = mock_response
 
                     with pytest.raises(ValueError, match="not found"):
-                        langwatch.prompts.get("pizza-prompt", label="production")
+                        prompts.get("pizza-prompt", label="production")
 
             finally:
                 os.chdir(original_cwd)
 
 
+@pytest.mark.integration
 class TestLabelAssignment:
     """Integration tests for label assignment."""
 
@@ -253,7 +255,7 @@ class TestLabelAssignment:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = mock_response
 
-                    result = langwatch.prompts.labels.assign(
+                    result = prompts.labels.assign(
                         "pizza-prompt",
                         label="production",
                         version_id="prompt_version_abc123",
@@ -275,6 +277,7 @@ class TestLabelAssignment:
                 os.chdir(original_cwd)
 
 
+@pytest.mark.integration
 class TestCreateWithLabels:
     """Integration tests for creating prompts with labels."""
 
@@ -309,7 +312,7 @@ class TestCreateWithLabels:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = mock_response
 
-                    langwatch.prompts.create(
+                    prompts.create(
                         handle="new-prompt",
                         prompt="Hello!",
                         labels=["production"],
@@ -323,6 +326,7 @@ class TestCreateWithLabels:
                 os.chdir(original_cwd)
 
 
+@pytest.mark.integration
 class TestUpdateWithLabels:
     """Integration tests for updating prompts with labels."""
 
@@ -357,7 +361,7 @@ class TestUpdateWithLabels:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = mock_response
 
-                    langwatch.prompts.update(
+                    prompts.update(
                         prompt_id_or_handle="pizza-prompt",
                         scope="PROJECT",
                         commit_message="update labels",
