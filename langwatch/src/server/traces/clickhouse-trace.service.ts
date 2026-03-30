@@ -508,18 +508,19 @@ export class ClickHouseTraceService {
 
           // Build the query with keyset pagination
           let { traces, totalHits, lastTrace } =
-            await this.fetchTracesWithPagination(
-              input.projectId,
+            await this.fetchTracesWithPagination({
+              projectId: input.projectId,
               pageSize,
               sortDirection,
               cursor,
               protections,
-              input.startDate,
-              input.endDate,
+              startDate: input.startDate,
+              endDate: input.endDate,
               filterConditions,
               filterParams,
-              input.traceIds,
-            );
+              traceIds: input.traceIds,
+              query: input.query,
+            });
 
           // When includeSpans is requested, fetch and attach actual spans
           if (options.includeSpans && traces.length > 0) {
@@ -1268,18 +1269,31 @@ export class ClickHouseTraceService {
    * Fetch traces with keyset pagination.
    * @internal
    */
-  private async fetchTracesWithPagination(
-    projectId: string,
-    pageSize: number,
-    sortDirection: "asc" | "desc",
-    cursor: ClickHouseScrollCursor | null,
-    protections: Protections,
-    startDate?: number,
-    endDate?: number,
-    filterConditions?: string[],
-    filterParams?: Record<string, unknown>,
-    traceIds?: string[],
-  ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
+  private async fetchTracesWithPagination({
+    projectId,
+    pageSize,
+    sortDirection,
+    cursor,
+    protections,
+    startDate,
+    endDate,
+    filterConditions,
+    filterParams,
+    traceIds,
+    query,
+  }: {
+    projectId: string;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    cursor: ClickHouseScrollCursor | null;
+    protections: Protections;
+    startDate?: number;
+    endDate?: number;
+    filterConditions?: string[];
+    filterParams?: Record<string, unknown>;
+    traceIds?: string[];
+    query?: string;
+  }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
       {
@@ -1303,6 +1317,31 @@ export class ClickHouseTraceService {
             ? " AND ts.TraceId IN ({traceIds:Array(String)})"
             : "";
 
+        // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
+        const effectiveQuery = query && query.length >= 3 ? query : undefined;
+
+        // If the user can't see input/output, searching their content is not allowed
+        if (
+          effectiveQuery &&
+          protections.canSeeCapturedInput === false &&
+          protections.canSeeCapturedOutput === false
+        ) {
+          return { traces: [], totalHits: 0, lastTrace: null };
+        }
+
+        const searchableColumns = [
+          ...(protections.canSeeCapturedInput !== false
+            ? ["lower(ifNull(ts.ComputedInput, ''))"]
+            : []),
+          ...(protections.canSeeCapturedOutput !== false
+            ? ["lower(ifNull(ts.ComputedOutput, ''))"]
+            : []),
+        ];
+
+        const searchFilter = effectiveQuery
+          ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
+          : "";
+
         // Keyset cursor condition — only for the data query
         let cursorCondition = "";
         if (cursor) {
@@ -1320,6 +1359,11 @@ export class ClickHouseTraceService {
           endDate: endDate ?? Date.now(),
           ...filterParams,
           ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
+          ...(effectiveQuery
+            ? {
+                searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
+              }
+            : {}),
         };
 
         // Run count + data queries in parallel.
@@ -1337,6 +1381,7 @@ export class ClickHouseTraceService {
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                 ${extraFilters}
                 ${traceIdFilter}
+                ${searchFilter}
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
@@ -1378,6 +1423,7 @@ export class ClickHouseTraceService {
                     AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                     ${extraFilters}
                     ${traceIdFilter}
+                    ${searchFilter}
                     ${cursorCondition}
                   ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
                   LIMIT 1 BY ts.TraceId
