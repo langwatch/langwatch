@@ -33,6 +33,17 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ),
 });
 
+function hasNonEmptyFilterParam(value: FilterParam): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  return Object.values(value).some((nested) =>
+    Array.isArray(nested)
+      ? nested.length > 0
+      : Object.values(nested as Record<string, string[]>).some(
+          (items) => items.length > 0,
+        ),
+  );
+}
+
 export function EditAutomationFilterDrawer({ automationId }: { automationId?: string }) {
   const { project } = useOrganizationTeamProject();
 
@@ -54,6 +65,10 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
     Partial<Record<FilterField, FilterParam>>
   >({});
 
+  // Guard against refetches overwriting unsaved user edits (TanStack Query v4
+  // fires onSuccess on every successful fetch, including background refetches)
+  const hydratedForRef = useRef<string | undefined>(undefined);
+
   api.automation.getTriggerById.useQuery(
     {
       triggerId: automationId ?? "",
@@ -62,6 +77,9 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
     {
       enabled: !!automationId && !!project?.id,
       onSuccess: (data) => {
+        const drawerKey = `${project?.id}:${automationId}`;
+        if (hydratedForRef.current === drawerKey) return;
+
         const filters = JSON.parse(data?.filters as string) as Record<
           string,
           string[] | Record<string, string[]>
@@ -82,16 +100,15 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
 
         setLocalFilters(filtersToSet);
         setCodeValue(JSON.stringify(filters, null, 2));
+        hydratedForRef.current = drawerKey;
       },
     },
   );
 
   const getNonEmptyFilters = useCallback(() => {
     return Object.fromEntries(
-      Object.entries(localFilters).filter(([_, value]) =>
-        Array.isArray(value)
-          ? value.length > 0
-          : Object.keys(value as Record<string, string[]>).length > 0,
+      Object.entries(localFilters).filter(
+        ([_, value]) => value !== undefined && hasNonEmptyFilterParam(value),
       ),
     );
   }, [localFilters]);
