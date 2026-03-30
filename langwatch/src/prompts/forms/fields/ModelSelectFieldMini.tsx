@@ -108,7 +108,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                   paddingX={3}
                   borderRadius="md"
                   border="1px solid"
-                  borderColor={hasErrors ? "red.500" : "border"}
+                  borderColor={hasErrors ? "border.error" : "border"}
                   cursor="pointer"
                   _hover={{ bg: "bg.subtle" }}
                   transition="background 0.15s"
@@ -124,7 +124,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                   <Text
                     data-testid="model-select-error-text"
                     fontSize="xs"
-                    color="red.500"
+                    color="fg.error"
                     paddingTop={1}
                   >
                     {errorMessages.join(". ")}
