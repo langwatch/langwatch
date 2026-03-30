@@ -318,13 +318,13 @@ describe("<Evaluations/>", () => {
 
       const evaluations: ElasticSearchEvaluation[] = [
         makeEvaluation({
-          evaluation_id: "shared",
+          evaluation_id: "eval_x",
           evaluator_id: undefined as unknown as string,
           name: "Ungrouped A",
           timestamps: { finished_at: 4000 },
         }),
         makeEvaluation({
-          evaluation_id: "shared",
+          evaluation_id: "eval_y",
           evaluator_id: undefined as unknown as string,
           name: "Ungrouped B",
           timestamps: { finished_at: 3000 },
