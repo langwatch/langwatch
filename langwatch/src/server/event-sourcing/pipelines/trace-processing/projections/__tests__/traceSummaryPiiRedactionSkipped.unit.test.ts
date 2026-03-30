@@ -1,55 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import type { NormalizedSpan } from "../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import {
-  applySpanToSummary,
-  TraceSummaryFoldProjection,
-  type TraceSummaryData,
-} from "../traceSummary.foldProjection";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { applySpanToSummary } from "../traceSummary.foldProjection";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 
 const PARTIAL_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
 const SKIPPED_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
-
-const traceSummaryProjection = new TraceSummaryFoldProjection({
-  store: { store: async () => {}, get: async () => null },
-});
-
-function createInitState(): TraceSummaryData {
-  return traceSummaryProjection.init();
-}
-
-function createTestSpan(
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan {
-  return {
-    id: "span-1",
-    traceId: "trace-1",
-    spanId: "span-1",
-    tenantId: "tenant-1",
-    parentSpanId: "parent-1",
-    parentTraceId: null,
-    parentIsRemote: null,
-    sampled: true,
-    startTimeUnixMs: 1000,
-    endTimeUnixMs: 2000,
-    durationMs: 1000,
-    name: "test-span",
-    kind: NormalizedSpanKind.INTERNAL,
-    resourceAttributes: {},
-    spanAttributes: {},
-    events: [],
-    links: [],
-    statusMessage: null,
-    statusCode: NormalizedStatusCode.UNSET,
-    instrumentationScope: { name: "test", version: null },
-    droppedAttributesCount: 0 as const,
-    droppedEventsCount: 0 as const,
-    droppedLinksCount: 0 as const,
-    ...overrides,
-  };
-}
 
 function getPartialSpanIds(state: TraceSummaryData): string[] {
   const raw = state.attributes[PARTIAL_KEY];

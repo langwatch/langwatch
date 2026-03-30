@@ -1,0 +1,164 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { NormalizedSpan } from "../../schemas/spans";
+import { parseJsonStringArray } from "./trace-summary.utils";
+
+/**
+ * Rules for inferring trace origin from legacy span markers.
+ * Checked in order; first match wins.
+ */
+export const LEGACY_ORIGIN_RULES: Array<{
+  check: (span: NormalizedSpan) => boolean;
+  origin: string;
+}> = [
+  {
+    check: (s) => s.instrumentationScope?.name === "langwatch-evaluation",
+    origin: "evaluation",
+  },
+  {
+    check: (s) => s.instrumentationScope?.name === "@langwatch/scenario",
+    origin: "simulation",
+  },
+  {
+    check: (s) =>
+      s.spanAttributes["metadata.platform"] === "optimization_studio",
+    origin: "workflow",
+  },
+  {
+    check: (s) => {
+      const labels = s.spanAttributes[ATTR_KEYS.LANGWATCH_LABELS];
+      const arr =
+        typeof labels === "string"
+          ? parseJsonStringArray(labels)
+          : Array.isArray(labels)
+            ? (labels as string[])
+            : [];
+      return arr.includes("scenario-runner");
+    },
+    origin: "simulation",
+  },
+  {
+    check: (s) => s.resourceAttributes["scenario.labels"] !== undefined,
+    origin: "simulation",
+  },
+  {
+    check: (s) => s.spanAttributes["evaluation.run_id"] !== undefined,
+    origin: "evaluation",
+  },
+];
+
+/**
+ * Resolves and hoists `langwatch.origin` and `langwatch.origin.source`
+ * into trace-level attributes, handling explicit values, legacy markers,
+ * and SDK-presence heuristics.
+ */
+export class TraceOriginService {
+  inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
+    for (const rule of LEGACY_ORIGIN_RULES) {
+      if (rule.check(span)) return rule.origin;
+    }
+    return undefined;
+  }
+
+  /**
+   * Strips legacy marker attributes that have been superseded by
+   * `langwatch.origin`. Mutates `mergedAttributes` in place.
+   *
+   * TODO(2027): remove once all clients are upgraded
+   */
+  stripLegacyMarkers(mergedAttributes: Record<string, string>): void {
+    if (mergedAttributes["metadata.platform"] === "optimization_studio") {
+      delete mergedAttributes["metadata.platform"];
+    }
+
+    if (mergedAttributes["langwatch.labels"]) {
+      const allLabels = parseJsonStringArray(
+        mergedAttributes["langwatch.labels"],
+      );
+      const filtered = allLabels.filter((l) => l !== "scenario-runner");
+      if (filtered.length > 0) {
+        mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
+      } else {
+        delete mergedAttributes["langwatch.labels"];
+      }
+    }
+  }
+
+  hoistOrigin({
+    state,
+    span,
+    mergedAttributes,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    mergedAttributes: Record<string, string>;
+  }): void {
+    const isRootSpan = !span.parentSpanId;
+    const explicitOrigin = span.spanAttributes["langwatch.origin"];
+    const hasExplicitOrigin =
+      typeof explicitOrigin === "string" && explicitOrigin !== "";
+
+    if (hasExplicitOrigin) {
+      if (isRootSpan) {
+        mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+      } else if (!state.attributes["langwatch.origin"]) {
+        mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+      } else {
+        mergedAttributes["langwatch.origin"] =
+          state.attributes["langwatch.origin"];
+      }
+    } else if (isRootSpan && state.attributes["langwatch.origin"]) {
+      mergedAttributes["langwatch.origin"] =
+        state.attributes["langwatch.origin"];
+    } else {
+      const inferred = this.inferOriginFromLegacyMarkers(span);
+      if (inferred) {
+        if (isRootSpan) {
+          mergedAttributes["langwatch.origin"] = inferred;
+        } else if (!state.attributes["langwatch.origin"]) {
+          mergedAttributes["langwatch.origin"] = inferred;
+        } else {
+          mergedAttributes["langwatch.origin"] =
+            state.attributes["langwatch.origin"];
+        }
+      } else if (state.attributes["langwatch.origin"]) {
+        mergedAttributes["langwatch.origin"] =
+          state.attributes["langwatch.origin"];
+      } else if (mergedAttributes["sdk.name"]) {
+        // SDK heuristic: sdk.name present but no explicit origin and no
+        // legacy markers -> old SDK that doesn't tag origin. Old SDK
+        // evaluations/simulations are already caught by legacy rules above,
+        // so what's left must be a regular application trace.
+        mergedAttributes["langwatch.origin"] = "application";
+      }
+    }
+  }
+
+  hoistSource({
+    state,
+    span,
+    mergedAttributes,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+    mergedAttributes: Record<string, string>;
+  }): void {
+    const isRootSpan = !span.parentSpanId;
+    const explicitSource = span.spanAttributes["langwatch.origin.source"] as
+      | string
+      | undefined;
+    if (typeof explicitSource === "string" && explicitSource !== "") {
+      if (isRootSpan) {
+        mergedAttributes["langwatch.origin.source"] = explicitSource;
+      } else if (!state.attributes["langwatch.origin.source"]) {
+        mergedAttributes["langwatch.origin.source"] = explicitSource;
+      } else {
+        mergedAttributes["langwatch.origin.source"] =
+          state.attributes["langwatch.origin.source"];
+      }
+    } else if (state.attributes["langwatch.origin.source"]) {
+      mergedAttributes["langwatch.origin.source"] =
+        state.attributes["langwatch.origin.source"];
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldOverrideOutput } from "../traceSummary.foldProjection";
+import { shouldOverrideOutput } from "../services/trace-io-accumulation.service";
 
 describe("shouldOverrideOutput", () => {
   describe("when the incoming span is the root span", () => {
