@@ -43,13 +43,15 @@ const ComponentPropertiesPanelMap: Partial<
  * for unified play/expand/close controls.
  */
 export function StudioNodeDrawer() {
-  const { selectedNode, deselectAllNodes, isDraggingNode } = useWorkflowStore(
-    useShallow((state) => ({
-      selectedNode: state.nodes.find((n) => n.selected),
-      deselectAllNodes: state.deselectAllNodes,
-      isDraggingNode: state.isDraggingNode,
-    })),
-  );
+  const { selectedNode, deselectAllNodes, isDraggingNode, clickedNodeId } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        selectedNode: state.nodes.find((n) => n.selected),
+        deselectAllNodes: state.deselectAllNodes,
+        isDraggingNode: state.isDraggingNode,
+        clickedNodeId: state.clickedNodeId,
+      })),
+    );
 
   const { currentDrawer } = useDrawer();
 
@@ -69,8 +71,18 @@ export function StudioNodeDrawer() {
   // appear for the selected node.
   const hasUrlDrawer = !!currentDrawer;
 
+  // Only open the drawer when onNodeClick has confirmed a genuine click
+  // (mousedown + mouseup without drag). This prevents the drawer from
+  // opening when the user merely drags a node (which selects it on mousedown).
+  const hasClickConfirmation =
+    selectedNode && clickedNodeId === selectedNode.id;
+
   const effectiveNode =
-    !hasUrlDrawer && !isEmptyEvaluator && !isEmptyAgent && !isDraggingNode
+    !hasUrlDrawer &&
+    !isEmptyEvaluator &&
+    !isEmptyAgent &&
+    !isDraggingNode &&
+    hasClickConfirmation
       ? selectedNode
       : undefined;
 
