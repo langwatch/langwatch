@@ -1317,9 +1317,9 @@ export class ClickHouseTraceService {
             ? " AND ts.TraceId IN ({traceIds:Array(String)})"
             : "";
 
-        // Text search on computed I/O — uses ngrambf_v1 skip index for granule pruning
+        // Text search on computed I/O — ifNull() matches the ngrambf_v1 indexed expression
         const searchFilter = query
-          ? " AND (ts.ComputedInput ILIKE {searchQuery:String} OR ts.ComputedOutput ILIKE {searchQuery:String})"
+          ? " AND (ifNull(ts.ComputedInput, '') ILIKE {searchQuery:String} OR ifNull(ts.ComputedOutput, '') ILIKE {searchQuery:String})"
           : "";
 
         // Keyset cursor condition — only for the data query

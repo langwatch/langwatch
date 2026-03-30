@@ -521,20 +521,20 @@ describe("ClickHouseTraceService", () => {
         // Count query (1st call) contains ILIKE
         const countCall = mockClickHouseQuery.mock.calls[0]!;
         expect(countCall[0].query).toContain(
-          "ts.ComputedInput ILIKE {searchQuery:String}",
+          "ifNull(ts.ComputedInput, '') ILIKE {searchQuery:String}",
         );
         expect(countCall[0].query).toContain(
-          "ts.ComputedOutput ILIKE {searchQuery:String}",
+          "ifNull(ts.ComputedOutput, '') ILIKE {searchQuery:String}",
         );
         expect(countCall[0].query_params.searchQuery).toBe("%hello world%");
 
         // Data query (2nd call) contains ILIKE
         const dataCall = mockClickHouseQuery.mock.calls[1]!;
         expect(dataCall[0].query).toContain(
-          "ts.ComputedInput ILIKE {searchQuery:String}",
+          "ifNull(ts.ComputedInput, '') ILIKE {searchQuery:String}",
         );
         expect(dataCall[0].query).toContain(
-          "ts.ComputedOutput ILIKE {searchQuery:String}",
+          "ifNull(ts.ComputedOutput, '') ILIKE {searchQuery:String}",
         );
         expect(dataCall[0].query_params.searchQuery).toBe("%hello world%");
       });
