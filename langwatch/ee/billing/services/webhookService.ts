@@ -14,6 +14,7 @@ import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalcul
 import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from "../utils/growthSeatEvent";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { traced } from "../../../src/server/app-layer/tracing";
+import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -252,6 +253,11 @@ export class EEWebhookService implements WebhookService {
     }
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
+
+    fireSubscriptionSyncNurturing({
+      organizationId: existingSubscription.organizationId,
+      hasSubscription: false,
+    });
   }
 
   async handleSubscriptionUpdated({
@@ -282,6 +288,11 @@ export class EEWebhookService implements WebhookService {
       // When the period ends, Stripe fires `customer.subscription.deleted`
       // which is handled by handleSubscriptionDeleted.
       await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
+
+      fireSubscriptionSyncNurturing({
+        organizationId: existingSubForUpdate.organizationId,
+        hasSubscription: false,
+      });
     } else if (subscription.status === "active") {
       const shouldNotify =
         existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
@@ -423,6 +434,11 @@ export class EEWebhookService implements WebhookService {
         startDate: updatedSubscription.startDate,
         maxMembers: updatedSubscription.maxMembers,
         maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+      });
+
+      fireSubscriptionSyncNurturing({
+        organizationId: updatedSubscription.organizationId,
+        hasSubscription: true,
       });
     }
   }
