@@ -282,6 +282,82 @@ const buildThreadData = async (
   return result;
 };
 
+/**
+ * Resolve thread-typed mappings and merge into an existing data record.
+ * Used at trace level when the mapping config contains a mix of trace and thread sources.
+ * Thread fields that cannot be resolved (e.g. trace has no thread_id) default to empty values.
+ */
+const resolveThreadMappingsIntoData = async (params: {
+  data: Record<string, any>;
+  trace: Trace;
+  mappings: MappingState;
+  projectId: string;
+  protections: Protections;
+}): Promise<void> => {
+  const { data, trace, mappings, projectId, protections } = params;
+  const threadId = trace.metadata?.thread_id;
+
+  // Lazily fetch thread traces only once (if needed)
+  let threadTraces: Trace[] | null = null;
+  const getThreadTraces = async (): Promise<Trace[]> => {
+    if (threadTraces !== null) return threadTraces;
+    if (!threadId) {
+      threadTraces = [];
+      return threadTraces;
+    }
+    threadTraces = await getTracesGroupedByThreadId({
+      connConfig: { projectId },
+      threadId,
+      protections,
+      includeSpans: true,
+    });
+    return threadTraces;
+  };
+
+  for (const [targetField, mappingConfig] of Object.entries(
+    mappings.mapping,
+  )) {
+    if (!("type" in mappingConfig && mappingConfig.type === "thread")) {
+      continue;
+    }
+    if (!("source" in mappingConfig) || !mappingConfig.source) {
+      continue;
+    }
+
+    const source = mappingConfig.source;
+
+    if (!threadId) {
+      // No thread_id: resolve to empty value
+      data[targetField] = "";
+      continue;
+    }
+
+    const traces = await getThreadTraces();
+
+    if (
+      (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
+    ) {
+      if (source === "formatted_traces") {
+        data[targetField] = (
+          await Promise.all(
+            traces.map((t) => formatSpansDigest(t.spans ?? [])),
+          )
+        ).join("\n\n---\n\n");
+      }
+    } else {
+      const threadSource = source as keyof typeof THREAD_MAPPINGS;
+      const selectedFields =
+        ("selectedFields" in mappingConfig
+          ? mappingConfig.selectedFields
+          : undefined) ?? [];
+      data[targetField] = THREAD_MAPPINGS[threadSource].mapping(
+        { thread_id: threadId, traces },
+        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+      );
+    }
+  }
+};
+
 const switchMapping = (
   trace: Trace,
   mapping_: MappingState,
@@ -385,6 +461,17 @@ const buildDataForEvaluation = async (
     }
 
     data = mappedData;
+
+    // Resolve any thread-typed mappings mixed into trace-level evaluations
+    if (mappings && hasThreadMappings(mappings)) {
+      await resolveThreadMappingsIntoData({
+        data,
+        trace,
+        mappings,
+        projectId,
+        protections,
+      });
+    }
   }
 
   // Workflow evaluators and custom evaluators pass data through as-is

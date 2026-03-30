@@ -1005,6 +1005,9 @@ export function getTraceAvailableSources(
       type: "dataset",
       fields: traceFields,
     },
+    // Include thread sources at trace level so evaluators can access
+    // full conversation context even when triggered per-trace
+    ...getThreadAvailableSources(),
   ];
 }
 

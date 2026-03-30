@@ -55,6 +55,7 @@ import {
 } from "~/components/preconditions/preconditionFieldUtils";
 import {
   type MappingState,
+  SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
@@ -527,9 +528,20 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               if ("subkey" in mapping && mapping.subkey)
                 pathParts.push(mapping.subkey);
             }
+            // Determine sourceId based on mapping type:
+            // Thread-typed mappings always use "thread" as sourceId,
+            // even at trace level (mixed trace + thread mappings)
+            const isThreadMapping =
+              "type" in mapping && mapping.type === "thread";
+            const sourceId =
+              monitorLevel === "thread"
+                ? "thread"
+                : isThreadMapping
+                  ? "thread"
+                  : "trace";
             uiMappings[field] = {
               type: "source",
-              sourceId: monitorLevel === "trace" ? "trace" : "thread",
+              sourceId,
               path: pathParts,
             };
           }
@@ -988,8 +1000,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         const parts = mapping.path;
         const source = parts[0]!;
 
-        // Check if this is a thread-level mapping source (e.g., "traces", "thread_id")
-        if (source in THREAD_MAPPINGS) {
+        // Check if this is a thread-level mapping source (e.g., "traces", "thread_id", "formatted_traces")
+        const isThreadSource =
+          source in THREAD_MAPPINGS ||
+          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source) ||
+          mapping.sourceId === "thread";
+        if (isThreadSource) {
           // For "traces" with sub-paths like "traces.input", "traces.output",
           // convert to selectedFields format
           const selectedFields =
