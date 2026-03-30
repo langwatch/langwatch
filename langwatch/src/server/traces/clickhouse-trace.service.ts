@@ -519,6 +519,7 @@ export class ClickHouseTraceService {
               filterConditions,
               filterParams,
               input.traceIds,
+              input.query,
             );
 
           // When includeSpans is requested, fetch and attach actual spans
@@ -1279,6 +1280,7 @@ export class ClickHouseTraceService {
     filterConditions?: string[],
     filterParams?: Record<string, unknown>,
     traceIds?: string[],
+    query?: string,
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1303,6 +1305,11 @@ export class ClickHouseTraceService {
             ? " AND ts.TraceId IN ({traceIds:Array(String)})"
             : "";
 
+        // Text search on computed I/O — uses ngrambf_v1 skip index for granule pruning
+        const searchFilter = query
+          ? " AND (ts.ComputedInput ILIKE {searchQuery:String} OR ts.ComputedOutput ILIKE {searchQuery:String})"
+          : "";
+
         // Keyset cursor condition — only for the data query
         let cursorCondition = "";
         if (cursor) {
@@ -1320,6 +1327,7 @@ export class ClickHouseTraceService {
           endDate: endDate ?? Date.now(),
           ...filterParams,
           ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
+          ...(query ? { searchQuery: `%${query}%` } : {}),
         };
 
         // Run count + data queries in parallel.
@@ -1337,6 +1345,7 @@ export class ClickHouseTraceService {
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                 ${extraFilters}
                 ${traceIdFilter}
+                ${searchFilter}
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
@@ -1378,6 +1387,7 @@ export class ClickHouseTraceService {
                     AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                     ${extraFilters}
                     ${traceIdFilter}
+                    ${searchFilter}
                     ${cursorCondition}
                   ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
                   LIMIT 1 BY ts.TraceId
