@@ -556,4 +556,46 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
   });
+
+  describe("getDistinctExternalSetIds()", () => {
+    describe("when rows exist with empty ScenarioSetId and 'default' ScenarioSetId", () => {
+      it("merges empty-string and 'default' into a single entry", async () => {
+        const legacyTenantId = `test-distinct-${nanoid()}`;
+
+        // Legacy row: ScenarioSetId = "" (written before coercion fix)
+        await insertRow(ch, makeInsertRow({
+          TenantId: legacyTenantId,
+          ScenarioRunId: `run-legacy-${nanoid()}`,
+          BatchRunId: `batch-legacy-${nanoid()}`,
+          ScenarioSetId: "",
+        }));
+
+        // New row: ScenarioSetId = "default"
+        await insertRow(ch, makeInsertRow({
+          TenantId: legacyTenantId,
+          ScenarioRunId: `run-new-${nanoid()}`,
+          BatchRunId: `batch-new-${nanoid()}`,
+          ScenarioSetId: "default",
+        }));
+
+        // Custom set: must remain separate
+        await insertRow(ch, makeInsertRow({
+          TenantId: legacyTenantId,
+          ScenarioRunId: `run-custom-${nanoid()}`,
+          BatchRunId: `batch-custom-${nanoid()}`,
+          ScenarioSetId: "some-custom-set",
+        }));
+
+        const result = await repo.getDistinctExternalSetIds({
+          projectIds: [legacyTenantId],
+        });
+
+        // "" and "default" must not appear as two distinct entries
+        expect(result.has("")).toBe(false);
+        expect(result.has("default")).toBe(true);
+        expect(result.has("some-custom-set")).toBe(true);
+        expect(result.size).toBe(2);
+      });
+    });
+  });
 });

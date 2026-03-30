@@ -12,7 +12,7 @@ import {
   mapStatus,
   type ClickHouseSimulationRunRow,
 } from "~/server/simulations/simulation-run.mappers";
-import { INTERNAL_SET_PREFIX, expandSetIdFilter } from "~/server/scenarios/internal-set-id";
+import { DEFAULT_SET_ID, INTERNAL_SET_PREFIX, expandSetIdFilter } from "~/server/scenarios/internal-set-id";
 import type { SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
@@ -856,7 +856,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const rows = await this.queryRows<{ ScenarioSetId: string }>(
-      `SELECT DISTINCT ScenarioSetId
+      `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
        FROM (
          SELECT ScenarioSetId, ArchivedAt
          FROM ${TABLE_NAME}
@@ -869,7 +869,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       { tenantId: firstProjectId, projectIds },
     );
 
-    return new Set(rows.map((r) => r.ScenarioSetId));
+    return new Set(
+      rows.map((r) => (r.ScenarioSetId === "" ? DEFAULT_SET_ID : r.ScenarioSetId)),
+    );
   }
 
   // ---- Cursor helpers ----
