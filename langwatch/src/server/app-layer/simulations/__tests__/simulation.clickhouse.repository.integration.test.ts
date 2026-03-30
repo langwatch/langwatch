@@ -261,6 +261,55 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(ourRun).toBeDefined();
       });
     });
+
+    describe("when a batch has empty-string ScenarioSetId (legacy data)", () => {
+      it("normalizes the empty-string to 'default' in the scenarioSetIds map", async () => {
+        const batchRunId = `batch-legacy-${nanoid()}`;
+
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-legacy-${nanoid()}`,
+          BatchRunId: batchRunId,
+          ScenarioSetId: "",
+        }));
+
+        const result = await repo.getRunDataForAllSuites({
+          projectId: tenantId,
+          limit: 100,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.scenarioSetIds[batchRunId]).toBe("default");
+      });
+    });
+
+    describe("when batches have both empty-string and 'default' ScenarioSetId for different batches", () => {
+      it("collapses both to 'default' and reports a single distinct set", async () => {
+        const batchEmpty = `batch-empty-${nanoid()}`;
+        const batchDefault = `batch-default-${nanoid()}`;
+
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-empty-${nanoid()}`,
+          BatchRunId: batchEmpty,
+          ScenarioSetId: "",
+        }));
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-default-${nanoid()}`,
+          BatchRunId: batchDefault,
+          ScenarioSetId: "default",
+        }));
+
+        const result = await repo.getRunDataForAllSuites({
+          projectId: tenantId,
+          limit: 100,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.scenarioSetIds[batchEmpty]).toBe("default");
+        expect(result.scenarioSetIds[batchDefault]).toBe("default");
+      });
+    });
   });
 
   describe("getExternalSetSummaries()", () => {
