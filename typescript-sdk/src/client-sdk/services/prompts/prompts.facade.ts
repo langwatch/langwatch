@@ -1,4 +1,4 @@
-import { PromptsApiService } from "./prompts-api.service";
+import { PromptsApiService, type AssignLabelResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
 import { FetchPolicy } from "./types";
@@ -38,10 +38,17 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
+  readonly labels: {
+    assign(id: string, params: { label: "production" | "staging"; versionId: string }): Promise<AssignLabelResult>;
+  };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
+    this.labels = {
+      assign: (id, { label, versionId }) =>
+        this.promptsApiService.assignLabel({ id, label, versionId }),
+    };
   }
 
   /**

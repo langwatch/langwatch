@@ -1,7 +1,7 @@
 Feature: SDK Prompt Label Support
   As an SDK consumer
-  I want to fetch prompts by label (e.g., "production", "staging")
-  So that I can pin my code to a labeled version without hardcoding version numbers
+  I want to fetch prompts by label and manage label assignments
+  So that I can pin my code to labeled versions and promote versions across environments
 
   Background:
     Given a LangWatch client initialized with a valid API key
@@ -39,10 +39,36 @@ Feature: SDK Prompt Label Support
   # --- Error handling ---
 
   @unit
-  Scenario: Invalid label returns clear error
-    Given "pizza-prompt" has no label "canary"
-    When I call get("pizza-prompt", { label: "canary" })
-    Then I receive a clear error indicating the label does not exist
+  Scenario: Unassigned label returns error
+    Given "pizza-prompt" has no version assigned to "production"
+    When I call get("pizza-prompt", { label: "production" })
+    Then the API returns an error and the SDK propagates it
+
+  # --- Label assignment (sub-resource) ---
+
+  @unit
+  Scenario: Assign label to existing version
+    Given "pizza-prompt" version v3 exists with a known versionId
+    When I call prompts.labels.assign("pizza-prompt", { label: "production", versionId })
+    Then the API receives PUT /api/prompts/pizza-prompt/labels/production
+    And the request body contains the versionId
+
+  @unit
+  Scenario: Assign label returns confirmation
+    When I call prompts.labels.assign("pizza-prompt", { label: "staging", versionId })
+    Then I receive a response with configId, versionId, label, and updatedAt
+
+  # --- Labels on create/update ---
+
+  @unit
+  Scenario: Create prompt with labels on initial version
+    When I call prompts.create with a labels array containing "production"
+    Then the API request body includes the labels array
+
+  @unit
+  Scenario: Update prompt with labels on new version
+    When I call prompts.update with a labels array containing "staging"
+    Then the API request body includes the labels array
 
   # --- API layer ---
 
@@ -50,8 +76,3 @@ Feature: SDK Prompt Label Support
   Scenario: Label is passed as query parameter to the API
     When I call PromptsApiService.get("pizza-prompt", { label: "production" })
     Then the API request includes query parameter label="production"
-
-  @unit
-  Scenario: Label and version are mutually exclusive in API call
-    When I call PromptsApiService.get("pizza-prompt", { label: "production", version: "3" })
-    Then both label and version are sent to the API (server validates mutual exclusion)

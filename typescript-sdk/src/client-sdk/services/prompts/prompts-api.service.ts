@@ -1,4 +1,4 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
+import type { paths, operations } from "@/internal/generated/openapi/api-client";
 import { type PromptResponse } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
@@ -9,6 +9,10 @@ import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/ap
 import { PromptsApiError } from "./errors";
 
 export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
+
+export type AssignLabelResult = NonNullable<
+  operations["putApiPromptsByIdLabelsByLabel"]["responses"]["200"]["content"]["application/json"]
+>;
 
 export type ConfigData = NonNullable<
   paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
@@ -179,6 +183,26 @@ export class PromptsApiService {
       });
     if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
     return updatedPrompt;
+  }
+
+  async assignLabel({
+    id,
+    label,
+    versionId,
+  }: {
+    id: string;
+    label: "production" | "staging";
+    versionId: string;
+  }): Promise<AssignLabelResult> {
+    const { data, error } = await this.apiClient.PUT(
+      "/api/prompts/{id}/labels/{label}",
+      {
+        params: { path: { id, label } },
+        body: { versionId },
+      },
+    );
+    if (error) this.handleApiError(`assign label "${label}" to prompt "${id}"`, error);
+    return data;
   }
 
   /**

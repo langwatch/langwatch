@@ -364,7 +364,7 @@ describe("Prompt Retrieval", () => {
       expect(promptsApiService.get).toHaveBeenCalledTimes(1);
     });
 
-    it("caches unlabeled requests separately from labeled ones", async () => {
+    it("returns cached unlabeled prompt on second call within TTL", async () => {
       const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
       promptsApiService.get.mockResolvedValue(latestPrompt);
 
