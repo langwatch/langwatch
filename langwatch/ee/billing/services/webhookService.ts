@@ -254,9 +254,12 @@ export class EEWebhookService implements WebhookService {
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
 
+    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+      existingSubscription.organizationId,
+    );
     fireSubscriptionSyncNurturing({
       organizationId: existingSubscription.organizationId,
-      hasSubscription: false,
+      hasSubscription: !!remainingActive,
     });
   }
 
@@ -289,9 +292,12 @@ export class EEWebhookService implements WebhookService {
       // which is handled by handleSubscriptionDeleted.
       await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
 
+      const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+        existingSubForUpdate.organizationId,
+      );
       fireSubscriptionSyncNurturing({
         organizationId: existingSubForUpdate.organizationId,
-        hasSubscription: false,
+        hasSubscription: !!remainingActive,
       });
     } else if (subscription.status === "active") {
       const shouldNotify =

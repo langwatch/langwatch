@@ -136,7 +136,10 @@ describe("Subscription sync hook", () => {
       const { captureException } = await import(
         "../../../../src/utils/posthogErrorCapture"
       );
-      mockFindMany.mockRejectedValueOnce(new Error("DB error"));
+      mockFindMany.mockResolvedValue([{ userId: "user-1" }]);
+      mockNurturing.identifyUser.mockRejectedValueOnce(
+        new Error("Customer.io error"),
+      );
 
       expect(() =>
         fireSubscriptionSyncNurturing({
