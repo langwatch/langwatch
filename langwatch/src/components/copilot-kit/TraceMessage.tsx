@@ -2,15 +2,16 @@ import {
   Alert,
   Button,
   HStack,
-  Spinner,
   type StackProps,
   Text,
 } from "@chakra-ui/react";
+import type { TRPCClientErrorLike } from "@trpc/client";
 import { LuListTree, LuRefreshCw } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { easyCatchToast } from "../../utils/easyCatchToast";
+import { getTraceErrorMessage } from "./getTraceErrorMessage";
 
 // Constants
 const TRACE_QUERY_CONFIG = {
@@ -36,11 +37,64 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
     },
   );
 
-  if (traceQuery.isLoading || traceQuery.isError || !traceQuery.data) {
+  if (traceQuery.isError) {
+    return (
+      <TraceErrorState
+        {...props}
+        traceId={traceId}
+        error={traceQuery.error}
+        isRefetching={traceQuery.isRefetching}
+        onRetry={() =>
+          void traceQuery
+            .refetch()
+            .catch((err) => easyCatchToast(err, "TraceMessage refetch"))
+        }
+      />
+    );
+  }
+
+  if (traceQuery.isLoading || !traceQuery.data) {
     return null;
   }
 
   return <TraceSuccessState {...props} traceId={traceId} />;
+}
+
+// Error state component
+function TraceErrorState({
+  traceId,
+  error,
+  isRefetching,
+  onRetry,
+  ...props
+}: {
+  traceId: string;
+  error: TRPCClientErrorLike<any> | null;
+  isRefetching: boolean;
+  onRetry: () => void;
+} & StackProps) {
+  const message = getTraceErrorMessage({ error, traceId });
+
+  return (
+    <HStack paddingBottom={4} {...props}>
+      <Alert.Root status="error" borderRadius="md">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Text>{message}</Text>
+        </Alert.Content>
+      </Alert.Root>
+      <Button
+        colorPalette="gray"
+        size="sm"
+        onClick={onRetry}
+        disabled={isRefetching}
+        loading={isRefetching}
+      >
+        <LuRefreshCw />
+        Retry
+      </Button>
+    </HStack>
+  );
 }
 
 // Success state component
