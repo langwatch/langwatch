@@ -2,6 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { FilterField } from "~/server/filters/types";
 
+const mockLoggerWarn = vi.fn();
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: () => ({
+    warn: mockLoggerWarn,
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 // Mock the filter registry with one real-looking filter for testing
 vi.mock("~/server/filters/registry", () => ({
   availableFilters: {
@@ -94,11 +105,26 @@ describe("generateTracesPivotQueryConditions()", () => {
 describe("generateFilterConditions()", () => {
   describe("when filter field is unknown", () => {
     it("returns a match_none condition so the trigger never fires", () => {
+      mockLoggerWarn.mockClear();
+
       const conditions = generateFilterConditions({
         ["service.name" as FilterField]: ["chat"],
       });
 
       expect(conditions).toEqual([{ match_none: {} }]);
+    });
+
+    it("logs a warning with the unknown field name", () => {
+      mockLoggerWarn.mockClear();
+
+      generateFilterConditions({
+        ["service.name" as FilterField]: ["chat"],
+      });
+
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        { field: "service.name" },
+        expect.stringContaining("Unknown filter field"),
+      );
     });
   });
 

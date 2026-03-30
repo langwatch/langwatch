@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { triggerFiltersSchema } from "../types";
+import { triggerFiltersSchema, triggerFiltersSchemaLenient } from "../types";
 
 describe("triggerFiltersSchema", () => {
   describe("when filter field is known", () => {
@@ -43,6 +43,52 @@ describe("triggerFiltersSchema", () => {
       const result = triggerFiltersSchema.safeParse({
         "spans.model": ["gpt-4"],
         "service.name": ["chat"],
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("triggerFiltersSchemaLenient", () => {
+  describe("when all fields are known", () => {
+    it("passes them through unchanged", () => {
+      const result = triggerFiltersSchemaLenient.safeParse({
+        "spans.model": ["gpt-4"],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({ "spans.model": ["gpt-4"] });
+    });
+  });
+
+  describe("when filter contains only unknown fields", () => {
+    it("strips all keys and returns an empty object", () => {
+      const result = triggerFiltersSchemaLenient.safeParse({
+        "service.name": ["chat"],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({});
+    });
+  });
+
+  describe("when mixing known and unknown fields", () => {
+    it("strips the unknown fields and keeps the known ones", () => {
+      const result = triggerFiltersSchemaLenient.safeParse({
+        "spans.model": ["gpt-4"],
+        "service.name": ["chat"],
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual({ "spans.model": ["gpt-4"] });
+    });
+  });
+
+  describe("when filter values are invalid", () => {
+    it("rejects structurally invalid values", () => {
+      const result = triggerFiltersSchemaLenient.safeParse({
+        "spans.model": "not-an-array",
       });
 
       expect(result.success).toBe(false);

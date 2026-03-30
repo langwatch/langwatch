@@ -44,8 +44,20 @@ const filterValueSchema: z.ZodType<
   ]),
 );
 
-// Schema for validating trigger filter JSON structure
+// Schema for validating trigger filter JSON structure — rejects unknown fields
 export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
+
+// Lenient variant that strips unknown fields instead of rejecting them.
+// Used on the update path so existing triggers with legacy fields (e.g.
+// service.name) can still be edited — the unknown keys are silently removed.
+const validFilterFields = new Set<string>(filterFieldsEnum.options);
+export const triggerFiltersSchemaLenient = z
+  .record(z.string(), filterValueSchema)
+  .transform((filters) =>
+    Object.fromEntries(
+      Object.entries(filters).filter(([key]) => validFilterFields.has(key)),
+    ),
+  );
 
 export type FilterDefinition = {
   name: string;
