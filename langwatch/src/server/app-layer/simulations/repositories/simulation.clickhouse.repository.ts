@@ -202,16 +202,24 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioRunData | null> {
+    // Uses a lightweight inner subquery to find the latest version, avoiding
+    // the old pattern that read all heavy columns (Messages, RoleCosts, etc.)
+    // in DEDUP_RUN_COLUMNS across entire granules (~8K rows) for dedup, causing
+    // OOM on parts with large payloads. The inner subquery reads only
+    // DEDUP_COLUMNS (no heavy fields) to locate the row, then the outer SELECT
+    // reads heavy columns for that single matched row.
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM (
-         SELECT ${DEDUP_RUN_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
-         ORDER BY UpdatedAt DESC
-         LIMIT 1
-       )
-       WHERE ArchivedAt IS NULL
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         AND t.ScenarioRunId = {scenarioRunId:String}
+         AND t.ArchivedAt IS NULL
+         AND t.UpdatedAt = (
+           SELECT max(s.UpdatedAt)
+           FROM ${TABLE_NAME} AS s
+           WHERE s.TenantId = {tenantId:String}
+             AND s.ScenarioRunId = {scenarioRunId:String}
+         )
        LIMIT 1`,
       { tenantId: projectId, scenarioRunId },
     );

@@ -320,8 +320,9 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
         const summary = summaries.find((s) => s.scenarioSetId === extSetId);
         expect(summary).toBeDefined();
-        expect(summary!.totalCount).toBe(5);
-        expect(summary!.passedCount).toBe(3);
+        // argMax returns the latest batch's counts (batch2: 1 passed + 1 stalled = 2 total)
+        expect(summary!.totalCount).toBe(2);
+        expect(summary!.passedCount).toBe(1);
         expect(summary!.lastRunTimestamp).toBeGreaterThan(0);
       });
     });
@@ -401,14 +402,14 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(filteredSummary!.totalCount).toBe(2);
         expect(filteredSummary!.passedCount).toBe(1);
 
-        // Without date filter: all 3 runs, 2 passed
+        // Without date filter: argMax picks the latest batch (recentBatch: 2 runs, 1 passed)
         const unfiltered = await repo.getExternalSetSummaries({
           projectId: tenantId,
         });
         const unfilteredSummary = unfiltered.find((s) => s.scenarioSetId === setId);
         expect(unfilteredSummary).toBeDefined();
-        expect(unfilteredSummary!.totalCount).toBe(3);
-        expect(unfilteredSummary!.passedCount).toBe(2);
+        expect(unfilteredSummary!.totalCount).toBe(2);
+        expect(unfilteredSummary!.passedCount).toBe(1);
       });
     });
 
