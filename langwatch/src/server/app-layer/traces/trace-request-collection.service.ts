@@ -12,6 +12,10 @@ import {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import type { SpanDedupService } from "./span-dedupe.service";
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const SPAN_MAX_FUTURE_MS = 7 * ONE_DAY_MS;
+const SPAN_MAX_PAST_MS = 15 * ONE_DAY_MS;
+
 /** An OtlpSpan whose ID fields have been normalized to hex strings. */
 type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
 
@@ -173,6 +177,18 @@ export class TraceRequestCollectionService {
         status: "dropped",
         error: `span validation failed: ${spanParseResult.error?.message ?? "unknown"}`,
       };
+    }
+
+    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+      TraceRequestUtils.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
+    );
+    const now = Date.now();
+
+    if (startTimeUnixMs > now + SPAN_MAX_FUTURE_MS) {
+      return { status: "dropped", error: "span start time is more than 7 days in the future" };
+    }
+    if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
+      return { status: "dropped", error: "span start time is more than 15 days in the past" };
     }
 
     const normalizedSpan = normalizeSpanIds(spanParseResult.data);
