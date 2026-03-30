@@ -13,7 +13,7 @@ import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal"
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
-import { ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -102,10 +102,12 @@ function ScenarioLibraryPage() {
   } = useLabelFilter(scenarios);
 
   const {
-    showWelcome,
+    showInlineWelcome,
+    showWelcomeModal,
     showCreateModal,
     handleNewScenario,
     handleWelcomeProceed,
+    handleWelcomeModalOpenChange,
     handleCloseCreateModal,
   } = useNewScenarioFlow({ scenarioCount: scenarios?.length ?? 0, isLoading });
 
@@ -190,12 +192,12 @@ function ScenarioLibraryPage() {
           </VStack>
         )}
 
-        {!isLoading && !error && scenarios?.length === 0 && !showWelcome && (
-          <ScenarioEmptyState onCreateClick={handleNewScenario} />
+        {!isLoading && !error && scenarios?.length === 0 && showInlineWelcome && (
+          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
         )}
 
-        {showWelcome && (
-          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
+        {!isLoading && !error && scenarios?.length === 0 && !showInlineWelcome && (
+          <ScenarioEmptyState onCreateClick={handleNewScenario} />
         )}
 
         {scenarios && scenarios.length > 0 && (
@@ -218,6 +220,11 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
+      <ScenarioWelcomeModal
+        open={showWelcomeModal}
+        onOpenChange={handleWelcomeModalOpenChange}
+        onProceed={handleWelcomeProceed}
+      />
       <ScenarioCreateModal
         open={showCreateModal}
         onClose={handleCloseCreateModal}
