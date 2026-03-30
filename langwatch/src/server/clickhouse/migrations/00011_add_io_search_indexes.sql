@@ -1,18 +1,18 @@
 -- +goose Up
 -- +goose ENVSUB ON
 
--- ngrambf_v1 skip indexes for substring search (ILIKE) on computed I/O.
--- Params: ngram_size=4, bloom_filter_size=10240 bytes, hash_functions=3, seed=0
--- ifNull() is required because ngrambf_v1 does not support Nullable(String).
+-- ngrambf_v1 skip indexes for case-insensitive substring search on computed I/O.
+-- lower(ifNull(...)) ensures the index matches the query expression exactly.
+-- Params: ngram_size=3 (supports 3+ char queries), bloom_filter_size=10240, hash_functions=3, seed=0
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  ADD INDEX IF NOT EXISTS idx_input_ngram ifNull(ComputedInput, '') TYPE ngrambf_v1(4, 10240, 3, 0) GRANULARITY 1;
+  ADD INDEX IF NOT EXISTS idx_input_ngram lower(ifNull(ComputedInput, '')) TYPE ngrambf_v1(3, 10240, 3, 0) GRANULARITY 1;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  ADD INDEX IF NOT EXISTS idx_output_ngram ifNull(ComputedOutput, '') TYPE ngrambf_v1(4, 10240, 3, 0) GRANULARITY 1;
+  ADD INDEX IF NOT EXISTS idx_output_ngram lower(ifNull(ComputedOutput, '')) TYPE ngrambf_v1(3, 10240, 3, 0) GRANULARITY 1;
 -- +goose StatementEnd
 
 -- Materialize indexes for existing data (runs as background mutation, partition-by-partition)

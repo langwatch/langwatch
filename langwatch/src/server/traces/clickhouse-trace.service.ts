@@ -1317,9 +1317,10 @@ export class ClickHouseTraceService {
             ? " AND ts.TraceId IN ({traceIds:Array(String)})"
             : "";
 
-        // Text search on computed I/O — ifNull() matches the ngrambf_v1 indexed expression
-        const searchFilter = query
-          ? " AND (ifNull(ts.ComputedInput, '') ILIKE {searchQuery:String} OR ifNull(ts.ComputedOutput, '') ILIKE {searchQuery:String})"
+        // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
+        const effectiveQuery = query && query.length >= 3 ? query : undefined;
+        const searchFilter = effectiveQuery
+          ? " AND (lower(ifNull(ts.ComputedInput, '')) LIKE {searchQuery:String} OR lower(ifNull(ts.ComputedOutput, '')) LIKE {searchQuery:String})"
           : "";
 
         // Keyset cursor condition — only for the data query
@@ -1339,7 +1340,11 @@ export class ClickHouseTraceService {
           endDate: endDate ?? Date.now(),
           ...filterParams,
           ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
-          ...(query ? { searchQuery: `%${query}%` } : {}),
+          ...(effectiveQuery
+            ? {
+                searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
+              }
+            : {}),
         };
 
         // Run count + data queries in parallel.
