@@ -31,8 +31,10 @@ describe("PromptsApiService.get", () => {
       expect(mockGet).toHaveBeenCalledWith(
         "/api/prompts/{id}",
         expect.objectContaining({
-          params: { path: { id: "pizza-prompt" } },
-          query: expect.objectContaining({ label: "production" }),
+          params: expect.objectContaining({
+            path: { id: "pizza-prompt" },
+            query: expect.objectContaining({ label: "production" }),
+          }),
         }),
       );
     });
@@ -46,8 +48,10 @@ describe("PromptsApiService.get", () => {
       expect(mockGet).toHaveBeenCalledWith(
         "/api/prompts/{id}",
         expect.objectContaining({
-          params: { path: { id: "pizza-prompt" } },
-          query: expect.objectContaining({ label: "production", version: 3 }),
+          params: expect.objectContaining({
+            path: { id: "pizza-prompt" },
+            query: expect.objectContaining({ label: "production", version: 3 }),
+          }),
         }),
       );
     });
