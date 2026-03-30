@@ -8,10 +8,9 @@ import {
 } from "@chakra-ui/react";
 import type { Monaco } from "@monaco-editor/react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
 import { useCallback, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useFilterParams } from "~/hooks/useFilterParams";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
@@ -22,7 +21,7 @@ import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
-import { QueryStringFieldsFilters } from "./filters/FieldsFilters";
+import { FieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -38,8 +37,6 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
   const { project } = useOrganizationTeamProject();
 
   const updateTriggerFilters = api.automation.updateTriggerFilters.useMutation();
-  const { getLatestFilters, clearFilters, setFilters } = useFilterParams();
-  const router = useRouter();
 
   const queryClient = api.useContext();
   const { closeDrawer } = useDrawer();
@@ -51,6 +48,11 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
 
   // Keep ref in sync for submit
   codeValueRef.current = codeValue;
+
+  // Local filter state — avoids router.push during drawer animation
+  const [localFilters, setLocalFilters] = useState<
+    Partial<Record<FilterField, FilterParam>>
+  >({});
 
   api.automation.getTriggerById.useQuery(
     {
@@ -78,24 +80,26 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
           {} as Record<FilterField, string[] | Record<string, string[]>>,
         );
 
-        setFilters(filtersToSet);
+        setLocalFilters(filtersToSet);
         setCodeValue(JSON.stringify(filters, null, 2));
       },
     },
   );
 
-  const syncVisualToCode = useCallback(() => {
-    const filterParams = getLatestFilters();
-    const nonEmptyFilters = Object.fromEntries(
-      Object.entries(filterParams.filters).filter(([_, value]) =>
+  const getNonEmptyFilters = useCallback(() => {
+    return Object.fromEntries(
+      Object.entries(localFilters).filter(([_, value]) =>
         Array.isArray(value)
           ? value.length > 0
           : Object.keys(value as Record<string, string[]>).length > 0,
       ),
     );
-    setCodeValue(JSON.stringify(nonEmptyFilters, null, 2));
+  }, [localFilters]);
+
+  const syncVisualToCode = useCallback(() => {
+    setCodeValue(JSON.stringify(getNonEmptyFilters(), null, 2));
     setCodeError(null);
-  }, [getLatestFilters]);
+  }, [getNonEmptyFilters]);
 
   // Handle switching between modes
   const handleModeToggle = (checked: boolean) => {
@@ -116,7 +120,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
           });
           return;
         }
-        setFilters(parsed);
+        setLocalFilters(parsed);
         setCodeError(null);
       } catch {
         toaster.create({
@@ -163,14 +167,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
       }
       filtersToSubmit = JSON.parse(codeValue);
     } else {
-      const filterParams = getLatestFilters();
-      filtersToSubmit = Object.fromEntries(
-        Object.entries(filterParams.filters).filter(([_, value]) =>
-          Array.isArray(value)
-            ? value.length > 0
-            : Object.keys(value as Record<string, string[]>).length > 0,
-        ),
-      );
+      filtersToSubmit = getNonEmptyFilters();
     }
 
     if (Object.keys(filtersToSubmit).length === 0) {
@@ -199,11 +196,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
           });
 
           void queryClient.automation.getTriggers.invalidate();
-          clearFilters();
-          void router.replace({
-            pathname: router.pathname,
-            query: { project: router.query.project },
-          });
+          closeDrawer();
         },
         onError: () => {
           toaster.create({
@@ -222,7 +215,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
       open={true}
       placement="end"
       size="lg"
-      onOpenChange={() => closeDrawer()}
+      onOpenChange={({ open }) => !open && closeDrawer()}
     >
       <Drawer.Content>
         <Drawer.Header>
@@ -296,7 +289,12 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
                 helper="Add or remove filters to the automation."
                 minWidth="calc(50% - 16px)"
               >
-                <QueryStringFieldsFilters hideTriggerButton />
+                <FieldsFilters
+                  filters={localFilters as Record<FilterField, FilterParam>}
+                  setFilters={(filters) =>
+                    setLocalFilters((prev) => ({ ...prev, ...filters }))
+                  }
+                />
               </HorizontalFormControl>
             )}
 
