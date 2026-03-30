@@ -505,6 +505,23 @@ describe("resultMapper", () => {
       });
     });
 
+    describe("when details is an empty string", () => {
+      it("does not include details in the result", () => {
+        const result = mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { passed: true, score: 1.0, details: "" },
+        });
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.result).toMatchObject({
+            status: "processed",
+            details: undefined,
+          });
+        }
+      });
+    });
+
     describe("when details is a non-empty string", () => {
       it("includes details in the result", () => {
         const result = mapEvaluatorResult("target-1.eval-1", 0, {
