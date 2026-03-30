@@ -395,8 +395,8 @@ describe("traceSummary full-flow integration", () => {
           kind: NormalizedSpanKind.INTERNAL,
           spanAttributes: {
             "langwatch.span.type": "llm",
-            "gen_ai.request.model": "us.anthropic.claude-sonnet-4-20250514",
-            "gen_ai.response.model": "us.anthropic.claude-sonnet-4-20250514",
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.response.model": "gpt-5-mini",
             "gen_ai.usage.input_tokens": 300,
             "gen_ai.usage.output_tokens": 150,
             "gen_ai.input.messages": [
@@ -445,7 +445,7 @@ describe("traceSummary full-flow integration", () => {
         state = applySpanToSummary({ state, span: executeToolSpan });
 
         expect(state.models).toContain(
-          "us.anthropic.claude-sonnet-4-20250514",
+          "gpt-5-mini",
         );
         expect(state.totalPromptTokenCount).toBe(300);
         expect(state.totalCompletionTokenCount).toBe(150);

@@ -50,10 +50,10 @@ export class SpanCostService {
       attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
     );
     if (numInputRate !== null || numOutputRate !== null) {
-      return (
+      const derivedCost =
         promptTokens * (numInputRate ?? 0) +
-        completionTokens * (numOutputRate ?? 0)
-      );
+        completionTokens * (numOutputRate ?? 0);
+      if (derivedCost > 0) return derivedCost;
     }
 
     if (model && (promptTokens > 0 || completionTokens > 0)) {
@@ -83,7 +83,8 @@ export class SpanCostService {
           | undefined;
         if (
           costObj?.currency === "USD" &&
-          typeof costObj.amount === "number"
+          typeof costObj.amount === "number" &&
+          costObj.amount > 0
         ) {
           return costObj.amount;
         }

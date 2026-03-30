@@ -130,7 +130,7 @@ export class TraceIOAccumulationService {
       };
     }
 
-    const isRoot = !span.parentSpanId;
+    const isRoot = span.parentSpanId === null;
 
     const inputResult =
       this.traceIOExtractionService.extractRichIOFromSpan(span, "input");

@@ -93,7 +93,7 @@ export class TraceOriginService {
     span: NormalizedSpan;
     mergedAttributes: Record<string, string>;
   }): void {
-    const isRootSpan = !span.parentSpanId;
+    const isRootSpan = span.parentSpanId === null;
     const explicitOrigin = span.spanAttributes["langwatch.origin"];
     const hasExplicitOrigin =
       typeof explicitOrigin === "string" && explicitOrigin !== "";
@@ -143,7 +143,7 @@ export class TraceOriginService {
     span: NormalizedSpan;
     mergedAttributes: Record<string, string>;
   }): void {
-    const isRootSpan = !span.parentSpanId;
+    const isRootSpan = span.parentSpanId === null;
     const explicitSource = span.spanAttributes["langwatch.origin.source"] as
       | string
       | undefined;
