@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -30,33 +28,33 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         id (str):
         project_id (str):
         name (str):
-        slug (None | str):
+        slug (Union[None, str]):
         type_ (str):
-        config (GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None):
-        workflow_id (None | str):
-        copied_from_evaluator_id (None | str):
+        config (Union['GetApiEvaluatorsByIdOrSlugResponse200ConfigType0', None]):
+        workflow_id (Union[None, str]):
+        copied_from_evaluator_id (Union[None, str]):
         created_at (str):
         updated_at (str):
-        fields (list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]):
-        output_fields (list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]):
-        workflow_name (str | Unset):
-        workflow_icon (str | Unset):
+        fields (list['GetApiEvaluatorsByIdOrSlugResponse200FieldsItem']):
+        output_fields (list['GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem']):
+        workflow_name (Union[Unset, str]):
+        workflow_icon (Union[Unset, str]):
     """
 
     id: str
     project_id: str
     name: str
-    slug: None | str
+    slug: Union[None, str]
     type_: str
-    config: GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None
-    workflow_id: None | str
-    copied_from_evaluator_id: None | str
+    config: Union["GetApiEvaluatorsByIdOrSlugResponse200ConfigType0", None]
+    workflow_id: Union[None, str]
+    copied_from_evaluator_id: Union[None, str]
     created_at: str
     updated_at: str
-    fields: list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]
-    output_fields: list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]
-    workflow_name: str | Unset = UNSET
-    workflow_icon: str | Unset = UNSET
+    fields: list["GetApiEvaluatorsByIdOrSlugResponse200FieldsItem"]
+    output_fields: list["GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem"]
+    workflow_name: Union[Unset, str] = UNSET
+    workflow_icon: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -70,21 +68,21 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
 
         name = self.name
 
-        slug: None | str
+        slug: Union[None, str]
         slug = self.slug
 
         type_ = self.type_
 
-        config: dict[str, Any] | None
+        config: Union[None, dict[str, Any]]
         if isinstance(self.config, GetApiEvaluatorsByIdOrSlugResponse200ConfigType0):
             config = self.config.to_dict()
         else:
             config = self.config
 
-        workflow_id: None | str
+        workflow_id: Union[None, str]
         workflow_id = self.workflow_id
 
-        copied_from_evaluator_id: None | str
+        copied_from_evaluator_id: Union[None, str]
         copied_from_evaluator_id = self.copied_from_evaluator_id
 
         created_at = self.created_at
@@ -149,16 +147,16 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
 
         name = d.pop("name")
 
-        def _parse_slug(data: object) -> None | str:
+        def _parse_slug(data: object) -> Union[None, str]:
             if data is None:
                 return data
-            return cast(None | str, data)
+            return cast(Union[None, str], data)
 
         slug = _parse_slug(d.pop("slug"))
 
         type_ = d.pop("type")
 
-        def _parse_config(data: object) -> GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None:
+        def _parse_config(data: object) -> Union["GetApiEvaluatorsByIdOrSlugResponse200ConfigType0", None]:
             if data is None:
                 return data
             try:
@@ -167,23 +165,23 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
                 config_type_0 = GetApiEvaluatorsByIdOrSlugResponse200ConfigType0.from_dict(data)
 
                 return config_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
+            except:  # noqa: E722
                 pass
-            return cast(GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None, data)
+            return cast(Union["GetApiEvaluatorsByIdOrSlugResponse200ConfigType0", None], data)
 
         config = _parse_config(d.pop("config"))
 
-        def _parse_workflow_id(data: object) -> None | str:
+        def _parse_workflow_id(data: object) -> Union[None, str]:
             if data is None:
                 return data
-            return cast(None | str, data)
+            return cast(Union[None, str], data)
 
         workflow_id = _parse_workflow_id(d.pop("workflowId"))
 
-        def _parse_copied_from_evaluator_id(data: object) -> None | str:
+        def _parse_copied_from_evaluator_id(data: object) -> Union[None, str]:
             if data is None:
                 return data
-            return cast(None | str, data)
+            return cast(Union[None, str], data)
 
         copied_from_evaluator_id = _parse_copied_from_evaluator_id(d.pop("copiedFromEvaluatorId"))
 

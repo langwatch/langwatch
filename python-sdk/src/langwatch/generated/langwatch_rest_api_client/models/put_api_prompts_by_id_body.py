@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
+from ..models.put_api_prompts_by_id_body_labels_item import PutApiPromptsByIdBodyLabelsItem
 from ..models.put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from ..models.put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from ..types import UNSET, Unset
@@ -23,31 +22,33 @@ class PutApiPromptsByIdBody:
     """
     Attributes:
         commit_message (str):
-        model (str | Unset):
-        temperature (float | Unset):
-        max_tokens (float | Unset):
-        author_id (str | Unset):
-        prompt (str | Unset):
-        messages (list[PutApiPromptsByIdBodyMessagesItem] | Unset):
-        inputs (list[PutApiPromptsByIdBodyInputsItem] | Unset):
-        outputs (list[PutApiPromptsByIdBodyOutputsItem] | Unset):
-        schema_version (PutApiPromptsByIdBodySchemaVersion | Unset):
-        scope (PutApiPromptsByIdBodyScope | Unset):
-        handle (str | Unset):
+        model (Union[Unset, str]):
+        temperature (Union[Unset, float]):
+        max_tokens (Union[Unset, float]):
+        author_id (Union[Unset, str]):
+        prompt (Union[Unset, str]):
+        messages (Union[Unset, list['PutApiPromptsByIdBodyMessagesItem']]):
+        inputs (Union[Unset, list['PutApiPromptsByIdBodyInputsItem']]):
+        outputs (Union[Unset, list['PutApiPromptsByIdBodyOutputsItem']]):
+        schema_version (Union[Unset, PutApiPromptsByIdBodySchemaVersion]):
+        labels (Union[Unset, list[PutApiPromptsByIdBodyLabelsItem]]):
+        scope (Union[Unset, PutApiPromptsByIdBodyScope]):
+        handle (Union[Unset, str]):
     """
 
     commit_message: str
-    model: str | Unset = UNSET
-    temperature: float | Unset = UNSET
-    max_tokens: float | Unset = UNSET
-    author_id: str | Unset = UNSET
-    prompt: str | Unset = UNSET
-    messages: list[PutApiPromptsByIdBodyMessagesItem] | Unset = UNSET
-    inputs: list[PutApiPromptsByIdBodyInputsItem] | Unset = UNSET
-    outputs: list[PutApiPromptsByIdBodyOutputsItem] | Unset = UNSET
-    schema_version: PutApiPromptsByIdBodySchemaVersion | Unset = UNSET
-    scope: PutApiPromptsByIdBodyScope | Unset = UNSET
-    handle: str | Unset = UNSET
+    model: Union[Unset, str] = UNSET
+    temperature: Union[Unset, float] = UNSET
+    max_tokens: Union[Unset, float] = UNSET
+    author_id: Union[Unset, str] = UNSET
+    prompt: Union[Unset, str] = UNSET
+    messages: Union[Unset, list["PutApiPromptsByIdBodyMessagesItem"]] = UNSET
+    inputs: Union[Unset, list["PutApiPromptsByIdBodyInputsItem"]] = UNSET
+    outputs: Union[Unset, list["PutApiPromptsByIdBodyOutputsItem"]] = UNSET
+    schema_version: Union[Unset, PutApiPromptsByIdBodySchemaVersion] = UNSET
+    labels: Union[Unset, list[PutApiPromptsByIdBodyLabelsItem]] = UNSET
+    scope: Union[Unset, PutApiPromptsByIdBodyScope] = UNSET
+    handle: Union[Unset, str] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         commit_message = self.commit_message
@@ -62,39 +63,45 @@ class PutApiPromptsByIdBody:
 
         prompt = self.prompt
 
-        messages: list[dict[str, Any]] | Unset = UNSET
+        messages: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.messages, Unset):
             messages = []
             for messages_item_data in self.messages:
                 messages_item = messages_item_data.to_dict()
                 messages.append(messages_item)
 
-        inputs: list[dict[str, Any]] | Unset = UNSET
+        inputs: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.inputs, Unset):
             inputs = []
             for inputs_item_data in self.inputs:
                 inputs_item = inputs_item_data.to_dict()
                 inputs.append(inputs_item)
 
-        outputs: list[dict[str, Any]] | Unset = UNSET
+        outputs: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.outputs, Unset):
             outputs = []
             for outputs_item_data in self.outputs:
                 outputs_item = outputs_item_data.to_dict()
                 outputs.append(outputs_item)
 
-        schema_version: str | Unset = UNSET
+        schema_version: Union[Unset, str] = UNSET
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
-        scope: str | Unset = UNSET
+        labels: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = []
+            for labels_item_data in self.labels:
+                labels_item = labels_item_data.value
+                labels.append(labels_item)
+
+        scope: Union[Unset, str] = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
 
         handle = self.handle
 
         field_dict: dict[str, Any] = {}
-
         field_dict.update(
             {
                 "commitMessage": commit_message,
@@ -118,6 +125,8 @@ class PutApiPromptsByIdBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
+        if labels is not UNSET:
+            field_dict["labels"] = labels
         if scope is not UNSET:
             field_dict["scope"] = scope
         if handle is not UNSET:
@@ -144,42 +153,43 @@ class PutApiPromptsByIdBody:
 
         prompt = d.pop("prompt", UNSET)
 
+        messages = []
         _messages = d.pop("messages", UNSET)
-        messages: list[PutApiPromptsByIdBodyMessagesItem] | Unset = UNSET
-        if _messages is not UNSET:
-            messages = []
-            for messages_item_data in _messages:
-                messages_item = PutApiPromptsByIdBodyMessagesItem.from_dict(messages_item_data)
+        for messages_item_data in _messages or []:
+            messages_item = PutApiPromptsByIdBodyMessagesItem.from_dict(messages_item_data)
 
-                messages.append(messages_item)
+            messages.append(messages_item)
 
+        inputs = []
         _inputs = d.pop("inputs", UNSET)
-        inputs: list[PutApiPromptsByIdBodyInputsItem] | Unset = UNSET
-        if _inputs is not UNSET:
-            inputs = []
-            for inputs_item_data in _inputs:
-                inputs_item = PutApiPromptsByIdBodyInputsItem.from_dict(inputs_item_data)
+        for inputs_item_data in _inputs or []:
+            inputs_item = PutApiPromptsByIdBodyInputsItem.from_dict(inputs_item_data)
 
-                inputs.append(inputs_item)
+            inputs.append(inputs_item)
 
+        outputs = []
         _outputs = d.pop("outputs", UNSET)
-        outputs: list[PutApiPromptsByIdBodyOutputsItem] | Unset = UNSET
-        if _outputs is not UNSET:
-            outputs = []
-            for outputs_item_data in _outputs:
-                outputs_item = PutApiPromptsByIdBodyOutputsItem.from_dict(outputs_item_data)
+        for outputs_item_data in _outputs or []:
+            outputs_item = PutApiPromptsByIdBodyOutputsItem.from_dict(outputs_item_data)
 
-                outputs.append(outputs_item)
+            outputs.append(outputs_item)
 
         _schema_version = d.pop("schemaVersion", UNSET)
-        schema_version: PutApiPromptsByIdBodySchemaVersion | Unset
+        schema_version: Union[Unset, PutApiPromptsByIdBodySchemaVersion]
         if isinstance(_schema_version, Unset):
             schema_version = UNSET
         else:
             schema_version = PutApiPromptsByIdBodySchemaVersion(_schema_version)
 
+        labels = []
+        _labels = d.pop("labels", UNSET)
+        for labels_item_data in _labels or []:
+            labels_item = PutApiPromptsByIdBodyLabelsItem(labels_item_data)
+
+            labels.append(labels_item)
+
         _scope = d.pop("scope", UNSET)
-        scope: PutApiPromptsByIdBodyScope | Unset
+        scope: Union[Unset, PutApiPromptsByIdBodyScope]
         if isinstance(_scope, Unset):
             scope = UNSET
         else:
@@ -198,6 +208,7 @@ class PutApiPromptsByIdBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
+            labels=labels,
             scope=scope,
             handle=handle,
         )

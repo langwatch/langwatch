@@ -77,6 +77,8 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
+    labelsCreated           PromptVersionLabel[]   @relation("labelCreatedBy")
+    labelsUpdated           PromptVersionLabel[]   @relation("labelUpdatedBy")
 
 }
 
@@ -937,6 +939,9 @@ model LlmPromptConfig {
     // Relation to all versions - latest is determined by query
     versions LlmPromptConfigVersion[] @relation("Versions")
 
+    // Relation to labels (e.g., "production", "staging")
+    labels PromptVersionLabel[] @relation("Labels")
+
     @@unique([handle], map: "LlmPromptConfig_handle_key")
     @@index([projectId])
     @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
@@ -961,10 +966,34 @@ model LlmPromptConfigVersion {
     // Required for multi-tenancy
     projectId String
 
+    // Labels pointing to this version
+    labels PromptVersionLabel[]
+
     @@unique([configId, version]) // Each version number must be unique per config
     @@index([configId])
     @@index([authorId])
     @@index([createdAt]) // Index important for finding the latest efficiently
+}
+
+model PromptVersionLabel {
+    id          String   @id @default(nanoid())
+    configId    String
+    config      LlmPromptConfig        @relation("Labels", fields: [configId], references: [id], onDelete: Cascade)
+    versionId   String
+    version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+    label       String
+    projectId   String
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
+    createdById String?
+    createdBy   User?    @relation("labelCreatedBy", fields: [createdById], references: [id])
+    updatedById String?
+    updatedBy   User?    @relation("labelUpdatedBy", fields: [updatedById], references: [id])
+
+    @@unique([configId, label])
+    @@index([configId])
+    @@index([versionId])
+    @@index([projectId])
 }
 
 model Analytics {

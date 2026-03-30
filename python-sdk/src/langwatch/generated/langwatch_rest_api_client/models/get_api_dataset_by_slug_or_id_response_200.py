@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -17,10 +15,10 @@ T = TypeVar("T", bound="GetApiDatasetBySlugOrIdResponse200")
 class GetApiDatasetBySlugOrIdResponse200:
     """
     Attributes:
-        data (list[GetApiDatasetBySlugOrIdResponse200DataItem]):
+        data (list['GetApiDatasetBySlugOrIdResponse200DataItem']):
     """
 
-    data: list[GetApiDatasetBySlugOrIdResponse200DataItem]
+    data: list["GetApiDatasetBySlugOrIdResponse200DataItem"]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

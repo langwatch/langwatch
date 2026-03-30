@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -14,7 +14,6 @@ from ...types import Response
 
 
 def _get_kwargs() -> dict[str, Any]:
-
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": "/api/scenario-events",
@@ -24,40 +23,36 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    DeleteApiScenarioEventsResponse200
-    | DeleteApiScenarioEventsResponse400
-    | DeleteApiScenarioEventsResponse401
-    | DeleteApiScenarioEventsResponse422
-    | DeleteApiScenarioEventsResponse500
-    | None
-):
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[
+    Union[
+        DeleteApiScenarioEventsResponse200,
+        DeleteApiScenarioEventsResponse400,
+        DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
+        DeleteApiScenarioEventsResponse500,
+    ]
+]:
     if response.status_code == 200:
         response_200 = DeleteApiScenarioEventsResponse200.from_dict(response.json())
 
         return response_200
-
     if response.status_code == 400:
         response_400 = DeleteApiScenarioEventsResponse400.from_dict(response.json())
 
         return response_400
-
     if response.status_code == 401:
         response_401 = DeleteApiScenarioEventsResponse401.from_dict(response.json())
 
         return response_401
-
     if response.status_code == 422:
         response_422 = DeleteApiScenarioEventsResponse422.from_dict(response.json())
 
         return response_422
-
     if response.status_code == 500:
         response_500 = DeleteApiScenarioEventsResponse500.from_dict(response.json())
 
         return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -65,13 +60,15 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
-    DeleteApiScenarioEventsResponse200
-    | DeleteApiScenarioEventsResponse400
-    | DeleteApiScenarioEventsResponse401
-    | DeleteApiScenarioEventsResponse422
-    | DeleteApiScenarioEventsResponse500
+    Union[
+        DeleteApiScenarioEventsResponse200,
+        DeleteApiScenarioEventsResponse400,
+        DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
+        DeleteApiScenarioEventsResponse500,
+    ]
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -83,13 +80,15 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
 ) -> Response[
-    DeleteApiScenarioEventsResponse200
-    | DeleteApiScenarioEventsResponse400
-    | DeleteApiScenarioEventsResponse401
-    | DeleteApiScenarioEventsResponse422
-    | DeleteApiScenarioEventsResponse500
+    Union[
+        DeleteApiScenarioEventsResponse200,
+        DeleteApiScenarioEventsResponse400,
+        DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
+        DeleteApiScenarioEventsResponse500,
+    ]
 ]:
     """Delete all events
 
@@ -98,7 +97,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500]
+        Response[Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]]
     """
 
     kwargs = _get_kwargs()
@@ -112,15 +111,16 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-) -> (
-    DeleteApiScenarioEventsResponse200
-    | DeleteApiScenarioEventsResponse400
-    | DeleteApiScenarioEventsResponse401
-    | DeleteApiScenarioEventsResponse422
-    | DeleteApiScenarioEventsResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[
+    Union[
+        DeleteApiScenarioEventsResponse200,
+        DeleteApiScenarioEventsResponse400,
+        DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
+        DeleteApiScenarioEventsResponse500,
+    ]
+]:
     """Delete all events
 
     Raises:
@@ -128,7 +128,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500
+        Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]
     """
 
     return sync_detailed(
@@ -138,13 +138,15 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
 ) -> Response[
-    DeleteApiScenarioEventsResponse200
-    | DeleteApiScenarioEventsResponse400
-    | DeleteApiScenarioEventsResponse401
-    | DeleteApiScenarioEventsResponse422
-    | DeleteApiScenarioEventsResponse500
+    Union[
+        DeleteApiScenarioEventsResponse200,
+        DeleteApiScenarioEventsResponse400,
+        DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
+        DeleteApiScenarioEventsResponse500,
+    ]
 ]:
     """Delete all events
 
@@ -153,7 +155,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500]
+        Response[Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]]
     """
 
     kwargs = _get_kwargs()
@@ -165,15 +167,16 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-) -> (
-    DeleteApiScenarioEventsResponse200
-    | DeleteApiScenarioEventsResponse400
-    | DeleteApiScenarioEventsResponse401
-    | DeleteApiScenarioEventsResponse422
-    | DeleteApiScenarioEventsResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[
+    Union[
+        DeleteApiScenarioEventsResponse200,
+        DeleteApiScenarioEventsResponse400,
+        DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
+        DeleteApiScenarioEventsResponse500,
+    ]
+]:
     """Delete all events
 
     Raises:
@@ -181,7 +184,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500
+        Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]
     """
 
     return (

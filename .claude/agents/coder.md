@@ -26,7 +26,9 @@ Then explore relevant code to understand existing patterns.
 
 ### 3. Implement with TDD
 
-1. Write failing test
+**Test levels must match spec tags.** If the feature file tags a scenario `@integration`, write an `.integration.test.ts` file. If `@unit`, write a `.unit.test.ts` file. Do not substitute unit tests for integration scenarios or vice versa.
+
+1. Write failing test (at the correct level per spec tag)
 2. Write minimal code to pass
 3. Refactor
 4. Run `pnpm typecheck` after changes

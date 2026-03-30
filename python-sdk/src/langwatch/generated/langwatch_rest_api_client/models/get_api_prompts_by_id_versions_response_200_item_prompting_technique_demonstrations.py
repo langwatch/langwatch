@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,14 +19,14 @@ T = TypeVar("T", bound="GetApiPromptsByIdVersionsResponse200ItemPromptingTechniq
 class GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrations:
     """
     Attributes:
-        id (str | Unset):
-        name (str | Unset):
-        inline (GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrationsInline | Unset):
+        id (Union[Unset, str]):
+        name (Union[Unset, str]):
+        inline (Union[Unset, GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrationsInline]):
     """
 
-    id: str | Unset = UNSET
-    name: str | Unset = UNSET
-    inline: GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrationsInline | Unset = UNSET
+    id: Union[Unset, str] = UNSET
+    name: Union[Unset, str] = UNSET
+    inline: Union[Unset, "GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrationsInline"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,7 +34,7 @@ class GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrations:
 
         name = self.name
 
-        inline: dict[str, Any] | Unset = UNSET
+        inline: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.inline, Unset):
             inline = self.inline.to_dict()
 
@@ -64,7 +62,7 @@ class GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrations:
         name = d.pop("name", UNSET)
 
         _inline = d.pop("inline", UNSET)
-        inline: GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrationsInline | Unset
+        inline: Union[Unset, GetApiPromptsByIdVersionsResponse200ItemPromptingTechniqueDemonstrationsInline]
         if isinstance(_inline, Unset):
             inline = UNSET
         else:

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -30,7 +28,7 @@ class GetApiDatasetBySlugOrIdResponse200DataItem:
     id: str
     dataset_id: str
     project_id: str
-    entry: GetApiDatasetBySlugOrIdResponse200DataItemEntry
+    entry: "GetApiDatasetBySlugOrIdResponse200DataItemEntry"
     created_at: str
     updated_at: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)

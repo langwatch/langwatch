@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,12 +13,12 @@ T = TypeVar("T", bound="PostApiScenarioEventsBodyType2MessagesItem")
 class PostApiScenarioEventsBodyType2MessagesItem:
     """
     Attributes:
-        id (str | Unset):
-        trace_id (str | Unset):
+        id (Union[Unset, str]):
+        trace_id (Union[Unset, str]):
     """
 
-    id: str | Unset = UNSET
-    trace_id: str | Unset = UNSET
+    id: Union[Unset, str] = UNSET
+    trace_id: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

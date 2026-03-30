@@ -1,22 +1,19 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PostApiTracesSearchBodyFiltersSentimentInputSentimentType2AdditionalProperty")
+T = TypeVar("T", bound="PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2AdditionalProperty")
 
 
 @_attrs_define
-class PostApiTracesSearchBodyFiltersSentimentInputSentimentType2AdditionalProperty:
+class PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2AdditionalProperty:
     """ """
 
     additional_properties: dict[str, list[str]] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-
         field_dict: dict[str, Any] = {}
         for prop_name, prop in self.additional_properties.items():
             field_dict[prop_name] = prop
@@ -26,7 +23,7 @@ class PostApiTracesSearchBodyFiltersSentimentInputSentimentType2AdditionalProper
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        post_api_traces_search_body_filters_sentiment_input_sentiment_type_2_additional_property = cls()
+        post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2_additional_property = cls()
 
         additional_properties = {}
         for prop_name, prop_dict in d.items():
@@ -34,8 +31,8 @@ class PostApiTracesSearchBodyFiltersSentimentInputSentimentType2AdditionalProper
 
             additional_properties[prop_name] = additional_property
 
-        post_api_traces_search_body_filters_sentiment_input_sentiment_type_2_additional_property.additional_properties = additional_properties
-        return post_api_traces_search_body_filters_sentiment_input_sentiment_type_2_additional_property
+        post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2_additional_property.additional_properties = additional_properties
+        return post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2_additional_property
 
     @property
     def additional_keys(self) -> list[str]:

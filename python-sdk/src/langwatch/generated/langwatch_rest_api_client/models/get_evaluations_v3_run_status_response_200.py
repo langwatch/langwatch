@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,20 +22,21 @@ class GetEvaluationsV3RunStatusResponse200:
         status (GetEvaluationsV3RunStatusResponse200Status):
         progress (int): Number of cells completed
         total (int): Total number of cells
-        started_at (int | Unset): Unix timestamp when run started
-        finished_at (int | Unset): Unix timestamp when run finished (only present when completed/failed/stopped)
-        summary (GetEvaluationsV3RunStatusResponse200Summary | Unset): Execution summary (only present when completed)
-        error (str | Unset): Error message (only present when failed)
+        started_at (Union[Unset, int]): Unix timestamp when run started
+        finished_at (Union[Unset, int]): Unix timestamp when run finished (only present when completed/failed/stopped)
+        summary (Union[Unset, GetEvaluationsV3RunStatusResponse200Summary]): Execution summary (only present when
+            completed)
+        error (Union[Unset, str]): Error message (only present when failed)
     """
 
     run_id: str
     status: GetEvaluationsV3RunStatusResponse200Status
     progress: int
     total: int
-    started_at: int | Unset = UNSET
-    finished_at: int | Unset = UNSET
-    summary: GetEvaluationsV3RunStatusResponse200Summary | Unset = UNSET
-    error: str | Unset = UNSET
+    started_at: Union[Unset, int] = UNSET
+    finished_at: Union[Unset, int] = UNSET
+    summary: Union[Unset, "GetEvaluationsV3RunStatusResponse200Summary"] = UNSET
+    error: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,7 +52,7 @@ class GetEvaluationsV3RunStatusResponse200:
 
         finished_at = self.finished_at
 
-        summary: dict[str, Any] | Unset = UNSET
+        summary: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.summary, Unset):
             summary = self.summary.to_dict()
 
@@ -100,7 +99,7 @@ class GetEvaluationsV3RunStatusResponse200:
         finished_at = d.pop("finishedAt", UNSET)
 
         _summary = d.pop("summary", UNSET)
-        summary: GetEvaluationsV3RunStatusResponse200Summary | Unset
+        summary: Union[Unset, GetEvaluationsV3RunStatusResponse200Summary]
         if isinstance(_summary, Unset):
             summary = UNSET
         else:
