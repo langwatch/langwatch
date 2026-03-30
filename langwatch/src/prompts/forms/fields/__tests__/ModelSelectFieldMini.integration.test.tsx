@@ -6,6 +6,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -232,6 +233,26 @@ describe("<ModelSelectFieldMini/>", () => {
           "Temperature must be between 0 and 2",
         );
         expect(errorText).toHaveTextContent("Max tokens must be positive");
+      });
+    });
+
+    describe("when popover is open", () => {
+      it("hides error text below the trigger", async () => {
+        const user = userEvent.setup();
+        renderComponent();
+        setTemperatureError();
+
+        // Error text is visible before opening
+        await screen.findByTestId("model-select-error-text");
+
+        // Open popover by clicking the trigger
+        const trigger = screen.getByTestId("model-select-trigger");
+        await user.click(trigger);
+
+        // Error text is hidden when popover is open
+        expect(
+          screen.queryByTestId("model-select-error-text"),
+        ).not.toBeInTheDocument();
       });
     });
   });

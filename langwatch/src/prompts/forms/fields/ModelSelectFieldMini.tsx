@@ -83,10 +83,14 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
       render={({ field }) => {
         const llmErrors = formState.errors.version?.configData?.llm;
         const hasErrors = !!llmErrors;
-        const errorMessages = [
-          llmErrors?.temperature?.message,
-          llmErrors?.maxTokens?.message,
-        ].filter(Boolean);
+        const errorMessages = llmErrors
+          ? Object.values(llmErrors)
+              .map(
+                (err) =>
+                  (err as { message?: string } | undefined)?.message,
+              )
+              .filter(Boolean)
+          : [];
 
         return (
           <Popover.Root
