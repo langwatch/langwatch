@@ -1,116 +1,19 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for thread variable serialization/deserialization in OnlineEvaluationDrawer.
+ * Unit tests for thread variable serialization/deserialization.
  * Feature: specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
  *
- * These tests verify the serialization logic extracted from OnlineEvaluationDrawer
- * without requiring DOM or React rendering.
+ * Tests the real serializeMappingsToMappingState and deserializeMappingStateToUI
+ * functions from the shared mappingSerialization module.
  */
 import { describe, expect, it } from "vitest";
+import type { MappingState } from "~/server/tracer/tracesMapping";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import {
-  SERVER_ONLY_THREAD_SOURCES,
-  THREAD_MAPPINGS,
-  TRACE_MAPPINGS,
-  type MappingState,
-} from "~/server/tracer/tracesMapping";
-
-// ---------------------------------------------------------------------------
-// Helpers: extracted serialization/deserialization logic from OnlineEvaluationDrawer
-// ---------------------------------------------------------------------------
-
-type UIFieldMapping =
-  | { type: "source"; sourceId: string; path: string[] }
-  | { type: "value"; value: string };
-
-/**
- * Serialize UI field mappings to MappingState format.
- * Mirrors the logic in OnlineEvaluationDrawer.handleSave.
- */
-function serializeMappingsToMappingState(
-  mappings: Record<string, UIFieldMapping>,
-): MappingState {
-  const mappingState: MappingState = {
-    mapping: {},
-    expansions: [],
-  };
-
-  for (const [field, mapping] of Object.entries(mappings)) {
-    if (mapping.type === "source" && mapping.path.length > 0) {
-      const parts = mapping.path;
-      const source = parts[0]!;
-
-      const isThreadSource =
-        source in THREAD_MAPPINGS ||
-        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source) ||
-        mapping.sourceId === "thread";
-
-      if (isThreadSource) {
-        const selectedFields =
-          parts.length > 1 ? parts.slice(1) : undefined;
-        mappingState.mapping[field] = {
-          type: "thread" as const,
-          source: source as keyof typeof THREAD_MAPPINGS,
-          selectedFields,
-        };
-      } else {
-        mappingState.mapping[field] = {
-          source: source as keyof typeof TRACE_MAPPINGS,
-          key: parts[1],
-          subkey: parts[2],
-        };
-      }
-    }
-  }
-
-  return mappingState;
-}
-
-/**
- * Deserialize MappingState to UI field mappings.
- * Mirrors the logic in OnlineEvaluationDrawer's monitor loading effect.
- */
-function deserializeMappingStateToUI(
-  existingMappings: MappingState,
-  monitorLevel: "trace" | "thread",
-): Record<string, UIFieldMapping> {
-  const uiMappings: Record<string, UIFieldMapping> = {};
-
-  for (const [field, mapping] of Object.entries(existingMappings.mapping)) {
-    if (mapping.source) {
-      const pathParts: string[] = [mapping.source as string];
-      if ("type" in mapping && mapping.type === "thread") {
-        if (
-          "selectedFields" in mapping &&
-          mapping.selectedFields?.length
-        ) {
-          pathParts.push(...mapping.selectedFields);
-        }
-      } else {
-        if ("key" in mapping && mapping.key) pathParts.push(mapping.key);
-        if ("subkey" in mapping && mapping.subkey)
-          pathParts.push(mapping.subkey);
-      }
-
-      const isThreadMapping =
-        "type" in mapping && mapping.type === "thread";
-      const sourceId =
-        monitorLevel === "thread"
-          ? "thread"
-          : isThreadMapping
-            ? "thread"
-            : "trace";
-
-      uiMappings[field] = {
-        type: "source",
-        sourceId,
-        path: pathParts,
-      };
-    }
-  }
-
-  return uiMappings;
-}
+  serializeMappingsToMappingState,
+  deserializeMappingStateToUI,
+} from "../mappingSerialization";
 
 // ---------------------------------------------------------------------------
 // Tests
