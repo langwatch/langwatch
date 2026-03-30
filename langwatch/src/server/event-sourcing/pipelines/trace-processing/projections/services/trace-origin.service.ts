@@ -107,20 +107,15 @@ export class TraceOriginService {
         mergedAttributes["langwatch.origin"] =
           state.attributes["langwatch.origin"];
       }
-    } else if (isRootSpan && state.attributes["langwatch.origin"]) {
-      mergedAttributes["langwatch.origin"] =
-        state.attributes["langwatch.origin"];
     } else {
+      // For root spans, always try legacy markers first — a root with a
+      // legacy marker should override a provisional origin (e.g. "application")
+      // set by an earlier-arriving child via the sdk.name heuristic.
       const inferred = this.inferOriginFromLegacyMarkers(span);
-      if (inferred) {
-        if (isRootSpan) {
-          mergedAttributes["langwatch.origin"] = inferred;
-        } else if (!state.attributes["langwatch.origin"]) {
-          mergedAttributes["langwatch.origin"] = inferred;
-        } else {
-          mergedAttributes["langwatch.origin"] =
-            state.attributes["langwatch.origin"];
-        }
+      if (isRootSpan && inferred) {
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else if (inferred && !state.attributes["langwatch.origin"]) {
+        mergedAttributes["langwatch.origin"] = inferred;
       } else if (state.attributes["langwatch.origin"]) {
         mergedAttributes["langwatch.origin"] =
           state.attributes["langwatch.origin"];

@@ -487,4 +487,34 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
   });
+
+  describe("when child with sdk.name arrives before root with legacy marker", () => {
+    it("overrides provisional 'application' origin with root's inferred origin", () => {
+      // Child arrives first — sdk.name heuristic sets origin to "application"
+      const childSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "root-1",
+        resourceAttributes: {
+          "telemetry.sdk.name": "@langwatch/scenario",
+        },
+        spanAttributes: {},
+      });
+
+      // Root arrives later — has legacy marker for simulation
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        instrumentationScope: { name: "@langwatch/scenario", version: null },
+        spanAttributes: {},
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("application");
+
+      state = applySpanToSummary({ state, span: rootSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
+    });
+  });
 });
