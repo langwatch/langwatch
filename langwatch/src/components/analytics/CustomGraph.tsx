@@ -551,7 +551,7 @@ const CustomGraph_ = React.memo(
       const dataLoaded = !timeseries.isLoading && timeseries.data;
       const allEmpty =
         dataLoaded &&
-        (maxValue == 0 || currentAndPreviousData?.length === 0);
+        (allValues.length === 0 || currentAndPreviousData?.length === 0);
 
       return (
         <Box width="full" height="full" position="relative">
