@@ -1,13 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import type { FilterField } from "~/server/filters/types";
 
-// Mock the filter registry to avoid generated-file dependency chain
+// Mock the filter registry with one real-looking filter for testing
 vi.mock("~/server/filters/registry", () => ({
-  availableFilters: {},
+  availableFilters: {
+    "spans.model": {
+      name: "Model",
+      urlKey: "model",
+      query: (values: string[]) => ({ terms: { "spans.model": values } }),
+      listMatch: {
+        aggregation: () => ({}),
+        extract: () => [],
+      },
+    },
+  },
 }));
 
 // Dynamic import after mocks are set
-const { generateTracesPivotQueryConditions } = await import("../common");
+const { generateTracesPivotQueryConditions, generateFilterConditions } =
+  await import("../common");
 
 describe("generateTracesPivotQueryConditions()", () => {
   const baseInput = {
@@ -75,6 +87,42 @@ describe("generateTracesPivotQueryConditions()", () => {
       );
 
       expect(termsFilter).toBeUndefined();
+    });
+  });
+});
+
+describe("generateFilterConditions()", () => {
+  describe("when filter field is unknown", () => {
+    it("returns a match_none condition so the trigger never fires", () => {
+      const conditions = generateFilterConditions({
+        ["service.name" as FilterField]: ["chat"],
+      });
+
+      expect(conditions).toEqual([{ match_none: {} }]);
+    });
+  });
+
+  describe("when filter field is known", () => {
+    it("returns real query conditions", () => {
+      const conditions = generateFilterConditions({
+        "spans.model": ["gpt-4"],
+      });
+
+      expect(conditions).toHaveLength(1);
+      expect(conditions[0]).toEqual({ terms: { "spans.model": ["gpt-4"] } });
+    });
+  });
+
+  describe("when mixing known and unknown fields", () => {
+    it("includes match_none for the unknown field", () => {
+      const conditions = generateFilterConditions({
+        "spans.model": ["gpt-4"],
+        ["service.name" as FilterField]: ["chat"],
+      });
+
+      expect(conditions).toHaveLength(2);
+      expect(conditions).toContainEqual({ terms: { "spans.model": ["gpt-4"] } });
+      expect(conditions).toContainEqual({ match_none: {} });
     });
   });
 });

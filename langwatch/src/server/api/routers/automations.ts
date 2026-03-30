@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { triggerFiltersSchema } from "../../filters/types";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
@@ -14,7 +15,7 @@ export const automationRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string(),
         action: z.nativeEnum(TriggerAction),
-        filters: z.any(),
+        filters: triggerFiltersSchema,
         actionParams: z.object({
           createdByUserId: z.string().optional(),
           members: z.string().array().optional(),
@@ -240,7 +241,7 @@ export const automationRouter = createTRPCRouter({
       z.object({
         triggerId: z.string(),
         projectId: z.string(),
-        filters: z.any(),
+        filters: triggerFiltersSchema,
       }),
     )
     .use(checkProjectPermission("triggers:update"))
