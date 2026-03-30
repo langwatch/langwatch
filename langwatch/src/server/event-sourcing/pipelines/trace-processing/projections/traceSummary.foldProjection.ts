@@ -9,9 +9,8 @@ import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-ext
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
-import { matchModelCostWithFallbacks } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
@@ -191,7 +190,7 @@ function computeSpanCost({
   }
 
   if (model && (promptTokens > 0 || completionTokens > 0)) {
-    const matched = matchModelCostWithFallbacks(model, getStaticModelCosts(), matchingLLMModelCost);
+    const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
     if (matched) {
       const computed = estimateCost({
         llmModelCost: matched,

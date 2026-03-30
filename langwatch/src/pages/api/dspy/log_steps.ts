@@ -6,9 +6,8 @@ import { fromZodError, type ZodError } from "zod-validation-error";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
 } from "../../../server/background/workers/collector/cost";
-import { matchModelCostWithFallbacks } from "../../../server/app-layer/traces/span-cost-enrichment.service";
 import { prisma } from "../../../server/db";
 import type {
   DSPyLLMCall,
@@ -250,7 +249,7 @@ const extractLLMCallInfo =
     ) {
       const model = call.response?.model;
       const llmModelCost =
-        model && matchModelCostWithFallbacks(call.response.model, llmModelCosts, matchingLLMModelCost);
+        model && matchModelCostWithFallbacks(call.response.model, llmModelCosts);
       const promptTokens = call.response?.usage?.prompt_tokens;
       const completionTokens = call.response?.usage?.completion_tokens;
 

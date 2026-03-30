@@ -5,11 +5,12 @@ import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processin
 import {
   OtlpSpanCostEnrichmentService,
   type OtlpSpanCostEnrichmentServiceDependencies,
+} from "../span-cost-enrichment.service";
+import {
+  matchModelCostWithFallbacks,
   stripProviderSubtype,
   stripDateSuffix,
-  matchModelCostWithFallbacks,
-} from "../span-cost-enrichment.service";
-import { matchingLLMModelCost } from "~/server/background/workers/collector/cost";
+} from "~/server/background/workers/collector/cost";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 
 function createTestSpan(
@@ -37,9 +38,6 @@ function createMockDeps(
 ): OtlpSpanCostEnrichmentServiceDependencies {
   return {
     getCustomModelCosts: vi.fn().mockResolvedValue(customCosts),
-    matchModelCost: vi.fn((model: string, costs: MaybeStoredLLMModelCost[]) => {
-      return costs.find((c) => new RegExp(c.regex).test(model));
-    }),
   };
 }
 
@@ -274,7 +272,6 @@ describe("matchModelCostWithFallbacks", () => {
       const result = matchModelCostWithFallbacks(
         "openai.responses/gpt-5-mini-2025-08-07",
         costs,
-        matchingLLMModelCost,
       );
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
@@ -285,7 +282,6 @@ describe("matchModelCostWithFallbacks", () => {
       const result = matchModelCostWithFallbacks(
         "openai.responses/gpt-5-mini",
         costs,
-        matchingLLMModelCost,
       );
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
@@ -296,7 +292,6 @@ describe("matchModelCostWithFallbacks", () => {
       const result = matchModelCostWithFallbacks(
         "gpt-5-mini-2025-08-07",
         costs,
-        matchingLLMModelCost,
       );
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
@@ -317,7 +312,6 @@ describe("matchModelCostWithFallbacks", () => {
       const result = matchModelCostWithFallbacks(
         "openai.responses/gpt-5-mini-2025-08-07",
         costsWithExact,
-        matchingLLMModelCost,
       );
       expect(result?.model).toBe("openai.responses/gpt-5-mini-2025-08-07");
     });
@@ -330,7 +324,6 @@ describe("matchModelCostWithFallbacks", () => {
       const result = matchModelCostWithFallbacks(
         "openai.responses/gpt-5-mini-2025-08-07",
         realCosts,
-        matchingLLMModelCost,
       );
       expect(result?.model).toBe("openai/gpt-5-mini");
     });
@@ -339,7 +332,6 @@ describe("matchModelCostWithFallbacks", () => {
       const result = matchModelCostWithFallbacks(
         "gpt-4o-2024-11-20",
         realCosts,
-        matchingLLMModelCost,
       );
       expect(result?.model).toBe("openai/gpt-4o-2024-11-20");
     });

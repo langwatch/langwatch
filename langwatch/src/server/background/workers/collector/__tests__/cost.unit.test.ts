@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
   normalizeModelName,
 } from "../cost";
 import { getStaticModelCosts } from "../../../../modelProviders/llmModelCost";
@@ -104,31 +104,31 @@ describe("normalizeModelName", () => {
   });
 });
 
-describe("matchingLLMModelCost", () => {
+describe("matchModelCostWithFallbacks", () => {
   describe("when model name matches exactly", () => {
     it("finds cost for model name without vendor prefix", () => {
-      expect(matchingLLMModelCost("gpt-4o", fakeModelCosts)?.model).toBe(
+      expect(matchModelCostWithFallbacks("gpt-4o", fakeModelCosts)?.model).toBe(
         "openai/gpt-4o"
       );
     });
 
     it("finds cost for model name with vendor prefix", () => {
       expect(
-        matchingLLMModelCost("openai/gpt-4o", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("openai/gpt-4o", fakeModelCosts)?.model
       ).toBe("openai/gpt-4o");
     });
   });
 
   describe("when model name uses uppercase letters", () => {
     it("normalizes to lowercase before matching", () => {
-      expect(matchingLLMModelCost("GPT-4O", fakeModelCosts)?.model).toBe(
+      expect(matchModelCostWithFallbacks("GPT-4O", fakeModelCosts)?.model).toBe(
         "openai/gpt-4o"
       );
     });
 
     it("normalizes mixed-case vendor prefix to lowercase", () => {
       expect(
-        matchingLLMModelCost("OpenAI/GPT-4O", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("OpenAI/GPT-4O", fakeModelCosts)?.model
       ).toBe("openai/gpt-4o");
     });
   });
@@ -136,25 +136,25 @@ describe("matchingLLMModelCost", () => {
   describe("when model name uses dot or hyphen in version numbers", () => {
     it("matches claude-opus-4.5 with a dot", () => {
       expect(
-        matchingLLMModelCost("claude-opus-4.5", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("claude-opus-4.5", fakeModelCosts)?.model
       ).toBe("anthropic/claude-opus-4.5");
     });
 
     it("matches claude-opus-4-5 with a hyphen (interchangeable with dot)", () => {
       expect(
-        matchingLLMModelCost("claude-opus-4-5", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("claude-opus-4-5", fakeModelCosts)?.model
       ).toBe("anthropic/claude-opus-4.5");
     });
 
     it("matches minimax-m2.1 with a dot", () => {
       expect(
-        matchingLLMModelCost("minimax-m2.1", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("minimax-m2.1", fakeModelCosts)?.model
       ).toBe("minimax/minimax-m2.1");
     });
 
     it("matches minimax-m2-1 with a hyphen", () => {
       expect(
-        matchingLLMModelCost("minimax-m2-1", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("minimax-m2-1", fakeModelCosts)?.model
       ).toBe("minimax/minimax-m2.1");
     });
   });
@@ -162,13 +162,13 @@ describe("matchingLLMModelCost", () => {
   describe("when model name has an extra vendor prefix from a proxy", () => {
     it("strips one prefix level and retries", () => {
       expect(
-        matchingLLMModelCost("together_ai/gpt-4o", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("together_ai/gpt-4o", fakeModelCosts)?.model
       ).toBe("openai/gpt-4o");
     });
 
     it("strips multiple prefix levels for multi-segment names", () => {
       expect(
-        matchingLLMModelCost("together_ai/openai/gpt-4o", fakeModelCosts)
+        matchModelCostWithFallbacks("together_ai/openai/gpt-4o", fakeModelCosts)
           ?.model
       ).toBe("openai/gpt-4o");
     });
@@ -177,14 +177,14 @@ describe("matchingLLMModelCost", () => {
   describe("when model name uses a known vendor alias", () => {
     it("normalizes deepseek-ai/ to deepseek/ before matching", () => {
       expect(
-        matchingLLMModelCost("deepseek-ai/deepseek-v3.2", fakeModelCosts)
+        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", fakeModelCosts)
           ?.model
       ).toBe("deepseek/deepseek-v3.2");
     });
 
     it("normalizes minimaxai/ to minimax/ before matching", () => {
       expect(
-        matchingLLMModelCost("minimaxai/minimax-m2.1", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("minimaxai/minimax-m2.1", fakeModelCosts)?.model
       ).toBe("minimax/minimax-m2.1");
     });
   });
@@ -192,19 +192,19 @@ describe("matchingLLMModelCost", () => {
   describe("when model name has a quantization suffix", () => {
     it("strips -fp8 suffix before matching", () => {
       expect(
-        matchingLLMModelCost("gpt-4o-fp8", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("gpt-4o-fp8", fakeModelCosts)?.model
       ).toBe("openai/gpt-4o");
     });
 
     it("strips -gptq suffix before matching", () => {
       expect(
-        matchingLLMModelCost("gpt-4o-gptq", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("gpt-4o-gptq", fakeModelCosts)?.model
       ).toBe("openai/gpt-4o");
     });
 
     it("strips -awq suffix before matching", () => {
       expect(
-        matchingLLMModelCost("gpt-4o-awq", fakeModelCosts)?.model
+        matchModelCostWithFallbacks("gpt-4o-awq", fakeModelCosts)?.model
       ).toBe("openai/gpt-4o");
     });
   });
@@ -212,7 +212,7 @@ describe("matchingLLMModelCost", () => {
   describe("when model name has a -turbo suffix", () => {
     it("does NOT strip -turbo (turbo is a distinct SKU with its own pricing)", () => {
       expect(
-        matchingLLMModelCost("gpt-4o-turbo", fakeModelCosts)
+        matchModelCostWithFallbacks("gpt-4o-turbo", fakeModelCosts)
       ).toBeUndefined();
     });
   });
@@ -220,18 +220,18 @@ describe("matchingLLMModelCost", () => {
   describe("when model name has no match", () => {
     it("returns undefined for an unknown model", () => {
       expect(
-        matchingLLMModelCost("made-up-model-xyz", fakeModelCosts)
+        matchModelCostWithFallbacks("made-up-model-xyz", fakeModelCosts)
       ).toBeUndefined();
     });
 
     it("returns undefined for an empty string", () => {
-      expect(matchingLLMModelCost("", fakeModelCosts)).toBeUndefined();
+      expect(matchModelCostWithFallbacks("", fakeModelCosts)).toBeUndefined();
     });
   });
 
   describe("when model costs list is empty", () => {
     it("returns undefined", () => {
-      expect(matchingLLMModelCost("gpt-4o", [])).toBeUndefined();
+      expect(matchModelCostWithFallbacks("gpt-4o", [])).toBeUndefined();
     });
   });
 
@@ -239,32 +239,32 @@ describe("matchingLLMModelCost", () => {
     const realCosts = getStaticModelCosts();
 
     it("matches real openai/gpt-4o entry by bare model name", () => {
-      expect(matchingLLMModelCost("gpt-4o", realCosts)?.model).toBe(
+      expect(matchModelCostWithFallbacks("gpt-4o", realCosts)?.model).toBe(
         "openai/gpt-4o"
       );
     });
 
     it("matches real anthropic/claude-opus-4.5 entry by hyphenated version", () => {
       expect(
-        matchingLLMModelCost("claude-opus-4-5", realCosts)?.model
+        matchModelCostWithFallbacks("claude-opus-4-5", realCosts)?.model
       ).toBe("anthropic/claude-opus-4.5");
     });
 
     it("matches real anthropic/claude-opus-4.6 entry by hyphenated version", () => {
       expect(
-        matchingLLMModelCost("claude-opus-4-6", realCosts)?.model
+        matchModelCostWithFallbacks("claude-opus-4-6", realCosts)?.model
       ).toBe("anthropic/claude-opus-4.6");
     });
 
     it("matches real deepseek/deepseek-v3.2 via deepseek-ai/ alias", () => {
       expect(
-        matchingLLMModelCost("deepseek-ai/deepseek-v3.2", realCosts)?.model
+        matchModelCostWithFallbacks("deepseek-ai/deepseek-v3.2", realCosts)?.model
       ).toBe("deepseek/deepseek-v3.2");
     });
 
     it("matches real minimax/minimax-m2.1 via minimaxai/ alias", () => {
       expect(
-        matchingLLMModelCost("minimaxai/minimax-m2.1", realCosts)?.model
+        matchModelCostWithFallbacks("minimaxai/minimax-m2.1", realCosts)?.model
       ).toBe("minimax/minimax-m2.1");
     });
   });
@@ -283,19 +283,19 @@ describe("matchingLLMModelCost", () => {
 
     it("matches raw model string before normalizing", () => {
       expect(
-        matchingLLMModelCost("MyModel-V2", caseSensitiveCosts)?.model
+        matchModelCostWithFallbacks("MyModel-V2", caseSensitiveCosts)?.model
       ).toBe("custom/MyModel-V2");
     });
 
     it("still falls back to normalized matching for lowercase input", () => {
       expect(
-        matchingLLMModelCost("gpt-4o", caseSensitiveCosts)?.model
+        matchModelCostWithFallbacks("gpt-4o", caseSensitiveCosts)?.model
       ).toBe("openai/gpt-4o");
     });
 
     it("falls back to normalized matching when raw does not match", () => {
       expect(
-        matchingLLMModelCost("GPT-4O", caseSensitiveCosts)?.model
+        matchModelCostWithFallbacks("GPT-4O", caseSensitiveCosts)?.model
       ).toBe("openai/gpt-4o");
     });
   });

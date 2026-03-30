@@ -1,58 +1,7 @@
-import { matchingLLMModelCost } from "~/server/background/workers/collector/cost";
+import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { PrismaClient } from "@prisma/client";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-
-const DATE_SUFFIX_RE = /-\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Strips the provider subtype from a model string.
- * Example: "openai.responses/gpt-5-mini" → "openai/gpt-5-mini"
- */
-export function stripProviderSubtype(model: string): string {
-  const slashIdx = model.indexOf("/");
-  if (slashIdx === -1) return model;
-  const provider = model.slice(0, slashIdx);
-  if (!provider.includes(".")) return model;
-  return provider.split(".")[0] + model.slice(slashIdx);
-}
-
-/**
- * Strips a trailing date suffix (-YYYY-MM-DD) from a model string.
- * Example: "gpt-5-mini-2025-08-07" → "gpt-5-mini"
- */
-export function stripDateSuffix(model: string): string {
-  return model.replace(DATE_SUFFIX_RE, "");
-}
-
-/**
- * Tries to match a model against cost entries using cascading fallbacks:
- * 1. Exact model string (e.g. "openai.responses/gpt-5-mini-2025-08-07")
- * 2. Strip provider subtype (e.g. "openai/gpt-5-mini-2025-08-07")
- * 3. Strip date suffix (e.g. "openai.responses/gpt-5-mini")
- * 4. Strip both (e.g. "openai/gpt-5-mini")
- */
-export function matchModelCostWithFallbacks(
-  model: string,
-  costs: MaybeStoredLLMModelCost[],
-  matchFn: typeof matchingLLMModelCost,
-): MaybeStoredLLMModelCost | undefined {
-  const strippedSubtype = stripProviderSubtype(model);
-  const strippedDate = stripDateSuffix(model);
-  const strippedBoth = stripProviderSubtype(strippedDate);
-
-  const candidates = [model, strippedSubtype, strippedDate, strippedBoth];
-
-  const seen = new Set<string>();
-  for (const candidate of candidates) {
-    if (seen.has(candidate)) continue;
-    seen.add(candidate);
-    const match = matchFn(candidate, costs);
-    if (match) return match;
-  }
-
-  return undefined;
-}
 
 /**
  * Attribute keys that may contain model names (checked in priority order).
@@ -69,7 +18,6 @@ const MODEL_ATTRIBUTE_KEYS = [
  */
 export interface OtlpSpanCostEnrichmentServiceDependencies {
   getCustomModelCosts: (projectId: string) => Promise<MaybeStoredLLMModelCost[]>;
-  matchModelCost: typeof matchingLLMModelCost;
 }
 
 /**
@@ -94,7 +42,6 @@ export function createCostEnrichmentDeps(
         createdAt: r.createdAt,
       }));
     },
-    matchModelCost: matchingLLMModelCost,
   };
 }
 
@@ -129,7 +76,7 @@ export class OtlpSpanCostEnrichmentService {
     const customCosts = await this.deps.getCustomModelCosts(tenantId);
     if (customCosts.length === 0) return;
 
-    const matched = matchModelCostWithFallbacks(modelName, customCosts, this.deps.matchModelCost);
+    const matched = matchModelCostWithFallbacks(modelName, customCosts);
     if (!matched) return;
 
     span.attributes.push(

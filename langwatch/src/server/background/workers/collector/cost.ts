@@ -145,12 +145,58 @@ const safeRegexTest = (pattern: string, input: string): boolean => {
   return re !== null && re.test(input);
 };
 
+const DATE_SUFFIX_RE = /-\d{4}-\d{2}-\d{2}$/;
+
 /**
- * Low-level model cost matcher — does NOT strip date suffixes or provider subtypes.
- * Use matchModelCostWithFallbacks() instead for production code.
- * @internal Exported only for dependency injection in span-cost-enrichment.service.ts
+ * Strips the provider subtype from a model string.
+ * Example: "openai.responses/gpt-5-mini" → "openai/gpt-5-mini"
  */
-export const matchingLLMModelCost = (
+export function stripProviderSubtype(model: string): string {
+  const slashIdx = model.indexOf("/");
+  if (slashIdx === -1) return model;
+  const provider = model.slice(0, slashIdx);
+  if (!provider.includes(".")) return model;
+  return provider.split(".")[0] + model.slice(slashIdx);
+}
+
+/**
+ * Strips a trailing date suffix (-YYYY-MM-DD) from a model string.
+ * Example: "gpt-5-mini-2025-08-07" → "gpt-5-mini"
+ */
+export function stripDateSuffix(model: string): string {
+  return model.replace(DATE_SUFFIX_RE, "");
+}
+
+/**
+ * Matches a model string against cost entries with cascading fallbacks:
+ * 1. Raw model string
+ * 2. Strip provider subtype (openai.responses → openai)
+ * 3. Strip date suffix (-2025-08-07)
+ * 4. Strip both
+ */
+export const matchModelCostWithFallbacks = (
+  model: string,
+  costs: MaybeStoredLLMModelCost[],
+): MaybeStoredLLMModelCost | undefined => {
+  const strippedSubtype = stripProviderSubtype(model);
+  const strippedDate = stripDateSuffix(model);
+  const strippedBoth = stripProviderSubtype(strippedDate);
+
+  const candidates = [model, strippedSubtype, strippedDate, strippedBoth];
+
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    const match = matchingLLMModelCost(candidate, costs);
+    if (match) return match;
+  }
+
+  return undefined;
+};
+
+/** Low-level regex matcher — no date/subtype stripping. Use matchModelCostWithFallbacks. */
+const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
@@ -186,7 +232,7 @@ export const getMatchingLLMModelCost = async (
   model: string,
 ) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
-  return matchingLLMModelCost(model, llmModelCosts);
+  return matchModelCostWithFallbacks(model, llmModelCosts);
 };
 
 // Pre-warm most used models
