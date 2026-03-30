@@ -20,14 +20,6 @@ interface TraceEval {
 /** Indentation matching the width of the evaluation status icon. */
 const EVALUATION_STATUS_INDENT = "22px";
 
-function getEvaluationGroupKey(group: EvaluationGroup, index: number) {
-  if (group.evaluatorId) {
-    return `${group.evaluatorId}::${group.latest.evaluation_id}`;
-  }
-
-  return `ungrouped::${group.latest.evaluation_id}::${index}`;
-}
-
 function EvaluationGroupEntry({ group }: { group: EvaluationGroup }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -79,7 +71,7 @@ function EvaluationGroupList({
   return (
     <VStack align="start" gap={0} width="full">
       {groups.map((group, index) => (
-        <Box key={getEvaluationGroupKey(group, index)} width="full">
+        <Box key={group.groupKey} width="full">
           {index > 0 && (
             <Box
               borderTopWidth="1px"
