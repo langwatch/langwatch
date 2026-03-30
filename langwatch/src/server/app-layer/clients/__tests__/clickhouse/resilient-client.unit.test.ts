@@ -453,6 +453,78 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
+  describe("when logging throws during query failure", () => {
+    it("still propagates the original ClickHouse error", async () => {
+      const chError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const mock = makeMockClient({
+        query: vi.fn().mockRejectedValue(chError),
+      });
+      mockQueryLogger.error.mockImplementation(() => {
+        throw new Error("pino transport crashed");
+      });
+
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
+
+      await expect(
+        client.query({ query: "SELECT 1" })
+      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+    });
+  });
+
+  describe("when logging throws during insert retry", () => {
+    it("still retries and succeeds", async () => {
+      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
+      const result = { executed: true };
+      const mock = makeMockClient({
+        insert: vi
+          .fn()
+          .mockRejectedValueOnce(transientError)
+          .mockResolvedValueOnce(result),
+      });
+      mockIncrementCount.mockImplementation(() => {
+        throw new Error("prometheus registry corrupted");
+      });
+
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+        baseDelayMs: 1,
+      });
+
+      const actual = await client.insert({
+        table: "test",
+        values: [],
+        format: "JSONEachRow",
+      });
+
+      expect(actual).toBe(result);
+      expect(mock.insert).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when logging throws during query success", () => {
+    it("still returns the query result", async () => {
+      const queryResult = { data: [] };
+      const mock = makeMockClient({
+        query: vi.fn().mockResolvedValue(queryResult),
+      });
+      mockQueryLogger.debug.mockImplementation(() => {
+        throw new Error("pino transport crashed");
+      });
+
+      const client = createResilientClickHouseClient({
+        client: mock,
+        maxRetries: 3,
+      });
+
+      const qr = await client.query({ query: "SELECT 1" });
+      expect(qr).toBe(queryResult);
+    });
+  });
+
   describe("when command or close is called", () => {
     it("passes through to the underlying client", async () => {
       const mock = makeMockClient({

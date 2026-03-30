@@ -65,44 +65,48 @@ function logQueryFailure({
   params: unknown;
   failureMonitor: FailureRateMonitor;
 }): void {
-  const errorType = classifyClickHouseError(error);
-  const meta = safeQueryMeta(params);
+  try {
+    const errorType = classifyClickHouseError(error);
+    const meta = safeQueryMeta(params);
 
-  queryLogger.error(
-    {
-      source: "clickhouse",
-      operation,
-      errorType,
-      durationMs: Math.round(durationMs),
-      queryId: meta.queryId,
-      format: meta.format,
-      paramKeys: meta.paramKeys,
-      error,
-    },
-    `ClickHouse ${operation} failed`
-  );
-
-  incrementClickHouseQueryCount(
-    operation === "query" ? "SELECT" : "INSERT",
-    "error"
-  );
-  observeClickHouseQueryDuration(
-    operation === "query" ? "SELECT" : "INSERT",
-    meta.table ?? "unknown",
-    durationMs / 1000
-  );
-
-  const shouldAlert = failureMonitor.record();
-  if (shouldAlert) {
-    queryLogger.fatal(
+    queryLogger.error(
       {
         source: "clickhouse",
-        alert: true,
-        recentErrorType: errorType,
-        windowMinutes: failureMonitor.windowMs / 60_000,
+        operation,
+        errorType,
+        durationMs: Math.round(durationMs),
+        queryId: meta.queryId,
+        format: meta.format,
+        paramKeys: meta.paramKeys,
+        error,
       },
-      "ClickHouse failure rate threshold exceeded"
+      `ClickHouse ${operation} failed`
     );
+
+    incrementClickHouseQueryCount(
+      operation === "query" ? "SELECT" : "INSERT",
+      "error"
+    );
+    observeClickHouseQueryDuration(
+      operation === "query" ? "SELECT" : "INSERT",
+      meta.table ?? "unknown",
+      durationMs / 1000
+    );
+
+    const shouldAlert = failureMonitor.record();
+    if (shouldAlert) {
+      queryLogger.fatal(
+        {
+          source: "clickhouse",
+          alert: true,
+          recentErrorType: errorType,
+          windowMinutes: failureMonitor.windowMs / 60_000,
+        },
+        "ClickHouse failure rate threshold exceeded"
+      );
+    }
+  } catch (loggingError) {
+    logger.error({ loggingError }, "Failed to log ClickHouse query failure");
   }
 }
 
@@ -115,27 +119,31 @@ function logQuerySuccess({
   durationMs: number;
   params: unknown;
 }): void {
-  const meta = safeQueryMeta(params);
+  try {
+    const meta = safeQueryMeta(params);
 
-  queryLogger.debug(
-    {
-      source: "clickhouse",
-      operation,
-      durationMs: Math.round(durationMs),
-      queryId: meta.queryId,
-    },
-    `ClickHouse ${operation} succeeded`
-  );
+    queryLogger.debug(
+      {
+        source: "clickhouse",
+        operation,
+        durationMs: Math.round(durationMs),
+        queryId: meta.queryId,
+      },
+      `ClickHouse ${operation} succeeded`
+    );
 
-  incrementClickHouseQueryCount(
-    operation === "query" ? "SELECT" : "INSERT",
-    "success"
-  );
-  observeClickHouseQueryDuration(
-    operation === "query" ? "SELECT" : "INSERT",
-    meta.table ?? "unknown",
-    durationMs / 1000
-  );
+    incrementClickHouseQueryCount(
+      operation === "query" ? "SELECT" : "INSERT",
+      "success"
+    );
+    observeClickHouseQueryDuration(
+      operation === "query" ? "SELECT" : "INSERT",
+      meta.table ?? "unknown",
+      durationMs / 1000
+    );
+  } catch (loggingError) {
+    logger.error({ loggingError }, "Failed to log ClickHouse query success");
+  }
 }
 
 /**
@@ -208,37 +216,45 @@ export function createResilientClickHouseClient({
           throw error;
         }
 
-        const errorType = classifyClickHouseError(error);
-        incrementClickHouseQueryCount("INSERT", "error");
-        if (failureMonitor.record()) {
-          queryLogger.fatal(
-            {
-              source: "clickhouse",
-              alert: true,
-              recentErrorType: errorType,
-              windowMinutes: failureMonitor.windowMs / 60_000,
-            },
-            "ClickHouse failure rate threshold exceeded"
-          );
-        }
-
         const delay = jitteredBackoff({
           attempt,
           baseDelayMs,
           maxDelayMs,
         });
-        logger.warn(
-          {
-            source: "clickhouse",
-            operation: "insert",
-            errorType,
-            attempt: attempt + 1,
-            maxRetries,
-            delayMs: Math.round(delay),
-            error,
-          },
-          "Transient ClickHouse insert error, retrying"
-        );
+
+        try {
+          const errorType = classifyClickHouseError(error);
+          incrementClickHouseQueryCount("INSERT", "error");
+          if (failureMonitor.record()) {
+            queryLogger.fatal(
+              {
+                source: "clickhouse",
+                alert: true,
+                recentErrorType: errorType,
+                windowMinutes: failureMonitor.windowMs / 60_000,
+              },
+              "ClickHouse failure rate threshold exceeded"
+            );
+          }
+
+          logger.warn(
+            {
+              source: "clickhouse",
+              operation: "insert",
+              errorType,
+              attempt: attempt + 1,
+              maxRetries,
+              delayMs: Math.round(delay),
+              error,
+            },
+            "Transient ClickHouse insert error, retrying"
+          );
+        } catch (loggingError) {
+          logger.error(
+            { loggingError },
+            "Failed to log transient insert retry"
+          );
+        }
 
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
