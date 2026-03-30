@@ -42,7 +42,7 @@ export function createEnvConfig() {
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
-      ELASTICSEARCH_NODE_URL: optionalIfBuildTime(z.string().min(1)),
+      ELASTICSEARCH_NODE_URL: z.string().min(1).optional(),
       ELASTICSEARCH_API_KEY: z.string().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
@@ -259,5 +259,19 @@ export function createEnvConfig() {
      */
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   });
+
+  if (!process.env.BUILD_TIME && !process.env.SKIP_ENV_VALIDATION) {
+    const isClickhouseMode =
+      _env.ENABLE_CLICKHOUSE && _env.ENABLE_EVENT_SOURCING && !!_env.CLICKHOUSE_URL;
+    const isElasticsearchMode = !!_env.ELASTICSEARCH_NODE_URL;
+
+    if (!isClickhouseMode && !isElasticsearchMode) {
+      throw new Error(
+        "Missing search backend configuration: set either ELASTICSEARCH_NODE_URL " +
+          "or all three of ENABLE_CLICKHOUSE=true, ENABLE_EVENT_SOURCING=true, and CLICKHOUSE_URL.",
+      );
+    }
+  }
+
   return _env;
 }

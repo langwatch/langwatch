@@ -24,6 +24,16 @@ import {
 const migrations: Record<string, any> = importedMigrations;
 
 export default async function execute() {
+  const isClickhouseMode =
+    process.env.ENABLE_CLICKHOUSE === "true" &&
+    process.env.ENABLE_EVENT_SOURCING === "true" &&
+    !!process.env.CLICKHOUSE_URL;
+
+  if (isClickhouseMode) {
+    console.log("ClickHouse mode is active; Elasticsearch migrations are disabled.");
+    return;
+  }
+
   if (env.IS_QUICKWIT) {
     return quickwitMigrate();
   }
