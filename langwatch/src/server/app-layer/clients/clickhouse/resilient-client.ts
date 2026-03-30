@@ -1,17 +1,34 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
-import {
-  observeClickHouseQueryDuration,
-  incrementClickHouseQueryCount,
-} from "~/server/clickhouse/metrics";
-import {
-  classifyClickHouseError,
-  isTransientClickHouseError,
-} from "./error-classification";
-import { FailureRateMonitor } from "./failure-monitor";
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
+
+const TRANSIENT_NETWORK_CODES = new Set([
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EPIPE",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+]);
+
+function isTransientError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message;
+  if (message.includes("MEMORY_LIMIT_EXCEEDED")) return true;
+  if (/timeout/i.test(message)) return true;
+
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code && TRANSIENT_NETWORK_CODES.has(code)) return true;
+
+  const status =
+    (error as { statusCode?: number }).statusCode ??
+    (error as { status?: number }).status;
+  if (status === 429 || status === 502 || status === 503) return true;
+
+  return false;
+}
 
 function jitteredBackoff({
   attempt,
@@ -52,28 +69,24 @@ function safeQueryMeta(params: unknown): {
   return meta;
 }
 
-function logQueryFailure({
+function logFailure({
   operation,
   error,
   durationMs,
   params,
-  failureMonitor,
 }: {
   operation: "query" | "insert";
   error: unknown;
   durationMs: number;
   params: unknown;
-  failureMonitor: FailureRateMonitor;
 }): void {
   try {
-    const errorType = classifyClickHouseError(error);
     const meta = safeQueryMeta(params);
 
     queryLogger.error(
       {
         source: "clickhouse",
         operation,
-        errorType,
         durationMs: Math.round(durationMs),
         queryId: meta.queryId,
         format: meta.format,
@@ -82,35 +95,12 @@ function logQueryFailure({
       },
       `ClickHouse ${operation} failed`
     );
-
-    incrementClickHouseQueryCount(
-      operation === "query" ? "SELECT" : "INSERT",
-      "error"
-    );
-    observeClickHouseQueryDuration(
-      operation === "query" ? "SELECT" : "INSERT",
-      meta.table ?? "unknown",
-      durationMs / 1000
-    );
-
-    const shouldAlert = failureMonitor.record();
-    if (shouldAlert) {
-      queryLogger.fatal(
-        {
-          source: "clickhouse",
-          alert: true,
-          recentErrorType: errorType,
-          windowMinutes: failureMonitor.windowMs / 60_000,
-        },
-        "ClickHouse failure rate threshold exceeded"
-      );
-    }
   } catch (loggingError) {
     logger.error({ loggingError }, "Failed to log ClickHouse query failure");
   }
 }
 
-function logQuerySuccess({
+function logSuccess({
   operation,
   durationMs,
   params,
@@ -131,40 +121,21 @@ function logQuerySuccess({
       },
       `ClickHouse ${operation} succeeded`
     );
-
-    incrementClickHouseQueryCount(
-      operation === "query" ? "SELECT" : "INSERT",
-      "success"
-    );
-    observeClickHouseQueryDuration(
-      operation === "query" ? "SELECT" : "INSERT",
-      meta.table ?? "unknown",
-      durationMs / 1000
-    );
   } catch (loggingError) {
     logger.error({ loggingError }, "Failed to log ClickHouse query success");
   }
 }
 
 /**
- * Wraps a ClickHouseClient with:
- * - Retry logic for `insert` (transient errors only)
- * - Structured logging for both `query` and `insert` (success + failure)
- * - Prometheus metrics integration
- * - Failure rate alerting
+ * Wraps a ClickHouseClient with structured logging and insert retry.
  */
 export function createResilientClickHouseClient({
   client,
-  failureMonitor = new FailureRateMonitor({
-    threshold: 10,
-    windowMs: 5 * 60_000,
-  }),
   maxRetries = 3,
   baseDelayMs = 500,
   maxDelayMs = 10_000,
 }: {
   client: ClickHouseClient;
-  failureMonitor?: FailureRateMonitor;
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
@@ -176,17 +147,11 @@ export function createResilientClickHouseClient({
     try {
       const result = await client.query(params);
       const durationMs = performance.now() - start;
-      logQuerySuccess({ operation: "query", durationMs, params });
+      logSuccess({ operation: "query", durationMs, params });
       return result;
     } catch (error) {
       const durationMs = performance.now() - start;
-      logQueryFailure({
-        operation: "query",
-        error,
-        durationMs,
-        params,
-        failureMonitor,
-      });
+      logFailure({ operation: "query", error, durationMs, params });
       throw error;
     }
   };
@@ -199,49 +164,24 @@ export function createResilientClickHouseClient({
       try {
         const result = await client.insert(params);
         const durationMs = performance.now() - start;
-        logQuerySuccess({ operation: "insert", durationMs, params });
+        logSuccess({ operation: "insert", durationMs, params });
         return result;
       } catch (error) {
         lastError = error;
 
-        if (!isTransientClickHouseError(error) || attempt === maxRetries) {
+        if (!isTransientError(error) || attempt === maxRetries) {
           const durationMs = performance.now() - start;
-          logQueryFailure({
-            operation: "insert",
-            error,
-            durationMs,
-            params,
-            failureMonitor,
-          });
+          logFailure({ operation: "insert", error, durationMs, params });
           throw error;
         }
 
-        const delay = jitteredBackoff({
-          attempt,
-          baseDelayMs,
-          maxDelayMs,
-        });
+        const delay = jitteredBackoff({ attempt, baseDelayMs, maxDelayMs });
 
         try {
-          const errorType = classifyClickHouseError(error);
-          incrementClickHouseQueryCount("INSERT", "error");
-          if (failureMonitor.record()) {
-            queryLogger.fatal(
-              {
-                source: "clickhouse",
-                alert: true,
-                recentErrorType: errorType,
-                windowMinutes: failureMonitor.windowMs / 60_000,
-              },
-              "ClickHouse failure rate threshold exceeded"
-            );
-          }
-
           logger.warn(
             {
               source: "clickhouse",
               operation: "insert",
-              errorType,
               attempt: attempt + 1,
               maxRetries,
               delayMs: Math.round(delay),

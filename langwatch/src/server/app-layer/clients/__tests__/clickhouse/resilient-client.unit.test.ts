@@ -1,12 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 
-const {
-  mockQueryLogger,
-  mockLogger,
-  mockIncrementCount,
-  mockObserveDuration,
-} = vi.hoisted(() => ({
+const { mockQueryLogger, mockLogger } = vi.hoisted(() => ({
   mockQueryLogger: {
     debug: vi.fn(),
     warn: vi.fn(),
@@ -19,8 +14,6 @@ const {
     error: vi.fn(),
     fatal: vi.fn(),
   },
-  mockIncrementCount: vi.fn(),
-  mockObserveDuration: vi.fn(),
 }));
 
 vi.mock("~/utils/logger/server", () => ({
@@ -28,15 +21,7 @@ vi.mock("~/utils/logger/server", () => ({
     name.includes("query") ? mockQueryLogger : mockLogger,
 }));
 
-vi.mock("~/server/clickhouse/metrics", () => ({
-  observeClickHouseQueryDuration: (...args: unknown[]) =>
-    mockObserveDuration(...args),
-  incrementClickHouseQueryCount: (...args: unknown[]) =>
-    mockIncrementCount(...args),
-}));
-
 import { createResilientClickHouseClient } from "../../clickhouse/resilient-client";
-import { FailureRateMonitor } from "../../clickhouse/failure-monitor";
 
 function makeMockClient(overrides?: Partial<ClickHouseClient>) {
   return {
@@ -61,8 +46,6 @@ describe("createResilientClickHouseClient()", () => {
     mockLogger.warn.mockClear();
     mockLogger.error.mockClear();
     mockLogger.fatal.mockClear();
-    mockIncrementCount.mockClear();
-    mockObserveDuration.mockClear();
   });
 
   describe("when insert fails with transient error then succeeds", () => {
@@ -91,101 +74,7 @@ describe("createResilientClickHouseClient()", () => {
       expect(mock.insert).toHaveBeenCalledTimes(2);
     });
 
-    it("increments error metric for the transient failure", async () => {
-      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
-      const result = { executed: true };
-      const mock = makeMockClient({
-        insert: vi
-          .fn()
-          .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(result),
-      });
-      const client = createResilientClickHouseClient({
-        client: mock,
-        maxRetries: 3,
-        baseDelayMs: 1,
-      });
-
-      await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
-
-      // Transient failure increments error, success increments success
-      expect(mockIncrementCount).toHaveBeenCalledWith("INSERT", "error");
-      expect(mockIncrementCount).toHaveBeenCalledWith("INSERT", "success");
-    });
-
-    it("feeds the failure rate monitor on transient retries", async () => {
-      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
-      const result = { executed: true };
-      const mock = makeMockClient({
-        insert: vi
-          .fn()
-          .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(result),
-      });
-      const monitor = new FailureRateMonitor({
-        threshold: 1,
-        windowMs: 60_000,
-      });
-      const recordSpy = vi.spyOn(monitor, "record");
-
-      const client = createResilientClickHouseClient({
-        client: mock,
-        failureMonitor: monitor,
-        maxRetries: 3,
-        baseDelayMs: 1,
-      });
-
-      await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
-
-      expect(recordSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("emits fatal alert when transient retry crosses threshold", async () => {
-      const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
-      const result = { executed: true };
-      const mock = makeMockClient({
-        insert: vi
-          .fn()
-          .mockRejectedValueOnce(transientError)
-          .mockResolvedValueOnce(result),
-      });
-      const monitor = new FailureRateMonitor({
-        threshold: 1,
-        windowMs: 60_000,
-      });
-
-      const client = createResilientClickHouseClient({
-        client: mock,
-        failureMonitor: monitor,
-        maxRetries: 3,
-        baseDelayMs: 1,
-      });
-
-      await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
-
-      expect(mockQueryLogger.fatal).toHaveBeenCalledWith(
-        expect.objectContaining({
-          alert: true,
-          recentErrorType: "oom",
-          windowMinutes: 1,
-        }),
-        "ClickHouse failure rate threshold exceeded"
-      );
-    });
-
-    it("includes source and errorType in retry warning log", async () => {
+    it("logs a retry warning with structured metadata", async () => {
       const transientError = new Error("MEMORY_LIMIT_EXCEEDED");
       const result = { executed: true };
       const mock = makeMockClient({
@@ -210,7 +99,7 @@ describe("createResilientClickHouseClient()", () => {
         expect.objectContaining({
           source: "clickhouse",
           operation: "insert",
-          errorType: "oom",
+          attempt: 1,
         }),
         expect.any(String)
       );
@@ -328,7 +217,6 @@ describe("createResilientClickHouseClient()", () => {
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
-          errorType: "oom",
         }),
         expect.any(String)
       );
@@ -356,36 +244,6 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when failure rate threshold is breached", () => {
-    it("logs a fatal alert", async () => {
-      const err = new Error("MEMORY_LIMIT_EXCEEDED");
-      const mock = makeMockClient({
-        query: vi.fn().mockRejectedValue(err),
-      });
-      const monitor = new FailureRateMonitor({
-        threshold: 1,
-        windowMs: 60_000,
-      });
-      const client = createResilientClickHouseClient({
-        client: mock,
-        failureMonitor: monitor,
-        maxRetries: 3,
-      });
-
-      await expect(
-        client.query({ query: "SELECT 1" })
-      ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
-
-      expect(mockQueryLogger.fatal).toHaveBeenCalledWith(
-        expect.objectContaining({
-          alert: true,
-          source: "clickhouse",
-        }),
-        expect.any(String)
-      );
-    });
-  });
-
   describe("when insert succeeds on first attempt", () => {
     it("calls insert once and returns the result", async () => {
       const result = { executed: true };
@@ -406,50 +264,6 @@ describe("createResilientClickHouseClient()", () => {
 
       expect(actual).toBe(result);
       expect(mock.insert).toHaveBeenCalledTimes(1);
-    });
-
-    it("increments metrics with INSERT and success", async () => {
-      const result = { executed: true };
-      const mock = makeMockClient({
-        insert: vi.fn().mockResolvedValue(result),
-      });
-      const client = createResilientClickHouseClient({
-        client: mock,
-        maxRetries: 3,
-        baseDelayMs: 1,
-      });
-
-      await client.insert({
-        table: "test",
-        values: [],
-        format: "JSONEachRow",
-      });
-
-      expect(mockIncrementCount).toHaveBeenCalledWith("INSERT", "success");
-    });
-
-    it("passes table name to duration metrics", async () => {
-      const result = { executed: true };
-      const mock = makeMockClient({
-        insert: vi.fn().mockResolvedValue(result),
-      });
-      const client = createResilientClickHouseClient({
-        client: mock,
-        maxRetries: 3,
-        baseDelayMs: 1,
-      });
-
-      await client.insert({
-        table: "my_table",
-        values: [],
-        format: "JSONEachRow",
-      });
-
-      expect(mockObserveDuration).toHaveBeenCalledWith(
-        "INSERT",
-        "my_table",
-        expect.any(Number)
-      );
     });
   });
 
@@ -484,8 +298,8 @@ describe("createResilientClickHouseClient()", () => {
           .mockRejectedValueOnce(transientError)
           .mockResolvedValueOnce(result),
       });
-      mockIncrementCount.mockImplementation(() => {
-        throw new Error("prometheus registry corrupted");
+      mockLogger.warn.mockImplementation(() => {
+        throw new Error("pino transport crashed");
       });
 
       const client = createResilientClickHouseClient({

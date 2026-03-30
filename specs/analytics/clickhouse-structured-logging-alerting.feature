@@ -1,27 +1,11 @@
-Feature: Structured Logging and Alerting for ClickHouse Query Failures
+Feature: Structured Logging for ClickHouse Queries
 
-  ClickHouse query failures (OOM, timeout, network, syntax) need structured
-  logging with metadata so they surface proactively via dashboards and alerts,
-  rather than waiting for users to report blank charts.
+  ClickHouse query failures need structured logging with metadata (tracing,
+  IDs, formats) so they surface in dashboards via log correlation, rather
+  than waiting for users to report blank charts.
 
   Background:
     Given a resilient ClickHouse client wrapper
-
-  # ---------------------------------------------------------------------------
-  # Error classification
-  # ---------------------------------------------------------------------------
-
-  @unit @regression
-  Scenario: ClickHouse errors are classified into well-known categories
-    When a ClickHouse error occurs
-    Then the error is classified as one of: oom, timeout, network, rate_limit, unavailable, syntax, or unknown
-    And the classification is based on error message content, errno code, or HTTP status
-
-  @unit @regression
-  Scenario: Transient errors are distinguished from permanent errors
-    When a ClickHouse error is classified
-    Then oom, timeout, network, rate_limit, and unavailable are considered transient
-    And syntax and unknown errors are not transient
 
   # ---------------------------------------------------------------------------
   # Structured logging
@@ -30,7 +14,7 @@ Feature: Structured Logging and Alerting for ClickHouse Query Failures
   @unit @regression
   Scenario: Query failures are logged with structured metadata
     When a ClickHouse query fails
-    Then a structured error log is emitted with source, operation, errorType, durationMs, and error message
+    Then a structured error log is emitted with source, operation, durationMs, and error
     And the log is tagged with source "clickhouse" to distinguish from general application errors
 
   @unit @regression
@@ -43,40 +27,6 @@ Feature: Structured Logging and Alerting for ClickHouse Query Failures
     When a ClickHouse query is logged
     Then full SQL text and query parameter values are not included
     And only safe metadata is logged: queryId, format, parameter key names, and table name
-
-  # ---------------------------------------------------------------------------
-  # Prometheus metrics
-  # ---------------------------------------------------------------------------
-
-  @unit @regression
-  Scenario: Query outcomes increment Prometheus counters
-    When a ClickHouse query completes (success or failure)
-    Then a query count metric is incremented with operation type and outcome
-    And a query duration metric is recorded with operation type and table name
-
-  # ---------------------------------------------------------------------------
-  # Failure rate alerting
-  # ---------------------------------------------------------------------------
-
-  @unit @regression
-  Scenario: Alert fires when failure rate exceeds threshold
-    Given a failure rate monitor with a configurable threshold and time window
-    When the number of failures within the window reaches the threshold
-    Then a fatal-level alert log is emitted with alert flag and recent error type
-
-  @unit @regression
-  Scenario: Alert cooldown prevents repeated alert floods
-    Given a failure rate monitor that has already fired an alert
-    When more failures occur within the cooldown period
-    Then no additional alert is fired
-    And when the cooldown period expires and threshold is breached again
-    Then a new alert fires
-
-  @unit @regression
-  Scenario: Old failures outside the time window are pruned
-    Given a failure rate monitor with a 60-second window
-    When failures occur and then 61 seconds pass
-    Then the old failures no longer count toward the threshold
 
   # ---------------------------------------------------------------------------
   # Retry behavior (insert only)
@@ -99,6 +49,15 @@ Feature: Structured Logging and Alerting for ClickHouse Query Failures
     When a query fails with any error type
     Then the query is not retried
     And a structured error log is emitted
+
+  # ---------------------------------------------------------------------------
+  # Safety: logging never breaks DB operations
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: Logging crashes do not affect query results
+    When structured logging throws an error during a query
+    Then the original ClickHouse result or error propagates normally
 
   # ---------------------------------------------------------------------------
   # Proxy pass-through
