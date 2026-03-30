@@ -45,9 +45,11 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
         error={traceQuery.error}
         isRefetching={traceQuery.isRefetching}
         onRetry={() =>
-          void traceQuery
-            .refetch()
-            .catch((err) => easyCatchToast(err, "TraceMessage refetch"))
+          void traceQuery.refetch().then((result) => {
+            if (result.error) {
+              easyCatchToast(result.error, "TraceMessage refetch");
+            }
+          })
         }
       />
     );

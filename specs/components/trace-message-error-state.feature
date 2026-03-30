@@ -21,7 +21,7 @@ Feature: TraceMessage error state UX
     Then the button remains rendered with disabled state
     And the button shows a loading indicator
 
-  Scenario: retry button passes context to error handler
+  Scenario: retry failure shows an error toast
     Given the trace query has errored
-    When the user clicks the retry button and it fails
-    Then easyCatchToast receives the error with context "TraceMessage refetch"
+    When the user clicks the retry button and the retry also fails
+    Then an error toast notification is shown to the user
