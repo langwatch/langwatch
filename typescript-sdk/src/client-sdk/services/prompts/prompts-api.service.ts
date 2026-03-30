@@ -91,10 +91,13 @@ export class PromptsApiService {
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
+   * @param options Optional parameters for the request.
+   * @param options.version Specific version to fetch (numeric string or "latest").
+   * @param options.label Label to fetch ("production" or "staging").
    * @returns Raw PromptResponse data.
    * @throws {PromptsApiError} If the API call fails.
    */
-  get = async (id: string, options?: { version?: string }): Promise<PromptResponse> => {
+  get = async (id: string, options?: { version?: string; label?: "production" | "staging" }): Promise<PromptResponse> => {
     // Parse version to number, skip for "latest" or invalid values
     const versionNumber = options?.version && options.version !== "latest"
       ? parseInt(options.version, 10)
@@ -106,6 +109,7 @@ export class PromptsApiService {
         params: { path: { id } },
         query: {
           version: Number.isNaN(versionNumber) ? undefined : versionNumber,
+          label: options?.label,
         },
       },
     );

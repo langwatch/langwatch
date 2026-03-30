@@ -1,8 +1,58 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PromptsApiService } from "../prompts-api.service";
 import { PromptsApiError } from "../errors";
 import { mock } from "vitest-mock-extended";
 import type { InternalConfig } from "@/client-sdk/types";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import type { LangwatchApiClient } from "@/internal/api/client";
+
+describe("PromptsApiService.get", () => {
+  let service: PromptsApiService;
+  let mockGet: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockGet = vi.fn();
+    const apiClient = {
+      GET: mockGet,
+    } as unknown as LangwatchApiClient;
+    service = new PromptsApiService({
+      langwatchApiClient: apiClient,
+      logger: mock(),
+    } as InternalConfig);
+  });
+
+  describe("when fetching with a label", () => {
+    it("passes label as query parameter to the API", async () => {
+      const mockPrompt = promptResponseFactory.build();
+      mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
+
+      await service.get("pizza-prompt", { label: "production" });
+
+      expect(mockGet).toHaveBeenCalledWith(
+        "/api/prompts/{id}",
+        expect.objectContaining({
+          params: { path: { id: "pizza-prompt" } },
+          query: expect.objectContaining({ label: "production" }),
+        }),
+      );
+    });
+
+    it("passes both label and version to the API when both provided", async () => {
+      const mockPrompt = promptResponseFactory.build();
+      mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
+
+      await service.get("pizza-prompt", { label: "production", version: "3" });
+
+      expect(mockGet).toHaveBeenCalledWith(
+        "/api/prompts/{id}",
+        expect.objectContaining({
+          params: { path: { id: "pizza-prompt" } },
+          query: expect.objectContaining({ label: "production", version: 3 }),
+        }),
+      );
+    });
+  });
+});
 
 describe("PromptsApiService.handleApiError", () => {
   let service: PromptsApiService;
