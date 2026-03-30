@@ -1,7 +1,9 @@
-import type { Currency, PrismaClient } from "@prisma/client";
+import { PricingModel, type Currency, type PrismaClient } from "@prisma/client";
+import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import type { OrganizationFeatureName } from "../organization.service";
 import type {
   OrganizationFeatureRow,
+  OrganizationForBilling,
   OrganizationRepository,
   OrganizationWithAdmins,
 } from "./organization.repository";
@@ -117,5 +119,26 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       select: { id: true, name: true },
     });
     return org ?? null;
+  }
+
+  async getOrganizationForBilling(
+    organizationId: string,
+  ): Promise<OrganizationForBilling | null> {
+    return this.prisma.organization.findFirst({
+      where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
+      select: {
+        id: true,
+        stripeCustomerId: true,
+        subscriptions: {
+          where: {
+            status: "ACTIVE",
+            plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+          },
+          take: 1,
+          select: { id: true },
+          orderBy: { startDate: "desc" },
+        },
+      },
+    });
   }
 }

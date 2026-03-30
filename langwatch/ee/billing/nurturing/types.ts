@@ -59,6 +59,7 @@ export interface CioPersonTraits {
 
   // Billing
   plan: string;
+  has_subscription: boolean;
 }
 
 // ---------------------------------------------------------------------------

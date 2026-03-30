@@ -28,7 +28,7 @@ vi.mock("./cost", () => ({
       (llmModelCost.output_cost_per_1k_tokens * outputTokens) / 1000
     );
   }),
-  matchingLLMModelCost: vi.fn((model, costs) => costs[model]),
+  matchModelCostWithFallbacks: vi.fn((model, costs) => costs[model]),
   tokenizeAndEstimateCost: vi.fn().mockResolvedValue({
     inputTokens: 100,
     outputTokens: 50,

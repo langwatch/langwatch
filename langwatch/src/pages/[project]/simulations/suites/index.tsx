@@ -12,7 +12,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -25,10 +25,9 @@ import {
 } from "~/components/suites/SuiteDetailPanel";
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
-import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { useRunSuite } from "~/components/suites/useRunSuite";
 import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
   extractExternalSetId,
@@ -76,29 +75,11 @@ function SuitesPageContent() {
     { enabled: !!project, refetchInterval: 15000 },
   );
 
-  const [suiteRunSinceTimestamp, setSuiteRunSinceTimestamp] = useState<number | undefined>(undefined);
-  const [cachedRunData, setCachedRunData] = useState<{
-    runs: ScenarioRunData[];
-    scenarioSetIds: Record<string, string>;
-  } | undefined>(undefined);
-
-  // Reset sinceTimestamp when period changes
-  const periodKeyRef = useRef(period.startDate.getTime());
-  useEffect(() => {
-    const key = period.startDate.getTime();
-    if (key !== periodKeyRef.current) {
-      periodKeyRef.current = key;
-      setSuiteRunSinceTimestamp(undefined);
-      setCachedRunData(undefined);
-    }
-  }, [period]);
-
-  const { data: allRunDataRaw } = api.scenarios.getSuiteRunData.useQuery(
+  const { data: suiteSummariesData } = api.suites.getSummaries.useQuery(
     {
       projectId: project?.id ?? "",
-      limit: 100,
       startDate: period.startDate.getTime(),
-      sinceTimestamp: suiteRunSinceTimestamp,
+      endDate: period.endDate.getTime(),
     },
     { enabled: !!project, refetchInterval: 30_000 },
   );
@@ -109,32 +90,16 @@ function SuitesPageContent() {
   useSimulationUpdateListener({
     projectId: project?.id ?? "",
     refetch: () => {
-      setSuiteRunSinceTimestamp(undefined);
-      void utils.scenarios.getSuiteRunData.invalidate();
+      void utils.suites.getSummaries.invalidate();
     },
     enabled: !!project?.id,
     debounceMs: 500,
   });
 
-  // Update cached data only when server reports changes
-  useEffect(() => {
-    if (!allRunDataRaw) return;
-    if (allRunDataRaw.changed) {
-      setCachedRunData({
-        runs: allRunDataRaw.runs,
-        scenarioSetIds: allRunDataRaw.scenarioSetIds,
-      });
-      setSuiteRunSinceTimestamp(allRunDataRaw.lastUpdatedAt);
-    }
-  }, [allRunDataRaw]);
-
   const runSummaries = useMemo(() => {
-    if (!cachedRunData) return undefined;
-    return computeSuiteRunSummaries({
-      runs: cachedRunData.runs,
-      scenarioSetIds: cachedRunData.scenarioSetIds,
-    });
-  }, [cachedRunData]);
+    if (!suiteSummariesData) return undefined;
+    return new Map<string, SuiteRunSummary>(Object.entries(suiteSummariesData));
+  }, [suiteSummariesData]);
 
   // Build suiteId -> suite name map for AllRuns view
   const suiteNameMap = useMemo(() => {
@@ -227,33 +192,9 @@ function SuitesPageContent() {
     },
   });
 
-  const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  useEffect(() => {
-    return () => {
-      retryTimersRef.current.forEach(clearTimeout);
-    };
-  }, []);
-
   const { requestRun, isPending: isRunPending, dialogProps: runDialogProps } = useRunSuite({
     onRunScheduled: () => {
-      setSuiteRunSinceTimestamp(undefined);
-      void utils.scenarios.getSuiteRunData.invalidate();
-
-      // The queue processor stages commands to Redis and processes them async.
-      // Schedule follow-up invalidations to catch ClickHouse data once the
-      // event-sourcing pipeline settles, as a safety net alongside SSE.
-      retryTimersRef.current.forEach(clearTimeout);
-      retryTimersRef.current = [
-        setTimeout(() => {
-          setSuiteRunSinceTimestamp(undefined);
-          void utils.scenarios.getSuiteRunData.invalidate();
-        }, 1000),
-        setTimeout(() => {
-          setSuiteRunSinceTimestamp(undefined);
-          void utils.scenarios.getSuiteRunData.invalidate();
-        }, 3000),
-      ];
+      void utils.suites.getSummaries.invalidate();
     },
   });
 
@@ -450,10 +391,6 @@ function MainPanel({
   period: Period;
   suiteNameMap: Map<string, string>;
 }) {
-  if (isLoading) {
-    return null;
-  }
-
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
@@ -487,6 +424,11 @@ function MainPanel({
         period={period}
       />
     );
+  }
+
+  // Suite slug specified but suite object not yet loaded — wait for suites.getAll
+  if (isLoading) {
+    return null;
   }
 
   return <SuiteEmptyState onNewSuite={onNewSuite} />;

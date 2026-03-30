@@ -94,15 +94,22 @@ export class EventSourcedQueueProcessorMemory<
     const jobId = this.generateJobId(payload);
     const deduplicationId = dedup?.makeId(payload);
 
-    // Simple job deduplication: replace existing job with same deduplication ID
+    // Simple job deduplication: squash onto existing job with same deduplication ID
     if (deduplicationId) {
       const existingJob =
         this.pendingJobsByDeduplicationId.get(deduplicationId);
       if (existingJob) {
-        existingJob.payload = payload;
+        const shouldReplace = dedup?.replace !== false;
+        const shouldExtend = dedup?.extend !== false;
+        if (shouldReplace) {
+          existingJob.payload = payload;
+        }
+        if (shouldExtend) {
+          existingJob.delay = effectiveDelay;
+        }
         this.logger.debug(
           { queueName: this.queueName, jobId, deduplicationId },
-          "Replaced existing job with same deduplication ID",
+          "Squashed onto existing job with same deduplication ID",
         );
         return;
       }

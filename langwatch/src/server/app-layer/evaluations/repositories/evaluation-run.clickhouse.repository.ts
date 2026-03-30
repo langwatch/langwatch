@@ -167,10 +167,10 @@ export class EvaluationRunClickHouseRepository
       evaluatorType: record.EvaluatorType,
       evaluatorName: record.EvaluatorName,
       traceId: record.TraceId,
-      isGuardrail: record.IsGuardrail === 1,
+      isGuardrail: !!record.IsGuardrail,
       status: record.Status as EvaluationRunData["status"],
       score: record.Score,
-      passed: record.Passed === null ? null : record.Passed === 1,
+      passed: record.Passed === null ? null : !!record.Passed,
       label: record.Label,
       details: record.Details,
       inputs: record.Inputs

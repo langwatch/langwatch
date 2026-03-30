@@ -74,6 +74,7 @@ export function UploadCSVModal({
       <Dialog.Root
         open={localIsOpen}
         onOpenChange={({ open }) => !open && onClose()}
+        closeOnInteractOutside={false}
       >
         <Dialog.Content>
           <Dialog.Header>

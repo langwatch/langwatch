@@ -470,14 +470,16 @@ describe("SimulationClickHouseRepository", () => {
       });
     });
 
-    it("uses LIKE pattern for internal suites", async () => {
+    it("queries without suite-specific filtering", async () => {
       setQueryResult(clickhouse, []);
 
       await repo.getRunDataForAllSuites({ projectId: "proj-1" });
 
       const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
         .calls[0]![0] as { query: string };
-      expect(call.query).toContain("__internal__%__suite");
+      // getRunDataForAllSuites fetches all runs (suite filtering is done by getSetSummaries)
+      expect(call.query).toContain("TenantId");
+      expect(call.query).not.toContain("__internal__");
     });
   });
 

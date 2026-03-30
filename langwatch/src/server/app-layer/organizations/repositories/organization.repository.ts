@@ -23,6 +23,16 @@ export interface OrganizationWithAdmins {
   }>;
 }
 
+/**
+ * Organization data needed by billing usage reporting.
+ * Only returned for SEAT_EVENT pricing orgs with active GROWTH subscriptions.
+ */
+export interface OrganizationForBilling {
+  id: string;
+  stripeCustomerId: string | null;
+  subscriptions: { id: string }[];
+}
+
 export interface OrganizationRepository {
   getOrganizationIdByTeamId(teamId: string): Promise<string | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
@@ -50,6 +60,7 @@ export interface OrganizationRepository {
   findNameById(
     organizationId: string,
   ): Promise<{ id: string; name: string } | null>;
+  getOrganizationForBilling(organizationId: string): Promise<OrganizationForBilling | null>;
 }
 
 export class NullOrganizationRepository implements OrganizationRepository {
@@ -105,6 +116,12 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async findNameById(
     _organizationId: string,
   ): Promise<{ id: string; name: string } | null> {
+    return null;
+  }
+
+  async getOrganizationForBilling(
+    _organizationId: string,
+  ): Promise<OrganizationForBilling | null> {
     return null;
   }
 }

@@ -48,7 +48,7 @@ export const DEFAULT_SET_ID = "default";
  * coercion fix: old rows may have ScenarioSetId = "" while new rows have "default".
  */
 export function expandSetIdFilter(scenarioSetId: string): string[] {
-  if (scenarioSetId === DEFAULT_SET_ID) {
+  if (scenarioSetId === DEFAULT_SET_ID || scenarioSetId === "") {
     return [DEFAULT_SET_ID, ""];
   }
   return [scenarioSetId];

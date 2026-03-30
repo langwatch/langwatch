@@ -56,6 +56,7 @@ const RUN_COLUMNS = `
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
+  toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
@@ -78,6 +79,7 @@ const LIST_COLUMNS = `
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
+  toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
@@ -111,7 +113,7 @@ const DEDUP_LIST_COLUMNS = `
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   DurationMs, TotalCost, RoleCosts, RoleLatencies,
-  UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+  StartedAt, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
 
 /** Inner subquery columns for full-detail queries */
 const DEDUP_RUN_COLUMNS = `
@@ -121,7 +123,7 @@ const DEDUP_RUN_COLUMNS = `
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   DurationMs, TotalCost, RoleCosts, RoleLatencies,
-  UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+  StartedAt, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
 
 interface CursorPayload {
   ts: string;
@@ -163,18 +165,25 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
     }>(
       `SELECT
-        ScenarioSetId,
+        NormalizedSetId AS ScenarioSetId,
         toString(count(*)) AS ScenarioCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
        FROM (
-         SELECT ${DEDUP_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         SELECT
+           -- 'default' must match DEFAULT_SET_ID from internal-set-id.ts
+           IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId,
+           UpdatedAt,
+           ArchivedAt
+         FROM (
+           SELECT ${DEDUP_COLUMNS}
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+           ORDER BY ScenarioRunId, UpdatedAt DESC
+           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
        )
        WHERE ArchivedAt IS NULL
-       GROUP BY ScenarioSetId
+       GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId },
     );
@@ -193,16 +202,24 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioRunData | null> {
+    // Uses a lightweight inner subquery to find the latest version, avoiding
+    // the old pattern that read all heavy columns (Messages, RoleCosts, etc.)
+    // in DEDUP_RUN_COLUMNS across entire granules (~8K rows) for dedup, causing
+    // OOM on parts with large payloads. The inner subquery reads only
+    // DEDUP_COLUMNS (no heavy fields) to locate the row, then the outer SELECT
+    // reads heavy columns for that single matched row.
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM (
-         SELECT ${DEDUP_RUN_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
-         ORDER BY UpdatedAt DESC
-         LIMIT 1
-       )
-       WHERE ArchivedAt IS NULL
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         AND t.ScenarioRunId = {scenarioRunId:String}
+         AND t.ArchivedAt IS NULL
+         AND t.UpdatedAt = (
+           SELECT max(s.UpdatedAt)
+           FROM ${TABLE_NAME} AS s
+           WHERE s.TenantId = {tenantId:String}
+             AND s.ScenarioRunId = {scenarioRunId:String}
+         )
        LIMIT 1`,
       { tenantId: projectId, scenarioRunId },
     );
@@ -724,17 +741,44 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return { changed: true, lastUpdatedAt, runs, scenarioSetIds, nextCursor, hasMore };
   }
 
-  async getExternalSetSummaries({
-    projectId,
-    startDate,
-    endDate,
-  }: {
+  async getExternalSetSummaries(params: {
     projectId: string;
     startDate?: number;
     endDate?: number;
   }): Promise<ExternalSetSummary[]> {
+    return this.getSetSummaries({ ...params, filter: "external" });
+  }
+
+  async getInternalSuiteSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]> {
+    return this.getSetSummaries({ ...params, filter: "internal-suites" });
+  }
+
+  private async getSetSummaries({
+    projectId,
+    startDate,
+    endDate,
+    filter,
+  }: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+    filter: "external" | "internal-suites";
+  }): Promise<ExternalSetSummary[]> {
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
+
+    const wherePredicate = filter === "external"
+      ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
+      : "AND startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite')";
+
+    // External sets normalize empty ScenarioSetId to 'default'
+    const selectId = filter === "external"
+      ? "IF(ScenarioSetId = '', 'default', ScenarioSetId) AS NormalizedSetId"
+      : "ScenarioSetId AS NormalizedSetId";
 
     const rows = await this.queryRows<{
       ScenarioSetId: string;
@@ -744,32 +788,35 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
     }>(
       `SELECT
-        ScenarioSetId,
+        NormalizedSetId AS ScenarioSetId,
         toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
         toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
         toString(argMax(FailCount, MaxCreatedAtMs)) AS FailCount,
         toString(max(MaxCreatedAtMs)) AS LastRunAt
        FROM (
          SELECT
-           ScenarioSetId,
+           NormalizedSetId,
            BatchRunId,
            count() AS RunCount,
            countIf(Status = 'SUCCESS') AS PassCount,
            countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
            toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
          FROM (
-           SELECT ${DEDUP_COLUMNS}
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND NOT startsWith(ScenarioSetId, '__internal__')
-           ORDER BY ScenarioRunId, UpdatedAt DESC
-           LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+           SELECT ${selectId}, BatchRunId, Status, CreatedAt, ArchivedAt
+           FROM (
+             SELECT ${DEDUP_COLUMNS}
+             FROM ${TABLE_NAME}
+             WHERE TenantId = {tenantId:String}
+               ${wherePredicate}
+             ORDER BY ScenarioRunId, UpdatedAt DESC
+             LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+           )
          )
          WHERE ArchivedAt IS NULL
-         GROUP BY ScenarioSetId, BatchRunId
+         GROUP BY NormalizedSetId, BatchRunId
          ${havingClause}
        )
-       GROUP BY ScenarioSetId
+       GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId, ...dateFilter.params },
     );

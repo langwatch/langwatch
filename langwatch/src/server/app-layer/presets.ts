@@ -72,6 +72,13 @@ import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
+import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
+import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
+import { SuiteRunStateRepositoryClickHouse, SuiteRunStateRepositoryMemory } from "../event-sourcing/pipelines/suite-run-processing/repositories";
+import { SimulationRunStateRepositoryClickHouse, SimulationRunStateRepositoryMemory } from "../event-sourcing/pipelines/simulation-processing/repositories";
+import { ExperimentRunStateRepositoryClickHouse, ExperimentRunStateRepositoryMemory } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
+import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 
 export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
@@ -95,6 +102,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     if (!client) throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+
 
   const redis = config.skipRedis ? null : createRedisConnectionFromConfig({
     url: config.redisUrl,
@@ -247,16 +255,44 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     processRole: config.processRole,
   });
 
+  // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
+  const repositories: PipelineRepositories = {
+    suiteRunState: clickhouseEnabled
+      ? new SuiteRunStateRepositoryClickHouse(resolveClickHouseClient)
+      : new SuiteRunStateRepositoryMemory(),
+    simulationRunState: clickhouseEnabled
+      ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
+      : new SimulationRunStateRepositoryMemory(),
+    experimentRunState: clickhouseEnabled
+      ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
+      : new ExperimentRunStateRepositoryMemory(),
+    traceSummaryFold: clickhouseEnabled
+      ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
+      : traceSummary.repository,
+    logRecordStorage: clickhouseEnabled
+      ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
+      : new NullLogRecordStorageRepository(),
+    metricRecordStorage: clickhouseEnabled
+      ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
+      : new NullMetricRecordStorageRepository(),
+    experimentRunItemStorage: createExperimentRunItemAppendStore(
+      clickhouseEnabled ? resolveClickHouseClient : null,
+    ),
+  };
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
-    prisma,
-    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
+    repositories,
+    redis: redis!,
     broadcast,
     projects,
     monitors,
+    organizations,
     traces: { summary: traceSummary, spans: spanStorage },
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId, prisma },
+    costRecorder: new PrismaEvaluationCostRecorder(prisma),
+    billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
   });
   const commands = registry.registerAll();
@@ -468,7 +504,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageEnd: noop,
         finishRun: noop,
         deleteRun: noop,
-        updateRunMetrics: noop,
+        computeRunMetrics: noop,
       } as AppCommands["simulations"],
       suiteRuns: {
         startSuiteRun: noop,

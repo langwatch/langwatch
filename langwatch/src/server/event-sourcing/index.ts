@@ -30,6 +30,10 @@ export type { Command, CommandHandler, CommandHandlerResult } from "./commands/c
 export type { CommandHandlerClass } from "./commands/commandHandlerClass";
 export { defineCommandSchema } from "./commands/commandSchema";
 export type { CommandSchema } from "./commands/commandSchema";
+export { defineCommand } from "./commands/defineCommand";
+export type { DefinedCommandClass } from "./commands/defineCommand";
+export { withCommandEnvelope, stripEnvelope } from "./commands/commandEnvelope";
+export type { CommandEnvelope } from "./commands/commandEnvelope";
 
 // Pipeline (static definitions)
 export { definePipeline } from "./pipeline/staticBuilder";
@@ -63,6 +67,9 @@ export type {
 export type { FoldProjectionDefinition, FoldProjectionStore } from "./projections/foldProjection.types";
 export type { AppendStore, MapProjectionDefinition } from "./projections/mapProjection.types";
 export type { ProjectionStoreContext } from "./projections/projectionStoreContext";
+export { AbstractMapProjection } from "./projections/abstractMapProjection";
+export type { MapEventHandlers } from "./projections/abstractMapProjection";
+export { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 
 // Queues
 export type { EventSourcedQueueProcessor } from "./queues";

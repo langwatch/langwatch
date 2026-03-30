@@ -197,7 +197,6 @@ export class SimulationRunStateRepositoryClickHouse<
         `,
         query_params: { tenantId: context.tenantId, scenarioRunId },
         format: "JSONEachRow",
-        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSimulationRunRecord>();
@@ -270,7 +269,10 @@ export class SimulationRunStateRepositoryClickHouse<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: {
+          async_insert: 1,
+          wait_for_async_insert: 0,
+        },
       });
 
     } catch (error) {

@@ -70,16 +70,20 @@ export const textMessageEndCommandDataSchema = z.object({
 });
 export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
 
-export const updateRunMetricsCommandDataSchema = z.object({
+export const computeRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   traceId: z.string(),
-  totalCost: z.number(),
-  roleCosts: z.record(z.string(), z.number()),
-  roleLatencies: z.record(z.string(), z.number()),
+  /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
+  metrics: z.object({
+    totalCost: z.number(),
+    roleCosts: z.record(z.string(), z.number()),
+    roleLatencies: z.record(z.string(), z.number()),
+  }).optional(),
+  retryCount: z.number().default(0),
   occurredAt: z.number(),
 });
-export type UpdateRunMetricsCommandData = z.infer<typeof updateRunMetricsCommandDataSchema>;
+export type ComputeRunMetricsCommandData = z.infer<typeof computeRunMetricsCommandDataSchema>;
 
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),

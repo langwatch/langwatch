@@ -85,6 +85,10 @@ export class SimulationRunService {
     return this.repository.getExternalSetSummaries(params);
   }
 
+  async getInternalSuiteSummaries(params: { projectId: string; startDate?: number; endDate?: number }): Promise<ExternalSetSummary[]> {
+    return this.repository.getInternalSuiteSummaries(params);
+  }
+
   async getRunDataForAllSuites(params: {
     projectId: string;
     limit?: number;

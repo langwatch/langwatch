@@ -13,15 +13,11 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
-/**
- * Read-side record type — intentionally excludes ScenarioRoleCosts,
- * ScenarioRoleLatencies, and ScenarioRoleSpans.
- *
- * WHY: These Map(String, ...) columns were added after millions of rows already
- * existed. When ClickHouse reads old merged parts it materializes default empty
- * maps for every row in the granule, causing OOM kills. The trace-side reactor
- * uses fold state instead, so these values are never needed on the read path.
- */
+type ClickHouseSummaryWriteRecord = WithDateWrites<
+  ClickHouseSummaryRecord,
+  "OccurredAt" | "CreatedAt" | "UpdatedAt"
+>;
+
 interface ClickHouseSummaryRecord {
   ProjectionId: string;
   TenantId: string;
@@ -53,20 +49,11 @@ interface ClickHouseSummaryRecord {
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
-}
-
-/** Write-side record extends the read type with ScenarioRole Map columns.
- *  Single-row inserts are fine — only reads across old merged parts OOM. */
-interface ClickHouseSummaryWriteExtended extends ClickHouseSummaryRecord {
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
+  SpanCosts: Record<string, number>;
 }
-
-type ClickHouseSummaryWriteRecord = WithDateWrites<
-  ClickHouseSummaryWriteExtended,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt"
->;
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
@@ -96,7 +83,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
 
     } catch (error) {
@@ -153,7 +140,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
-            HasAnnotation
+            HasAnnotation,
+            ScenarioRoleCosts,
+            ScenarioRoleLatencies,
+            ScenarioRoleSpans,
+            SpanCosts
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -194,26 +185,26 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       timeToFirstTokenMs: record.TimeToFirstTokenMs,
       timeToLastTokenMs: record.TimeToLastTokenMs,
       tokensPerSecond: record.TokensPerSecond,
-      containsErrorStatus: record.ContainsErrorStatus === 1,
-      containsOKStatus: record.ContainsOKStatus === 1,
+      containsErrorStatus: !!record.ContainsErrorStatus,
+      containsOKStatus: !!record.ContainsOKStatus,
       errorMessage: record.ErrorMessage,
       models: record.Models,
       totalCost: record.TotalCost,
-      tokensEstimated: record.TokensEstimated === true,
+      tokensEstimated: !!record.TokensEstimated,
       totalPromptTokenCount: record.TotalPromptTokenCount,
       totalCompletionTokenCount: record.TotalCompletionTokenCount,
-      outputFromRootSpan: record.OutputFromRootSpan === 1,
+      outputFromRootSpan: !!record.OutputFromRootSpan,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
-      blockedByGuardrail: record.BlockedByGuardrail === 1,
+      blockedByGuardrail: !!record.BlockedByGuardrail,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       hasAnnotation:
-        record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
+        record.HasAnnotation != null ? !!record.HasAnnotation : null,
       attributes: record.Attributes ?? {},
-      // Hardcoded to empty — see ClickHouseSummaryRecord comment for OOM rationale.
-      scenarioRoleCosts: {},
-      scenarioRoleLatencies: {},
-      scenarioRoleSpans: {},
+      scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
+      scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
+      scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
+      spanCosts: record.SpanCosts ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -261,6 +252,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
+      SpanCosts: data.spanCosts ?? {},
     };
   }
 }

@@ -12,7 +12,7 @@
  * Detection: Presence of langwatch.* attributes
  *
  * Canonical attributes produced:
- * - langwatch.span.type (passthrough, upgraded to "llm" for chat_messages)
+ * - langwatch.span.type (passthrough)
  * - gen_ai.conversation.id (from langwatch.thread.id variants)
  * - langwatch.user.id (consolidated from legacy variants)
  * - langwatch.customer.id (consolidated from legacy variants)
@@ -74,7 +74,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Span Type (highest precedence)
     // Explicit langwatch.span.type takes priority
-    // Note: May be upgraded to "llm" later if chat_messages input is detected
     // ─────────────────────────────────────────────────────────────────────────
     const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE);
     if (
@@ -278,9 +277,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             ctx.recordRule(
               `${this.id}:input.chat_messages->gen_ai.input.messages`,
             );
-
-            ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "llm");
-            ctx.recordRule(`${this.id}:type=llm`);
           }
 
           // Always preserve the raw input — even when normalization fails

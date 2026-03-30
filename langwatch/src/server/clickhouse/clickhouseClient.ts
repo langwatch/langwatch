@@ -29,21 +29,21 @@ const PRIVATE_CH_ENV_PREFIX = "CLICKHOUSE_URL__";
  * Map of orgId → connectionUrl, parsed from env vars at module load.
  * Zero runtime overhead — no DB queries, no decryption.
  */
-const privateClickHouseUrls = parsePrivateClickHouseEnvVars();
+const privateClickHouseUrls = parsePrivateEnvVars(PRIVATE_CH_ENV_PREFIX, "ClickHouse");
 
-function parsePrivateClickHouseEnvVars(): Map<string, string> {
+function parsePrivateEnvVars(prefix: string, label: string): Map<string, string> {
   const map = new Map<string, string>();
   for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith(PRIVATE_CH_ENV_PREFIX)) continue;
+    if (!key.startsWith(prefix)) continue;
 
     if (!value || value.trim() === "") {
-      logger.warn({ envVar: key }, "Skipping private ClickHouse env var: empty value");
+      logger.warn({ envVar: key }, `Skipping private ${label} env var: empty value`);
       continue;
     }
 
-    // Format: CLICKHOUSE_URL__<label>__<orgId>
+    // Format: <PREFIX><label>__<orgId>
     // Strip prefix, then take the last segment after "__" as orgId
-    const suffix = key.slice(PRIVATE_CH_ENV_PREFIX.length);
+    const suffix = key.slice(prefix.length);
     const lastSep = suffix.lastIndexOf("__");
     const orgId = lastSep >= 0 ? suffix.slice(lastSep + 2) : suffix;
 
@@ -51,15 +51,15 @@ function parsePrivateClickHouseEnvVars(): Map<string, string> {
 
     if (map.has(orgId)) {
       throw new Error(
-        `Duplicate private ClickHouse config for orgId "${orgId}": env var "${key}" conflicts with an earlier definition. Each orgId must map to exactly one ClickHouse URL.`,
+        `Duplicate private ${label} config for orgId "${orgId}": env var "${key}" conflicts with an earlier definition.`,
       );
     }
 
     map.set(orgId, value);
-    logger.info({ orgId, envVar: key }, "Loaded private ClickHouse URL from env var");
+    logger.info({ orgId, envVar: key }, `Loaded private ${label} URL from env var`);
   }
   if (map.size > 0) {
-    logger.info({ count: map.size }, "Private ClickHouse instances configured");
+    logger.info({ count: map.size }, `Private ${label} instances configured`);
   }
   return map;
 }
@@ -159,6 +159,7 @@ export function isClickHouseEnabled(): boolean {
 
 /** Re-export for infrastructure-only use (metrics collection, not tenant data). */
 export { _getSharedClickHouseClient as getSharedClickHouseClient } from "./client";
+
 
 /**
  * Returns a cached ClickHouse client for the given org and URL,

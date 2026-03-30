@@ -32,7 +32,7 @@ import {
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { SuiteRunSummary } from "./run-history-transforms";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,

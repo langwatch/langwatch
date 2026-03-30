@@ -1,9 +1,11 @@
 ---
-title: "Template Syntax"
+title: "Liquid Template Syntax"
 description: "Reference for the Liquid template syntax supported in LangWatch prompts: variables, conditionals, loops, filters, and more."
 ---
 
-LangWatch prompts use [Liquid](https://liquidjs.com/) as their template language. Liquid gives you variables, conditionals, loops, and filters so you can build dynamic prompts without custom code.
+LangWatch prompts use [Liquid](https://liquidjs.com/) as their template language — a more powerful alternative to Jinja-style templating with a cleaner syntax. If you're coming from Jinja2, you'll find Liquid familiar but with better support for filters, strict compilation modes, and safe rendering out of the box.
+
+Liquid gives you variables, conditionals, loops, and filters so you can build dynamic prompts without custom code.
 
 Templates are rendered when you call `compile()` in the Python or TypeScript SDK, or when the platform executes a prompt on your behalf.
 

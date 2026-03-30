@@ -4,11 +4,11 @@ import type { NormalizedSpan } from "../../schemas/spans";
 import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
 import {
   applySpanToSummary,
-  createTraceSummaryFoldProjection,
+  TraceSummaryFoldProjection,
   type TraceSummaryData,
 } from "../traceSummary.foldProjection";
 
-const traceSummaryProjection = createTraceSummaryFoldProjection({
+const traceSummaryProjection = new TraceSummaryFoldProjection({
   store: { store: async () => {}, get: async () => null },
 });
 

@@ -239,11 +239,15 @@ export class EventSourcingService<
                 error instanceof Error ? error.message : String(error),
             });
             if (this.logger) {
+              const subErrors = error instanceof AggregateError
+                ? error.errors.map((e: unknown) => e instanceof Error ? { message: e.message, stack: e.stack?.split("\n").slice(0, 3).join("\n") } : String(e))
+                : [];
               this.logger.error(
                 {
                   aggregateType: this.aggregateType,
                   eventCount: enrichedEvents.length,
                   error: error instanceof Error ? error.message : String(error),
+                  subErrors,
                 },
                 "Failed to dispatch events to projections",
               );

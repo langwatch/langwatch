@@ -20,9 +20,9 @@ import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
-import { createSpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
+import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import { createTraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 import { SpanAppendStore } from "../projections/spanStorage.store";
@@ -38,6 +38,17 @@ function generateTestSpanId(): string {
 
 function generateTestPipelineName(): string {
   return `trace_processing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+class TestRecordSpanCommand extends RecordSpanCommand {
+  static override readonly schema = RecordSpanCommand.schema;
+  constructor() {
+    super({
+      piiRedactionService: { redactSpan: async () => {} },
+      costEnrichmentService: { enrichSpan: async () => {} },
+      tokenEstimationService: { estimateSpanTokens: async () => {} },
+    });
+  }
 }
 
 /**
@@ -96,6 +107,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   { recordSpan: any; assignTopic: any }
 > & {
   eventStore: EventStoreClickHouse;
+  eventSourcing: EventSourcing;
   pipelineName: string;
   ready: () => Promise<void>;
 } {
@@ -118,6 +130,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository);
@@ -126,9 +139,9 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("trace" as AggregateType)
-    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
-    .withMapProjection("spanStorage", createSpanStorageMapProjection({ store: spanAppendStore }) as any)
-    .withCommand("recordSpan", RecordSpanCommand as any)
+    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
+    .withMapProjection("spanStorage", new SpanStorageMapProjection({ store: spanAppendStore }) as any)
+    .withCommand("recordSpan", TestRecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)
     .build();
 
@@ -137,6 +150,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     ready: () => pipeline.service.waitUntilReady(),
   } as any;
@@ -326,7 +340,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      await pipeline.service.close();
+      await pipeline.eventSourcing.close();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await cleanupTestDataForTenant(tenantIdString);
     });
@@ -350,6 +364,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -378,6 +393,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         const count = await waitForStoredSpans(traceId, tenantIdString, 1);
@@ -403,6 +419,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
         await waitForClickHouseConsistency();
 
@@ -420,6 +437,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 2);
@@ -452,6 +470,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -487,6 +506,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -521,6 +541,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
 
@@ -533,6 +554,7 @@ describe.skipIf(!hasTestcontainers)(
           subtopicId,
           subtopicName: "Billing Questions",
           isIncremental: false,
+          occurredAt: Date.now(),
         });
 
         await waitForTopicAssignment(pipeline, traceId, tenantId, topicId);
@@ -570,6 +592,7 @@ describe.skipIf(!hasTestcontainers)(
           },
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -604,6 +627,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
