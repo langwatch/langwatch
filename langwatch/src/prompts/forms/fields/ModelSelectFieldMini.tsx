@@ -1,4 +1,10 @@
-import { Box, HStack, Popover as ChakraPopover } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Popover as ChakraPopover,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import {
@@ -76,6 +82,12 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
       control={control}
       render={({ field }) => {
         const llmErrors = formState.errors.version?.configData?.llm;
+        const hasErrors = !!llmErrors;
+        const errorMessages = [
+          llmErrors?.temperature?.message,
+          llmErrors?.maxTokens?.message,
+        ].filter(Boolean);
+
         return (
           <Popover.Root
             positioning={{ placement: "bottom-start" }}
@@ -84,23 +96,37 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             onOpenChange={({ open }) => setPopoverOpen(open)}
           >
             <ChakraPopover.Anchor asChild>
-              <HStack
-                paddingY={2}
-                paddingX={3}
-                borderRadius="md"
-                border="1px solid"
-                borderColor="border"
-                cursor="pointer"
-                _hover={{ bg: "bg.subtle" }}
-                transition="background 0.15s"
-                justify="space-between"
-                onClick={() => setPopoverOpen((prev) => !prev)}
-              >
-                <LLMModelDisplay model={field.value?.model ?? ""} />
-                <Box color="fg.muted">
-                  <ChevronDown size={16} />
-                </Box>
-              </HStack>
+              <VStack gap={0} align="stretch">
+                <HStack
+                  data-testid="model-select-trigger"
+                  data-error={hasErrors ? "true" : undefined}
+                  paddingY={2}
+                  paddingX={3}
+                  borderRadius="md"
+                  border="1px solid"
+                  borderColor={hasErrors ? "red.500" : "border"}
+                  cursor="pointer"
+                  _hover={{ bg: "bg.subtle" }}
+                  transition="background 0.15s"
+                  justify="space-between"
+                  onClick={() => setPopoverOpen((prev) => !prev)}
+                >
+                  <LLMModelDisplay model={field.value?.model ?? ""} />
+                  <Box color="fg.muted">
+                    <ChevronDown size={16} />
+                  </Box>
+                </HStack>
+                {!popoverOpen && errorMessages.length > 0 && (
+                  <Text
+                    data-testid="model-select-error-text"
+                    fontSize="xs"
+                    color="red.500"
+                    paddingTop={1}
+                  >
+                    {errorMessages.join(". ")}
+                  </Text>
+                )}
+              </VStack>
             </ChakraPopover.Anchor>
             <LLMConfigPopover
               values={field.value}
