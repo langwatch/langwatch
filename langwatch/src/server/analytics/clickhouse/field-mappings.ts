@@ -473,26 +473,44 @@ export function getTableAlias(table: CHTable): string {
 }
 
 /**
+ * Optional date range for pruning JOIN subqueries.
+ *
+ * WHY: Without date bounds, JOIN subqueries scan ALL data for the tenant,
+ * causing ClickHouse OOM on large tenants. Pushing date bounds into the
+ * subquery lets ClickHouse prune partitions early.
+ */
+export interface JoinDateBounds {
+  start: Date;
+  end: Date;
+}
+
+/**
  * Build JOIN clause for a table, selecting only the columns needed.
  *
  * @param table - The table to JOIN
  * @param requiredColumns - Optional set of columns needed by the query.
  *   When provided, only these columns (plus identity columns) are selected.
  *   When omitted, all analytics columns for the table are selected.
+ * @param dateBounds - Optional date range to push into the JOIN subquery.
+ *   When provided, adds date predicates so ClickHouse can prune partitions.
+ *   When omitted, no date filtering is applied (backward compat for callers
+ *   like filter queries that may not have date context).
  */
 export function buildJoinClause(
   table: CHTable,
   requiredColumns?: ReadonlySet<string>,
+  dateBounds?: JoinDateBounds,
 ): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
+  const dateFilter = buildJoinDateFilter(table, dateBounds);
 
   switch (table) {
     case "stored_spans": {
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${dateFilter}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
@@ -500,13 +518,49 @@ export function buildJoinClause(
         : EVALUATION_ANALYTICS_COLUMNS;
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId = {tenantId:String}${dateFilter}
         ORDER BY EvaluationId, UpdatedAt DESC
         LIMIT 1 BY TenantId, EvaluationId
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     default:
       return "";
+  }
+}
+
+/**
+ * Build the date filter fragment for a JOIN subquery.
+ *
+ * Each table uses a different timestamp column:
+ * - stored_spans: StartTime (when the span began)
+ * - evaluation_runs: CreatedAt (when the evaluation was created)
+ *
+ * Returns an empty string when no date bounds are provided,
+ * preserving backward compatibility for callers without date context.
+ */
+function buildJoinDateFilter(
+  table: CHTable,
+  dateBounds?: JoinDateBounds,
+): string {
+  if (!dateBounds) return "";
+
+  const timestampColumn = getJoinTimestampColumn(table);
+  if (!timestampColumn) return "";
+
+  return ` AND ${timestampColumn} >= {joinDateStart:DateTime64(3)} AND ${timestampColumn} < {joinDateEnd:DateTime64(3)}`;
+}
+
+/**
+ * Map each joinable table to its appropriate timestamp column for date pruning.
+ */
+function getJoinTimestampColumn(table: CHTable): string | null {
+  switch (table) {
+    case "stored_spans":
+      return "StartTime";
+    case "evaluation_runs":
+      return "CreatedAt";
+    default:
+      return null;
   }
 }
 

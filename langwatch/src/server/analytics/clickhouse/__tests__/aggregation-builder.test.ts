@@ -542,6 +542,76 @@ describe("aggregation-builder", () => {
         expect(result.params).not.toHaveProperty("groupByKey");
       });
     });
+
+    // @regression issue #2692: JOIN subqueries scanned full tenant history
+    // causing ClickHouse OOM. Date bounds must be pushed into JOIN subqueries.
+    describe("when query requires evaluation_runs JOIN", () => {
+      it("includes date bounds in evaluation_runs JOIN subquery", () => {
+        const input = {
+          ...baseInput,
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "my-evaluator",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain(
+          "CreatedAt >= {joinDateStart:DateTime64(3)}"
+        );
+        expect(result.sql).toContain(
+          "CreatedAt < {joinDateEnd:DateTime64(3)}"
+        );
+        expect(result.params).toHaveProperty("joinDateStart");
+        expect(result.params).toHaveProperty("joinDateEnd");
+      });
+
+      it("uses previousPeriodStartDate as joinDateStart and endDate as joinDateEnd", () => {
+        const input = {
+          ...baseInput,
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "my-evaluator",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.params.joinDateStart).toEqual(
+          baseInput.previousPeriodStartDate
+        );
+        expect(result.params.joinDateEnd).toEqual(baseInput.endDate);
+      });
+    });
+
+    describe("when query requires stored_spans JOIN", () => {
+      it("includes date bounds in stored_spans JOIN subquery", () => {
+        const input = {
+          ...baseInput,
+          series: [
+            {
+              metric: "metadata.span_type" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain(
+          "StartTime >= {joinDateStart:DateTime64(3)}"
+        );
+        expect(result.sql).toContain(
+          "StartTime < {joinDateEnd:DateTime64(3)}"
+        );
+        expect(result.params).toHaveProperty("joinDateStart");
+        expect(result.params).toHaveProperty("joinDateEnd");
+      });
+    });
   });
 
   describe("buildDataForFilterQuery", () => {
@@ -682,6 +752,46 @@ describe("aggregation-builder", () => {
       );
 
       expect(result.sql).toContain("WHERE 1=0");
+    });
+
+    // @regression issue #2692: JOIN subqueries for filter queries must include
+    // date bounds to prevent scanning full tenant history.
+    describe("when JOIN subquery requires date bounds", () => {
+      it("includes StartTime date bounds in stored_spans JOIN for spans.model", () => {
+        const result = buildDataForFilterQuery(
+          projectId,
+          "spans.model",
+          startDate,
+          endDate
+        );
+
+        expect(result.sql).toContain(
+          "StartTime >= {joinDateStart:DateTime64(3)}"
+        );
+        expect(result.sql).toContain(
+          "StartTime < {joinDateEnd:DateTime64(3)}"
+        );
+        expect(result.params).toHaveProperty("joinDateStart", startDate);
+        expect(result.params).toHaveProperty("joinDateEnd", endDate);
+      });
+
+      it("includes CreatedAt date bounds in evaluation_runs JOIN", () => {
+        const result = buildDataForFilterQuery(
+          projectId,
+          "evaluations.evaluator_id",
+          startDate,
+          endDate
+        );
+
+        expect(result.sql).toContain(
+          "CreatedAt >= {joinDateStart:DateTime64(3)}"
+        );
+        expect(result.sql).toContain(
+          "CreatedAt < {joinDateEnd:DateTime64(3)}"
+        );
+        expect(result.params).toHaveProperty("joinDateStart", startDate);
+        expect(result.params).toHaveProperty("joinDateEnd", endDate);
+      });
     });
   });
 
