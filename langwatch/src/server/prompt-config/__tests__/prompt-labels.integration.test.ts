@@ -331,7 +331,7 @@ describe("Feature: Prompt version labels", () => {
         organizationId: testOrganization.id,
         handle: `org-prompt-${nanoid()}`,
         prompt: "You are an org-wide assistant",
-        model: "openai/gpt-5",
+        model: "openai/gpt-5-mini",
         scope: "ORGANIZATION",
       });
 
