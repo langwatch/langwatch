@@ -508,19 +508,19 @@ export class ClickHouseTraceService {
 
           // Build the query with keyset pagination
           let { traces, totalHits, lastTrace } =
-            await this.fetchTracesWithPagination(
-              input.projectId,
+            await this.fetchTracesWithPagination({
+              projectId: input.projectId,
               pageSize,
               sortDirection,
               cursor,
               protections,
-              input.startDate,
-              input.endDate,
+              startDate: input.startDate,
+              endDate: input.endDate,
               filterConditions,
               filterParams,
-              input.traceIds,
-              input.query,
-            );
+              traceIds: input.traceIds,
+              query: input.query,
+            });
 
           // When includeSpans is requested, fetch and attach actual spans
           if (options.includeSpans && traces.length > 0) {
@@ -1269,19 +1269,31 @@ export class ClickHouseTraceService {
    * Fetch traces with keyset pagination.
    * @internal
    */
-  private async fetchTracesWithPagination(
-    projectId: string,
-    pageSize: number,
-    sortDirection: "asc" | "desc",
-    cursor: ClickHouseScrollCursor | null,
-    protections: Protections,
-    startDate?: number,
-    endDate?: number,
-    filterConditions?: string[],
-    filterParams?: Record<string, unknown>,
-    traceIds?: string[],
-    query?: string,
-  ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
+  private async fetchTracesWithPagination({
+    projectId,
+    pageSize,
+    sortDirection,
+    cursor,
+    protections,
+    startDate,
+    endDate,
+    filterConditions,
+    filterParams,
+    traceIds,
+    query,
+  }: {
+    projectId: string;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    cursor: ClickHouseScrollCursor | null;
+    protections: Protections;
+    startDate?: number;
+    endDate?: number;
+    filterConditions?: string[];
+    filterParams?: Record<string, unknown>;
+    traceIds?: string[];
+    query?: string;
+  }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
       {

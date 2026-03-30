@@ -487,6 +487,95 @@ describe("ClickHouseTraceService", () => {
       });
     });
 
+    describe("when query is provided", () => {
+      it("includes ILIKE clause and searchQuery param in both queries", async () => {
+        const summaryRow = makeSummaryRow("trace-1");
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([summaryRow]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const inputWithQuery = {
+          ...baseInput,
+          query: "hello world",
+        } as GetAllTracesForProjectInput;
+
+        const result = await service.getAllTracesForProject(
+          inputWithQuery,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+
+        // Count query (1st call) contains ILIKE
+        const countCall = mockClickHouseQuery.mock.calls[0]!;
+        expect(countCall[0].query).toContain(
+          "ts.ComputedInput ILIKE {searchQuery:String}",
+        );
+        expect(countCall[0].query).toContain(
+          "ts.ComputedOutput ILIKE {searchQuery:String}",
+        );
+        expect(countCall[0].query_params.searchQuery).toBe("%hello world%");
+
+        // Data query (2nd call) contains ILIKE
+        const dataCall = mockClickHouseQuery.mock.calls[1]!;
+        expect(dataCall[0].query).toContain(
+          "ts.ComputedInput ILIKE {searchQuery:String}",
+        );
+        expect(dataCall[0].query).toContain(
+          "ts.ComputedOutput ILIKE {searchQuery:String}",
+        );
+        expect(dataCall[0].query_params.searchQuery).toBe("%hello world%");
+      });
+    });
+
+    describe("when query is undefined", () => {
+      it("does not include ILIKE clause in queries", async () => {
+        const summaryRow = makeSummaryRow("trace-1");
+
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([summaryRow]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+
+        const countCall = mockClickHouseQuery.mock.calls[0]!;
+        expect(countCall[0].query).not.toContain("ILIKE");
+        expect(countCall[0].query_params.searchQuery).toBeUndefined();
+
+        const dataCall = mockClickHouseQuery.mock.calls[1]!;
+        expect(dataCall[0].query).not.toContain("ILIKE");
+        expect(dataCall[0].query_params.searchQuery).toBeUndefined();
+      });
+    });
+
     describe("when includeSpans is true", () => {
       it("fetches and attaches spans to traces", async () => {
         const summaryRow = makeSummaryRow("trace-1");
