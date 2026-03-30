@@ -806,13 +806,19 @@ function accumulateRoleCostLatency({
 
   if (isNewRoleSpan) {
     scenarioRoleSpans[span.spanId] = directRole;
-    // Propagate role to all existing spans that are descendants of this span
-    for (const key of Object.keys(scenarioRoleSpans)) {
-      if (key.startsWith("_parent:")) {
+    // Propagate role transitively to all descendants of this span.
+    // Loops until no new assignments are made (transitive closure)
+    // to handle arbitrarily deep nesting (e.g. Agent → ai.generateText → ai.generateText.doGenerate).
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const key of Object.keys(scenarioRoleSpans)) {
+        if (!key.startsWith("_parent:")) continue;
         const childId = key.slice("_parent:".length);
         const parentId = scenarioRoleSpans[key]!;
-        if (parentId === span.spanId && !scenarioRoleSpans[childId]) {
-          scenarioRoleSpans[childId] = directRole;
+        if (scenarioRoleSpans[parentId] && !scenarioRoleSpans[childId]) {
+          scenarioRoleSpans[childId] = scenarioRoleSpans[parentId]!;
+          changed = true;
         }
       }
     }

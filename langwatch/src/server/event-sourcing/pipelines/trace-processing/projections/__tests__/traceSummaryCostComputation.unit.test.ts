@@ -609,6 +609,105 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
     });
   });
 
+  describe("given a Vercel AI SDK trace with 2-level nesting (Agent.call → ai.generateText → ai.generateText.doGenerate)", () => {
+    describe("when the LLM span is a grandchild of the role span", () => {
+      it("accumulates costs into the correct role", () => {
+        // Mirrors real TS scenario trace structure:
+        // Scenario Turn (root)
+        //   Agent.call [role=Agent]
+        //     ai.generateText (no tokens)
+        //       ai.generateText.doGenerate (has tokens)
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: "root",
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 5000,
+          durationMs: 4000,
+          spanAttributes: {
+            "scenario.role": "Agent",
+          },
+        });
+
+        const generateTextSpan = createTestSpan({
+          spanId: "gen-text-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 1100,
+          endTimeUnixMs: 4900,
+          durationMs: 3800,
+          spanAttributes: {},
+        });
+
+        const doGenerateSpan = createTestSpan({
+          spanId: "do-gen-1",
+          parentSpanId: "gen-text-1",
+          startTimeUnixMs: 1200,
+          endTimeUnixMs: 4800,
+          durationMs: 3600,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 200,
+            "gen_ai.usage.output_tokens": 100,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: agentSpan });
+        state = applySpanToSummary({ state, span: generateTextSpan });
+        state = applySpanToSummary({ state, span: doGenerateSpan });
+
+        // cost: 200 * 0.000005 + 100 * 0.000015 = 0.001 + 0.0015 = 0.0025
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(0.0025, 6);
+      });
+
+      it("accumulates costs when spans arrive in reverse order (LLM first)", () => {
+        const doGenerateSpan = createTestSpan({
+          spanId: "do-gen-1",
+          parentSpanId: "gen-text-1",
+          startTimeUnixMs: 1200,
+          endTimeUnixMs: 4800,
+          durationMs: 3600,
+          spanAttributes: {
+            "gen_ai.request.model": "gpt-5-mini",
+            "gen_ai.usage.input_tokens": 200,
+            "gen_ai.usage.output_tokens": 100,
+            "langwatch.model.inputCostPerToken": 0.000005,
+            "langwatch.model.outputCostPerToken": 0.000015,
+          },
+        });
+
+        const generateTextSpan = createTestSpan({
+          spanId: "gen-text-1",
+          parentSpanId: "agent-1",
+          startTimeUnixMs: 1100,
+          endTimeUnixMs: 4900,
+          durationMs: 3800,
+          spanAttributes: {},
+        });
+
+        const agentSpan = createTestSpan({
+          spanId: "agent-1",
+          parentSpanId: "root",
+          startTimeUnixMs: 1000,
+          endTimeUnixMs: 5000,
+          durationMs: 4000,
+          spanAttributes: {
+            "scenario.role": "Agent",
+          },
+        });
+
+        let state = createInitState();
+        state = applySpanToSummary({ state, span: doGenerateSpan });
+        state = applySpanToSummary({ state, span: generateTextSpan });
+        state = applySpanToSummary({ state, span: agentSpan });
+
+        // Same cost regardless of arrival order
+        expect(state.scenarioRoleCosts?.["Agent"]).toBeCloseTo(0.0025, 6);
+      });
+    });
+  });
+
   describe("given a trace without scenario roles", () => {
     describe("when spans have no scenario.role attribute", () => {
       it("leaves scenarioRoleCosts and scenarioRoleLatencies empty", () => {
