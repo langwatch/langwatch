@@ -50,9 +50,9 @@ vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
     providers: {},
     modelMetadata: {
-      "openai/gpt-4.1": {
-        id: "openai/gpt-4.1",
-        name: "GPT-4.1",
+      "openai/gpt-5-mini": {
+        id: "openai/gpt-5-mini",
+        name: "GPT-5 Mini",
         provider: "openai",
         supportedParameters: ["temperature", "max_tokens"],
         contextLength: 128000,
@@ -70,14 +70,14 @@ vi.mock("~/hooks/useModelProvidersSettings", () => ({
 
 // Mock ModelSelector
 vi.mock("~/components/ModelSelector", () => ({
-  allModelOptions: ["openai/gpt-4.1"],
+  allModelOptions: ["openai/gpt-5-mini"],
   ModelSelector: ({ model }: { model: string }) => (
     <select
       data-testid="model-selector"
       value={model}
       onChange={() => {}}
     >
-      <option value="openai/gpt-4.1">GPT-4.1</option>
+      <option value="openai/gpt-5-mini">GPT-5 Mini</option>
     </select>
   ),
   useModelSelectionOptions: (
@@ -116,7 +116,7 @@ type TestFormValues = {
 let testFormMethods: ReturnType<typeof useForm<TestFormValues>> | null = null;
 
 const defaultLlmConfig = {
-  model: "openai/gpt-4.1",
+  model: "openai/gpt-5-mini",
   temperature: 0.7,
   maxTokens: 4096,
 };
