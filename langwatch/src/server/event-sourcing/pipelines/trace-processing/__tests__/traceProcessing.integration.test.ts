@@ -28,23 +28,6 @@ import type { OtlpSpan } from "../schemas/otlp";
 import { SpanAppendStore } from "../projections/spanStorage.store";
 import { TraceSummaryStore } from "../projections/traceSummary.store";
 
-/**
- * Test subclass that provides no-op dependencies to avoid requiring Prisma.
- * The real RecordSpanCommand lazily requires ~/server/db when no deps are passed.
- */
-class TestRecordSpanCommand extends RecordSpanCommand {
-  static override readonly schema = RecordSpanCommand.schema;
-
-  constructor() {
-    const noOpDeps: RecordSpanCommandDependencies = {
-      piiRedactionService: { redactSpan: async () => {} },
-      costEnrichmentService: { enrichSpan: async () => {} },
-      tokenEstimationService: { estimateSpanTokens: async () => {} },
-    };
-    super(noOpDeps);
-  }
-}
-
 function generateTestTraceId(): string {
   return `trace-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }

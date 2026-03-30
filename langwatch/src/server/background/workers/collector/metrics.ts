@@ -7,7 +7,7 @@ import type { LLMSpan, Span, Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
   tokenizeAndEstimateCost,
 } from "./cost";
 
@@ -142,7 +142,7 @@ export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
     if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
       const llmModelCost =
-        llmSpan.model && matchingLLMModelCost(llmSpan.model, llmModelCosts);
+        llmSpan.model && matchModelCostWithFallbacks(llmSpan.model, llmModelCosts);
 
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};
