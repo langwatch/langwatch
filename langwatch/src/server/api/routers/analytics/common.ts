@@ -97,6 +97,13 @@ export const generateFilterConditions = (
       continue;
     }
 
+    // Fail-closed: unknown filter fields must produce a "match nothing"
+    // condition so triggers don't silently fire on all traces.
+    if (!(field in availableFilters)) {
+      filterConditions.push({ match_none: {} });
+      continue;
+    }
+
     const col = collectConditions(field as FilterField, params);
     filterConditions = filterConditions.concat(col);
   }
