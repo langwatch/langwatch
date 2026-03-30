@@ -32,6 +32,7 @@ const { mockNurturing, mockPrisma } = vi.hoisted(() => {
       organizationUser: { findFirst: fn() },
       organization: { findUnique: fn() },
       project: { findMany: fn() },
+      subscription: { findFirst: fn() },
     },
   };
 });
@@ -80,6 +81,7 @@ describe("ensureUserSyncedToCio()", () => {
     mockPrisma.project.findMany.mockResolvedValue([
       { id: "proj-1", firstMessage: true, integrated: true },
     ]);
+    mockPrisma.subscription.findFirst.mockResolvedValue(null);
   };
 
   describe("given a user who has not been synced this process lifetime", () => {
@@ -287,6 +289,7 @@ describe("ensureUserSyncedToCio()", () => {
         mockPrisma.project.findMany.mockResolvedValue([
           { id: "proj-1", firstMessage: false, integrated: false },
         ]);
+        mockPrisma.subscription.findFirst.mockResolvedValue(null);
 
         ensureUserSyncedToCio({ userId: "user-1", hasOrganization: true });
 
