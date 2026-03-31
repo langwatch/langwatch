@@ -5,6 +5,7 @@ import type { z } from "zod";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { extractErrorMessage } from "~/utils/captureError";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
@@ -400,7 +401,7 @@ export async function handleEvaluatorCall(
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
-      details: error instanceof Error ? error.message : typeof error === "string" ? error : "Internal error",
+      details: extractErrorMessage(error) ?? "Internal error",
       traceback: [],
     };
   } finally {

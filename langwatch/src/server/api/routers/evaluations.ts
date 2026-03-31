@@ -6,7 +6,9 @@ import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { trackServerEvent } from "~/server/posthog";
 
+import { extractErrorMessage } from "~/utils/captureError";
 import { createLogger } from "~/utils/logger/server";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
@@ -77,6 +79,11 @@ export const evaluationsRouter = createTRPCRouter({
           protections,
         });
       } catch (error) {
+        captureException(error, {
+          extra: {
+            projectId: input.projectId,
+          },
+        });
         logger.error(
           { err: error, projectId: input.projectId },
           "error running evaluation from tRPC",
@@ -84,7 +91,7 @@ export const evaluationsRouter = createTRPCRouter({
         return {
           status: "error" as const,
           error_type: "INTERNAL_ERROR",
-          details: error instanceof Error ? error.message : typeof error === "string" ? error : "Internal error",
+          details: extractErrorMessage(error) ?? "Internal error",
           traceback: [],
         };
       }

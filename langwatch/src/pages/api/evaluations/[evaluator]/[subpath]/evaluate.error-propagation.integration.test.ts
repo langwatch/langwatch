@@ -85,7 +85,7 @@ describe("Feature: Evaluation error propagation (#986)", () => {
   };
 
   describe("when runEvaluation throws an Error object", () => {
-    it("includes the error message in the response details", async () => {
+    it("propagates the Error message to response details", async () => {
       const errorMessage = "Provider vertex_ai is not configured";
       mockRunEvaluation.mockRejectedValue(new Error(errorMessage));
 
@@ -101,7 +101,7 @@ describe("Feature: Evaluation error propagation (#986)", () => {
   });
 
   describe("when runEvaluation throws a string", () => {
-    it("includes the string error in the response details instead of 'Internal error'", async () => {
+    it("propagates the string error to response details", async () => {
       const errorMessage = "422 Unprocessable Entity: model not found";
       mockRunEvaluation.mockRejectedValue(errorMessage);
 
@@ -113,14 +113,12 @@ describe("Feature: Evaluation error propagation (#986)", () => {
         status: "error",
         details: errorMessage,
       });
-      // The bug: before the fix, this would be "Internal error"
-      expect(data.details).not.toBe("Internal error");
     });
   });
 
-  describe("when runEvaluation throws a non-string, non-Error value", () => {
-    it("falls back to 'Internal error' for the response details", async () => {
-      mockRunEvaluation.mockRejectedValue({ code: 500 });
+  describe("when runEvaluation throws a falsy value", () => {
+    it("falls back to 'Internal error' for unknown error types", async () => {
+      mockRunEvaluation.mockRejectedValue(null);
 
       const { res } = await callHandler();
 
