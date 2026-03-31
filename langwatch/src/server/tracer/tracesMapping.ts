@@ -1019,7 +1019,7 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
   return [
     {
       id: "thread",
-      name: "Thread",
+      name: "Current Thread",
       type: "dataset",
       fields: [
         // Server-only thread sources at the top for discoverability
