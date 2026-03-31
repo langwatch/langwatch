@@ -44,8 +44,11 @@ describe("OTEL traces API stress test", () => {
   });
 
   test(`benchmarks ${NUMBER_OF_RUNS} OTEL trace insertions`, async () => {
+    const traceIds: string[] = [];
+
     const makeApiCall = async (): Promise<number> => {
       const traceIdHex = makeOtelTraceId();
+      traceIds.push(traceIdHex);
       const spanIdHex = traceIdHex.slice(0, 16);
       const nowNs = `${Date.now()}000000`;
 
@@ -133,5 +136,33 @@ describe("OTEL traces API stress test", () => {
     );
 
     printStats(responseTimes);
+
+    // Send thumbs up/down events for each trace (80% up, 20% down)
+    const thumbsUpCount = Math.round(traceIds.length * 0.8);
+    console.log(
+      `Sending ${traceIds.length} thumbs up/down events (${thumbsUpCount} up, ${traceIds.length - thumbsUpCount} down)...`,
+    );
+
+    await Promise.all(
+      traceIds.map((traceId, i) =>
+        fetch(`${LANGWATCH_ENDPOINT}/api/track_event`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Auth-Token": apiKey,
+          },
+          body: JSON.stringify({
+            trace_id: traceId,
+            event_type: "thumbs_up_down",
+            metrics: { vote: i < thumbsUpCount ? 1 : -1 },
+            timestamp: Date.now(),
+          }),
+        }).then((r) => {
+          expect(r.ok).toBe(true);
+        }),
+      ),
+    );
+
+    console.log("Thumbs up/down events sent.");
   });
 });
