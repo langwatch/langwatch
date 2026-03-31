@@ -18,33 +18,51 @@ import type { SimulationRepository } from "./simulation.repository";
 const TABLE_NAME = "simulation_runs" as const;
 
 /**
- * Builds a HAVING clause fragment that filters batches by their max(CreatedAt)
- * falling within [startDate, endDate]. Returns both the SQL clause and the
- * parameterized values so they stay co-located. Filters atomically by the
- * batch's latest timestamp so entire batches are included or excluded together.
+ * Builds date filter clauses from startDate/endDate:
+ *
+ * - `havingClause`: Filters on max(CreatedAt) for exact batch-level filtering
+ *   (post-aggregation). Used in HAVING.
+ * - `whereClause`: Filters on StartedAt for partition pruning (pre-scan).
+ *   simulation_runs is partitioned by toYearWeek(StartedAt). Without this,
+ *   ClickHouse scans ALL partitions including cold storage.
+ *
+ * Both clauses use the same startDate/endDate range but on different columns.
+ * The WHERE on StartedAt enables partition pruning (~12x faster), the HAVING
+ * on max(CreatedAt) ensures exact filtering for edge cases where they differ.
  */
-function buildDateHavingFilter({
+function buildDateFilter({
   startDate,
   endDate,
 }: {
   startDate?: number;
   endDate?: number;
-}): { clause: string | null; params: Record<string, string> } {
-  const parts: string[] = [];
+}): { havingClause: string | null; whereClause: string; params: Record<string, string> } {
+  const havingParts: string[] = [];
+  const whereParts: string[] = [];
   const params: Record<string, string> = {};
   if (startDate !== undefined) {
-    parts.push(
+    havingParts.push(
       "toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})",
+    );
+    whereParts.push(
+      "StartedAt >= fromUnixTimestamp64Milli(toUInt64({startDateMs:String}))",
     );
     params.startDateMs = String(startDate);
   }
   if (endDate !== undefined) {
-    parts.push(
+    havingParts.push(
       "toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})",
+    );
+    whereParts.push(
+      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({endDateMs:String}))",
     );
     params.endDateMs = String(endDate);
   }
-  return { clause: parts.length > 0 ? parts.join(" AND ") : null, params };
+  return {
+    havingClause: havingParts.length > 0 ? havingParts.join(" AND ") : null,
+    whereClause: whereParts.length > 0 ? `AND ${whereParts.join(" AND ")}` : "",
+    params,
+  };
 }
 
 const RUN_COLUMNS = `
@@ -567,8 +585,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         )`
       : "1 = 1";
 
-    const dateFilter = buildDateHavingFilter({ startDate, endDate });
-    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     const batchRows = await this.queryRows<{
       BatchRunId: string;
@@ -582,6 +601,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+           ${dateFilter.whereClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -668,8 +688,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         )`
       : "1 = 1";
 
-    const dateFilter = buildDateHavingFilter({ startDate, endDate });
-    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     const batchRows = await this.queryRows<{
       BatchRunId: string;
@@ -684,6 +705,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
+           ${dateFilter.whereClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -754,8 +776,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     endDate?: number;
     filter: "external" | "internal-suites";
   }): Promise<ExternalSetSummary[]> {
-    const dateFilter = buildDateHavingFilter({ startDate, endDate });
-    const havingClause = dateFilter.clause ? `HAVING ${dateFilter.clause}` : "";
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    
+    const havingClause = dateFilter.havingClause ? `HAVING ${dateFilter.havingClause}` : "";
 
     const wherePredicate = filter === "external"
       ? "AND NOT startsWith(ScenarioSetId, '__internal__')"
@@ -794,6 +817,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
              FROM ${TABLE_NAME}
              WHERE TenantId = {tenantId:String}
                ${wherePredicate}
+               ${dateFilter.whereClause}
              ORDER BY ScenarioRunId, UpdatedAt DESC
              LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
            )

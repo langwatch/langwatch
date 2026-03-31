@@ -104,6 +104,35 @@ SELECT TraceId, argMax(OccurredAt, UpdatedAt) AS _oa FROM trace_summaries GROUP 
 
 Using `max(column)` for sort keys can select values from stale versions, causing cursor pagination to skip or duplicate rows at page boundaries.
 
+## Always Filter on the Partition Key
+
+Tables use weekly partitions (e.g. `toYearWeek(StartedAt)`, `toYearWeek(OccurredAt)`). Without a WHERE filter on the partition column, ClickHouse scans ALL partitions — including cold storage on S3. This turns a 100ms query into a 1-2s query.
+
+When a date range is available, always add a WHERE filter on the partition column:
+
+```sql
+-- WRONG: HAVING on max(CreatedAt) doesn't help partition pruning
+WHERE TenantId = {tenantId:String}
+GROUP BY BatchRunId
+HAVING toUnixTimestamp64Milli(max(CreatedAt)) >= ...
+
+-- CORRECT: WHERE on StartedAt enables partition pruning (~12x faster)
+WHERE TenantId = {tenantId:String}
+  AND StartedAt >= fromUnixTimestamp64Milli(...)
+  AND StartedAt <= fromUnixTimestamp64Milli(...)
+GROUP BY BatchRunId
+HAVING toUnixTimestamp64Milli(max(CreatedAt)) >= ...
+```
+
+Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for the edge case where `StartedAt` and `CreatedAt` differ.
+
+| Table | Partition Key |
+|-------|--------------|
+| `simulation_runs` | `toYearWeek(StartedAt)` |
+| `trace_summaries` | `toYearWeek(OccurredAt)` |
+| `stored_spans` | `toYearWeek(StartTime)` |
+| `evaluation_runs` | `toYearWeek(UpdatedAt)` |
+
 ## TenantId is Always Required
 
 Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}`. No other ID (ScenarioRunId, BatchRunId, TraceId, etc.) is unique across tenants.

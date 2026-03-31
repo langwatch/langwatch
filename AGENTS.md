@@ -109,6 +109,7 @@ specs/               # BDD feature specs
 | Writing ClickHouse queries without TenantId filtering | Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}` — no other ID (ScenarioRunId, BatchRunId, etc.) is unique across tenants. Always make TenantId the first predicate |
 | Using `LIMIT 1 BY` with heavy columns in subqueries | Use the IN-tuple dedup pattern (`GROUP BY key + max(UpdatedAt)` in subquery). `LIMIT 1 BY` forces ClickHouse to materialize ALL selected columns for entire granules (~8K rows), causing OOM with heavy payloads (Messages, SpanAttributes, ComputedInput/Output) |
 | Using `max(column)` for pagination sort keys on deduped tables | Use `argMax(column, UpdatedAt)` to derive sort keys from the latest version only. `max()` may pick values from stale versions, causing cursor pagination to skip/duplicate rows |
+| Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 
 ## Orchestration Model
 
