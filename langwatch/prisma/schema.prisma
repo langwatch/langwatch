@@ -79,6 +79,7 @@ model User {
     savedViews              SavedView[]
     labelsCreated           PromptVersionLabel[]   @relation("labelCreatedBy")
     labelsUpdated           PromptVersionLabel[]   @relation("labelUpdatedBy")
+    promptLabelsCreated     PromptLabel[]          @relation("promptLabelCreatedBy")
 
 }
 
@@ -183,6 +184,7 @@ model Organization {
     notifications Notification[]
     subscriptions Subscription[]
     scimTokens    ScimToken[]
+    promptLabels  PromptLabel[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -994,6 +996,20 @@ model PromptVersionLabel {
     @@index([configId])
     @@index([versionId])
     @@index([projectId])
+}
+
+model PromptLabel {
+    id             String       @id @default(nanoid())
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    name           String
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
+    createdById    String?
+    createdBy      User?        @relation("promptLabelCreatedBy", fields: [createdById], references: [id])
+
+    @@unique([organizationId, name])
+    @@index([organizationId])
 }
 
 model Analytics {

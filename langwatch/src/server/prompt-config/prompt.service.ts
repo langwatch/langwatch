@@ -1071,7 +1071,15 @@ export class PromptService {
     label: string;
     projectId: string;
     userId?: string;
+    organizationId?: string;
   }) {
-    return this.labelRepository.assignLabel(params);
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    return this.labelRepository.assignLabel({
+      ...params,
+      organizationId,
+    });
   }
 }

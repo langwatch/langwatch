@@ -17,15 +17,17 @@ export class LabelValidationError extends Error {
 
 /**
  * Repository for managing prompt version labels.
- * Labels are named pointers (production, staging) to specific prompt versions.
- * Only two labels are allowed: "production" and "staging".
+ * Labels are named pointers (production, staging, or custom) to specific prompt versions.
+ * Built-in labels "production" and "staging" are always valid.
+ * Custom labels are valid when a PromptLabel definition exists for the org.
  * "latest" is resolved at query time (highest version number), never stored.
  */
 export class PromptVersionLabelRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Validates that a label is one of the two allowed values.
+   * Validates that a label is one of the built-in values.
+   * For custom label validation (with org context), use isValidLabel().
    */
   validateLabel(label: string): asserts label is ValidLabel {
     if (!VALID_LABELS.includes(label as ValidLabel)) {
@@ -34,6 +36,29 @@ export class PromptVersionLabelRepository {
         `Invalid label "${label}". Only "production" and "staging" are allowed.`,
       );
     }
+  }
+
+  /**
+   * Returns true if the label is valid for the given org.
+   * Built-in labels (production, staging) are always valid.
+   * Custom labels are valid when a PromptLabel definition exists for the org.
+   */
+  async isValidLabel({
+    label,
+    organizationId,
+  }: {
+    label: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    if (VALID_LABELS.includes(label as ValidLabel)) {
+      return true;
+    }
+
+    const custom = await this.prisma.promptLabel.findFirst({
+      where: { organizationId, name: label },
+    });
+
+    return custom !== null;
   }
 
   /**
@@ -70,6 +95,7 @@ export class PromptVersionLabelRepository {
   /**
    * Assign a label to a specific version.
    * If the label already exists for the config, it is reassigned (upsert).
+   * When organizationId is provided, custom labels are also accepted.
    */
   async assignLabel({
     configId,
@@ -77,6 +103,7 @@ export class PromptVersionLabelRepository {
     label,
     projectId,
     userId,
+    organizationId,
     tx,
   }: {
     configId: string;
@@ -84,9 +111,20 @@ export class PromptVersionLabelRepository {
     label: string;
     projectId: string;
     userId?: string;
+    organizationId?: string;
     tx?: Prisma.TransactionClient;
   }): Promise<PromptVersionLabel> {
-    this.validateLabel(label);
+    if (organizationId) {
+      const valid = await this.isValidLabel({ label, organizationId });
+      if (!valid) {
+        logger.warn({ label }, "Invalid label name rejected");
+        throw new LabelValidationError(
+          `Invalid label "${label}". Must be a built-in label or a custom label defined for this org.`,
+        );
+      }
+    } else {
+      this.validateLabel(label);
+    }
 
     const client = tx ?? this.prisma;
 

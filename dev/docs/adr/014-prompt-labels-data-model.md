@@ -80,18 +80,43 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 - Optional `labels` array in `POST /` and `PUT /:id` payloads — assign labels to newly created versions (like Langfuse)
 - Both patterns are needed: sub-resource for label promotion without version changes, payloads for label assignment during version creation
 
+## Revision History — v4 (2026-03-31): Custom label definitions (issue #2821)
+
+Added the `PromptLabel` table for org-scoped custom label definitions:
+
+```prisma
+model PromptLabel {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(...)
+  name           String       // validated: lowercase, starts with letter, non-numeric
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
+  createdById    String?
+  createdBy      User?        @relation("promptLabelCreatedBy", ...)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+```
+
+New API surface added:
+- `POST /api/orgs/:orgId/prompt-labels` — create custom label (admin only)
+- `GET /api/orgs/:orgId/prompt-labels` — list built-in + custom labels
+- `DELETE /api/orgs/:orgId/prompt-labels/:labelId` — delete custom label + cascade assignments
+
+Built-in labels (`latest`, `production`, `staging`) are still not stored in the database.
+`PromptVersionLabel.label` remains a plain string (no FK to `PromptLabel`). Validation was widened to accept custom labels via org lookup.
+
 ## Deferred Scope
 
 The following are explicitly deferred to future issues:
 
-- **Label definition table (`PromptLabel`)** — a project/org-scoped table defining available labels (slug, display name, description). Needed when custom label creation is introduced.
-- **Label CRUD** — create, edit, archive label definitions. Blocked on the definition table.
+- **FK from PromptVersionLabel.label to PromptLabel** — currently a plain string with soft validation. A FK would enforce referential integrity but requires migrating existing rows.
+- **Label edit/rename** — changing a label name requires updating all assignments. Not implemented.
 - **RBAC** — per-label permissions (who can assign/reassign). See #2713.
-- **Archiving** — soft delete on both definitions and assignments. Not needed while labels are hardcoded constants.
-- **Scoping** — project vs org-level label definitions. Not relevant until the definition table exists.
+- **Archiving** — soft delete on both definitions and assignments.
 - **Label description field** — nice-to-have on the definition table.
-
-When custom labels are introduced, the `PromptVersionLabel.label` column will become a FK to the definition table, and the code-level validation will be replaced by a DB lookup.
 
 ### API Surface
 

@@ -109,9 +109,9 @@ app.put(
       {
         name: "label",
         in: "path",
-        description: 'The label to assign (e.g., "production", "staging")',
+        description: 'The label to assign (e.g., "production", "staging", or a custom label)',
         required: true,
-        schema: { type: "string", enum: ["production", "staging"] },
+        schema: { type: "string" },
       },
     ],
     responses: {
@@ -162,6 +162,7 @@ app.put(
         versionId,
         label,
         projectId: config.projectId,
+        organizationId: organization.id,
       });
 
       logger.info(
@@ -252,9 +253,9 @@ app.get(
         name: "label",
         in: "query",
         description:
-          'Fetch the version pointed to by this label (e.g., "production", "staging")',
+          'Fetch the version pointed to by this label (e.g., "production", "staging", or a custom label)',
         required: false,
-        schema: { type: "string", enum: ["production", "staging"] },
+        schema: { type: "string" },
       },
     ],
     responses: {
@@ -365,6 +366,7 @@ app.post(
               versionId: newConfig.versionId,
               label,
               projectId: newConfig.projectId,
+              organizationId: organization.id,
             }),
           ),
         );
@@ -536,6 +538,7 @@ app.put(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
     const { labels, ...data } = c.req.valid("json");
     const projectId = project.id;
@@ -577,6 +580,7 @@ app.put(
               versionId: updatedConfig.versionId,
               label,
               projectId: updatedConfig.projectId,
+              organizationId: organization.id,
             }),
           ),
         );

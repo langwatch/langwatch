@@ -14,10 +14,7 @@ import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreati
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
-import {
-  LabelValidationError,
-  VALID_LABELS,
-} from "~/server/prompt-config/repositories/llm-config-label.repository";
+import { LabelValidationError } from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
@@ -885,7 +882,7 @@ export const promptsRouter = createTRPCRouter({
 
   /**
    * Assign (or reassign) a label to a specific prompt version.
-   * Only "production" and "staging" are valid labels.
+   * Accepts built-in labels (production, staging) and custom labels defined for the org.
    */
   assignLabel: protectedProcedure
     .input(
@@ -893,7 +890,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
         configId: z.string(),
         versionId: z.string(),
-        label: z.enum(VALID_LABELS),
+        label: z.string().min(1),
       }),
     )
     .use(checkProjectPermission("prompts:update"))
