@@ -12,9 +12,8 @@ Covers:
 """
 import json
 from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch, call
+from unittest.mock import Mock, patch
 
-import httpx
 import pytest
 
 import langwatch
@@ -90,13 +89,11 @@ class TestPromptApiServiceGetWithLabel:
         rest_client = _rest_client_with_mocked_httpx(mock_request)
 
         service = PromptApiService(rest_client)
-        result = service.get("pizza-prompt", label="production")
+        service.get("pizza-prompt", label="production")
 
         # Verify the HTTP call included label in query string
         assert mock_request.called
         call_kwargs = mock_request.call_args
-        # The URL and params are passed through httpx; check the params
-        url = call_kwargs[1].get("url") or call_kwargs[0][0] if call_kwargs[0] else ""
         params = call_kwargs[1].get("params", {})
         assert params.get("label") == "production"
 
@@ -111,7 +108,7 @@ class TestPromptApiServiceGetWithLabel:
         rest_client = _rest_client_with_mocked_httpx(mock_request)
 
         service = PromptApiService(rest_client)
-        result = service.get("pizza-prompt", label="canary")
+        service.get("pizza-prompt", label="canary")
 
         call_kwargs = mock_request.call_args
         params = call_kwargs[1].get("params", {})
@@ -193,20 +190,16 @@ class TestPromptApiServiceAssignLabel:
         rest_client = _rest_client_with_mocked_httpx(mock_request)
 
         service = PromptApiService(rest_client)
-        result = service.assign_label(
+        service.assign_label(
             prompt_id="pizza-prompt",
             label="production",
             version_id="v3_id",
         )
 
         call_kwargs = mock_request.call_args
-        method = call_kwargs[1].get("method") or ""
-        url = call_kwargs[1].get("url") or ""
-        body = call_kwargs[1].get("json") or {}
-
-        assert method == "put"
-        assert "/api/prompts/pizza-prompt/labels/production" in url
-        assert body.get("versionId") == "v3_id"
+        assert call_kwargs[1].get("method") == "put"
+        assert "/api/prompts/pizza-prompt/labels/production" in call_kwargs[1].get("url", "")
+        assert call_kwargs[1].get("json", {}).get("versionId") == "v3_id"
 
     def test_calls_put_with_custom_label_string(self):
         """
@@ -598,8 +591,6 @@ class TestCacheKeyWithLabels:
         production_resp = _make_api_response_json(version=3, version_id="v3")
         staging_resp = _make_api_response_json(version=4, version_id="v4")
 
-        call_count = [0]
-
         def side_effect(**kwargs):
             params = kwargs.get("params", {})
             label = params.get("label")
@@ -614,10 +605,10 @@ class TestCacheKeyWithLabels:
         facade = PromptsFacade(rest_client)
 
         with patch("time.time", return_value=0):
-            r1 = facade.get(
+            facade.get(
                 "pizza-prompt", label="production", fetch_policy=FetchPolicy.CACHE_TTL
             )
-            r2 = facade.get(
+            facade.get(
                 "pizza-prompt", label="staging", fetch_policy=FetchPolicy.CACHE_TTL
             )
 
@@ -681,7 +672,7 @@ class TestPromptsFacadeLabelsAssign:
         rest_client = _rest_client_with_mocked_httpx(mock_request)
         facade = PromptsFacade(rest_client)
 
-        result = facade.labels.assign(
+        facade.labels.assign(
             "pizza-prompt", label="production", version_id="v3_id"
         )
 
