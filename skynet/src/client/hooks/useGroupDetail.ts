@@ -37,12 +37,7 @@ export function useGroupDetail(groupId: string, queueName?: string) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
-      if (message.includes("404")) {
-        setIsCompleted(true);
-        setError(null);
-      } else {
-        setError(message);
-      }
+      setError(message);
     }
   }, [groupId, queueName]);
 

@@ -650,6 +650,14 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
   const [ageThresholdMs, setAgeThresholdMs] = useState<number | null>(null);
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
 
+  // Tick every 30s when an age filter is active so groups crossing the threshold appear/disappear
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (ageThresholdMs === null) return;
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [ageThresholdMs]);
+
   const filteredQueues = queues.map((queue) => ({
     ...queue,
     groups: queue.groups.filter(
@@ -667,7 +675,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
         const matchesError = !errorFilter ||
           (g.errorMessage ? normalizeErrorMessage(g.errorMessage) === errorFilter : false);
         const matchesAge = ageThresholdMs === null ||
-          (Date.now() - (g.oldestJobMs ?? Date.now()) > ageThresholdMs);
+          (now - (g.oldestJobMs ?? now) > ageThresholdMs);
         return matchesSearch && matchesPipeline && matchesStatus && matchesError && matchesAge;
       },
     ),

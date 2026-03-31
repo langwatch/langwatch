@@ -31,8 +31,11 @@ async function main() {
   sseManager.start();
   sseManager.startDashboardBroadcast(metrics);
 
-  // Periodic queue discovery
+  // Periodic queue discovery (single-flight: skip if previous run still in progress)
+  let discoveryInProgress = false;
   setInterval(async () => {
+    if (discoveryInProgress) return;
+    discoveryInProgress = true;
     try {
       const names = await discoverQueueNames(redis);
       const added = names.filter((n) => !currentGroupQueueNames.includes(n));
@@ -43,6 +46,8 @@ async function main() {
       metrics.updateGroupQueueNames(currentGroupQueueNames);
     } catch (err) {
       console.error("Queue discovery error:", err);
+    } finally {
+      discoveryInProgress = false;
     }
   }, QUEUE_DISCOVERY_INTERVAL_MS);
 
