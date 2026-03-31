@@ -1,4 +1,5 @@
 import type { Evaluation } from "~/server/tracer/types";
+import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
@@ -50,7 +51,7 @@ export function mapClickHouseEvaluationToTraceEvaluation(
     label: record.Label,
     details: record.Details,
     error: record.Error,
-    inputs: safeJsonParsing(record.Inputs),
+    inputs: safeJsonParse(record.Inputs),
     timestamps: {
       // CH DateTime64(3) returns UTC strings without timezone suffix; append "Z" only when missing
       scheduledAt: record.ScheduledAt
@@ -143,13 +144,4 @@ export function mapTraceEvaluationsToLegacyEvaluations(
 /** Appends "Z" to a timestamp string only when it lacks a timezone indicator. */
 function appendUtcSuffix(ts: string): string {
   return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";
-}
-
-function safeJsonParsing(json: string | null): Record<string, any> | null {
-  if (!json) return null;
-  try {
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
 }
