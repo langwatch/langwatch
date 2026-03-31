@@ -50,28 +50,32 @@ export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
 // Schema for validating trigger filter JSON structure — rejects unknown fields
 export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
 
-const validFilterFields = new Set<string>(filterFieldsEnum.options);
-export const triggerFiltersRawSchema = z.record(z.string(), filterValueSchema);
+/** Validates filter value structure without restricting field names. */
+export const triggerFiltersPermissiveSchema = z.record(
+  z.string(),
+  filterValueSchema,
+);
 
-export const isTriggerFilterField = (field: string): field is FilterField =>
+const validFilterFields = new Set<string>(filterFieldsEnum.options);
+
+const isTriggerFilterField = (field: string): field is FilterField =>
   validFilterFields.has(field);
 
 export const sanitizeTriggerFilters = (
   filters: Record<string, TriggerFilterValue>,
 ) => {
-  const sanitizedFilters: TriggerFilters = {};
+  const sanitized: TriggerFilters = {};
   const unknownFields: string[] = [];
 
   for (const [key, value] of Object.entries(filters)) {
     if (isTriggerFilterField(key)) {
-      sanitizedFilters[key] = value;
-      continue;
+      sanitized[key] = value;
+    } else {
+      unknownFields.push(key);
     }
-
-    unknownFields.push(key);
   }
 
-  return { sanitizedFilters, unknownFields };
+  return { sanitized, unknownFields };
 };
 
 export type FilterDefinition = {

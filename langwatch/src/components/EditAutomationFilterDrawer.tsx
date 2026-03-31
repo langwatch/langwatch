@@ -16,7 +16,7 @@ import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
   type FilterField,
   sanitizeTriggerFilters,
-  triggerFiltersRawSchema,
+  triggerFiltersPermissiveSchema,
   type TriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
@@ -51,7 +51,7 @@ type ParsedCodeFilters =
   | {
       success: true;
       rawFilters: Record<string, TriggerFilterValue>;
-      sanitizedFilters: TriggerFilters;
+      sanitized: TriggerFilters;
       unknownFields: string[];
     }
   | { success: false; message: string };
@@ -59,7 +59,7 @@ type ParsedCodeFilters =
 function parseCodeFilters(value: string): ParsedCodeFilters {
   try {
     const parsed = JSON.parse(value);
-    const result = triggerFiltersRawSchema.safeParse(parsed);
+    const result = triggerFiltersPermissiveSchema.safeParse(parsed);
 
     if (!result.success) {
       return {
@@ -68,14 +68,12 @@ function parseCodeFilters(value: string): ParsedCodeFilters {
       };
     }
 
-    const { sanitizedFilters, unknownFields } = sanitizeTriggerFilters(
-      result.data,
-    );
+    const { sanitized, unknownFields } = sanitizeTriggerFilters(result.data);
 
     return {
       success: true,
       rawFilters: result.data,
-      sanitizedFilters,
+      sanitized,
       unknownFields,
     };
   } catch {
@@ -123,10 +121,10 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
           string,
           FilterParam
         >;
-        const { sanitizedFilters } = sanitizeTriggerFilters(
+        const { sanitized } = sanitizeTriggerFilters(
           filters as Record<string, TriggerFilterValue>,
         );
-        const filtersToSet = Object.entries(sanitizedFilters).reduce(
+        const filtersToSet = Object.entries(sanitized).reduce(
           (acc, [key, value]) => {
             if (Array.isArray(value)) {
               if (value.length > 0) {
@@ -180,7 +178,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
 
       if (
         Object.keys(parsed.rawFilters).length > 0 &&
-        Object.keys(parsed.sanitizedFilters).length === 0
+        Object.keys(parsed.sanitized).length === 0
       ) {
         toaster.create({
           title: "Unsupported filters only",
@@ -201,7 +199,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
         });
       }
 
-      setLocalFilters(parsed.sanitizedFilters);
+      setLocalFilters(parsed.sanitized);
       setCodeError(null);
     }
     setIsCodeMode(checked);
@@ -217,7 +215,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
 
     if (
       Object.keys(parsed.rawFilters).length > 0 &&
-      Object.keys(parsed.sanitizedFilters).length === 0
+      Object.keys(parsed.sanitized).length === 0
     ) {
       const message =
         "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.";
