@@ -9,7 +9,7 @@ describe("triggerFiltersSchema", () => {
   describe("when filter field is known", () => {
     it("accepts spans.model with string array", () => {
       const result = triggerFiltersSchema.safeParse({
-        "spans.model": ["gpt-4"],
+        "spans.model": ["gpt-5-mini"],
       });
 
       expect(result.success).toBe(true);
@@ -45,7 +45,7 @@ describe("triggerFiltersSchema", () => {
   describe("when mixing known and unknown fields", () => {
     it("rejects the entire input", () => {
       const result = triggerFiltersSchema.safeParse({
-        "spans.model": ["gpt-4"],
+        "spans.model": ["gpt-5-mini"],
         "service.name": ["chat"],
       });
 
@@ -70,10 +70,10 @@ describe("sanitizeTriggerFilters", () => {
   describe("when all fields are known", () => {
     it("passes them through unchanged", () => {
       const { sanitized } = sanitizeTriggerFilters({
-        "spans.model": ["gpt-4"],
+        "spans.model": ["gpt-5-mini"],
       });
 
-      expect(sanitized).toEqual({ "spans.model": ["gpt-4"] });
+      expect(sanitized).toEqual({ "spans.model": ["gpt-5-mini"] });
     });
   });
 
@@ -91,11 +91,11 @@ describe("sanitizeTriggerFilters", () => {
   describe("when mixing known and unknown fields", () => {
     it("keeps known fields and reports unknown ones", () => {
       const { sanitized, unknownFields } = sanitizeTriggerFilters({
-        "spans.model": ["gpt-4"],
+        "spans.model": ["gpt-5-mini"],
         "service.name": ["chat"],
       });
 
-      expect(sanitized).toEqual({ "spans.model": ["gpt-4"] });
+      expect(sanitized).toEqual({ "spans.model": ["gpt-5-mini"] });
       expect(unknownFields).toEqual(["service.name"]);
     });
   });

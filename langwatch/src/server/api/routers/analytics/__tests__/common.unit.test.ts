@@ -121,6 +121,7 @@ describe("generateFilterConditions()", () => {
         ["service.name" as FilterField]: ["chat"],
       });
 
+      expect(mockLoggerWarn).toHaveBeenCalledTimes(1);
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         { field: "service.name" },
         expect.stringContaining("Unknown filter field"),
@@ -131,23 +132,23 @@ describe("generateFilterConditions()", () => {
   describe("when filter field is known", () => {
     it("returns real query conditions", () => {
       const conditions = generateFilterConditions({
-        "spans.model": ["gpt-4"],
+        "spans.model": ["gpt-5-mini"],
       });
 
       expect(conditions).toHaveLength(1);
-      expect(conditions[0]).toEqual({ terms: { "spans.model": ["gpt-4"] } });
+      expect(conditions[0]).toEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
     });
   });
 
   describe("when mixing known and unknown fields", () => {
     it("includes match_none for the unknown field", () => {
       const conditions = generateFilterConditions({
-        "spans.model": ["gpt-4"],
+        "spans.model": ["gpt-5-mini"],
         ["service.name" as FilterField]: ["chat"],
       });
 
       expect(conditions).toHaveLength(2);
-      expect(conditions).toContainEqual({ terms: { "spans.model": ["gpt-4"] } });
+      expect(conditions).toContainEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
       expect(conditions).toContainEqual({ match_none: {} });
     });
   });

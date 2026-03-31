@@ -86,8 +86,8 @@ describe("automationRouter", () => {
       });
 
       it("does not reach license enforcement", async () => {
-        try {
-          await caller.create({
+        await expect(
+          caller.create({
             projectId: "proj_123",
             name: "Unknown field trigger",
             action: TriggerAction.SEND_SLACK_MESSAGE,
@@ -95,10 +95,8 @@ describe("automationRouter", () => {
             actionParams: {
               slackWebhook: "https://hooks.slack.test/unknown-field",
             },
-          } as any);
-        } catch {
-          // Expected to throw
-        }
+          } as any),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
         expect(mockEnforceLicenseLimit).not.toHaveBeenCalled();
       });
@@ -144,17 +142,15 @@ describe("automationRouter", () => {
       });
 
       it("does not persist an empty filter set", async () => {
-        try {
-          await caller.updateTriggerFilters({
+        await expect(
+          caller.updateTriggerFilters({
             projectId: "proj_123",
             triggerId: "trigger_test_123",
             filters: {
               "service.name": ["chat"],
             },
-          });
-        } catch {
-          // Expected to throw
-        }
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
         expect(mockTriggerUpdate).not.toHaveBeenCalled();
       });
