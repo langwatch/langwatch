@@ -102,7 +102,7 @@ interface UsageData {
   evaluatorsCount: number;
   agentsCount: number;
   experimentsCount: number;
-  currentMonthMessagesCount: number;
+  currentMonthMessagesCount: number | null;
   evaluationsCreditUsed: number;
 }
 
@@ -148,7 +148,7 @@ export function mapUsageToLimits(
     evaluators: { current: usage.evaluatorsCount, max: plan.maxEvaluators },
     agents: { current: usage.agentsCount, max: plan.maxAgents },
     experiments: { current: usage.experimentsCount, max: plan.maxExperiments },
-    messagesPerMonth: { current: usage.currentMonthMessagesCount, max: plan.maxMessagesPerMonth },
+    messagesPerMonth: { current: usage.currentMonthMessagesCount ?? 0, max: plan.maxMessagesPerMonth },
     evaluationsCredit: { current: usage.evaluationsCreditUsed, max: plan.evaluationsCredit },
   };
 }

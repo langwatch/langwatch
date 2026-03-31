@@ -259,9 +259,6 @@ describe("UsageLimitService", () => {
   // -------------------------------------------------------------------------
 
   describe("notifyResourceLimitReached()", () => {
-    beforeEach(() => {
-      resourceLimitCooldown.clear();
-    });
 
     describe("when IS_SAAS is false", () => {
       beforeEach(() => {
@@ -292,7 +289,7 @@ describe("UsageLimitService", () => {
       it("suppresses the notification", async () => {
         const { service, notificationService } = createService();
 
-        resourceLimitCooldown.set("org_1:workflows", true);
+        await resourceLimitCooldown.set("org_1:workflows", true);
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
@@ -405,7 +402,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(resourceLimitCooldown.get("org_missing:workflows")).toBeUndefined();
+        expect(await resourceLimitCooldown.get("org_missing:workflows")).toBeUndefined();
       });
     });
 
@@ -426,7 +423,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(resourceLimitCooldown.get("org_1:workflows")).toBeUndefined();
+        expect(await resourceLimitCooldown.get("org_1:workflows")).toBeUndefined();
       });
     });
 

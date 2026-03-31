@@ -78,7 +78,7 @@ export function buildMessageLimitInfo(
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number>;
+  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
 }
 
 /**
@@ -96,7 +96,7 @@ export interface IUsageUnitResolver {
  */
 export interface UsageStats {
   projectsCount: number;
-  currentMonthMessagesCount: number;
+  currentMonthMessagesCount: number | null;
   currentMonthCost: number;
   activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
@@ -191,14 +191,16 @@ export class UsageStatsService {
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
+    const resolvedCount = currentMonthMessagesCount === "unlimited" ? null : currentMonthMessagesCount;
+
     const messageLimitInfo = buildMessageLimitInfo(
-      currentMonthMessagesCount,
+      resolvedCount ?? 0,
       activePlan.maxMessagesPerMonth,
     );
 
     return {
       projectsCount,
-      currentMonthMessagesCount,
+      currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,

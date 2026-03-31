@@ -137,12 +137,8 @@ async function createHandler() {
 // ---------------------------------------------------------------------------
 
 describe("ReportUsageForMonthCommand", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    const { clearOrgCache } = await import(
-      "../reportUsageForMonth.command"
-    );
-    clearOrgCache();
   });
 
   // ========================================================================
