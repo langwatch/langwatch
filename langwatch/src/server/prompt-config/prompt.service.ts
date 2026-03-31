@@ -1059,6 +1059,11 @@ export class PromptService {
 
   // --- Label operations ---
 
+  /** Get all labels for a prompt config. */
+  async getLabelsForConfig(params: { configId: string; projectId: string }) {
+    return this.labelRepository.getLabelsForConfig(params);
+  }
+
   /** Assign (or reassign) a label to a specific prompt version. */
   async assignLabel(params: {
     configId: string;

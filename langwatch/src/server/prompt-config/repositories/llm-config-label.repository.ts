@@ -4,8 +4,9 @@ import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:prompt-version-labels");
 
-export const VALID_LABELS = ["production", "staging"] as const;
-type ValidLabel = (typeof VALID_LABELS)[number];
+import { VALID_LABELS, type ValidLabel } from "~/prompts/constants/labels";
+export { VALID_LABELS } from "~/prompts/constants/labels";
+export type { ValidLabel } from "~/prompts/constants/labels";
 
 export class LabelValidationError extends Error {
   constructor(message: string) {
@@ -119,6 +120,21 @@ export class PromptVersionLabelRepository {
     logger.info({ configId, versionId, label, projectId }, "Label assigned to prompt version");
 
     return result;
+  }
+
+  /**
+   * Get all labels for a prompt config.
+   */
+  async getLabelsForConfig({
+    configId,
+    projectId,
+  }: {
+    configId: string;
+    projectId: string;
+  }): Promise<PromptVersionLabel[]> {
+    return this.prisma.promptVersionLabel.findMany({
+      where: { configId, projectId },
+    });
   }
 
   /**
