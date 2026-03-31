@@ -14,7 +14,7 @@
 #
 # Per-worktree ports (create .env.dev in your worktree):
 #   APP_PORT=5560
-#   BULLBOARD_PORT=3000
+#   BULLBOARD_PORT=6380
 #   AI_SERVER_PORT=3456
 #
 # Debug logging (set in shell or .env.dev):
@@ -27,6 +27,15 @@
 #
 # Stop everything:
 #   docker compose -f compose.dev.yml --profile full down
+
+x-common-env: &common-env
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  NODE_ENV: development
+  SKIP_TIKTOKEN: 'true'
+  DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
+  REDIS_URL: redis://redis:6379
+  LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
+  LANGEVALS_ENDPOINT: http://langevals:5562
 
 services:
   # =============================================================================
@@ -118,7 +127,16 @@ services:
       sh -c "
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
-        pnpm install &&
+        mkdir -p /app/node_modules &&
+        LOCK_HASH=$$(md5sum /app/pnpm-lock.yaml | cut -d' ' -f1) &&
+        if [ ! -f /app/node_modules/.install-hash ] ||
+           [ \"$$LOCK_HASH\" != \"$$(cat /app/node_modules/.install-hash)\" ]; then
+          echo 'Lockfile changed — running pnpm install...' &&
+          pnpm install &&
+          echo $$LOCK_HASH > /app/node_modules/.install-hash
+        else
+          echo 'Lockfile unchanged — skipping pnpm install'
+        fi &&
         pnpm prisma generate &&
         pnpm run types:zod:generate
       "
@@ -145,14 +163,7 @@ services:
     ports:
       - "${APP_PORT:-5560}:5560"
     environment:
-      SKIP_TIKTOKEN: 'true'
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      NODE_ENV: development
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      # ELASTICSEARCH_NODE_URL comes from .env
-      REDIS_URL: redis://redis:6379
-      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-      LANGEVALS_ENDPOINT: http://langevals:5562
+      <<: *common-env
       # Override .env so Auth0 callback matches the dynamic host port
       BASE_HOST: http://localhost:${APP_PORT:-5560}
       NEXTAUTH_URL: http://localhost:${APP_PORT:-5560}
@@ -191,14 +202,7 @@ services:
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
-      SKIP_TIKTOKEN: 'true'
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      NODE_ENV: development
-      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      # ELASTICSEARCH_NODE_URL comes from .env
-      REDIS_URL: redis://redis:6379
-      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
-      LANGEVALS_ENDPOINT: http://langevals:5562
+      <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
       BASE_HOST: http://app:5560
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
@@ -285,7 +289,7 @@ services:
     ports:
       - "${AI_SERVER_PORT:-3456}:3456"
     environment:
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      <<: *common-env
       LANGWATCH_ENDPOINT: "http://app:5560/"
       # LANGWATCH_API_KEY comes from langwatch/.env via env_file below
       PINO_CONSOLE_LEVEL: "debug"
