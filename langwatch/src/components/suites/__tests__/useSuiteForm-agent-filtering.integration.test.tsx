@@ -8,7 +8,6 @@
  * targets regardless of their type field, causing code/signature/workflow
  * agents to silently appear in the suite target picker and fail at runtime.
  *
- * @see specs/suites/gate-code-agents.feature
  */
 
 import { renderHook } from "@testing-library/react";
@@ -43,7 +42,7 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
         );
 
         expect(agentTargets).toHaveLength(1);
-        expect(agentTargets[0]!.referenceId).toBe("agent_http");
+        expect(agentTargets[0]?.referenceId).toBe("agent_http");
       });
 
       it("excludes the code agent", () => {
