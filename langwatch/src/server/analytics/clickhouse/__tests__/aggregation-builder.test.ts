@@ -30,7 +30,7 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("SELECT");
       expect(result.sql).toContain("FROM trace_summaries");
-      expect(result.sql).toContain("GROUP BY TenantId, TraceId");
+      expect(result.sql).toContain("LIMIT 1 BY TenantId, TraceId");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
