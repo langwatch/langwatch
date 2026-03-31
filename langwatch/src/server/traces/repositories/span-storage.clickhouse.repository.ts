@@ -45,6 +45,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         FROM stored_spans
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
+          AND (TenantId, TraceId, SpanId, StartTime) IN (
+            SELECT TenantId, TraceId, SpanId, max(StartTime)
+            FROM stored_spans
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+            GROUP BY TenantId, TraceId, SpanId
+          )
         ORDER BY StartTime ASC
       `,
       query_params: { tenantId, traceId },
