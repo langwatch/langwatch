@@ -1448,6 +1448,17 @@ function transformMetricForDedup(
     }
   }
 
+  // Handle event-based metrics that reference stored_spans columns (ss."Events.Name", etc.)
+  // In the CTE context with arrayJoin grouping, the group_key already filters to matching events,
+  // so countIf on event presence becomes a simple trace count
+  const ss = tableAliases.stored_spans;
+  if (
+    selectExpression.includes(`${ss}."Events.Name"`) ||
+    selectExpression.includes(`${ss}."Events.Attributes"`)
+  ) {
+    return `uniqExact(trace_id) AS ${alias}`;
+  }
+
   // Default: return as-is (may need extension for other metric types)
   return selectExpression;
 }
