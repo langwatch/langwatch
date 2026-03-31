@@ -88,19 +88,33 @@ type BatchRunsSidebarProps = {
 };
 
 /**
- * Check if a run was interrupted (no explicit finish/stop but stale)
+ * Check if a run was interrupted (no explicit finish/stop but stale).
+ * A run is NOT interrupted if all work completed (progress >= total),
+ * even when FinishedAt is missing due to a failed completion event.
  */
-const isRunInterrupted = (
-  timestamps: BatchRunSummary["timestamps"],
-): boolean => {
+const isRunInterrupted = (run: {
+  timestamps: BatchRunSummary["timestamps"];
+  progress?: number | null;
+  total?: number | null;
+}): boolean => {
   // Has explicit finish or stop - not interrupted
-  if (timestamps.finishedAt ?? timestamps.stoppedAt) {
+  if (run.timestamps.finishedAt ?? run.timestamps.stoppedAt) {
+    return false;
+  }
+
+  // All work completed — not interrupted even without FinishedAt
+  if (
+    run.progress != null &&
+    run.total != null &&
+    run.total > 0 &&
+    run.progress >= run.total
+  ) {
     return false;
   }
 
   // No updates for 5 minutes - considered interrupted
-  if (timestamps.updatedAt) {
-    const timeSinceUpdate = Date.now() - timestamps.updatedAt;
+  if (run.timestamps.updatedAt) {
+    const timeSinceUpdate = Date.now() - run.timestamps.updatedAt;
     return timeSinceUpdate > INTERRUPTED_THRESHOLD_MS;
   }
 
@@ -288,7 +302,11 @@ export function BatchRunsSidebar({
           !error &&
           sortedRuns.map((run) => {
             const isSelected = selectedRunId === run.runId;
-            const isFinished = isRunFinished(run.timestamps);
+            const isFinished = isRunFinished({
+              ...run.timestamps,
+              progress: run.progress,
+              total: run.total,
+            });
             const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
@@ -312,7 +330,7 @@ export function BatchRunsSidebar({
               });
 
             const isSelectedForComparison = selectedRunIds.includes(run.runId);
-            const interrupted = isRunInterrupted(run.timestamps);
+            const interrupted = isRunInterrupted(run);
 
             // Use stable color from parent (based on position in full runs list)
             // Override with red for stopped runs, orange for interrupted

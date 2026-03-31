@@ -82,6 +82,49 @@ describe("isRunFinished", () => {
     });
   });
 
+  describe("when progress equals total and total > 0 (all work completed)", () => {
+    describe("when finishedAt is missing and updatedAt is stale", () => {
+      it("returns true (run completed all work)", () => {
+        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+        expect(
+          isRunFinished({
+            updatedAt: tenMinutesAgo,
+            progress: 50,
+            total: 50,
+          }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when finishedAt is missing and updatedAt is recent", () => {
+      it("returns true (all work completed)", () => {
+        const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
+        expect(
+          isRunFinished({
+            updatedAt: twoMinutesAgo,
+            progress: 50,
+            total: 50,
+          }),
+        ).toBe(true);
+      });
+    });
+  });
+
+  describe("when progress is less than total", () => {
+    describe("when finishedAt is missing and updatedAt is stale", () => {
+      it("returns true (interrupted)", () => {
+        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+        expect(
+          isRunFinished({
+            updatedAt: tenMinutesAgo,
+            progress: 25,
+            total: 50,
+          }),
+        ).toBe(true);
+      });
+    });
+  });
+
   it("exports INTERRUPTED_THRESHOLD_MS as 5 minutes in milliseconds", () => {
     expect(INTERRUPTED_THRESHOLD_MS).toBe(5 * 60 * 1000);
   });

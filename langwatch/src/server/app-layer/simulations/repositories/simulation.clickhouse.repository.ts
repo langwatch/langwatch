@@ -392,6 +392,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
         const resolvedStatus = resolveRunStatus({
           finishedStatus: hasFinished ? baseStatus : undefined,
+          storedStatus: baseStatus,
           lastEventTimestamp: perRunUpdatedAt,
           now,
         });

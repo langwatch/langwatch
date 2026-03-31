@@ -1125,19 +1125,28 @@ export async function* runOrchestrator(
 
     // Dispatch completion event to ClickHouse — must fire regardless of
     // repository (which is null when featureEventSourcingEvaluationIngestion is ON).
+    // Retry once on failure to reduce the chance of FinishedAt staying NULL.
     if (experimentId) {
       chDispatchTotal++;
-      await commands.completeExperimentRun({
+      const completionPayload = {
         tenantId: projectId,
         runId,
         experimentId,
         finishedAt: aborted ? null : finishedAt,
         stoppedAt: aborted ? finishedAt : null,
         occurredAt: Date.now(),
-      }).catch((err) => {
-        chDispatchFailures++;
-        logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
-      });
+      };
+      try {
+        await commands.completeExperimentRun(completionPayload);
+      } catch (firstErr) {
+        logger.error({ err: firstErr, runId }, "Failed to dispatch completeExperimentRun to CH, retrying once");
+        try {
+          await commands.completeExperimentRun(completionPayload);
+        } catch (retryErr) {
+          chDispatchFailures++;
+          logger.error({ err: retryErr, runId }, "Retry of completeExperimentRun also failed");
+        }
+      }
     }
   }
 
