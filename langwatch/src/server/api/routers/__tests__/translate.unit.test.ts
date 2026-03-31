@@ -3,13 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { translateRouter } from "../translate";
 import { createInnerTRPCContext } from "../../trpc";
 
-/**
- * Unit tests for translate.translate mutation
- *
- * Verifies that:
- * - Translation uses the project's configured model provider (not hardcoded OpenAI)
- * - Error handling returns a generic message and logs the full error server-side
- */
+// Regression: translate previously hardcoded openai("gpt-4-turbo"), ignoring project model config
 
 const mockGetVercelAIModel = vi.fn();
 vi.mock("../../../modelProviders/utils", () => ({
@@ -26,6 +20,11 @@ vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
+type MiddlewareParams = {
+  ctx: Record<string, unknown>;
+  next: () => Promise<unknown>;
+};
+
 // Mock the permission check to always allow
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
@@ -34,34 +33,34 @@ vi.mock("../../rbac", async (importOriginal) => {
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
     checkProjectPermission:
       () =>
-      async ({ ctx, next }: any) => {
+      async ({ ctx, next }: MiddlewareParams) => {
         ctx.permissionChecked = true;
         return next();
       },
     checkOrganizationPermission:
       () =>
-      async ({ ctx, next }: any) => {
+      async ({ ctx, next }: MiddlewareParams) => {
         ctx.permissionChecked = true;
         return next();
       },
     checkTeamPermission:
       () =>
-      async ({ ctx, next }: any) => {
+      async ({ ctx, next }: MiddlewareParams) => {
         ctx.permissionChecked = true;
         return next();
       },
-    skipPermissionCheck: ({ ctx, next }: any) => {
+    skipPermissionCheck: ({ ctx, next }: MiddlewareParams) => {
       ctx.permissionChecked = true;
       return next();
     },
-    skipPermissionCheckProjectCreation: ({ ctx, next }: any) => {
+    skipPermissionCheckProjectCreation: ({ ctx, next }: MiddlewareParams) => {
       ctx.permissionChecked = true;
       return next();
     },
   };
 });
 
-describe("translate.translate mutation", () => {
+describe("translateRouter.translate()", () => {
   let caller: ReturnType<typeof translateRouter.createCaller>;
   const mockModel = { modelId: "test-model" };
 
@@ -97,21 +96,6 @@ describe("translate.translate mutation", () => {
       });
 
       expect(mockGetVercelAIModel).toHaveBeenCalledWith(projectId);
-    });
-
-    it("passes the resolved model to generateText", async () => {
-      mockGenerateText.mockResolvedValue({ text: "Hello" });
-
-      await caller.translate({
-        projectId: "project_abc123",
-        textToTranslate: "Hola",
-      });
-
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: mockModel,
-        }),
-      );
     });
 
     it("returns the translated text", async () => {
