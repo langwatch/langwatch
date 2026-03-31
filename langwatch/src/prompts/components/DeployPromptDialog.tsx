@@ -164,7 +164,7 @@ export function DeployPromptDialog({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use tags to get specific prompt version via SDK. Prompt tagged as
+              Use labels to get specific prompt version via SDK. Prompt labeled as
               Production is returned by default.
             </Text>
 

@@ -113,7 +113,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
         expect(
           screen.getByText(
-            "Use tags to get specific prompt version via SDK. Prompt tagged as Production is returned by default.",
+            "Use labels to get specific prompt version via SDK. Prompt labeled as Production is returned by default.",
           ),
         ).toBeInTheDocument();
       });
