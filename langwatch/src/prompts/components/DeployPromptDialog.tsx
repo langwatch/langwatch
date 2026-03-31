@@ -324,9 +324,10 @@ export function DeployPromptDialog({
                       >
                         <GeneratePromptApiSnippetDialog.Trigger>
                           <IconButton
-                            variant="ghost"
+                            variant="plain"
                             size="xs"
                             aria-label="View code snippet"
+                            color="fg.muted"
                           >
                             <UnplugIcon size={14} />
                           </IconButton>
