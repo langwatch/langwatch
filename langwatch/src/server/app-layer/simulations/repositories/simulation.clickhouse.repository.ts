@@ -106,25 +106,6 @@ const DEDUP_PREVIEW_COLUMNS = `
   \`Messages.Role\`, \`Messages.Content\`,
   DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
 
-/** Inner subquery columns for list-view queries (getRunsForBatchIds) */
-const DEDUP_LIST_COLUMNS = `
-  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, Name, Description, Metadata,
-  \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
-  TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-  DurationMs, TotalCost, RoleCosts, RoleLatencies,
-  StartedAt, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
-
-/** Inner subquery columns for full-detail queries */
-const DEDUP_RUN_COLUMNS = `
-  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, Name, Description, Metadata,
-  \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
-  \`Messages.TraceId\`, \`Messages.Rest\`,
-  TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-  DurationMs, TotalCost, RoleCosts, RoleLatencies,
-  StartedAt, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
-
 interface CursorPayload {
   ts: string;
   batchRunId: string;
@@ -202,12 +183,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     projectId: string;
     scenarioRunId: string;
   }): Promise<ScenarioRunData | null> {
-    // Uses a lightweight inner subquery to find the latest version, avoiding
-    // the old pattern that read all heavy columns (Messages, RoleCosts, etc.)
-    // in DEDUP_RUN_COLUMNS across entire granules (~8K rows) for dedup, causing
-    // OOM on parts with large payloads. The inner subquery reads only
-    // DEDUP_COLUMNS (no heavy fields) to locate the row, then the outer SELECT
-    // reads heavy columns for that single matched row.
+    // Uses a scalar subquery to find the latest UpdatedAt, avoiding the old
+    // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
+    // entire granules (~8K rows) for dedup, causing OOM on parts with large
+    // payloads.
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM ${TABLE_NAME} AS t
@@ -454,16 +433,19 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM (
-         SELECT ${DEDUP_RUN_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-           AND BatchRunId = {batchRunId:String}
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE ArchivedAt IS NULL
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         AND t.BatchRunId = {batchRunId:String}
+         AND t.ArchivedAt IS NULL
+         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+             AND BatchRunId = {batchRunId:String}
+           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId), batchRunId },
     );
@@ -509,15 +491,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }): Promise<ScenarioRunData[] | null> {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM (
-         SELECT ${DEDUP_RUN_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ScenarioId = {scenarioId:String}
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE ArchivedAt IS NULL
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         AND t.ScenarioId = {scenarioId:String}
+         AND t.ArchivedAt IS NULL
+         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+             AND ScenarioId = {scenarioId:String}
+           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
        ORDER BY CreatedAt DESC
        LIMIT 1000`,
       { tenantId: projectId, scenarioId },
@@ -538,15 +522,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   }): Promise<ScenarioRunData[]> {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM (
-         SELECT ${DEDUP_RUN_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE ArchivedAt IS NULL
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         AND t.ArchivedAt IS NULL
+         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
        ORDER BY BatchRunId ASC, CreatedAt ASC
        LIMIT 10000`,
       { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
@@ -908,21 +894,27 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     if (batchRunIds.length === 0) return [];
 
     const setFilter = scenarioSetId
+      ? "AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})"
+      : "";
+    const innerSetFilter = scenarioSetId
       ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
       : "";
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${LIST_COLUMNS}
-       FROM (
-         SELECT ${DEDUP_LIST_COLUMNS}
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND BatchRunId IN ({batchRunIds:Array(String)})
-           ${setFilter}
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-       )
-       WHERE ArchivedAt IS NULL
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId = {tenantId:String}
+         AND t.BatchRunId IN ({batchRunIds:Array(String)})
+         ${setFilter}
+         AND t.ArchivedAt IS NULL
+         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+           FROM ${TABLE_NAME}
+           WHERE TenantId = {tenantId:String}
+             AND BatchRunId IN ({batchRunIds:Array(String)})
+             ${innerSetFilter}
+           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )
        ORDER BY CreatedAt ASC
        LIMIT 5000`,
       { tenantId: projectId, batchRunIds, ...(scenarioSetId ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) } : {}) },
