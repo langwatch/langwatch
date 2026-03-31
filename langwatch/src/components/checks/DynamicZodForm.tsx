@@ -9,21 +9,15 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import React, { useCallback, useMemo } from "react";
-import { ChevronDown, Info, Plus, Trash2, X } from "react-feather";
+import React, { useMemo } from "react";
+import { Info, Plus, Trash2, X } from "react-feather";
 import {
   Controller,
   type FieldErrors,
   useFieldArray,
   useFormContext,
-  useWatch,
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
-import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
-import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import { toInternalKey } from "~/components/llmPromptConfigs/parameterConfig";
-import { Popover } from "~/components/ui/popover";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import type {
@@ -86,91 +80,7 @@ const ModelSelectorWithWarning = ({
   );
 };
 
-/**
- * LLM config parameter keys that the popover can read/write.
- * Used to bridge react-hook-form fields with LLMConfigPopover's object API.
- */
-const LLM_CONFIG_KEYS = [
-  "model",
-  "max_tokens",
-  "temperature",
-  "top_p",
-  "frequency_penalty",
-  "presence_penalty",
-  "seed",
-  "top_k",
-  "min_p",
-  "repetition_penalty",
-  "reasoning",
-  "verbosity",
-] as const;
-
-/**
- * Bridging component that connects react-hook-form's flat structure
- * with LLMConfigPopover's object-based API.
- *
- * Reads all LLM config parameters from form context, constructs an
- * LLMConfig object, and writes all changed parameters back on change.
- */
-const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
-  const { setValue, control } = useFormContext();
-
-  // Watch all LLM config fields for changes
-  const watchedValues = useWatch({
-    control,
-    name: LLM_CONFIG_KEYS.map((key) => `${prefix}.${key}`),
-  }) as unknown[];
-
-  // Construct LLMConfig object from watched values
-  const llmConfig: LLMConfig = useMemo(() => {
-    const config: Record<string, unknown> = {};
-    LLM_CONFIG_KEYS.forEach((key, index) => {
-      if (watchedValues[index] !== undefined) {
-        config[key] = watchedValues[index];
-      }
-    });
-    config.model = (config.model as string) ?? "";
-    return config as LLMConfig;
-  }, [watchedValues]);
-
-  // Handle changes from LLMConfigPopover — write all keys back to form
-  const handleChange = useCallback(
-    (newConfig: LLMConfig) => {
-      for (const [key, value] of Object.entries(newConfig)) {
-        const formKey = toInternalKey(key);
-        if (value !== undefined) {
-          setValue(`${prefix}.${formKey}`, value, { shouldDirty: true });
-        }
-      }
-    },
-    [prefix, setValue],
-  );
-
-  return (
-    <Popover.Root positioning={{ placement: "bottom-start" }}>
-      <Popover.Trigger asChild>
-        <HStack
-          width="full"
-          paddingY={2}
-          paddingX={3}
-          borderRadius="md"
-          border="1px solid"
-          borderColor="border"
-          cursor="pointer"
-          _hover={{ bg: "gray.50" }}
-          transition="background 0.15s"
-          justify="space-between"
-        >
-          <LLMModelDisplay model={llmConfig.model} />
-          <Box color="fg.muted">
-            <ChevronDown size={16} />
-          </Box>
-        </HStack>
-      </Popover.Trigger>
-      <LLMConfigPopover values={llmConfig} onChange={handleChange} />
-    </Popover.Root>
-  );
-};
+import { EvaluatorLLMConfigField } from "./EvaluatorLLMConfigField";
 
 // Separate component for array fields to handle useFieldArray hook
 const ArrayField = <T extends EvaluatorTypes>({
