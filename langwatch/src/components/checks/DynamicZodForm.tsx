@@ -21,6 +21,7 @@ import {
 import { type ZodType, z } from "zod";
 import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
+import { toInternalKey } from "~/components/llmPromptConfigs/parameterConfig";
 import { Popover } from "~/components/ui/popover";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -86,41 +87,60 @@ const ModelSelectorWithWarning = ({
 };
 
 /**
+ * LLM config parameter keys that the popover can read/write.
+ * Used to bridge react-hook-form fields with LLMConfigPopover's object API.
+ */
+const LLM_CONFIG_KEYS = [
+  "model",
+  "max_tokens",
+  "temperature",
+  "top_p",
+  "frequency_penalty",
+  "presence_penalty",
+  "seed",
+  "top_k",
+  "min_p",
+  "repetition_penalty",
+  "reasoning",
+  "verbosity",
+] as const;
+
+/**
  * Bridging component that connects react-hook-form's flat structure
  * with LLMConfigPopover's object-based API.
  *
- * Renders a compact model selector (like ModelSelectFieldMini) that
- * reads model and max_tokens from form context, constructs LLMConfig
- * object, and updates both fields on change.
+ * Reads all LLM config parameters from form context, constructs an
+ * LLMConfig object, and writes all changed parameters back on change.
  */
 const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   const { setValue, control } = useFormContext();
 
-  // Watch both fields for changes
-  const model = useWatch({ control, name: `${prefix}.model` }) as
-    | string
-    | undefined;
-  const maxTokens = useWatch({ control, name: `${prefix}.max_tokens` }) as
-    | number
-    | undefined;
+  // Watch all LLM config fields for changes
+  const watchedValues = useWatch({
+    control,
+    name: LLM_CONFIG_KEYS.map((key) => `${prefix}.${key}`),
+  }) as unknown[];
 
-  // Construct LLMConfig object
-  const llmConfig: LLMConfig = useMemo(
-    () => ({
-      model: model ?? "",
-      max_tokens: maxTokens,
-    }),
-    [model, maxTokens],
-  );
+  // Construct LLMConfig object from watched values
+  const llmConfig: LLMConfig = useMemo(() => {
+    const config: Record<string, unknown> = {};
+    LLM_CONFIG_KEYS.forEach((key, index) => {
+      if (watchedValues[index] !== undefined) {
+        config[key] = watchedValues[index];
+      }
+    });
+    config.model = (config.model as string) ?? "";
+    return config as LLMConfig;
+  }, [watchedValues]);
 
-  // Handle changes from LLMConfigPopover
+  // Handle changes from LLMConfigPopover — write all keys back to form
   const handleChange = useCallback(
     (newConfig: LLMConfig) => {
-      setValue(`${prefix}.model`, newConfig.model, { shouldDirty: true });
-      if (newConfig.max_tokens !== undefined) {
-        setValue(`${prefix}.max_tokens`, newConfig.max_tokens, {
-          shouldDirty: true,
-        });
+      for (const [key, value] of Object.entries(newConfig)) {
+        const formKey = toInternalKey(key);
+        if (value !== undefined) {
+          setValue(`${prefix}.${formKey}`, value, { shouldDirty: true });
+        }
       }
     },
     [prefix, setValue],
@@ -141,7 +161,7 @@ const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          <LLMModelDisplay model={model ?? ""} />
+          <LLMModelDisplay model={llmConfig.model} />
           <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>
