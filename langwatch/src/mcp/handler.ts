@@ -138,12 +138,10 @@ export function createMcpHandler(): McpHandler {
   }
 
   function parseFormBody(raw: string): Record<string, string> {
+    const params = new URLSearchParams(raw);
     const result: Record<string, string> = {};
-    for (const pair of raw.split("&")) {
-      const [key, value] = pair.split("=");
-      if (key) {
-        result[decodeURIComponent(key)] = decodeURIComponent(value ?? "");
-      }
+    for (const [key, value] of params) {
+      result[key] = value;
     }
     return result;
   }

@@ -265,27 +265,16 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("issues an access token", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
-      const res = await sendRequest({
-        server,
-        method: "POST",
-        path: "/oauth/token",
-        body: null,
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-        },
-      });
-
-      // Send form-encoded body manually
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
-      const formRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
       });
 
-      expect(formRes.status).toBe(200);
-      const body = await formRes.json();
+      expect(res.status).toBe(200);
+      const body = await res.json();
       expect(body.access_token).toBeDefined();
       expect(body.token_type).toBe("Bearer");
     });
