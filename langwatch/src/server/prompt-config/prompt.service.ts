@@ -1073,9 +1073,10 @@ export class PromptService {
     userId?: string;
     organizationId?: string;
   }) {
-    const organizationId =
-      params.organizationId ??
-      (await this.getOrganizationIdFromProjectId(params.projectId));
+    // Always resolve organizationId from projectId to prevent org mismatch attacks
+    const organizationId = await this.getOrganizationIdFromProjectId(
+      params.projectId,
+    );
 
     return this.labelRepository.assignLabel({
       ...params,
