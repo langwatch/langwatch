@@ -62,9 +62,7 @@
                 "group": "LangWatch Skills",
                 "pages": [
                   "skills/directory",
-                  "skills/code-prompts",
-                  "skills/platform-prompts",
-                  "skills/recipes"
+                  "skills/platform-prompts"
                 ]
               },
               "integration/mcp",
@@ -778,7 +776,15 @@
     },
     {
       "source": "/skills/developers",
-      "destination": "/skills/code-prompts"
+      "destination": "/skills/directory"
+    },
+    {
+      "source": "/skills/code-prompts",
+      "destination": "/skills/directory"
+    },
+    {
+      "source": "/skills/recipes",
+      "destination": "/skills/directory"
     },
     {
       "source": "/skills/teams",

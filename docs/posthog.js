@@ -21,6 +21,24 @@ document.addEventListener('click', function(e) {
     setTimeout(function() { target.removeAttribute('data-copied'); }, 2000);
   }
 
+  // --- Download SKILL.md from GitHub (data-download-url) ---
+  var dlEl = e.target.closest('[data-download-url]');
+  if (dlEl) {
+    var rawUrl = dlEl.getAttribute('data-download-url');
+    var name = dlEl.getAttribute('data-download-name') || 'SKILL.md';
+    fetch(rawUrl)
+      .then(function(r) { return r.text(); })
+      .then(function(content) {
+        var blob = new Blob([content], { type: 'text/markdown' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+  }
+
   // --- PostHog tracking (data-track) ---
   var trackEl = e.target.closest('[data-track]');
   if (trackEl && window.posthog) {

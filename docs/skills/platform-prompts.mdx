@@ -1,68 +1,15 @@
 ---
-title: "Platform Prompts"
-description: "Ask your chat assistant to query performance, set up evaluators, and create scenarios."
-sidebarTitle: "Platform Prompts"
+title: "PMs & Domain Experts Skills"
+description: "Skills for PMs and domain experts to collaborate with their team using AI assistants."
+sidebarTitle: "PMs & Domain Experts"
 ---
 
-import { CopyPrompt } from "/snippets/copy-prompt.jsx"
-import { CopyLine } from "/snippets/copy-line.jsx"
+import { SkillAccordion } from "/snippets/skill-accordion.jsx"
 import { PROMPTS } from "/snippets/prompts-data.jsx"
 
-<Tabs>
-  <Tab title="Prompts">
-    <CopyPrompt title="How is my agent performing?" prompt={PROMPTS.platform_analytics} skill="platform-analytics" />
-    <CopyPrompt title="Create scenario tests for my agent" prompt={PROMPTS.platform_scenarios} skill="platform-scenarios" />
-    <CopyPrompt title="Set up evaluators for my agent" prompt={PROMPTS.platform_evaluators} skill="platform-evaluators" />
-  </Tab>
-
-  <Tab title="MCP">
-    Install the LangWatch MCP once:
-
-    <Tabs>
-      <Tab title="ChatGPT">
-        1. Go to **Settings → Connectors**
-        2. Click **Add connector**
-        3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-        4. For authentication, select **Bearer Token** and enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize))
-
-        *Requires a Plus or Team plan.*
-      </Tab>
-      <Tab title="Claude Chat">
-        1. Go to **Settings → Connectors**
-        2. Click **Add custom connector**
-        3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-        4. In **Advanced settings**, enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize)) as the **OAuth Client Secret**. Leave Client ID empty.
-
-        *Requires a Pro or Max plan.*
-      </Tab>
-      <Tab title="Claude Code">
-        ```bash
-        claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
-        ```
-      </Tab>
-      <Tab title="Other">
-        Add to your editor's MCP settings:
-        ```json
-        {
-          "mcpServers": {
-            "langwatch": {
-              "command": "npx",
-              "args": ["-y", "@langwatch/mcp-server"],
-              "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
-            }
-          }
-        }
-        ```
-      </Tab>
-    </Tabs>
-
-    Ask your agent to:
-
-    <CopyLine text="How is my agent performing?" />
-    <CopyLine text="Create scenario tests for my agent" />
-    <CopyLine text="Set up evaluators for my agent" />
-  </Tab>
-</Tabs>
+<SkillAccordion title="How is my agent performing?" prompt={PROMPTS.platform_analytics} />
+<SkillAccordion title="Create scenario tests for my agent" prompt={PROMPTS.platform_scenarios} />
+<SkillAccordion title="Set up evaluators for my agent" prompt={PROMPTS.platform_evaluators} />
 
 ---
 

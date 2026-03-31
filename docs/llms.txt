@@ -9,10 +9,8 @@ Always navigate to docs links using the .md extension for better readability.
 
 ### LangWatch Skills
 
-- [Skills Directory](https://langwatch.ai/docs/skills/directory.md): Get started with LangWatch in seconds. Copy a prompt, install a skill, or set up the MCP — your AI agent does the rest.
-- [Code Prompts](https://langwatch.ai/docs/skills/code-prompts.md): Copy a prompt, paste it into your coding assistant, done.
-- [Platform Prompts](https://langwatch.ai/docs/skills/platform-prompts.md): Ask your chat assistant to query performance, set up evaluators, and create scenarios.
-- [Prompt Recipes](https://langwatch.ai/docs/skills/recipes.md): Domain-specific, actionable recipes for improving your AI agent.
+- [Skills Directory](https://langwatch.ai/docs/skills/directory.md): Get started with LangWatch in seconds. Install a skill, and your AI agent does the rest.
+- [PMs & Domain Experts Skills](https://langwatch.ai/docs/skills/platform-prompts.md): Skills for PMs and domain experts to collaborate with their team using AI assistants.
 
 - [LangWatch MCP Server](https://langwatch.ai/docs/integration/mcp.md): Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
 - [Better Agents](https://langwatch.ai/docs/better-agents/overview.md): Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development
