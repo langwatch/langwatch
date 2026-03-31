@@ -17,7 +17,7 @@ class PromptServiceTracing:
     @staticmethod
     def get(func: Callable[..., "Prompt"]) -> Callable[..., "Prompt"]:
         """
-        Type-safe decorator for PromptService.get method with OpenTelemetry tracing
+        Decorator for PromptService.get method with OpenTelemetry tracing.
 
         Expected function signature:
         def get(self: T, prompt_id: str, version_number: Optional[int] = None,
