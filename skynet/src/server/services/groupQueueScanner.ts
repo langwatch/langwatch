@@ -223,7 +223,10 @@ async function scanSingleQueue(
 
   groups.sort((a, b) => b.pendingJobs - a.pendingJobs);
 
-  // Use exact Redis counter when available, fall back to sampled sum
+  // Use exact Redis counter when available, fall back to approximate sum from fetched groups.
+  // Note: the fallback only covers the current page of groups (top N by pending count).
+  // Once stats:total-pending is populated by the upstream staging scripts, this fallback
+  // is no longer used and the counter is authoritative.
   let totalPendingJobs: number;
   if (totalPendingRaw !== null) {
     totalPendingJobs = Math.max(0, parseInt(totalPendingRaw, 10) || 0);
