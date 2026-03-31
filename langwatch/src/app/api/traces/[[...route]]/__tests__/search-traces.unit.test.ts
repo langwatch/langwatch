@@ -218,5 +218,18 @@ describe("POST /search", () => {
       ]);
       expect(body.traces[1].evaluations).toEqual([]);
     });
+
+    it("includes evaluations when llmMode is true", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        llmMode: true,
+      });
+      const body = await res.json();
+      expect(body.traces[0].evaluations).toEqual([
+        expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
+      ]);
+      expect(body.traces[1].evaluations).toEqual([]);
+    });
   });
 });
