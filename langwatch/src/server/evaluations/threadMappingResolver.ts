@@ -90,6 +90,10 @@ export async function resolveThreadMappingsIntoData(params: {
             traces.map((t) => formatSpansDigest(t.spans ?? [])),
           )
         ).join("\n\n---\n\n");
+      } else {
+        throw new Error(
+          `Unhandled SERVER_ONLY_THREAD_SOURCES entry "${source}" for field "${targetField}"`,
+        );
       }
     } else {
       const threadSource = source as keyof typeof THREAD_MAPPINGS;

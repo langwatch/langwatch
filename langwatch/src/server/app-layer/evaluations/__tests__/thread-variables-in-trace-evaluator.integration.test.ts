@@ -338,7 +338,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           }),
         ];
 
-        const { service, mockTraceService } = createTestService({
+        const { service } = createTestService({
           trace,
           traceService: {
             getTracesWithSpansByThreadIds: vi

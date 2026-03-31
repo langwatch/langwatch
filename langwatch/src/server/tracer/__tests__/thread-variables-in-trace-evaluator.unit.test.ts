@@ -8,8 +8,6 @@ import { describe, expect, it } from "vitest";
 import {
   getTraceAvailableSources,
   getThreadAvailableSources,
-  SERVER_ONLY_THREAD_SOURCES,
-  THREAD_MAPPINGS,
 } from "../tracesMapping";
 
 describe("Feature: Thread variables available in trace-level evaluator input mapping", () => {
