@@ -646,6 +646,7 @@ export const mappingStateSchema = z.object({
           ]),
           key: z.string().optional(),
           subkey: z.string().optional(),
+          selectedFields: z.array(z.string()).optional(),
         })
         .extend({
           type: z.literal("trace").optional(),

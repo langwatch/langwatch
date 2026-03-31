@@ -705,10 +705,12 @@ export const TracesMapping = ({
                           />
                           <MultiSelect
                             isMulti
-                            options={Object.keys(TRACE_MAPPINGS).map((key) => ({
-                              label: key,
-                              value: key,
-                            }))}
+                            options={Object.keys(TRACE_MAPPINGS)
+                              .filter((key) => key !== "threads")
+                              .map((key) => ({
+                                label: key,
+                                value: key,
+                              }))}
                             value={(
                               mapping[targetField]?.selectedFields ?? []
                             ).map((field) => ({
