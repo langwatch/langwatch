@@ -10,10 +10,8 @@
 import { describe, expect, it } from "vitest";
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import {
-  serializeMappingsToMappingState,
-  deserializeMappingStateToUI,
-} from "../mappingSerialization";
+import { serializeMappingsToMappingState } from "../utils/serializeMappingsToMappingState";
+import { deserializeMappingStateToUI } from "../utils/deserializeMappingStateToUI";
 
 // ---------------------------------------------------------------------------
 // Tests

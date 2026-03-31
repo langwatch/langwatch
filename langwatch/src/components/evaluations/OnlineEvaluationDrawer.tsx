@@ -57,10 +57,8 @@ import {
   type MappingState,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
-import {
-  deserializeMappingStateToUI,
-  serializeMappingsToMappingState,
-} from "./mappingSerialization";
+import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
+import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
 import { HorizontalFormControl } from "../HorizontalFormControl";
