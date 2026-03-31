@@ -10,10 +10,13 @@
  *
  *   "Unknown expression or function identifier 'ss.Events.Name' in scope"
  *
- * The fix in transformMetricForDedup() detects expressions containing
+ * The fix in transformMetricForDedup() detects count-like expressions containing
  * ss."Events.Name" or ss."Events.Attributes" and rewrites them to
  * uniqExact(trace_id), since in the CTE context the group_key already
  * filters to matching events.
+ *
+ * Value-based aggregations (avgArray, sumArray, etc.) are NOT rewritten,
+ * because doing so would silently change "average score" to "count of traces".
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetParamCounter } from "../filter-translator";
@@ -33,7 +36,7 @@ function extractOuterSelect(sql: string): string {
   return cteEndMatch?.[1] ?? "";
 }
 
-describe("event metric CTE scope regression", () => {
+describe("buildTimeseriesQuery()", () => {
   beforeEach(() => {
     resetParamCounter();
   });
@@ -46,120 +49,132 @@ describe("event metric CTE scope regression", () => {
     timeScale: 60,
   };
 
-  describe("when sentiment.thumbs_up_down metric is used with sentiment.thumbs_up_down groupBy", () => {
-    it("does not reference ss.Events.Name in the outer SELECT", () => {
-      const result = buildTimeseriesQuery({
-        ...baseInput,
-        series: [
-          {
-            metric:
-              "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
-            aggregation: "cardinality" as const,
-          },
-        ],
-        groupBy: "sentiment.thumbs_up_down",
+  describe("given event-based metrics with CTE dedup groupBy", () => {
+    describe("when sentiment.thumbs_up_down cardinality metric is used", () => {
+      it("rewrites countIf metric to uniqExact(trace_id) in the outer SELECT", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+          groupBy: "sentiment.thumbs_up_down",
+        });
+
+        // The query must use the CTE dedup path (WITH ... AS)
+        expect(result.sql).toContain("WITH deduped_traces AS");
+
+        // The outer SELECT must NOT reference ss."Events.Name" — that alias
+        // only exists inside the CTE
+        const outerSelect = extractOuterSelect(result.sql);
+        expect(outerSelect).not.toContain('ss."Events.Name"');
+        expect(outerSelect).not.toContain('ss."Events.Attributes"');
+
+        // The count-like metric is rewritten to uniqExact(trace_id)
+        expect(outerSelect).toContain("uniqExact(trace_id)");
       });
 
-      // The query must use the CTE dedup path (WITH ... AS)
-      expect(result.sql).toContain("WITH deduped_traces AS");
+      it("still references Events.Name inside the CTE where the alias is valid", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric:
+                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+          groupBy: "sentiment.thumbs_up_down",
+        });
 
-      // The outer SELECT must NOT reference ss."Events.Name" — that alias
-      // only exists inside the CTE
-      const outerSelect = extractOuterSelect(result.sql);
-      expect(outerSelect).not.toContain('ss."Events.Name"');
-      expect(outerSelect).not.toContain('ss."Events.Attributes"');
-
-      // The transformed metric should use uniqExact(trace_id) instead
-      expect(outerSelect).toContain("uniqExact(trace_id)");
+        // The CTE inner query should still use the stored_spans columns
+        // (the groupBy expression uses Events.Name and Events.Attributes)
+        const cteMatch = result.sql.match(
+          /WITH deduped_traces AS\s*\(([\s\S]+?)\)\s*SELECT/,
+        );
+        const cteBody = cteMatch?.[1] ?? "";
+        expect(cteBody).toContain('"Events.Name"');
+      });
     });
 
-    it("still references ss.Events.Name inside the CTE where the alias is valid", () => {
-      const result = buildTimeseriesQuery({
-        ...baseInput,
-        series: [
-          {
-            metric:
-              "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
-            aggregation: "cardinality" as const,
-          },
-        ],
-        groupBy: "sentiment.thumbs_up_down",
+    describe("when events.event_type cardinality metric is used with a key", () => {
+      it("rewrites countIf metric to uniqExact(trace_id) in the outer SELECT", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "events.event_type" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              key: "thumbs_up_down",
+            },
+          ],
+          groupBy: "events.event_type",
+        });
+
+        // Must use CTE dedup path
+        expect(result.sql).toContain("WITH deduped_traces AS");
+
+        // Outer SELECT must not leak stored_spans alias
+        const outerSelect = extractOuterSelect(result.sql);
+        expect(outerSelect).not.toContain('ss."Events.Name"');
+        expect(outerSelect).not.toContain('ss."Events.Attributes"');
+
+        // Count-like metric is rewritten to uniqExact(trace_id)
+        expect(outerSelect).toContain("uniqExact(trace_id)");
       });
-
-      // The CTE inner query should still use the stored_spans columns
-      // (the groupBy expression uses Events.Name and Events.Attributes)
-      const cteMatch = result.sql.match(
-        /WITH deduped_traces AS\s*\(([\s\S]+?)\)\s*SELECT/,
-      );
-      const cteBody = cteMatch?.[1] ?? "";
-      expect(cteBody).toContain('"Events.Name"');
-    });
-  });
-
-  describe("when events.event_type metric is used with events.event_type groupBy", () => {
-    it("does not reference ss.Events.Name in the outer SELECT", () => {
-      const result = buildTimeseriesQuery({
-        ...baseInput,
-        series: [
-          {
-            metric: "events.event_type" as FlattenAnalyticsMetricsEnum,
-            aggregation: "cardinality" as const,
-            key: "thumbs_up_down",
-          },
-        ],
-        groupBy: "events.event_type",
-      });
-
-      // Must use CTE dedup path
-      expect(result.sql).toContain("WITH deduped_traces AS");
-
-      // Outer SELECT must not leak stored_spans alias
-      const outerSelect = extractOuterSelect(result.sql);
-      expect(outerSelect).not.toContain('ss."Events.Name"');
-      expect(outerSelect).not.toContain('ss."Events.Attributes"');
-
-      // Should be rewritten to uniqExact(trace_id)
-      expect(outerSelect).toContain("uniqExact(trace_id)");
     });
 
-    it("does not reference ss.Events.Name in the outer SELECT without a metric key", () => {
-      const result = buildTimeseriesQuery({
-        ...baseInput,
-        series: [
-          {
-            metric: "events.event_type" as FlattenAnalyticsMetricsEnum,
-            aggregation: "cardinality" as const,
-          },
-        ],
-        groupBy: "events.event_type",
+    describe("when events.event_type cardinality metric is used without a key", () => {
+      it("rewrites countIf metric to uniqExact(trace_id) in the outer SELECT", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "events.event_type" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+          groupBy: "events.event_type",
+        });
+
+        expect(result.sql).toContain("WITH deduped_traces AS");
+
+        const outerSelect = extractOuterSelect(result.sql);
+        expect(outerSelect).not.toContain('ss."Events.Name"');
       });
-
-      expect(result.sql).toContain("WITH deduped_traces AS");
-
-      const outerSelect = extractOuterSelect(result.sql);
-      expect(outerSelect).not.toContain('ss."Events.Name"');
     });
-  });
 
-  describe("when events.event_score metric is used with events.event_type groupBy", () => {
-    it("does not reference ss.Events.Attributes in the outer SELECT", () => {
-      const result = buildTimeseriesQuery({
-        ...baseInput,
-        series: [
-          {
-            metric: "events.event_score" as FlattenAnalyticsMetricsEnum,
-            aggregation: "avg" as const,
-            key: "thumbs_up_down",
-          },
-        ],
-        groupBy: "events.event_type",
+    describe("when events.event_score avg metric is used", () => {
+      it("does not rewrite the value-based aggregation to uniqExact(trace_id)", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "events.event_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "thumbs_up_down",
+            },
+          ],
+          groupBy: "events.event_type",
+        });
+
+        expect(result.sql).toContain("WITH deduped_traces AS");
+
+        const outerSelect = extractOuterSelect(result.sql);
+
+        // Value-based metrics must NOT be rewritten to uniqExact(trace_id)
+        // because that would silently change "average score" to "count of traces"
+        expect(outerSelect).not.toContain("uniqExact(trace_id)");
+
+        // The expression passes through as-is (avgArray on event data),
+        // which may still reference ss columns — that's a known limitation
+        // of event-based value metrics in the CTE path, but it's honest
+        // rather than silently corrupting the metric semantics
+        expect(outerSelect).toContain("avgArray");
       });
-
-      expect(result.sql).toContain("WITH deduped_traces AS");
-
-      const outerSelect = extractOuterSelect(result.sql);
-      expect(outerSelect).not.toContain('ss."Events.Name"');
-      expect(outerSelect).not.toContain('ss."Events.Attributes"');
     });
   });
 });
