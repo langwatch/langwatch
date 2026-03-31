@@ -75,7 +75,11 @@ export const experimentsRouter = createTRPCRouter({
       let workflowId = input.dsl.workflow_id;
       const name =
         input.workbenchState.name ?? (await findNextDraftName(input.projectId));
-      const slug = slugify(name);
+      const slug = await generateUniqueExperimentSlug({
+        baseSlug: slugify(name),
+        projectId: input.projectId,
+        excludeExperimentId: input.experimentId,
+      });
 
       if (input.experimentId) {
         const currentExperiment = await prisma.experiment.findUnique({
@@ -1165,6 +1169,54 @@ const findNextDraftName = async (projectId: string) => {
 };
 
 /**
+ * Generates a unique slug for an experiment within a project.
+ *
+ * If the base slug already exists (belonging to a different experiment),
+ * appends an incrementing numeric suffix (-2, -3, ...) until a unique
+ * slug is found. Falls back to a random nanoid suffix after 100 attempts.
+ *
+ * @param baseSlug - The initial slug derived from the experiment name
+ * @param projectId - The project to check for uniqueness within
+ * @param excludeExperimentId - Optional experiment ID to exclude from
+ *   conflict checks (used when updating an existing experiment)
+ */
+export const generateUniqueExperimentSlug = async ({
+  baseSlug,
+  projectId,
+  excludeExperimentId,
+}: {
+  baseSlug: string;
+  projectId: string;
+  excludeExperimentId?: string;
+}): Promise<string> => {
+  const MAX_ATTEMPTS = 100;
+  let candidateSlug = baseSlug;
+  let index = 2;
+  let attempts = 0;
+
+  while (attempts < MAX_ATTEMPTS) {
+    const conflicting = await prisma.experiment.findFirst({
+      where: {
+        projectId,
+        slug: candidateSlug,
+        ...(excludeExperimentId ? { id: { not: excludeExperimentId } } : {}),
+      },
+    });
+
+    if (!conflicting) {
+      return candidateSlug;
+    }
+
+    candidateSlug = `${baseSlug}-${index}`;
+    index++;
+    attempts++;
+  }
+
+  // Fallback to random suffix if we hit the limit
+  return `${baseSlug}-${nanoid(8)}`;
+};
+
+/**
  * Copies an EVALUATIONS_V3 experiment to another project.
  * V3 experiments store their state in workbenchState (no workflow).
  * Optionally copies saved datasets and updates references.
@@ -1240,34 +1292,10 @@ const copyEvaluationsV3Experiment = async ({
 
   // Generate unique slug for the new experiment
   const experimentName = experiment.name ?? experiment.slug;
-  const baseSlug = slugify(experimentName);
-
-  const MAX_ATTEMPTS = 100;
-  let newSlug = baseSlug;
-  let index = 2;
-  let attempts = 0;
-
-  while (attempts < MAX_ATTEMPTS) {
-    const existingExperiment = await ctx.prisma.experiment.findFirst({
-      where: {
-        projectId: targetProjectId,
-        slug: newSlug,
-      },
-    });
-
-    if (!existingExperiment) {
-      break;
-    }
-
-    newSlug = `${baseSlug}-${index}`;
-    index++;
-    attempts++;
-  }
-
-  // Fallback to random suffix if we hit the limit
-  if (attempts >= MAX_ATTEMPTS) {
-    newSlug = `${baseSlug}-${nanoid(8)}`;
-  }
+  const newSlug = await generateUniqueExperimentSlug({
+    baseSlug: slugify(experimentName),
+    projectId: targetProjectId,
+  });
 
   // Create the new experiment
   const newExperiment = await ctx.prisma.experiment.create({
