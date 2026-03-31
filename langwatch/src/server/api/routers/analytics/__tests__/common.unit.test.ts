@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { FilterField } from "~/server/filters/types";
 
@@ -104,9 +104,11 @@ describe("generateTracesPivotQueryConditions()", () => {
 
 describe("generateFilterConditions()", () => {
   describe("when filter field is unknown", () => {
-    it("returns a match_none condition so the trigger never fires", () => {
+    beforeEach(() => {
       mockLoggerWarn.mockClear();
+    });
 
+    it("returns a match_none condition so the trigger never fires", () => {
       const conditions = generateFilterConditions({
         ["service.name" as FilterField]: ["chat"],
       });
@@ -115,8 +117,6 @@ describe("generateFilterConditions()", () => {
     });
 
     it("logs a warning with the unknown field name", () => {
-      mockLoggerWarn.mockClear();
-
       generateFilterConditions({
         ["service.name" as FilterField]: ["chat"],
       });
