@@ -304,13 +304,15 @@ async function fetchTracesFromClickHouse(
 ): Promise<TraceSearchResult> {
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
-  const conditions = [
+  const baseConditions = [
     "TenantId = {tenantId:String}",
     "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
     "OccurredAt < now64(3)",
     "ComputedInput IS NOT NULL",
     "ComputedInput != ''",
   ];
+
+  const conditions = [...baseConditions];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
     // Must either not have any of the known topics, or not have any of the known subtopics
@@ -331,6 +333,7 @@ async function fetchTracesFromClickHouse(
     );
   }
 
+  const baseWhereClause = baseConditions.join(" AND ");
   const whereClause = conditions.join(" AND ");
 
   const result = await clickhouse.query({
@@ -346,7 +349,7 @@ async function fetchTracesFromClickHouse(
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
-          WHERE ${whereClause}
+          WHERE ${baseWhereClause}
           GROUP BY TenantId, TraceId
         )
       ORDER BY t.OccurredAt DESC, t.TraceId ASC

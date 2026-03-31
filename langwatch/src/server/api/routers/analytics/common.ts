@@ -57,7 +57,7 @@ export const generateTracesPivotQueryConditions = ({
   const endDate_ =
     endDate < now && now - endDate < 1000 * 60 * 60 * 2 ? now : endDate;
 
-  const filterConditions = generateFilterConditions(filters);
+  const { filterConditions, hasUnknownFilter } = generateFilterConditions(filters);
 
   return {
     pivotIndexConditions: {
@@ -77,12 +77,16 @@ export const generateTracesPivotQueryConditions = ({
           ...(traceIds && traceIds.length > 0
             ? [{ terms: { trace_id: traceIds } }]
             : []),
-          ...(negateFilters ? [] : [...filterConditions]),
+          ...(negateFilters
+            ? hasUnknownFilter
+              ? [{ match_none: {} }]
+              : []
+            : [...filterConditions]),
         ],
         ...(negateFilters
-          ? {
-              must_not: [...filterConditions],
-            }
+          ? hasUnknownFilter
+            ? {}
+            : { must_not: [...filterConditions] }
           : {}),
       } as QueryDslBoolQuery,
     },
@@ -93,10 +97,12 @@ export const generateTracesPivotQueryConditions = ({
 
 export const generateFilterConditions = (
   filters: Partial<Record<FilterField, FilterParam>>,
-) => {
+): { filterConditions: QueryDslQueryContainer[]; hasUnknownFilter: boolean } => {
   let filterConditions: QueryDslQueryContainer[] = [];
+  let hasUnknownFilter = false;
   for (const [field, params] of Object.entries(filters)) {
     if (!(field in availableFilters)) {
+      hasUnknownFilter = true;
       logger.warn(
         { field },
         "Unknown filter field encountered — producing match_none. Queries using this filter will match nothing.",
@@ -113,7 +119,7 @@ export const generateFilterConditions = (
     filterConditions = filterConditions.concat(col);
   }
 
-  return filterConditions;
+  return { filterConditions, hasUnknownFilter };
 };
 
 const collectConditions = (

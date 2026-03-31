@@ -177,7 +177,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
             [filtersWrapperKey]: {
               filter: {
                 bool: {
-                  must: generateFilterConditions(filters ?? {}),
+                  must: generateFilterConditions(filters ?? {}).filterConditions,
                 } as QueryDslBoolQuery,
               },
               aggs: aggregationQuery,
