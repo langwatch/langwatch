@@ -306,14 +306,16 @@ export function DeployPromptDialog({
                         <Select.Content>
                           {versionItems.map((v) => (
                             <Select.Item key={v.value} item={v}>
-                              <HStack gap={2} maxWidth="100%" overflow="hidden">
-                                <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
-                                  v{v.version}
-                                </Text>
-                                <Text as="span" fontSize="sm" color="fg.muted" truncate>
-                                  {v.commitMessage}
-                                </Text>
-                              </HStack>
+                              <Tooltip content={v.commitMessage} openDelay={500}>
+                                <HStack gap={2} maxWidth="100%" overflow="hidden">
+                                  <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
+                                    v{v.version}
+                                  </Text>
+                                  <Text as="span" fontSize="sm" color="fg.muted" truncate>
+                                    {v.commitMessage}
+                                  </Text>
+                                </HStack>
+                              </Tooltip>
                             </Select.Item>
                           ))}
                         </Select.Content>
