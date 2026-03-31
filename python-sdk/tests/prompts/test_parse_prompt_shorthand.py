@@ -1,5 +1,5 @@
 """
-Unit tests for parse_prompt_shorthand in the Python SDK.
+Unit tests for parse_prompt_shorthand and SDK conflict validation in the Python SDK.
 
 @see specs/prompts/shorthand-prompt-label-syntax.feature
 """
@@ -9,7 +9,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from langwatch.prompts.prompt_facade import parse_prompt_shorthand
+from unittest.mock import Mock
+from langwatch.prompts.prompt_facade import parse_prompt_shorthand, PromptsFacade
 
 
 class TestParsePromptShorthand:
@@ -50,3 +51,28 @@ class TestParsePromptShorthand:
     def test_treats_float_as_label(self):
         result = parse_prompt_shorthand("pizza-prompt:1.5")
         assert result == {"slug": "pizza-prompt", "label": "1.5", "version": None}
+
+
+class TestPromptsFacadeConflictValidation:
+    """Tests for SDK-level conflict validation in PromptsFacade.get()."""
+
+    @pytest.fixture
+    def facade(self):
+        mock_client = Mock()
+        return PromptsFacade(rest_api_client=mock_client)
+
+    def test_throws_when_shorthand_version_conflicts_with_explicit_version(self, facade):
+        with pytest.raises(ValueError, match="Cannot combine shorthand with explicit version/label options"):
+            facade.get("pizza-prompt:2", version_number=5)
+
+    def test_throws_when_shorthand_label_conflicts_with_explicit_label(self, facade):
+        with pytest.raises(ValueError, match="Cannot combine shorthand with explicit version/label options"):
+            facade.get("pizza-prompt:production", label="staging")
+
+    def test_throws_when_shorthand_version_conflicts_with_explicit_label(self, facade):
+        with pytest.raises(ValueError, match="Cannot combine shorthand with explicit version/label options"):
+            facade.get("pizza-prompt:2", label="production")
+
+    def test_throws_when_both_explicit_version_and_label_provided(self, facade):
+        with pytest.raises(ValueError, match="Cannot specify both version and label"):
+            facade.get("pizza-prompt", version_number=5, label="production")
