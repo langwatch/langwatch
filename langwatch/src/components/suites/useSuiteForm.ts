@@ -62,7 +62,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt";
+  type: "http" | "prompt" | "code";
   referenceId: string;
 }
 
@@ -122,8 +122,9 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        if (agent.type !== "http") continue;
-        result.push({ name: agent.name, type: "http", referenceId: agent.id });
+        // Only http and code agents are supported as suite targets
+        if (agent.type !== "http" && agent.type !== "code") continue;
+        result.push({ name: agent.name, type: agent.type, referenceId: agent.id });
       }
     }
     if (prompts) {

@@ -105,6 +105,8 @@ type VariableMappingInputProps = {
   isMissing?: boolean;
   /** When true, shows yellow background but not "Required" placeholder (for optional fields) */
   optionalHighlighting?: boolean;
+  /** Identifier used for data-testid on the underlying input element */
+  inputTestId?: string;
 };
 
 /** Represents a selectable option in the dropdown */
@@ -190,6 +192,7 @@ export const VariableMappingInput = ({
   disabled = false,
   isMissing = false,
   optionalHighlighting = false,
+  inputTestId,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -778,6 +781,7 @@ export const VariableMappingInput = ({
             minWidth={isSourceMapping || inProgressPath ? "20px" : undefined}
             height="24px"
             paddingX={0}
+            data-testid={inputTestId}
           />
         </HStack>
       </Box>

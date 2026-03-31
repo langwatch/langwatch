@@ -10,6 +10,18 @@ import { z } from "zod";
 import type { Span } from "../../tracer/types";
 
 // ============================================================================
+// Field Mapping Types
+// (defined first so adapter schemas can reference them)
+// ============================================================================
+
+/** Field mapping for agent inputs — maps to a scenario source or a static value */
+export const FieldMappingSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("source"), sourceId: z.string(), path: z.array(z.string()) }),
+  z.object({ type: z.literal("value"), value: z.string() }),
+]);
+export type FieldMapping = z.infer<typeof FieldMappingSchema>;
+
+// ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
 // ============================================================================
 
@@ -84,6 +96,8 @@ export const HttpAgentDataSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
@@ -110,6 +124,10 @@ export const CodeAgentDataSchema = z.object({
       type: z.string(),
     })
   ),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 

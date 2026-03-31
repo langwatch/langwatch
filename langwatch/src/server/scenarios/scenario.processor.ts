@@ -290,9 +290,10 @@ export async function processScenarioJob(
     );
 
     // Inject pre-generated scenarioRunId if present in job data
-    const childProcessData = jobData.scenarioRunId
-      ? { ...prefetchResult.data, scenarioRunId: jobData.scenarioRunId }
-      : prefetchResult.data;
+    const childProcessData = {
+      ...prefetchResult.data,
+      ...(jobData.scenarioRunId ? { scenarioRunId: jobData.scenarioRunId } : {}),
+    };
 
     // Spawn child process with isolated OTEL context
     const childStartTime = Date.now();

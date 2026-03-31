@@ -29,6 +29,7 @@ import {
   type ChildProcessJobData,
   type CodeAgentData,
   type ExecutionContext,
+  FieldMappingSchema,
   type HttpAgentData,
   type LiteLLMParams,
   type PromptConfigData,
@@ -302,6 +303,7 @@ const HttpAgentConfigSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
 async function fetchHttpAgentData(
@@ -327,6 +329,7 @@ async function fetchHttpAgentData(
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
+    scenarioMappings: config.scenarioMappings,
   };
 }
 
@@ -348,6 +351,8 @@ const RawCodeAgentConfigSchema = z.object({
     identifier: z.string(),
     type: z.string(),
   })).optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  scenarioOutputField: z.string().optional(),
 });
 
 async function fetchCodeAgentData(
@@ -377,6 +382,8 @@ async function fetchCodeAgentData(
     code: codeParam.value,
     inputs: config.inputs ?? [],
     outputs: config.outputs ?? [],
+    scenarioMappings: config.scenarioMappings,
+    scenarioOutputField: config.scenarioOutputField,
   };
 }
 
