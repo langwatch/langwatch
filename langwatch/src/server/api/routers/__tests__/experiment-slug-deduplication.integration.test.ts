@@ -53,6 +53,7 @@ describe("Feature: Experiment slug deduplication", () => {
         const result = await generateUniqueExperimentSlug({
           baseSlug: uniqueBase,
           projectId,
+          prisma,
         });
 
         expect(result).toBe(uniqueBase);
@@ -79,6 +80,7 @@ describe("Feature: Experiment slug deduplication", () => {
           const result = await generateUniqueExperimentSlug({
             baseSlug: conflictingSlug,
             projectId,
+            prisma,
           });
 
           expect(result).toBe(`${conflictingSlug}-2`);
@@ -95,6 +97,7 @@ describe("Feature: Experiment slug deduplication", () => {
           const result = await generateUniqueExperimentSlug({
             baseSlug: slug,
             projectId,
+            prisma,
             excludeExperimentId: existingExperimentId,
           });
 
@@ -116,6 +119,7 @@ describe("Feature: Experiment slug deduplication", () => {
           const result = await generateUniqueExperimentSlug({
             baseSlug,
             projectId,
+            prisma,
           });
 
           expect(result).toBe(`${baseSlug}-3`);
@@ -136,6 +140,7 @@ describe("Feature: Experiment slug deduplication", () => {
         const uniqueSlug = await generateUniqueExperimentSlug({
           baseSlug: sharedSlug,
           projectId,
+          prisma,
         });
 
         // Now create the second experiment with the deduplicated slug
