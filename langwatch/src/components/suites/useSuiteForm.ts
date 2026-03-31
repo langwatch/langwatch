@@ -16,6 +16,7 @@ import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
   parseSuiteTargets,
+  suiteAgentTargetTypes,
   suiteTargetSchema,
   type SuiteTarget,
 } from "~/server/suites/types";
@@ -49,9 +50,11 @@ interface Scenario {
   labels: string[];
 }
 
+
 interface Agent {
   id: string;
   name: string;
+  type: string;
 }
 
 interface Prompt {
@@ -61,7 +64,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt";
+  type: SuiteTarget["type"];
   referenceId: string;
 }
 
@@ -121,7 +124,8 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        result.push({ name: agent.name, type: "http", referenceId: agent.id });
+        if (!suiteAgentTargetTypes.has(agent.type)) continue;
+        result.push({ name: agent.name, type: agent.type as SuiteTarget["type"], referenceId: agent.id });
       }
     }
     if (prompts) {
