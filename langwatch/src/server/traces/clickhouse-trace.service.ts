@@ -588,8 +588,13 @@ export class ClickHouseTraceService {
                 FROM evaluation_runs
                 WHERE TenantId = {tenantId:String}
                   AND TraceId IN ({traceIds:Array(String)})
-                ORDER BY EvaluationId, UpdatedAt DESC
-                LIMIT 1 BY TenantId, EvaluationId
+                  AND (TenantId, EvaluationId, UpdatedAt) IN (
+                    SELECT TenantId, EvaluationId, max(UpdatedAt)
+                    FROM evaluation_runs
+                    WHERE TenantId = {tenantId:String}
+                      AND TraceId IN ({traceIds:Array(String)})
+                    GROUP BY TenantId, EvaluationId
+                  )
               `,
               query_params: {
                 tenantId: input.projectId,

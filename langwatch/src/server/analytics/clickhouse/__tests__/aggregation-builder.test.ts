@@ -30,7 +30,7 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("SELECT");
       expect(result.sql).toContain("FROM trace_summaries");
-      expect(result.sql).toContain("LIMIT 1 BY TenantId, TraceId");
+      expect(result.sql).toContain("GROUP BY TenantId, TraceId");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
@@ -94,7 +94,7 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(input);
 
       expect(result.sql).toContain("FROM evaluation_runs");
-      expect(result.sql).toContain("LIMIT 1 BY TenantId, EvaluationId");
+      expect(result.sql).toContain("GROUP BY TenantId, EvaluationId");
     });
 
     it("adds filters to WHERE clause with parameterized values", () => {
@@ -630,7 +630,7 @@ describe("aggregation-builder", () => {
       );
 
       expect(result.sql).toContain("FROM evaluation_runs");
-      expect(result.sql).toContain("LIMIT 1 BY TenantId, EvaluationId");
+      expect(result.sql).toContain("GROUP BY TenantId, EvaluationId");
       expect(result.sql).toContain("es.EvaluatorId AS field");
     });
 

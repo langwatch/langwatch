@@ -320,8 +320,13 @@ describe.skipIf(!hasTestcontainers)(
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
                 AND Status = 'processed'
-              ORDER BY UpdatedAt DESC
-              LIMIT 1 BY TenantId, EvaluationId
+                AND (TenantId, EvaluationId, UpdatedAt) IN (
+                  SELECT TenantId, EvaluationId, max(UpdatedAt)
+                  FROM evaluation_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId = {traceId:String}
+                  GROUP BY TenantId, EvaluationId
+                )
             `,
             query_params: { tenantId: tenantIdString, traceId },
             format: "JSONEachRow",

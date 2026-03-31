@@ -76,8 +76,12 @@ function dedupedTraceSummaries(
   return `(
     SELECT ${columnList} FROM trace_summaries
     WHERE TenantId = {tenantId:String}
-    ORDER BY TraceId, UpdatedAt DESC
-    LIMIT 1 BY TenantId, TraceId
+      AND (TenantId, TraceId, UpdatedAt) IN (
+        SELECT TenantId, TraceId, max(UpdatedAt)
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+        GROUP BY TenantId, TraceId
+      )
   ) ${alias}`;
 }
 

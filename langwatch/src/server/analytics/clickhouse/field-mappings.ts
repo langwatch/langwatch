@@ -501,8 +501,12 @@ export function buildJoinClause(
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
         WHERE TenantId = {tenantId:String}
-        ORDER BY EvaluationId, UpdatedAt DESC
-        LIMIT 1 BY TenantId, EvaluationId
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM evaluation_runs
+            WHERE TenantId = {tenantId:String}
+            GROUP BY TenantId, EvaluationId
+          )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     default:
