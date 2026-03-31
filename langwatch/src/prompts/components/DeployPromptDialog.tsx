@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Code,
   HStack,
   NativeSelect,
   Text,
@@ -165,58 +164,109 @@ export function DeployPromptDialog({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Assign prompt versions to environment labels. Default (no label)
-              returns the latest version.
+              Use tags to get specific prompt version via SDK. Prompt tagged as
+              Production is returned by default.
             </Text>
 
             <HStack gap={2}>
-              <Code fontSize="sm" paddingX={2} paddingY={1}>
-                {handle}
-              </Code>
-              <CopyButton value={handle} label="Prompt slug" />
+              <Box
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="full"
+                paddingX={3}
+                paddingY={1}
+              >
+                <HStack gap={2}>
+                  <Text fontSize="sm" color="fg.muted">
+                    Slug:
+                  </Text>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {handle}
+                  </Text>
+                  <CopyButton value={handle} label="Prompt slug" />
+                </HStack>
+              </Box>
             </HStack>
 
             {/* Label rows */}
             <VStack align="stretch" gap={3}>
               {/* latest row — auto-managed, not editable */}
-              <HStack justify="space-between">
-                <HStack gap={2}>
-                  <Text fontWeight="medium" fontSize="sm">
-                    latest
-                  </Text>
-                  <Tooltip content="Automatically points to the highest version number. This label is managed by the system.">
-                    <Box color="fg.muted" cursor="help">
-                      <Info size={14} />
-                    </Box>
-                  </Tooltip>
+              <Box
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="lg"
+                paddingX={4}
+                paddingY={3}
+              >
+                <HStack justify="space-between">
+                  <HStack gap={3}>
+                    <Box
+                      width="10px"
+                      height="10px"
+                      borderRadius="full"
+                      bg="green.400"
+                      flexShrink={0}
+                    />
+                    <Text fontWeight="medium" fontSize="sm">
+                      latest
+                    </Text>
+                  </HStack>
+                  <HStack gap={2}>
+                    <Text fontSize="sm" color="fg.muted" data-testid="latest-version">
+                      {latestVersion ? `v${latestVersion.version}` : "--"}
+                    </Text>
+                    <Tooltip content="Automatically points to the highest version number. This label is managed by the system.">
+                      <Box color="fg.muted" cursor="help">
+                        <Info size={14} />
+                      </Box>
+                    </Tooltip>
+                  </HStack>
                 </HStack>
-                <Text fontSize="sm" color="fg.muted" data-testid="latest-version">
-                  {latestVersion ? `v${latestVersion.version}` : "--"}
-                </Text>
-              </HStack>
+              </Box>
 
               {/* Environment label rows */}
-              {VALID_LABELS.map((label) => (
-                <HStack key={label} justify="space-between">
-                  <Text fontWeight="medium" fontSize="sm">
-                    {label}
-                  </Text>
-                  <NativeSelect.Root size="sm" width="auto" minWidth="200px">
-                    <NativeSelect.Field
-                      aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
-                      value={labelSelections[label] ?? ""}
-                      onChange={(e) => setLabelVersionId(label, e.target.value)}
-                    >
-                      <option value="">-- Select version --</option>
-                      {versionOptions.map((v) => (
-                        <option key={v.versionId} value={v.versionId}>
-                          v{v.version} — {v.commitMessage ?? "No message"}
-                        </option>
-                      ))}
-                    </NativeSelect.Field>
-                  </NativeSelect.Root>
-                </HStack>
-              ))}
+              {VALID_LABELS.map((label) => {
+                const isAssigned = !!(labelSelections[label]);
+                return (
+                  <Box
+                    key={label}
+                    borderWidth="1px"
+                    borderColor="border"
+                    borderRadius="lg"
+                    paddingX={4}
+                    paddingY={3}
+                  >
+                    <HStack justify="space-between">
+                      <HStack gap={3}>
+                        <Box
+                          width="10px"
+                          height="10px"
+                          borderRadius="full"
+                          bg={isAssigned ? "green.400" : "gray.300"}
+                          flexShrink={0}
+                        />
+                        <Text fontWeight="medium" fontSize="sm">
+                          {label}
+                        </Text>
+                      </HStack>
+                      <NativeSelect.Root size="sm" width="auto" minWidth="140px">
+                        <NativeSelect.Field
+                          aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
+                          value={labelSelections[label] ?? ""}
+                          onChange={(e) => setLabelVersionId(label, e.target.value)}
+                        >
+                          <option value="">-- Select version --</option>
+                          {versionOptions.map((v) => (
+                            <option key={v.versionId} value={v.versionId}>
+                              v{v.version} — {v.commitMessage ?? "No message"}
+                            </option>
+                          ))}
+                        </NativeSelect.Field>
+                      </NativeSelect.Root>
+                    </HStack>
+                  </Box>
+                );
+              })}
             </VStack>
           </VStack>
         </DialogBody>

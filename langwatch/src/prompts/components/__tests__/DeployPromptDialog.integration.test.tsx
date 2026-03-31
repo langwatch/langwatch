@@ -113,7 +113,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
         expect(
           screen.getByText(
-            "Assign prompt versions to environment labels. Default (no label) returns the latest version.",
+            "Use tags to get specific prompt version via SDK. Prompt tagged as Production is returned by default.",
           ),
         ).toBeInTheDocument();
       });
@@ -121,6 +121,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       it("displays the prompt slug with a copy button", () => {
         renderDialog();
 
+        expect(screen.getByText("Slug:")).toBeInTheDocument();
         expect(screen.getByText("pizza-prompt")).toBeInTheDocument();
         expect(screen.getByTestId("copy-button")).toBeInTheDocument();
       });

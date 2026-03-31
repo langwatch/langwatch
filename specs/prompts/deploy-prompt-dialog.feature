@@ -15,7 +15,7 @@ Feature: Deploy Prompt Dialog
     When I click the "Deploy" button
     Then I see the Deploy prompt dialog
     And the dialog title is "Deploy prompt"
-    And the description reads "Assign prompt versions to environment labels. Default (no label) returns the latest version."
+    And the description reads "Use tags to get specific prompt version via SDK. Prompt tagged as Production is returned by default."
     And I see the prompt slug "pizza-prompt" with a copy button
 
   @integration
