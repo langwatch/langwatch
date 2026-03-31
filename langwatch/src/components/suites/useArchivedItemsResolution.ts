@@ -6,7 +6,6 @@
  */
 
 import { useMemo } from "react";
-import type { SuiteTarget } from "~/server/suites/types";
 import { api } from "~/utils/api";
 
 interface ArchivedScenarioRef {
@@ -14,7 +13,7 @@ interface ArchivedScenarioRef {
 }
 
 interface ArchivedTargetRef {
-  type: SuiteTarget["type"];
+  type: "http" | "prompt" | "code";
   referenceId: string;
 }
 

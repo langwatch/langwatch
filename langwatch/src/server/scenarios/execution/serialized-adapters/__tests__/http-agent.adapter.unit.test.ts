@@ -283,8 +283,8 @@ describe("SerializedHttpAgentAdapter", () => {
         ...defaultConfig,
         bodyTemplate: '{"query": "{{query}}", "history": {{context}}}',
         scenarioMappings: {
-          query: { type: "source", sourceId: "scenario", path: ["input"] },
-          context: { type: "source", sourceId: "scenario", path: ["messages"] },
+          query: { type: "source", sourceId: "scenario", path: ["scenario_message"] },
+          context: { type: "source", sourceId: "scenario", path: ["conversation_history"] },
         },
       };
       const adapter = new SerializedHttpAgentAdapter(config);

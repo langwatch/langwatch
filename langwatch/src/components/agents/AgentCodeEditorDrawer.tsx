@@ -45,7 +45,7 @@ import type {
 } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { ScenarioInputMappingSection, isScenarioMappingValid } from "~/components/suites/ScenarioInputMappingSection";
+import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 const DEFAULT_CODE = `import dspy
@@ -199,12 +199,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       setOutputs(getOutputsFromConfig(agentQuery.data.config));
       const existingMappings = (agentQuery.data.config as CodeComponentConfig).scenarioMappings ?? {};
       // If no saved mappings, compute best-match defaults from input names
-      const effectiveInputs = agentInputs.length > 0
-        ? agentInputs
-        : [{ identifier: "input", type: "str" }];
       const mappings = Object.keys(existingMappings).length > 0
         ? existingMappings
-        : computeBestMatchMappings({ inputs: effectiveInputs });
+        : computeBestMatchMappings({ inputs: agentInputs });
       setScenarioMappings(mappings);
       setScenarioOutputField((agentQuery.data.config as CodeComponentConfig).scenarioOutputField ?? undefined);
       setHasUnsavedChanges(false);
@@ -250,7 +247,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings, outputs, outputField: scenarioOutputField });
+  const isValid = name.trim().length > 0;
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -311,12 +308,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     setInputs(newInputs);
     // Recompute best-match for any new inputs that don't already have a mapping
     setScenarioMappings((prev) => {
-      const effectiveInputs = newInputs.length > 0
-        ? newInputs
-        : [{ identifier: "input", type: "str" }];
-      const bestMatch = computeBestMatchMappings({ inputs: effectiveInputs });
+      const bestMatch = computeBestMatchMappings({ inputs: newInputs });
       const merged = { ...prev };
-      for (const inp of effectiveInputs) {
+      for (const inp of newInputs) {
         const match = bestMatch[inp.identifier];
         if (!merged[inp.identifier] && match) {
           merged[inp.identifier] = match;
@@ -324,7 +318,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       }
       // Remove mappings for inputs that no longer exist
       for (const key of Object.keys(merged)) {
-        if (!effectiveInputs.some((inp) => inp.identifier === key)) {
+        if (!newInputs.some((inp) => inp.identifier === key)) {
           delete merged[key];
         }
       }
@@ -371,25 +365,11 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     [],
   );
 
-  const handleScenarioOutputFieldChange = useCallback(
-    (field: string | undefined) => {
-      setScenarioOutputField(field);
-      setHasUnsavedChanges(true);
-    },
-    [],
-  );
-
   // Convert DSL inputs to Variable[] for VariablesSection
   const variablesForUI: Variable[] = inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
-
-  // For scenario mappings, mirror the backend's implicit input fallback
-  // (code-agent.adapter.ts synthesizes { identifier: "input", type: "str" } when inputs is empty)
-  const scenarioInputsForUI: Variable[] = variablesForUI.length > 0
-    ? variablesForUI
-    : [{ identifier: "input", type: "str" }];
 
   // Convert DSL outputs to Output[] for OutputsSection
   const outputsForUI: Output[] = outputs.map((output) => ({
@@ -516,17 +496,19 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   />
                 </Box>
 
-                {/* Scenario Input/Output Mapping */}
-                <Box>
-                  <ScenarioInputMappingSection
-                    inputs={scenarioInputsForUI}
-                    mappings={scenarioMappings}
-                    onMappingChange={handleScenarioMappingChange}
-                    outputs={outputsForUI}
-                    outputField={scenarioOutputField}
-                    onOutputFieldChange={handleScenarioOutputFieldChange}
-                  />
-                </Box>
+                {/* Scenario Input/Output Mapping — only shown when agent has inputs */}
+                {variablesForUI.length > 0 && (
+                  <Box>
+                    <ScenarioInputMappingSection
+                      inputs={variablesForUI}
+                      mappings={scenarioMappings}
+                      onMappingChange={handleScenarioMappingChange}
+                      outputs={outputsForUI}
+                      outputField={scenarioOutputField}
+                      onOutputFieldChange={setScenarioOutputField}
+                    />
+                  </Box>
+                )}
               </VStack>
             )}
           </Drawer.Body>

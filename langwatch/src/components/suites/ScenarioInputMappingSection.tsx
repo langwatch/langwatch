@@ -14,6 +14,7 @@
 
 import {
   Box,
+  createListCollection,
   Link,
   Separator,
   Text,
@@ -26,28 +27,14 @@ import type {
   FieldMapping,
 } from "~/components/variables/VariableMappingInput";
 import type { Variable } from "~/components/variables/VariablesSection";
+import { Select } from "~/components/ui/select";
 
 /** The three scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [
-  { identifier: "input", type: "str" },
-  { identifier: "messages", type: "str" },
-  { identifier: "threadId", type: "str" },
+  { identifier: "scenario_message", type: "str" },
+  { identifier: "conversation_history", type: "str" },
+  { identifier: "thread_id", type: "str" },
 ];
-
-const SCENARIO_INPUT_INFO: Record<string, string> = {
-  input: "The latest message from the simulated user",
-  messages: "Full conversation history as a JSON string",
-  threadId: "Unique identifier for the conversation thread",
-};
-
-/** The single scenario output field. */
-const SCENARIO_OUTPUT_FIELD: Variable[] = [
-  { identifier: "output", type: "str" },
-];
-
-const SCENARIO_OUTPUT_INFO: Record<string, string> = {
-  output: "The agent's response sent back to the scenario",
-};
 
 export type ScenarioInputMappingSectionProps = {
   /** Declared inputs for the agent (identifier + type). */
@@ -79,7 +66,7 @@ function invertMappings(
       const scenarioField = mapping.path[0];
       display[scenarioField] = {
         type: "source",
-        sourceId: "agent_input",
+        sourceId: "agent",
         path: [agentInput],
       };
     }
@@ -89,7 +76,7 @@ function invertMappings(
 
 function buildAgentInputSource(inputs: Variable[]): AvailableSource {
   return {
-    id: "agent_input",
+    id: "agent",
     name: "Agent Inputs",
     type: "evaluator",
     fields: inputs.map((inp) => ({
@@ -98,45 +85,6 @@ function buildAgentInputSource(inputs: Variable[]): AvailableSource {
       type: inp.type ?? "str",
     })),
   };
-}
-
-function buildAgentOutputSource(outputs: Variable[]): AvailableSource {
-  return {
-    id: "agent_output",
-    name: "Agent Outputs",
-    type: "evaluator",
-    fields: outputs.map((out) => ({
-      name: out.identifier,
-      label: out.identifier,
-      type: out.type ?? "str",
-    })),
-  };
-}
-
-/**
- * Checks whether the scenario mappings are valid.
- * - At least one of input or messages must be mapped.
- * - An output must be selected (not cleared).
- */
-export function isScenarioMappingValid({
-  mappings,
-  outputs,
-  outputField,
-}: {
-  mappings: Record<string, FieldMapping>;
-  outputs?: Variable[];
-  outputField?: string;
-}): boolean {
-  const mappedPaths = Object.values(mappings)
-    .filter((m) => m.type === "source")
-    .map((m) => m.path[0]);
-  const hasRequiredInput =
-    mappedPaths.includes("input") ||
-    mappedPaths.includes("messages");
-  const hasOutputs = (outputs ?? []).length > 0;
-  // outputField === "" means explicitly cleared; undefined means auto-populate
-  const hasOutputMapping = hasOutputs && outputField !== "";
-  return hasRequiredInput && hasOutputMapping;
 }
 
 export function ScenarioInputMappingSection({
@@ -150,64 +98,23 @@ export function ScenarioInputMappingSection({
   const displayMappings = useMemo(() => invertMappings(mappings), [mappings]);
   const agentSource = useMemo(() => buildAgentInputSource(inputs), [inputs]);
 
-  const valueMappings = useMemo(
+  const outputCollection = useMemo(
     () =>
-      Object.entries(mappings).filter(
-        (entry): entry is [string, { type: "value"; value: string }] =>
-          entry[1].type === "value",
-      ),
-    [mappings],
-  );
-
-  const agentOutputSource = useMemo(
-    () => buildAgentOutputSource(outputs ?? []),
+      createListCollection({
+        items: (outputs ?? []).map((o) => ({
+          label: o.identifier,
+          value: o.identifier,
+        })),
+      }),
     [outputs],
   );
 
-  const hasOutputs = (outputs ?? []).length > 0;
+  const hasMultipleOutputs = (outputs ?? []).length >= 2;
   const autoOutputLabel = outputs?.[0]?.identifier ?? "output";
-  // undefined = not yet set (auto-populate), "" = explicitly cleared, string = user selection
-  const selectedOutput = outputField === undefined ? autoOutputLabel : outputField;
-  const hasOutputMapping = selectedOutput !== "" && hasOutputs;
-
-  const outputDisplayMappings = useMemo<Record<string, FieldMapping>>(
-    () =>
-      hasOutputMapping
-        ? {
-            output: {
-              type: "source",
-              sourceId: "agent_output",
-              path: [selectedOutput],
-            },
-          }
-        : ({} as Record<string, FieldMapping>),
-    [hasOutputMapping, selectedOutput],
+  const selectedOutputValues = useMemo(
+    () => (outputField ? [outputField] : [autoOutputLabel]),
+    [outputField, autoOutputLabel],
   );
-
-  const missingOutputIds = useMemo(
-    () => (hasOutputMapping ? new Set<string>() : new Set(["output"])),
-    [hasOutputMapping],
-  );
-
-  // Validation: at least one of input or messages must be mapped
-  const missingInputIds = useMemo(() => {
-    const hasInput = !!displayMappings["input"];
-    const hasMessages = !!displayMappings["messages"];
-    if (hasInput || hasMessages) return new Set<string>();
-    return new Set(["input", "messages"]);
-  }, [displayMappings]);
-
-  const handleOutputMappingChange = (
-    _scenarioField: string,
-    displayMapping: FieldMapping | undefined,
-  ) => {
-    if (displayMapping?.type === "source" && displayMapping.path[0]) {
-      onOutputFieldChange?.(displayMapping.path[0]);
-    } else {
-      // Empty string signals "explicitly cleared" vs undefined which means "not yet set"
-      onOutputFieldChange?.("");
-    }
-  };
 
   const handleDisplayMappingChange = (
     scenarioField: string,
@@ -227,10 +134,6 @@ export function ScenarioInputMappingSection({
         path: [scenarioField],
       });
     }
-    // Static value mappings are not editable from this inverted UI:
-    // a scenario-field row has no natural agent-input target to bind a literal to.
-    // Existing type:"value" entries render read-only below; creating or editing them
-    // belongs in a follow-up that rebuilds the section with agent-input rows.
   };
 
   return (
@@ -268,56 +171,51 @@ export function ScenarioInputMappingSection({
           canAddRemove={false}
           readOnly={true}
           title="Inputs"
-          variableInfo={SCENARIO_INPUT_INFO}
-          missingMappingIds={missingInputIds}
-          optionalHighlighting={true}
-          showMissingMappingsError={false}
         />
-        {missingInputIds.size > 0 && (
-          <Text fontSize="xs" color="fg.error" marginTop={1}>
-            Map at least one of: input or messages
-          </Text>
-        )}
-        {valueMappings.length > 0 && (
-          <VStack align="stretch" gap={1} marginTop={2}>
-            {valueMappings.map(([identifier, mapping]) => (
-              <Box key={identifier}>
-                <Text as="span" fontSize="xs" color="fg.muted" fontFamily="mono">
-                  {identifier}
-                </Text>
-                <Text as="span" fontSize="xs" color="fg.muted">
-                  {": "}
-                </Text>
-                <Text as="span" fontSize="xs">
-                  {mapping.value}
-                </Text>
-              </Box>
-            ))}
-          </VStack>
-        )}
       </Box>
 
       {/* Output mapping */}
       {outputs !== undefined && (
         <Box>
-          <VariablesSection
-            variables={SCENARIO_OUTPUT_FIELD}
-            onChange={() => {}}
-            mappings={outputDisplayMappings}
-            onMappingChange={handleOutputMappingChange}
-            availableSources={[agentOutputSource]}
-            showMappings={true}
-            canAddRemove={false}
-            readOnly={true}
-            title="Output"
-            variableInfo={SCENARIO_OUTPUT_INFO}
-            missingMappingIds={missingOutputIds}
-            showMissingMappingsError={false}
-          />
-          {(outputs ?? []).length === 0 && (
-            <Text fontSize="xs" color="fg.error" marginTop={1}>
-              Add at least one output to the agent
-            </Text>
+          {hasMultipleOutputs ? (
+            <VStack align="stretch" gap={2}>
+              <Text
+                fontSize="xs"
+                fontWeight="bold"
+                textTransform="uppercase"
+                color="fg.muted"
+              >
+                Output
+              </Text>
+              <Select.Root
+                collection={outputCollection}
+                value={selectedOutputValues}
+                onValueChange={(details) => {
+                  const selected = details.value[0];
+                  onOutputFieldChange?.(selected ?? undefined);
+                }}
+                size="sm"
+              >
+                <Select.Trigger>
+                  <Select.ValueText placeholder="Select output field" />
+                </Select.Trigger>
+                <Select.Content>
+                  {outputCollection.items.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      <Select.ItemText>{item.label}</Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </VStack>
+          ) : (
+            <VariablesSection
+              variables={[{ identifier: autoOutputLabel, type: (outputs[0]?.type ?? "str") }]}
+              onChange={() => {}}
+              canAddRemove={false}
+              readOnly={true}
+              title="Output"
+            />
           )}
         </Box>
       )}

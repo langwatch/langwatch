@@ -3,8 +3,8 @@
  *
  * Integration tests for Scenario Input Mapping UI.
  *
- * The component shows scenario fields as rows (input,
- * messages, threadId) and agent inputs as sources in the
+ * The component shows scenario fields as rows (scenario_message,
+ * conversation_history, thread_id) and agent inputs as sources in the
  * dropdown. Direction: "Where does each scenario field go?"
  *
  * Stored format: agent_input → scenario_source
@@ -79,13 +79,13 @@ describe("ScenarioInputMappingSection", () => {
         renderSection();
 
         expect(
-          screen.getByTestId("variable-name-input"),
+          screen.getByTestId("variable-name-scenario_message"),
         ).toBeInTheDocument();
         expect(
-          screen.getByTestId("variable-name-messages"),
+          screen.getByTestId("variable-name-conversation_history"),
         ).toBeInTheDocument();
         expect(
-          screen.getByTestId("variable-name-threadId"),
+          screen.getByTestId("variable-name-thread_id"),
         ).toBeInTheDocument();
       });
     });
@@ -96,12 +96,12 @@ describe("ScenarioInputMappingSection", () => {
   // ============================================================================
 
   describe("given the mapping UI with agent inputs 'query' and 'context'", () => {
-    describe("when the user opens the input mapping dropdown", () => {
+    describe("when the user opens the scenario_message mapping dropdown", () => {
       it("offers 'query' as a target", async () => {
         const user = userEvent.setup();
         renderSection();
 
-        await user.click(screen.getByTestId("mapping-input-input"));
+        await user.click(screen.getByTestId("mapping-input-scenario_message"));
 
         expect(
           await screen.findByTestId("field-option-query"),
@@ -112,7 +112,7 @@ describe("ScenarioInputMappingSection", () => {
         const user = userEvent.setup();
         renderSection();
 
-        await user.click(screen.getByTestId("mapping-input-input"));
+        await user.click(screen.getByTestId("mapping-input-scenario_message"));
 
         expect(
           await screen.findByTestId("field-option-context"),
@@ -125,15 +125,15 @@ describe("ScenarioInputMappingSection", () => {
   // Scenario: Selecting an agent input produces stored-format mapping
   // ============================================================================
 
-  describe("given the mapping UI for input", () => {
+  describe("given the mapping UI for scenario_message", () => {
     describe("when the user selects 'query' from the dropdown", () => {
-      it("calls onMappingChange with stored format: query → input", async () => {
+      it("calls onMappingChange with stored format: query → scenario_message", async () => {
         const user = userEvent.setup();
         const onMappingChange = vi.fn();
 
         renderSection({ onMappingChange });
 
-        await user.click(screen.getByTestId("mapping-input-input"));
+        await user.click(screen.getByTestId("mapping-input-scenario_message"));
 
         const option = await screen.findByTestId("field-option-query");
         await user.click(option);
@@ -143,7 +143,7 @@ describe("ScenarioInputMappingSection", () => {
           expect.objectContaining<FieldMapping>({
             type: "source",
             sourceId: "scenario",
-            path: ["input"],
+            path: ["scenario_message"],
           }),
         );
       });
@@ -154,85 +154,25 @@ describe("ScenarioInputMappingSection", () => {
   // Scenario: Existing mappings display correctly (inverted)
   // ============================================================================
 
-  describe("given stored mappings { query: input, context: messages }", () => {
+  describe("given stored mappings { query: scenario_message, context: conversation_history }", () => {
     describe("when the section renders", () => {
       it("shows the mappings inverted on the correct scenario field rows", () => {
         const mappings: Record<string, FieldMapping> = {
-          query: { type: "source", sourceId: "scenario", path: ["input"] },
-          context: { type: "source", sourceId: "scenario", path: ["messages"] },
+          query: { type: "source", sourceId: "scenario", path: ["scenario_message"] },
+          context: { type: "source", sourceId: "scenario", path: ["conversation_history"] },
         };
 
         renderSection({ mappings });
 
-        // The input row should show "query" as its mapping
-        // The messages row should show "context" as its mapping
+        // The scenario_message row should show "query" as its mapping
+        // The conversation_history row should show "context" as its mapping
         // We verify by checking the mapping input values contain the agent input names
-        const scenarioMessageInput = screen.getByTestId("mapping-input-input");
-        const conversationHistoryInput = screen.getByTestId("mapping-input-messages");
+        const scenarioMessageInput = screen.getByTestId("mapping-input-scenario_message");
+        const conversationHistoryInput = screen.getByTestId("mapping-input-conversation_history");
 
         // The inputs should exist and be rendered
         expect(scenarioMessageInput).toBeInTheDocument();
         expect(conversationHistoryInput).toBeInTheDocument();
-      });
-    });
-  });
-
-  // ============================================================================
-  // Scenario: Static value mappings can NOT be created from the inverted UI
-  //
-  // The scenario-field-row display has no natural agent-input target for a literal,
-  // so the section intentionally ignores type:"value" emissions from the child widget.
-  // Stored static values still render read-only (see the round-trip test below).
-  // Creating/editing value mappings belongs in a future agent-input-row UI.
-  // ============================================================================
-
-  describe("given the mapping UI with an empty mappings state", () => {
-    describe("when the child widget emits a type:value mapping for input", () => {
-      it("does not forward the value mapping to storage", async () => {
-        const user = userEvent.setup();
-        const onMappingChange = vi.fn();
-
-        renderSection({ onMappingChange });
-
-        await user.click(screen.getByTestId("mapping-input-input"));
-
-        const input = screen.getByTestId("mapping-input-input");
-        await user.type(input, "hello");
-
-        const valueOption = await screen.findByTestId("use-as-value-option");
-        await user.click(valueOption);
-
-        // No call with a type:"value" payload should ever reach storage from
-        // the inverted scenario-field-row UI — the keyspace has no place for it.
-        const valueCalls = onMappingChange.mock.calls.filter(
-          ([, mapping]) =>
-            mapping !== undefined &&
-            (mapping as FieldMapping).type === "value",
-        );
-        expect(valueCalls).toHaveLength(0);
-      });
-    });
-  });
-
-  // ============================================================================
-  // Scenario: Static value round-trips from stored state (Gap B — invertMappings)
-  // ============================================================================
-
-  describe("given stored mappings with a static value for 'context'", () => {
-    describe("when the section renders", () => {
-      it("displays the stored static value text in the context row", () => {
-        const mappings: Record<string, FieldMapping> = {
-          context: { type: "value", value: "Use the KB" },
-        };
-
-        renderSection({ mappings });
-
-        // Stored value mappings round-trip via the read-only render block:
-        // invertMappings only handles type:"source", so the section surfaces
-        // type:"value" entries as an inert <key>: <value> line beneath the
-        // scenario-field rows. Creating or editing them from the UI is
-        // deferred to a future agent-input-row variant.
-        expect(screen.getByText("Use the KB")).toBeInTheDocument();
       });
     });
   });
@@ -249,13 +189,13 @@ describe("ScenarioInputMappingSection", () => {
         });
 
         expect(
-          screen.getByTestId("variable-name-input"),
+          screen.getByTestId("variable-name-scenario_message"),
         ).toBeInTheDocument();
         expect(
-          screen.getByTestId("variable-name-messages"),
+          screen.getByTestId("variable-name-conversation_history"),
         ).toBeInTheDocument();
         expect(
-          screen.getByTestId("variable-name-threadId"),
+          screen.getByTestId("variable-name-thread_id"),
         ).toBeInTheDocument();
       });
     });

@@ -261,7 +261,7 @@ describe("SerializedCodeAgentAdapter", () => {
         { identifier: "context", type: "str" },
       ],
       scenarioMappings: {
-        query: { type: "source", sourceId: "scenario", path: ["input"] },
+        query: { type: "source", sourceId: "scenario", path: ["scenario_message"] },
         context: { type: "value", value: "Search the knowledge base" },
       },
     };
@@ -295,7 +295,7 @@ describe("SerializedCodeAgentAdapter", () => {
         ...defaultConfig,
         inputs: [{ identifier: "query", type: "str" }],
         scenarioMappings: {
-          query: { type: "source", sourceId: "scenario", path: ["input"] },
+          query: { type: "source", sourceId: "scenario", path: ["scenario_message"] },
           deleted_field: { type: "value", value: "stale mapping" },
         },
       };

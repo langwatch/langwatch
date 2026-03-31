@@ -15,7 +15,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
-  isSuiteAgentTargetType,
   parseSuiteTargets,
   suiteTargetSchema,
   type SuiteTarget,
@@ -63,7 +62,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: SuiteTarget["type"];
+  type: "http" | "prompt" | "code";
   referenceId: string;
 }
 
@@ -123,7 +122,8 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        if (!isSuiteAgentTargetType(agent.type)) continue;
+        // Only http and code agents are supported as suite targets
+        if (agent.type !== "http" && agent.type !== "code") continue;
         result.push({ name: agent.name, type: agent.type, referenceId: agent.id });
       }
     }

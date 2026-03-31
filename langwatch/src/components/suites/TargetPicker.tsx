@@ -12,15 +12,9 @@ import { Tooltip } from "../ui/tooltip";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
 
-const targetTypeLabels: Record<SuiteTarget["type"], string> = {
-  http: "HTTP",
-  prompt: "Prompt",
-  code: "Code",
-};
-
 interface AvailableTarget {
   name: string;
-  type: SuiteTarget["type"];
+  type: "http" | "prompt" | "code";
   referenceId: string;
 }
 
@@ -129,7 +123,7 @@ export function TargetPicker({
                     {target.name}
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    ({targetTypeLabels[target.type]})
+                    ({target.type === "http" ? "HTTP" : target.type === "code" ? "Code" : "Prompt"})
                   </Text>
                 </HStack>
               </Checkbox>

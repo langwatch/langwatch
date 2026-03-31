@@ -285,8 +285,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         : JSON.stringify(lastUserMessage?.content ?? "");
 
     const record: Record<string, string> = {};
-    for (const [i, inp] of declaredInputs.entries()) {
-      record[inp.identifier] = i === 0 ? inputValue : "";
+    for (let i = 0; i < declaredInputs.length; i++) {
+      record[declaredInputs[i]!.identifier] = i === 0 ? inputValue : "";
     }
     return record;
   }
