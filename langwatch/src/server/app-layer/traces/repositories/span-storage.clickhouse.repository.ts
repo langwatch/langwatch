@@ -243,14 +243,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             \`Links.TraceId\` AS Links_TraceId,
             \`Links.SpanId\` AS Links_SpanId,
             \`Links.Attributes\` AS Links_Attributes
-          FROM (
-            SELECT *
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-            ORDER BY SpanId ASC, StartTime DESC
-            LIMIT 1 BY TenantId, TraceId, SpanId
-          )
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND (TenantId, TraceId, SpanId, StartTime) IN (
+              SELECT TenantId, TraceId, SpanId, max(StartTime)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId, SpanId
+            )
           ORDER BY StartTime ASC
         `,
         query_params: { tenantId, traceId },
@@ -354,14 +356,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             toUnixTimestamp64Milli(event_timestamp) AS started_at,
             event_name AS event_type,
             event_attrs AS attributes
-          FROM (
-            SELECT *
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-            ORDER BY SpanId ASC, StartTime DESC
-            LIMIT 1 BY TenantId, TraceId, SpanId
-          )
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND (TenantId, TraceId, SpanId, StartTime) IN (
+              SELECT TenantId, TraceId, SpanId, max(StartTime)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId, SpanId
+            )
           ARRAY JOIN
             "Events.Timestamp" AS event_timestamp,
             "Events.Name" AS event_name,

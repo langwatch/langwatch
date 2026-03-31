@@ -138,6 +138,66 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
+  // span-storage.clickhouse.repository.ts (app-layer): getSpansByTraceId
+  // ---------------------------------------------------------------------------
+  describe("SpanStorageClickHouseRepository.getSpansByTraceId() (app-layer)", () => {
+    const spanStoragePath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "app-layer",
+      "traces",
+      "repositories",
+      "span-storage.clickhouse.repository.ts",
+    );
+    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
+    const body = extractMethodBody(spanStorageSource, "getSpansByTraceId");
+
+    describe("when the stored_spans query SQL is inspected", () => {
+      it("does not use LIMIT 1 BY for deduplication", () => {
+        expect(body).not.toContain("LIMIT 1 BY");
+      });
+
+      it("uses max(StartTime) GROUP BY for span dedup", () => {
+        expect(body).toContain("max(StartTime)");
+        expect(body).toMatch(
+          /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
+        );
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // span-storage.clickhouse.repository.ts (app-layer): getEventsByTraceId
+  // ---------------------------------------------------------------------------
+  describe("SpanStorageClickHouseRepository.getEventsByTraceId() (app-layer)", () => {
+    const spanStoragePath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "app-layer",
+      "traces",
+      "repositories",
+      "span-storage.clickhouse.repository.ts",
+    );
+    const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
+    const body = extractMethodBody(spanStorageSource, "getEventsByTraceId");
+
+    describe("when the stored_spans query SQL is inspected", () => {
+      it("does not use LIMIT 1 BY for deduplication", () => {
+        expect(body).not.toContain("LIMIT 1 BY");
+      });
+
+      it("uses max(StartTime) GROUP BY for span dedup", () => {
+        expect(body).toContain("max(StartTime)");
+        expect(body).toMatch(
+          /GROUP BY\s+TenantId,\s*TraceId,\s*SpanId/,
+        );
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // collectUsageStats.ts: getChScenariosCount
   // ---------------------------------------------------------------------------
   describe("getChScenariosCount()", () => {
