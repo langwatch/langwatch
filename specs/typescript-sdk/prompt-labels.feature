@@ -76,3 +76,31 @@ Feature: SDK Prompt Label Support
   Scenario: Label is passed as query parameter to the API
     When I call PromptsApiService.get("pizza-prompt", { label: "production" })
     Then the API request includes query parameter label="production"
+
+  # --- E2E (real API) ---
+
+  @e2e
+  Scenario: Assign label and fetch by label via real API
+    Given I create a prompt with two versions via the SDK
+    When I assign the "production" label to version 1
+    And I fetch the prompt with label "production"
+    Then I receive version 1 config data
+
+  @e2e
+  Scenario: Reassign label to newer version
+    Given a prompt with "production" label assigned to version 1
+    When I reassign "production" to version 2
+    And I fetch the prompt with label "production"
+    Then I receive version 2 config data
+
+  @e2e
+  Scenario: Fetch without label returns latest version
+    Given a prompt with "production" label assigned to version 1 and latest is version 2
+    When I fetch the prompt without a label
+    Then I receive version 2 config data
+
+  @e2e
+  Scenario: Fetch with unassigned label returns error
+    Given a prompt with no labels assigned
+    When I fetch the prompt with label "production"
+    Then I receive an error
