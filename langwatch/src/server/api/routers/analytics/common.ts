@@ -5,9 +5,12 @@ import type {
 import { addDays, differenceInCalendarDays } from "date-fns";
 import type { z } from "zod";
 import type { FilterParam } from "../../../../hooks/useFilterParams";
+import { createLogger } from "../../../../utils/logger/server";
 import type { sharedFiltersInputSchema } from "../../../analytics/types";
 import { availableFilters } from "../../../filters/registry";
 import type { FilterField } from "../../../filters/types";
+
+const logger = createLogger("analytics:filters");
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -93,14 +96,16 @@ export const generateFilterConditions = (
 ) => {
   let filterConditions: QueryDslQueryContainer[] = [];
   for (const [field, params] of Object.entries(filters)) {
-    if (params.length == 0) {
+    if (!(field in availableFilters)) {
+      logger.warn(
+        { field },
+        "Unknown filter field encountered — producing match_none. Queries using this filter will match nothing.",
+      );
+      filterConditions.push({ match_none: {} });
       continue;
     }
 
-    // Fail-closed: unknown filter fields must produce a "match nothing"
-    // condition so triggers don't silently fire on all traces.
-    if (!(field in availableFilters)) {
-      filterConditions.push({ match_none: {} });
+    if (params.length == 0) {
       continue;
     }
 
