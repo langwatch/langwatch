@@ -3,13 +3,17 @@ import {
   Button,
   createListCollection,
   HStack,
+  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Info } from "react-feather";
+import { Code, Info } from "react-feather";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CopyButton } from "~/components/CopyButton";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -20,7 +24,6 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
-import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
 import { VALID_LABELS } from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { api } from "~/utils/api";
@@ -46,6 +49,8 @@ export function DeployPromptDialog({
   handle,
   projectId,
 }: DeployPromptDialogProps) {
+  const { project } = useOrganizationTeamProject();
+
   const versionsQuery = api.prompts.getAllVersionsForPrompt.useQuery(
     { idOrHandle: configId, projectId },
     { enabled: isOpen && !!configId && !!projectId },
@@ -265,6 +270,23 @@ export function DeployPromptDialog({
                         <Text fontWeight="medium" fontSize="sm">
                           {label}
                         </Text>
+                        <GeneratePromptApiSnippetDialog
+                          promptHandle={handle}
+                          apiKey={project?.apiKey}
+                          label={label}
+                        >
+                          <GeneratePromptApiSnippetDialog.Trigger>
+                            <Tooltip content="View code snippet">
+                              <IconButton
+                                variant="ghost"
+                                size="xs"
+                                aria-label="View code snippet"
+                              >
+                                <Code size={14} />
+                              </IconButton>
+                            </Tooltip>
+                          </GeneratePromptApiSnippetDialog.Trigger>
+                        </GeneratePromptApiSnippetDialog>
                       </HStack>
                       <Select.Root
                         collection={versionCollection}

@@ -49,6 +49,22 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", apiKey: "test-api-key" },
+  }),
+}));
+
+vi.mock("~/prompts/components/GeneratePromptApiSnippetDialog", () => {
+  const Dialog = ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="snippet-dialog">{children}</div>
+  );
+  Dialog.Trigger = ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="snippet-trigger">{children}</div>
+  );
+  return { GeneratePromptApiSnippetDialog: Dialog };
+});
+
 // Mock the custom Select to render a native <select> for testability
 vi.mock("~/components/ui/select", () => {
   const SelectRoot = ({

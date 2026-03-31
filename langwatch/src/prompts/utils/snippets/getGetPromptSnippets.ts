@@ -2,15 +2,18 @@ import type { Snippet } from "../../types";
 
 /**
  * Returns code snippets for getting prompts from the LangWatch API
- * @param promptId - The ID of the prompt to retrieve (defaults to "{id}")
+ * @param promptHandle - The handle of the prompt to retrieve (defaults to "{id}")
  * @param apiKey - The API key to use for authentication (defaults to "YOUR_API_KEY")
+ * @param label - Optional label to filter by (e.g. "production", "staging")
  * @returns Array of code snippets for getting prompts
  */
 export function getGetPromptSnippets(params?: {
   promptHandle?: string;
   apiKey?: string;
+  label?: string;
 }): Snippet[] {
-  const { promptHandle = "{id}", apiKey = "YOUR_API_KEY" } = params ?? {};
+  const { promptHandle = "{id}", apiKey = "YOUR_API_KEY", label } = params ?? {};
+  const urlSuffix = label ? `?label=${label}` : "";
 
   return [
     {
@@ -20,7 +23,7 @@ export function getGetPromptSnippets(params?: {
 langwatch.setup(api_key="${apiKey}")
 
 # Fetch prompt
-prompt = langwatch.prompts.get("${promptHandle}")
+prompt = langwatch.prompts.get("${promptHandle}"${label ? `, label="${label}"` : ""})
 
 # Access prompt properties
 print(f"Prompt Name: {prompt.name}")
@@ -42,7 +45,7 @@ print(f"Compiled messages: {compiled.messages}")
     },
     {
       content: `curl --request GET \\
-  --url https://app.langwatch.ai/api/prompts/${promptHandle} \\
+  --url https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix} \\
   --header 'X-Auth-Token: ${apiKey}'
 `,
       target: "shell_curl",
@@ -59,7 +62,7 @@ const langwatch = new LangWatch({
 });
 
 // Fetch prompt
-const prompt = await langwatch.prompts.get('${promptHandle}');
+const prompt = await langwatch.prompts.get('${promptHandle}'${label ? `, { label: '${label}' }` : ""});
 
 // Access prompt properties
 console.log(\`Prompt Name: \${prompt.name}\`);
@@ -86,7 +89,7 @@ console.log(\`Compiled messages: \${compiled.messages}\`);
 $curl = curl_init();
 
 curl_setopt_array($curl, [
-  CURLOPT_URL => "https://app.langwatch.ai/api/prompts/${promptHandle}",
+  CURLOPT_URL => "https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix}",
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_ENCODING => "",
   CURLOPT_MAXREDIRS => 10,
@@ -124,7 +127,7 @@ import (
 )
 
 func main() {
-	url := "https://app.langwatch.ai/api/prompts/${promptHandle}"
+	url := "https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix}"
 
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("X-Auth-Token", "${apiKey}")
@@ -151,7 +154,7 @@ import com.mashape.unirest.http.exceptions.UnirestException;
 public class GetPrompt {
     public static void main(String[] args) {
         try {
-            HttpResponse<String> response = Unirest.get("https://app.langwatch.ai/api/prompts/${promptHandle}")
+            HttpResponse<String> response = Unirest.get("https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix}")
                 .header("X-Auth-Token", "${apiKey}")
                 .asString();
 
