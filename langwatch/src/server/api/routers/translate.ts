@@ -2,8 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { z } from "zod";
 import { getVercelAIModel } from "../../modelProviders/utils";
+import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const logger = createLogger("langwatch:translate");
 
 export const translateRouter = createTRPCRouter({
   translate: protectedProcedure
@@ -24,9 +27,14 @@ export const translateRouter = createTRPCRouter({
         const { text } = response;
         return { translation: text };
       } catch (error) {
+        logger.error(
+          { error, projectId: input.projectId },
+          "Failed to get translation",
+        );
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Failed to get translation: ${error instanceof Error ? error.message : String(error)}`,
+          message:
+            "Failed to get translation. Check model provider configuration.",
           cause: error,
         });
       }

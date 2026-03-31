@@ -8,7 +8,7 @@ import { createInnerTRPCContext } from "../../trpc";
  *
  * Verifies that:
  * - Translation uses the project's configured model provider (not hardcoded OpenAI)
- * - Error handling includes meaningful messages with the underlying cause
+ * - Error handling returns a generic message and logs the full error server-side
  */
 
 const mockGetVercelAIModel = vi.fn();
@@ -127,8 +127,8 @@ describe("translate.translate mutation", () => {
   });
 
   describe("when the model call fails", () => {
-    it("throws a TRPCError with the underlying error message", async () => {
-      const underlyingError = new Error("API key not configured");
+    it("throws a TRPCError with a generic message that hides upstream details", async () => {
+      const underlyingError = new Error("Invalid API key: sk-proj-abc123");
       mockGenerateText.mockRejectedValue(underlyingError);
 
       await expect(
@@ -138,11 +138,26 @@ describe("translate.translate mutation", () => {
         }),
       ).rejects.toMatchObject({
         code: "INTERNAL_SERVER_ERROR",
-        message: expect.stringContaining("API key not configured"),
+        message:
+          "Failed to get translation. Check model provider configuration.",
       });
     });
 
-    it("includes the original error as cause", async () => {
+    it("does not leak the upstream error message to the client", async () => {
+      const underlyingError = new Error("Invalid API key: sk-proj-abc123");
+      mockGenerateText.mockRejectedValue(underlyingError);
+
+      await expect(
+        caller.translate({
+          projectId: "project_abc123",
+          textToTranslate: "Hola",
+        }),
+      ).rejects.toMatchObject({
+        message: expect.not.stringContaining("sk-proj-abc123"),
+      });
+    });
+
+    it("includes the original error as cause for server-side debugging", async () => {
       const underlyingError = new Error("Rate limit exceeded");
       mockGenerateText.mockRejectedValue(underlyingError);
 
@@ -155,24 +170,10 @@ describe("translate.translate mutation", () => {
         cause: underlyingError,
       });
     });
-
-    it("uses a provider-agnostic error message", async () => {
-      const underlyingError = new Error("Connection refused");
-      mockGenerateText.mockRejectedValue(underlyingError);
-
-      await expect(
-        caller.translate({
-          projectId: "project_abc123",
-          textToTranslate: "Hola",
-        }),
-      ).rejects.toMatchObject({
-        message: expect.not.stringContaining("OpenAI"),
-      });
-    });
   });
 
   describe("when getVercelAIModel fails", () => {
-    it("throws a TRPCError with the model provider error", async () => {
+    it("throws a TRPCError with a generic message and preserves cause", async () => {
       const modelError = new Error(
         "Model provider openai not configured or disabled for project",
       );
@@ -185,7 +186,8 @@ describe("translate.translate mutation", () => {
         }),
       ).rejects.toMatchObject({
         code: "INTERNAL_SERVER_ERROR",
-        message: expect.stringContaining("not configured or disabled"),
+        message:
+          "Failed to get translation. Check model provider configuration.",
         cause: modelError,
       });
     });
