@@ -508,6 +508,7 @@ export class ElasticsearchTraceService {
       if (ancestorRef) {
         result.promptHandle = ancestorRef.promptHandle;
         result.promptVersionNumber = ancestorRef.promptVersionNumber;
+        result.promptLabel = ancestorRef.promptLabel;
         result.promptVariables = ancestorRef.promptVariables;
       }
     }
@@ -620,6 +621,7 @@ export class ElasticsearchTraceService {
       metrics: span.metrics ?? null,
       promptHandle: promptRef.promptHandle,
       promptVersionNumber: promptRef.promptVersionNumber,
+      promptLabel: promptRef.promptLabel,
       promptVariables: promptRef.promptVariables,
     };
   }

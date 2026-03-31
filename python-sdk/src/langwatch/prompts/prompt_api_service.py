@@ -23,6 +23,9 @@ from langwatch.generated.langwatch_rest_api_client.api.default import (
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
 )
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_label import (
+    GetApiPromptsByIdLabel,
+)
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_body import (
     PostApiPromptsBody,
 )

@@ -80,7 +80,7 @@ describe("Prompt Retrieval", () => {
       // When I retrieve the prompt, Then throws error
       await expect(facade.get(ghostHandle)).rejects.toThrow(mockError);
       expect(localPromptsService.get).toHaveBeenCalledWith(ghostHandle);
-      expect(promptsApiService.get).toHaveBeenCalledWith(ghostHandle, undefined);
+      expect(promptsApiService.get).toHaveBeenCalledWith(ghostHandle, {});
     });
   });
 

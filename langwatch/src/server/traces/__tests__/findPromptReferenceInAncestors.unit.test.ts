@@ -34,6 +34,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
+        promptLabel: null,
         promptVariables: { name: "Alice" },
       });
     });
@@ -72,6 +73,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "org/deep-prompt",
         promptVersionNumber: 7,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -380,6 +382,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/old-prompt",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -420,6 +423,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/nearest",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });

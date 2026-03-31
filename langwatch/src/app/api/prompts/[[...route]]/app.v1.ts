@@ -15,6 +15,7 @@ import { prisma } from "~/server/db";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { createLogger } from "~/utils/logger/server";
+import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
@@ -274,19 +275,39 @@ app.get(
     const project = c.get("project");
     const organization = c.get("organization");
     const { id } = c.req.param();
-    const version = c.req.query("version")
-      ? parseInt(c.req.query("version")!)
+
+    // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
+    const shorthand = parsePromptShorthand(id);
+
+    const queryVersion = c.req.query("version")
+      ? parseInt(c.req.query("version") ?? "")
       : undefined;
-    const tag = c.req.query("tag") ?? undefined;
+    const queryTag = c.req.query("tag") ?? undefined;
+
+    // Reject conflicting shorthand + query param
+    if (shorthand.tag && queryTag) {
+      throw new HTTPException(422, {
+        message: `Conflict: shorthand path specifies tag "${shorthand.tag}" but query parameter also specifies tag "${queryTag}". Use one or the other, not both.`,
+      });
+    }
+
+    if (shorthand.version && queryVersion) {
+      throw new HTTPException(422, {
+        message: `Conflict: shorthand path specifies version ${String(shorthand.version)} but query parameter also specifies version ${String(queryVersion)}. Use one or the other, not both.`,
+      });
+    }
+
+    const version = shorthand.version ?? queryVersion;
+    const tag = shorthand.tag ?? queryTag;
 
     logger.info(
-      { projectId: project.id, id, version, tag },
+      { projectId: project.id, id: shorthand.slug, version, tag },
       "Getting prompt",
     );
 
     try {
       const config = await service.getPromptByIdOrHandle({
-        idOrHandle: id,
+        idOrHandle: shorthand.slug,
         projectId: project.id,
         organizationId: organization.id,
         version,
