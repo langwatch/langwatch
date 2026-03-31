@@ -41,7 +41,9 @@ export function serializeMappingsToMappingState(
           parts.length > 1 ? parts.slice(1) : undefined;
         mappingState.mapping[field] = {
           type: "thread" as const,
-          source: source as keyof typeof THREAD_MAPPINGS,
+          source: source as
+            | keyof typeof THREAD_MAPPINGS
+            | (typeof SERVER_ONLY_THREAD_SOURCES)[number],
           selectedFields,
         };
       } else {

@@ -49,17 +49,10 @@ export async function resolveThreadMappingsIntoData(params: {
   const { data, trace, mappings, getThreadTraces } = params;
   const threadId = trace.metadata?.thread_id;
 
-  // Lazily fetch thread traces only once (if needed)
-  let threadTraces: Trace[] | null = null;
-  const fetchOnce = async (): Promise<Trace[]> => {
-    if (threadTraces !== null) return threadTraces;
-    if (!threadId) {
-      threadTraces = [];
-      return threadTraces;
-    }
-    threadTraces = await getThreadTraces(threadId);
-    return threadTraces;
-  };
+  // Eagerly fetch thread traces once (empty if no thread_id)
+  const threadTraces = threadId
+    ? await getThreadTraces(threadId)
+    : [];
 
   for (const [targetField, mappingConfig] of Object.entries(
     mappings.mapping,
@@ -79,7 +72,7 @@ export async function resolveThreadMappingsIntoData(params: {
       continue;
     }
 
-    const traces = await fetchOnce();
+    const traces = threadTraces;
 
     if (
       (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
@@ -91,9 +84,8 @@ export async function resolveThreadMappingsIntoData(params: {
           )
         ).join("\n\n---\n\n");
       } else {
-        throw new Error(
-          `Unhandled SERVER_ONLY_THREAD_SOURCES entry "${source}" for field "${targetField}"`,
-        );
+        // Unknown server-only source: degrade gracefully instead of crashing the evaluation loop
+        data[targetField] = "";
       }
     } else {
       const threadSource = source as keyof typeof THREAD_MAPPINGS;
