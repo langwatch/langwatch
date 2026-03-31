@@ -24,8 +24,6 @@ from .local_loader import LocalPromptLoader
 from .types import Message, Input, Output, MessageDict, InputDict, OutputDict
 from logging import getLogger
 
-_VALID_LABELS = ("production", "staging")
-
 logger = getLogger(__name__)
 
 
@@ -67,7 +65,7 @@ class PromptsFacade:
         version_number: Optional[int] = None,
         fetch_policy: Optional[FetchPolicy] = None,
         cache_ttl_minutes: Optional[int] = None,
-        label: Optional[Literal["production", "staging"]] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """
         Retrieve a prompt by its ID with configurable fetch policy.
@@ -77,11 +75,10 @@ class PromptsFacade:
             version_number: Optional specific version number to retrieve
             fetch_policy: How to fetch the prompt. Defaults to MATERIALIZED_FIRST.
             cache_ttl_minutes: Cache TTL in minutes (only used with CACHE_TTL policy). Defaults to 5.
-            label: Optional label to fetch a specific labeled version ("production" or "staging").
+            label: Optional label to fetch a specific labeled version (e.g. "production", "staging", or any custom label).
 
         Raises:
             ValueError: If both version_number and label are provided.
-            ValueError: If label is not a valid value.
             ValueError: If label is used with MATERIALIZED_ONLY policy.
             ValueError: If the prompt is not found (404 error).
             RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
@@ -89,11 +86,6 @@ class PromptsFacade:
         if label is not None and version_number is not None:
             raise ValueError(
                 "Cannot specify both version_number and label"
-            )
-
-        if label is not None and label not in _VALID_LABELS:
-            raise ValueError(
-                f"Invalid label '{label}'. Must be one of: {', '.join(_VALID_LABELS)}"
             )
 
         fetch_policy = fetch_policy or FetchPolicy.MATERIALIZED_FIRST
@@ -118,7 +110,7 @@ class PromptsFacade:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[Literal["production", "staging"]] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using MATERIALIZED_FIRST policy (local first, API fallback).
 
@@ -147,7 +139,7 @@ class PromptsFacade:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[Literal["production", "staging"]] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using ALWAYS_FETCH policy (API first, local fallback)."""
         try:
@@ -165,7 +157,7 @@ class PromptsFacade:
         prompt_id: str,
         version_number: Optional[int] = None,
         cache_ttl_minutes: int = 5,
-        label: Optional[Literal["production", "staging"]] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using CACHE_TTL policy (cache with TTL, fallback to local)."""
         cache_key = f"{prompt_id}::version:{version_number or ''}::label:{label or ''}"
@@ -212,7 +204,7 @@ class PromptsFacade:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[Literal["production", "staging"]]] = None,
+        labels: Optional[List[str]] = None,
     ) -> Prompt:
         """
         Create a new prompt via API.
@@ -251,7 +243,7 @@ class PromptsFacade:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[Literal["production", "staging"]]] = None,
+        labels: Optional[List[str]] = None,
     ) -> Prompt:
         """
         Update an existing prompt via API.
@@ -296,7 +288,7 @@ class PromptLabelsNamespace:
         self,
         prompt_id: str,
         *,
-        label: Literal["production", "staging"],
+        label: str,
         version_id: str,
     ) -> Dict[str, str]:
         """

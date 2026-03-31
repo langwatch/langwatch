@@ -116,7 +116,7 @@ class PromptApiService:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[Literal["production", "staging"]] = None,
+        label: Optional[str] = None,
     ) -> PromptData:
         """Retrieve a prompt by its ID from the API. You can optionally specify a version number or label to get a specific version of the prompt."""
         api_label = UNSET
@@ -144,7 +144,7 @@ class PromptApiService:
     def assign_label(
         self,
         prompt_id: str,
-        label: Literal["production", "staging"],
+        label: str,
         version_id: str,
     ) -> Dict[str, str]:
         """
@@ -188,7 +188,7 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[Literal["production", "staging"]]] = None,
+        labels: Optional[List[str]] = None,
     ) -> PromptData:
         """
         Create a new prompt with clean dictionary interfaces.
@@ -264,7 +264,7 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[Literal["production", "staging"]]] = None,
+        labels: Optional[List[str]] = None,
     ) -> PromptData:
         """
         Update an existing prompt with clean dictionary interfaces.

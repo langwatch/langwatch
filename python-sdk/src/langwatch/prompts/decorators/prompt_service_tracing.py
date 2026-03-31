@@ -1,6 +1,6 @@
 from functools import wraps
 from opentelemetry import trace
-from typing import TYPE_CHECKING, Literal, Optional, TypeVar, Callable
+from typing import TYPE_CHECKING, Optional, TypeVar, Callable
 import json
 
 from langwatch.attributes import AttributeKey
@@ -21,7 +21,7 @@ class PromptServiceTracing:
 
         Expected function signature:
         def get(self: T, prompt_id: str, version_number: Optional[int] = None,
-                label: Optional[Literal["production", "staging"]] = None) -> PromptData
+                label: Optional[str] = None) -> PromptData
         """
 
         @wraps(func)
@@ -29,7 +29,7 @@ class PromptServiceTracing:
             self: T,
             prompt_id: str,
             version_number: Optional[int] = None,
-            label: Optional[Literal["production", "staging"]] = None,
+            label: Optional[str] = None,
         ) -> "Prompt":
             with trace.get_tracer(__name__).start_as_current_span(
                 PromptServiceTracing._create_span_name("get")

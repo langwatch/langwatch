@@ -31,27 +31,6 @@ class TestGetLabelValidation:
 
             facade._api_service.get.assert_not_called()
 
-    class TestWhenInvalidLabelProvided:
-        """Scenario: Invalid label value raises an error at runtime."""
-
-        def test_raises_value_error_for_canary_label(self):
-            mock_client = Mock()
-            facade = PromptsFacade(mock_client)
-            facade._api_service.get = Mock()
-
-            with pytest.raises(ValueError, match="Invalid label"):
-                facade.get("pizza-prompt", label="canary")
-
-            facade._api_service.get.assert_not_called()
-
-        def test_raises_value_error_for_empty_string_label(self):
-            mock_client = Mock()
-            facade = PromptsFacade(mock_client)
-            facade._api_service.get = Mock()
-
-            with pytest.raises(ValueError, match="Invalid label"):
-                facade.get("pizza-prompt", label="")
-
     class TestWhenLabelWithMaterializedOnly:
         """Scenario: Label with MATERIALIZED_ONLY raises an error."""
 
