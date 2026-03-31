@@ -62,7 +62,7 @@
                 "group": "LangWatch Skills",
                 "pages": [
                   "skills/directory",
-                  "skills/platform-prompts"
+                  "skills/pms-and-domain-experts"
                 ]
               },
               "integration/mcp",
@@ -788,11 +788,15 @@
     },
     {
       "source": "/skills/teams",
-      "destination": "/skills/platform-prompts"
+      "destination": "/skills/pms-and-domain-experts"
     },
     {
       "source": "/skills/platform",
-      "destination": "/skills/platform-prompts"
+      "destination": "/skills/pms-and-domain-experts"
+    },
+    {
+      "source": "/skills/platform-prompts",
+      "destination": "/skills/pms-and-domain-experts"
     },
     {
       "source": "/skills/manual",

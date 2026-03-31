@@ -33,7 +33,7 @@ The fastest way to set up your agent with LangWatch and get started is by using 
   <Card
     title="My agent is already set up"
     icon="comments"
-    href="/skills/platform-prompts"
+    href="/skills/pms-and-domain-experts"
   >
     See PM & Domain Expert Skills to collaborate with your team
   </Card>

@@ -243,11 +243,12 @@ code {
   border-radius: 12px;
   background: #f9fafb;
   margin-bottom: 16px;
+  margin-top: 32px;
 }
 .lw-info-box-icon {
   flex-shrink: 0;
   color: #6b7280;
-  margin-top: 1px;
+  margin-top: 6px;
 }
 .lw-info-box-content {
   flex: 1;
@@ -258,6 +259,12 @@ code {
 .lw-info-box-content p:last-child { margin-bottom: 0; }
 .lw-info-box-content pre {
   margin: 8px 0 0 !important;
+}
+.lw-info-box-content [data-component-part="code-block-root"] {
+  padding-top: 6px !important;
+}
+.lw-info-box-content .code-block {
+  margin-bottom: 0 !important;
 }
 
 .dark .lw-info-box {
