@@ -5,6 +5,7 @@ import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
 import { PromptsError } from "./errors";
+import { parsePromptShorthand } from "./parsePromptShorthand";
 
 /**
  * Options for fetching a prompt.
@@ -13,7 +14,7 @@ export interface GetPromptOptions {
   /** Specific version to fetch */
   version?: string;
   /** Label to fetch (e.g., "production", "staging") */
-  label?: "production" | "staging";
+  label?: string;
   /** Fetch policy to use */
   fetchPolicy?: FetchPolicy;
   /** Cache TTL in minutes (only used with CACHE_TTL policy) */
@@ -64,30 +65,60 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
 
   /**
    * Retrieves a prompt by handle or ID.
-   * @param handleOrId The prompt's handle or unique identifier.
+   *
+   * Supports shorthand syntax: `"pizza-prompt:production"` resolves to the
+   * version labeled "production". `"pizza-prompt:2"` resolves to version 2.
+   *
+   * @param handleOrId The prompt's handle, ID, or shorthand (e.g., "slug:label").
    * @param options Optional parameters for the request.
    * @returns The Prompt instance.
+   * @throws {PromptsError} If conflicting shorthand and explicit options are provided.
+   * @throws {PromptsError} If both version and label are specified.
    * @throws {PromptsError} If the prompt is not found or the API call fails.
    */
   async get(
     handleOrId: string,
     options?: GetPromptOptions,
   ): Promise<Prompt> {
-    const fetchPolicy = options?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
+    const shorthand = parsePromptShorthand(handleOrId);
+    const resolvedHandle = shorthand.slug;
+    const hasShorthandVersion = shorthand.version !== undefined;
+    const hasShorthandLabel = shorthand.label !== undefined;
+
+    // Conflict: shorthand carries version or label AND explicit options also specify version or label
+    if ((hasShorthandVersion || hasShorthandLabel) && (options?.version !== undefined || options?.label !== undefined)) {
+      throw new PromptsError("Cannot combine shorthand with explicit version/label options");
+    }
+
+    // Conflict: both explicit version AND explicit label
+    if (options?.version !== undefined && options?.label !== undefined) {
+      throw new PromptsError("Cannot specify both version and label");
+    }
+
+    const resolvedLabel = options?.label ?? shorthand.label;
+    const resolvedVersion = options?.version ?? (shorthand.version ? String(shorthand.version) : undefined);
+
+    const resolvedOptions: GetPromptOptions = {
+      ...options,
+      ...(resolvedLabel !== undefined && { label: resolvedLabel }),
+      ...(resolvedVersion !== undefined && { version: resolvedVersion }),
+    };
+
+    const fetchPolicy = resolvedOptions.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
 
     switch (fetchPolicy) {
       case FetchPolicy.MATERIALIZED_ONLY:
-        return this.getMaterializedOnly(handleOrId);
+        return this.getMaterializedOnly(resolvedHandle);
 
       case FetchPolicy.ALWAYS_FETCH:
-        return this.getAlwaysFetch(handleOrId, options);
+        return this.getAlwaysFetch(resolvedHandle, resolvedOptions);
 
       case FetchPolicy.CACHE_TTL:
-        return this.getCacheTtl(handleOrId, options);
+        return this.getCacheTtl(resolvedHandle, resolvedOptions);
 
       case FetchPolicy.MATERIALIZED_FIRST:
       default:
-        return this.getMaterializedFirst(handleOrId, options);
+        return this.getMaterializedFirst(resolvedHandle, resolvedOptions);
     }
   }
 
@@ -128,8 +159,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   }
 
   private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    const labelSegment = options?.label != null ? `::label:${options.label}` : '';
-    return `${handleOrId}::version:${options?.version ?? ''}${labelSegment}`;
+    return `${handleOrId}::version:${options?.version ?? ''}::label:${options?.label ?? ''}`;
   }
 
   private async getCacheTtl(
