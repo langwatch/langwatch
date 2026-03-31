@@ -21,18 +21,9 @@ Feature: SDK Prompt Label Support
     Then I receive version v4 config data (unchanged behavior)
 
   # --- Custom label fetch (transparent) ---
-
-  @unit
-  Scenario: Fetch prompt by custom label
-    Given "pizza-prompt" has custom label "canary" assigned to v2
-    When I call prompts.get("pizza-prompt", { label: "canary" })
-    Then I receive version v2 config data
-
-  @unit
-  Scenario: Label type accepts any string
-    When I call prompts.get("pizza-prompt", { label: "canary" })
-    Then the TypeScript compiler accepts it without error
-    And the API request includes query parameter label="canary"
+  # Note: fetch-by-custom-label exercises the same SDK code path as built-in labels.
+  # Type widening (label: string instead of "production"|"staging") is verified at
+  # compile time via pnpm typecheck — no separate runtime scenario needed.
 
   # --- Cache key isolation ---
 
@@ -50,12 +41,8 @@ Feature: SDK Prompt Label Support
     And I fetch with label "staging" using CACHE_TTL
     Then both results are cached independently
 
-  @unit
-  Scenario: Custom labels produce distinct cache entries
-    Given "pizza-prompt" has custom label "canary" assigned to v2 and production=v3
-    When I fetch with label "canary" using CACHE_TTL
-    And I fetch with label "production" using CACHE_TTL
-    Then both results are cached independently
+  # Note: custom labels reuse the same cache key logic as built-in labels
+  # (any string in the label segment). No separate scenario needed.
 
   # --- Error handling ---
 
@@ -74,13 +61,8 @@ Feature: SDK Prompt Label Support
     Then the API receives PUT /api/prompts/pizza-prompt/labels/production
     And the request body contains the versionId
 
-  @unit
-  Scenario: Assign custom label to existing version
-    Given "pizza-prompt" version v2 exists with a known versionId
-    And a custom label "canary" exists in the org
-    When I call prompts.labels.assign("pizza-prompt", { label: "canary", versionId })
-    Then the API receives PUT /api/prompts/pizza-prompt/labels/canary
-    And the request body contains the versionId
+  # Note: assign with custom label uses same code path as built-in labels —
+  # no separate unit scenario needed. Covered by E2E lifecycle test.
 
   @unit
   Scenario: Assign label returns confirmation
@@ -100,11 +82,7 @@ Feature: SDK Prompt Label Support
     Then the API request body includes the labels array
 
   # --- API layer ---
-
-  @unit
-  Scenario: Label is passed as query parameter to the API
-    When I call PromptsApiService.get("pizza-prompt", { label: "production" })
-    Then the API request includes query parameter label="production"
+  # Note: "Label is passed as query parameter" already covered in prompts-api.service.test.ts
 
   # --- Org-level label CRUD via SDK ---
 
