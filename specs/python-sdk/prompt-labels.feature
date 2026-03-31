@@ -69,7 +69,7 @@ Feature: Python SDK custom label support
 
   # --- Label assignment (sub-resource) ---
 
-  @integration
+  @unit
   Scenario: assigns label and returns confirmation
     Given "pizza-prompt" version v3 exists with a known versionId
     When I call prompts.labels.assign("pizza-prompt", label="production", version_id=versionId)
@@ -77,7 +77,7 @@ Feature: Python SDK custom label support
     And the request body contains the versionId
     And I receive a response with config_id, version_id, label, and updated_at
 
-  @integration
+  @unit
   Scenario: assigns custom label to existing version
     Given "pizza-prompt" version v3 exists with a known versionId
     When I call prompts.labels.assign("pizza-prompt", label="canary", version_id=versionId)
@@ -86,24 +86,24 @@ Feature: Python SDK custom label support
 
   # --- Labels on create/update ---
 
-  @integration
+  @unit
   Scenario: includes labels in create request body
     When I call prompts.create with a labels list containing "production"
     Then the API request body includes the labels list
 
-  @integration
+  @unit
   Scenario: includes labels in update request body
     When I call prompts.update with a labels list containing "staging"
     Then the API request body includes the labels list
 
   # --- API layer ---
 
-  @integration
+  @unit
   Scenario: passes label as query parameter to the API
     When I call PromptApiService.get("pizza-prompt", label="production")
     Then the API request includes query parameter label="production"
 
-  @integration
+  @unit
   Scenario: passes custom label string through to the API
     When I call PromptApiService.get("pizza-prompt", label="canary")
     Then the API request includes query parameter label="canary"
