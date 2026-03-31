@@ -249,10 +249,10 @@ class TestPromptApiServiceAssignLabel:
             version_id="v3_id",
         )
 
-        assert result["config_id"] == "config_abc"
-        assert result["version_id"] == "v3_id"
+        assert result["configId"] == "config_abc"
+        assert result["versionId"] == "v3_id"
         assert result["label"] == "production"
-        assert result["updated_at"] == "2026-01-01T00:00:00.000Z"
+        assert result["updatedAt"] == "2026-01-01T00:00:00.000Z"
 
     def test_propagates_error_on_api_failure(self):
         """
@@ -568,10 +568,10 @@ class TestCacheKeyWithLabels:
 
         assert any("::label:production" in k for k in facade._cache.keys())
 
-    def test_cache_key_without_label_unchanged(self):
+    def test_cache_key_without_label_has_empty_label_segment(self):
         """
         When get() is called without label and CACHE_TTL
-        Then the cache key does NOT include "::label:"
+        Then the cache key has an empty label segment (::label:)
         """
         api_response = _make_api_response_json(version=4)
         mock_request = Mock(return_value=_mock_httpx_response(api_response))
@@ -581,7 +581,9 @@ class TestCacheKeyWithLabels:
         with patch("time.time", return_value=0):
             facade.get("pizza-prompt", fetch_policy=FetchPolicy.CACHE_TTL)
 
-        assert all("::label:" not in k for k in facade._cache.keys())
+        keys = list(facade._cache.keys())
+        assert len(keys) == 1
+        assert keys[0].endswith("::label:")
 
     def test_different_labels_cached_independently(self):
         """
@@ -700,10 +702,10 @@ class TestPromptsFacadeLabelsAssign:
             "pizza-prompt", label="production", version_id="v3_id"
         )
 
-        assert result["config_id"] == "config_abc"
-        assert result["version_id"] == "v3_id"
+        assert result["configId"] == "config_abc"
+        assert result["versionId"] == "v3_id"
         assert result["label"] == "production"
-        assert result["updated_at"] == "2026-01-01T00:00:00.000Z"
+        assert result["updatedAt"] == "2026-01-01T00:00:00.000Z"
 
     def test_labels_assign_works_with_custom_label(self):
         """

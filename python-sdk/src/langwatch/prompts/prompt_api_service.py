@@ -9,7 +9,7 @@ Uses TypedDict for clean interfaces and from_dict methods for type safety.
 This service is responsible only for API operations and does not handle local file loading.
 """
 from http import HTTPStatus
-from typing import Any, Dict, List, Literal, Optional, TypedDict
+from typing import Any, Dict, List, Literal, Optional
 
 from langwatch.generated.langwatch_rest_api_client.types import UNSET, Response
 from langwatch.generated.langwatch_rest_api_client.client import (
@@ -69,13 +69,6 @@ from langwatch.state import get_instance
 from .errors import unwrap_response
 from .decorators.prompt_service_tracing import prompt_service_tracing
 from .types import PromptData, Message, Input, Output, MessageDict, InputDict, OutputDict
-
-
-class AssignLabelResult(TypedDict):
-    config_id: str
-    version_id: str
-    label: str
-    updated_at: str
 
 
 class PromptApiService:
@@ -174,7 +167,7 @@ class PromptApiService:
         prompt_id: str,
         label: str,
         version_id: str,
-    ) -> AssignLabelResult:
+    ) -> Dict[str, str]:
         """Assign a label to a specific prompt version.
 
         Uses direct httpx calls to support arbitrary label strings.
@@ -202,13 +195,7 @@ class PromptApiService:
                 f"Failed to assign label '{label}' to prompt '{prompt_id}'"
             )
 
-        data = raw_resp.json()
-        return AssignLabelResult(
-            config_id=data.get("configId", ""),
-            version_id=data.get("versionId", ""),
-            label=data.get("label", ""),
-            updated_at=data.get("updatedAt", ""),
-        )
+        return raw_resp.json()
 
     def create(
         self,
