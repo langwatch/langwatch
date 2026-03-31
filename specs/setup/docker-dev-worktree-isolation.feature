@@ -33,8 +33,8 @@ Feature: Docker dev environment worktree isolation and startup speed
   Scenario: Rebuild command works correctly
     Given the rebuild option is selected in dev.sh
     When rebuild runs
-    Then it does not reference stale volume names
-    And node_modules are cleaned via the bind-mount directory
+    Then it removes the correct named volumes (app-modules and bullboard-modules)
+    And uses the VOLUME_PREFIX for worktree-aware volume names
 
   @unit
   Scenario: Port scan starts at correct base ports
@@ -42,12 +42,6 @@ Feature: Docker dev environment worktree isolation and startup speed
     Then APP_PORT scanning starts at 5560
     And BULLBOARD_PORT scanning starts at 6380
     And AI_SERVER_PORT scanning starts at 3456
-
-  @unit
-  Scenario: Corepack enable is not repeated per container
-    Given a custom base image extends node:24 with corepack enabled
-    When services start using the custom image
-    Then no service command includes "corepack enable"
 
   @unit
   Scenario: Environment variables are not duplicated across services

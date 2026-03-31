@@ -7,6 +7,7 @@ COMPOSE="docker compose -f compose.dev.yml"
 # Auto-detect worktree for container/volume isolation
 if git rev-parse --is-inside-work-tree &>/dev/null; then
   WORKTREE_NAME=$(basename "$(git rev-parse --show-toplevel)")
+  # "langwatch" is the expected main checkout directory name (repo name)
   if [ "$WORKTREE_NAME" != "langwatch" ]; then
     # Sanitize: replace slashes with hyphens, lowercase
     WORKTREE_NAME=$(echo "$WORKTREE_NAME" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
