@@ -60,6 +60,11 @@ def parse_prompt_shorthand(input_str: str) -> Dict[str, Any]:
             f'Invalid format: slug must not be empty. Received "{input_str}"'
         )
 
+    if len(suffix) == 0:
+        raise ValueError(
+            f'Invalid format: suffix after colon must not be empty. Received "{input_str}"'
+        )
+
     if suffix == "latest":
         return {"slug": slug, "label": None, "version": None}
 

@@ -42,6 +42,10 @@ class TestParsePromptShorthand:
         with pytest.raises(ValueError, match="slug must not be empty"):
             parse_prompt_shorthand(":production")
 
+    def test_rejects_empty_suffix_after_colon(self):
+        with pytest.raises(ValueError, match="suffix after colon must not be empty"):
+            parse_prompt_shorthand("pizza-prompt:")
+
     def test_treats_zero_as_label(self):
         result = parse_prompt_shorthand("pizza-prompt:0")
         assert result == {"slug": "pizza-prompt", "label": "0", "version": None}
