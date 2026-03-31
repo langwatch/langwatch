@@ -9,6 +9,10 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
+import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "~/server/evaluations/threadMappingResolver";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import {
   type MappingState,
@@ -201,6 +205,21 @@ export class EvaluationExecutionService {
       }
 
       data = mappedData as Record<string, unknown>;
+
+      // Resolve any thread-typed mappings mixed into trace-level evaluations
+      if (mappings && hasThreadMappings(mappings)) {
+        await resolveThreadMappingsIntoData({
+          data,
+          trace,
+          mappings,
+          getThreadTraces: (threadId) =>
+            this.deps.traceService.getTracesWithSpansByThreadIds(
+              projectId,
+              [threadId],
+              INTERNAL_PROTECTIONS,
+            ),
+        });
+      }
     }
 
     // Workflow/custom evaluators pass data through as-is
@@ -385,15 +404,8 @@ export class EvaluationExecutionService {
 }
 
 // ---------------------------------------------------------------------------
-// Pure helper functions (moved from evaluationsWorker)
+// Pure helper functions
 // ---------------------------------------------------------------------------
-
-function hasThreadMappings(mappingState: MappingState | null): boolean {
-  if (!mappingState) return false;
-  return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread",
-  );
-}
 
 function switchMapping(
   trace: Trace,

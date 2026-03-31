@@ -25,6 +25,11 @@ import {
   TRACE_MAPPINGS,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
+
+/** Trace field options for the threads sub-field selector, excluding "threads" itself. */
+const THREAD_SUB_FIELD_OPTIONS = Object.keys(TRACE_MAPPINGS)
+  .filter((key) => key !== "threads")
+  .map((key) => ({ label: key, value: key }));
 import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { Switch } from "../ui/switch";
 
@@ -705,10 +710,7 @@ export const TracesMapping = ({
                           />
                           <MultiSelect
                             isMulti
-                            options={Object.keys(TRACE_MAPPINGS).map((key) => ({
-                              label: key,
-                              value: key,
-                            }))}
+                            options={THREAD_SUB_FIELD_OPTIONS}
                             value={(
                               mapping[targetField]?.selectedFields ?? []
                             ).map((field) => ({
