@@ -20,24 +20,27 @@ keywords: langwatch, llm, ai, observability, evaluation, prompt optimization, ll
 
 ## Quick Start
 
+The fastest way to set up your agent with LangWatch and get started is by using LangWatch Skills via a coding assistant. If your agent is already set up, check out the skills to monitor performance and improve your agent.
+
 <CardGroup cols={2}>
   <Card
-    title="Using a Coding Assistant"
-    description="Prompt Claude Code or Copilot to instrument your agent, create evaluations, add simulation tests, version prompts..."
+    title="Get Started Using a Code Assistant"
     icon="terminal"
-    href="/skills/code-prompts"
-  />
+    href="/skills/directory"
+  >
+    Tracing, evaluations, agent simulations, prompt management and more
+  </Card>
   <Card
-    title="Using a Chat Assistant"
-    description="Ask your chat assistant to check agent performance, set up evaluators, create scenarios on the platform..."
-    icon="messages"
-    href="/skills/platform-prompts"
-  />
+    title="My agent is already set up"
+    icon="comments"
+    href="/skills/pms-and-domain-experts"
+  >
+    See PM & Domain Expert Skills to collaborate with your team
+  </Card>
 </CardGroup>
 
 <Tip>
-  **Starting from scratch?** Use [Better Agents](/better-agents/overview) to scaffold a new agent project.
-  **Want to install skills?** Browse the [Skills Directory](/skills/directory).
+  **Don't have an agent yet?** Use [Better Agents](/better-agents/overview) to scaffold a new agent project.
 </Tip>
 
 ## What is LangWatch?
