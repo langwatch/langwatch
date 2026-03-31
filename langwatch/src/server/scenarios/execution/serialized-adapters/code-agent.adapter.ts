@@ -12,6 +12,7 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
 /** Timeout for NLP service requests (2 minutes) */
@@ -38,14 +39,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
-    const lastUserMessage = input.messages.findLast((m) => m.role === "user");
-    const inputValue =
-      typeof lastUserMessage?.content === "string"
-        ? lastUserMessage.content
-        : JSON.stringify(lastUserMessage?.content ?? "");
-
-    const inputRecord = this.buildInputRecord(inputValue);
-    const workflow = this.buildWorkflow(inputValue);
+    const inputRecord = this.resolveInputValues(input);
+    const workflow = this.buildWorkflow(inputRecord);
     const result = await this.executeOnNlpService(workflow, inputRecord);
     return result;
   }
@@ -56,21 +51,18 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    * The /studio/execute_sync endpoint returns result.get("end"), so we need
    * an end node to capture the code node's outputs.
    */
-  private buildWorkflow(inputValue: string) {
+  private buildWorkflow(resolvedValues: Record<string, string>) {
     const { ENTRY_NODE_ID, CODE_NODE_ID, END_NODE_ID } =
       SerializedCodeAgentAdapter;
 
-    // Build input fields - only the first input receives the scenario message,
-    // remaining inputs get empty strings (code agents with multiple inputs
-    // should use the first input for the primary message).
     const inputs =
       this.config.inputs.length > 0
-        ? this.config.inputs.map((inp, index) => ({
+        ? this.config.inputs.map((inp) => ({
             identifier: inp.identifier,
             type: inp.type,
-            value: index === 0 ? inputValue : "",
+            value: resolvedValues[inp.identifier] ?? "",
           }))
-        : [{ identifier: "input", type: "str", value: inputValue }];
+        : [{ identifier: "input", type: "str", value: resolvedValues["input"] ?? "" }];
 
     const outputs =
       this.config.outputs.length > 0
@@ -259,18 +251,42 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
   }
 
   /**
-   * Build input values record for the execute_flow event.
-   * Only the first input receives the scenario message; others get empty strings.
+   * Resolve input values from scenarioMappings (on the agent config) or fall
+   * back to legacy behavior.
+   *
+   * With scenarioMappings: resolve each declared agent input from its mapping.
+   *   Orphan mappings (for inputs that don't exist on the agent) are ignored.
+   * Without scenarioMappings: first input gets the last user message, rest get "".
    */
-  private buildInputRecord(inputValue: string): Record<string, string> {
-    const inputs =
+  private resolveInputValues(agentInput: AgentInput): Record<string, string> {
+    const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
+    if (this.config.scenarioMappings) {
+      const resolved = resolveFieldMappings({
+        fieldMappings: this.config.scenarioMappings,
+        agentInput,
+      });
+      // Only include values for inputs that exist on the agent
+      const record: Record<string, string> = {};
+      for (const inp of declaredInputs) {
+        record[inp.identifier] = resolved[inp.identifier] ?? "";
+      }
+      return record;
+    }
+
+    // Legacy behavior: first input = last user message, rest = ""
+    const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
+    const inputValue =
+      typeof lastUserMessage?.content === "string"
+        ? lastUserMessage.content
+        : JSON.stringify(lastUserMessage?.content ?? "");
+
     const record: Record<string, string> = {};
-    for (let i = 0; i < inputs.length; i++) {
-      record[inputs[i]!.identifier] = i === 0 ? inputValue : "";
+    for (let i = 0; i < declaredInputs.length; i++) {
+      record[declaredInputs[i]!.identifier] = i === 0 ? inputValue : "";
     }
     return record;
   }
@@ -283,12 +299,26 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
    *
    * The result is the output from the "end" node, which is a dict
    * of output identifier -> value.
+   *
+   * When scenarioOutputField is set: extract that specific field (throw if missing).
+   * When unset: use first configured output (legacy behavior).
    */
   private extractOutput(result: Record<string, unknown> | null): string {
     if (!result) return "";
     if (typeof result === "string") return result;
 
-    // Try to extract by the first configured output identifier
+    const { scenarioOutputField } = this.config;
+
+    if (scenarioOutputField) {
+      if (scenarioOutputField in result) {
+        return this.stringify(result[scenarioOutputField]);
+      }
+      throw new Error(
+        `Scenario output field "${scenarioOutputField}" not found in agent output. Available fields: ${Object.keys(result).join(", ")}`,
+      );
+    }
+
+    // Legacy/default: use first configured output identifier
     const firstOutputId = this.config.outputs[0]?.identifier ?? "output";
     const value = result[firstOutputId];
     if (value !== undefined) return this.stringify(value);
