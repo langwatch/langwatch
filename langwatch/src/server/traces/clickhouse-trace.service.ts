@@ -1418,7 +1418,8 @@ export class ClickHouseTraceService {
                 AND ts.TraceId IN (
                   SELECT s.TraceId
                   FROM (
-                    SELECT ts.TraceId AS TraceId, max(ts.OccurredAt) AS _oa
+                    SELECT ts.TraceId AS TraceId,
+                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
                     FROM trace_summaries ts
                     WHERE ts.TenantId = {tenantId:String}
                       AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
