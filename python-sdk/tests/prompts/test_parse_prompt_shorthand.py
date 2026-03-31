@@ -12,6 +12,8 @@ import pytest
 from unittest.mock import Mock
 from langwatch.prompts.prompt_facade import parse_prompt_shorthand, PromptsFacade
 
+pytestmark = pytest.mark.unit
+
 
 class TestParsePromptShorthand:
     """Tests for parse_prompt_shorthand()."""
