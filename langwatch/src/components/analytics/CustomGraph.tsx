@@ -593,7 +593,7 @@ const CustomGraph_ = React.memo(
                   </Badge>
                 </button>
               )}
-              {allEmpty ? (
+              {allEmpty && input.graphType !== "monitor_graph" ? (
                 <Box
                   position="absolute"
                   top="50%"
@@ -1296,6 +1296,7 @@ function MonitorGraph({
     : currentAndPreviousData
       ?.map((entry) => entry[firstKey]!)
       .filter((x) => x !== undefined && x !== null);
+  const hasData = allValues !== undefined && allValues.length > 0;
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -1307,7 +1308,7 @@ function MonitorGraph({
   // TODO: allow user to define the thresholds instead of hardcoded amounts
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
-    : average > 0.8 || !hasLoaded
+    : !hasData || average > 0.8 || !hasLoaded
       ? "greenTones"
       : average < 0.4
         ? "redTones"
@@ -1376,7 +1377,11 @@ function MonitorGraph({
         <HStack gap={2}>
           <Text fontSize="2xl" fontWeight="bold">
             {hasLoaded ? (
-              numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              hasData ? (
+                numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              ) : (
+                "-"
+              )
             ) : (
               <Skeleton
                 width="56px"
@@ -1386,7 +1391,11 @@ function MonitorGraph({
             )}
           </Text>
           <Text fontSize="xs">
-            {isPassRate ? "Pass Rate" : "Average Score"}
+            {hasData
+              ? isPassRate
+                ? "Pass Rate"
+                : "Average Score"
+              : "No data yet"}
           </Text>
         </HStack>
         <Text fontSize="xs">
