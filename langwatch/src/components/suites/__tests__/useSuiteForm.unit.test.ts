@@ -19,7 +19,7 @@ const baseParams = {
     { id: "scen_2", name: "Policy violation", labels: ["safety"] },
     { id: "scen_3", name: "Happy path checkout", labels: ["billing"] },
   ],
-  agents: [{ id: "agent_1", name: "Prod Agent" }],
+  agents: [{ id: "agent_1", name: "Prod Agent", type: "http" }],
   prompts: [{ id: "prompt_1", handle: "test-prompt" }],
 };
 
@@ -515,7 +515,7 @@ describe("useSuiteForm()", () => {
         const { result } = renderHook(() =>
           useSuiteForm({
             ...baseParams,
-            agents: [{ id: "agent_1", name: "Prod Agent" }],
+            agents: [{ id: "agent_1", name: "Prod Agent", type: "http" }],
             prompts: undefined,
             suite: {
               id: "suite_1",
