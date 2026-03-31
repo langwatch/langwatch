@@ -21,13 +21,16 @@ document.addEventListener('click', function(e) {
     setTimeout(function() { target.removeAttribute('data-copied'); }, 2000);
   }
 
-  // --- Download SKILL.md from GitHub (data-download-url) ---
+  // --- Download SKILL.md (data-download-url) ---
   var dlEl = e.target.closest('[data-download-url]');
   if (dlEl) {
     var rawUrl = dlEl.getAttribute('data-download-url');
     var name = dlEl.getAttribute('data-download-name') || 'SKILL.md';
     fetch(rawUrl)
-      .then(function(r) { return r.text(); })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Download failed with status ' + r.status);
+        return r.text();
+      })
       .then(function(content) {
         var blob = new Blob([content], { type: 'text/markdown' });
         var url = URL.createObjectURL(blob);
@@ -36,6 +39,9 @@ document.addEventListener('click', function(e) {
         a.download = name;
         a.click();
         URL.revokeObjectURL(url);
+      })
+      .catch(function(err) {
+        console.error('Failed to download SKILL.md', err);
       });
   }
 
