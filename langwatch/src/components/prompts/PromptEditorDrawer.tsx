@@ -863,6 +863,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // If we have a local config change handler (evaluations context), just close
       // Local config is already being updated on every change
       if (onLocalConfigChange) {
+        debouncedUpdateLocalConfig.flush();
         onClose();
         return;
       }
@@ -875,6 +876,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         return;
       }
     }
+    debouncedUpdateLocalConfig.flush();
     onClose();
   };
 
