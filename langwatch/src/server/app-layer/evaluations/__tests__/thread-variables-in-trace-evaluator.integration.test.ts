@@ -297,14 +297,8 @@ describe("Feature: Thread variables available in trace-level evaluator input map
         // Trace-sourced fields still resolve normally
         expect(inputs.input).toBe("hello there");
 
-        // Thread-sourced field resolves to an empty value
-        expect(
-          inputs.conversation === "" ||
-            inputs.conversation === undefined ||
-            inputs.conversation === null ||
-            (Array.isArray(inputs.conversation) &&
-              (inputs.conversation as any[]).length === 0),
-        ).toBe(true);
+        // Thread-sourced field resolves to empty string when no thread_id
+        expect(inputs.conversation).toBe("");
 
         // Evaluation does not fail
         expect(result.status).toBe("processed");

@@ -9,6 +9,7 @@ import {
   getTraceAvailableSources,
   getThreadAvailableSources,
 } from "../tracesMapping";
+import { hasThreadMappings } from "~/server/evaluations/threadMappingResolver";
 
 describe("Feature: Thread variables available in trace-level evaluator input mapping", () => {
   // -------------------------------------------------------------------------
@@ -95,9 +96,6 @@ describe("Feature: Thread variables available in trace-level evaluator input map
   // @unit Scenario: hasThreadMappings detects thread-typed mappings in a mixed config
   // -------------------------------------------------------------------------
   describe("hasThreadMappings()", () => {
-    // We test this by importing directly from the service where it's defined
-    // But since it's a private helper in evaluation-execution.service.ts,
-    // we test it indirectly here by verifying the mapping state detection
     describe("given a mapping state with one trace source and one thread source", () => {
       it("detects thread-typed mappings", () => {
         const mappingState = {
@@ -111,11 +109,27 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           expansions: [],
         };
 
-        const hasThread = Object.values(mappingState.mapping).some(
-          (mapping) => "type" in mapping && mapping.type === "thread",
-        );
+        expect(hasThreadMappings(mappingState)).toBe(true);
+      });
+    });
 
-        expect(hasThread).toBe(true);
+    describe("given a mapping state with only trace sources", () => {
+      it("returns false", () => {
+        const mappingState = {
+          mapping: {
+            input: { source: "input" as const },
+            output: { source: "output" as const },
+          },
+          expansions: [],
+        };
+
+        expect(hasThreadMappings(mappingState)).toBe(false);
+      });
+    });
+
+    describe("given null", () => {
+      it("returns false", () => {
+        expect(hasThreadMappings(null)).toBe(false);
       });
     });
   });
