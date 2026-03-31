@@ -969,7 +969,8 @@ export class ClickHouseTraceService {
           );
 
           // If the LLM span itself doesn't have a prompt reference,
-          // walk up ancestor spans to find it (SDK sets it on the parent span)
+          // search ancestors and their siblings to find it (SDK sets it on
+          // sibling spans like Prompt.compile or PromptApiService.get)
           if (!result.promptHandle) {
             const ancestorSpans = allRows.map((r) => {
               const attributes: Record<string, unknown> = {};
@@ -988,6 +989,7 @@ export class ClickHouseTraceService {
               return {
                 spanId: r.SpanId,
                 parentSpanId: r.ParentSpanId ?? null,
+                startTime: r.StartTime,
                 attributes,
               };
             });
