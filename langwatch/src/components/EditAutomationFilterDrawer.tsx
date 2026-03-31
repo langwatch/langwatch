@@ -228,7 +228,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
   };
 
   const onSubmit = () => {
-    let filtersToSubmit: Partial<Record<FilterField, FilterParam>> | Record<string, TriggerFilterValue>;
+    let filtersToSubmit: Partial<Record<FilterField, FilterParam>>;
 
     if (isCodeMode) {
       // Validate code before submitting
@@ -242,7 +242,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
         });
         return;
       }
-      filtersToSubmit = parsed.rawFilters;
+      filtersToSubmit = parsed.sanitized;
     } else {
       filtersToSubmit = getNonEmptyFilters();
     }
