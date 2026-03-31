@@ -45,10 +45,12 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
 
   // Construct LLMConfig object from watched values
   const llmConfig: LLMConfig = useMemo(() => {
-    const config: Record<string, string | number | undefined> = {};
+    const config: Partial<LLMConfig> = {};
     LLM_CONFIG_KEYS.forEach((key, index) => {
-      if (watchedValues[index] !== undefined) {
-        config[key] = watchedValues[index];
+      const val = watchedValues[index];
+      if (val !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (config as any)[key] = val;
       }
     });
     config.model = (config.model as string) ?? "";
