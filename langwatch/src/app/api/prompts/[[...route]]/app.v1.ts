@@ -161,7 +161,7 @@ app.put(
         configId: config.id,
         versionId,
         label,
-        projectId: project.id,
+        projectId: config.projectId,
       });
 
       logger.info(
@@ -364,7 +364,7 @@ app.post(
               configId: newConfig.id,
               versionId: newConfig.versionId,
               label,
-              projectId: project.id,
+              projectId: newConfig.projectId,
             }),
           ),
         );
@@ -576,7 +576,7 @@ app.put(
               configId: updatedConfig.id,
               versionId: updatedConfig.versionId,
               label,
-              projectId,
+              projectId: updatedConfig.projectId,
             }),
           ),
         );
