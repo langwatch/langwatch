@@ -35,10 +35,6 @@ type CachedOrgData = {
 
 const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS);
 
-/** Exposed for testing: clears the org cache. */
-export function clearOrgCache(): void {
-  orgCache.clear();
-}
 
 export interface ReportUsageForMonthCommandDeps {
   organizations: OrganizationService;
@@ -115,11 +111,11 @@ export class ReportUsageForMonthCommand
     let shouldSelfDispatch = false;
     try {
       // 1. Skip conditions
-      let org = orgCache.get(organizationId) ?? null;
+      let org = (await orgCache.get(organizationId)) ?? null;
       if (!org) {
         org = await this.deps.organizations.getOrganizationForBilling(organizationId);
         if (org) {
-          orgCache.set(organizationId, org);
+          await orgCache.set(organizationId, org);
         }
       }
 

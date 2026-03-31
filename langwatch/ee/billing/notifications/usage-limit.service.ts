@@ -182,17 +182,17 @@ export class UsageLimitService {
 
     const cooldownKey = `${organizationId}:${limitType}`;
 
-    if (resourceLimitCooldown.get(cooldownKey)) {
+    if (await resourceLimitCooldown.get(cooldownKey)) {
       return;
     }
 
-    resourceLimitCooldown.set(cooldownKey, true);
+    await resourceLimitCooldown.set(cooldownKey, true);
 
     try {
       const org = await this.organizationService.findWithAdmins(organizationId);
 
       if (!org) {
-        resourceLimitCooldown.delete(cooldownKey);
+        await resourceLimitCooldown.delete(cooldownKey);
         return;
       }
 

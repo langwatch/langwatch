@@ -25,11 +25,6 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const monthCountCache = new TtlCache<number>(CACHE_TTL_MS);
 
 
-/** Clear cache (for testing) */
-export const clearMonthCountCache = (): void => {
-  monthCountCache.clear();
-};
-
 /**
  * Service for trace usage tracking and limit enforcement
  */
@@ -65,7 +60,7 @@ export class TraceUsageService {
     const billingMonth = getBillingMonth();
     const cacheKey = `${organizationId}:traces:${billingMonth}`;
 
-    const cached = monthCountCache.get(cacheKey);
+    const cached = await monthCountCache.get(cacheKey);
     if (cached !== undefined) {
       logger.info({ organizationId, cached, billingMonth }, "getCurrentMonthCount: cache hit");
       return cached;
@@ -77,7 +72,7 @@ export class TraceUsageService {
 
     if (clickHouseTotal !== null) {
       logger.info({ organizationId, clickHouseTotal, billingMonth }, "getCurrentMonthCount: ClickHouse result");
-      monthCountCache.set(cacheKey, clickHouseTotal);
+      await monthCountCache.set(cacheKey, clickHouseTotal);
       return clickHouseTotal;
     }
 
@@ -95,7 +90,7 @@ export class TraceUsageService {
     });
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
-    monthCountCache.set(cacheKey, total);
+    await monthCountCache.set(cacheKey, total);
     return total;
   }
 
