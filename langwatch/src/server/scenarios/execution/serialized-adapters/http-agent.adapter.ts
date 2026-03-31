@@ -11,6 +11,7 @@ import { JSONPath } from "jsonpath-plus";
 import { Liquid } from "liquidjs";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
+import { resolveFieldMappings } from "../resolve-field-mappings";
 import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
 
@@ -114,9 +115,9 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       return JSON.stringify({ messages: input.messages });
     }
 
-    // Build template context for Liquid (matching prompt adapter pattern)
+    // Build base template context for Liquid (legacy defaults)
     const lastUserMessage = input.messages.findLast((m) => m.role === "user");
-    const templateContext = {
+    const baseContext = {
       messages: JSON.stringify(input.messages),
       threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
       input:
@@ -124,6 +125,13 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
           ? lastUserMessage.content
           : JSON.stringify(lastUserMessage?.content ?? ""),
     };
+
+    // Merge resolved scenarioMappings into the template context (overrides defaults)
+    const mappedValues = this.config.scenarioMappings
+      ? resolveFieldMappings({ fieldMappings: this.config.scenarioMappings, agentInput: input })
+      : {};
+
+    const templateContext = { ...baseContext, ...mappedValues };
 
     return liquid.parseAndRenderSync(this.config.bodyTemplate, templateContext);
   }

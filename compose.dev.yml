@@ -137,6 +137,7 @@ services:
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      CI: "true"
 
   # =============================================================================
   # APP (mounted for hot reload)
@@ -154,6 +155,8 @@ services:
     command: >
       sh -c "
         corepack enable &&
+        pnpm prisma generate &&
+        pnpm run types:zod:generate &&
         SKIP_CLICKHOUSE_MIGRATE=true SKIP_ELASTIC_MIGRATE=true pnpm run start:prepare:db &&
         pnpm run start:app
       "
@@ -167,6 +170,8 @@ services:
       # Enable scenarios UI in dev
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
+      # Use email login for dev (no Auth0 dependency)
+      NEXTAUTH_PROVIDER: "email"
     env_file:
       - langwatch/.env
       - path: langwatch/.env.dev-up

@@ -45,6 +45,8 @@ import type {
 } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
+import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 const DEFAULT_CODE = `import dspy
 
@@ -92,6 +94,8 @@ const buildCodeConfig = (
   code: string,
   inputs: DSLField[],
   outputs: DSLField[],
+  scenarioMappings: Record<string, FieldMapping>,
+  scenarioOutputField: string | undefined,
 ): CodeComponentConfig => ({
   name: "Code",
   description: "Python code block",
@@ -104,6 +108,8 @@ const buildCodeConfig = (
   ],
   inputs: inputs as CodeComponentConfig["inputs"],
   outputs: outputs as CodeComponentConfig["outputs"],
+  scenarioMappings: Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
+  scenarioOutputField,
 });
 
 export type AgentCodeEditorDrawerProps = {
@@ -167,6 +173,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const [code, setCode] = useState(DEFAULT_CODE);
   const [inputs, setInputs] = useState<DSLField[]>(DEFAULT_INPUTS);
   const [outputs, setOutputs] = useState<DSLField[]>(DEFAULT_OUTPUTS);
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>({});
+  const [scenarioOutputField, setScenarioOutputField] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
@@ -186,15 +194,25 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     if (agentQuery.data) {
       setName(agentQuery.data.name);
       setCode(getCodeFromConfig(agentQuery.data.config));
-      setInputs(getInputsFromConfig(agentQuery.data.config));
+      const agentInputs = getInputsFromConfig(agentQuery.data.config);
+      setInputs(agentInputs);
       setOutputs(getOutputsFromConfig(agentQuery.data.config));
+      const existingMappings = (agentQuery.data.config as CodeComponentConfig).scenarioMappings ?? {};
+      // If no saved mappings, compute best-match defaults from input names
+      const mappings = Object.keys(existingMappings).length > 0
+        ? existingMappings
+        : computeBestMatchMappings({ inputs: agentInputs });
+      setScenarioMappings(mappings);
+      setScenarioOutputField((agentQuery.data.config as CodeComponentConfig).scenarioOutputField ?? undefined);
       setHasUnsavedChanges(false);
     } else if (!agentId) {
-      // Reset form for new agent
+      // Reset form for new agent — compute best-match from default inputs
       setName("");
       setCode(DEFAULT_CODE);
       setInputs(DEFAULT_INPUTS);
       setOutputs(DEFAULT_OUTPUTS);
+      setScenarioMappings(computeBestMatchMappings({ inputs: DEFAULT_INPUTS }));
+      setScenarioOutputField(undefined);
       setHasUnsavedChanges(false);
     }
   }, [agentQuery.data, agentId, isOpen]);
@@ -234,8 +252,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
-    // Build DSL-compatible config with current inputs/outputs
-    const config = buildCodeConfig(code, inputs, outputs);
+    // Build DSL-compatible config with current inputs/outputs/scenarioMappings/scenarioOutputField
+    const config = buildCodeConfig(code, inputs, outputs, scenarioMappings, scenarioOutputField);
 
     if (agentId) {
       // Editing existing agent - no limit check needed
@@ -263,6 +281,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     code,
     inputs,
     outputs,
+    scenarioMappings,
+    scenarioOutputField,
     isValid,
     createMutation,
     updateMutation,
@@ -286,6 +306,24 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       type: v.type as DSLField["type"],
     }));
     setInputs(newInputs);
+    // Recompute best-match for any new inputs that don't already have a mapping
+    setScenarioMappings((prev) => {
+      const bestMatch = computeBestMatchMappings({ inputs: newInputs });
+      const merged = { ...prev };
+      for (const inp of newInputs) {
+        const match = bestMatch[inp.identifier];
+        if (!merged[inp.identifier] && match) {
+          merged[inp.identifier] = match;
+        }
+      }
+      // Remove mappings for inputs that no longer exist
+      for (const key of Object.keys(merged)) {
+        if (!newInputs.some((inp) => inp.identifier === key)) {
+          delete merged[key];
+        }
+      }
+      return merged;
+    });
     setHasUnsavedChanges(true);
   }, []);
 
@@ -296,6 +334,10 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       type: o.type as DSLField["type"],
     }));
     setOutputs(newFields);
+    // If the previously selected output field no longer exists, reset to auto
+    setScenarioOutputField((prev) =>
+      prev && !newFields.some((f) => f.identifier === prev) ? undefined : prev,
+    );
     setHasUnsavedChanges(true);
   }, []);
 
@@ -305,6 +347,22 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onInputMappingsChange?.(identifier, mapping);
     },
     [onInputMappingsChange],
+  );
+
+  // Handle scenario mapping change (persisted on agent config)
+  const handleScenarioMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      setScenarioMappings((prev) => {
+        if (!mapping) {
+          const next = { ...prev };
+          delete next[identifier];
+          return next;
+        }
+        return { ...prev, [identifier]: mapping };
+      });
+      setHasUnsavedChanges(true);
+    },
+    [],
   );
 
   // Convert DSL inputs to Variable[] for VariablesSection
@@ -437,6 +495,20 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                     availableTypes={CODE_OUTPUT_TYPES}
                   />
                 </Box>
+
+                {/* Scenario Input/Output Mapping — only shown when agent has inputs */}
+                {variablesForUI.length > 0 && (
+                  <Box>
+                    <ScenarioInputMappingSection
+                      inputs={variablesForUI}
+                      mappings={scenarioMappings}
+                      onMappingChange={handleScenarioMappingChange}
+                      outputs={outputsForUI}
+                      outputField={scenarioOutputField}
+                      onOutputFieldChange={setScenarioOutputField}
+                    />
+                  </Box>
+                )}
               </VStack>
             )}
           </Drawer.Body>
