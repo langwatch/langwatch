@@ -26,7 +26,7 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { VALID_LABELS } from "~/server/prompt-config/repositories/llm-config-label.repository";
+import { VALID_LABELS } from "~/prompts/constants/labels";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -83,6 +83,7 @@ export function DeployPromptDialog({
 
   // Initialize selections from current label assignments
   useEffect(() => {
+    if (!isOpen) return;
     const data = labelsQuery.data;
     if (!data?.length) {
       setLabelSelections(Object.fromEntries(VALID_LABELS.map((l) => [l, ""])));
@@ -95,7 +96,7 @@ export function DeployPromptDialog({
       next[label] = found?.versionId ?? "";
     }
     setLabelSelections(next);
-  }, [labelsQuery.data]);
+  }, [isOpen, labelsQuery.data]);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -290,11 +291,11 @@ export function DeployPromptDialog({
                               const item = items[0] as typeof versionItems[number] | undefined;
                               if (!item) return "Select version";
                               return (
-                                <HStack gap={1}>
-                                  <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold">
+                                <HStack gap={1} maxWidth="100%" overflow="hidden">
+                                  <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
                                     v{item.version}
                                   </Text>
-                                  <Text as="span" fontSize="sm" color="fg.muted">
+                                  <Text as="span" fontSize="sm" color="fg.muted" truncate>
                                     {item.commitMessage}
                                   </Text>
                                 </HStack>
@@ -305,11 +306,11 @@ export function DeployPromptDialog({
                         <Select.Content>
                           {versionItems.map((v) => (
                             <Select.Item key={v.value} item={v}>
-                              <HStack gap={2}>
-                                <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold">
+                              <HStack gap={2} maxWidth="100%" overflow="hidden">
+                                <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
                                   v{v.version}
                                 </Text>
-                                <Text as="span" fontSize="sm" color="fg.muted">
+                                <Text as="span" fontSize="sm" color="fg.muted" truncate>
                                   {v.commitMessage}
                                 </Text>
                               </HStack>

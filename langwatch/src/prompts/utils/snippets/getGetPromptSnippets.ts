@@ -22,8 +22,8 @@ export function getGetPromptSnippets(params?: {
 # Setup LangWatch (ensure LANGWATCH_API_KEY is set in environment)
 langwatch.setup(api_key="${apiKey}")
 
-# Fetch prompt
-prompt = langwatch.prompts.get("${promptHandle}"${label ? `, label="${label}"` : ""})
+# Fetch prompt${label ? `\n# Note: To fetch by label, use the REST API: GET /api/prompts/${promptHandle}?label=${label}` : ""}
+prompt = langwatch.prompts.get("${promptHandle}")
 
 # Access prompt properties
 print(f"Prompt Name: {prompt.name}")
@@ -61,8 +61,8 @@ const langwatch = new LangWatch({
   apiKey: '${apiKey}'
 });
 
-// Fetch prompt
-const prompt = await langwatch.prompts.get('${promptHandle}'${label ? `, { label: '${label}' }` : ""});
+// Fetch prompt${label ? `\n// Note: To fetch by label, use the REST API: GET /api/prompts/${promptHandle}?label=${label}` : ""}
+const prompt = await langwatch.prompts.get('${promptHandle}');
 
 // Access prompt properties
 console.log(\`Prompt Name: \${prompt.name}\`);
