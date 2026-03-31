@@ -152,6 +152,7 @@ function makeQueryInput(
 }
 
 let ch: ClickHouseClient;
+let service: ClickHouseTraceService;
 
 // Mock getClickHouseClientForProject to return the test container client
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
@@ -182,6 +183,10 @@ beforeAll(async () => {
     chModule.getClickHouseClientForProject,
   );
   getClickHouseClientForProject.mockResolvedValue(ch);
+
+  // Import the mocked prisma and build the shared service instance
+  const { prisma } = await import("~/server/db");
+  service = new ClickHouseTraceService(prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]);
 }, 60_000);
 
 afterAll(async () => {
@@ -246,11 +251,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest version of the trace", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
-
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
           openProtections,
@@ -269,10 +269,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy ComputedInput/ComputedOutput columns", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
@@ -328,10 +324,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns both traces without duplication", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
@@ -423,10 +415,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest trace summary version", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const traces = await service.getTracesWithSpans(
           tenantId,
@@ -443,10 +431,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest span version", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const traces = await service.getTracesWithSpans(
           tenantId,
@@ -463,10 +447,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy SpanAttributes in the result", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const traces = await service.getTracesWithSpans(
           tenantId,
@@ -486,10 +466,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy ComputedInput/ComputedOutput from the latest trace version", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const traces = await service.getTracesWithSpans(
           tenantId,
@@ -614,10 +590,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("deduplicates spans per trace correctly", async () => {
-        const { prisma } = await import("~/server/db");
-        const service = new ClickHouseTraceService(
-          prisma as Parameters<typeof ClickHouseTraceService.create>[0],
-        );
 
         const traces = await service.getTracesWithSpans(
           tenantId,
