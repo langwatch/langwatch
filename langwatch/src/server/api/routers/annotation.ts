@@ -130,6 +130,9 @@ export const annotationRouter = createTRPCRouter({
         expectedOutput: input.expectedOutput ?? null,
       });
 
+      // Best-effort ClickHouse sync: Prisma is the source of truth.
+      // Failures are logged but don't fail the mutation — the backfill task
+      // can reconcile any missed syncs.
       try {
         const app = getApp();
         await app.traces.addAnnotation({
@@ -255,6 +258,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
+      // Best-effort ClickHouse sync (see create mutation comment above).
       try {
         const app = getApp();
         await app.traces.removeAnnotation({

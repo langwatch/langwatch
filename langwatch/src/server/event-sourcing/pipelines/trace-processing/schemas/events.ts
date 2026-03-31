@@ -232,6 +232,7 @@ export const annotationAddedEventMetadataSchema = z
  * Zod schema for AnnotationAddedEvent data.
  */
 export const annotationAddedEventDataSchema = z.object({
+  traceId: z.string(),
   annotationId: z.string(),
 });
 
@@ -268,6 +269,7 @@ export const annotationRemovedEventMetadataSchema = z
  * Zod schema for AnnotationRemovedEvent data.
  */
 export const annotationRemovedEventDataSchema = z.object({
+  traceId: z.string(),
   annotationId: z.string(),
 });
 
@@ -306,6 +308,7 @@ export const annotationsBulkSyncedEventMetadataSchema = z
  * Zod schema for AnnotationsBulkSyncedEvent data.
  */
 export const annotationsBulkSyncedEventDataSchema = z.object({
+  traceId: z.string(),
   annotationIds: z.array(z.string()),
 });
 

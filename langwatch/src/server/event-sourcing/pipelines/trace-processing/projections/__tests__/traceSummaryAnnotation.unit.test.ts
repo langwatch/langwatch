@@ -43,7 +43,7 @@ function makeAnnotationAddedEvent({
     tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    data: { annotationId },
+    data: { traceId: "trace-1", annotationId },
     metadata: {},
   };
 }
@@ -62,7 +62,7 @@ function makeAnnotationRemovedEvent({
     tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    data: { annotationId },
+    data: { traceId: "trace-1", annotationId },
     metadata: {},
   };
 }
@@ -81,7 +81,7 @@ function makeAnnotationsBulkSyncedEvent({
     tenantId: createTenantId("tenant-1"),
     createdAt: Date.now(),
     occurredAt: Date.now(),
-    data: { annotationIds },
+    data: { traceId: "trace-1", annotationIds },
     metadata: {},
   };
 }
@@ -162,7 +162,7 @@ describe("traceSummary fold projection — annotation events", () => {
     });
 
     describe("when AnnotationsBulkSyncedEvent is received", () => {
-      it("replaces the entire annotation IDs array", () => {
+      it("merges with existing annotation IDs without duplicates", () => {
         let state = makeInitState();
         state = projection.apply(
           state,
@@ -172,11 +172,11 @@ describe("traceSummary fold projection — annotation events", () => {
         const result = projection.apply(
           state,
           makeAnnotationsBulkSyncedEvent({
-            annotationIds: ["bulk-1", "bulk-2", "bulk-3"],
+            annotationIds: ["old-ann", "bulk-1", "bulk-2"],
           }),
         );
 
-        expect(result.annotationIds).toEqual(["bulk-1", "bulk-2", "bulk-3"]);
+        expect(result.annotationIds).toEqual(["old-ann", "bulk-1", "bulk-2"]);
       });
     });
 

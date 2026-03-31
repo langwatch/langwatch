@@ -351,6 +351,7 @@ export class TraceSummaryFoldProjection
     event: AnnotationsBulkSyncedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
-    return { ...state, annotationIds: event.data.annotationIds };
+    const merged = [...new Set([...state.annotationIds, ...event.data.annotationIds])];
+    return { ...state, annotationIds: merged };
   }
 }

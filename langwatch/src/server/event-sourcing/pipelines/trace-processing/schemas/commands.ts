@@ -86,35 +86,3 @@ export type ResolveOriginCommandData = z.infer<
   typeof resolveOriginCommandDataSchema
 >;
 
-export const addAnnotationCommandDataSchema = z.object({
-  tenantId: z.string(),
-  traceId: z.string(),
-  annotationId: z.string(),
-  occurredAt: z.number(),
-});
-
-export type AddAnnotationCommandData = z.infer<
-  typeof addAnnotationCommandDataSchema
->;
-
-export const removeAnnotationCommandDataSchema = z.object({
-  tenantId: z.string(),
-  traceId: z.string(),
-  annotationId: z.string(),
-  occurredAt: z.number(),
-});
-
-export type RemoveAnnotationCommandData = z.infer<
-  typeof removeAnnotationCommandDataSchema
->;
-
-export const bulkSyncAnnotationsCommandDataSchema = z.object({
-  tenantId: z.string(),
-  traceId: z.string(),
-  annotationIds: z.array(z.string()),
-  occurredAt: z.number(),
-});
-
-export type BulkSyncAnnotationsCommandData = z.infer<
-  typeof bulkSyncAnnotationsCommandDataSchema
->;

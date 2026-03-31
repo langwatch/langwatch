@@ -163,6 +163,15 @@ describe("AbstractFoldProjection", () => {
       expect(s2.UpdatedAt).toBe(1002); // max(1000, 1001 + 1) = 1002
     });
 
+    it("bumps UpdatedAt even when handler returns state unchanged", () => {
+      const state = projection.init();
+      const event: ResetEvent = { type: "test.reset" };
+
+      const result = projection.apply(state, event);
+
+      expect(result.UpdatedAt).toBeGreaterThan(state.UpdatedAt);
+    });
+
     it("uses Date.now() when it exceeds previous + 1", () => {
       const state = projection.init();
       const event: IncrementedEvent = { type: "test.incremented", amount: 1 };
