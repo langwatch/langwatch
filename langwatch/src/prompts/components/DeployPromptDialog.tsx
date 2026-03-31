@@ -3,6 +3,7 @@ import {
   Button,
   createListCollection,
   HStack,
+  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -283,17 +284,17 @@ export function DeployPromptDialog({
                         }}
                         aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
                       >
-                        <Select.Trigger>
+                        <Select.Trigger clearable>
                           <Select.ValueText placeholder="Select version">
                             {(items) => {
                               const item = items[0] as typeof versionItems[number] | undefined;
                               if (!item) return "Select version";
                               return (
                                 <HStack gap={1}>
-                                  <Text as="span" fontFamily="mono" fontSize="xs" fontWeight="semibold">
+                                  <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold">
                                     v{item.version}
                                   </Text>
-                                  <Text as="span" fontSize="xs" color="fg.muted">
+                                  <Text as="span" fontSize="sm" color="fg.muted">
                                     {item.commitMessage}
                                   </Text>
                                 </HStack>
@@ -305,10 +306,10 @@ export function DeployPromptDialog({
                           {versionItems.map((v) => (
                             <Select.Item key={v.value} item={v}>
                               <HStack gap={2}>
-                                <Text as="span" fontFamily="mono" fontSize="xs" fontWeight="semibold">
+                                <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold">
                                   v{v.version}
                                 </Text>
-                                <Text as="span" fontSize="xs" color="fg.muted">
+                                <Text as="span" fontSize="sm" color="fg.muted">
                                   {v.commitMessage}
                                 </Text>
                               </HStack>
@@ -322,17 +323,14 @@ export function DeployPromptDialog({
                         label={label}
                       >
                         <GeneratePromptApiSnippetDialog.Trigger>
-                          <Box
-                            as="button"
-                            color="fg.muted"
-                            cursor="pointer"
-                            _hover={{ color: "fg" }}
+                          <IconButton
+                            variant="ghost"
+                            size="xs"
                             aria-label="View code snippet"
-                            display="flex"
-                            alignItems="center"
+                            css={{ boxShadow: "none !important" }}
                           >
                             <UnplugIcon size={14} />
-                          </Box>
+                          </IconButton>
                         </GeneratePromptApiSnippetDialog.Trigger>
                       </GeneratePromptApiSnippetDialog>
                       </HStack>
