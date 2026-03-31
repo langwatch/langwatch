@@ -57,14 +57,18 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     return config as LLMConfig;
   }, [watchedValues]);
 
-  // Handle changes from LLMConfigPopover — write all keys back to form
+  // Handle changes from LLMConfigPopover — write all keys back to form.
+  // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that
+  // cleared fields (e.g. reasoning removed on model switch) are set to
+  // undefined, preventing stale values from persisting.
   const handleChange = useCallback(
     (newConfig: LLMConfig) => {
+      const incoming = new Map<string, string | number | undefined>();
       for (const [key, value] of Object.entries(newConfig)) {
-        const formKey = toInternalKey(key);
-        if (value !== undefined) {
-          setValue(`${prefix}.${formKey}`, value, { shouldDirty: true });
-        }
+        incoming.set(toInternalKey(key), value as string | number | undefined);
+      }
+      for (const key of LLM_CONFIG_KEYS) {
+        setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
       }
     },
     [prefix, setValue],
