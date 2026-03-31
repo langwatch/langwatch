@@ -138,6 +138,7 @@ describe("Prompt Labels", () => {
           versionId: "prompt_version_abc123",
         });
 
+        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.assignLabel).toHaveBeenCalledWith({
           id: "pizza-prompt",
           label: "production",
