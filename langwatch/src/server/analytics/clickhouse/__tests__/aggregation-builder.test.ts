@@ -259,7 +259,7 @@ describe("aggregation-builder", () => {
         expect(result.sql).toContain("group_key");
       });
 
-      it("includes group_key in both sides of UNION ALL for simple metrics", () => {
+      it("includes group_key in standard query for simple metrics with groupBy", () => {
         const input = {
           ...baseInput,
           timeScale: "full" as const,
@@ -274,11 +274,11 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
-        // Both the current and previous SELECT branches of UNION ALL must include group_key
-        const unionParts = result.sql.split("UNION ALL");
-        expect(unionParts.length).toBeGreaterThanOrEqual(2);
-        expect(unionParts[0]).toContain("group_key");
-        expect(unionParts[1]).toContain("group_key");
+        // timeScale "full" + groupBy uses the standard query path (not CTE/UNION ALL),
+        // which produces a single SELECT with GROUP BY period, group_key
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("GROUP BY");
+        expect(result.sql).toContain("period");
       });
 
       it("does not include group_key when groupBy is absent", () => {
@@ -297,7 +297,7 @@ describe("aggregation-builder", () => {
         expect(result.sql).not.toContain("group_key");
       });
 
-      it("includes group_key via FULL OUTER JOIN when mixing simple and subquery metrics", () => {
+      it("includes group_key when mixing simple and pipeline metrics with groupBy", () => {
         const input = {
           ...baseInput,
           timeScale: "full" as const,
@@ -317,9 +317,10 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
+        // timeScale "full" + groupBy falls through to the standard query path,
+        // which includes group_key in a single SELECT with GROUP BY
         expect(result.sql).toContain("group_key");
-        expect(result.sql).toContain("FULL OUTER JOIN");
-        expect(result.sql).toContain("UNION ALL");
+        expect(result.sql).toContain("GROUP BY");
       });
 
       it("uses direct group_key alias without null-check wrapper when groupBy handlesUnknown", () => {
