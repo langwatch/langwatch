@@ -215,7 +215,7 @@ export function DeployPromptDialog({
                     <Text fontSize="sm" color="fg.muted" data-testid="latest-version">
                       {latestVersion ? `v${latestVersion.version}` : "--"}
                     </Text>
-                    <Tooltip content="Automatically points to the latest version.">
+                    <Tooltip content="Automatically points to the latest version number.">
                       <Box color="fg.muted" cursor="help">
                         <Info size={14} />
                       </Box>
