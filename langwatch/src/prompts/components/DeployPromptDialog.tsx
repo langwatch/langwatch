@@ -149,20 +149,22 @@ export function DeployPromptDialog({
     utils,
   ]);
 
-  const versionOptions = useMemo(
+  const versionItems = useMemo(
     () =>
       [...versions]
         .sort((a, b) => b.version - a.version)
         .map((v) => ({
-          label: `v${v.version} — ${v.commitMessage ?? "No message"}`,
+          label: `v${v.version}: ${v.commitMessage ?? "No message"}`,
           value: v.versionId,
+          version: v.version,
+          commitMessage: v.commitMessage ?? "No message",
         })),
     [versions],
   );
 
   const versionCollection = useMemo(
-    () => createListCollection({ items: versionOptions }),
-    [versionOptions],
+    () => createListCollection({ items: versionItems }),
+    [versionItems],
   );
 
   return (
@@ -179,8 +181,8 @@ export function DeployPromptDialog({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use labels to get specific prompt version via SDK. Prompt labeled as
-              Production is returned by default.
+              Use labels to get specific prompt versions via the SDK and API.
+              Prompt versions with the production label are returned by default.
             </Text>
 
             <HStack gap={2}>
@@ -276,12 +278,34 @@ export function DeployPromptDialog({
                         aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
                       >
                         <Select.Trigger>
-                          <Select.ValueText placeholder="Select version" />
+                          <Select.ValueText placeholder="Select version">
+                            {(items) => {
+                              const item = items[0] as typeof versionItems[number] | undefined;
+                              if (!item) return "Select version";
+                              return (
+                                <HStack gap={1}>
+                                  <Text as="span" fontFamily="mono" fontSize="xs" fontWeight="semibold">
+                                    v{item.version}
+                                  </Text>
+                                  <Text as="span" fontSize="xs" color="fg.muted">
+                                    {item.commitMessage}
+                                  </Text>
+                                </HStack>
+                              );
+                            }}
+                          </Select.ValueText>
                         </Select.Trigger>
                         <Select.Content>
-                          {versionOptions.map((v) => (
+                          {versionItems.map((v) => (
                             <Select.Item key={v.value} item={v}>
-                              {v.label}
+                              <HStack gap={2}>
+                                <Text as="span" fontFamily="mono" fontSize="xs" fontWeight="semibold">
+                                  v{v.version}
+                                </Text>
+                                <Text as="span" fontSize="xs" color="fg.muted">
+                                  {v.commitMessage}
+                                </Text>
+                              </HStack>
                             </Select.Item>
                           ))}
                         </Select.Content>

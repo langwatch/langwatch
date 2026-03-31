@@ -59,7 +59,7 @@ vi.mock("~/components/ui/select", () => {
     ...rest
   }: {
     children: React.ReactNode;
-    collection: { items: Array<{ label: string; value: string }> };
+    collection: { items: Array<{ label: string; value: string; version: number; commitMessage: string }> };
     value: string[];
     onValueChange: (details: { value: string[] }) => void;
     "aria-label"?: string;
@@ -73,7 +73,7 @@ vi.mock("~/components/ui/select", () => {
       >
         <option value="">Select version</option>
         {collection.items.map(
-          (item: { label: string; value: string }) => (
+          (item: { label: string; value: string; version: number; commitMessage: string }) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
@@ -161,7 +161,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
         expect(
           screen.getByText(
-            "Use labels to get specific prompt version via SDK. Prompt labeled as Production is returned by default.",
+            "Use labels to get specific prompt versions via the SDK and API. Prompt versions with the production label are returned by default.",
           ),
         ).toBeInTheDocument();
       });
