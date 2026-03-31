@@ -8,6 +8,11 @@ const logger = createLogger("langwatch:tasks:backfillAnnotationsToClickhouse");
 /**
  * One-time backfill task that syncs all annotations from Prisma to ClickHouse
  * via the event sourcing pipeline using bulkSyncAnnotations commands.
+ *
+ * Race-condition note: concurrent add/remove mutations are safe because
+ * handleTraceAnnotationsBulkSynced merges via Set (never overwrites).
+ * The worst case is a brief window where a just-removed annotation
+ * reappears until the next add/remove event corrects it.
  */
 export default async function execute() {
   initializeDefaultApp();
