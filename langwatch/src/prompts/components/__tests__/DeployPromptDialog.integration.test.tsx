@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeployPromptDialog } from "../DeployPromptDialog";
 
@@ -48,6 +48,54 @@ vi.mock("~/components/CopyButton", () => ({
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
+
+// Mock the custom Select to render a native <select> for testability
+vi.mock("~/components/ui/select", () => {
+  const SelectRoot = ({
+    children,
+    collection,
+    value,
+    onValueChange,
+    ...rest
+  }: {
+    children: React.ReactNode;
+    collection: { items: Array<{ label: string; value: string }> };
+    value: string[];
+    onValueChange: (details: { value: string[] }) => void;
+    "aria-label"?: string;
+    [key: string]: unknown;
+  }) => (
+    <div data-testid="select-root">
+      <select
+        aria-label={rest["aria-label"] as string}
+        value={value[0] ?? ""}
+        onChange={(e) => onValueChange({ value: [e.target.value] })}
+      >
+        <option value="">Select version</option>
+        {collection.items.map(
+          (item: { label: string; value: string }) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ),
+        )}
+      </select>
+      {children}
+    </div>
+  );
+
+  return {
+    Select: {
+      Root: SelectRoot,
+      Trigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+      Content: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+      Item: () => null,
+      ValueText: ({ placeholder }: { placeholder?: string }) => (
+        <span>{placeholder}</span>
+      ),
+    },
+  };
+});
 
 const mockVersions = [
   { version: 1, versionId: "v1-id", commitMessage: "Initial version" },
@@ -158,14 +206,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
       it("does not render an editable control for the latest row", () => {
         renderDialog();
 
-        // The latest row should not have a select/dropdown
         const latestVersion = screen.getByTestId("latest-version");
-        const latestRow = latestVersion.closest("[class]");
-        expect(latestRow).toBeTruthy();
-        // Verify no select inside the latest row area
-        expect(
-          within(latestVersion).queryByRole("combobox"),
-        ).not.toBeInTheDocument();
+        expect(latestVersion.closest("[data-testid='select-root']")).toBeNull();
       });
     });
 
@@ -178,10 +220,10 @@ describe("Feature: Deploy Prompt Dialog", () => {
         renderDialog();
 
         const prodSelect = screen.getByLabelText("Production version");
-        const options = within(prodSelect).getAllByRole("option");
+        const options = prodSelect.querySelectorAll("option");
 
         // First option is the placeholder
-        expect(options[0]).toHaveTextContent("-- Select version --");
+        expect(options[0]).toHaveTextContent("Select version");
         // Versions should be newest first
         expect(options[1]).toHaveTextContent("v4");
         expect(options[1]).toHaveTextContent("Update model");

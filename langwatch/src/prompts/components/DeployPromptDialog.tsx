@@ -1,13 +1,13 @@
 import {
   Box,
   Button,
+  createListCollection,
   HStack,
-  NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CopyButton } from "~/components/CopyButton";
 import {
@@ -19,6 +19,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Select } from "~/components/ui/select";
 import { Tooltip } from "~/components/ui/tooltip";
 import { toaster } from "~/components/ui/toaster";
 import { VALID_LABELS } from "~/server/prompt-config/repositories/llm-config-label.repository";
@@ -148,7 +149,21 @@ export function DeployPromptDialog({
     utils,
   ]);
 
-  const versionOptions = [...versions].sort((a, b) => b.version - a.version);
+  const versionOptions = useMemo(
+    () =>
+      [...versions]
+        .sort((a, b) => b.version - a.version)
+        .map((v) => ({
+          label: `v${v.version} — ${v.commitMessage ?? "No message"}`,
+          value: v.versionId,
+        })),
+    [versions],
+  );
+
+  const versionCollection = useMemo(
+    () => createListCollection({ items: versionOptions }),
+    [versionOptions],
+  );
 
   return (
     <DialogRoot
@@ -249,20 +264,28 @@ export function DeployPromptDialog({
                           {label}
                         </Text>
                       </HStack>
-                      <NativeSelect.Root size="sm" width="auto" minWidth="140px">
-                        <NativeSelect.Field
-                          aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
-                          value={labelSelections[label] ?? ""}
-                          onChange={(e) => setLabelVersionId(label, e.target.value)}
-                        >
-                          <option value="">-- Select version --</option>
+                      <Select.Root
+                        collection={versionCollection}
+                        size="sm"
+                        width="auto"
+                        minWidth="180px"
+                        value={labelSelections[label] ? [labelSelections[label]!] : []}
+                        onValueChange={(details) => {
+                          setLabelVersionId(label, details.value[0] ?? "");
+                        }}
+                        aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
+                      >
+                        <Select.Trigger>
+                          <Select.ValueText placeholder="Select version" />
+                        </Select.Trigger>
+                        <Select.Content>
                           {versionOptions.map((v) => (
-                            <option key={v.versionId} value={v.versionId}>
-                              v{v.version} — {v.commitMessage ?? "No message"}
-                            </option>
+                            <Select.Item key={v.value} item={v}>
+                              {v.label}
+                            </Select.Item>
                           ))}
-                        </NativeSelect.Field>
-                      </NativeSelect.Root>
+                        </Select.Content>
+                      </Select.Root>
                     </HStack>
                   </Box>
                 );
