@@ -1,6 +1,6 @@
 from functools import wraps
 from opentelemetry import trace
-from typing import TYPE_CHECKING, Literal, Optional, TypeVar, Callable, Any
+from typing import TYPE_CHECKING, Literal, Optional, TypeVar, Callable
 import json
 
 from langwatch.attributes import AttributeKey
@@ -15,7 +15,7 @@ class PromptServiceTracing:
     """Namespace for PromptService method tracing decorators"""
 
     @staticmethod
-    def get(func: Callable[..., Any]) -> Callable[..., Any]:
+    def get(func: Callable[..., "Prompt"]) -> Callable[..., "Prompt"]:
         """
         Type-safe decorator for PromptService.get method with OpenTelemetry tracing
 
@@ -34,7 +34,7 @@ class PromptServiceTracing:
             with trace.get_tracer(__name__).start_as_current_span(
                 PromptServiceTracing._create_span_name("get")
             ) as span:
-                variables_dict: dict[str, Any] = {"prompt_id": prompt_id}
+                variables_dict: dict[str, str] = {"prompt_id": prompt_id}
                 if label is not None:
                     variables_dict["label"] = label
                 span.set_attribute(
