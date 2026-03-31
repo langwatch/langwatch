@@ -223,6 +223,20 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
+  describe("when a non-MCP route is requested", () => {
+    it("is not intercepted by the MCP handler", async () => {
+      const res = await sendRequest({
+        server,
+        method: "GET",
+        path: "/api/health",
+      });
+      // The handler returns 404 for unknown routes, proving /api/health
+      // is not matched as an MCP route. In production, start.ts checks
+      // isMcpRoute() first and falls through to Next.js.
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe("when MCP POST request body is sent", () => {
     it("returns a valid initialize result", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
@@ -456,6 +470,26 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.headers["access-control-allow-methods"]).toContain("POST");
       expect(res.headers["access-control-allow-methods"]).toContain("GET");
       expect(res.headers["access-control-allow-methods"]).toContain("DELETE");
+    });
+  });
+
+  // --- Standalone Package Isolation ---
+
+  describe("when the standalone mcp-server package is checked for isolation", () => {
+    it("does not import any main app modules", async () => {
+      // The mcp-server package's create-mcp-server.ts should not import
+      // from the main app (~/server/db, ~/server/redis, etc.)
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const mcpServerDir = path.resolve(__dirname, "../../../../mcp-server/src");
+      const createMcpServerSrc = fs.readFileSync(
+        path.join(mcpServerDir, "create-mcp-server.ts"),
+        "utf-8"
+      );
+      // Should not import from the main app
+      expect(createMcpServerSrc).not.toContain("~/server/");
+      expect(createMcpServerSrc).not.toContain("../server/");
+      expect(createMcpServerSrc).not.toContain("langwatch/src/");
     });
   });
 
