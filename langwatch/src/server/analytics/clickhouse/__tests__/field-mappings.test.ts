@@ -178,7 +178,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("buildJoinClause", () => {
+  describe("buildJoinClause()", () => {
     it("returns empty string for trace_summaries", () => {
       expect(buildJoinClause("trace_summaries")).toBe("");
     });
@@ -199,6 +199,56 @@ describe("field-mappings", () => {
       expect(join).toContain("LIMIT 1 BY TenantId, EvaluationId");
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
+    });
+
+    describe("when date bounds are provided", () => {
+      const dateBounds = {
+        start: new Date("2024-01-01T00:00:00Z"),
+        end: new Date("2024-02-01T00:00:00Z"),
+      };
+
+      it("includes StartTime date filter in stored_spans subquery", () => {
+        const join = buildJoinClause("stored_spans", undefined, dateBounds);
+        expect(join).toContain(
+          "StartTime >= {joinDateStart:DateTime64(3)}"
+        );
+        expect(join).toContain(
+          "StartTime < {joinDateEnd:DateTime64(3)}"
+        );
+      });
+
+      it("includes CreatedAt date filter in evaluation_runs subquery", () => {
+        const join = buildJoinClause("evaluation_runs", undefined, dateBounds);
+        expect(join).toContain(
+          "CreatedAt >= {joinDateStart:DateTime64(3)}"
+        );
+        expect(join).toContain(
+          "CreatedAt < {joinDateEnd:DateTime64(3)}"
+        );
+      });
+
+      it("preserves column pruning alongside date bounds", () => {
+        const columns = new Set(["SpanAttributes"]);
+        const join = buildJoinClause("stored_spans", columns, dateBounds);
+        expect(join).toContain("SpanAttributes");
+        expect(join).toContain("StartTime >= {joinDateStart:DateTime64(3)}");
+      });
+    });
+
+    describe("when date bounds are omitted", () => {
+      it("does not include date filters for stored_spans (backward compat)", () => {
+        const join = buildJoinClause("stored_spans");
+        expect(join).not.toContain("joinDateStart");
+        expect(join).not.toContain("joinDateEnd");
+        expect(join).not.toContain("StartTime >=");
+      });
+
+      it("does not include date filters for evaluation_runs (backward compat)", () => {
+        const join = buildJoinClause("evaluation_runs");
+        expect(join).not.toContain("joinDateStart");
+        expect(join).not.toContain("joinDateEnd");
+        expect(join).not.toContain("CreatedAt >=");
+      });
     });
   });
 

@@ -10,6 +10,7 @@ import type { SeriesInputType } from "../registry";
 import type { FilterField } from "../../filters/types";
 import {
   type CHTable,
+  type JoinDateBounds,
   buildJoinClause,
   tableAliases,
   TRACE_ANALYTICS_COLUMNS,
@@ -488,18 +489,24 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     }
   }
 
-  // Build JOIN clauses with column pruning.
+  // Build JOIN clauses with column pruning and date bounds.
   // Collect all SQL expressions that reference columns from joined tables
   // so we only SELECT the columns actually needed in each JOIN subquery.
+  // Date bounds span both current and previous periods so the JOIN covers
+  // all rows the outer query might reference.
   const allExpressions = [
     ...metricTranslations.map((m) => m.selectExpression),
     filterTranslation.whereClause,
     groupByColumn ?? "",
   ];
+  const joinDateBounds: JoinDateBounds = {
+    start: input.previousPeriodStartDate,
+    end: input.endDate,
+  };
   const joinClauses = Array.from(allJoins)
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, allExpressions);
-      return buildJoinClause(table, requiredColumns);
+      return buildJoinClause(table, requiredColumns, joinDateBounds);
     })
     .join("\n");
 
@@ -533,6 +540,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       filterWhere,
       allTranslationParams,
       timeZone,
+      joinDateBounds,
     );
   }
 
@@ -555,6 +563,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       allTranslationParams,
       groupByColumn,
       groupByHandlesUnknown,
+      joinDateBounds,
     );
   }
 
@@ -566,6 +575,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       groupByColumn,
       groupByHandlesUnknown,
       joinClauses,
+      joinDateBounds,
       baseWhere,
       filterWhere,
       filterParams: allTranslationParams,
@@ -647,6 +657,8 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
+      joinDateStart: joinDateBounds.start,
+      joinDateEnd: joinDateBounds.end,
       ...allTranslationParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
@@ -668,6 +680,7 @@ function buildArrayJoinTimeseriesQuery(
   filterWhere: string,
   filterParams: Record<string, unknown>,
   timeZone: string,
+  joinDateBounds: JoinDateBounds,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
 
@@ -769,6 +782,8 @@ function buildArrayJoinTimeseriesQuery(
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
+      joinDateStart: joinDateBounds.start,
+      joinDateEnd: joinDateBounds.end,
       ...filterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
@@ -790,12 +805,14 @@ function buildGroupByUnionAllQuery({
   simpleMetrics,
   subqueryMetrics,
   filterParams,
+  joinDateBounds,
 }: {
   input: TimeseriesQueryInput;
   ctes: string[];
   simpleMetrics: MetricTranslation[];
   subqueryMetrics: MetricTranslation[];
   filterParams: Record<string, unknown>;
+  joinDateBounds?: JoinDateBounds;
 }): BuiltQuery {
   const simpleAliases = simpleMetrics.map((m) => quoteIdentifier(m.alias));
   const subqueryAliasExprs = subqueryMetrics.map(
@@ -884,6 +901,9 @@ function buildGroupByUnionAllQuery({
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
+      ...(joinDateBounds
+        ? { joinDateStart: joinDateBounds.start, joinDateEnd: joinDateBounds.end }
+        : {}),
       ...filterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
@@ -904,6 +924,7 @@ function buildSubqueryTimeseriesQuery(
   filterParams: Record<string, unknown>,
   groupByColumn: string | null = null,
   groupByHandlesUnknown = false,
+  joinDateBounds?: JoinDateBounds,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ctes: string[] = [];
@@ -1073,6 +1094,7 @@ function buildSubqueryTimeseriesQuery(
       simpleMetrics,
       subqueryMetrics,
       filterParams,
+      joinDateBounds,
     });
   }
 
@@ -1124,6 +1146,9 @@ function buildSubqueryTimeseriesQuery(
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
+      ...(joinDateBounds
+        ? { joinDateStart: joinDateBounds.start, joinDateEnd: joinDateBounds.end }
+        : {}),
       ...filterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
@@ -1152,6 +1177,7 @@ function buildDateBucketedPipelineQuery({
   groupByColumn,
   groupByHandlesUnknown,
   joinClauses,
+  joinDateBounds,
   baseWhere,
   filterWhere,
   filterParams,
@@ -1162,6 +1188,7 @@ function buildDateBucketedPipelineQuery({
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
   joinClauses: string;
+  joinDateBounds: JoinDateBounds;
   baseWhere: string;
   filterWhere: string;
   filterParams: Record<string, unknown>;
@@ -1252,6 +1279,8 @@ function buildDateBucketedPipelineQuery({
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
+      joinDateStart: joinDateBounds.start,
+      joinDateEnd: joinDateBounds.end,
       ...filterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
@@ -1483,10 +1512,11 @@ export function buildDataForFilterQuery(
       ? `AND ${filterTranslation.whereClause}`
       : "";
   const filterExpressions = [filterTranslation.whereClause];
+  const filterDateBounds: JoinDateBounds = { start: startDate, end: endDate };
   const filterJoins = Array.from(filterTranslation.requiredJoins)
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, filterExpressions);
-      return buildJoinClause(table, requiredColumns);
+      return buildJoinClause(table, requiredColumns, filterDateBounds);
     })
     .join("\n");
 
@@ -1578,7 +1608,7 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.model":
-      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
+      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]), filterDateBounds);
       sql = `
         SELECT
           ${ss}.SpanAttributes['gen_ai.request.model'] AS field,
@@ -1600,7 +1630,7 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.type":
-      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
+      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]), filterDateBounds);
       sql = `
         SELECT
           ${ss}.SpanAttributes['langwatch.span.type'] AS field,
@@ -1623,7 +1653,7 @@ export function buildDataForFilterQuery(
 
     case "evaluations.evaluator_id":
     case "evaluations.evaluator_id.guardrails_only":
-      joins = buildJoinClause("evaluation_runs");
+      joins = buildJoinClause("evaluation_runs", undefined, filterDateBounds);
       sql = `
         SELECT
           ${es}.EvaluatorId AS field,
@@ -1672,6 +1702,8 @@ export function buildDataForFilterQuery(
       tenantId: projectId,
       startDate,
       endDate,
+      joinDateStart: filterDateBounds.start,
+      joinDateEnd: filterDateBounds.end,
       searchQuery: searchQuery ? `%${searchQuery}%` : undefined,
       ...filterTranslation.params,
     },
