@@ -97,10 +97,38 @@ Feature: Shorthand prompt label syntax
     Then it returns v4
 
   @integration
-  Scenario: TS SDK accepts explicit label option alongside slug
+  Scenario: TS SDK accepts explicit label option with bare slug
     Given "pizza-prompt" has staging=v2
     When the TS SDK resolves "pizza-prompt" with option label "staging"
     Then it returns v2
+
+  @integration
+  Scenario: TS SDK accepts explicit version option with bare slug
+    Given "pizza-prompt" has versions v1 through v5
+    When the TS SDK resolves "pizza-prompt" with option version 5
+    Then it returns v5
+
+  # --- SDK conflict validation (TypeScript) ---
+
+  @unit
+  Scenario: TS SDK throws when shorthand version conflicts with explicit version
+    When the TS SDK resolves "pizza-prompt:2" with option version 5
+    Then it throws "Cannot combine shorthand with explicit version/label options"
+
+  @unit
+  Scenario: TS SDK throws when shorthand label conflicts with explicit label
+    When the TS SDK resolves "pizza-prompt:production" with option label "staging"
+    Then it throws "Cannot combine shorthand with explicit version/label options"
+
+  @unit
+  Scenario: TS SDK throws when shorthand version conflicts with explicit label
+    When the TS SDK resolves "pizza-prompt:2" with option label "production"
+    Then it throws "Cannot combine shorthand with explicit version/label options"
+
+  @unit
+  Scenario: TS SDK throws when both explicit version and label are provided
+    When the TS SDK resolves "pizza-prompt" with option version 5 and label "production"
+    Then it throws "Cannot specify both version and label"
 
   # --- SDK resolution (Python) ---
 
@@ -123,10 +151,32 @@ Feature: Shorthand prompt label syntax
     Then it returns v4
 
   @integration
-  Scenario: Python SDK accepts explicit label parameter
+  Scenario: Python SDK accepts explicit label parameter with bare slug
     Given "pizza-prompt" has staging=v2
     When the Python SDK resolves "pizza-prompt" with label "staging"
     Then it returns v2
+
+  # --- SDK conflict validation (Python) ---
+
+  @unit
+  Scenario: Python SDK throws when shorthand version conflicts with explicit version
+    When the Python SDK resolves "pizza-prompt:2" with version_number 5
+    Then it raises "Cannot combine shorthand with explicit version/label options"
+
+  @unit
+  Scenario: Python SDK throws when shorthand label conflicts with explicit label
+    When the Python SDK resolves "pizza-prompt:production" with label "staging"
+    Then it raises "Cannot combine shorthand with explicit version/label options"
+
+  @unit
+  Scenario: Python SDK throws when shorthand version conflicts with explicit label
+    When the Python SDK resolves "pizza-prompt:2" with label "production"
+    Then it raises "Cannot combine shorthand with explicit version/label options"
+
+  @unit
+  Scenario: Python SDK throws when both explicit version and label are provided
+    When the Python SDK resolves "pizza-prompt" with version_number 5 and label "production"
+    Then it raises "Cannot specify both version and label"
 
   # --- REST API shorthand integration ---
 
