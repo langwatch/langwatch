@@ -495,6 +495,7 @@ const VariableRow = ({
                 placeholder=""
                 isMissing={isMissing}
                 optionalHighlighting={optionalHighlighting}
+                inputTestId={`mapping-input-${variable.identifier}`}
               />
             </Box>
           ) : (

@@ -1,13 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression tests for issue #2788: code agents must be excluded from
- * availableTargets in useSuiteForm.
+ * Tests for agent type filtering in useSuiteForm.availableTargets.
  *
- * Before the fix, ALL agents from api.agents.getAll were included as HTTP
- * targets regardless of their type field, causing code/signature/workflow
- * agents to silently appear in the suite target picker and fail at runtime.
- *
+ * HTTP and code agents are supported as suite targets.
+ * Signature and workflow agents are excluded (not supported by the adapter layer).
  */
 
 import { renderHook } from "@testing-library/react";
@@ -32,29 +29,30 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
     ];
 
     describe("when availableTargets is derived", () => {
-      it("includes only the http agent", () => {
+      it("includes the http agent", () => {
         const { result } = renderHook(() =>
           useSuiteForm({ ...baseParams, agents: mixedAgents }),
         );
 
-        const agentTargets = result.current.availableTargets.filter(
+        const httpTargets = result.current.availableTargets.filter(
           (t) => t.type === "http",
         );
 
-        expect(agentTargets).toHaveLength(1);
-        expect(agentTargets[0]?.referenceId).toBe("agent_http");
+        expect(httpTargets).toHaveLength(1);
+        expect(httpTargets[0]?.referenceId).toBe("agent_http");
       });
 
-      it("excludes the code agent", () => {
+      it("includes the code agent", () => {
         const { result } = renderHook(() =>
           useSuiteForm({ ...baseParams, agents: mixedAgents }),
         );
 
-        const referenceIds = result.current.availableTargets.map(
-          (t) => t.referenceId,
+        const codeTargets = result.current.availableTargets.filter(
+          (t) => t.type === "code",
         );
 
-        expect(referenceIds).not.toContain("agent_code");
+        expect(codeTargets).toHaveLength(1);
+        expect(codeTargets[0]?.referenceId).toBe("agent_code");
       });
 
       it("excludes the signature agent", () => {
@@ -90,16 +88,20 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
     ];
 
     describe("when availableTargets is derived", () => {
-      it("returns no agent targets", () => {
+      it("includes all code agents as targets", () => {
         const { result } = renderHook(() =>
           useSuiteForm({ ...baseParams, agents: codeOnlyAgents }),
         );
 
-        const agentTargets = result.current.availableTargets.filter(
-          (t) => t.type === "http",
+        const codeTargets = result.current.availableTargets.filter(
+          (t) => t.type === "code",
         );
 
-        expect(agentTargets).toHaveLength(0);
+        expect(codeTargets).toHaveLength(2);
+        expect(codeTargets.map((t) => t.referenceId)).toEqual([
+          "agent_code_1",
+          "agent_code_2",
+        ]);
       });
     });
   });
@@ -116,12 +118,12 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
           useSuiteForm({ ...baseParams, agents: httpOnlyAgents }),
         );
 
-        const agentTargets = result.current.availableTargets.filter(
+        const httpTargets = result.current.availableTargets.filter(
           (t) => t.type === "http",
         );
 
-        expect(agentTargets).toHaveLength(2);
-        expect(agentTargets.map((t) => t.referenceId)).toEqual([
+        expect(httpTargets).toHaveLength(2);
+        expect(httpTargets.map((t) => t.referenceId)).toEqual([
           "agent_http_1",
           "agent_http_2",
         ]);
