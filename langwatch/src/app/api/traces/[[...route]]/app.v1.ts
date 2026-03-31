@@ -116,6 +116,11 @@ app.post(
 
     const rawTraces = results.groups.flat() as Trace[];
 
+    // Merge evaluations from traceChecks into each trace object
+    for (const trace of rawTraces) {
+      trace.evaluations = results.traceChecks[trace.trace_id] ?? [];
+    }
+
     let traces: unknown[];
     if (format === "digest") {
       traces = rawTraces.map((trace) => ({
@@ -126,6 +131,7 @@ app.post(
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         error: trace.error,
+        evaluations: trace.evaluations,
       }));
     } else {
       traces = rawTraces;

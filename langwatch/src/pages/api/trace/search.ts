@@ -103,6 +103,11 @@ export default async function handler(
 
   const rawTraces = results.groups.flat() as Trace[];
 
+  // Merge evaluations from traceChecks into each trace object
+  for (const trace of rawTraces) {
+    trace.evaluations = results.traceChecks[trace.trace_id] ?? [];
+  }
+
   let traces: unknown[];
   if (format === "digest") {
     traces = rawTraces.map((trace) => ({
@@ -113,13 +118,14 @@ export default async function handler(
       timestamps: trace.timestamps,
       metadata: trace.metadata,
       error: trace.error,
+      evaluations: trace.evaluations,
     }));
   } else if (params.llmMode) {
     // Legacy llmMode behavior (kept for backward compat, but format=digest is preferred)
     traces = (rawTraces as Trace[]).map((trace) => ({
       ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
       spans: [],
-      evaluations: undefined,
+      evaluations: trace.evaluations,
     }));
   } else {
     traces = rawTraces;

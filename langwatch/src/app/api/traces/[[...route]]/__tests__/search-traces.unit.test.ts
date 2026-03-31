@@ -99,6 +99,10 @@ describe("POST /search", () => {
     mockGetAllTracesForProject.mockResolvedValue({
       groups: [sampleTraces],
       totalHits: 2,
+      traceChecks: {
+        "trace-1": [{ evaluation_id: "eval-1", evaluator_id: "evaluator-1", status: "processed", score: 0.95, label: "positive" }],
+        "trace-2": [],
+      },
       scrollId: undefined,
     });
   });
@@ -185,6 +189,34 @@ describe("POST /search", () => {
 
       const body = await res.json();
       expect(body.traces[0]).toHaveProperty("formatted_trace");
+    });
+  });
+
+  describe("when traceChecks contains evaluations", () => {
+    it("includes evaluations in json format response traces", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        format: "json",
+      });
+      const body = await res.json();
+      expect(body.traces[0].evaluations).toEqual([
+        expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
+      ]);
+      expect(body.traces[1].evaluations).toEqual([]);
+    });
+
+    it("includes evaluations in digest format response traces", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        format: "digest",
+      });
+      const body = await res.json();
+      expect(body.traces[0].evaluations).toEqual([
+        expect.objectContaining({ evaluation_id: "eval-1", score: 0.95 }),
+      ]);
+      expect(body.traces[1].evaluations).toEqual([]);
     });
   });
 });
