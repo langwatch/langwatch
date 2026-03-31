@@ -44,9 +44,7 @@ describe("PromptVersionLabelRepository", () => {
         expect(() => repo.validateLabel("canary")).toThrow(
           expect.objectContaining({
             name: "LabelValidationError",
-            message: expect.stringContaining(
-              'Only "production" and "staging" are allowed',
-            ),
+            message: expect.stringContaining('Invalid label "canary"'),
           }),
         );
       });

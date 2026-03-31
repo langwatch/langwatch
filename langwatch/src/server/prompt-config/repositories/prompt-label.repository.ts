@@ -1,10 +1,12 @@
 import type { PrismaClient, PromptLabel } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
+import { VALID_LABELS, type ValidLabel } from "~/prompts/constants/labels";
 
 const logger = createLogger("langwatch:prompt-labels");
 
-export const BUILT_IN_LABELS = ["latest", "production", "staging"] as const;
+/** Labels that are always available and cannot be created or deleted as custom labels. */
+export const BUILT_IN_LABELS = ["latest", ...VALID_LABELS] as const;
 export type BuiltInLabel = (typeof BUILT_IN_LABELS)[number];
 
 const LABEL_NAME_REGEX = /^[a-z][a-z0-9_-]*$/;
@@ -26,8 +28,9 @@ export class PromptLabelConflictError extends Error {
 
 /**
  * Validates a custom label name.
+ * - Must not be empty
  * - Must not be purely numeric
- * - Must match /^[a-z][a-z0-9_-]*$/ (lowercase, starts with letter, alphanumeric/dash/underscore only)
+ * - Must match /^[a-z][a-z0-9_-]*$/
  * - Must not clash with built-in labels
  */
 export function validateLabelName(name: string): void {
@@ -131,7 +134,7 @@ export class PromptLabelRepository {
 
   /**
    * Deletes a custom label definition and cascades to PromptVersionLabel rows
-   * for prompts belonging to the same org.
+   * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
    */
   async delete({
     id,
@@ -140,40 +143,39 @@ export class PromptLabelRepository {
     id: string;
     organizationId: string;
   }): Promise<void> {
-    const label = await this.prisma.promptLabel.findFirst({
-      where: { id, organizationId },
-    });
-
-    if (!label) {
-      return;
-    }
-
-    // Find all project IDs belonging to this org (via teams).
-    const projects = await this.prisma.project.findMany({
-      where: {
-        team: { organizationId },
-      },
-      select: { id: true },
-    });
-
-    const projectIds = projects.map((p) => p.id);
-
-    // Cascade: delete all PromptVersionLabel rows where the label name matches
-    // and the project belongs to this org.
-    if (projectIds.length > 0) {
-      await this.prisma.promptVersionLabel.deleteMany({
-        where: {
-          label: label.name,
-          projectId: { in: projectIds },
-        },
+    await this.prisma.$transaction(async (tx) => {
+      const label = await tx.promptLabel.findFirst({
+        where: { id, organizationId },
       });
-    }
 
-    await this.prisma.promptLabel.delete({
-      where: { id },
+      if (!label) {
+        return;
+      }
+
+      const projects = await tx.project.findMany({
+        where: {
+          team: { organizationId },
+        },
+        select: { id: true },
+      });
+
+      const projectIds = projects.map((p) => p.id);
+
+      if (projectIds.length > 0) {
+        await tx.promptVersionLabel.deleteMany({
+          where: {
+            label: label.name,
+            projectId: { in: projectIds },
+          },
+        });
+      }
+
+      await tx.promptLabel.delete({
+        where: { id },
+      });
+
+      logger.info({ organizationId, id, name: label.name }, "Custom prompt label deleted");
     });
-
-    logger.info({ organizationId, id, name: label.name }, "Custom prompt label deleted");
   }
 
   /**
@@ -189,7 +191,7 @@ export class PromptLabelRepository {
     label: string;
     organizationId: string;
   }): Promise<boolean> {
-    if ((["production", "staging"] as string[]).includes(label)) {
+    if (VALID_LABELS.includes(label as ValidLabel)) {
       return true;
     }
 

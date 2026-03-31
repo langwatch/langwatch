@@ -1,12 +1,13 @@
 import type { Prisma, PrismaClient, PromptVersionLabel } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
-
-const logger = createLogger("langwatch:prompt-version-labels");
-
 import { VALID_LABELS, type ValidLabel } from "~/prompts/constants/labels";
+import { PromptLabelRepository } from "./prompt-label.repository";
+
 export { VALID_LABELS } from "~/prompts/constants/labels";
 export type { ValidLabel } from "~/prompts/constants/labels";
+
+const logger = createLogger("langwatch:prompt-version-labels");
 
 export class LabelValidationError extends Error {
   constructor(message: string) {
@@ -23,25 +24,28 @@ export class LabelValidationError extends Error {
  * "latest" is resolved at query time (highest version number), never stored.
  */
 export class PromptVersionLabelRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly labelDefinitionRepo: PromptLabelRepository;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.labelDefinitionRepo = new PromptLabelRepository(prisma);
+  }
 
   /**
-   * Validates that a label is one of the built-in values.
-   * For custom label validation (with org context), use isValidLabel().
+   * Validates that a label is one of the built-in assignable values.
+   * For validation that also accepts custom labels, use isValidLabel() with organizationId.
    */
   validateLabel(label: string): asserts label is ValidLabel {
     if (!VALID_LABELS.includes(label as ValidLabel)) {
       logger.warn({ label }, "Invalid label name rejected");
       throw new LabelValidationError(
-        `Invalid label "${label}". Only "production" and "staging" are allowed.`,
+        `Invalid label "${label}". Must be a built-in label ("production", "staging") or a custom label defined for this org.`,
       );
     }
   }
 
   /**
    * Returns true if the label is valid for the given org.
-   * Built-in labels (production, staging) are always valid.
-   * Custom labels are valid when a PromptLabel definition exists for the org.
+   * Delegates to PromptLabelRepository.isValidLabelForOrg().
    */
   async isValidLabel({
     label,
@@ -50,15 +54,10 @@ export class PromptVersionLabelRepository {
     label: string;
     organizationId: string;
   }): Promise<boolean> {
-    if (VALID_LABELS.includes(label as ValidLabel)) {
-      return true;
-    }
-
-    const custom = await this.prisma.promptLabel.findFirst({
-      where: { organizationId, name: label },
+    return this.labelDefinitionRepo.isValidLabelForOrg({
+      label,
+      organizationId,
     });
-
-    return custom !== null;
   }
 
   /**
