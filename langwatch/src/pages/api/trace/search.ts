@@ -5,6 +5,7 @@ import { getAllForProjectInput } from "../../../server/api/routers/traces.schema
 import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
 import type { Span, Trace } from "../../../server/tracer/types";
+import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import { TraceService } from "../../../server/traces/trace.service";
 import { toLLMModeTrace, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 
@@ -102,15 +103,14 @@ export default async function handler(
   );
 
   const rawTraces = results.groups.flat() as Trace[];
-
-  // Merge evaluations from traceChecks into each trace object
-  for (const trace of rawTraces) {
-    trace.evaluations = results.traceChecks[trace.trace_id] ?? [];
-  }
+  const enrichedTraces = enrichTracesWithEvaluations({
+    traces: rawTraces,
+    traceChecks: results.traceChecks,
+  });
 
   let traces: unknown[];
   if (format === "digest") {
-    traces = rawTraces.map((trace) => ({
+    traces = enrichedTraces.map((trace) => ({
       trace_id: trace.trace_id,
       formatted_trace: formatTraceSummaryDigest(trace),
       input: trace.input,
@@ -122,13 +122,13 @@ export default async function handler(
     }));
   } else if (params.llmMode) {
     // Legacy llmMode behavior (kept for backward compat, but format=digest is preferred)
-    traces = (rawTraces as Trace[]).map((trace) => ({
+    traces = enrichedTraces.map((trace) => ({
       ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
       spans: [],
       evaluations: trace.evaluations,
     }));
   } else {
-    traces = rawTraces;
+    traces = enrichedTraces;
   }
 
   return res.status(200).json({

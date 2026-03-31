@@ -100,7 +100,7 @@ describe("POST /search", () => {
       groups: [sampleTraces],
       totalHits: 2,
       traceChecks: {
-        "trace-1": [{ evaluation_id: "eval-1", evaluator_id: "evaluator-1", status: "processed", score: 0.95, label: "positive" }],
+        "trace-1": [{ evaluation_id: "eval-1", evaluator_id: "evaluator-1", name: "sentiment", status: "processed", score: 0.95, label: "positive", timestamps: { started_at: 1000, finished_at: 2000 } }],
         "trace-2": [],
       },
       scrollId: undefined,
