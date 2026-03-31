@@ -37,6 +37,22 @@ const logger = createLogger(
   "langwatch:evaluation-processing:execute-evaluation",
 );
 
+/**
+ * Interface for recording evaluation costs.
+ * Extracted from the command to remove the direct Prisma dependency.
+ */
+export interface EvaluationCostRecorder {
+  recordCost(params: {
+    projectId: string;
+    isGuardrail: boolean;
+    evaluatorName: string;
+    evaluatorId: string;
+    traceId: string;
+    amount: number;
+    currency: string;
+  }): Promise<string>;
+}
+
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
@@ -305,3 +321,5 @@ function emitReported(
   return [event];
 }
 
+/** Re-export makeJobId for backward compatibility with existing tests. */
+export const makeJobId = ExecuteEvaluationCommand.makeJobId;

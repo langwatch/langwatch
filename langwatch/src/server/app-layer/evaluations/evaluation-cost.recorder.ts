@@ -1,23 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import { CostReferenceType, CostType, type PrismaClient } from "@prisma/client";
 import { KSUID_RESOURCES } from "../../../utils/constants";
-
-/**
- * Interface for recording evaluation costs.
- * Consumers (command handlers) depend on this interface; the Prisma
- * implementation lives alongside it in the app-layer.
- */
-export interface EvaluationCostRecorder {
-  recordCost(params: {
-    projectId: string;
-    isGuardrail: boolean;
-    evaluatorName: string;
-    evaluatorId: string;
-    traceId: string;
-    amount: number;
-    currency: string;
-  }): Promise<string>;
-}
+import type { EvaluationCostRecorder } from "../../event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 
 /**
  * Records evaluation costs in the database via Prisma.

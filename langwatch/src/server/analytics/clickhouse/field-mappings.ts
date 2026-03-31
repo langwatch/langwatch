@@ -36,7 +36,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "ErrorMessage",
   "TopicId",
   "SubTopicId",
-  "HasAnnotation",
+  "AnnotationIds",
   "Models",
   "Attributes",
 ] as const;
@@ -398,8 +398,8 @@ export const fieldMappings: Record<string, FieldMapping> = {
   // ===== Annotation Fields =====
   annotations: {
     table: "trace_summaries",
-    column: "HasAnnotation",
-    description: "Whether trace has annotations",
+    column: "AnnotationIds",
+    description: "Annotation IDs on trace",
   },
 
   // ===== Model Fields (for grouping) =====

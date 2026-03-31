@@ -17,6 +17,9 @@ import type {
   OriginResolvedEvent,
   SpanReceivedEvent,
   TopicAssignedEvent,
+  AnnotationAddedEvent,
+  AnnotationRemovedEvent,
+  AnnotationsBulkSyncedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -24,6 +27,9 @@ import {
   logRecordReceivedEventSchema,
   metricRecordReceivedEventSchema,
   originResolvedEventSchema,
+  annotationAddedEventSchema,
+  annotationRemovedEventSchema,
+  annotationsBulkSyncedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
@@ -124,6 +130,9 @@ const traceSummaryEvents = [
   logRecordReceivedEventSchema,
   metricRecordReceivedEventSchema,
   originResolvedEventSchema,
+  annotationAddedEventSchema,
+  annotationRemovedEventSchema,
+  annotationsBulkSyncedEventSchema,
 ] as const;
 
 /**
@@ -134,18 +143,17 @@ const traceSummaryEvents = [
  * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
  */
 export class TraceSummaryFoldProjection
-  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents>
+  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents, "createdAt", "updatedAt">
   implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
 {
   readonly name = "traceSummary";
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceSummaryData>;
-  protected override readonly timestampStyle = "camel" as const;
 
   protected readonly events = traceSummaryEvents;
 
   constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {
-    super();
+    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
     this.store = deps.store;
   }
 
@@ -173,7 +181,7 @@ export class TraceSummaryFoldProjection
       blockedByGuardrail: false,
       topicId: null,
       subTopicId: null,
-      hasAnnotation: null,
+      annotationIds: [],
       attributes: {},
       scenarioRoleCosts: {},
       scenarioRoleLatencies: {},
@@ -316,5 +324,33 @@ export class TraceSummaryFoldProjection
         "langwatch.origin": event.data.origin,
       },
     };
+  }
+
+  handleTraceAnnotationAdded(
+    event: AnnotationAddedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    const ids = state.annotationIds;
+    if (ids.includes(event.data.annotationId)) return state;
+    return { ...state, annotationIds: [...ids, event.data.annotationId] };
+  }
+
+  handleTraceAnnotationRemoved(
+    event: AnnotationRemovedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return {
+      ...state,
+      annotationIds: state.annotationIds.filter(
+        (id) => id !== event.data.annotationId,
+      ),
+    };
+  }
+
+  handleTraceAnnotationsBulkSynced(
+    event: AnnotationsBulkSyncedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return { ...state, annotationIds: event.data.annotationIds };
   }
 }

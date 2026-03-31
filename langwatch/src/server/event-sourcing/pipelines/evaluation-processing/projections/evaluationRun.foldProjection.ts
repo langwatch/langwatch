@@ -49,20 +49,17 @@ const evaluationRunEvents = [
  * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export class EvaluationRunFoldProjection
-  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents>
+  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents, "createdAt", "updatedAt">
   implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
 {
   readonly name = "evaluationRun";
   readonly version = EVALUATION_PROJECTION_VERSIONS.STATE;
   readonly store: FoldProjectionStore<EvaluationRunData>;
-  // TODO: normalize all state types to camelCase and push PascalCase conversion
-  // to the ClickHouse repository layer, then remove timestampStyle entirely
-  protected override readonly timestampStyle = "camel" as const;
 
   protected readonly events = evaluationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
-    super();
+    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
     this.store = deps.store;
   }
 
@@ -128,9 +125,13 @@ export class EvaluationRunFoldProjection
     event: EvaluationCompletedEvent,
     state: EvaluationRunData,
   ): EvaluationRunData {
+    if (!state.evaluationId) {
+      throw new Error(
+        `Received EvaluationCompletedEvent for evaluation ${event.data.evaluationId} but state has no evaluationId — likely a replica lag issue, retrying`,
+      );
+    }
     return {
       ...state,
-      evaluationId: state.evaluationId || event.data.evaluationId,
       status: event.data.status,
       score: typeof event.data.score === 'number' ? event.data.score : null,
       passed: event.data.passed ?? null,

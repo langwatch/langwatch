@@ -3,10 +3,13 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { AddAnnotationCommand } from "./commands/addAnnotationCommand";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
+import { BulkSyncAnnotationsCommand } from "./commands/bulkSyncAnnotationsCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { RemoveAnnotationCommand } from "./commands/removeAnnotationCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
@@ -75,5 +78,8 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)
+    .withCommand("addAnnotation", AddAnnotationCommand)
+    .withCommand("removeAnnotation", RemoveAnnotationCommand)
+    .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
     .build();
 }

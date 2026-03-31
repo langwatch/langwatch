@@ -74,7 +74,7 @@ export const traceSummaryDataSchema = z.object({
   blockedByGuardrail: z.boolean(),
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
-  hasAnnotation: z.boolean().nullable(),
+  annotationIds: z.array(z.string()),
   attributes: z.record(z.string()),
   scenarioRoleCosts: z.record(z.string(), z.number()).optional(),
   scenarioRoleLatencies: z.record(z.string(), z.number()).optional(),

@@ -111,11 +111,11 @@ export class ReportUsageForMonthCommand
     let shouldSelfDispatch = false;
     try {
       // 1. Skip conditions
-      let org = (await orgCache.get(organizationId)) ?? null;
+      let org = orgCache.get(organizationId) ?? null;
       if (!org) {
         org = await this.deps.organizations.getOrganizationForBilling(organizationId);
         if (org) {
-          await orgCache.set(organizationId, org);
+          orgCache.set(organizationId, org);
         }
       }
 
