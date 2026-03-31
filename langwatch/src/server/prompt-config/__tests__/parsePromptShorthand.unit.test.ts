@@ -73,6 +73,14 @@ describe("parsePromptShorthand()", () => {
     });
   });
 
+  describe("when suffix after colon is empty", () => {
+    it("throws an error indicating invalid format", () => {
+      expect(() => parsePromptShorthand("pizza-prompt:")).toThrow(
+        /invalid.*format/i,
+      );
+    });
+  });
+
   describe("when input is slug with version 0", () => {
     it("treats 0 as a tag since version must be positive", () => {
       const result = parsePromptShorthand("pizza-prompt:0");

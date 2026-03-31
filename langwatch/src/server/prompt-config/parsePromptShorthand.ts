@@ -43,6 +43,12 @@ export function parsePromptShorthand(input: string): PromptShorthand {
     );
   }
 
+  if (suffix.length === 0) {
+    throw new Error(
+      `Invalid format: suffix after colon must not be empty. Received "${input}"`,
+    );
+  }
+
   if (suffix === "latest") {
     return { slug, tag: undefined, version: undefined };
   }
