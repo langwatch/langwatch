@@ -40,6 +40,7 @@ const TOKEN_TTL_SECONDS = 3600;
 interface SessionState {
   transport: StreamableHTTPServerTransport;
   apiKey: string;
+  createdAt: number;
 }
 
 /** OAuth token entry stored in memory and Redis. */
@@ -79,6 +80,36 @@ export function createMcpHandler(): McpHandler {
 
   const sessions: Record<string, SessionState> = {};
   const oauthTokens = new Map<string, OAuthTokenEntry>();
+
+  // -------------------------------------------------------------------------
+  // Session & token reaper — prevents unbounded memory from abandoned sessions
+  // and never-used OAuth tokens.
+  // -------------------------------------------------------------------------
+
+  const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+  const REAPER_INTERVAL_MS = 60 * 1000; // 60 seconds
+
+  const reaper = setInterval(() => {
+    const now = Date.now();
+
+    // Sweep expired sessions
+    for (const [id, session] of Object.entries(sessions)) {
+      if (now - session.createdAt > SESSION_MAX_AGE_MS) {
+        session.transport.close().catch(() => {});
+        delete sessions[id];
+      }
+    }
+
+    // Sweep expired OAuth tokens
+    for (const [token, entry] of oauthTokens) {
+      if (now >= entry.expiresAt) {
+        oauthTokens.delete(token);
+      }
+    }
+  }, REAPER_INTERVAL_MS);
+
+  // Allow the process to exit naturally even if the reaper is still scheduled
+  reaper.unref();
 
   // -------------------------------------------------------------------------
   // Route matching
@@ -188,11 +219,16 @@ export function createMcpHandler(): McpHandler {
           return null;
         }
       } catch (err) {
+        // Fail closed: if Redis is down we cannot distinguish an OAuth token
+        // from a direct API key, so reject rather than risk accepting an
+        // arbitrary string as a valid key.
         logger.error({ error: err }, "Redis token lookup failed");
+        return null;
       }
     }
 
-    // 3. Treat as direct API key
+    // 3. Treat as direct API key (only reached when token was not found in
+    //    either the in-memory cache or Redis)
     return token;
   }
 
@@ -409,7 +445,7 @@ export function createMcpHandler(): McpHandler {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
-          sessions[id] = { transport, apiKey };
+          sessions[id] = { transport, apiKey, createdAt: Date.now() };
         },
       });
 
@@ -479,7 +515,7 @@ export function createMcpHandler(): McpHandler {
     const method = req.method ?? "GET";
 
     // Handle OPTIONS preflight for any MCP route
-    if (method === "OPTIONS" && isMcpRoute(pathname!)) {
+    if (method === "OPTIONS" && isMcpRoute(pathname ?? "")) {
       setCorsHeaders(res);
       res.writeHead(200);
       res.end();
@@ -543,6 +579,7 @@ export function createMcpHandler(): McpHandler {
   }
 
   function closeAllSessions(): void {
+    clearInterval(reaper);
     for (const [id, session] of Object.entries(sessions)) {
       session.transport.close().catch(() => {});
       delete sessions[id];
