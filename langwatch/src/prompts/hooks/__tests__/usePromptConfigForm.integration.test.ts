@@ -108,5 +108,88 @@ describe("usePromptConfigForm", () => {
         result.current.methods.getValues("version.configData.llm.model"),
       ).toBe("openai/gpt-5-mini");
     });
+
+    /**
+     * Same race condition applies to fresh/unsaved nodes (no configId).
+     * The configId parameter has no effect on sync logic — the forward/reverse
+     * sync path is identical for saved and unsaved nodes.
+     */
+    it("preserves field edits on a fresh node without configId when stale props arrive", async () => {
+      const { usePromptConfigForm } = await import("../usePromptConfigForm");
+
+      const initialConfigValues = {
+        version: {
+          configData: {
+            llm: { model: "openai/gpt-4o", temperature: 0.7 },
+            messages: [
+              {
+                role: "system" as const,
+                content: "You are a helpful assistant.",
+              },
+              { role: "user" as const, content: "{{input}}" },
+            ],
+            inputs: [{ identifier: "input", type: "str" as const }],
+            outputs: [{ identifier: "output", type: "str" as const }],
+          },
+        },
+      };
+
+      const onChangeMock = vi.fn();
+
+      // No configId — simulates a fresh node dragged onto the canvas
+      const { result, rerender } = renderHook(
+        ({ configValues }: { configValues: typeof initialConfigValues }) =>
+          usePromptConfigForm({
+            initialConfigValues: configValues,
+            onChange: onChangeMock,
+          }),
+        { initialProps: { configValues: initialConfigValues } },
+      );
+
+      // User changes temperature
+      act(() => {
+        result.current.methods.setValue(
+          "version.configData.llm.temperature",
+          0.2,
+          { shouldDirty: true },
+        );
+      });
+
+      expect(
+        result.current.methods.getValues("version.configData.llm.temperature"),
+      ).toBe(0.2);
+
+      // Release the guard
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      // Stale props arrive (still has old temperature)
+      const staleConfigValues = {
+        version: {
+          configData: {
+            llm: { model: "openai/gpt-4o", temperature: 0.7 },
+            messages: [
+              {
+                role: "system" as const,
+                content: "You are a helpful assistant.",
+              },
+              { role: "user" as const, content: "{{input}}" },
+            ],
+            inputs: [{ identifier: "input", type: "str" as const }],
+            outputs: [{ identifier: "output", type: "str" as const }],
+          },
+        },
+      };
+
+      act(() => {
+        rerender({ configValues: staleConfigValues });
+      });
+
+      // Temperature must still be the user's value
+      expect(
+        result.current.methods.getValues("version.configData.llm.temperature"),
+      ).toBe(0.2);
+    });
   });
 });
