@@ -125,7 +125,7 @@ export function ReplicateToProjectDialog({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select project" />
                 </Select.Trigger>
-                <Select.Content zIndex="popover" paddingY={2}>
+                <Select.Content paddingY={2}>
                   {projectCollection.items.map((proj) => {
                     const perm = proj.hasCreatePermission;
                     return (

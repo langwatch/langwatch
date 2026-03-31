@@ -1,0 +1,146 @@
+---
+title: Evaluations Overview
+sidebarTitle: Overview
+description: Ensure quality and safety for your LLM applications with experiments, online evaluation, guardrails, and evaluators.
+---
+
+<Tip>
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+</Tip>
+
+LangWatch provides comprehensive evaluations tools for your LLM applications. Whether you're evaluating before deployment or monitoring in production, we have you covered.
+
+## The Agent Evaluation Lifecycle
+
+```
+BUILD → TEST → DEPLOY → MONITOR
+         ↓              ↓
+    Experiments    Online Evaluation
+         ↓              ↓
+    CI/CD Gate      Guardrails
+```
+
+## Core Concepts
+
+<CardGroup cols={2}>
+  <Card
+    title="Experiments"
+    description="Batch test your prompts, models, and agents on datasets before deploying to production."
+    icon="flask"
+    href="/evaluations/experiments/overview"
+  />
+  <Card
+    title="Online Evaluation"
+    description="Continuously score and monitor your LLM's production traffic for quality and safety."
+    icon="chart-line"
+    href="/evaluations/online-evaluation/overview"
+  />
+  <Card
+    title="Guardrails"
+    description="Block or modify responses in real-time to enforce safety and policy constraints."
+    icon="shield"
+    href="/evaluations/guardrails/overview"
+  />
+  <Card
+    title="Evaluators"
+    description="Scoring functions that assess output quality - from built-in options to your custom configurations."
+    icon="check-double"
+    href="/evaluations/evaluators/overview"
+  />
+</CardGroup>
+
+## When to Use What
+
+| Use Case | Solution |
+|----------|----------|
+| Test prompt changes before deploying | [Experiments](/evaluations/experiments/overview) |
+| Compare different models or configurations | [Experiments](/evaluations/experiments/overview) |
+| Run quality checks in CI/CD | [Experiments CI/CD](/evaluations/experiments/ci-cd) |
+| Monitor production quality over time | [Online Evaluation](/evaluations/online-evaluation/overview) |
+| Block harmful or policy-violating content | [Guardrails](/evaluations/guardrails/overview) |
+| Get alerts when quality drops | [Online Evaluation](/evaluations/online-evaluation/overview) + [Automations](/features/automations) |
+
+## Quick Start
+
+### 1. Run Your First Experiment
+
+Test your LLM on a dataset using the Experiments via UI or via code:
+
+<Tabs>
+  <Tab title="Platform">
+    Go to [Experiments](https://app.langwatch.ai/@project/evaluations) and click "New Experiment" to get started with the UI.
+  </Tab>
+  <Tab title="Python">
+```python
+import langwatch
+
+evaluation = langwatch.experiment.init("my-first-experiment")
+
+for idx, row in evaluation.loop(dataset.iterrows()):
+    response = my_llm(row["input"])
+    evaluation.log("quality", index=idx, score=0.95)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+const evaluation = await langwatch.experiments.init("my-first-experiment");
+
+await evaluation.run(dataset, async ({ item, index }) => {
+  const response = await myLLM(item.input);
+  evaluation.log("quality", { index, score: 0.95 });
+});
+```
+  </Tab>
+</Tabs>
+
+### 2. Set Up Online Evaluation
+
+Monitor your production traffic with evaluators that run on every trace:
+
+1. Go to [Monitors](https://app.langwatch.ai/@project/evaluations)
+2. Create a new monitor with "When a message arrives" trigger
+3. Select evaluators (e.g., PII Detection, Faithfulness)
+4. Enable monitoring
+
+### 3. Add Guardrails
+
+Protect your users by blocking harmful content in real-time:
+
+```python
+import langwatch
+
+@langwatch.trace()
+def my_llm_call(user_input):
+    # Check input before processing
+    guardrail = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+
+    if not guardrail.passed:
+        return "I can't help with that request."
+
+    # Continue with normal processing...
+```
+
+## Supporting Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="Datasets"
+    description="Create and manage test datasets for your experiments."
+    icon="table"
+    href="/datasets/overview"
+  />
+  <Card
+    title="Annotations"
+    description="Add human feedback and labels to improve quality."
+    icon="pencil"
+    href="/features/annotations"
+  />
+</CardGroup>

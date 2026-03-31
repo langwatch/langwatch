@@ -1,0 +1,255 @@
+---
+title: "Get Started"
+description: "Create your first managed prompt in LangWatch, link it to traces, and use it in your application with built-in prompt versioning and analytics."
+---
+
+<Tip>
+  **Automated setup available.** [Copy the prompts skill prompt](/skills/code-prompts#version-my-prompts) into your coding agent to set up prompt versioning automatically.
+</Tip>
+
+Learn how to create your first prompt in LangWatch and use it in your application with dynamic variables. This enables your team to update AI interactions without code changes.
+
+## Get API keys
+
+1. Create a LangWatch [account](https://app.langwatch.ai) or set up [self-hosted LangWatch](https://github.com/langwatch/langwatch?tab=readme-ov-file#self-hosted-%EF%B8%8F)
+2. Create new API credentials in your [project settings](https://app.langwatch.ai/settings)
+3. Note your API key for use in the steps below
+
+## Create a prompt
+
+<Tabs>
+  <Tab title="LangWatch UI">
+    Use the LangWatch UI to create a new prompt or update an existing one.
+
+    1. Navigate to your project dashboard
+    2. Go to **Prompt Management** in the sidebar
+    3. Click **"Create New Prompt"**
+    4. Fill in the prompt details and save
+
+    <Frame>
+      <img
+        className="block"
+        src="/images/prompts/view-editing-the-prompt.png"
+        alt="Editing a prompt in LangWatch UI"
+      />
+    </Frame>
+
+  </Tab>
+
+  <Tab title="TypeScript SDK">
+    ```typescript create_prompt.ts
+    import { LangWatch } from "langwatch";
+
+    // Initialize LangWatch client
+    const langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY
+    });
+
+    // Create a new prompt
+    const prompt = await langwatch.prompts.create({
+      handle: "customer-support-bot",
+      scope: "PROJECT",
+      prompt: "You are a helpful customer support agent. Help the customer with their inquiry: {{input}}",
+      model: "openai/gpt-4o-mini"
+    });
+
+    console.log(`Created prompt with handle: ${prompt.handle}`);
+    ```
+
+  </Tab>
+
+  <Tab title="Python SDK">
+    ```python create_prompt.py
+    import langwatch
+
+    # Create a new prompt
+    prompt = langwatch.prompts.create(
+        handle="customer-support-bot",
+        scope="PROJECT",
+        prompt="You are a helpful customer support agent. Help the customer with their inquiry: {{input}}",
+        model="openai/gpt-4o-mini"
+    )
+
+    print(f"Created prompt with handle: {prompt.handle}")
+    ```
+
+  </Tab>
+
+  <Tab title="REST API">
+    Use the REST API to create a new prompt:
+
+    ```bash create_prompt.sh
+    # Create a new prompt (this creates the prompt with an initial version)
+    curl -X POST "https://app.langwatch.ai/api/prompts" \
+      -H "Content-Type: application/json" \
+      -H "X-Auth-Token: your-api-key" \
+      -d '{
+        "handle": "customer-support-bot",
+        "scope": "PROJECT",
+        "prompt": "You are a helpful customer support agent. Help the customer with their inquiry: {{input}}",
+        "model": "openai/gpt-4o-mini"
+      }'
+    ```
+
+  </Tab>
+</Tabs>
+
+## Use prompt
+
+At runtime, you can fetch the latest version of your prompt from LangWatch using the prompt handle.
+
+<Tabs>
+  <Tab title="Python SDK">
+    ```python use_prompt.py
+    import langwatch
+    from litellm import completion
+
+    # Get the latest prompt by handle
+    prompt = langwatch.prompts.get("customer-support-bot")
+
+    # Compile prompt with variables
+    compiled_prompt = prompt.compile(
+        user_name="John Doe",
+        user_email="john.doe@example.com",
+        input="How do I reset my password?"
+    )
+
+    # Use with LiteLLM (unified interface to multiple providers)
+    response = completion(
+        model=prompt.model,  # LiteLLM handles provider prefixes automatically
+        messages=compiled_prompt.messages
+    )
+
+    print(response.choices[0].message.content)
+    ```
+
+  </Tab>
+
+  <Tab title="TypeScript SDK">
+    ```typescript use_prompt.ts
+    import { LangWatch } from "langwatch";
+    import { openai } from "@ai-sdk/openai";
+    import { generateText } from "ai";
+
+    // Initialize LangWatch client
+    const langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY
+    });
+
+    // Get the latest prompt by handle
+    const prompt = await langwatch.prompts.get("customer-support-bot");
+
+    // Compile prompt with variables
+    const compiledPrompt = prompt.compile({
+      user_name: "John Doe",
+      user_email: "john.doe@example.com",
+      input: "How do I reset my password?"
+    });
+
+    // Use with AI SDK
+    const result = await generateText({
+      model: openai(prompt.model.replace("openai/", "")),
+      messages: compiledPrompt.messages,
+      experimental_telemetry: { isEnabled: true },
+    });
+
+    console.log(result.text);
+    ```
+
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash use_prompt.sh
+    # Get prompt by handle
+    curl -X GET "https://app.langwatch.ai/api/prompts/customer-support-bot" \
+      -H "X-Auth-Token: your-api-key"
+    ```
+  </Tab>
+</Tabs>
+
+## Link with LangWatch Tracing
+
+You can link your prompt to LLM generation traces to track performance and see which prompt versions work best. For detailed information about linking prompts to traces, see the [Link to Traces](/prompt-management/features/advanced/link-to-traces) page.
+
+<Tabs>
+  <Tab title="Python SDK">
+    ```python tracing.py
+    import langwatch
+    from litellm import completion
+
+    # Initialize LangWatch
+    langwatch.setup()
+
+    # Create a trace function
+    @langwatch.trace()
+    def customer_support_generation():
+        # Get prompt (automatically linked to trace when API key is present)
+        prompt = langwatch.prompts.get("customer-support-bot")
+
+        # Compile prompt with variables
+        compiled_prompt = prompt.compile(
+            user_name="John Doe",
+            user_email="john.doe@example.com",
+            input="I need help with my account"
+        )
+
+        # Use with LiteLLM (unified interface to multiple providers)
+        response = completion(
+            model=prompt.model,  # LiteLLM handles provider prefixes automatically
+            messages=compiled_prompt.messages
+        )
+
+        return response.choices[0].message.content
+
+    # Call the function
+    result = customer_support_generation()
+    ```
+
+  </Tab>
+
+  <Tab title="TypeScript SDK">
+    ```typescript tracing.ts
+    import { LangWatch, getLangWatchTracer } from "langwatch";
+    import { openai } from "@ai-sdk/openai";
+    import { generateText } from "ai";
+
+    // Initialize LangWatch client
+    const langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY
+    });
+
+    const tracer = getLangWatchTracer("customer-support");
+
+    async function customerSupportGeneration() {
+      return tracer.withActiveSpan("customer-support-generation", async () => {
+        // Get prompt (automatically linked to trace when API key is present)
+        const prompt = await langwatch.prompts.get("customer-support-bot");
+
+        // Compile prompt with variables
+        const compiledPrompt = prompt.compile({
+          user_name: "John Doe",
+          user_email: "john.doe@example.com",
+          input: "I need help with my account",
+        });
+
+        // Use with AI SDK
+        const { text } = await generateText({
+          model: openai(prompt.model.replace("openai/", "")),
+          messages: compiledPrompt.messages
+        });
+
+        return text;
+      });
+    }
+
+    // Call the function
+    const result = await customerSupportGeneration();
+    ```
+
+  </Tab>
+
+</Tabs>
+
+---
+
+[← Back to Prompt Management Overview](/prompt-management/overview)

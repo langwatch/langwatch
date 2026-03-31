@@ -1,6 +1,5 @@
 from http import HTTPStatus
-from typing import Any
-from urllib.parse import quote
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -21,37 +20,38 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/annotations/trace/{id}".format(
-            id=quote(str(id), safe=""),
-        ),
+        "url": f"/api/annotations/trace/{id}",
     }
 
-    _kwargs["json"] = body.to_dict()
+    _body = body.to_dict()
 
+    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Annotation | Error | None:
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[Union[Annotation, Error]]:
     if response.status_code == 200:
         response_200 = Annotation.from_dict(response.json())
 
         return response_200
-
     if response.status_code == 400:
         response_400 = Error.from_dict(response.json())
 
         return response_400
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Annotation | Error]:
+def _build_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[Union[Annotation, Error]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -63,9 +63,9 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAnnotationsTraceIdBody,
-) -> Response[Annotation | Error]:
+) -> Response[Union[Annotation, Error]]:
     """Create an annotation for a single trace
 
     Args:
@@ -77,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Annotation | Error]
+        Response[Union[Annotation, Error]]
     """
 
     kwargs = _get_kwargs(
@@ -95,9 +95,9 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAnnotationsTraceIdBody,
-) -> Annotation | Error | None:
+) -> Optional[Union[Annotation, Error]]:
     """Create an annotation for a single trace
 
     Args:
@@ -109,7 +109,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Annotation | Error
+        Union[Annotation, Error]
     """
 
     return sync_detailed(
@@ -122,9 +122,9 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAnnotationsTraceIdBody,
-) -> Response[Annotation | Error]:
+) -> Response[Union[Annotation, Error]]:
     """Create an annotation for a single trace
 
     Args:
@@ -136,7 +136,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Annotation | Error]
+        Response[Union[Annotation, Error]]
     """
 
     kwargs = _get_kwargs(
@@ -152,9 +152,9 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAnnotationsTraceIdBody,
-) -> Annotation | Error | None:
+) -> Optional[Union[Annotation, Error]]:
     """Create an annotation for a single trace
 
     Args:
@@ -166,7 +166,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Annotation | Error
+        Union[Annotation, Error]
     """
 
     return (

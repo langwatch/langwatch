@@ -6,7 +6,7 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
-import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
+
 import { ActiveProjectProvider } from "../contexts/ActiveProjectContext";
 import { useProductFlow } from "../hooks/use-product-flow";
 import { useCreateProductScreens } from "./create-product-screens";
@@ -70,9 +70,9 @@ export const ProductScreen: React.FC = () => {
         widthVariant={currentScreen.widthVariant ?? "narrow"}
         showBackButton={canGoBack}
         onBack={() => navigation.prevScreen()}
+        skipHref={activeProject?.slug ? `/${activeProject.slug}` : undefined}
       >
-        <Box w="full" position="relative">
-          <OnboardingMeshBackground opacity={0.4} blurPx={90} />
+        <Box w="full">
           <ActiveProjectProvider
             value={{ project: activeProject, organization }}
           >

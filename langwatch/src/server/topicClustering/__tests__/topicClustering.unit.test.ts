@@ -33,13 +33,6 @@ vi.mock("../../env.mjs", () => ({
   env: { TOPIC_CLUSTERING_SERVICE: "http://localhost:1234" },
 }));
 
-vi.mock("~/server/license-enforcement/license-enforcement.repository", () => ({
-  createCostChecker: () => ({
-    maxMonthlyUsageLimit: vi.fn().mockResolvedValue(Infinity),
-    getCurrentMonthCost: vi.fn().mockResolvedValue(0),
-  }),
-}));
-
 vi.mock("~/server/background/queues/topicClusteringQueue", () => ({
   scheduleTopicClusteringNextPage: vi.fn(),
 }));

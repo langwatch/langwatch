@@ -7,7 +7,7 @@ import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
 } from "~/server/background/workers/collector/cost";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import type {
@@ -284,7 +284,7 @@ function computeSpanCost({
   // Priority 2: Static model registry
   const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
   if (typeof model === "string" && ((promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0)) {
-    const matched = matchingLLMModelCost(model, getStaticModelCosts());
+    const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
     if (matched) {
       const computed = estimateCost({ llmModelCost: matched, inputTokens: promptTokens ?? 0, outputTokens: completionTokens ?? 0 });
       if (computed !== undefined && computed > 0) return computed;

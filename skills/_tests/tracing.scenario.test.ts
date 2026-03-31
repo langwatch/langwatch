@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,11 +66,12 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+            "instrument my code with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/main.py`,
               "utf8"
@@ -115,11 +117,12 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+            "instrument my code with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -164,11 +167,12 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+            "instrument my code with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/main.py`,
               "utf8"
@@ -213,13 +217,64 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch, short and sweet, no need to test"
+            "instrument my code with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const resultFile = fs.readFileSync(
               `${tempFolder}/index.ts`,
+              "utf8"
+            );
+            expect(resultFile).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "instruments a Python Google ADK agent with LangWatch",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-google-adk-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-google-adk")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python Google ADK instrumentation",
+        description:
+          "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should modify the Python file to add LangWatch tracing",
+              "Agent should use the LangWatch MCP to check Google ADK integration docs",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "instrument my code with langwatch"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
+            const resultFile = fs.readFileSync(
+              `${tempFolder}/main.py`,
               "utf8"
             );
             expect(resultFile).toContain("langwatch");
@@ -271,11 +326,12 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch. My API key should be in the .env file. Short and sweet, no need to test."
+            "instrument my code with langwatch. My API key should be in the .env file."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
               "utf8"
@@ -329,11 +385,12 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch. The LangWatch MCP is not installed, but you can fetch docs directly from https://langwatch.ai/docs/llms.txt. My API key is in the .env file. Short and sweet, no need to test."
+            "instrument my code with langwatch. The LangWatch MCP is not installed, but you can fetch docs directly from https://langwatch.ai/docs/llms.txt. My API key is in the .env file."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(mainPy).toContain("langwatch");
             expect(mainPy).toContain("trace");
@@ -379,7 +436,7 @@ describe("Tracing Skill", () => {
         ],
         script: [
           scenario.user(
-            "please instrument my code with langwatch, short and sweet, no need to test"
+            "instrument my code with langwatch"
           ),
           scenario.agent(),
           // Agent should ask for API key — we provide it
@@ -389,6 +446,7 @@ describe("Tracing Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "tracing");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             expect(mainPy).toContain("langwatch");
 

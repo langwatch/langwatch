@@ -69,8 +69,12 @@ export const timeseries = async (input: TimeseriesInputType) => {
       typeof input.timeScale === "number" ? input.timeScale : undefined,
     );
 
-  // Calculate total time span in minutes
-  const totalMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+  // Calculate total time span in minutes, clamping to 1 minute minimum
+  // to prevent negative or zero values from inverted date ranges
+  const totalMinutes = Math.max(
+    1,
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60),
+  );
 
   // Adjust timeScale to avoid too many buckets (max 1000 buckets)
   let adjustedTimeScale = input.timeScale;

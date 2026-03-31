@@ -35,7 +35,6 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
-import { createCostChecker } from "../../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -498,27 +497,6 @@ export const runEvaluation = async ({
   workflowId?: string | null;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, archivedAt: null },
-    include: { team: true },
-  });
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return {
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    };
-  }
-
   if (data.type === "custom") {
     return customEvaluation(
       projectId,

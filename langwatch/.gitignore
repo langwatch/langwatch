@@ -50,7 +50,6 @@ yarn-error.log*
 # Sentry Config File
 .sentryclirc
 
-llmModelCosts.json
 *.generated.ts
 !src/server/evaluations/evaluators.generated.ts
 src/server/sdk-radar/sdk-versions.json

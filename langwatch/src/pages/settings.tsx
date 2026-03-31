@@ -37,6 +37,7 @@ import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
 import { useActivePlan } from "../hooks/useActivePlan";
+import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
@@ -72,6 +73,7 @@ function SettingsForm({
   project: Project;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -254,15 +256,17 @@ function SettingsForm({
               )}
             </VStack>
 
-            <HStack width="full" justify="flex-end" paddingTop={4}>
-              <Button
-                type="submit"
-                colorPalette="blue"
-                loading={updateOrganization.isLoading}
-              >
-                Save Changes
-              </Button>
-            </HStack>
+            {!isLiteMember && (
+              <HStack width="full" justify="flex-end" paddingTop={4}>
+                <Button
+                  type="submit"
+                  colorPalette="blue"
+                  loading={updateOrganization.isLoading}
+                >
+                  Save Changes
+                </Button>
+              </HStack>
+            )}
           </VStack>
         </form>
 

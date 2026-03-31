@@ -3,8 +3,13 @@ Feature: Simulation Run Cost and Latency Metrics
   Scenario runs need pre-computed cost and latency metrics so the suites page
   can display them without joining traces at query time. Per-role cost and
   latency are accumulated in the traceSummary fold projection as spans arrive
-  (using the langwatch.scenario.role attribute). Dual-trigger reactors then
-  propagate these metrics to the simulation run state.
+  (using the langwatch.scenario.role attribute).
+
+  The trace-side reactor acts as an ECST (Event-Carried State Transfer)
+  publisher: after a trace stabilises (60s of no new spans), it publishes
+  the metrics to the simulation pipeline. The simulation-side reactor on
+  RunFinished handles the reverse ordering via pull-based computation with
+  deferred retry for late traces.
 
   Metrics are stored as Maps: RoleCosts Map(String, Float64) and
   RoleLatencies Map(String, Float64) — extensible for new roles/metrics
@@ -53,84 +58,93 @@ Feature: Simulation Run Cost and Latency Metrics
     And totalCost is computed normally from all spans
 
   # ---------------------------------------------------------------------------
-  # Trace-side reactor: propagate metrics to simulation run
+  # Trace-side reactor: ECST publisher
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Trace-side reactor propagates fold metrics to matching simulation run
-    Given a simulation run with TraceIds ["trace-abc"]
-    And the traceSummary fold for "trace-abc" has roleCosts and roleLatencies
-    When the traceSummary fold is updated for "trace-abc"
-    Then the reactor queries simulation_runs for trace "trace-abc"
-    And dispatches an updateRunMetrics command with the fold state's metrics
+  Scenario: Trace-side reactor publishes metrics via ECST after trace stabilises
+    Given a trace with scenario.run_id "run-1" and role cost data
+    When the trace stabilises (60s after last span)
+    Then the reactor dispatches computeRunMetrics with metrics in the payload
+    And the simulation pipeline receives and applies the metrics
 
   @integration
-  Scenario: Trace-side reactor ignores traces not linked to simulation runs
-    Given no simulation run references trace "trace-xyz"
-    When the traceSummary fold is updated for "trace-xyz"
-    Then no updateRunMetrics command is dispatched
+  Scenario: Trace-side reactor ignores non-scenario traces
+    Given a trace without scenario.run_id in its attributes
+    When the traceSummary fold is updated
+    Then no computeRunMetrics command is dispatched
 
   # ---------------------------------------------------------------------------
-  # Simulation-side reactor: message with trace_id arrives
+  # Simulation-side reactor: pull-based on RunFinished
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Simulation-side reactor reads trace summary when trace data exists
-    Given a simulation run that received a TextMessageEnd with traceId "trace-abc"
-    And traceSummary for "trace-abc" has been computed with roleCosts and roleLatencies
-    When the simulation fold processes the TextMessageEnd event
-    Then the reactor reads the traceSummary fold state for "trace-abc"
-    And dispatches an updateRunMetrics command with the trace's role metrics
+  Scenario: Simulation-side reactor dispatches pull-based computation on RunFinished
+    Given a simulation run with TraceIds ["trace-1", "trace-2"]
+    And trace "trace-1" has metrics already applied via ECST
+    And trace "trace-2" has no metrics yet
+    When the simulation run finishes
+    Then the reactor dispatches computeRunMetrics (pull mode) for "trace-2" only
+    And skips "trace-1" because TraceMetrics already contains it
 
   @integration
-  Scenario: Simulation-side reactor succeeds silently when trace not yet available
-    Given a simulation run that received a TextMessageEnd with traceId "trace-abc"
-    And traceSummary for "trace-abc" does not exist yet
-    When the simulation fold processes the TextMessageEnd event
-    Then the reactor does not dispatch any command
-    And does not raise an error
+  Scenario: Pull-mode command reads trace summary and emits event
+    Given a computeRunMetrics command for "trace-1" with no metrics in payload
+    And the trace summary store has data for "trace-1"
+    When the command handler processes the command
+    Then it reads the trace summary from the store
+    And emits a MetricsComputed event with the trace's cost and latency data
+
+  @integration
+  Scenario: Pull-mode command schedules deferred retry for missing traces
+    Given a computeRunMetrics command for "trace-1" with no metrics in payload
+    And the trace summary store has no data for "trace-1"
+    When the command handler processes the command
+    Then it schedules a deferred retry with incremented retryCount
+    And no MetricsComputed event is emitted
 
   # ---------------------------------------------------------------------------
-  # Fold projection: metrics_updated event
+  # Fold projection: metrics_computed event
   # ---------------------------------------------------------------------------
 
   @unit
   Scenario: Simulation fold stores per-trace metrics and recomputes aggregates
     Given a simulation run state with empty TraceMetrics
-    When a metrics_updated event is applied for traceId "trace-1" with totalCost 0.003 and roleCosts {"Agent": 0.003}
+    When a metrics_computed event is applied for traceId "trace-1" with totalCost 0.003 and roleCosts {"Agent": 0.003}
     Then TraceMetrics contains an entry for "trace-1"
     And TotalCost is 0.003
     And RoleCosts contains "Agent" with value 0.003
-    When a second metrics_updated event is applied for traceId "trace-2" with totalCost 0.002 and roleCosts {"Judge": 0.002}
+    When a second metrics_computed event is applied for traceId "trace-2" with totalCost 0.002 and roleCosts {"Judge": 0.002}
     Then TotalCost is 0.005
     And RoleCosts contains "Agent" with 0.003 and "Judge" with 0.002
 
   @unit
   Scenario: Reprocessing a trace replaces its entry (idempotent)
     Given a simulation run with TraceMetrics containing "trace-1" with totalCost 0.003
-    When a metrics_updated event is applied for "trace-1" with totalCost 0.004
+    When a metrics_computed event is applied for "trace-1" with totalCost 0.004
     Then TraceMetrics["trace-1"].totalCost is 0.004
     And TotalCost reflects the updated value
 
   # ---------------------------------------------------------------------------
-  # Dual-trigger convergence
+  # Convergence: both arrival orders handled
   # ---------------------------------------------------------------------------
 
   @integration
   Scenario: Metrics computed regardless of arrival order — trace first
-    Given trace "trace-abc" arrives and is processed before the simulation message
-    When the simulation run later receives a TextMessageEnd with traceId "trace-abc"
-    Then the simulation-side reactor computes and stores the metrics
+    Given trace "trace-abc" arrives and is processed before the simulation finishes
+    When the trace stabilises (60s after last span)
+    Then the trace-side ECST reactor publishes metrics to the simulation run
 
   @integration
   Scenario: Metrics computed regardless of arrival order — simulation first
-    Given a simulation run receives a TextMessageEnd with traceId "trace-abc"
+    Given a simulation run finishes with TraceIds ["trace-abc"]
     And trace "trace-abc" has not arrived yet
-    When trace "trace-abc" is later processed by the trace pipeline
-    Then the trace-side reactor finds the simulation run and computes metrics
+    When the RunFinished reactor dispatches computeRunMetrics (pull mode)
+    Then the command schedules a deferred retry
+    And when "trace-abc" eventually arrives, the retry succeeds
 
   # ---------------------------------------------------------------------------
-  # Multiple traces per run (progressive aggregation)
+  # Multiple traces per run
   # ---------------------------------------------------------------------------
 
   @integration
@@ -138,7 +152,7 @@ Feature: Simulation Run Cost and Latency Metrics
     Given a simulation run with TraceIds ["trace-1", "trace-2"]
     And trace "trace-1" has Agent cost 0.003 and Agent latency 1200ms
     And trace "trace-2" has not arrived yet
-    When spans for "trace-1" are stored
+    When trace "trace-1" stabilises
     Then metrics are computed from trace-1 only (partial)
     When trace "trace-2" later arrives with Agent cost 0.002 and Agent latency 800ms
     Then metrics are recomputed from both traces (complete)

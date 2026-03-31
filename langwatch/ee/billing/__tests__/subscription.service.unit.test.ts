@@ -83,6 +83,7 @@ const createMockOrganizationRepository = (): {
   getPricingModel: vi.fn(),
   getStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
+  getOrganizationForBilling: vi.fn(),
 });
 
 const createMockSeatEventFns = (): {

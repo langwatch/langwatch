@@ -1,0 +1,501 @@
+---
+title: LangWatch MCP Server
+sidebarTitle: LangWatch MCP
+description: Use the LangWatch MCP Server to extend your coding assistant with deep LangWatch insights for tracing, testing, and agent evaluations.
+---
+
+The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) gives your AI coding assistant (Cursor, Claude Code, Codex, etc.) full access to all LangWatch and [Scenario](https://langwatch.ai/scenario/) documentation and features via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
+
+- **Set up agent testing with [Scenario](https://langwatch.ai/scenario/)** to test agent behavior through user simulations and edge cases
+- **Automatically instrument your code** with LangWatch tracing for any framework (OpenAI, Agno, Mastra, DSPy, and more)
+- **Set up evaluations** to test and monitor your LLM outputs
+- **Search and inspect traces** from your LangWatch project directly in your editor
+- **Query analytics** to understand performance trends, costs, and error rates
+- **Manage prompts** — list, create, update, and version prompts without leaving your IDE
+
+Instead of manually reading docs and writing boilerplate code, just ask your AI assistant to instrument your codebase with LangWatch, and it will do it for you.
+
+## Setup
+
+<Steps>
+
+<Step title="Get your API key">
+Go to your LangWatch project **Settings** page and copy your API key. The API key is required for observability and prompt tools. Documentation tools work without it.
+</Step>
+
+<Step title="Configure your MCP">
+
+<Tabs>
+<Tab title="Claude Code">
+Run this command to add the MCP server:
+
+```bash
+claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey your-api-key-here
+```
+
+Or add it manually to your `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
+</Tab>
+
+<Tab title="Copilot">
+Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette):
+
+```json
+{
+  "servers": {
+    "langwatch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": { "LANGWATCH_API_KEY": "your-api-key-here" }
+    }
+  }
+}
+```
+</Tab>
+
+<Tab title="Cursor">
+1. Open Cursor Settings
+2. Navigate to the **Tools and MCP** section in the sidebar
+3. Add the LangWatch MCP server:
+
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+</Tab>
+
+<Tab title="ChatGPT">
+1. Go to **Settings → Connectors**
+2. Click **Add connector**
+3. Enter the server URL: `https://mcp.langwatch.ai/sse`
+4. For authentication, select **Bearer Token** and enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize))
+
+*Requires a Plus or Team plan.*
+</Tab>
+
+<Tab title="Claude Chat">
+1. Go to **Settings → Connectors**
+2. Click **Add custom connector**
+3. Enter the server URL: `https://mcp.langwatch.ai/sse`
+4. In **Advanced settings**, enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize)) as the **OAuth Client Secret**. Leave Client ID empty.
+
+*Requires a Pro or Max plan.*
+</Tab>
+
+<Tab title="Other">
+For other MCP-compatible editors, add the following configuration to your MCP settings file:
+
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Refer to your editor's MCP documentation for the specific configuration file location.
+</Tab>
+</Tabs>
+
+</Step>
+
+<Step title="Start using it">
+Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shift + P` > "Claude Code: Open Chat" in Claude Code) and ask it to help with LangWatch tasks.
+</Step>
+</Steps>
+
+### Configuration
+
+| Environment Variable | CLI Argument | Description |
+|---------------------|-------------|-------------|
+| `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
+| `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
+
+### Two Modes
+
+The MCP server runs in two modes:
+
+- **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat). Hosted at `https://mcp.langwatch.ai`. Supports both Bearer token auth (ChatGPT) and OAuth client_credentials (Claude Chat) — each user brings their own key.
+
+## Usage Examples
+
+### Write Agent Tests with Scenario
+
+Simply ask your AI assistant to write scenario tests for your agents:
+
+<CodeGroup>
+```plaintext Basic
+"Write a scenario test that checks the agent calls the summarization tool when requested"
+```
+
+```plaintext More specific
+"Create a scenario test that verifies my agent handles error cases when the API is unavailable"
+```
+
+```plaintext Edge cases
+"Write scenario tests for my customer support agent covering refund requests and policy questions"
+```
+</CodeGroup>
+
+The AI assistant will:
+1. Fetch the Scenario documentation and best practices
+2. Create test files with proper imports and setup
+3. Write scenario scripts that simulate user interactions
+4. Add verification logic to check agent behavior
+5. Include judge criteria to evaluate conversation quality
+
+**Example scenario test:**
+
+Here's an example scenario that checks for tool calls and includes criteria validation:
+
+```python
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_conversation_summary_request(agent_adapter):
+    """Explicit summary requests should call the conversation summary tool."""
+
+    def verify_summary_call(state: scenario.ScenarioState) -> bool:
+        args = _require_tool_call(state, "get_conversation_summary")
+        assert "conversation_context" in args, "summary tool must include context reference"
+        return True
+
+    result = await scenario.run(
+        name="conversation summary follow-up",
+        description="Customer wants a recap of troubleshooting steps that were discussed.",
+        agents=[
+            agent_adapter,
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(
+                criteria=[
+                    "Agent provides a clear recap",
+                    "Agent confirms next steps and resources",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user("Thanks for explaining the dispute process earlier."),
+            scenario.agent(),
+            scenario.user(
+                "Before we wrap, can you summarize everything we covered so I don't miss a step?"
+            ),
+            scenario.agent(),
+            verify_summary_call,
+            scenario.judge(),
+        ],
+    )
+
+    assert result.success, result.reasoning
+```
+
+The LangWatch MCP automatically handles fetching the right documentation, understanding your agent's framework, and generating tests that follow Scenario best practices.
+
+### Instrument Your Code with LangWatch
+
+Simply ask your AI assistant to add LangWatch tracking to your existing code:
+
+<CodeGroup>
+```plaintext Basic
+"Please instrument my code with LangWatch"
+```
+
+```plaintext More specific
+"Add LangWatch tracing to my OpenAI chatbot with RAG tracking for the vector search"
+```
+
+```plaintext Framework-specific
+"Instrument this LangChain agent with LangWatch, including all tool calls"
+```
+</CodeGroup>
+
+The AI assistant will:
+1. Fetch the relevant LangWatch documentation for your framework
+2. Add the necessary imports and setup code
+3. Wrap your functions with `@langwatch.trace()` decorators
+4. Configure automatic tracking for your LLM calls
+5. Add labels and metadata following best practices
+
+**Example transformation:**
+
+Before:
+```python
+from openai import OpenAI
+
+client = OpenAI()
+
+def chat(message: str):
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.choices[0].message.content
+```
+
+After (automatically added by AI assistant):
+```python
+from openai import OpenAI
+import langwatch
+
+client = OpenAI()
+langwatch.setup()
+
+@langwatch.trace()
+def chat(message: str):
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["document_parsing"]}
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": message}]
+    )
+    return response.choices[0].message.content
+```
+
+### Set Up Evaluations
+
+Ask your AI assistant to set up evaluation code for your LLM outputs:
+
+```plaintext
+"Create a notebook to evaluate the faithfulness of my RAG pipeline using LangWatch's Evaluating via Code guide"
+```
+
+The AI assistant will:
+1. Fetch the relevant LangWatch evaluation documentation
+2. Create evaluation notebooks or scripts with proper setup
+3. Add evaluation metrics and criteria for your use case
+4. Include code to run evaluations following [Evaluating via Code](/evaluations/experiments/sdk)
+
+### Search and Debug Traces
+
+Ask your AI assistant to find and analyze traces from your project:
+
+<CodeGroup>
+```plaintext Find recent errors
+"Search for traces with errors in the last 24 hours"
+```
+
+```plaintext Investigate a specific trace
+"Get the full details of trace abc123 and explain what happened"
+```
+
+```plaintext Analyze a conversation thread
+"Find all traces for thread thread_xyz and show me the full conversation flow"
+```
+</CodeGroup>
+
+The AI assistant will use `search_traces` to find matching traces and `get_trace` to drill into individual ones. Traces are returned as AI-readable digests by default, showing the full span hierarchy with timing, inputs, outputs, and errors.
+
+### Query Analytics
+
+Ask about performance trends, costs, and usage patterns:
+
+<CodeGroup>
+```plaintext Cost analysis
+"Show me the total LLM cost for the last 7 days"
+```
+
+```plaintext Performance monitoring
+"What's the p95 completion time for the last 30 days, broken down by model?"
+```
+
+```plaintext Usage trends
+"How many traces have we had per day this week?"
+```
+</CodeGroup>
+
+The assistant starts with `discover_schema` to understand available metrics and filters, then uses `get_analytics` to query timeseries data.
+
+### Manage Prompts
+
+Ask your AI assistant to work with prompts:
+
+<CodeGroup>
+```plaintext List prompts
+"List all prompts in my LangWatch project"
+```
+
+```plaintext Create a prompt
+"Create a new prompt called 'pdf-parser' with a system message for extracting structured data from PDFs"
+```
+
+```plaintext Update with versioning
+"Update the pdf-parser prompt to also handle images, and create a new version"
+```
+</CodeGroup>
+
+The AI assistant will guide you through creating, versioning, and using prompts from LangWatch's [Prompt Management](/prompt-management/overview).
+
+## Advanced: Self-Building AI Agents
+
+The LangWatch MCP is so powerful that it can help AI agents automatically instrument themselves while being built. This enables self-improving AI systems that can track and debug their own behavior.
+
+<Frame>
+<iframe
+  width="720"
+  height="460"
+  src="https://www.youtube.com/embed/ZPaG9H-N0uY"
+  title="AI Agent that vibe-codes itself - YouTube video player"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+</Frame>
+
+## MCP Tools Reference
+
+The MCP server provides 10 tools organized into three categories. Your AI assistant automatically chooses the right tools based on your request.
+
+### Documentation
+
+| Tool | Description |
+|------|-------------|
+| `fetch_langwatch_docs` | Fetch LangWatch integration docs |
+| `fetch_scenario_docs` | Fetch Scenario agent testing docs |
+
+### Observability (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `discover_schema` | Explore available filter fields, metrics, aggregation types, and group-by options |
+| `search_traces` | Search traces with filters, text query, and date range. Returns AI-readable digests by default |
+| `get_trace` | Get full trace details by ID with span hierarchy, evaluations, and metadata |
+| `get_analytics` | Query timeseries analytics (costs, latency, token usage, etc.) |
+
+### Prompts (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `list_prompts` | List all prompts in the project |
+| `get_prompt` | Get a prompt with messages, model config, and version history |
+| `create_prompt` | Create a new prompt with messages and model configuration |
+| `update_prompt` | Update a prompt or create a new version |
+
+### Tool Details
+
+#### `discover_schema`
+
+Discover available filter fields, metrics, aggregation types, and group-by options for LangWatch queries. Call this before using `search_traces` or `get_analytics` to understand available options.
+
+**Parameters:**
+- `category` (required): One of `"filters"`, `"metrics"`, `"aggregations"`, `"groups"`, or `"all"`
+
+#### `search_traces`
+
+Search traces with filters, text query, and date range. Returns AI-readable trace digests by default.
+
+**Parameters:**
+- `query` (optional): Text search query
+- `startDate` (optional): Start date — ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
+- `endDate` (optional): End date — ISO string or relative. Default: now
+- `filters` (optional): Filter object (e.g. `{"metadata.labels": ["production"]}`)
+- `pageSize` (optional): Results per page (default: 25, max: 1000)
+- `scrollId` (optional): Pagination token from previous search
+- `format` (optional): `"digest"` (default, AI-readable) or `"json"` (full raw data)
+
+#### `get_trace`
+
+Get full details of a single trace by ID. Returns AI-readable trace digest by default.
+
+**Parameters:**
+- `traceId` (required): The trace ID to retrieve
+- `format` (optional): `"digest"` (default, AI-readable) or `"json"` (full raw data)
+
+#### `get_analytics`
+
+Query analytics timeseries from LangWatch. Metrics use `"category.name"` format (e.g., `"performance.completion_time"`).
+
+**Parameters:**
+- `metric` (required): Metric in `"category.name"` format (e.g., `"metadata.trace_id"`, `"performance.total_cost"`)
+- `aggregation` (optional): `avg`, `sum`, `min`, `max`, `median`, `p90`, `p95`, `p99`, `cardinality`, `terms`. Default: `avg`
+- `startDate` (optional): Start date — ISO string or relative. Default: 7 days ago
+- `endDate` (optional): End date. Default: now
+- `groupBy` (optional): Group results by field
+- `filters` (optional): Filters to apply
+- `timeZone` (optional): Timezone. Default: UTC
+
+#### `list_prompts`
+
+List all prompts configured in the LangWatch project. No parameters required.
+
+#### `get_prompt`
+
+Get a specific prompt by ID or handle, including messages, model config, and version history.
+
+**Parameters:**
+- `idOrHandle` (required): Prompt ID or handle
+- `version` (optional): Specific version number (default: latest)
+
+#### `create_prompt`
+
+Create a new prompt in the LangWatch project.
+
+**Parameters:**
+- `name` (required): Prompt name
+- `messages` (required): Array of `{role, content}` messages
+- `model` (required): Model name (e.g., `"gpt-4o"`, `"claude-sonnet-4-5-20250929"`)
+- `modelProvider` (required): Provider name (e.g., `"openai"`, `"anthropic"`)
+- `handle` (optional): URL-friendly handle
+- `description` (optional): Prompt description
+
+#### `update_prompt`
+
+Update an existing prompt or create a new version.
+
+**Parameters:**
+- `idOrHandle` (required): Prompt ID or handle to update
+- `messages` (optional): Updated messages array
+- `model` (optional): Updated model name
+- `modelProvider` (optional): Updated provider
+- `createVersion` (optional): If `true`, creates a new version instead of updating in place
+- `commitMessage` (optional): Commit message for the change
+
+#### `fetch_langwatch_docs`
+
+Fetches LangWatch documentation pages to understand how to implement features.
+
+**Parameters:**
+- `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
+
+#### `fetch_scenario_docs`
+
+Fetches Scenario documentation pages to understand how to write agent tests.
+
+**Parameters:**
+- `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
+
+<Info>
+Your AI assistant will automatically choose the right tools based on your request. You don't need to call these tools manually.
+</Info>

@@ -1,17 +1,11 @@
 import { definePipeline } from "../../";
 import type { Event } from "../../domain/types";
+import { ReportUsageForMonthCommand } from "./commands/reportUsageForMonth.command";
 
 export const BILLING_REPORTING_PIPELINE_NAME = "billing_reporting" as const;
 
 export interface BillingReportingPipelineDeps {
-  ReportUsageForMonthCommand: {
-    new (): any;
-    readonly schema: any;
-    getAggregateId(payload: any): string;
-    getSpanAttributes?(
-      payload: any,
-    ): Record<string, string | number | boolean>;
-  };
+  reportUsageForMonthCommand: ReportUsageForMonthCommand;
 }
 
 /**
@@ -27,7 +21,7 @@ export function createBillingReportingPipeline(
   return definePipeline<Event>()
     .withName(BILLING_REPORTING_PIPELINE_NAME)
     .withAggregateType("billing_report")
-    .withCommand("reportUsageForMonth", deps.ReportUsageForMonthCommand, {
+    .withCommandInstance("reportUsageForMonth", ReportUsageForMonthCommand, deps.reportUsageForMonthCommand, {
       delay: 300_000, // 5 min delay (initial + re-trigger)
       deduplication: {
         makeId: (p: { organizationId: string; billingMonth: string }) =>

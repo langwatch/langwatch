@@ -1,6 +1,7 @@
 import { Popover as ChakraPopover, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
+import { OverlayDepthContext, useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 
 interface PopoverContentProps extends ChakraPopover.ContentProps {
   portalled?: boolean;
@@ -13,6 +14,7 @@ export const PopoverContent = React.forwardRef<
   PopoverContentProps
 >(function PopoverContent(props, ref) {
   const { portalled = true, portalRef, positionerProps, ...rest } = props;
+  const { zIndex, depth } = useOverlayZIndex();
   return (
     <Portal disabled={!portalled} container={portalRef}>
       <ChakraPopover.Positioner
@@ -21,17 +23,19 @@ export const PopoverContent = React.forwardRef<
           if (node) {
             // Zag.js sets --z-index inline based on layer stack order, which
             // can place popovers behind drawers. Force it higher. See #2390.
-            node.style.setProperty("z-index", "2000", "important");
+            node.style.setProperty("z-index", zIndex, "important");
           }
         }}
       >
-        <ChakraPopover.Content
-          borderRadius="lg"
-          background="bg.panel/75"
-          backdropFilter="blur(8px)"
-          ref={ref}
-          {...rest}
-        />
+        <OverlayDepthContext.Provider value={depth}>
+          <ChakraPopover.Content
+            borderRadius="lg"
+            background="bg.panel/75"
+            backdropFilter="blur(8px)"
+            ref={ref}
+            {...rest}
+          />
+        </OverlayDepthContext.Provider>
       </ChakraPopover.Positioner>
     </Portal>
   );

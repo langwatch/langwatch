@@ -1,0 +1,230 @@
+---
+title: "Data Model"
+description: "Learn the LangWatch prompt data model to manage versions, variants, and performance links for structured prompt versioning."
+---
+
+# Prompt Data Model
+
+This page explains the structure of prompts in LangWatch and how they're organized.
+
+## Overview
+
+Prompts in LangWatch contain all the information needed to generate AI responses, including the prompt text, model configuration, and optimization settings.
+
+## Complete Prompt Structure
+
+When you retrieve a prompt, you get all the configuration in a single response:
+
+```json
+{
+  "id": "prompt_TrYXZLsiTJkn9N6PiZiae",
+  "handle": "customer-support-bot",
+  "scope": "PROJECT",
+  "projectId": "proj_123",
+  "organizationId": null,
+  "version": 1,
+  "versionId": "version_abc123",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z",
+  "authorId": "user_789",
+  "deletedAt": null,
+  
+  "prompt": "You are a helpful customer support agent...",
+  "model": "openai/gpt-4o-mini",
+  "temperature": 0.7,
+  "maxTokens": 1000,
+  "messages": [
+    { "role": "system", "content": "You are a helpful customer support agent..." },
+    { "role": "user", "content": "I need help with my account" }
+  ],
+  "inputs": [
+    { "name": "user_name", "type": "string" },
+    { "name": "user_email", "type": "string" }
+  ],
+  "outputs": [
+    { "name": "user_name", "type": "string" },
+    { "name": "user_email", "type": "string" }
+  ],
+  "demonstrations": {
+    "columns": [
+      { "id": "input", "name": "User Input", "type": "string" },
+      { "id": "output", "name": "Expected Output", "type": "string" }
+    ],
+    "rows": [
+      { "id": "example_1", "input": "I need help with my account", "output": "I'd be happy to help you with your account. What specific issue are you experiencing?" }
+    ]
+  },
+  "promptingTechnique": "chain_of_thought"
+}
+```
+
+## Field Descriptions
+
+### Core Fields
+
+<ResponseField name="id" type="string" required>
+Unique identifier for the prompt
+</ResponseField>
+
+<ResponseField name="handle" type="string" required>
+Human-readable identifier for the prompt (primary way to reference prompts)
+</ResponseField>
+
+<ResponseField name="projectId" type="string" required>
+The project that owns the prompt
+</ResponseField>
+
+<ResponseField name="organizationId" type="string | null">
+The organization that owns the prompt
+</ResponseField>
+
+<ResponseField name="version" type="integer" required>
+Current version number
+</ResponseField>
+
+<ResponseField name="versionId" type="string" required>
+Unique identifier for this version
+</ResponseField>
+
+<ResponseField name="createdAt" type="timestamp" required>
+When this version was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="timestamp" required>
+When the prompt was last updated
+</ResponseField>
+
+<ResponseField name="authorId" type="string" required>
+The user who created this version
+</ResponseField>
+
+<ResponseField name="deletedAt" type="timestamp | null">
+Soft delete timestamp (null if not deleted)
+</ResponseField>
+
+### Scope and Access
+
+<ResponseField name="scope" type="string" required default="PROJECT">
+- `PROJECT` - Prompts are only accessible within the project
+- `ORGANIZATION` - Prompts are shared across all projects in the organization
+</ResponseField>
+
+
+### Model Configuration
+
+<ResponseField name="model" type="string" required>
+The LLM model to use (e.g., "openai/gpt-4o-mini"). Model names follow the litellm structure ("provider/model")
+</ResponseField>
+
+<ResponseField name="temperature" type="float" required>
+Fine-tune creativity vs. consistency (0.0 = deterministic, 2.0 = very creative)
+</ResponseField>
+
+<ResponseField name="maxTokens" type="integer" required>
+Control response length and costs
+</ResponseField>
+
+### Content Fields
+
+<ResponseField name="prompt" type="string" required>
+The main prompt text (system message)
+</ResponseField>
+
+<ResponseField name="messages" type="array">
+Array of chat messages with roles and content (alternative to prompt field)
+</ResponseField>
+
+## Variable System
+
+### Variable Formatting
+
+Prompts use `{{ variable_name }}` syntax for dynamic content:
+
+```text
+You are a helpful customer support agent. The user is {{user_name}} and their email is {{user_email}}.
+
+Please help them with: {{input}}
+```
+
+### Supported Variable Types
+
+- **Strings**: `{{user_name}}`
+- **Numbers**: `{{count}}`
+- **Booleans**: `{{is_premium}}`
+- **Lists**: `{{items}}`
+- **Objects**: `{{user_data}}` (will be converted to string)
+
+## Optimization Features
+
+<Note>
+**Studio Only**: These advanced optimization features require the optimization studio interface for proper experimentation, 
+performance measurement, and A/B testing. They cannot be configured via the API.
+</Note>
+
+### Input/Output Definitions
+
+<ResponseField name="inputs" type="array">
+Array of input variable definitions with identifiers and types
+</ResponseField>
+
+<ResponseField name="outputs" type="array">
+Array of output variable definitions with identifiers and types
+</ResponseField>
+
+### Type System
+
+<AccordionGroup>
+<Accordion title="Input Types">
+- `"str"` - String values
+- `"float"` - Floating point numbers
+- `"bool"` - Boolean values
+- `"image"` - Image data
+- `"list[str]"` - List of strings
+- `"list[float]"` - List of floats
+- `"list[int]"` - List of integers
+- `"list[bool]"` - List of booleans
+- `"dict"` - Dictionary/object
+</Accordion>
+
+<Accordion title="Output Types">
+- `"str"` - String responses
+- `"float"` - Numeric responses
+- `"bool"` - Boolean responses
+- `"json_schema"` - Structured JSON responses
+</Accordion>
+</AccordionGroup>
+
+### Advanced Features
+<ResponseField name="promptingTechnique" type="object">
+Configuration for advanced prompting strategies
+
+The prompting strategy to use.
+  - `"few_shot"` - Few-shot learning with examples
+  - `"in_context"` - In-context learning approach  
+  - `"chain_of_thought"` - Chain-of-thought reasoning
+
+</ResponseField>
+
+<ResponseField name="demonstrations" type="object">
+Few-shot examples with columns and rows structure
+</ResponseField>
+
+### Demonstrations Structure
+
+```json
+{
+  "demonstrations": {
+    "columns": [
+      { "id": "input", "name": "User Input", "type": "string" },
+      { "id": "output", "name": "Expected Output", "type": "string" }
+    ],
+    "rows": [
+      {
+        "id": "example_1",
+        "input": "I need help with my account",
+        "output": "I'd be happy to help you with your account. What specific issue are you experiencing?"
+      }
+    ]
+  }
+}
+```

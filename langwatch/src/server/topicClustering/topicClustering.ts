@@ -23,7 +23,6 @@ import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { getPayloadSizeHistogram } from "../metrics";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
@@ -45,23 +44,9 @@ export const clusterTopicsForProject = async (
 ): Promise<void> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { team: true },
   });
   if (!project) {
     throw new Error("Project not found");
-  }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    logger.info(
-      { projectId },
-      "skipping clustering for project as monthly limit has been reached",
-    );
   }
 
   const clickhouse = project.featureClickHouseDataSourceTraces
@@ -351,19 +336,20 @@ async function fetchTracesFromClickHouse(
   const result = await clickhouse.query({
     query: `
       SELECT
-        TraceId,
-        ComputedInput,
-        TopicId,
-        SubTopicId,
-        toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
-      FROM (
-        SELECT *
-        FROM trace_summaries
-        WHERE ${whereClause}
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
-      )
-      ORDER BY OccurredAt DESC, TraceId ASC
+        t.TraceId AS TraceId,
+        t.ComputedInput AS ComputedInput,
+        t.TopicId AS TopicId,
+        t.SubTopicId AS SubTopicId,
+        toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
+      FROM trace_summaries t
+      WHERE ${whereClause}
+        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries
+          WHERE ${whereClause}
+          GROUP BY TenantId, TraceId
+        )
+      ORDER BY t.OccurredAt DESC, t.TraceId ASC
       LIMIT 2000
     `,
     query_params: {

@@ -1,25 +1,27 @@
 import type { Projection } from "../../../";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "../../../projections/abstractFoldProjection";
+import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "../../../projections/foldProjection.types";
+  SuiteRunStartedEvent,
+  SuiteRunItemStartedEvent,
+  SuiteRunItemCompletedEvent,
+} from "../schemas/events";
 import {
-  SUITE_RUN_PROCESSING_EVENT_TYPES,
-  SUITE_RUN_PROJECTION_VERSIONS,
-} from "../schemas/constants";
-import type { SuiteRunProcessingEvent } from "../schemas/events";
-import {
-  isSuiteRunStartedEvent,
-  isSuiteRunItemStartedEvent,
-  isSuiteRunItemCompletedEvent,
-} from "../schemas/typeGuards";
+  SuiteRunStartedEventSchema,
+  SuiteRunItemStartedEventSchema,
+  SuiteRunItemCompletedEventSchema,
+} from "../schemas/events";
 
 /**
  * State data for a suite run.
  * Matches the suite_runs ClickHouse table schema.
  *
  * This is both the fold state and the stored data — one type, not two.
- * `apply()` does all computation using simple counters (no Sets/arrays).
+ * Handlers do all computation using simple counters (no Sets/arrays).
  * Store is a dumb read/write layer.
  */
 export interface SuiteRunStateData {
@@ -48,33 +50,58 @@ export interface SuiteRunState extends Projection<SuiteRunStateData> {
   data: SuiteRunStateData;
 }
 
-function init(): SuiteRunStateData {
-  return {
-    SuiteRunId: "",
-    BatchRunId: "",
-    ScenarioSetId: "",
-    SuiteId: "",
-    Status: "PENDING",
-    Total: 0,
-    StartedCount: 0,
-    CompletedCount: 0,
-    FailedCount: 0,
-    Progress: 0,
-    PassRateBps: null,
-    CreatedAt: Date.now(),
-    UpdatedAt: Date.now(),
-    StartedAt: null,
-    FinishedAt: null,
-    PassedCount: 0,
-    GradedCount: 0,
-  };
-}
+const suiteRunEvents = [
+  SuiteRunStartedEventSchema,
+  SuiteRunItemStartedEventSchema,
+  SuiteRunItemCompletedEventSchema,
+] as const;
 
-function apply(
-  state: SuiteRunStateData,
-  event: SuiteRunProcessingEvent,
-): SuiteRunStateData {
-  if (isSuiteRunStartedEvent(event)) {
+/**
+ * Type-safe fold projection for suite run state.
+ *
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.suite_run.started"` → `handleSuiteRunStarted`)
+ * - `UpdatedAt` is auto-managed by the base class after each handler call
+ */
+export class SuiteRunStateFoldProjection
+  extends AbstractFoldProjection<SuiteRunStateData, typeof suiteRunEvents>
+  implements FoldEventHandlers<typeof suiteRunEvents, SuiteRunStateData>
+{
+  readonly name = "suiteRunState";
+  readonly version = SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE;
+  readonly store: FoldProjectionStore<SuiteRunStateData>;
+
+  protected readonly events = suiteRunEvents;
+
+  constructor(deps: { store: FoldProjectionStore<SuiteRunStateData> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return {
+      SuiteRunId: "",
+      BatchRunId: "",
+      ScenarioSetId: "",
+      SuiteId: "",
+      Status: "PENDING",
+      Total: 0,
+      StartedCount: 0,
+      CompletedCount: 0,
+      FailedCount: 0,
+      Progress: 0,
+      PassRateBps: null,
+      StartedAt: null,
+      FinishedAt: null,
+      PassedCount: 0,
+      GradedCount: 0,
+    };
+  }
+
+  handleSuiteRunStarted(
+    event: SuiteRunStartedEvent,
+    state: SuiteRunStateData,
+  ): SuiteRunStateData {
     return {
       ...state,
       BatchRunId: event.data.batchRunId,
@@ -83,24 +110,27 @@ function apply(
       Total: event.data.total,
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: Date.now(),
     };
   }
 
-  if (isSuiteRunItemStartedEvent(event)) {
+  handleSuiteRunItemStarted(
+    _event: SuiteRunItemStartedEvent,
+    state: SuiteRunStateData,
+  ): SuiteRunStateData {
     const startedCount = state.StartedCount + 1;
     return {
       ...state,
       StartedCount: startedCount,
       Progress: state.CompletedCount + state.FailedCount,
-      UpdatedAt: Date.now(),
     };
   }
 
-  if (isSuiteRunItemCompletedEvent(event)) {
+  handleSuiteRunItemCompleted(
+    event: SuiteRunItemCompletedEvent,
+    state: SuiteRunStateData,
+  ): SuiteRunStateData {
     const isFailure =
-      event.data.status === "FAILURE" ||
-      event.data.status === "ERROR";
+      event.data.status === "FAILURE" || event.data.status === "ERROR";
 
     let completedCount = state.CompletedCount;
     let failedCount = state.FailedCount;
@@ -111,7 +141,6 @@ function apply(
       completedCount += 1;
     }
 
-    // Update pass rate if verdict is present
     let { PassedCount: passedCount, GradedCount: gradedCount } = state;
     if (event.data.verdict) {
       gradedCount += 1;
@@ -128,7 +157,6 @@ function apply(
     const progress = completedCount + failedCount;
     const allDone = state.Total > 0 && progress >= state.Total;
 
-    // Derive final status when all items are done
     let status = state.Status;
     let finishedAt = state.FinishedAt;
     if (allDone) {
@@ -146,28 +174,6 @@ function apply(
       PassRateBps: passRateBps,
       Status: status,
       FinishedAt: finishedAt,
-      UpdatedAt: Date.now(),
     };
   }
-
-  return state;
-}
-
-/**
- * Creates FoldProjection definition for suite run state.
- *
- * Fold state = stored data. Uses simple counters instead of Sets/arrays
- * so state round-trips through the store without loss.
- */
-export function createSuiteRunStateFoldProjection(deps: {
-  store: FoldProjectionStore<SuiteRunStateData>;
-}): FoldProjectionDefinition<SuiteRunStateData, SuiteRunProcessingEvent> {
-  return {
-    name: "suiteRunState",
-    version: SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-    eventTypes: SUITE_RUN_PROCESSING_EVENT_TYPES,
-    init,
-    apply,
-    store: deps.store,
-  };
 }

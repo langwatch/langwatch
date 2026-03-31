@@ -1,6 +1,5 @@
 from http import HTTPStatus
-from typing import Any
-from urllib.parse import quote
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -20,19 +19,18 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     trace_id: str,
     *,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    format_: Union[Unset, GetApiTracesByTraceIdFormat] = UNSET,
+    llm_mode: Union[Unset, GetApiTracesByTraceIdLlmMode] = UNSET,
 ) -> dict[str, Any]:
-
     params: dict[str, Any] = {}
 
-    json_format_: str | Unset = UNSET
+    json_format_: Union[Unset, str] = UNSET
     if not isinstance(format_, Unset):
         json_format_ = format_.value
 
     params["format"] = json_format_
 
-    json_llm_mode: str | Unset = UNSET
+    json_llm_mode: Union[Unset, str] = UNSET
     if not isinstance(llm_mode, Unset):
         json_llm_mode = llm_mode.value
 
@@ -42,9 +40,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/traces/{trace_id}".format(
-            trace_id=quote(str(trace_id), safe=""),
-        ),
+        "url": f"/api/traces/{trace_id}",
         "params": params,
     }
 
@@ -52,46 +48,41 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiTracesByTraceIdResponse200
-    | GetApiTracesByTraceIdResponse400
-    | GetApiTracesByTraceIdResponse401
-    | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse422
-    | GetApiTracesByTraceIdResponse500
-    | None
-):
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[
+    Union[
+        GetApiTracesByTraceIdResponse200,
+        GetApiTracesByTraceIdResponse400,
+        GetApiTracesByTraceIdResponse401,
+        GetApiTracesByTraceIdResponse404,
+        GetApiTracesByTraceIdResponse422,
+        GetApiTracesByTraceIdResponse500,
+    ]
+]:
     if response.status_code == 200:
         response_200 = GetApiTracesByTraceIdResponse200.from_dict(response.json())
 
         return response_200
-
     if response.status_code == 400:
         response_400 = GetApiTracesByTraceIdResponse400.from_dict(response.json())
 
         return response_400
-
     if response.status_code == 401:
         response_401 = GetApiTracesByTraceIdResponse401.from_dict(response.json())
 
         return response_401
-
     if response.status_code == 404:
         response_404 = GetApiTracesByTraceIdResponse404.from_dict(response.json())
 
         return response_404
-
     if response.status_code == 422:
         response_422 = GetApiTracesByTraceIdResponse422.from_dict(response.json())
 
         return response_422
-
     if response.status_code == 500:
         response_500 = GetApiTracesByTraceIdResponse500.from_dict(response.json())
 
         return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -99,14 +90,16 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
-    GetApiTracesByTraceIdResponse200
-    | GetApiTracesByTraceIdResponse400
-    | GetApiTracesByTraceIdResponse401
-    | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse422
-    | GetApiTracesByTraceIdResponse500
+    Union[
+        GetApiTracesByTraceIdResponse200,
+        GetApiTracesByTraceIdResponse400,
+        GetApiTracesByTraceIdResponse401,
+        GetApiTracesByTraceIdResponse404,
+        GetApiTracesByTraceIdResponse422,
+        GetApiTracesByTraceIdResponse500,
+    ]
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -119,30 +112,32 @@ def _build_response(
 def sync_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    client: Union[AuthenticatedClient, Client],
+    format_: Union[Unset, GetApiTracesByTraceIdFormat] = UNSET,
+    llm_mode: Union[Unset, GetApiTracesByTraceIdLlmMode] = UNSET,
 ) -> Response[
-    GetApiTracesByTraceIdResponse200
-    | GetApiTracesByTraceIdResponse400
-    | GetApiTracesByTraceIdResponse401
-    | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse422
-    | GetApiTracesByTraceIdResponse500
+    Union[
+        GetApiTracesByTraceIdResponse200,
+        GetApiTracesByTraceIdResponse400,
+        GetApiTracesByTraceIdResponse401,
+        GetApiTracesByTraceIdResponse404,
+        GetApiTracesByTraceIdResponse422,
+        GetApiTracesByTraceIdResponse500,
+    ]
 ]:
     """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (Union[Unset, GetApiTracesByTraceIdFormat]):
+        llm_mode (Union[Unset, GetApiTracesByTraceIdLlmMode]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500]
+        Response[Union[GetApiTracesByTraceIdResponse200, GetApiTracesByTraceIdResponse400, GetApiTracesByTraceIdResponse401, GetApiTracesByTraceIdResponse404, GetApiTracesByTraceIdResponse422, GetApiTracesByTraceIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -161,31 +156,32 @@ def sync_detailed(
 def sync(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
-) -> (
-    GetApiTracesByTraceIdResponse200
-    | GetApiTracesByTraceIdResponse400
-    | GetApiTracesByTraceIdResponse401
-    | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse422
-    | GetApiTracesByTraceIdResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+    format_: Union[Unset, GetApiTracesByTraceIdFormat] = UNSET,
+    llm_mode: Union[Unset, GetApiTracesByTraceIdLlmMode] = UNSET,
+) -> Optional[
+    Union[
+        GetApiTracesByTraceIdResponse200,
+        GetApiTracesByTraceIdResponse400,
+        GetApiTracesByTraceIdResponse401,
+        GetApiTracesByTraceIdResponse404,
+        GetApiTracesByTraceIdResponse422,
+        GetApiTracesByTraceIdResponse500,
+    ]
+]:
     """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (Union[Unset, GetApiTracesByTraceIdFormat]):
+        llm_mode (Union[Unset, GetApiTracesByTraceIdLlmMode]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500
+        Union[GetApiTracesByTraceIdResponse200, GetApiTracesByTraceIdResponse400, GetApiTracesByTraceIdResponse401, GetApiTracesByTraceIdResponse404, GetApiTracesByTraceIdResponse422, GetApiTracesByTraceIdResponse500]
     """
 
     return sync_detailed(
@@ -199,30 +195,32 @@ def sync(
 async def asyncio_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    client: Union[AuthenticatedClient, Client],
+    format_: Union[Unset, GetApiTracesByTraceIdFormat] = UNSET,
+    llm_mode: Union[Unset, GetApiTracesByTraceIdLlmMode] = UNSET,
 ) -> Response[
-    GetApiTracesByTraceIdResponse200
-    | GetApiTracesByTraceIdResponse400
-    | GetApiTracesByTraceIdResponse401
-    | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse422
-    | GetApiTracesByTraceIdResponse500
+    Union[
+        GetApiTracesByTraceIdResponse200,
+        GetApiTracesByTraceIdResponse400,
+        GetApiTracesByTraceIdResponse401,
+        GetApiTracesByTraceIdResponse404,
+        GetApiTracesByTraceIdResponse422,
+        GetApiTracesByTraceIdResponse500,
+    ]
 ]:
     """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (Union[Unset, GetApiTracesByTraceIdFormat]):
+        llm_mode (Union[Unset, GetApiTracesByTraceIdLlmMode]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500]
+        Response[Union[GetApiTracesByTraceIdResponse200, GetApiTracesByTraceIdResponse400, GetApiTracesByTraceIdResponse401, GetApiTracesByTraceIdResponse404, GetApiTracesByTraceIdResponse422, GetApiTracesByTraceIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -239,31 +237,32 @@ async def asyncio_detailed(
 async def asyncio(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
-) -> (
-    GetApiTracesByTraceIdResponse200
-    | GetApiTracesByTraceIdResponse400
-    | GetApiTracesByTraceIdResponse401
-    | GetApiTracesByTraceIdResponse404
-    | GetApiTracesByTraceIdResponse422
-    | GetApiTracesByTraceIdResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+    format_: Union[Unset, GetApiTracesByTraceIdFormat] = UNSET,
+    llm_mode: Union[Unset, GetApiTracesByTraceIdLlmMode] = UNSET,
+) -> Optional[
+    Union[
+        GetApiTracesByTraceIdResponse200,
+        GetApiTracesByTraceIdResponse400,
+        GetApiTracesByTraceIdResponse401,
+        GetApiTracesByTraceIdResponse404,
+        GetApiTracesByTraceIdResponse422,
+        GetApiTracesByTraceIdResponse500,
+    ]
+]:
     """Get a single trace by ID. Defaults to AI-readable digest format.
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (Union[Unset, GetApiTracesByTraceIdFormat]):
+        llm_mode (Union[Unset, GetApiTracesByTraceIdLlmMode]):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiTracesByTraceIdResponse200 | GetApiTracesByTraceIdResponse400 | GetApiTracesByTraceIdResponse401 | GetApiTracesByTraceIdResponse404 | GetApiTracesByTraceIdResponse422 | GetApiTracesByTraceIdResponse500
+        Union[GetApiTracesByTraceIdResponse200, GetApiTracesByTraceIdResponse400, GetApiTracesByTraceIdResponse401, GetApiTracesByTraceIdResponse404, GetApiTracesByTraceIdResponse422, GetApiTracesByTraceIdResponse500]
     """
 
     return (

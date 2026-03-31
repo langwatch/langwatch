@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -117,6 +118,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "generate-rag-dataset");
 
             // Find CSV or Python dataset files
             const csvFiles = findTestFiles(tempFolder, /\.csv$/);
@@ -214,6 +216,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "test-compliance");
 
             // Find test files (Python or TypeScript)
             const pyTestFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
@@ -304,6 +307,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "debug-instrumentation");
 
             // Verify the agent used MCP trace tools
             const allContent = state.messages

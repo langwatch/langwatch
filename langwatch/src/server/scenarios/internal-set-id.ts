@@ -38,3 +38,18 @@ export function isOnPlatformSet(setId: string): boolean {
 export function getOnPlatformSetId(projectId: string): string {
   return `${INTERNAL_SET_PREFIX}${projectId}${ON_PLATFORM_SET_SUFFIX}`;
 }
+
+/** The canonical default set ID used when none is specified */
+export const DEFAULT_SET_ID = "default";
+
+/**
+ * Expands a scenarioSetId into the list of values to match in queries.
+ * Handles backwards-compatibility with data written before the empty-string
+ * coercion fix: old rows may have ScenarioSetId = "" while new rows have "default".
+ */
+export function expandSetIdFilter(scenarioSetId: string): string[] {
+  if (scenarioSetId === DEFAULT_SET_ID || scenarioSetId === "") {
+    return [DEFAULT_SET_ID, ""];
+  }
+  return [scenarioSetId];
+}

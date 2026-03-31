@@ -1474,12 +1474,10 @@ export const organizationRouter = createTRPCRouter({
         });
       });
 
-      const project = await prisma.project.findFirst({
-        where: { teamId: invite.teamIds.split(",")[0] },
-        select: { slug: true },
-      });
+      const inviteService = InviteService.create(prisma);
+      const projectSlug = await inviteService.findLandingProjectSlug(invite);
 
-      return { success: true, invite, project };
+      return { success: true, invite, project: projectSlug ? { slug: projectSlug } : null };
     }),
   updateTeamMemberRole: protectedProcedure
     .input(
@@ -2151,7 +2149,7 @@ export const organizationRouter = createTRPCRouter({
         endDate: z.number().optional(), // End date timestamp (milliseconds)
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

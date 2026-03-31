@@ -36,9 +36,10 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
       expect(result.attributes["gen_ai.input.messages"]).toEqual(messages);
     });
 
-    it("upgrades span type to llm", () => {
+    it("does not override span type to llm", () => {
       const result = service.canonicalize(
         {
+          "langwatch.span.type": "agent",
           "langwatch.input": JSON.stringify({
             type: "chat_messages",
             value: [{ role: "user", content: "Hello" }],
@@ -48,7 +49,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["langwatch.span.type"]).toBe("llm");
+      expect(result.attributes["langwatch.span.type"]).toBe("agent");
     });
 
     it("extracts system instruction from first system message", () => {

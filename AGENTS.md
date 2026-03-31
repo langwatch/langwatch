@@ -25,7 +25,7 @@ make quickstart       # Interactive profile chooser
 make down             # Stop all services
 ```
 
-See `docs/adr/004-docker-dev-environment.md` for architecture decisions.
+See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 ## Commands
 
@@ -51,10 +51,10 @@ specs/               # BDD feature specs
 
 ## Key References
 
-- `docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
-- `docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
-- `docs/best_practices/` - language/framework conventions
-- `docs/adr/` - Architecture Decision Records
+- `dev/docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
+- `dev/docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
+- `dev/docs/best_practices/` - language/framework conventions
+- `dev/docs/adr/` - Architecture Decision Records
 
 ## General
 
@@ -66,6 +66,7 @@ specs/               # BDD feature specs
 | Describe blocks without "when" context | Inner describe blocks must use "when" conditions: `describe("when user clicks submit", () => ...)` not `describe("submit behavior", ...)` |
 | Flat test structure with GWT comments | Use nested `describe("given X")` and `describe("when Y")` blocks for BDD structure, not comments |
 | Naming tests as unit when they render components | Tests that render components and mock boundaries are integration tests (`.integration.test.ts`), not unit tests |
+| Writing string-assertion "regression tests" for runtime bugs | If the bug is a runtime crash/error, the regression test must execute the code path and observe the crash — not just assert the generated output string looks different. String checks are supplementary, not primary |
 | Code before tests | Outside-In TDD: spec → test → code |
 | Tests after TODO list | BDD specs come first |
 | Shared types in `types.ts` | Colocate unless truly shared |
@@ -86,6 +87,7 @@ specs/               # BDD feature specs
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
+| Using `form.watch()` in child components that receive `form` as a prop | Use `useWatch({ control: form.control, name: "field" })` instead — `form.watch()` doesn't trigger re-renders in child components (especially inside `useFieldArray` items). Only the form owner component should use `form.watch()` |
 
 ## TypeScript
 
@@ -98,11 +100,16 @@ specs/               # BDD feature specs
 
 ## Database
 
+**Read `dev/docs/best_practices/clickhouse-queries.md` before writing or modifying any ClickHouse query.**
+
 | Common Mistake | Correct Behavior |
 |----------------|------------------|
 | Modifying deployed migrations | Never edit migrations that have been deployed - they are immutable history. Create a new migration instead. (New migrations not yet in production can be fixed before merging) |
 | Hardcoding schema names in migrations | Use unqualified table names (e.g., `"Monitor"` not `"langwatch_db"."Monitor"`) - Prisma uses the schema from connection string |
 | Writing ClickHouse queries without TenantId filtering | Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}` — no other ID (ScenarioRunId, BatchRunId, etc.) is unique across tenants. Always make TenantId the first predicate |
+| Using `LIMIT 1 BY` with heavy columns in subqueries | Use the IN-tuple dedup pattern (`GROUP BY key + max(UpdatedAt)` in subquery). `LIMIT 1 BY` forces ClickHouse to materialize ALL selected columns for entire granules (~8K rows), causing OOM with heavy payloads (Messages, SpanAttributes, ComputedInput/Output) |
+| Using `max(column)` for pagination sort keys on deduped tables | Use `argMax(column, UpdatedAt)` to derive sort keys from the latest version only. `max()` may pick values from stale versions, causing cursor pagination to skip/duplicate rows |
+| Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 
 ## Orchestration Model
 

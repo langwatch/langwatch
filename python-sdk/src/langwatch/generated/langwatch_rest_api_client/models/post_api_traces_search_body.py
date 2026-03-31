@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -20,55 +18,58 @@ T = TypeVar("T", bound="PostApiTracesSearchBody")
 class PostApiTracesSearchBody:
     """
     Attributes:
-        start_date (float | str):
-        end_date (float | str):
-        query (str | Unset):
-        filters (PostApiTracesSearchBodyFilters | Unset):
-        trace_ids (list[str] | Unset):
-        negate_filters (bool | Unset):
-        page_offset (float | Unset):
-        page_size (float | Unset):
-        group_by (str | Unset):
-        sort_by (str | Unset):
-        sort_direction (str | Unset):
-        updated_at (float | Unset):
-        scroll_id (None | str | Unset):
-        format_ (PostApiTracesSearchBodyFormat | Unset): Output format: 'digest' (AI-readable trace digest) or 'json'
-            (full raw data)
-        llm_mode (bool | Unset):
+        start_date (Union[float, str]):
+        end_date (Union[float, str]):
+        query (Union[Unset, str]):
+        filters (Union[Unset, PostApiTracesSearchBodyFilters]):
+        trace_ids (Union[Unset, list[str]]):
+        negate_filters (Union[Unset, bool]):
+        page_offset (Union[Unset, float]):
+        page_size (Union[Unset, float]):
+        group_by (Union[Unset, str]):
+        sort_by (Union[Unset, str]):
+        sort_direction (Union[Unset, str]):
+        updated_at (Union[Unset, float]):
+        scroll_id (Union[None, Unset, str]):
+        format_ (Union[Unset, PostApiTracesSearchBodyFormat]): Output format: 'digest' (AI-readable trace digest) or
+            'json' (full raw data)
+        include_spans (Union[Unset, bool]): When true, fetches full span data for each trace. Useful for bulk export.
+            Default false.
+        llm_mode (Union[Unset, bool]):
     """
 
-    start_date: float | str
-    end_date: float | str
-    query: str | Unset = UNSET
-    filters: PostApiTracesSearchBodyFilters | Unset = UNSET
-    trace_ids: list[str] | Unset = UNSET
-    negate_filters: bool | Unset = UNSET
-    page_offset: float | Unset = UNSET
-    page_size: float | Unset = UNSET
-    group_by: str | Unset = UNSET
-    sort_by: str | Unset = UNSET
-    sort_direction: str | Unset = UNSET
-    updated_at: float | Unset = UNSET
-    scroll_id: None | str | Unset = UNSET
-    format_: PostApiTracesSearchBodyFormat | Unset = UNSET
-    llm_mode: bool | Unset = UNSET
+    start_date: Union[float, str]
+    end_date: Union[float, str]
+    query: Union[Unset, str] = UNSET
+    filters: Union[Unset, "PostApiTracesSearchBodyFilters"] = UNSET
+    trace_ids: Union[Unset, list[str]] = UNSET
+    negate_filters: Union[Unset, bool] = UNSET
+    page_offset: Union[Unset, float] = UNSET
+    page_size: Union[Unset, float] = UNSET
+    group_by: Union[Unset, str] = UNSET
+    sort_by: Union[Unset, str] = UNSET
+    sort_direction: Union[Unset, str] = UNSET
+    updated_at: Union[Unset, float] = UNSET
+    scroll_id: Union[None, Unset, str] = UNSET
+    format_: Union[Unset, PostApiTracesSearchBodyFormat] = UNSET
+    include_spans: Union[Unset, bool] = UNSET
+    llm_mode: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        start_date: float | str
+        start_date: Union[float, str]
         start_date = self.start_date
 
-        end_date: float | str
+        end_date: Union[float, str]
         end_date = self.end_date
 
         query = self.query
 
-        filters: dict[str, Any] | Unset = UNSET
+        filters: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.filters, Unset):
             filters = self.filters.to_dict()
 
-        trace_ids: list[str] | Unset = UNSET
+        trace_ids: Union[Unset, list[str]] = UNSET
         if not isinstance(self.trace_ids, Unset):
             trace_ids = self.trace_ids
 
@@ -86,15 +87,17 @@ class PostApiTracesSearchBody:
 
         updated_at = self.updated_at
 
-        scroll_id: None | str | Unset
+        scroll_id: Union[None, Unset, str]
         if isinstance(self.scroll_id, Unset):
             scroll_id = UNSET
         else:
             scroll_id = self.scroll_id
 
-        format_: str | Unset = UNSET
+        format_: Union[Unset, str] = UNSET
         if not isinstance(self.format_, Unset):
             format_ = self.format_.value
+
+        include_spans = self.include_spans
 
         llm_mode = self.llm_mode
 
@@ -130,6 +133,8 @@ class PostApiTracesSearchBody:
             field_dict["scrollId"] = scroll_id
         if format_ is not UNSET:
             field_dict["format"] = format_
+        if include_spans is not UNSET:
+            field_dict["includeSpans"] = include_spans
         if llm_mode is not UNSET:
             field_dict["llmMode"] = llm_mode
 
@@ -141,20 +146,20 @@ class PostApiTracesSearchBody:
 
         d = dict(src_dict)
 
-        def _parse_start_date(data: object) -> float | str:
-            return cast(float | str, data)
+        def _parse_start_date(data: object) -> Union[float, str]:
+            return cast(Union[float, str], data)
 
         start_date = _parse_start_date(d.pop("startDate"))
 
-        def _parse_end_date(data: object) -> float | str:
-            return cast(float | str, data)
+        def _parse_end_date(data: object) -> Union[float, str]:
+            return cast(Union[float, str], data)
 
         end_date = _parse_end_date(d.pop("endDate"))
 
         query = d.pop("query", UNSET)
 
         _filters = d.pop("filters", UNSET)
-        filters: PostApiTracesSearchBodyFilters | Unset
+        filters: Union[Unset, PostApiTracesSearchBodyFilters]
         if isinstance(_filters, Unset):
             filters = UNSET
         else:
@@ -176,21 +181,23 @@ class PostApiTracesSearchBody:
 
         updated_at = d.pop("updatedAt", UNSET)
 
-        def _parse_scroll_id(data: object) -> None | str | Unset:
+        def _parse_scroll_id(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         scroll_id = _parse_scroll_id(d.pop("scrollId", UNSET))
 
         _format_ = d.pop("format", UNSET)
-        format_: PostApiTracesSearchBodyFormat | Unset
+        format_: Union[Unset, PostApiTracesSearchBodyFormat]
         if isinstance(_format_, Unset):
             format_ = UNSET
         else:
             format_ = PostApiTracesSearchBodyFormat(_format_)
+
+        include_spans = d.pop("includeSpans", UNSET)
 
         llm_mode = d.pop("llmMode", UNSET)
 
@@ -209,6 +216,7 @@ class PostApiTracesSearchBody:
             updated_at=updated_at,
             scroll_id=scroll_id,
             format_=format_,
+            include_spans=include_spans,
             llm_mode=llm_mode,
         )
 

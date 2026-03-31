@@ -58,6 +58,14 @@ const existingUser = {
   id: "user-1",
   email: "alice@sso-corp.com",
   deactivatedAt: null,
+  pendingSsoSetup: false,
+};
+
+const pendingSsoUser = {
+  id: "user-2",
+  email: "pending@sso-corp.com",
+  deactivatedAt: null,
+  pendingSsoSetup: true,
 };
 
 const ssoAccount = {
@@ -107,6 +115,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
       prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
       prismaMock.account.upsert.mockResolvedValue({});
       prismaMock.account.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.user.update.mockResolvedValue({});
     });
 
     it("auto-links the account and allows sign-in", async () => {
@@ -142,6 +151,18 @@ describe("NextAuth signIn callback – SSO flow", () => {
       );
     });
 
+    it("clears pendingSsoSetup flag after linking", async () => {
+      await signInCallback({
+        user: { id: "user-1", email: "alice@sso-corp.com" },
+        account: ssoAccount,
+      });
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { pendingSsoSetup: false },
+      });
+    });
+
     it("removes old auth methods for the same provider", async () => {
       await signInCallback({
         user: { id: "user-1", email: "alice@sso-corp.com" },
@@ -164,28 +185,49 @@ describe("NextAuth signIn callback – SSO flow", () => {
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue(existingUser);
       prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
+      prismaMock.user.update.mockResolvedValue({});
     });
 
-    it("throws SSO_PROVIDER_NOT_ALLOWED", async () => {
-      await expect(
-        signInCallback({
-          user: { id: "user-1", email: "alice@sso-corp.com" },
-          account: nonSsoAccount,
-        }),
-      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+    it("allows sign-in and sets pendingSsoSetup so the banner is shown", async () => {
+      const result = await signInCallback({
+        user: { id: "user-1", email: "alice@sso-corp.com" },
+        account: nonSsoAccount,
+      });
+
+      expect(result).toBe(true);
     });
 
-    it("does not attempt to link any account", async () => {
-      try {
-        await signInCallback({
-          user: { id: "user-1", email: "alice@sso-corp.com" },
-          account: nonSsoAccount,
-        });
-      } catch {
-        // expected
-      }
+    it("marks the user as pendingSsoSetup", async () => {
+      await signInCallback({
+        user: { id: "user-1", email: "alice@sso-corp.com" },
+        account: nonSsoAccount,
+      });
+
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { pendingSsoSetup: true },
+      });
+    });
+
+    it("does not link any account", async () => {
+      await signInCallback({
+        user: { id: "user-1", email: "alice@sso-corp.com" },
+        account: nonSsoAccount,
+      });
 
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("does not set pendingSsoSetup again when it is already true", async () => {
+      prismaMock.user.findUnique.mockResolvedValue(pendingSsoUser);
+
+      const result = await signInCallback({
+        user: { id: "user-2", email: "pending@sso-corp.com" },
+        account: nonSsoAccount,
+      });
+
+      expect(result).toBe(true);
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
     });
   });
 
@@ -254,12 +296,62 @@ describe("NextAuth signIn callback – SSO flow", () => {
     });
   });
 
+  describe("when user has pendingSsoSetup and no org SSO domain is found (fallback path)", () => {
+    beforeEach(() => {
+      prismaMock.user.findUnique.mockResolvedValue(pendingSsoUser);
+      prismaMock.organization.findUnique.mockResolvedValue(null);
+    });
+
+    it("allows sign-in so they can still access the link-SSO settings page", async () => {
+      const result = await signInCallback({
+        user: { id: "user-2", email: "pending@sso-corp.com" },
+        account: nonSsoAccount,
+      });
+
+      expect(result).toBe(true);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when user has pendingSsoSetup and signs in with correct SSO provider", () => {
+    beforeEach(() => {
+      prismaMock.user.findUnique.mockResolvedValue(pendingSsoUser);
+      prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
+      prismaMock.account.upsert.mockResolvedValue({});
+      prismaMock.account.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.user.update.mockResolvedValue({});
+    });
+
+    it("allows sign-in", async () => {
+      const result = await signInCallback({
+        user: { id: "user-2", email: "pending@sso-corp.com" },
+        account: ssoAccount,
+      });
+
+      expect(result).toBe(true);
+    });
+
+    it("links the SSO account and clears pendingSsoSetup", async () => {
+      await signInCallback({
+        user: { id: "user-2", email: "pending@sso-corp.com" },
+        account: ssoAccount,
+      });
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: "user-2" },
+        data: { pendingSsoSetup: false },
+      });
+    });
+  });
+
   describe("when user signs in with no SSO domain configured", () => {
     beforeEach(() => {
       prismaMock.user.findUnique.mockResolvedValue({
         id: "user-99",
         email: "dave@regular.com",
         deactivatedAt: null,
+        pendingSsoSetup: false,
       });
       prismaMock.organization.findUnique.mockResolvedValue(null);
     });
@@ -281,6 +373,7 @@ describe("NextAuth signIn callback – SSO flow", () => {
       prismaMock.organization.findUnique.mockResolvedValue(ssoOrg);
       prismaMock.account.upsert.mockResolvedValue({});
       prismaMock.account.deleteMany.mockResolvedValue({ count: 0 });
+      prismaMock.user.update.mockResolvedValue({});
     });
 
     it("upsert is idempotent — no errors on repeat login", async () => {

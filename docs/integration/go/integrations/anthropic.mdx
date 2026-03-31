@@ -1,0 +1,85 @@
+---
+title: Anthropic (Claude) Integration
+sidebarTitle: Go
+description: Instrument Anthropic Claude API calls in Go using LangWatch to track performance, detect errors, and improve AI agent testing.
+icon: golang
+keywords: go, golang, anthropic, claude, instrumentation, langwatch, openai-compatible
+---
+
+LangWatch supports tracing Anthropic Claude API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to Anthropic's API endpoint.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY` and `ANTHROPIC_API_KEY` environment variables before running.
+</Info>
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	"github.com/openai/openai-go"
+	oaioption "github.com/openai/openai-go/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up LangWatch exporter
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+
+	// Create Anthropic client via OpenAI-compatible API
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
+		oaioption.WithBaseURL(os.Getenv("ANTHROPIC_BASE_URL")),
+		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureOutput(),
+			otelopenai.WithGenAISystem("anthropic"),
+		)),
+	)
+
+	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: "claude-4-5-sonnet",
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant."),
+			openai.UserMessage("Hello, Claude!"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("Chat completion failed: %v", err)
+	}
+
+	log.Printf("Response: %s", response.Choices[0].Message.Content)
+}
+```
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Anthropic applications

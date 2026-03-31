@@ -1,0 +1,22 @@
+---
+title: "Overview"
+description: "Prompts are used to manage and version your prompts"
+---
+
+## Intro
+
+With the Prompts API, you can manage and version your prompts. This is useful for tracking different versions of your prompts, managing prompt templates, and collaborating on prompt development.
+
+## Authentication
+
+To make a call to the Prompts API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
+
+#### Allowed Methods
+
+- `GET /api/prompts` - Get all prompts for a project
+- `POST /api/prompts` - Create a new prompt
+- `GET /api/prompts/:id` - Get a specific prompt
+- `PUT /api/prompts/:id` - Update a prompt
+- `DELETE /api/prompts/:id` - Delete a prompt
+- `GET /api/prompts/:id/versions` - Get all versions for a prompt
+- `POST /api/prompts/:id/versions` - Create a new version for a prompt

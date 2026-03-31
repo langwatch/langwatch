@@ -241,7 +241,7 @@ ORCHESTRATOR (main thread)
 The **repo-sherpa** agent owns the "meta-layer":
 - Repository structure and organization
 - Agent and skill definitions (`.claude/agents/`, `.claude/skills/`)
-- Documentation (`README`, `CLAUDE.md`, `AGENTS.md`, `docs/`)
+- Documentation (`README`, `CLAUDE.md`, `AGENTS.md`, `dev/docs/`)
 - Developer experience and workflows
 
 When changes touch these areas, invoke `/sherpa` for guidance.

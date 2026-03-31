@@ -1,13 +1,22 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { Projection } from "../../../";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { EVALUATION_PROCESSING_EVENT_TYPES, EVALUATION_PROJECTION_VERSIONS } from "../schemas/constants";
-import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
-  isEvaluationCompletedEvent,
-  isEvaluationReportedEvent,
-  isEvaluationScheduledEvent,
-  isEvaluationStartedEvent,
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "../../../projections/abstractFoldProjection";
+import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import { EVALUATION_PROJECTION_VERSIONS } from "../schemas/constants";
+import type {
+  EvaluationScheduledEvent,
+  EvaluationStartedEvent,
+  EvaluationCompletedEvent,
+  EvaluationReportedEvent,
+} from "../schemas/events";
+import {
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
 } from "../schemas/events";
 
 export type { EvaluationRunData };
@@ -19,135 +28,145 @@ export interface EvaluationRun extends Projection<EvaluationRunData> {
   data: EvaluationRunData;
 }
 
+const evaluationRunEvents = [
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+] as const;
+
 /**
- * Creates a FoldProjection definition for evaluation run.
+ * Type-safe fold projection for evaluation run state.
  *
- * Fold state = stored data. `apply()` writes camelCase fields directly.
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.evaluation.scheduled"` -> `handleEvaluationScheduled`)
+ * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
+ *
  * Events are applied in order:
  * - EvaluationScheduledEvent -> status: "scheduled"
  * - EvaluationStartedEvent -> status: "in_progress"
  * - EvaluationCompletedEvent -> status: "processed" | "error" | "skipped"
  * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
-export function createEvaluationRunFoldProjection({
-  store,
-}: {
-  store: FoldProjectionStore<EvaluationRunData>;
-}): FoldProjectionDefinition<EvaluationRunData, EvaluationProcessingEvent> {
-  return {
-    name: "evaluationRun",
-    version: EVALUATION_PROJECTION_VERSIONS.STATE,
-    eventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
+export class EvaluationRunFoldProjection
+  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents>
+  implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
+{
+  readonly name = "evaluationRun";
+  readonly version = EVALUATION_PROJECTION_VERSIONS.STATE;
+  readonly store: FoldProjectionStore<EvaluationRunData>;
+  // TODO: normalize all state types to camelCase and push PascalCase conversion
+  // to the ClickHouse repository layer, then remove timestampStyle entirely
+  protected override readonly timestampStyle = "camel" as const;
 
-    init(): EvaluationRunData {
-      return {
-        evaluationId: "",
-        evaluatorId: "",
-        evaluatorType: "",
-        evaluatorName: null,
-        traceId: null,
-        isGuardrail: false,
-        status: "scheduled",
-        score: null,
-        passed: null,
-        label: null,
-        details: null,
-        inputs: null,
-        error: null,
-        errorDetails: null,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        archivedAt: null,
-        scheduledAt: null,
-        startedAt: null,
-        completedAt: null,
-        costId: null,
-      };
-    },
+  protected readonly events = evaluationRunEvents;
 
-    apply(
-      state: EvaluationRunData,
-      event: EvaluationProcessingEvent,
-    ): EvaluationRunData {
-      if (isEvaluationScheduledEvent(event)) {
-        return {
-          ...state,
-          evaluationId: event.data.evaluationId,
-          evaluatorId: event.data.evaluatorId,
-          evaluatorType: event.data.evaluatorType,
-          evaluatorName: event.data.evaluatorName ?? null,
-          traceId: event.data.traceId ?? null,
-          isGuardrail: event.data.isGuardrail ?? false,
-          status: "scheduled",
-          scheduledAt: event.occurredAt,
-          updatedAt: Date.now(),
-        };
-      }
+  constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
+    super();
+    this.store = deps.store;
+  }
 
-      if (isEvaluationStartedEvent(event)) {
-        return {
-          ...state,
-          evaluationId: state.evaluationId || event.data.evaluationId,
-          evaluatorId: state.evaluatorId || event.data.evaluatorId,
-          evaluatorType: state.evaluatorType || event.data.evaluatorType,
-          evaluatorName: state.evaluatorName ?? (event.data.evaluatorName ?? null),
-          traceId: state.traceId ?? (event.data.traceId ?? null),
-          isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
-          status: "in_progress",
-          startedAt: event.occurredAt,
-          updatedAt: Date.now(),
-        };
-      }
+  protected initState() {
+    return {
+      evaluationId: "",
+      evaluatorId: "",
+      evaluatorType: "",
+      evaluatorName: null,
+      traceId: null,
+      isGuardrail: false,
+      status: "scheduled" as const,
+      score: null,
+      passed: null,
+      label: null,
+      details: null,
+      inputs: null,
+      error: null,
+      errorDetails: null,
+      archivedAt: null,
+      scheduledAt: null,
+      startedAt: null,
+      completedAt: null,
+      costId: null,
+    };
+  }
 
-      if (isEvaluationCompletedEvent(event)) {
-        if (!state.evaluationId) {
-          throw new Error(
-            `Received EvaluationCompletedEvent for evaluation ${event.data.evaluationId} but state has no evaluationId — likely a replica lag issue, retrying`,
-          );
-        }
-        return {
-          ...state,
-          status: event.data.status,
-          score: typeof event.data.score === 'number' ? event.data.score : null,
-          passed: event.data.passed ?? null,
-          label: event.data.label ?? null,
-          details: event.data.details ?? null,
-          inputs: event.data.inputs ?? null,
-          error: event.data.error ?? null,
-          errorDetails: event.data.errorDetails ?? null,
-          completedAt: event.occurredAt,
-          costId: event.data.costId ?? null,
-          updatedAt: Date.now(),
-        };
-      }
+  handleEvaluationScheduled(
+    event: EvaluationScheduledEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: event.data.evaluationId,
+      evaluatorId: event.data.evaluatorId,
+      evaluatorType: event.data.evaluatorType,
+      evaluatorName: event.data.evaluatorName ?? null,
+      traceId: event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? false,
+      status: "scheduled",
+      scheduledAt: event.occurredAt,
+    };
+  }
 
-      if (isEvaluationReportedEvent(event)) {
-        return {
-          ...state,
-          evaluationId: event.data.evaluationId,
-          evaluatorId: event.data.evaluatorId,
-          evaluatorType: event.data.evaluatorType,
-          evaluatorName: event.data.evaluatorName ?? null,
-          traceId: event.data.traceId ?? null,
-          isGuardrail: event.data.isGuardrail ?? false,
-          status: event.data.status,
-          score: typeof event.data.score === "number" ? event.data.score : null,
-          passed: event.data.passed ?? null,
-          label: event.data.label ?? null,
-          details: event.data.details ?? null,
-          inputs: event.data.inputs ?? null,
-          error: event.data.error ?? null,
-          errorDetails: event.data.errorDetails ?? null,
-          costId: event.data.costId ?? null,
-          startedAt: event.occurredAt,
-          completedAt: event.occurredAt,
-          updatedAt: Date.now(),
-        };
-      }
+  handleEvaluationStarted(
+    event: EvaluationStartedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
+      evaluatorId: state.evaluatorId || event.data.evaluatorId,
+      evaluatorType: state.evaluatorType || event.data.evaluatorType,
+      evaluatorName: state.evaluatorName ?? (event.data.evaluatorName ?? null),
+      traceId: state.traceId ?? (event.data.traceId ?? null),
+      isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
+      status: "in_progress",
+      startedAt: event.occurredAt,
+    };
+  }
 
-      return state;
-    },
+  handleEvaluationCompleted(
+    event: EvaluationCompletedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
+      status: event.data.status,
+      score: typeof event.data.score === 'number' ? event.data.score : null,
+      passed: event.data.passed ?? null,
+      label: event.data.label ?? null,
+      details: event.data.details ?? null,
+      inputs: event.data.inputs ?? null,
+      error: event.data.error ?? null,
+      errorDetails: event.data.errorDetails ?? null,
+      completedAt: event.occurredAt,
+      costId: event.data.costId ?? null,
+    };
+  }
 
-    store,
-  };
+  handleEvaluationReported(
+    event: EvaluationReportedEvent,
+    state: EvaluationRunData,
+  ): EvaluationRunData {
+    return {
+      ...state,
+      evaluationId: event.data.evaluationId,
+      evaluatorId: event.data.evaluatorId,
+      evaluatorType: event.data.evaluatorType,
+      evaluatorName: event.data.evaluatorName ?? null,
+      traceId: event.data.traceId ?? null,
+      isGuardrail: event.data.isGuardrail ?? false,
+      status: event.data.status,
+      score: typeof event.data.score === "number" ? event.data.score : null,
+      passed: event.data.passed ?? null,
+      label: event.data.label ?? null,
+      details: event.data.details ?? null,
+      inputs: event.data.inputs ?? null,
+      error: event.data.error ?? null,
+      errorDetails: event.data.errorDetails ?? null,
+      costId: event.data.costId ?? null,
+      startedAt: event.occurredAt,
+      completedAt: event.occurredAt,
+    };
+  }
 }

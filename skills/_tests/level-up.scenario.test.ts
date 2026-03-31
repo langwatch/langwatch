@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,11 +67,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             // Verify tracing was added
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -116,11 +118,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -163,11 +166,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
               "utf8"
@@ -210,11 +214,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"

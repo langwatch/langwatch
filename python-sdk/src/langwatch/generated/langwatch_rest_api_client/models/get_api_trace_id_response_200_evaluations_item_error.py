@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,18 +13,18 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200EvaluationsItemError")
 class GetApiTraceIdResponse200EvaluationsItemError:
     """
     Attributes:
-        stacktrace (list[str] | Unset):  Example: ['TypeError: fetch failed'].
-        message (str | Unset):  Example: fetch failed.
-        has_error (bool | Unset):  Example: True.
+        stacktrace (Union[Unset, list[str]]):  Example: ['TypeError: fetch failed'].
+        message (Union[Unset, str]):  Example: fetch failed.
+        has_error (Union[Unset, bool]):  Example: True.
     """
 
-    stacktrace: list[str] | Unset = UNSET
-    message: str | Unset = UNSET
-    has_error: bool | Unset = UNSET
+    stacktrace: Union[Unset, list[str]] = UNSET
+    message: Union[Unset, str] = UNSET
+    has_error: Union[Unset, bool] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        stacktrace: list[str] | Unset = UNSET
+        stacktrace: Union[Unset, list[str]] = UNSET
         if not isinstance(self.stacktrace, Unset):
             stacktrace = self.stacktrace
 

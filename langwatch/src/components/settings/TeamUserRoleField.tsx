@@ -215,7 +215,7 @@ export const TeamRoleSelect = ({
       <Select.Trigger width="200px" background="bg">
         <Select.ValueText placeholder="Select role" />
       </Select.Trigger>
-      <Select.Content width="300px" paddingY={2} zIndex="popover">
+      <Select.Content width="300px" paddingY={2}>
         {allRoleOptions.map((option) => (
           <Select.Item key={option.value} item={option}>
             <TeamRoleSelectItemContent option={option} />

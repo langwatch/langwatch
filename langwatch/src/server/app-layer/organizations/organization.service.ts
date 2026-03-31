@@ -1,4 +1,5 @@
 import type {
+  OrganizationForBilling,
   OrganizationRepository,
   OrganizationWithAdmins,
 } from "./repositories/organization.repository";
@@ -48,5 +49,11 @@ export class OrganizationService {
     organizationId: string,
   ): Promise<Array<{ id: string; name: string }>> {
     return this.repo.findProjectsWithName(organizationId);
+  }
+
+  async getOrganizationForBilling(
+    organizationId: string,
+  ): Promise<OrganizationForBilling | null> {
+    return this.repo.getOrganizationForBilling(organizationId);
   }
 }

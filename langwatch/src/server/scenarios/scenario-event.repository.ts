@@ -8,6 +8,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { ScenarioEventType, Verdict } from "./scenario-event.enums";
 import { scenarioEventSchema } from "./schemas";
 import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
+import { DEFAULT_SET_ID, expandSetIdFilter } from "./internal-set-id";
 import type {
   ScenarioEvent,
   ScenarioMessageSnapshotEvent,
@@ -489,13 +490,30 @@ export class ScenarioEventRepository {
 
         span.setAttribute("result.count", setBuckets.length);
 
-        return setBuckets.map((bucket) => {
-          return {
-            scenarioSetId: bucket.key,
-            scenarioCount: bucket.unique_scenario_count.value,
-            lastRunAt: bucket.latest_run_timestamp.value,
-          };
-        });
+        // Normalize "" to "default" and merge counts for backwards-compatibility:
+        // old rows may have scenarioSetId="" while new rows have "default".
+        const mergedMap = new Map<string, { scenarioCount: number; lastRunAt: number }>();
+        for (const bucket of setBuckets) {
+          const key = bucket.key === "" ? DEFAULT_SET_ID : bucket.key;
+          const existing = mergedMap.get(key);
+          if (existing) {
+            mergedMap.set(key, {
+              scenarioCount: existing.scenarioCount + bucket.unique_scenario_count.value,
+              lastRunAt: Math.max(existing.lastRunAt, bucket.latest_run_timestamp.value),
+            });
+          } else {
+            mergedMap.set(key, {
+              scenarioCount: bucket.unique_scenario_count.value,
+              lastRunAt: bucket.latest_run_timestamp.value,
+            });
+          }
+        }
+
+        return Array.from(mergedMap.entries()).map(([scenarioSetId, data]) => ({
+          scenarioSetId,
+          scenarioCount: data.scenarioCount,
+          lastRunAt: data.lastRunAt,
+        }));
       },
     );
   }
@@ -541,7 +559,7 @@ export class ScenarioEventRepository {
           projectId,
           limit,
           cursor,
-          setFilter: { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+          setFilter: { terms: { [ES_FIELDS.scenarioSetId]: expandSetIdFilter(validatedScenarioSetId) } },
           startDate,
           endDate,
         });
@@ -791,7 +809,7 @@ export class ScenarioEventRepository {
               bool: {
                 filter: [
                   { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-                  { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+                  { terms: { [ES_FIELDS.scenarioSetId]: expandSetIdFilter(validatedScenarioSetId) } },
                   { exists: { field: ES_FIELDS.batchRunId } },
                 ],
               },
@@ -859,7 +877,7 @@ export class ScenarioEventRepository {
               bool: {
                 filter: [
                   { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-                  { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+                  { terms: { [ES_FIELDS.scenarioSetId]: expandSetIdFilter(validatedScenarioSetId) } },
                   { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
                 ],
               },

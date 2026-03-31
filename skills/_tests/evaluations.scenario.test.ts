@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -89,11 +90,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests), short and sweet, no need to run it. IMPORTANT: read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests). Read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
 
             const newFiles = findNewPythonFiles(tempFolder);
             expect(
@@ -152,11 +154,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch experiments SDK, short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch experiments SDK"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             // Find new TypeScript files (not index.ts)
             const files = fs
               .readdirSync(tempFolder)
@@ -209,11 +212,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK, short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(
               newFiles.length,
@@ -260,11 +264,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create an evaluation that checks if my agent hallucinates or makes up information, use langwatch experiments SDK with a faithfulness evaluator, short and sweet, no need to run it"
+            "create an evaluation that checks if my agent hallucinates, use langwatch experiments SDK with a faithfulness evaluator"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(newFiles.length).toBeGreaterThan(0);
             const content = newFiles
@@ -308,11 +313,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK, no need to run it."
+            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(newFiles.length).toBeGreaterThan(0);
             const content = newFiles

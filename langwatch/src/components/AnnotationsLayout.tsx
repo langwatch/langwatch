@@ -5,6 +5,7 @@ import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -17,6 +18,7 @@ export default function AnnotationsLayout({
   const { data: session } = useRequiredSession();
   const user = session?.user;
   const { project } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
 
   // Use optimized count endpoints instead of fetching full data
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
@@ -120,12 +122,14 @@ export default function AnnotationsLayout({
               <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
                 My Queues
               </Text>
-              <Plus
-                onClick={() => openDrawer("addAnnotationQueue", undefined)}
-                width={18}
-                height={18}
-                cursor="pointer"
-              />
+              {!isLiteMember && (
+                <Plus
+                  onClick={() => openDrawer("addAnnotationQueue", undefined)}
+                  width={18}
+                  height={18}
+                  cursor="pointer"
+                />
+              )}
             </HStack>
             {queueItemsCounts.data?.map((queue) => (
               <MenuLink

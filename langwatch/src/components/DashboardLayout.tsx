@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -20,6 +20,7 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
+import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
@@ -34,6 +35,7 @@ import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
+import { AnnouncementBanner } from "./AnnouncementBanner";
 import { SdkRadarBanner } from "./SdkRadarBanner";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import { FullLogo } from "./icons/FullLogo";
@@ -132,7 +134,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
       <Portal>
         <Box zIndex="popover" padding={0}>
           {open && (
-            <Menu.Content zIndex="popover">
+            <Menu.Content>
               <>
                 {projectGroups
                   .filter((projectGroup) =>
@@ -285,6 +287,7 @@ export const DashboardLayout = ({
 
   const { isLoading, organization, organizations, team, project } =
     useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
@@ -295,6 +298,10 @@ export const DashboardLayout = ({
   );
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
+  const { data: ssoStatus } = api.user.getSsoStatus.useQuery(
+    {},
+    { enabled: !!session },
+  );
 
   usePostHogIdentify({
     session: session ?? null,
@@ -463,18 +470,20 @@ export const DashboardLayout = ({
             </Menu.Trigger>
             {session && (
               <Portal>
-                <Menu.Content zIndex="popover">
+                <Menu.Content>
                   {dependencies.ExtraMenuItems && (
                     <dependencies.ExtraMenuItems />
                   )}
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >
-                    <Menu.Item value="setup" asChild>
-                      <Link href={`/${project?.slug}/setup`}>
-                        API Key & Setup
-                      </Link>
-                    </Menu.Item>
+                    {!isLiteMember && (
+                      <Menu.Item value="setup" asChild>
+                        <Link href={`/${project?.slug}/setup`}>
+                          API Key & Setup
+                        </Link>
+                      </Menu.Item>
+                    )}
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
@@ -623,7 +632,49 @@ export const DashboardLayout = ({
                 </Alert.Root>
               )}
 
+            <AnnouncementBanner />
             <SdkRadarBanner />
+
+            {ssoStatus?.pendingSsoSetup && (
+              <Alert.Root
+                status="error"
+                width="full"
+                border="1px solid"
+                borderColor="colorPalette.muted"
+                marginX={4}
+                marginTop={3}
+                borderRadius="lg"
+                maxWidth="calc(100% - 22px)"
+              >
+                <Alert.Indicator />
+                <Alert.Content>
+                  <HStack width="full" gap={4}>
+                    <VStack align="start" gap={0} flex={1}>
+                      <Alert.Title fontWeight="bold">
+                        Action Required: Link your SSO account
+                      </Alert.Title>
+                      <Text fontSize="sm">
+                        Your organization requires SSO login. Please link your
+                        account by logging in via the email input box on the
+                        sign-in page.
+                      </Text>
+                    </VStack>
+                    <Button
+                      size="sm"
+                      colorPalette="red"
+                      flexShrink={0}
+                      color="white"
+                      asChild
+                    >
+                      <Link href="/settings/authentication">
+                        <KeyRound size={14} />
+                        Link SSO Account
+                      </Link>
+                    </Button>
+                  </HStack>
+                </Alert.Content>
+              </Alert.Root>
+            )}
 
             {publicEnv.data?.DEMO_PROJECT_SLUG &&
               publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
@@ -656,15 +707,25 @@ export const DashboardLayout = ({
               <Alert.Root
                 status="warning"
                 width="full"
-                borderBottom="1px solid"
-                borderBottomColor="yellow.300"
+                border="1px solid"
+                borderColor="colorPalette.muted"
+                marginX={4}
+                marginTop={3}
+                borderRadius="lg"
+                maxWidth="calc(100% - 22px)"
               >
                 <Alert.Indicator />
                 <Alert.Content>
-                  <Text>
-                    You are not part of any team in this organization, please
-                    ask your administrator to add you to a team.
-                  </Text>
+                  <HStack width="full" gap={4}>
+                    <Text flex={1}>
+                      You are not part of any team in this organization. Ask
+                      your administrator to add you, or{" "}
+                      <Link href="/" textDecoration="underline">
+                        go back to your home page
+                      </Link>
+                      .
+                    </Text>
+                  </HStack>
                 </Alert.Content>
               </Alert.Root>
             )}

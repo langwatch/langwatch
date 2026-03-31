@@ -26,6 +26,8 @@ import { dependencies } from "../injection/dependencies.server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
+import { ensureUserSyncedToCio } from "../../ee/billing/nurturing/hooks/userSync";
+import { getApp } from "./app-layer/app";
 
 const logger = createLogger("langwatch:auth");
 
@@ -77,7 +79,17 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
-        fireActivityTrackingNurturing({ userId: user_.id });
+        // Fire-and-forget: skip the DB query entirely when nurturing is off
+        if (getApp().nurturing) {
+          void prisma.organizationUser
+            .count({ where: { userId: user_.id } })
+            .then((orgCount_) => {
+              const hasOrg_ = orgCount_ > 0;
+              fireActivityTrackingNurturing({ userId: user_.id, hasOrganization: hasOrg_ });
+              ensureUserSyncedToCio({ userId: user_.id, hasOrganization: hasOrg_ });
+            })
+            .catch(() => {});
+        }
 
         return {
           ...session,
@@ -89,7 +101,17 @@ export const authOptions = (
         };
       }
 
-      fireActivityTrackingNurturing({ userId: user.id });
+      // Fire-and-forget: skip the DB query entirely when nurturing is off
+      if (getApp().nurturing) {
+        void prisma.organizationUser
+          .count({ where: { userId: user.id } })
+          .then((orgCount) => {
+            const hasOrg = orgCount > 0;
+            fireActivityTrackingNurturing({ userId: user.id, hasOrganization: hasOrg });
+            ensureUserSyncedToCio({ userId: user.id, hasOrganization: hasOrg });
+          })
+          .catch(() => {});
+      }
 
       return {
         ...session,
@@ -121,18 +143,31 @@ export const authOptions = (
         },
       });
 
-      // SSO flow for orgs with ssoDomain configured:
-      // - Existing user + correct SSO provider → auto-link account (replaces old auth method)
-      // - Existing user + wrong provider → block with SSO_PROVIDER_NOT_ALLOWED
+      // SSO flow for orgs with ssoDomain+ssoProvider configured:
+      // - Existing user + correct SSO provider → auto-link account (clears pendingSsoSetup)
+      // - Existing user + wrong provider → set pendingSsoSetup and let them in to show the
+      //   "link your SSO account" banner (avoids hard-blocking existing users during migration)
       if (existingUser && account && orgWithSsoDomain) {
         if (isSsoProviderMatch(orgWithSsoDomain, account)) {
           await linkExistingUserToOAuthProvider(existingUser, account);
           return true;
         }
-        throw new Error("SSO_PROVIDER_NOT_ALLOWED");
+        if (!existingUser.pendingSsoSetup) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: { pendingSsoSetup: true },
+          });
+        }
+        return true;
       }
 
-      // Block non-SSO sign-in attempts for users whose domain has SSO enforced
+      // Fallback: user is already marked pendingSsoSetup but org lookup returned nothing
+      // (e.g. credentials provider login, or domain no longer has an SSO org) — let them in
+      if (existingUser?.pendingSsoSetup) {
+        return true;
+      }
+
+      // Block non-SSO sign-in attempts for new users whose domain has SSO enforced
       if (orgWithSsoDomain && account) {
         await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
       }
@@ -403,6 +438,10 @@ const linkExistingUserToOAuthProvider = async (
         provider: account.provider,
         providerAccountId: { not: account.providerAccountId },
       },
+    }),
+    prisma.user.update({
+      where: { id: existingUser.id },
+      data: { pendingSsoSetup: false },
     }),
   ]);
 };

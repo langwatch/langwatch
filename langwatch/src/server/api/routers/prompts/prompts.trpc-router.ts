@@ -10,8 +10,14 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
 } from "~/prompts/schemas";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
+import { NotFoundError } from "~/server/prompt-config/errors";
+import {
+  LabelValidationError,
+  VALID_LABELS,
+} from "~/server/prompt-config/repositories/llm-config-label.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
@@ -218,11 +224,19 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      return await service.createPrompt({
+      const result = await service.createPrompt({
         ...input.data,
         projectId: input.projectId,
         authorId,
       });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
+      });
+
+      return result;
     }),
 
   /**
@@ -314,12 +328,30 @@ export const promptsRouter = createTRPCRouter({
         versionId: z.string().optional(),
         /** Optional: fetch a specific version by number */
         version: z.number().optional(),
+        /** Optional: fetch the version pointed to by this label */
+        label: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
-      return await service.getPromptByIdOrHandle(input);
+      try {
+        const service = new PromptService(ctx.prisma);
+        return await service.getPromptByIdOrHandle(input);
+      } catch (error) {
+        if (error instanceof LabelValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        if (error instanceof NotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -511,6 +543,12 @@ export const promptsRouter = createTRPCRouter({
       await ctx.prisma.llmPromptConfig.update({
         where: { id: copiedPrompt.id },
         data: { copiedFromPromptId: sourcePrompt.id },
+      });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
       });
 
       return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };
@@ -827,5 +865,43 @@ export const promptsRouter = createTRPCRouter({
         selectedCopies: copiesToPush.length,
         results,
       };
+    }),
+
+  // --- Label Assignment ---
+
+  /**
+   * Assign (or reassign) a label to a specific prompt version.
+   * Only "production" and "staging" are valid labels.
+   */
+  assignLabel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        configId: z.string(),
+        versionId: z.string(),
+        label: z.enum(VALID_LABELS),
+      }),
+    )
+    .use(checkProjectPermission("prompts:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+
+      try {
+        return await service.assignLabel({
+          configId: input.configId,
+          versionId: input.versionId,
+          label: input.label,
+          projectId: input.projectId,
+          userId: ctx.session?.user?.id,
+        });
+      } catch (error) {
+        if (error instanceof LabelValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
 });

@@ -2,7 +2,6 @@ import { Alert, Button, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { signOut } from "next-auth/react";
 import { useEffect } from "react";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
@@ -13,7 +12,6 @@ export default function Accept() {
   const router = useRouter();
   const { inviteCode } = router.query;
   const acceptInviteMutation = api.organization.acceptInvite.useMutation();
-  const queryClient = api.useContext();
 
   const { data: session } = useRequiredSession();
   const triggerInvite = typeof inviteCode === "string" && !!session;
@@ -25,15 +23,6 @@ export default function Accept() {
       { inviteCode },
       {
         onSuccess: (data) => {
-          // Invalidate queries to refresh user's organization data
-          void queryClient.organization.getAll.invalidate().catch((error) => {
-            captureException(error, {
-              tags: {
-                inviteCode,
-              },
-            });
-          });
-
           toaster.create({
             title: "Invite Accepted",
             description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
@@ -44,13 +33,12 @@ export default function Accept() {
             duration: 5000,
           });
 
-          void router.push(`/${data.project?.slug ?? ""}`).catch((error) => {
-            captureException(error, {
-              tags: {
-                inviteCode,
-              },
-            });
-          });
+          // Hard redirect so the page reloads with a clean cache — avoids
+          // useOrganizationTeamProject reading stale (no-org) data and
+          // bouncing the user to /onboarding/welcome
+          window.location.href = data.project?.slug
+            ? `/${data.project.slug}`
+            : "/";
         },
       },
     );
@@ -67,6 +55,11 @@ export default function Accept() {
   }
 
   if (acceptInviteMutation.isError) {
+    if (acceptInviteMutation.error.message === "Invite was already accepted") {
+      void router.push("/");
+      return <LoadingScreen />;
+    }
+
     return (
       <SetupLayout>
         <VStack gap={4}>

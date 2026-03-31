@@ -211,6 +211,16 @@ export function SignaturePromptEditorBridge({
         localPromptConfig: config,
       };
 
+      // Mirror LLM config into parameters so the canvas node display stays in sync.
+      // The canvas reads model from parameters[identifier="llm"].value (Nodes.tsx:384).
+      const oldParameters = signatureNode.data.parameters ?? [];
+      const updatedParameters = oldParameters.map((p) =>
+        p.identifier === "llm" ? { ...p, value: config.llm } : p,
+      );
+      if (updatedParameters.some((p) => p.identifier === "llm")) {
+        data.parameters = updatedParameters;
+      }
+
       const oldInputs = signatureNode.data.inputs ?? [];
       const oldOutputs = signatureNode.data.outputs ?? [];
 
@@ -260,6 +270,7 @@ export function SignaturePromptEditorBridge({
       node.id,
       signatureNode.data.inputs,
       signatureNode.data.outputs,
+      signatureNode.data.parameters,
       setNode,
       updateNodeInternals,
       getWorkflow,

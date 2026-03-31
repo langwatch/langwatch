@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
@@ -45,6 +46,7 @@ export function TraceDetails(props: {
   onToggleView?: () => void;
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
   const queryClient = api.useContext();
@@ -104,8 +106,8 @@ export function TraceDetails(props: {
 
   const availableTabs = [
     ...(canViewMessages ? ["messages"] : []),
-    "traceDetails",
-    "sequenceDiagram",
+    ...(!isLiteMember ? ["traceDetails"] : []),
+    ...(!isLiteMember ? ["sequenceDiagram"] : []),
     ...(anyGuardrails ? ["guardrails"] : []),
     "evaluations",
     "events",
@@ -332,8 +334,12 @@ export function TraceDetails(props: {
             {canViewMessages && (
               <Tabs.Trigger value="messages">Thread</Tabs.Trigger>
             )}
-            <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
-            <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
+            {!isLiteMember && (
+              <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
+            )}
+            {!isLiteMember && (
+              <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
+            )}
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
                 Guardrails

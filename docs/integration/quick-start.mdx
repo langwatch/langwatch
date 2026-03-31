@@ -1,0 +1,124 @@
+---
+title: Quick Start
+mode: "wide"
+---
+
+<Tip>
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+</Tip>
+
+LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved. We've made getting started super smooth.
+
+Let's get cracking.
+
+<Steps>
+  <Step title="Create your LangWatch account">
+    First step: if you haven't already, grab your LangWatch account. Head over to [langwatch.ai](https://app.langwatch.ai), sign up, and get your API key ready.
+
+    <img src="/images/llm-observability/quick-start/setup-full.webp" />
+  </Step>
+
+  <Step title="Sign in with LangWatch">
+    Open a terminal and run the following command to sign in with LangWatch:
+
+    ```bash
+    npx langwatch login
+    ```
+
+    This will add the `LANGWATCH_API_KEY` to your local `.env` file.
+  </Step>
+
+  <Step title="Let LangWatch MCP do the rest for you (Optional)">
+    Install the [LangWatch MCP Server](/integration/mcp) and ask your coding assistant (Cursor, Claude Code, Codex, etc.) to instrument your codebase with LangWatch, OR keep following the steps below to instrument your codebase manually.
+
+    Add the LangWatch MCP to your editor:
+
+    ```json
+    {
+      "mcpServers": {
+        "langwatch": {
+          "command": "npx",
+          "args": ["-y", "@langwatch/mcp-server"]
+        }
+      }
+    }
+    ```
+
+    Then ask your coding assistant to instrument your codebase with LangWatch:
+
+    ```plaintext
+    "Instrument my codebase with LangWatch"
+    ```
+  </Step>
+
+  <Step title="Install the LangWatch SDK">
+    We have official SDKs for Python and Node.js ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
+
+    <CodeGroup>
+```bash Python
+pip install langwatch
+# or
+uv add langwatch
+```
+```bash JavaScript
+npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add LangWatch to your project">
+    Time to connect LangWatch. Initialize the SDK within your project. Here's how you can set it up:
+
+    <CodeGroup>
+```python Python
+import langwatch
+import os
+from langwatch.instrumentors import OpenAIInstrumentor
+
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"), # Your LangWatch API key
+    instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
+)
+```
+```javascript JavaScript
+// ./next.config.js - Enable the Next.js instrumentation hook
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
+};
+
+module.exports = nextConfig;
+
+// ./src/instrumentation.ts - Configure LangWatch export
+import { registerOTel } from '@vercel/otel';
+import { LangWatchExporter } from 'langwatch';
+
+export function register() {
+  registerOTel({
+    serviceName: 'your-app-name', // Give your service a clear name
+    traceExporter: new LangWatchExporter({
+      apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
+    })
+  });
+}
+
+// ./src/index.ts - Enable telemetry where needed
+const result = await generateText({
+  model: openai('gpt-5'),
+  prompt: 'How many calories do I burn jumping to conclusions?',
+  experimental_telemetry: {
+    isEnabled: true, // Ensure telemetry is active for relevant operations
+  },
+});
+```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start observing!">
+    You're all set! Jump into your LangWatch dashboard to see your data flowing in. You'll find **Traces** (individual AI tasks) and their detailed **Spans** (the steps within), all organized into **Threads** (complete user sessions). Start exploring and use **User IDs** or custom **Labels** to dive deeper!
+
+    <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
+  </Step>
+</Steps>

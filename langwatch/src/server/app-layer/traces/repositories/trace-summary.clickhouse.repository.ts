@@ -52,6 +52,7 @@ interface ClickHouseSummaryRecord {
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
+  SpanCosts: Record<string, number>;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
@@ -82,7 +83,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
 
     } catch (error) {
@@ -142,7 +143,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             HasAnnotation,
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
-            ScenarioRoleSpans
+            ScenarioRoleSpans,
+            SpanCosts
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -183,25 +185,26 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       timeToFirstTokenMs: record.TimeToFirstTokenMs,
       timeToLastTokenMs: record.TimeToLastTokenMs,
       tokensPerSecond: record.TokensPerSecond,
-      containsErrorStatus: record.ContainsErrorStatus === 1,
-      containsOKStatus: record.ContainsOKStatus === 1,
+      containsErrorStatus: !!record.ContainsErrorStatus,
+      containsOKStatus: !!record.ContainsOKStatus,
       errorMessage: record.ErrorMessage,
       models: record.Models,
       totalCost: record.TotalCost,
-      tokensEstimated: record.TokensEstimated === true,
+      tokensEstimated: !!record.TokensEstimated,
       totalPromptTokenCount: record.TotalPromptTokenCount,
       totalCompletionTokenCount: record.TotalCompletionTokenCount,
-      outputFromRootSpan: record.OutputFromRootSpan === 1,
+      outputFromRootSpan: !!record.OutputFromRootSpan,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
-      blockedByGuardrail: record.BlockedByGuardrail === 1,
+      blockedByGuardrail: !!record.BlockedByGuardrail,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       hasAnnotation:
-        record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
+        record.HasAnnotation != null ? !!record.HasAnnotation : null,
       attributes: record.Attributes ?? {},
       scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
       scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
+      spanCosts: record.SpanCosts ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -226,10 +229,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs: data.timeToFirstTokenMs,
-      TimeToLastTokenMs: data.timeToLastTokenMs,
-      TotalDurationMs: data.totalDurationMs,
-      TokensPerSecond: data.tokensPerSecond,
+      TimeToFirstTokenMs: data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
+      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+      TotalDurationMs: Math.round(data.totalDurationMs),
+      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
       SpanCount: data.spanCount,
       ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
       ContainsOKStatus: data.containsOKStatus ? 1 : 0,
@@ -249,6 +252,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
+      SpanCosts: data.spanCosts ?? {},
     };
   }
 }

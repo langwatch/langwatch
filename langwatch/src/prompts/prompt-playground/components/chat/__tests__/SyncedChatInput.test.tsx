@@ -121,8 +121,8 @@ describe("SyncedChatInput", () => {
       expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
-    it("shows sync checkbox when multiple tabs exist", () => {
-      // Add two tabs
+    it("hides sync checkbox when multiple tabs exist in a single window", () => {
+      // Add two tabs to the same window
       store.getState().addTab({ data: createTabData() });
       store.getState().addTab({ data: createTabData() });
 
@@ -131,8 +131,8 @@ describe("SyncedChatInput", () => {
 
       renderSyncedChatInput({ tabId: tabId! });
 
-      // Sync checkbox should be in the document (though hidden until hover)
-      expect(screen.getByRole("checkbox")).toBeInTheDocument();
+      // Multiple tabs in ONE window should NOT show sync checkbox
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     });
 
     it("shows sync checkbox when tabs are split across windows", () => {

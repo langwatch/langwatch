@@ -18,7 +18,7 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
  * Uses PostHog for flag evaluation with optional project/organization targeting.
  * Results are cached server-side (5s TTL) and client-side (React Query).
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  */
 export const featureFlagRouter = createTRPCRouter({
   /**

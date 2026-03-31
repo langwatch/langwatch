@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.19.0...typescript-sdk@v0.20.0) (2026-03-29)
+
+
+### Features
+
+* **skills:** agent skills-based onboarding with feature map and scenario tests ([#2377](https://github.com/langwatch/langwatch/issues/2377)) ([6f6abdb](https://github.com/langwatch/langwatch/commit/6f6abdb67b97fcb7c2958dbc193dcde37d4c82a8))
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2346](https://github.com/langwatch/langwatch/issues/2346)) ([348874e](https://github.com/langwatch/langwatch/commit/348874e48ce79537596d28887c6ed9c719200b29))
+
+
+### Bug Fixes
+
+* **sdk+skills:** widen peer deps, fix scenario config, strengthen skill tests ([#2485](https://github.com/langwatch/langwatch/issues/2485)) ([c77237c](https://github.com/langwatch/langwatch/commit/c77237c8f5690f4eafcc96ed3334e3c6d61a7249))
+* **sdk:** throw PromptsError instead of Error in fetch-policy branches ([#2691](https://github.com/langwatch/langwatch/issues/2691)) ([9388ab6](https://github.com/langwatch/langwatch/commit/9388ab63a77f32f8888b204f462f8ec3cc88abcc)), closes [#976](https://github.com/langwatch/langwatch/issues/976)
+* **typescript-sdk:** handle Zod-first evaluations.ts and filter types import ([#2352](https://github.com/langwatch/langwatch/issues/2352)) ([516d4e8](https://github.com/langwatch/langwatch/commit/516d4e839388ae954b42ba5f742ef6b96c0beacf))
+
 ## [0.19.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.18.0...typescript-sdk@v0.19.0) (2026-03-13)
 
 

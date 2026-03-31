@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Flex,
@@ -17,6 +16,7 @@ import { format } from "date-fns";
 import numeral from "numeral";
 import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
+import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
   AreaChart,
@@ -396,10 +396,9 @@ const CustomGraph_ = React.memo(
     );
 
     const sortedKeys = expectedKeys
-      .filter((key) => keysToSum[key]! !== 0)
       .toSorted((a, b) => {
-        const totalA = keysToSum[a]!;
-        const totalB = keysToSum[b]!;
+        const totalA = keysToSum[a] ?? 0;
+        const totalB = keysToSum[b] ?? 0;
 
         return totalB - totalA;
       });
@@ -549,44 +548,65 @@ const CustomGraph_ = React.memo(
     };
 
     const container = (child: React.ReactNode) => {
+      const dataLoaded = !timeseries.isLoading && timeseries.data;
       const allEmpty =
-        currentAndPreviousData &&
-        (maxValue == 0 || currentAndPreviousData?.length === 0);
+        dataLoaded &&
+        (allValues.length === 0 || currentAndPreviousData?.length === 0);
 
       return (
         <Box width="full" height="full" position="relative">
-          {input.graphType !== "summary" && timeseries.isFetching && (
+          {timeseries.isFetching && !timeseries.isLoading && (
             <Delayed>
               <Spinner position="absolute" right={4} top={4} />
             </Delayed>
           )}
-          {timeseries.error && (
-            <Alert.Root
-              status="error"
-              position="absolute"
-              borderStartWidth="4px"
-              borderStartColor="colorPalette.solid"
-              width="fit-content"
-              right={4}
-              top={4}
-            >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>Error loading graph data</Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
+          {timeseries.error && !timeseries.data ? (
+            <ChartErrorState
+              errorMessage={timeseries.error.message}
+              onRetry={() => void timeseries.refetch()}
+            />
+          ) : (
+            <>
+              {timeseries.error && timeseries.data && (
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    right: 16,
+                    top: 16,
+                    zIndex: 1,
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                  }}
+                  aria-label="Retry loading chart data"
+                  onClick={() => void timeseries.refetch()}
+                  title={timeseries.error.message}
+                >
+                  <Badge
+                    colorPalette="red"
+                    variant="solid"
+                    fontSize="xs"
+                  >
+                    Refresh failed — click to retry
+                  </Badge>
+                </button>
+              )}
+              {allEmpty ? (
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="50%"
+                  transform="translate(-50%, -50%)"
+                >
+                  No data
+                </Box>
+              ) : (
+                child
+              )}
+            </>
           )}
-          {input.graphType !== "summary" && allEmpty && (
-            <Box
-              position="absolute"
-              top="50%"
-              left="50%"
-              transform="translate(-50%, -50%)"
-            >
-              No data
-            </Box>
-          )}
-          {child}
         </Box>
       );
     };
@@ -799,7 +819,7 @@ const CustomGraph_ = React.memo(
               }}
               style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
-              {summaryData.current.map((entry, index) => (
+              {sortedCurrentData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={colorForSeries(entry.key, index)}
@@ -1006,7 +1026,9 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-      JSON.stringify(nextProps.titleProps) &&
+        JSON.stringify(nextProps.titleProps) &&
+      JSON.stringify(prevProps.filters) ===
+        JSON.stringify(nextProps.filters) &&
       prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
@@ -1084,18 +1106,17 @@ const shapeDataForGraph = (
   const flattenPreviousPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
-  const currentAndPreviousData =
-    flattenPreviousPeriod &&
-    flattenCurrentPeriod?.map((entry, index) => {
-      return {
-        ...entry,
-        ...Object.fromEntries(
-          Object.entries(flattenPreviousPeriod[index] ?? {}).map(
-            ([key, value]) => [`previous>${key}`, value ?? 0],
-          ),
+  const currentAndPreviousData = flattenCurrentPeriod?.map((entry, index) => {
+    if (!flattenPreviousPeriod) return entry;
+    return {
+      ...entry,
+      ...Object.fromEntries(
+        Object.entries(flattenPreviousPeriod[index] ?? {}).map(
+          ([key, value]) => [`previous>${key}`, value ?? 0],
         ),
-      };
-    });
+      ),
+    };
+  });
 
   return currentAndPreviousData as
     | ({ date: string } & Record<string, number>)[]
@@ -1153,7 +1174,7 @@ const collectAllDays = (
       if (!result[key]) {
         result[key] = [];
       }
-      result[key]!.push(entry[key]!);
+      result[key]?.push(entry[key] ?? 0);
     }
   }
 

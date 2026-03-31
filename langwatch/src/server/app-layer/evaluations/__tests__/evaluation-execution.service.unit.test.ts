@@ -13,20 +13,17 @@ import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.gen
 import type { Trace } from "~/server/tracer/types";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {
-  CostLimitExceededError,
   EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "../errors";
 import {
   EvaluationExecutionService,
-  type CostChecker,
   type EvaluationExecutionDeps,
   type ModelEnvResolver,
   type WorkflowExecutor,
 } from "../evaluation-execution.service";
 import type { TraceService } from "~/server/traces/trace.service";
-import type { ProjectService } from "../../projects/project.service";
 
 // Uses a real evaluator from AVAILABLE_EVALUATORS — no vi.mock needed.
 // openai/moderation: requiredFields=[], optionalFields=["input","output"], envVars=[]
@@ -54,10 +51,8 @@ function buildTrace(overrides?: Partial<Trace>): Trace {
 
 interface TestOverrides {
   traceService?: Partial<Pick<TraceService, "getTracesWithSpans" | "getTracesWithSpansByThreadIds">>;
-  costChecker?: Partial<CostChecker>;
   modelEnvResolver?: Partial<ModelEnvResolver>;
   workflowExecutor?: Partial<WorkflowExecutor>;
-  projectService?: Partial<Pick<ProjectService, "getWithTeam">>;
   client?: Partial<LangEvalsClient>;
   trace?: Trace | undefined;
 }
@@ -70,12 +65,6 @@ function createTestService(overrides: TestOverrides = {}) {
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
     ...overrides.traceService,
   } as unknown as TraceService;
-
-  const mockCostChecker: CostChecker = {
-    maxMonthlyUsageLimit: vi.fn().mockResolvedValue(Infinity),
-    getCurrentMonthCost: vi.fn().mockResolvedValue(0),
-    ...overrides.costChecker,
-  };
 
   const mockModelEnvResolver: ModelEnvResolver = {
     resolveForEvaluator: vi.fn().mockResolvedValue({}),
@@ -90,14 +79,6 @@ function createTestService(overrides: TestOverrides = {}) {
     ...overrides.workflowExecutor,
   };
 
-  const mockProjectService = {
-    getWithTeam: vi.fn().mockResolvedValue({
-      id: "proj-1",
-      team: { organizationId: "org-1" },
-    }),
-    ...overrides.projectService,
-  } as unknown as ProjectService;
-
   const mockClient: LangEvalsClient = {
     evaluate: vi.fn().mockResolvedValue({
       status: "processed",
@@ -109,8 +90,6 @@ function createTestService(overrides: TestOverrides = {}) {
 
   const deps: EvaluationExecutionDeps = {
     traceService: mockTraceService,
-    projectService: mockProjectService,
-    costChecker: mockCostChecker,
     modelEnvResolver: mockModelEnvResolver,
     workflowExecutor: mockWorkflowExecutor,
     langevalsClient: mockClient,
@@ -121,10 +100,8 @@ function createTestService(overrides: TestOverrides = {}) {
   return {
     service,
     mockTraceService,
-    mockCostChecker,
     mockModelEnvResolver,
     mockWorkflowExecutor,
-    mockProjectService,
     mockClient,
   };
 }
@@ -280,35 +257,6 @@ describe("EvaluationExecutionService", () => {
         });
 
         expect(result.status).toBe("error");
-      });
-    });
-
-    describe("when cost limit is exceeded", () => {
-      it("throws CostLimitExceededError", async () => {
-        const { service } = createTestService({
-          costChecker: {
-            maxMonthlyUsageLimit: vi.fn().mockResolvedValue(100),
-            getCurrentMonthCost: vi.fn().mockResolvedValue(100),
-          },
-        });
-
-        await expect(service.executeForTrace(defaultParams)).rejects.toThrow(
-          CostLimitExceededError,
-        );
-      });
-    });
-
-    describe("when project is not found", () => {
-      it("throws EvaluatorConfigError", async () => {
-        const { service } = createTestService({
-          projectService: {
-            getWithTeam: vi.fn().mockResolvedValue(null),
-          },
-        });
-
-        await expect(service.executeForTrace(defaultParams)).rejects.toThrow(
-          EvaluatorConfigError,
-        );
       });
     });
 

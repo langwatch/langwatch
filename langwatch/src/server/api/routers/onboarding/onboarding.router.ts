@@ -4,6 +4,10 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import {
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
+} from "~/../ee/billing/nurturing/hooks/productInterest";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
@@ -112,5 +116,35 @@ export const onboardingRouter = createTRPCRouter({
         captureException(error);
         throw error;
       }
+    }),
+
+  /**
+   * Sets the integration_method trait in Customer.io after the user
+   * picks their flavour on the onboarding screen.
+   *
+   * Separate from initializeOrganization because the org is created
+   * BEFORE the flavour selection screen.
+   */
+  setIntegrationMethod: protectedProcedure
+    .input(
+      z.object({
+        integrationMethod: z.enum([
+          "via-claude-code",
+          "via-platform",
+          "via-claude-desktop",
+          "manually",
+        ]),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
+
+      fireIntegrationMethodNurturing({
+        userId: ctx.session.user.id,
+        integrationMethod: traitValue,
+      });
+
+      return { success: true };
     }),
 });

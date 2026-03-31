@@ -179,7 +179,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
-      <Select.Content zIndex="1600">
+      <Select.Content>
         <Field.Root asChild>
           <Box position="sticky" top={0} zIndex="1">
             <InputGroup

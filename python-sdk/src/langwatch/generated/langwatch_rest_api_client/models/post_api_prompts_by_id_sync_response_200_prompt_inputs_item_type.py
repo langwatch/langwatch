@@ -3,9 +3,11 @@ from enum import Enum
 
 class PostApiPromptsByIdSyncResponse200PromptInputsItemType(str, Enum):
     BOOL = "bool"
+    CHAT_MESSAGES = "chat_messages"
     DICT = "dict"
     FLOAT = "float"
     IMAGE = "image"
+    LIST = "list"
     LISTBOOL = "list[bool]"
     LISTFLOAT = "list[float]"
     LISTINT = "list[int]"

@@ -93,6 +93,7 @@ export function ExternalSetDetailPanel({
     {
       enabled: !!project,
       refetchInterval: 5000,
+      trpc: { context: { skipBatch: true } },
     },
   );
 

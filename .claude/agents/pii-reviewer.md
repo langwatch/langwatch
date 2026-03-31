@@ -11,7 +11,7 @@ You are a security-focused reviewer specializing in PII (Personally Identifiable
 
 Read these files before reviewing:
 - `AGENTS.md` - common mistakes to avoid
-- `docs/CODING_STANDARDS.md` - project conventions
+- `dev/docs/CODING_STANDARDS.md` - project conventions
 - Any `.env.example` files to understand expected secrets
 
 ## Scope

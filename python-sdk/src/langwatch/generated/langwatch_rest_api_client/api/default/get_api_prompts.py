@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -14,7 +14,6 @@ from ...types import Response
 
 
 def _get_kwargs() -> dict[str, Any]:
-
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/prompts",
@@ -24,15 +23,16 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiPromptsResponse400
-    | GetApiPromptsResponse401
-    | GetApiPromptsResponse422
-    | GetApiPromptsResponse500
-    | list[GetApiPromptsResponse200Item]
-    | None
-):
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[
+    Union[
+        GetApiPromptsResponse400,
+        GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
+        GetApiPromptsResponse500,
+        list["GetApiPromptsResponse200Item"],
+    ]
+]:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.json()
@@ -42,27 +42,22 @@ def _parse_response(
             response_200.append(response_200_item)
 
         return response_200
-
     if response.status_code == 400:
         response_400 = GetApiPromptsResponse400.from_dict(response.json())
 
         return response_400
-
     if response.status_code == 401:
         response_401 = GetApiPromptsResponse401.from_dict(response.json())
 
         return response_401
-
     if response.status_code == 422:
         response_422 = GetApiPromptsResponse422.from_dict(response.json())
 
         return response_422
-
     if response.status_code == 500:
         response_500 = GetApiPromptsResponse500.from_dict(response.json())
 
         return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -70,13 +65,15 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
-    GetApiPromptsResponse400
-    | GetApiPromptsResponse401
-    | GetApiPromptsResponse422
-    | GetApiPromptsResponse500
-    | list[GetApiPromptsResponse200Item]
+    Union[
+        GetApiPromptsResponse400,
+        GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
+        GetApiPromptsResponse500,
+        list["GetApiPromptsResponse200Item"],
+    ]
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -88,13 +85,15 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
 ) -> Response[
-    GetApiPromptsResponse400
-    | GetApiPromptsResponse401
-    | GetApiPromptsResponse422
-    | GetApiPromptsResponse500
-    | list[GetApiPromptsResponse200Item]
+    Union[
+        GetApiPromptsResponse400,
+        GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
+        GetApiPromptsResponse500,
+        list["GetApiPromptsResponse200Item"],
+    ]
 ]:
     """Get all prompts for a project
 
@@ -103,7 +102,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiPromptsResponse400 | GetApiPromptsResponse401 | GetApiPromptsResponse422 | GetApiPromptsResponse500 | list[GetApiPromptsResponse200Item]]
+        Response[Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]]
     """
 
     kwargs = _get_kwargs()
@@ -117,15 +116,16 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-) -> (
-    GetApiPromptsResponse400
-    | GetApiPromptsResponse401
-    | GetApiPromptsResponse422
-    | GetApiPromptsResponse500
-    | list[GetApiPromptsResponse200Item]
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[
+    Union[
+        GetApiPromptsResponse400,
+        GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
+        GetApiPromptsResponse500,
+        list["GetApiPromptsResponse200Item"],
+    ]
+]:
     """Get all prompts for a project
 
     Raises:
@@ -133,7 +133,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiPromptsResponse400 | GetApiPromptsResponse401 | GetApiPromptsResponse422 | GetApiPromptsResponse500 | list[GetApiPromptsResponse200Item]
+        Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]
     """
 
     return sync_detailed(
@@ -143,13 +143,15 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
 ) -> Response[
-    GetApiPromptsResponse400
-    | GetApiPromptsResponse401
-    | GetApiPromptsResponse422
-    | GetApiPromptsResponse500
-    | list[GetApiPromptsResponse200Item]
+    Union[
+        GetApiPromptsResponse400,
+        GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
+        GetApiPromptsResponse500,
+        list["GetApiPromptsResponse200Item"],
+    ]
 ]:
     """Get all prompts for a project
 
@@ -158,7 +160,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiPromptsResponse400 | GetApiPromptsResponse401 | GetApiPromptsResponse422 | GetApiPromptsResponse500 | list[GetApiPromptsResponse200Item]]
+        Response[Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]]
     """
 
     kwargs = _get_kwargs()
@@ -170,15 +172,16 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-) -> (
-    GetApiPromptsResponse400
-    | GetApiPromptsResponse401
-    | GetApiPromptsResponse422
-    | GetApiPromptsResponse500
-    | list[GetApiPromptsResponse200Item]
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[
+    Union[
+        GetApiPromptsResponse400,
+        GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
+        GetApiPromptsResponse500,
+        list["GetApiPromptsResponse200Item"],
+    ]
+]:
     """Get all prompts for a project
 
     Raises:
@@ -186,7 +189,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiPromptsResponse400 | GetApiPromptsResponse401 | GetApiPromptsResponse422 | GetApiPromptsResponse500 | list[GetApiPromptsResponse200Item]
+        Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]
     """
 
     return (

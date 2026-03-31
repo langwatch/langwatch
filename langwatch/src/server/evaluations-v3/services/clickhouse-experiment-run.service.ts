@@ -122,6 +122,7 @@ export class ClickHouseExperimentRunService {
                 LIMIT 1 BY TenantId, RunId, ExperimentId
               )
               ORDER BY CreatedAt DESC
+              LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
@@ -164,6 +165,7 @@ export class ClickHouseExperimentRunService {
               WHERE ResultType = 'evaluator'
                 AND EvaluationStatus = 'processed'
               GROUP BY RunId, EvaluatorId
+              LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
@@ -211,6 +213,7 @@ export class ClickHouseExperimentRunService {
                 LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               GROUP BY RunId
+              LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,

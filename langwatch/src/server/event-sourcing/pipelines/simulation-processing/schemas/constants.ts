@@ -14,7 +14,7 @@ export const SIMULATION_RUN_EVENT_TYPES = {
   TEXT_MESSAGE_END: "lw.simulation_run.text_message_end",
   FINISHED: "lw.simulation_run.finished",
   DELETED: "lw.simulation_run.deleted",
-  METRICS_UPDATED: "lw.simulation_run.metrics_updated",
+  METRICS_COMPUTED: "lw.simulation_run.metrics_computed",
 } as const;
 
 export const SIMULATION_PROCESSING_EVENT_TYPES = [
@@ -25,7 +25,7 @@ export const SIMULATION_PROCESSING_EVENT_TYPES = [
   SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
   SIMULATION_RUN_EVENT_TYPES.FINISHED,
   SIMULATION_RUN_EVENT_TYPES.DELETED,
-  SIMULATION_RUN_EVENT_TYPES.METRICS_UPDATED,
+  SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
 ] as const;
 
 export type SimulationProcessingEventType =
@@ -43,7 +43,7 @@ export const SIMULATION_RUN_COMMAND_TYPES = {
   TEXT_MESSAGE_END: "lw.simulation_run.text_message_end",
   FINISH: "lw.simulation_run.finish",
   DELETE: "lw.simulation_run.delete",
-  UPDATE_METRICS: "lw.simulation_run.update_metrics",
+  COMPUTE_METRICS: "lw.simulation_run.compute_metrics",
 } as const;
 
 export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
@@ -54,7 +54,7 @@ export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
   SIMULATION_RUN_COMMAND_TYPES.TEXT_MESSAGE_END,
   SIMULATION_RUN_COMMAND_TYPES.FINISH,
   SIMULATION_RUN_COMMAND_TYPES.DELETE,
-  SIMULATION_RUN_COMMAND_TYPES.UPDATE_METRICS,
+  SIMULATION_RUN_COMMAND_TYPES.COMPUTE_METRICS,
 ] as const;
 
 export type SimulationProcessingCommandType =
@@ -71,7 +71,7 @@ export const SIMULATION_EVENT_VERSIONS = {
   TEXT_MESSAGE_END: "2026-02-01",
   FINISHED: "2026-02-01",
   DELETED: "2026-02-01",
-  METRICS_UPDATED: "2026-03-21",
+  METRICS_COMPUTED: "2026-03-27",
 } as const;
 
 /**

@@ -217,6 +217,133 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
+    describe("when timeScale is full with groupBy", () => {
+      // @regression issue #2644: Summary charts with groupBy render blank because
+      // buildSubqueryTimeseriesQuery never includes group_key in SELECT, GROUP BY,
+      // or UNION ALL — causing the frontend to receive no group dimension to render.
+
+      it("includes group_key in the UNION ALL SELECT for simple metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+      });
+
+      it("includes group_key in the CTE query for pipeline metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+      });
+
+      it("includes group_key in both sides of UNION ALL for simple metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Both the current and previous SELECT branches of UNION ALL must include group_key
+        const unionParts = result.sql.split("UNION ALL");
+        expect(unionParts.length).toBeGreaterThanOrEqual(2);
+        expect(unionParts[0]).toContain("group_key");
+        expect(unionParts[1]).toContain("group_key");
+      });
+
+      it("does not include group_key when groupBy is absent", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).not.toContain("group_key");
+      });
+
+      it("includes group_key via FULL OUTER JOIN when mixing simple and subquery metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+            {
+              metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("FULL OUTER JOIN");
+        expect(result.sql).toContain("UNION ALL");
+      });
+
+      it("uses direct group_key alias without null-check wrapper when groupBy handlesUnknown", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_passed" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        // When handlesUnknown=true the column expression itself handles unknown values,
+        // so no outer if(... IS NULL, 'unknown', toString(...)) wrapper is added.
+        expect(result.sql).not.toContain("IS NULL, 'unknown'");
+      });
+    });
+
     it("uses date-bucketed pipeline query for pipeline metrics with numeric timeScale", () => {
       const input = {
         ...baseInput,
@@ -309,6 +436,111 @@ describe("aggregation-builder", () => {
       expect(result.params.tenantId).toBe("test-project");
       // Tenant isolation in SQL (dedupedTraceSummaries + baseWhere)
       expect(result.sql).toContain("TenantId = {tenantId:String}");
+    });
+
+    describe("when groupBy is evaluation field with cross-evaluator metrics", () => {
+      // @regression issue #2668: groupByAdditionalWhere was appended to the global WHERE
+      // clause, pre-filtering the entire dataset to one evaluator. This caused metrics
+      // that use conditional aggregation (avgIf/sumIf with their OWN evaluator filter)
+      // to find no matching rows because the global WHERE already excluded all rows for
+      // the OTHER evaluator.
+
+      it("excludes global EvaluatorId WHERE filter for evaluation_label groupBy", () => {
+        // GroupBy evaluatorA, but metric targets evaluatorB via its own conditional aggregation.
+        // The global WHERE must NOT filter by evaluatorA — that would make evaluatorB rows invisible.
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // The group_key expression should incorporate the evaluatorA filter (not the global WHERE)
+        expect(result.sql).toContain("group_key");
+        // The metric's conditional aggregation should reference evaluatorB
+        expect(result.sql).toContain("evaluatorB");
+        // The global WHERE clause must NOT contain a standalone EvaluatorId equality filter
+        // (it would appear as "AND es.EvaluatorId = {groupByKey:String}" or similar)
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("excludes global EvaluatorId WHERE filter for evaluation_passed groupBy", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_passed",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("evaluatorB");
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("keeps EvaluatorId condition inside group_key expression for evaluation_label", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // The evaluator filter must live inside the group_key column expression, not in WHERE
+        expect(result.sql).toContain("{groupByKey:String}");
+        // The group_key expression should be conditional (if/CASE) so non-matching rows
+        // return NULL and get filtered by HAVING rather than excluded from the whole dataset
+        expect(result.sql).toMatch(/if\(.*EvaluatorId.*group_key|CASE.*EvaluatorId/s);
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("produces no evaluator filter when groupByKey is absent", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          // no groupByKey
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Without a groupByKey there is no evaluator groupBy filter at all
+        expect(result.sql).not.toContain("{groupByKey:String}");
+        expect(result.params).not.toHaveProperty("groupByKey");
+      });
     });
   });
 

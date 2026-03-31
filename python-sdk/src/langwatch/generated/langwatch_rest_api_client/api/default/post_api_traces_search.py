@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -11,12 +11,12 @@ from ...models.post_api_traces_search_response_400 import PostApiTracesSearchRes
 from ...models.post_api_traces_search_response_401 import PostApiTracesSearchResponse401
 from ...models.post_api_traces_search_response_422 import PostApiTracesSearchResponse422
 from ...models.post_api_traces_search_response_500 import PostApiTracesSearchResponse500
-from ...types import UNSET, Response, Unset
+from ...types import Response
 
 
 def _get_kwargs(
     *,
-    body: PostApiTracesSearchBody | Unset = UNSET,
+    body: PostApiTracesSearchBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -25,9 +25,9 @@ def _get_kwargs(
         "url": "/api/traces/search",
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _body = body.to_dict()
 
+    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -35,40 +35,36 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiTracesSearchResponse200
-    | PostApiTracesSearchResponse400
-    | PostApiTracesSearchResponse401
-    | PostApiTracesSearchResponse422
-    | PostApiTracesSearchResponse500
-    | None
-):
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[
+    Union[
+        PostApiTracesSearchResponse200,
+        PostApiTracesSearchResponse400,
+        PostApiTracesSearchResponse401,
+        PostApiTracesSearchResponse422,
+        PostApiTracesSearchResponse500,
+    ]
+]:
     if response.status_code == 200:
         response_200 = PostApiTracesSearchResponse200.from_dict(response.json())
 
         return response_200
-
     if response.status_code == 400:
         response_400 = PostApiTracesSearchResponse400.from_dict(response.json())
 
         return response_400
-
     if response.status_code == 401:
         response_401 = PostApiTracesSearchResponse401.from_dict(response.json())
 
         return response_401
-
     if response.status_code == 422:
         response_422 = PostApiTracesSearchResponse422.from_dict(response.json())
 
         return response_422
-
     if response.status_code == 500:
         response_500 = PostApiTracesSearchResponse500.from_dict(response.json())
 
         return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -76,13 +72,15 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
-    PostApiTracesSearchResponse200
-    | PostApiTracesSearchResponse400
-    | PostApiTracesSearchResponse401
-    | PostApiTracesSearchResponse422
-    | PostApiTracesSearchResponse500
+    Union[
+        PostApiTracesSearchResponse200,
+        PostApiTracesSearchResponse400,
+        PostApiTracesSearchResponse401,
+        PostApiTracesSearchResponse422,
+        PostApiTracesSearchResponse500,
+    ]
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -94,26 +92,28 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTracesSearchBody | Unset = UNSET,
+    client: Union[AuthenticatedClient, Client],
+    body: PostApiTracesSearchBody,
 ) -> Response[
-    PostApiTracesSearchResponse200
-    | PostApiTracesSearchResponse400
-    | PostApiTracesSearchResponse401
-    | PostApiTracesSearchResponse422
-    | PostApiTracesSearchResponse500
+    Union[
+        PostApiTracesSearchResponse200,
+        PostApiTracesSearchResponse400,
+        PostApiTracesSearchResponse401,
+        PostApiTracesSearchResponse422,
+        PostApiTracesSearchResponse500,
+    ]
 ]:
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody | Unset):
+        body (PostApiTracesSearchBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTracesSearchResponse200 | PostApiTracesSearchResponse400 | PostApiTracesSearchResponse401 | PostApiTracesSearchResponse422 | PostApiTracesSearchResponse500]
+        Response[Union[PostApiTracesSearchResponse200, PostApiTracesSearchResponse400, PostApiTracesSearchResponse401, PostApiTracesSearchResponse422, PostApiTracesSearchResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -129,27 +129,28 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTracesSearchBody | Unset = UNSET,
-) -> (
-    PostApiTracesSearchResponse200
-    | PostApiTracesSearchResponse400
-    | PostApiTracesSearchResponse401
-    | PostApiTracesSearchResponse422
-    | PostApiTracesSearchResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+    body: PostApiTracesSearchBody,
+) -> Optional[
+    Union[
+        PostApiTracesSearchResponse200,
+        PostApiTracesSearchResponse400,
+        PostApiTracesSearchResponse401,
+        PostApiTracesSearchResponse422,
+        PostApiTracesSearchResponse500,
+    ]
+]:
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody | Unset):
+        body (PostApiTracesSearchBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTracesSearchResponse200 | PostApiTracesSearchResponse400 | PostApiTracesSearchResponse401 | PostApiTracesSearchResponse422 | PostApiTracesSearchResponse500
+        Union[PostApiTracesSearchResponse200, PostApiTracesSearchResponse400, PostApiTracesSearchResponse401, PostApiTracesSearchResponse422, PostApiTracesSearchResponse500]
     """
 
     return sync_detailed(
@@ -160,26 +161,28 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTracesSearchBody | Unset = UNSET,
+    client: Union[AuthenticatedClient, Client],
+    body: PostApiTracesSearchBody,
 ) -> Response[
-    PostApiTracesSearchResponse200
-    | PostApiTracesSearchResponse400
-    | PostApiTracesSearchResponse401
-    | PostApiTracesSearchResponse422
-    | PostApiTracesSearchResponse500
+    Union[
+        PostApiTracesSearchResponse200,
+        PostApiTracesSearchResponse400,
+        PostApiTracesSearchResponse401,
+        PostApiTracesSearchResponse422,
+        PostApiTracesSearchResponse500,
+    ]
 ]:
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody | Unset):
+        body (PostApiTracesSearchBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiTracesSearchResponse200 | PostApiTracesSearchResponse400 | PostApiTracesSearchResponse401 | PostApiTracesSearchResponse422 | PostApiTracesSearchResponse500]
+        Response[Union[PostApiTracesSearchResponse200, PostApiTracesSearchResponse400, PostApiTracesSearchResponse401, PostApiTracesSearchResponse422, PostApiTracesSearchResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -193,27 +196,28 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiTracesSearchBody | Unset = UNSET,
-) -> (
-    PostApiTracesSearchResponse200
-    | PostApiTracesSearchResponse400
-    | PostApiTracesSearchResponse401
-    | PostApiTracesSearchResponse422
-    | PostApiTracesSearchResponse500
-    | None
-):
+    client: Union[AuthenticatedClient, Client],
+    body: PostApiTracesSearchBody,
+) -> Optional[
+    Union[
+        PostApiTracesSearchResponse200,
+        PostApiTracesSearchResponse400,
+        PostApiTracesSearchResponse401,
+        PostApiTracesSearchResponse422,
+        PostApiTracesSearchResponse500,
+    ]
+]:
     """Search traces for a project
 
     Args:
-        body (PostApiTracesSearchBody | Unset):
+        body (PostApiTracesSearchBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiTracesSearchResponse200 | PostApiTracesSearchResponse400 | PostApiTracesSearchResponse401 | PostApiTracesSearchResponse422 | PostApiTracesSearchResponse500
+        Union[PostApiTracesSearchResponse200, PostApiTracesSearchResponse400, PostApiTracesSearchResponse401, PostApiTracesSearchResponse422, PostApiTracesSearchResponse500]
     """
 
     return (

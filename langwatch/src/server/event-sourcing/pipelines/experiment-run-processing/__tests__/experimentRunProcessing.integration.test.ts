@@ -14,13 +14,15 @@ import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
-import { CompleteExperimentRunCommand } from "../commands/completeExperimentRun.command";
-import { RecordEvaluatorResultCommand } from "../commands/recordEvaluatorResult.command";
-import { RecordTargetResultCommand } from "../commands/recordTargetResult.command";
-import { StartExperimentRunCommand } from "../commands/startExperimentRun.command";
-import { createExperimentRunResultStorageMapProjection } from "../projections/experimentRunResultStorage.mapProjection";
+import {
+  StartExperimentRunCommand,
+  RecordTargetResultCommand,
+  RecordEvaluatorResultCommand,
+  CompleteExperimentRunCommand,
+} from "../commands";
+import { ExperimentRunResultStorageMapProjection } from "../projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "../projections/experimentRunState.foldProjection";
-import { createExperimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
+import { ExperimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
 import { ExperimentRunStateRepositoryClickHouse } from "../repositories";
 import { createExperimentRunStateFoldStore } from "../projections/experimentRunState.store";
 import { createExperimentRunItemAppendStore } from "../projections/experimentRunResultStorage.store";
@@ -74,6 +76,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   const repository = new ExperimentRunStateRepositoryClickHouse(async () => clickHouseClient);
@@ -83,10 +86,10 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
   const pipelineDefinition = definePipeline<ExperimentRunProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("experiment_run" as AggregateType)
-    .withFoldProjection("experimentRunState", createExperimentRunStateFoldProjection({
+    .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
       store: experimentRunStateFoldStore,
     }) as any)
-    .withMapProjection("experimentRunResultStorage", createExperimentRunResultStorageMapProjection({
+    .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
       store: experimentRunItemAppendStore,
     }) as any)
     .withCommand("startExperimentRun", StartExperimentRunCommand as any)
@@ -100,6 +103,7 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     ready: () => pipeline.service.waitUntilReady(),
   } as any;
@@ -219,7 +223,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      await pipeline.service.close();
+      await pipeline.eventSourcing.close();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await cleanupTestDataForTenant(tenantIdString);
     });

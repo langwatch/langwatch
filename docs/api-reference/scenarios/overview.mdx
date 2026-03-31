@@ -1,0 +1,57 @@
+---
+title: Overview
+---
+
+# Scenario Event Schema
+
+The Simulations visualizer is powered by a single endpoint that receives events from your test runs. All events are sent via a `POST` request to the following endpoint:
+
+```
+/api/scenario-events
+```
+
+The request body should be a JSON object representing one of the event types described below. These events allow LangWatch to reconstruct the entire history of your simulation sets, batches, and individual scenario runs.
+
+For a detailed look at the request and response models, see the [Create Event endpoint reference](/api-reference/scenarios/create-event).
+
+## Common Properties
+
+All scenario events share a common set of properties to identify and organize them:
+
+-   `type`: The specific type of the event.
+-   `timestamp`: A Unix timestamp (in milliseconds) of when the event occurred.
+-   `batchRunId`: An ID that groups all scenarios run within the same test execution or process.
+-   `scenarioId`: A stable identifier for a specific scenario (e.g., "test_vegetarian_recipe").
+-   `scenarioRunId`: A unique ID for a single execution of a scenario.
+-   `scenarioSetId`: The top-level grouping for a collection of scenarios, which defaults to `"default"`.
+
+---
+
+## Event Types
+
+There are three main types of events that you can send.
+
+### 1. `SCENARIO_RUN_STARTED`
+
+This event marks the beginning of a new scenario run.
+
+-   **`metadata`**:
+    -   `name`: The display name of the scenario.
+    -   `description`: A longer description of what the scenario tests.
+
+### 2. `SCENARIO_MESSAGE_SNAPSHOT`
+
+This event captures the state of the conversation at a specific point in time. It includes an array of messages exchanged between the user, agent, and tools.
+
+-   **`messages`**: An array of message objects. The schema for these messages (user, assistant, tool, etc.) is detailed in the OpenAPI specification.
+
+### 3. `SCENARIO_RUN_FINISHED`
+
+This event marks the end of a scenario run and includes the final results.
+
+-   **`status`**: The final status of the run (`SUCCESS`, `FAILED`, `ERROR`, etc.).
+-   **`results`**: An object containing the final verdict from a Judge Agent, including:
+    -   `verdict`: The final outcome (`success`, `failure`).
+    -   `reasoning`: The explanation for the verdict.
+    -   `metCriteria`: A list of criteria that were satisfied.
+    -   `unmetCriteria`: A list of criteria that were not met. 

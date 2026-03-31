@@ -13,6 +13,8 @@ import {
   buildJoinClause,
   tableAliases,
   TRACE_ANALYTICS_COLUMNS,
+  extractReferencedSpanColumns,
+  extractReferencedEvaluationColumns,
 } from "./field-mappings";
 import {
   type MetricTranslation,
@@ -26,6 +28,29 @@ import {
 import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:analytics:aggregation-builder");
+
+/**
+ * Resolve which columns a joined table needs based on the SQL expressions
+ * that reference it.
+ *
+ * Returns a `ReadonlySet<string>` of column names to pass as
+ * `requiredColumns` to `buildJoinClause`. This ensures each JOIN subquery
+ * only SELECTs the columns actually used, avoiding expensive reads of
+ * wide columns like SpanAttributes or Events arrays.
+ */
+function resolveRequiredColumns(
+  table: CHTable,
+  expressions: string[],
+): ReadonlySet<string> | undefined {
+  switch (table) {
+    case "stored_spans":
+      return extractReferencedSpanColumns(expressions);
+    case "evaluation_runs":
+      return extractReferencedEvaluationColumns(expressions);
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.
@@ -133,7 +158,6 @@ interface GroupByExpression {
   requiredJoins: CHTable[];
   usesArrayJoin?: boolean;
   handlesUnknown?: boolean;
-  additionalWhere?: string;
 }
 
 /**
@@ -199,20 +223,25 @@ const groupByExpressions: Partial<
   }),
 
   "evaluations.evaluation_passed": (groupByKey) => ({
-    column: `CASE
+    column: groupByKey
+      ? `CASE
+        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
+        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
+        ELSE NULL
+      END`
+      : `CASE
       WHEN ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
       WHEN ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
       ELSE 'unknown'
     END`,
     requiredJoins: ["evaluation_runs"],
     handlesUnknown: true,
-    additionalWhere: groupByKey
-      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String}`
-      : undefined,
   }),
 
-  "evaluations.evaluation_label": () => ({
-    column: `${tableAliases.evaluation_runs}.Label`,
+  "evaluations.evaluation_label": (groupByKey) => ({
+    column: groupByKey
+      ? `if(${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed', ${tableAliases.evaluation_runs}.Label, '')`
+      : `${tableAliases.evaluation_runs}.Label`,
     requiredJoins: ["evaluation_runs"],
   }),
 
@@ -284,6 +313,34 @@ export interface TimeseriesQueryInput {
 export interface BuiltQuery {
   sql: string;
   params: Record<string, unknown>;
+}
+
+/**
+ * Build the HAVING clause for group_key filtering.
+ *
+ * Different groupBy fields produce different sentinel values for non-matching rows:
+ * - evaluation_label with groupByKey: returns '' → filter with != ''
+ * - evaluation_passed with groupByKey: returns NULL → filter with IS NOT NULL
+ * - Fields with handlesUnknown=true: already handle empty/null internally → no HAVING
+ * - No groupBy: no HAVING needed
+ */
+function buildGroupKeyHavingClause({
+  groupByColumn,
+  groupByHandlesUnknown,
+  groupBy,
+  groupByKey,
+}: {
+  groupByColumn: string | null;
+  groupByHandlesUnknown: boolean;
+  groupBy?: string;
+  groupByKey?: string;
+}): string {
+  if (!groupByColumn) return "";
+  const hasGroupByKey = !!groupByKey;
+  const isEvaluationPassed = groupBy === "evaluations.evaluation_passed";
+  if (isEvaluationPassed && hasGroupByKey) return "HAVING group_key IS NOT NULL";
+  if (!groupByHandlesUnknown && !isEvaluationPassed) return "HAVING group_key != ''";
+  return "";
 }
 
 /**
@@ -420,22 +477,30 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   let usesArrayJoin = false;
   let groupByHandlesUnknown = false;
   let groupByRequiresSpans = false;
-  let groupByAdditionalWhere: string | undefined;
   if (input.groupBy) {
     const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
     groupByColumn = groupByExpr.column;
     usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
     groupByHandlesUnknown = groupByExpr.handlesUnknown ?? false;
     groupByRequiresSpans = groupByExpr.requiredJoins.includes("stored_spans");
-    groupByAdditionalWhere = groupByExpr.additionalWhere;
     for (const join of groupByExpr.requiredJoins) {
       allJoins.add(join);
     }
   }
 
-  // Build JOIN clauses
+  // Build JOIN clauses with column pruning.
+  // Collect all SQL expressions that reference columns from joined tables
+  // so we only SELECT the columns actually needed in each JOIN subquery.
+  const allExpressions = [
+    ...metricTranslations.map((m) => m.selectExpression),
+    filterTranslation.whereClause,
+    groupByColumn ?? "",
+  ];
   const joinClauses = Array.from(allJoins)
-    .map((table) => buildJoinClause(table))
+    .map((table) => {
+      const requiredColumns = resolveRequiredColumns(table, allExpressions);
+      return buildJoinClause(table, requiredColumns);
+    })
     .join("\n");
 
   // Build WHERE clause
@@ -452,11 +517,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
-
-  // Add groupBy additional WHERE clause if present (e.g., for filtering by specific evaluator)
-  if (groupByAdditionalWhere) {
-    filterWhere += ` AND ${groupByAdditionalWhere}`;
-  }
 
   // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
   // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates
@@ -480,9 +540,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
 
-  // For timeScale "full" (summary queries), always use CTE-based query to ensure
-  // both current and previous periods return data (even if one is empty)
-  if (input.timeScale === "full") {
+  // For timeScale "full" (summary queries) without groupBy, use CTE-based query to ensure
+  // both current and previous periods return data (even if one is empty).
+  // When groupBy is present, fall through to the standard query path which correctly
+  // handles GROUP BY group_key — the CTE path doesn't support grouped results.
+  if (input.timeScale === "full" && !groupByColumn) {
     return buildSubqueryTimeseriesQuery(
       input,
       simpleMetrics,
@@ -491,6 +553,8 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       baseWhere,
       filterWhere,
       allTranslationParams,
+      groupByColumn,
+      groupByHandlesUnknown,
     );
   }
 
@@ -501,7 +565,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       pipelineMetrics: subqueryMetrics,
       groupByColumn,
       groupByHandlesUnknown,
-      groupByAdditionalWhere,
       joinClauses,
       baseWhere,
       filterWhere,
@@ -556,15 +619,12 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     groupByExprs.push("group_key");
   }
 
-  // Filter out empty groupBy values to match ES terms aggregation behavior
-  // Skip HAVING if column already handles 'unknown' conversion (those already excluded empty strings)
-  // Skip HAVING for boolean fields like evaluations.evaluation_passed (which use 0/1, not empty strings)
-  const havingClause =
-    groupByColumn &&
-    !groupByHandlesUnknown &&
-    input.groupBy !== "evaluations.evaluation_passed"
-      ? "HAVING group_key != ''"
-      : "";
+  const havingClause = buildGroupKeyHavingClause({
+    groupByColumn,
+    groupByHandlesUnknown,
+    groupBy: input.groupBy,
+    groupByKey: input.groupByKey,
+  });
 
   // Build the complete SQL
   const sql = `
@@ -716,6 +776,121 @@ function buildArrayJoinTimeseriesQuery(
 }
 
 /**
+ * Build the UNION ALL SQL for the groupBy path in buildSubqueryTimeseriesQuery.
+ * Returns the complete SQL + params object when groupByColumn is active.
+ *
+ * Each branch handles a different combination of metric types:
+ * - simple only: SELECT directly from simple_metrics CTEs
+ * - single subquery only: SELECT directly from that metric's CTE
+ * - mixed / multiple subquery: FULL OUTER JOIN all CTEs on group_key
+ */
+function buildGroupByUnionAllQuery({
+  input,
+  ctes,
+  simpleMetrics,
+  subqueryMetrics,
+  filterParams,
+}: {
+  input: TimeseriesQueryInput;
+  ctes: string[];
+  simpleMetrics: MetricTranslation[];
+  subqueryMetrics: MetricTranslation[];
+  filterParams: Record<string, unknown>;
+}): BuiltQuery {
+  const simpleAliases = simpleMetrics.map((m) => quoteIdentifier(m.alias));
+  const subqueryAliasExprs = subqueryMetrics.map(
+    (m) => `metric_value AS ${quoteIdentifier(m.alias)}`,
+  );
+
+  const currentParts: string[] = ["'current' AS period", "group_key"];
+  const previousParts: string[] = ["'previous' AS period", "group_key"];
+
+  let currentFrom = "";
+  let previousFrom = "";
+
+  if (simpleMetrics.length > 0 && subqueryMetrics.length === 0) {
+    // Simple metrics only: SELECT directly from the simple_metrics CTEs
+    currentParts.push(...simpleAliases);
+    previousParts.push(...simpleAliases);
+    currentFrom = "FROM simple_metrics_current";
+    previousFrom = "FROM simple_metrics_previous";
+  } else if (simpleMetrics.length === 0 && subqueryMetrics.length === 1) {
+    // Single subquery metric only: SELECT directly from the subquery CTE
+    const singleSubquery = subqueryMetrics[0];
+    const singleAliasExpr = subqueryAliasExprs[0];
+    if (!singleSubquery || !singleAliasExpr) {
+      throw new Error("Expected exactly one subquery metric");
+    }
+    const cteName = `cte_${singleSubquery.alias}`;
+    currentParts.push(singleAliasExpr);
+    previousParts.push(singleAliasExpr);
+    currentFrom = `FROM ${cteName}_current`;
+    previousFrom = `FROM ${cteName}_previous`;
+  } else if (simpleMetrics.length > 0 || subqueryMetrics.length > 0) {
+    // Mixed or multiple subquery metrics: JOIN the CTEs on group_key
+    const allCurrentSources: string[] = [];
+    const allPreviousSources: string[] = [];
+    const allCurrentCols: string[] = [];
+    const allPreviousCols: string[] = [];
+
+    if (simpleMetrics.length > 0) {
+      allCurrentSources.push("simple_metrics_current smc");
+      allPreviousSources.push("simple_metrics_previous smp");
+      simpleAliases.forEach((a) => {
+        allCurrentCols.push(`smc.${a}`);
+        allPreviousCols.push(`smp.${a}`);
+      });
+    }
+
+    subqueryMetrics.forEach((m, i) => {
+      const cteName = `cte_${m.alias}`;
+      const alias = `sq${i}`;
+      const quotedAlias = quoteIdentifier(m.alias);
+      if (allCurrentSources.length === 0) {
+        allCurrentSources.push(`${cteName}_current ${alias}`);
+        allPreviousSources.push(`${cteName}_previous ${alias}`);
+      } else {
+        const baseCurrentAlias = allCurrentSources[0]?.split(" ")[1] ?? alias;
+        const basePreviousAlias = allPreviousSources[0]?.split(" ")[1] ?? alias;
+        allCurrentSources.push(
+          `FULL OUTER JOIN ${cteName}_current ${alias} ON ${baseCurrentAlias}.group_key = ${alias}.group_key`,
+        );
+        allPreviousSources.push(
+          `FULL OUTER JOIN ${cteName}_previous ${alias} ON ${basePreviousAlias}.group_key = ${alias}.group_key`,
+        );
+      }
+      allCurrentCols.push(`${alias}.metric_value AS ${quotedAlias}`);
+      allPreviousCols.push(`${alias}.metric_value AS ${quotedAlias}`);
+    });
+
+    currentParts.push(...allCurrentCols);
+    previousParts.push(...allPreviousCols);
+    currentFrom = `FROM ${allCurrentSources.join("\n    ")}`;
+    previousFrom = `FROM ${allPreviousSources.join("\n    ")}`;
+  }
+
+  const sql = `
+    WITH
+      ${ctes.join(",\n      ")}
+    SELECT ${currentParts.join(", ")} ${currentFrom}
+    UNION ALL
+    SELECT ${previousParts.join(", ")} ${previousFrom}
+  `;
+  return {
+    sql,
+    params: {
+      tenantId: input.projectId,
+      currentStart: input.startDate,
+      currentEnd: input.endDate,
+      previousStart: input.previousPeriodStartDate,
+      previousEnd: input.startDate,
+      ...filterParams,
+      ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
+    },
+  };
+}
+
+/**
  * Build a timeseries query using CTEs for subquery (pipeline) metrics.
  * This handles metrics that require two-level aggregation (e.g., avg threads per user).
  */
@@ -727,15 +902,32 @@ function buildSubqueryTimeseriesQuery(
   baseWhere: string,
   filterWhere: string,
   filterParams: Record<string, unknown>,
+  groupByColumn: string | null = null,
+  groupByHandlesUnknown = false,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ctes: string[] = [];
 
+  // Build group_key expression when groupBy is active, matching the pattern used in
+  // buildArrayJoinTimeseriesQuery and the standard query path.
+  const groupKeyExpr = groupByColumn
+    ? groupByHandlesUnknown
+      ? `${groupByColumn} AS group_key`
+      : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
+    : null;
+
   // Build CTEs for each subquery metric, one for current and one for previous period
   // Use 'cte_' prefix to ensure CTE names don't start with a digit (which is invalid SQL)
   for (const metric of subqueryMetrics) {
-    const subquery = metric.subquery!;
+    if (!metric.subquery) continue;
+    const subquery = metric.subquery;
     const cteName = `cte_${metric.alias}`;
+
+    // When groupByColumn is set, propagate group_key into the CTE so the outer query
+    // can group results by it. The group_key is added to both the inner SELECT and
+    // inner GROUP BY of the subquery.
+    const groupKeyInnerSelect = groupKeyExpr ? `, ${groupKeyExpr}` : "";
+    const groupKeyInnerGroupBy = groupByColumn ? `, group_key` : "";
 
     // Check if this is a nested subquery (3-level aggregation)
     if (subquery.nestedSubquery) {
@@ -745,9 +937,9 @@ function buildSubqueryTimeseriesQuery(
       // CTE for current period with nested subquery
       ctes.push(`
       ${cteName}_current AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
           FROM (
             SELECT ${nested.select}
             FROM ${dedupedTraceSummaries(ts)}
@@ -759,17 +951,18 @@ function buildSubqueryTimeseriesQuery(
             GROUP BY ${nested.groupBy}
             ${havingClause}
           ) thread_data
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
       )`);
 
       // CTE for previous period with nested subquery
       ctes.push(`
       ${cteName}_previous AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
           FROM (
             SELECT ${nested.select}
             FROM ${dedupedTraceSummaries(ts)}
@@ -781,44 +974,47 @@ function buildSubqueryTimeseriesQuery(
             GROUP BY ${nested.groupBy}
             ${havingClause}
           ) thread_data
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
       )`);
     } else {
       // Standard 2-level aggregation
       // CTE for current period
       ctes.push(`
       ${cteName}_current AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
           FROM ${dedupedTraceSummaries(ts)}
           ${joinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
             AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
             AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
             ${filterWhere}
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
       )`);
 
       // CTE for previous period
       ctes.push(`
       ${cteName}_previous AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
           FROM ${dedupedTraceSummaries(ts)}
           ${joinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
             AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
             AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
             ${filterWhere}
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
         ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
       )`);
     }
   }
@@ -826,6 +1022,9 @@ function buildSubqueryTimeseriesQuery(
   // Build simple metrics query for current period
   // Quote aliases that start with digits for ClickHouse compatibility
   const simpleSelectExprs: string[] = [];
+  if (groupKeyExpr) {
+    simpleSelectExprs.push(groupKeyExpr);
+  }
   for (const metric of simpleMetrics) {
     // Replace unquoted alias with quoted alias in the selectExpression
     const quotedAlias = quoteIdentifier(metric.alias);
@@ -837,6 +1036,7 @@ function buildSubqueryTimeseriesQuery(
   }
 
   // CTE for simple metrics current period
+  const simpleGroupBy = groupByColumn ? "\n        GROUP BY group_key" : "";
   if (simpleMetrics.length > 0) {
     ctes.push(`
       simple_metrics_current AS (
@@ -847,7 +1047,7 @@ function buildSubqueryTimeseriesQuery(
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
           AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
-          ${filterWhere}
+          ${filterWhere}${simpleGroupBy}
       )`);
 
     ctes.push(`
@@ -859,11 +1059,25 @@ function buildSubqueryTimeseriesQuery(
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
           AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
-          ${filterWhere}
+          ${filterWhere}${simpleGroupBy}
       )`);
   }
 
-  // Build final SELECT that combines simple and subquery metrics
+  // When groupByColumn is present, delegate to the grouped UNION ALL builder.
+  // Scalar subqueries cannot be used here because the CTEs now return multiple rows
+  // (one per group_key value).
+  if (groupByColumn) {
+    return buildGroupByUnionAllQuery({
+      input,
+      ctes,
+      simpleMetrics,
+      subqueryMetrics,
+      filterParams,
+    });
+  }
+
+  // No groupBy: use scalar subqueries wrapped in COALESCE to guarantee a row even
+  // when there is no data in one of the periods.
   const currentSelectExprs: string[] = ["'current' AS period"];
   const previousSelectExprs: string[] = ["'previous' AS period"];
 
@@ -937,7 +1151,6 @@ function buildDateBucketedPipelineQuery({
   pipelineMetrics,
   groupByColumn,
   groupByHandlesUnknown,
-  groupByAdditionalWhere,
   joinClauses,
   baseWhere,
   filterWhere,
@@ -948,7 +1161,6 @@ function buildDateBucketedPipelineQuery({
   pipelineMetrics: MetricTranslation[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
-  groupByAdditionalWhere: string | undefined;
   joinClauses: string;
   baseWhere: string;
   filterWhere: string;
@@ -973,16 +1185,14 @@ function buildDateBucketedPipelineQuery({
       : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
     : null;
 
-  let fullFilterWhere = filterWhere;
-  if (groupByAdditionalWhere) {
-    fullFilterWhere += ` AND ${groupByAdditionalWhere}`;
-  }
+  const fullFilterWhere = filterWhere;
 
-  // Skip HAVING group_key != '' for boolean fields and columns that already handle unknown
-  const skipGroupKeyHaving =
-    !groupByColumn ||
-    groupByHandlesUnknown ||
-    input.groupBy === "evaluations.evaluation_passed";
+  const groupKeyHaving = buildGroupKeyHavingClause({
+    groupByColumn,
+    groupByHandlesUnknown,
+    groupBy: input.groupBy,
+    groupByKey: input.groupByKey,
+  });
 
   const ctes = pipelineMetrics.map((metric) =>
     buildPipelineMetricCTE(metric, {
@@ -991,7 +1201,7 @@ function buildDateBucketedPipelineQuery({
       dateTrunc,
       groupByColumn,
       groupKeyExpr,
-      skipGroupKeyHaving,
+      groupKeyHaving,
       joinClauses,
       baseWhere,
       fullFilterWhere,
@@ -1055,7 +1265,7 @@ interface PipelineCTEContext {
   dateTrunc: string;
   groupByColumn: string | null;
   groupKeyExpr: string | null;
-  skipGroupKeyHaving: boolean;
+  groupKeyHaving: string;
   joinClauses: string;
   baseWhere: string;
   fullFilterWhere: string;
@@ -1069,7 +1279,10 @@ function buildPipelineMetricCTE(
   metric: MetricTranslation,
   ctx: PipelineCTEContext,
 ): string {
-  const subquery = metric.subquery!;
+  if (!metric.subquery) {
+    throw new Error(`Metric "${metric.alias}" is missing subquery definition`);
+  }
+  const subquery = metric.subquery;
   const cteName = `cte_${metric.alias}`;
   const hasGroup = !!ctx.groupByColumn;
   const groupPrefix = hasGroup ? "group_key, " : "";
@@ -1084,8 +1297,7 @@ function buildPipelineMetricCTE(
   // Outer GROUP BY / HAVING
   const outerGroupByCols = ["period", "date"];
   if (hasGroup) outerGroupByCols.push("group_key");
-  const outerHaving =
-    !ctx.skipGroupKeyHaving ? "HAVING group_key != ''" : "";
+  const outerHaving = ctx.groupKeyHaving;
 
   // Inner select: the base scan with period/date bucketing
   const baseSelectCols = [
@@ -1270,8 +1482,12 @@ export function buildDataForFilterQuery(
     filterTranslation.whereClause !== "1=1"
       ? `AND ${filterTranslation.whereClause}`
       : "";
+  const filterExpressions = [filterTranslation.whereClause];
   const filterJoins = Array.from(filterTranslation.requiredJoins)
-    .map((table) => buildJoinClause(table))
+    .map((table) => {
+      const requiredColumns = resolveRequiredColumns(table, filterExpressions);
+      return buildJoinClause(table, requiredColumns);
+    })
     .join("\n");
 
   let sql: string;
@@ -1362,7 +1578,7 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.model":
-      joins = buildJoinClause("stored_spans");
+      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
       sql = `
         SELECT
           ${ss}.SpanAttributes['gen_ai.request.model'] AS field,
@@ -1384,7 +1600,7 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.type":
-      joins = buildJoinClause("stored_spans");
+      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
       sql = `
         SELECT
           ${ss}.SpanAttributes['langwatch.span.type'] AS field,

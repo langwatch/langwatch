@@ -260,6 +260,7 @@ describe("ExperimentRunEsSyncReactor", () => {
           },
         ],
         progress: 1,
+        targets: [],
       });
     });
   });

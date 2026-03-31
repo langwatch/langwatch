@@ -146,7 +146,7 @@ export const CopyEvaluationDialog = ({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select project" />
                 </Select.Trigger>
-                <Select.Content zIndex="1600">
+                <Select.Content>
                   {projectCollection.items.map((project) => {
                     const hasPermission = project.hasManagePermission;
                     return (
