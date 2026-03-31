@@ -38,14 +38,14 @@ function makeMockClient(overrides?: Partial<ClickHouseClient>) {
 describe("createResilientClickHouseClient()", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    mockQueryLogger.debug.mockClear();
-    mockQueryLogger.warn.mockClear();
-    mockQueryLogger.error.mockClear();
-    mockQueryLogger.fatal.mockClear();
-    mockLogger.debug.mockClear();
-    mockLogger.warn.mockClear();
-    mockLogger.error.mockClear();
-    mockLogger.fatal.mockClear();
+    mockQueryLogger.debug.mockReset();
+    mockQueryLogger.warn.mockReset();
+    mockQueryLogger.error.mockReset();
+    mockQueryLogger.fatal.mockReset();
+    mockLogger.debug.mockReset();
+    mockLogger.warn.mockReset();
+    mockLogger.error.mockReset();
+    mockLogger.fatal.mockReset();
   });
 
   describe("when insert fails with transient error then succeeds", () => {
@@ -336,6 +336,150 @@ describe("createResilientClickHouseClient()", () => {
 
       const qr = await client.query({ query: "SELECT 1" });
       expect(qr).toBe(queryResult);
+    });
+  });
+
+  describe("when query exceeds default duration threshold (1s)", () => {
+    it("logs at warn level with query preview", async () => {
+      const queryResult = { response_headers: {} };
+      const mock = makeMockClient({
+        query: vi.fn().mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 1100));
+          return queryResult;
+        }),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      await client.query({ query: "SELECT * FROM big_table WHERE x = 1" });
+
+      expect(mockQueryLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "clickhouse",
+          operation: "query",
+          query: expect.stringContaining("SELECT * FROM big_table"),
+        }),
+        expect.stringContaining("ClickHouse slow query")
+      );
+      expect(mockQueryLogger.debug).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when query result exceeds default size threshold (3MB)", () => {
+    it("logs at warn level with readBytes", async () => {
+      const queryResult = {
+        response_headers: {
+          "x-clickhouse-summary": JSON.stringify({ read_bytes: "4000000" }),
+        },
+      };
+      const mock = makeMockClient({
+        query: vi.fn().mockResolvedValue(queryResult),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      await client.query({ query: "SELECT messages FROM traces" });
+
+      expect(mockQueryLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: "clickhouse",
+          operation: "query",
+          readBytes: 4000000,
+        }),
+        expect.stringContaining("3.0MB expected")
+      );
+    });
+  });
+
+  describe("when query is fast and light", () => {
+    it("logs at debug level only", async () => {
+      const queryResult = {
+        response_headers: {
+          "x-clickhouse-summary": JSON.stringify({ read_bytes: "500" }),
+        },
+      };
+      const mock = makeMockClient({
+        query: vi.fn().mockResolvedValue(queryResult),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      await client.query({ query: "SELECT count() FROM t" });
+
+      expect(mockQueryLogger.debug).toHaveBeenCalled();
+      expect(mockQueryLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when per-query expectations override defaults", () => {
+    it("uses custom thresholds for slow query detection", async () => {
+      const queryResult = {
+        response_headers: {
+          "x-clickhouse-summary": JSON.stringify({ read_bytes: "4000000" }),
+        },
+      };
+      const mock = makeMockClient({
+        query: vi.fn().mockResolvedValue(queryResult),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      // 4MB is over the default 3MB, but under the custom 5MB
+      await client.query({
+        query: "SELECT * FROM heavy_table",
+        clickhouse_settings: {
+          langwatch_expected_max_duration_ms: 5000,
+          langwatch_expected_max_read_bytes: 5_000_000,
+        },
+      } as any);
+
+      expect(mockQueryLogger.debug).toHaveBeenCalled();
+      expect(mockQueryLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when langwatch_* settings are passed", () => {
+    it("strips them before forwarding to ClickHouse", async () => {
+      const queryResult = { response_headers: {} };
+      const mock = makeMockClient({
+        query: vi.fn().mockResolvedValue(queryResult),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      await client.query({
+        query: "SELECT 1",
+        clickhouse_settings: {
+          max_memory_usage: 1000000,
+          langwatch_expected_max_duration_ms: 5000,
+          langwatch_expected_max_read_bytes: 10_000_000,
+        },
+      } as any);
+
+      const forwarded = (mock.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+      expect(forwarded.clickhouse_settings).toEqual({
+        max_memory_usage: 1000000,
+      });
+      expect(forwarded.clickhouse_settings).not.toHaveProperty("langwatch_expected_max_duration_ms");
+      expect(forwarded.clickhouse_settings).not.toHaveProperty("langwatch_expected_max_read_bytes");
+    });
+  });
+
+  describe("when both duration and size exceed thresholds", () => {
+    it("includes both reasons in the warn message", async () => {
+      const queryResult = {
+        response_headers: {
+          "x-clickhouse-summary": JSON.stringify({ read_bytes: "5000000" }),
+        },
+      };
+      const mock = makeMockClient({
+        query: vi.fn().mockImplementation(async () => {
+          await new Promise((r) => setTimeout(r, 1100));
+          return queryResult;
+        }),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      await client.query({ query: "SELECT * FROM huge" });
+
+      const msg = mockQueryLogger.warn.mock.calls[0]![1] as string;
+      expect(msg).toContain("ms >");
+      expect(msg).toContain("MB >");
     });
   });
 
