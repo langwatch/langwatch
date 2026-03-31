@@ -20,6 +20,7 @@ export interface ClickHouseEvaluationRunRow {
   Label: string | null;
   Details: string | null;
   Error: string | null;
+  Inputs: string | null;
   ScheduledAt: string | null; // DateTime64(3) as string
   StartedAt: string | null;
   CompletedAt: string | null;
@@ -49,6 +50,7 @@ export function mapClickHouseEvaluationToTraceEvaluation(
     label: record.Label,
     details: record.Details,
     error: record.Error,
+    inputs: safeJsonParsing(record.Inputs),
     timestamps: {
       // CH DateTime64(3) returns UTC strings without timezone suffix; append "Z" only when missing
       scheduledAt: record.ScheduledAt
@@ -123,7 +125,10 @@ export function mapTraceEvaluationsToLegacyEvaluations(
       score: te.score,
       label: te.label,
       details: te.details,
-      error: te.error ? { has_error: true as const, message: te.error, stacktrace: [] } : null,
+      error: te.error
+        ? { has_error: true as const, message: te.error, stacktrace: [] }
+        : null,
+      inputs: te.inputs,
       timestamps: {
         inserted_at: te.timestamps.scheduledAt,
         started_at: te.timestamps.startedAt,
@@ -138,4 +143,13 @@ export function mapTraceEvaluationsToLegacyEvaluations(
 /** Appends "Z" to a timestamp string only when it lacks a timezone indicator. */
 function appendUtcSuffix(ts: string): string {
   return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";
+}
+
+function safeJsonParsing(json: string | null): Record<string, any> | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
 }
