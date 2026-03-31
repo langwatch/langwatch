@@ -237,13 +237,14 @@ class PromptsFacade:
         self,
         prompt_id_or_handle: str,
         scope: Literal["PROJECT", "ORGANIZATION"],
-        commit_message: str = "",
         handle: Optional[str] = None,
         prompt: Optional[str] = None,
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         labels: Optional[List[str]] = None,
+        *,
+        commit_message: str = "",
     ) -> Prompt:
         """
         Update an existing prompt via API.

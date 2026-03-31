@@ -228,7 +228,7 @@ class PromptApiService:
 
         api_labels = UNSET
         if labels:
-            api_labels = [PostApiPromptsBodyLabelsItem(l) for l in labels]
+            api_labels = [PostApiPromptsBodyLabelsItem(label) for label in labels]
 
         resp = post_api_prompts.sync_detailed(
             client=self._client,
@@ -305,7 +305,7 @@ class PromptApiService:
 
         api_labels = UNSET
         if labels:
-            api_labels = [PutApiPromptsByIdBodyLabelsItem(l) for l in labels]
+            api_labels = [PutApiPromptsByIdBodyLabelsItem(label) for label in labels]
 
         resp = put_api_prompts_by_id.sync_detailed(
             id=prompt_id_or_handle,
