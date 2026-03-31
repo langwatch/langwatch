@@ -7,7 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Code, Info } from "react-feather";
+import { Info } from "react-feather";
+import { UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CopyButton } from "~/components/CopyButton";
@@ -270,24 +271,8 @@ export function DeployPromptDialog({
                         <Text fontWeight="medium" fontSize="sm">
                           {label}
                         </Text>
-                        <GeneratePromptApiSnippetDialog
-                          promptHandle={handle}
-                          apiKey={project?.apiKey}
-                          label={label}
-                        >
-                          <GeneratePromptApiSnippetDialog.Trigger>
-                            <Tooltip content="View code snippet">
-                              <IconButton
-                                variant="ghost"
-                                size="xs"
-                                aria-label="View code snippet"
-                              >
-                                <Code size={14} />
-                              </IconButton>
-                            </Tooltip>
-                          </GeneratePromptApiSnippetDialog.Trigger>
-                        </GeneratePromptApiSnippetDialog>
                       </HStack>
+                      <HStack gap={2}>
                       <Select.Root
                         collection={versionCollection}
                         size="sm"
@@ -332,6 +317,22 @@ export function DeployPromptDialog({
                           ))}
                         </Select.Content>
                       </Select.Root>
+                      <GeneratePromptApiSnippetDialog
+                        promptHandle={handle}
+                        apiKey={project?.apiKey}
+                        label={label}
+                      >
+                        <GeneratePromptApiSnippetDialog.Trigger>
+                          <IconButton
+                            variant="ghost"
+                            size="xs"
+                            aria-label="View code snippet"
+                          >
+                            <UnplugIcon size={14} />
+                          </IconButton>
+                        </GeneratePromptApiSnippetDialog.Trigger>
+                      </GeneratePromptApiSnippetDialog>
+                      </HStack>
                     </HStack>
                   </Box>
                 );
