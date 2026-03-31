@@ -12,8 +12,8 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs
-    MODIFY COLUMN AvgScoreBps Nullable(UInt32);
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs
+ --   MODIFY COLUMN AvgScoreBps Nullable(UInt32);
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
