@@ -81,6 +81,31 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("TotalCost");
     });
 
+    // @regression: LLM Metrics card mixed metadata.span_type (cardinality) with
+    // performance.total_cost (sum) and performance.total_tokens (sum). The span_type
+    // metric forced a stored_spans JOIN even though cardinality only uses uniq(TraceId)
+    // from trace_summaries. The JOIN created one row per span per trace, inflating
+    // the trace-level SUM aggregations (cost ~4x, tokens ~6x).
+    it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.span_type" as FlattenAnalyticsMetricsEnum, key: "llm", aggregation: "cardinality" as const },
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "performance.total_tokens" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The query must NOT join stored_spans — all three metrics work from trace_summaries alone
+      expect(result.sql).not.toContain("JOIN stored_spans");
+      expect(result.sql).not.toContain("FROM stored_spans");
+      // But the metrics themselves should still be present
+      expect(result.sql).toContain("uniq(");
+      expect(result.sql).toContain("TotalCost");
+      expect(result.sql).toContain("TotalPromptTokenCount");
+    });
+
     it("adds JOINs when metrics require them", () => {
       const input = {
         ...baseInput,
