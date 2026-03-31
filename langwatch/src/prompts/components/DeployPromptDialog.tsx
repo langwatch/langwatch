@@ -3,7 +3,6 @@ import {
   Button,
   createListCollection,
   HStack,
-  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -323,14 +322,17 @@ export function DeployPromptDialog({
                         label={label}
                       >
                         <GeneratePromptApiSnippetDialog.Trigger>
-                          <IconButton
-                            variant="plain"
-                            size="xs"
-                            aria-label="View code snippet"
+                          <Box
+                            as="button"
                             color="fg.muted"
+                            cursor="pointer"
+                            _hover={{ color: "fg" }}
+                            aria-label="View code snippet"
+                            display="flex"
+                            alignItems="center"
                           >
                             <UnplugIcon size={14} />
-                          </IconButton>
+                          </Box>
                         </GeneratePromptApiSnippetDialog.Trigger>
                       </GeneratePromptApiSnippetDialog>
                       </HStack>
