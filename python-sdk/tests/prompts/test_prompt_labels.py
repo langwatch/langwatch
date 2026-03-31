@@ -19,7 +19,7 @@ import pytest
 import langwatch
 from langwatch.prompts.prompt_api_service import PromptApiService
 from langwatch.prompts.prompt_facade import PromptsFacade
-from langwatch.prompts.types import FetchPolicy, PromptData, Message
+from langwatch.prompts.types import FetchPolicy
 
 
 # ---------------------------------------------------------------------------
