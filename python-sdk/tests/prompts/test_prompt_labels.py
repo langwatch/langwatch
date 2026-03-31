@@ -309,18 +309,46 @@ class TestPromptApiServiceCreateUpdateWithLabels:
     def test_create_without_labels_omits_field(self):
         """
         When create() is called without labels
-        Then the request body omits the labels field
+        Then the generated client is called and the body it receives has no labels field
         """
-        api_response = _make_api_response_json()
-        mock_request = Mock(return_value=_mock_httpx_response(api_response))
-        rest_client = _rest_client_with_mocked_httpx(mock_request)
+        from langwatch.generated.langwatch_rest_api_client.api.default import (
+            post_api_prompts,
+        )
+        from langwatch.generated.langwatch_rest_api_client.client import Client
 
-        service = PromptApiService(rest_client)
-        service.create(handle="pizza-prompt")
+        real_client = Client(base_url="https://api.langwatch.ai")
+        service = PromptApiService(real_client)
 
-        call_kwargs = mock_request.call_args
-        body = call_kwargs[1].get("json") or {}
-        assert "labels" not in body
+        mock_post_response = Mock()
+        mock_post_response.parsed = Mock()
+        # Satisfy PromptData.from_api_response
+        mock_post_response.parsed.id = "pizza-prompt"
+        mock_post_response.parsed.handle = "pizza-prompt"
+        mock_post_response.parsed.model = "openai/gpt-4"
+        mock_post_response.parsed.version = 1
+        mock_post_response.parsed.version_id = "v1"
+        mock_post_response.parsed.scope = Mock()
+        mock_post_response.parsed.scope.value = "PROJECT"
+        mock_post_response.parsed.prompt = None
+        mock_post_response.parsed.temperature = None
+        mock_post_response.parsed.max_tokens = None
+        mock_post_response.parsed.response_format = None
+        mock_post_response.parsed.messages = []
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_post_response
+            with patch(
+                "langwatch.prompts.prompt_api_service.unwrap_response",
+                return_value=mock_post_response.parsed,
+            ):
+                service.create(handle="pizza-prompt")
+
+        mock_module.sync_detailed.assert_called_once()
+        body_arg = mock_module.sync_detailed.call_args[1]["body"]
+        body_dict = body_arg.to_dict()
+        assert "labels" not in body_dict
 
     def test_update_includes_labels_in_request_body(self):
         """
@@ -416,6 +444,71 @@ class TestPromptsFacadeGetWithLabel:
         call_kwargs = mock_request.call_args
         params = call_kwargs[1].get("params") or {}
         assert "label" not in params
+
+
+# ---------------------------------------------------------------------------
+# PromptsFacade fetch policy + label edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestPromptsFacadeEdgeCasesWithLabel:
+    """Edge cases for PromptsFacade fetch policies combined with label parameter."""
+
+    def _make_facade_with_mock(self, mock_request: Mock) -> PromptsFacade:
+        rest_client = _rest_client_with_mocked_httpx(mock_request)
+        return PromptsFacade(rest_client)
+
+    def test_materialized_only_with_label_raises_value_error(self):
+        """
+        When get() is called with MATERIALIZED_ONLY + label
+        Then a ValueError is raised before any API call
+        (labels are server-side only; MATERIALIZED_ONLY cannot resolve them)
+        """
+        mock_request = Mock()
+        facade = self._make_facade_with_mock(mock_request)
+
+        with pytest.raises(ValueError, match="MATERIALIZED_ONLY"):
+            facade.get(
+                "pizza-prompt",
+                label="production",
+                fetch_policy=FetchPolicy.MATERIALIZED_ONLY,
+            )
+
+        mock_request.assert_not_called()
+
+    def test_always_fetch_with_label_and_api_failure_raises_error(self):
+        """
+        When get() is called with ALWAYS_FETCH + label and the API fails
+        Then the error propagates (no local fallback when label is provided)
+        """
+        mock_request = Mock(
+            return_value=_mock_httpx_response({"error": "Server error"}, status_code=500)
+        )
+        facade = self._make_facade_with_mock(mock_request)
+
+        with pytest.raises(Exception):
+            facade.get(
+                "pizza-prompt",
+                label="production",
+                fetch_policy=FetchPolicy.ALWAYS_FETCH,
+            )
+
+    def test_cache_ttl_with_label_and_api_failure_raises_error(self):
+        """
+        When get() is called with CACHE_TTL + label and the API fails (cache miss)
+        Then the error propagates (no local fallback when label is provided)
+        """
+        mock_request = Mock(
+            return_value=_mock_httpx_response({"error": "Server error"}, status_code=500)
+        )
+        facade = self._make_facade_with_mock(mock_request)
+
+        with pytest.raises(Exception):
+            facade.get(
+                "pizza-prompt",
+                label="production",
+                fetch_policy=FetchPolicy.CACHE_TTL,
+            )
 
 
 # ---------------------------------------------------------------------------
