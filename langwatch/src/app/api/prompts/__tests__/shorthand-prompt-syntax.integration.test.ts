@@ -126,6 +126,22 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
   });
 
+  describe("when shorthand is malformed", () => {
+    it("returns 422 for empty slug (e.g. ':production')", async () => {
+      const res = await makeRequest("/api/prompts/:production");
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toMatch(/slug must not be empty/i);
+    });
+
+    it("returns 422 for empty suffix (e.g. 'pizza-prompt:')", async () => {
+      const res = await makeRequest("/api/prompts/pizza-prompt:");
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toMatch(/suffix after colon must not be empty/i);
+    });
+  });
+
   describe("when shorthand is used in the tag-assignment route", () => {
     it("does not parse shorthand from the prompt ID", async () => {
       // Create prompt

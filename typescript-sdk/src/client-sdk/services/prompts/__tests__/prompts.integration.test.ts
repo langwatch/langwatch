@@ -19,7 +19,6 @@ import type { paths } from "@/internal/generated/openapi/api-client";
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import { CliRunner } from "../../../../../__tests__/e2e/cli/helpers/cli-runner";
 import { LangWatch } from "@/client-sdk";
-import { FetchPolicy } from "../types";
 
 const http = createOpenApiHttp<paths>({
   baseUrl: process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560",
@@ -29,23 +28,9 @@ const handlers = [
   http.get("/api/prompts/{id}", ({ params, request, response }) => {
     const url = new URL(request.url);
     const versionParam = url.searchParams.get("version");
-    const labelParam = url.searchParams.get("label");
-
-    // Simulate label resolution: production=v3, staging=v2
-    const labelVersionMap: Record<string, number> = {
-      production: 3,
-      staging: 2,
-    };
-
-    const resolvedVersion = labelParam
-      ? labelVersionMap[labelParam]
-      : versionParam
-        ? parseInt(versionParam, 10)
-        : undefined;
-
     const prompt = promptResponseFactory.build({
       id: params.id,
-      ...(resolvedVersion !== undefined && { version: resolvedVersion }),
+      ...(versionParam && { version: parseInt(versionParam, 10) }),
     });
     return response(200).json(prompt);
   }),
@@ -190,48 +175,6 @@ describe("Prompts Integration", () => {
       it("returns local prompt", async () => {
         const prompt = await langwatch.prompts.get(handle);
         expect(prompt?.handle).toBe(handle);
-      });
-    });
-  });
-
-  describe("Feature: Shorthand prompt label syntax (TS SDK)", () => {
-    describe("when resolving label shorthand", () => {
-      it("resolves 'pizza-prompt:production' to version 3", async () => {
-        const prompt = await langwatch.prompts.get("pizza-prompt:production", {
-          fetchPolicy: FetchPolicy.ALWAYS_FETCH,
-        });
-        expect(prompt?.id).toBe("pizza-prompt");
-        expect(prompt?.version).toBe(3);
-      });
-    });
-
-    describe("when resolving version shorthand", () => {
-      it("resolves 'pizza-prompt:2' to version 2", async () => {
-        const prompt = await langwatch.prompts.get("pizza-prompt:2", {
-          fetchPolicy: FetchPolicy.ALWAYS_FETCH,
-        });
-        expect(prompt?.id).toBe("pizza-prompt");
-        expect(prompt?.version).toBe(2);
-      });
-    });
-
-    describe("when resolving bare slug", () => {
-      it("resolves 'pizza-prompt' to latest version", async () => {
-        const prompt = await langwatch.prompts.get("pizza-prompt", {
-          fetchPolicy: FetchPolicy.ALWAYS_FETCH,
-        });
-        expect(prompt?.id).toBe("pizza-prompt");
-      });
-    });
-
-    describe("when explicit label option is provided alongside slug", () => {
-      it("uses the explicit label option", async () => {
-        const prompt = await langwatch.prompts.get("pizza-prompt", {
-          label: "staging",
-          fetchPolicy: FetchPolicy.ALWAYS_FETCH,
-        });
-        expect(prompt?.id).toBe("pizza-prompt");
-        expect(prompt?.version).toBe(2);
       });
     });
   });

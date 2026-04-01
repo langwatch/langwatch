@@ -481,36 +481,36 @@ app.get(
     const organization = c.get("organization");
     const { id } = c.req.param();
 
-    // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
-    const shorthand = parsePromptShorthand(id);
-
-    const queryVersion = c.req.query("version")
-      ? parseInt(c.req.query("version") ?? "")
-      : undefined;
-    const queryTag = c.req.query("tag") ?? undefined;
-
-    // Reject conflicting shorthand + query param
-    if (shorthand.tag && queryTag) {
-      throw new HTTPException(422, {
-        message: `Conflict: shorthand path specifies tag "${shorthand.tag}" but query parameter also specifies tag "${queryTag}". Use one or the other, not both.`,
-      });
-    }
-
-    if (shorthand.version && queryVersion) {
-      throw new HTTPException(422, {
-        message: `Conflict: shorthand path specifies version ${String(shorthand.version)} but query parameter also specifies version ${String(queryVersion)}. Use one or the other, not both.`,
-      });
-    }
-
-    const version = shorthand.version ?? queryVersion;
-    const tag = shorthand.tag ?? queryTag;
-
-    logger.info(
-      { projectId: project.id, id: shorthand.slug, version, tag },
-      "Getting prompt",
-    );
-
     try {
+      // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
+      const shorthand = parsePromptShorthand(id);
+
+      const queryVersion = c.req.query("version")
+        ? parseInt(c.req.query("version") ?? "")
+        : undefined;
+      const queryTag = c.req.query("tag") ?? undefined;
+
+      // Reject conflicting shorthand + query param
+      if (shorthand.tag && queryTag) {
+        throw new HTTPException(422, {
+          message: `Conflict: shorthand path specifies tag "${shorthand.tag}" but query parameter also specifies tag "${queryTag}". Use one or the other, not both.`,
+        });
+      }
+
+      if (shorthand.version && queryVersion) {
+        throw new HTTPException(422, {
+          message: `Conflict: shorthand path specifies version ${String(shorthand.version)} but query parameter also specifies version ${String(queryVersion)}. Use one or the other, not both.`,
+        });
+      }
+
+      const version = shorthand.version ?? queryVersion;
+      const tag = shorthand.tag ?? queryTag;
+
+      logger.info(
+        { projectId: project.id, id: shorthand.slug, version, tag },
+        "Getting prompt",
+      );
+
       const config = await service.getPromptByIdOrHandle({
         idOrHandle: shorthand.slug,
         projectId: project.id,
@@ -527,6 +527,9 @@ app.get(
 
       return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
     } catch (error: unknown) {
+      if (error instanceof HTTPException) {
+        throw error;
+      }
       if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,

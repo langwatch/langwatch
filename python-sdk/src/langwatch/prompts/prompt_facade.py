@@ -27,57 +27,6 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
-def parse_prompt_shorthand(input_str: str) -> Dict[str, Any]:
-    """
-    Parse a shorthand prompt reference string.
-
-    Supported formats:
-    - ``"pizza-prompt:production"`` -> slug with label
-    - ``"pizza-prompt:2"`` -> slug with version (positive integer)
-    - ``"pizza-prompt"`` -> bare slug
-    - ``"pizza-prompt:latest"`` -> treated as bare slug (no-op)
-    - ``"my-org/prompt:staging"`` -> slug with slash preserved
-
-    Args:
-        input_str: The shorthand string to parse.
-
-    Returns:
-        Dict with keys: slug (str), label (Optional[str]), version (Optional[int]).
-
-    Raises:
-        ValueError: If the slug portion is empty.
-    """
-    colon_index = input_str.rfind(":")
-
-    if colon_index == -1:
-        return {"slug": input_str, "label": None, "version": None}
-
-    slug = input_str[:colon_index]
-    suffix = input_str[colon_index + 1:]
-
-    if len(slug) == 0:
-        raise ValueError(
-            f'Invalid format: slug must not be empty. Received "{input_str}"'
-        )
-
-    if len(suffix) == 0:
-        raise ValueError(
-            f'Invalid format: suffix after colon must not be empty. Received "{input_str}"'
-        )
-
-    if suffix == "latest":
-        return {"slug": slug, "label": None, "version": None}
-
-    try:
-        parsed = int(suffix)
-        if parsed > 0:
-            return {"slug": slug, "label": None, "version": parsed}
-    except ValueError:
-        pass  # Not a valid integer — treat suffix as a label name
-
-    return {"slug": slug, "label": suffix, "version": None}
-
-
 class PromptsFacade:
     """
     Facade service for managing LangWatch prompts with guaranteed availability.
@@ -114,7 +63,6 @@ class PromptsFacade:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[str] = None,
         fetch_policy: Optional[FetchPolicy] = None,
         cache_ttl_minutes: Optional[int] = None,
         tag: Optional[str] = None,
@@ -122,57 +70,41 @@ class PromptsFacade:
         """
         Retrieve a prompt by its ID with configurable fetch policy.
 
-        Supports shorthand syntax: ``"pizza-prompt:production"`` resolves to the
-        version labeled "production". ``"pizza-prompt:2"`` resolves to version 2.
-
         Args:
-            prompt_id: The prompt ID, handle, or shorthand (e.g., "slug:label").
-            version_number: Optional specific version number to retrieve.
-            label: Optional label to fetch (e.g., "production", "staging").
+            prompt_id: The prompt ID to retrieve
+            version_number: Optional specific version number to retrieve
             fetch_policy: How to fetch the prompt. Defaults to MATERIALIZED_FIRST.
             cache_ttl_minutes: Cache TTL in minutes (only used with CACHE_TTL policy). Defaults to 5.
             tag: Optional tag to fetch a specific tagged version (e.g. "production", "staging", or any custom tag).
 
         Raises:
-            ValueError: If conflicting shorthand and explicit options are provided.
-            ValueError: If both version_number and tag are specified.
+            ValueError: If both version_number and tag are provided.
             ValueError: If tag is used with MATERIALIZED_ONLY policy.
             ValueError: If the prompt is not found (404 error).
             RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
         """
-        shorthand = parse_prompt_shorthand(prompt_id)
-        resolved_id = shorthand["slug"]
-        has_shorthand_version = shorthand.get("version") is not None
-        has_shorthand_tag = shorthand.get("label") is not None
-
-        # Conflict: shorthand carries version or tag AND explicit options also specify version or tag
-        if (has_shorthand_version or has_shorthand_tag) and (version_number is not None or tag is not None):
-            raise ValueError("Cannot combine shorthand with explicit version/tag options")
-
-        # Conflict: both explicit version AND explicit tag
-        if version_number is not None and tag is not None:
-            raise ValueError("Cannot specify both version and tag")
-
-        resolved_version = version_number if version_number is not None else shorthand.get("version")
-        resolved_tag = tag if tag is not None else shorthand.get("label")
+        if tag is not None and version_number is not None:
+            raise ValueError(
+                "Cannot specify both version_number and tag"
+            )
 
         fetch_policy = fetch_policy or FetchPolicy.MATERIALIZED_FIRST
 
-        if resolved_tag is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
+        if tag is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
             raise ValueError(
                 "Tag-based fetch requires API access; incompatible with MATERIALIZED_ONLY policy"
             )
 
         if fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
-            return self._get_materialized_only(resolved_id)
+            return self._get_materialized_only(prompt_id)
         elif fetch_policy == FetchPolicy.ALWAYS_FETCH:
-            return self._get_always_fetch(resolved_id, resolved_version, resolved_tag)
+            return self._get_always_fetch(prompt_id, version_number, tag)
         elif fetch_policy == FetchPolicy.CACHE_TTL:
             return self._get_cache_ttl(
-                resolved_id, resolved_version, cache_ttl_minutes or 5, resolved_tag
+                prompt_id, version_number, cache_ttl_minutes or 5, tag
             )
         else:  # MATERIALIZED_FIRST (default)
-            return self._get_materialized_first(resolved_id, resolved_version, resolved_tag)
+            return self._get_materialized_first(prompt_id, version_number, tag)
 
     def _get_materialized_first(
         self,

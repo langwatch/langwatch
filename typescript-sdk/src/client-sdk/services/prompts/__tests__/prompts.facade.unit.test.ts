@@ -80,7 +80,7 @@ describe("Prompt Retrieval", () => {
       // When I retrieve the prompt, Then throws error
       await expect(facade.get(ghostHandle)).rejects.toThrow(mockError);
       expect(localPromptsService.get).toHaveBeenCalledWith(ghostHandle);
-      expect(promptsApiService.get).toHaveBeenCalledWith(ghostHandle, {});
+      expect(promptsApiService.get).toHaveBeenCalledWith(ghostHandle, undefined);
     });
   });
 
@@ -241,44 +241,6 @@ describe("Prompt Retrieval", () => {
       expect(promptsApiService.get).toHaveBeenCalled();
       expect(localPromptsService.get).toHaveBeenCalledWith(testHandle);
       expect(result).toEqual(new Prompt(mockLocalPrompt));
-    });
-  });
-
-  describe("Feature: Shorthand conflict validation", () => {
-    describe("when shorthand version conflicts with explicit version", () => {
-      it("throws an error before making a network call", async () => {
-        await expect(
-          facade.get("pizza-prompt:2", { version: "5" })
-        ).rejects.toThrow("Cannot combine shorthand with explicit version/label options");
-        expect(promptsApiService.get).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when shorthand label conflicts with explicit label", () => {
-      it("throws an error before making a network call", async () => {
-        await expect(
-          facade.get("pizza-prompt:production", { label: "staging" })
-        ).rejects.toThrow("Cannot combine shorthand with explicit version/label options");
-        expect(promptsApiService.get).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when shorthand version conflicts with explicit label", () => {
-      it("throws an error before making a network call", async () => {
-        await expect(
-          facade.get("pizza-prompt:2", { label: "production" })
-        ).rejects.toThrow("Cannot combine shorthand with explicit version/label options");
-        expect(promptsApiService.get).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when both explicit version and label are provided", () => {
-      it("throws an error before making a network call", async () => {
-        await expect(
-          facade.get("pizza-prompt", { version: "5", label: "production" })
-        ).rejects.toThrow("Cannot specify both version and label");
-        expect(promptsApiService.get).not.toHaveBeenCalled();
-      });
     });
   });
 
