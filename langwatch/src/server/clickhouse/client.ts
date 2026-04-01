@@ -8,32 +8,30 @@ const logger = createLogger("langwatch:clickhouse:client");
 let clickHouseClient: ClickHouseClient | null = null;
 
 /**
- * Checks if ClickHouse should be skipped.
- * Uses process.env directly to avoid triggering @t3-oss/env validation at module load.
- * This prevents false "client-side access" errors during vitest execution.
- */
-function shouldSkipClickHouse(): boolean {
-  // During unit/integration tests (set in vitest.config.ts)
-  if (process.env.BUILD_TIME) return true;
-
-  // ClickHouse not enabled or URL not provided
-  if (!process.env.ENABLE_CLICKHOUSE || !process.env.CLICKHOUSE_URL)
-    return true;
-
-  return false;
-}
-
-/**
  * Get or create the shared ClickHouse client instance (from env vars).
+ *
+ * Throws if CLICKHOUSE_URL is not set (ClickHouse is now required).
+ * Skipped only during build time (vitest / next build).
  *
  * NOT exported — all external code must use the org-aware functions
  * in clickhouseClient.ts to prevent data leaks between tenants.
  */
 function getClickHouseClient(): ClickHouseClient | null {
-  if (!clickHouseClient && !shouldSkipClickHouse()) {
-    const clickHouseUrl = process.env.CLICKHOUSE_URL!;
-    let url: URL | string = clickHouseUrl;
+  // During unit/integration tests or next build (set in vitest.config.ts)
+  if (process.env.BUILD_TIME) return null;
 
+  if (!clickHouseClient) {
+    const clickHouseUrl = process.env.CLICKHOUSE_URL;
+    if (!clickHouseUrl) {
+      // TODO: see the ClickHouse migration and setup guide:
+      // https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/004-docker-dev-environment.md
+      throw new Error(
+        "CLICKHOUSE_URL environment variable is required. " +
+        "ClickHouse is the primary data store — see dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
+      );
+    }
+
+    let url: URL | string = clickHouseUrl;
     try {
       url = new URL(clickHouseUrl);
     } catch (error) {

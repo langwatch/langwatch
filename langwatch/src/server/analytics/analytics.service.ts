@@ -75,26 +75,8 @@ export class AnalyticsService {
   /**
    * Check if ClickHouse is enabled for the given project
    */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    // First check if ClickHouse client is available
-    if (!this.chService.isAvailable()) {
-      return false;
-    }
-
-    try {
-      const project = await this.prisma.project.findUnique({
-        where: { id: projectId },
-        select: { featureClickHouseDataSourceTraces: true },
-      });
-
-      return project?.featureClickHouseDataSourceTraces === true;
-    } catch (error) {
-      this.logger.warn(
-        { projectId, error: error instanceof Error ? error.message : error },
-        "Failed to check ClickHouse feature flag, defaulting to ES",
-      );
-      return false;
-    }
+  async isClickHouseEnabled(_projectId: string): Promise<boolean> {
+    return true;
   }
 
   /**

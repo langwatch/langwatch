@@ -53,7 +53,6 @@ export function QueryStringFieldsFilters({
 	const { project, hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
-	const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
 
 	return (
 		<FieldsFilters
@@ -61,7 +60,7 @@ export function QueryStringFieldsFilters({
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
 			actionButton={
 				<HStack gap={1}>
-					{hasClickHouse && hasAnyFilters && (
+					{hasAnyFilters && (
 						<SaveAsViewButton />
 					)}
 					{hasPermission("triggers:manage") && !hideTriggerButton && (
@@ -92,12 +91,8 @@ export function FieldsFilters({
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 	actionButton?: React.ReactNode;
 }) {
-	const { project } = useOrganizationTeamProject();
-	const hasClickHouse =
-		project?.featureClickHouseDataSourceTraces === true;
-
 	const filterKeys: FilterField[] = [
-		...(hasClickHouse ? (["traces.origin"] as const) : []),
+		"traces.origin",
 		"metadata.prompt_ids",
 		"spans.model",
 		"metadata.labels",

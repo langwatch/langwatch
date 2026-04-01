@@ -94,7 +94,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const { prisma } = require("../db") as { prisma: PrismaClient; };
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
-  const clickhouseEnabled = !!(config.enableClickhouse && config.clickhouseUrl) || isClickHouseEnabled();
+  const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
 
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId: string): Promise<ClickHouseClient> => {
@@ -250,7 +250,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
-    enabled: config.enableEventSourcing !== false,
+    enabled: true,
     isSaas: config.isSaas,
     processRole: config.processRole,
   });

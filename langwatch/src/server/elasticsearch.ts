@@ -63,7 +63,7 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
 
 export const esClient = async (
   args?: { projectId: string } | { organizationId: string } | { test: true },
-) => {
+): Promise<ElasticClient | null> => {
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
 
@@ -108,13 +108,15 @@ export const esClient = async (
       : (env.ELASTICSEARCH_API_KEY ?? null);
   }
 
+  if (!elasticsearchNodeUrl) return null;
+
   const client =
     !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
       ? (new OpenSearchClient({
-          node: elasticsearchNodeUrl?.replace("quickwit://", "http://"),
+          node: elasticsearchNodeUrl.replace("quickwit://", "http://"),
         }) as unknown as ElasticClient)
       : new ElasticClient({
-          node: elasticsearchNodeUrl ?? "http://bogus:9200",
+          node: elasticsearchNodeUrl,
           ...(elasticsearchApiKey
             ? {
                 auth: {

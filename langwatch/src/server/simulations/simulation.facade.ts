@@ -32,9 +32,8 @@ export class SimulationFacade {
     });
   }
 
-  async isClickHouseReadEnabled(projectId: string): Promise<boolean> {
-    if (!this.deps.chService) return false;
-    return this.deps.projects.isFeatureEnabled(projectId, "featureClickHouseDataSourceSimulations");
+  async isClickHouseReadEnabled(_projectId: string): Promise<boolean> {
+    return this.deps.chService !== null;
   }
 
   /**
