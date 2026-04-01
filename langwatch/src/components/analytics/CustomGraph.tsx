@@ -504,6 +504,9 @@ const CustomGraph_ = React.memo(
     const valueFormats = Array.from(
       new Set(
         input.series.map((series) => {
+          if (series.aggregation === "cardinality") {
+            return "0a";
+          }
           const metric = getMetric(series.metric);
           // Count aggregations should use integer format regardless of metric's default
           if (series.aggregation === "cardinality") {
@@ -1154,11 +1157,9 @@ const shapeDataForSummary = (
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
       // Count aggregations should use integer format regardless of metric's default
-      const isCountAggregation = input.series.some(
-        (s) => s.aggregation === "cardinality",
-      );
+      const isCardinalitySeries = series?.aggregation === "cardinality";
       const formatOverride =
-        isCountAggregation && metric ? { ...metric, format: "0a" } : metric;
+        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
 
       return {
         key: aggKey,
