@@ -441,6 +441,7 @@ const CustomGraph_ = React.memo(
               .replace("Evaluation passed failed", "Evaluation Failed")
               .replace("Contains error", "Traces")
               .replace(/^Evaluation label /i, "")
+              .replace(/^Thumbs up\/down /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -504,6 +505,10 @@ const CustomGraph_ = React.memo(
       new Set(
         input.series.map((series) => {
           const metric = getMetric(series.metric);
+          // Count aggregations should use integer format regardless of metric's default
+          if (series.aggregation === "cardinality") {
+            return "0a";
+          }
           return metric?.format ?? "0a";
         }),
       ),
@@ -1148,10 +1153,17 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
+      // Count aggregations should use integer format regardless of metric's default
+      const isCountAggregation = input.series.some(
+        (s) => s.aggregation === "cardinality",
+      );
+      const formatOverride =
+        isCountAggregation && metric ? { ...metric, format: "0a" } : metric;
+
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric,
+        metric: formatOverride,
         value: totalValue,
       };
     });
