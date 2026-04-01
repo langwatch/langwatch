@@ -43,8 +43,8 @@ const getImportedModelCosts = () => {
         : "";
 
       const regex = hasVendorPrefix
-        ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}$`
-        : `^${escapedModelName}$`;
+        ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}`
+        : `^${escapedModelName}`;
 
       tokenModels[modelId] = {
         regex,
@@ -110,15 +110,17 @@ let cachedStaticModelCosts: MaybeStoredLLMModelCost[] | null = null;
 export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
   if (!cachedStaticModelCosts) {
     const importedData = getImportedModelCosts();
-    cachedStaticModelCosts = Object.entries(importedData).map(
-      ([key, value]) => ({
+    cachedStaticModelCosts = Object.entries(importedData)
+      .map(([key, value]) => ({
         projectId: "",
         model: key,
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
-      }),
-    );
+      }))
+      // Sort by model key length descending so longer (more specific)
+      // patterns match before shorter ones (e.g. "gpt-5-mini" before "gpt-5")
+      .sort((a, b) => b.model.length - a.model.length);
   }
   return cachedStaticModelCosts;
 };

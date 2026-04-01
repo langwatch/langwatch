@@ -145,8 +145,6 @@ const safeRegexTest = (pattern: string, input: string): boolean => {
   return re !== null && re.test(input);
 };
 
-const DATE_SUFFIX_RE = /-\d{4}-\d{2}-\d{2}$/;
-
 /**
  * Strips the provider subtype from a model string.
  * Example: "openai.responses/gpt-5-mini" → "openai/gpt-5-mini"
@@ -160,36 +158,23 @@ export function stripProviderSubtype(model: string): string {
 }
 
 /**
- * Strips a trailing date suffix (-YYYY-MM-DD) from a model string.
- * Example: "gpt-5-mini-2025-08-07" → "gpt-5-mini"
- */
-export function stripDateSuffix(model: string): string {
-  return model.replace(DATE_SUFFIX_RE, "");
-}
-
-/**
  * Matches a model string against cost entries with cascading fallbacks:
  * 1. Raw model string
  * 2. Strip provider subtype (openai.responses → openai)
- * 3. Strip date suffix (-2025-08-07)
- * 4. Strip both
+ *
+ * Date suffixes are handled by the prefix-match regex patterns in the
+ * static model registry, so no explicit date stripping is needed.
  */
 export const matchModelCostWithFallbacks = (
   model: string,
   costs: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
+  const match = matchingLLMModelCost(model, costs);
+  if (match) return match;
+
   const strippedSubtype = stripProviderSubtype(model);
-  const strippedDate = stripDateSuffix(model);
-  const strippedBoth = stripProviderSubtype(strippedDate);
-
-  const candidates = [model, strippedSubtype, strippedDate, strippedBoth];
-
-  const seen = new Set<string>();
-  for (const candidate of candidates) {
-    if (seen.has(candidate)) continue;
-    seen.add(candidate);
-    const match = matchingLLMModelCost(candidate, costs);
-    if (match) return match;
+  if (strippedSubtype !== model) {
+    return matchingLLMModelCost(strippedSubtype, costs);
   }
 
   return undefined;

@@ -9,7 +9,6 @@ import {
 import {
   matchModelCostWithFallbacks,
   stripProviderSubtype,
-  stripDateSuffix,
 } from "~/server/background/workers/collector/cost";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 
@@ -175,7 +174,7 @@ describe("OtlpSpanCostEnrichmentService", () => {
         const customCost: MaybeStoredLLMModelCost = {
           projectId: "project-1",
           model: "openai/gpt-5-mini",
-          regex: "^(openai\\/)?gpt-5-mini$",
+          regex: "^(openai\\/)?gpt-5-mini",
           inputCostPerToken: 0.00000025,
           outputCostPerToken: 0.000002,
         };
@@ -195,11 +194,11 @@ describe("OtlpSpanCostEnrichmentService", () => {
     });
 
     describe("when model has provider subtype and date suffix", () => {
-      it("falls back to base provider without date", async () => {
+      it("falls back to base provider and matches via prefix regex", async () => {
         const customCost: MaybeStoredLLMModelCost = {
           projectId: "project-1",
           model: "openai/gpt-5-mini",
-          regex: "^(openai\\/)?gpt-5-mini$",
+          regex: "^(openai\\/)?gpt-5-mini",
           inputCostPerToken: 0.00000025,
           outputCostPerToken: 0.000002,
         };
@@ -238,37 +237,19 @@ describe("stripProviderSubtype", () => {
   });
 });
 
-describe("stripDateSuffix", () => {
-  it("strips YYYY-MM-DD suffix", () => {
-    expect(stripDateSuffix("gpt-5-mini-2025-08-07")).toBe("gpt-5-mini");
-  });
-
-  it("strips date suffix with provider prefix", () => {
-    expect(stripDateSuffix("openai/gpt-5-mini-2025-08-07")).toBe("openai/gpt-5-mini");
-  });
-
-  it("leaves model without date suffix unchanged", () => {
-    expect(stripDateSuffix("gpt-5-mini")).toBe("gpt-5-mini");
-  });
-
-  it("does not strip non-date suffixes", () => {
-    expect(stripDateSuffix("gpt-4o-turbo")).toBe("gpt-4o-turbo");
-  });
-});
-
 describe("matchModelCostWithFallbacks", () => {
   const costs: MaybeStoredLLMModelCost[] = [
     {
       projectId: "",
       model: "openai/gpt-5-mini",
-      regex: "^(openai\\/)?gpt-5-mini$",
+      regex: "^(openai\\/)?gpt-5-mini",
       inputCostPerToken: 0.00000025,
       outputCostPerToken: 0.000002,
     },
   ];
 
   describe("when model has provider subtype and date suffix", () => {
-    it("matches openai.responses/gpt-5-mini-2025-08-07 via cascading fallback", () => {
+    it("matches openai.responses/gpt-5-mini-2025-08-07 via subtype stripping + prefix regex", () => {
       const result = matchModelCostWithFallbacks(
         "openai.responses/gpt-5-mini-2025-08-07",
         costs,
@@ -288,7 +269,7 @@ describe("matchModelCostWithFallbacks", () => {
   });
 
   describe("when model has date suffix only", () => {
-    it("matches gpt-5-mini-2025-08-07 via date stripping", () => {
+    it("matches gpt-5-mini-2025-08-07 via prefix regex", () => {
       const result = matchModelCostWithFallbacks(
         "gpt-5-mini-2025-08-07",
         costs,
@@ -334,6 +315,59 @@ describe("matchModelCostWithFallbacks", () => {
         realCosts,
       );
       expect(result?.model).toBe("openai/gpt-4o-2024-11-20");
+    });
+
+    describe("when model has non-standard date suffixes (@regression)", () => {
+      it("matches gpt-5.2-20260315 (YYYYMMDD) to openai/gpt-5.2", () => {
+        const result = matchModelCostWithFallbacks("gpt-5.2-20260315", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2");
+      });
+
+      it("matches gpt-5.2-0315 (MMDD) to openai/gpt-5.2", () => {
+        const result = matchModelCostWithFallbacks("gpt-5.2-0315", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2");
+      });
+
+      it("matches gpt-5.2-03-15 (MM-DD) to openai/gpt-5.2", () => {
+        const result = matchModelCostWithFallbacks("gpt-5.2-03-15", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2");
+      });
+
+      it("matches mistral-small-2603 (YYMM) to mistralai/mistral-small-2603", () => {
+        const result = matchModelCostWithFallbacks("mistral-small-2603", realCosts);
+        expect(result?.model).toBe("mistralai/mistral-small-2603");
+      });
+    });
+
+    describe("when model specificity matters (@regression)", () => {
+      it("matches gpt-5-mini to openai/gpt-5-mini, not openai/gpt-5", () => {
+        const result = matchModelCostWithFallbacks("gpt-5-mini", realCosts);
+        expect(result?.model).toBe("openai/gpt-5-mini");
+      });
+
+      it("matches gpt-5.2-chat to openai/gpt-5.2-chat, not openai/gpt-5.2", () => {
+        const result = matchModelCostWithFallbacks("gpt-5.2-chat", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2-chat");
+      });
+    });
+
+    describe("when model has provider subtype and non-standard date suffix (@regression)", () => {
+      it("matches openai.responses/gpt-5.2-0315 to openai/gpt-5.2", () => {
+        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.2-0315", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2");
+      });
+    });
+
+    describe("when exact model string is used", () => {
+      it("matches gpt-5.2 exactly", () => {
+        const result = matchModelCostWithFallbacks("gpt-5.2", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2");
+      });
+
+      it("matches openai/gpt-5.2 with vendor prefix", () => {
+        const result = matchModelCostWithFallbacks("openai/gpt-5.2", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.2");
+      });
     });
   });
 });
