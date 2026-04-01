@@ -8,9 +8,9 @@ Uses the generated REST API client for all operations.
 
 This service is responsible only for API operations and does not handle local file loading.
 """
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
-from langwatch.generated.langwatch_rest_api_client.types import UNSET, Response
+from langwatch.generated.langwatch_rest_api_client.types import UNSET
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
