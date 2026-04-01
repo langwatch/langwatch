@@ -13,8 +13,8 @@ import {
  */
 
 export const StartEvaluationCommand = defineCommand({
-  commandType: "lw.evaluation.start" as const,
-  eventType: "lw.evaluation.started" as const,
+  commandType: "lw.evaluation.start",
+  eventType: "lw.evaluation.started",
   eventVersion: "2025-01-14",
   aggregateType: "evaluation",
   schema: evaluationStartedEventDataSchema,
@@ -30,8 +30,8 @@ export const StartEvaluationCommand = defineCommand({
 });
 
 export const CompleteEvaluationCommand = defineCommand({
-  commandType: "lw.evaluation.complete" as const,
-  eventType: "lw.evaluation.completed" as const,
+  commandType: "lw.evaluation.complete",
+  eventType: "lw.evaluation.completed",
   eventVersion: "2025-01-14",
   aggregateType: "evaluation",
   schema: evaluationCompletedEventDataSchema,
@@ -45,8 +45,8 @@ export const CompleteEvaluationCommand = defineCommand({
 });
 
 export const ReportEvaluationCommand = defineCommand({
-  commandType: "lw.evaluation.report" as const,
-  eventType: "lw.evaluation.reported" as const,
+  commandType: "lw.evaluation.report",
+  eventType: "lw.evaluation.reported",
   eventVersion: "2025-01-14",
   aggregateType: "evaluation",
   schema: evaluationReportedEventDataSchema,
