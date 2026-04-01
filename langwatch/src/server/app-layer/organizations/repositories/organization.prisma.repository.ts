@@ -14,7 +14,7 @@ import {
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../../../api/enterprise";
-import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "../../../api/routers/organization";
+import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "../compute-effective-team-role-updates";
 import type { OrganizationFeatureName } from "../organization.service";
 import type {
   AuditLogFilters,
@@ -35,20 +35,6 @@ type TransactionClient = Omit<
   PrismaClient,
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
-
-async function getCustomRolePermissions(
-  tx: TransactionClient,
-  customRoleId: string | null | undefined,
-): Promise<string[] | undefined> {
-  if (!customRoleId) return undefined;
-
-  const role = await tx.customRole.findUnique({
-    where: { id: customRoleId },
-    select: { permissions: true },
-  });
-
-  return role?.permissions as string[] | undefined;
-}
 
 async function getUserCustomRolePermissions(
   tx: TransactionClient,
@@ -417,20 +403,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async update(input: UpdateOrganizationInput): Promise<void> {
-    const adminMembership = await this.prisma.organizationUser.findFirst({
-      where: {
-        organizationId: input.organizationId,
-        role: "ADMIN",
-      },
-    });
-
-    if (!adminMembership) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You don't have the necessary permissions",
-      });
-    }
-
     await this.prisma.organization.update({
       where: { id: input.organizationId },
       data: {
@@ -818,22 +790,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             });
           }
 
-          const currentTeamUser = await tx.teamUser.findUnique({
-            where: {
-              userId_teamId: {
-                userId,
-                teamId,
-              },
-            },
-            select: { assignedRoleId: true },
-          });
-
-          const oldPermissions = await getCustomRolePermissions(
-            tx,
-            currentTeamUser?.assignedRoleId,
-          );
-
-          void oldPermissions; // Consumed by calling code for license checks — kept for future use
         }
 
         const adminCount = await tx.teamUser.count({

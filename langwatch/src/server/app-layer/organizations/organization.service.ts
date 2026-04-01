@@ -3,9 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import { type TeamRoleValue } from "~/utils/memberRoleConstraints";
-import {
-  computeEffectiveTeamRoleUpdates,
-} from "../../api/routers/organization";
+import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import { isCustomRole } from "../../api/enterprise";
 import type {
   AuditLogFilters,
