@@ -50,10 +50,6 @@ export default async function execute() {
 
 export const elasticsearchMigrate = async (organizationId?: string) => {
   const client = await esClient({ organizationId: organizationId ?? "" });
-  if (!client) {
-    console.log("Elasticsearch client not available, skipping migration");
-    return;
-  }
   const migrationsExists = await client.indices.exists({
     index: MIGRATION_INDEX,
   });

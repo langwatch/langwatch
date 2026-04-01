@@ -61,9 +61,25 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   return project?.team.organization ?? null;
 };
 
+/**
+ * Returns a proxy that throws on any method call — used when ES is not configured
+ * so callers don't need null checks but get a clear error if they actually try to use it.
+ */
+const unconfiguredEsClient: ElasticClient = new Proxy({} as ElasticClient, {
+  get(_target, prop) {
+    if (prop === "then" || typeof prop === "symbol") return undefined;
+    return () => {
+      throw new Error(
+        `Elasticsearch is not configured (called .${String(prop)}()). ` +
+          `Set ELASTICSEARCH_NODE_URL or remove this code path.`,
+      );
+    };
+  },
+});
+
 export const esClient = async (
   args?: { projectId: string } | { organizationId: string } | { test: true },
-): Promise<ElasticClient | null> => {
+): Promise<ElasticClient> => {
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
 
@@ -108,7 +124,7 @@ export const esClient = async (
       : (env.ELASTICSEARCH_API_KEY ?? null);
   }
 
-  if (!elasticsearchNodeUrl) return null;
+  if (!elasticsearchNodeUrl) return unconfiguredEsClient;
 
   const client =
     !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
