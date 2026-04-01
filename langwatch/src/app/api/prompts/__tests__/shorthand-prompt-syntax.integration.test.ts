@@ -183,6 +183,8 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     it("returns 500 for unexpected server errors", async () => {
       const res = await makeRequest("/api/prompts/some-id");
       expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toMatch(/internal server error/i);
     });
   });
 });
