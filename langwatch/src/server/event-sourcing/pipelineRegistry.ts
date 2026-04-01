@@ -80,6 +80,7 @@ import type { AppendStore } from "./projections/mapProjection.types";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import type { RegisteredFoldProjection } from "./replay/types";
 import type { EvaluationRunRepository } from "../app-layer/evaluations/repositories/evaluation-run.repository";
+import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -383,7 +384,7 @@ export class PipelineRegistry {
     });
 
     // Late-bound: computeRunMetrics dispatches back to self (same pipeline)
-    let selfComputeRunMetrics: ((data: any) => Promise<void>) | null = null;
+    let selfComputeRunMetrics: ((data: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
 
     // Late-bound: deferred retry dispatcher
     let scheduleRetryDispatcher: ((payload: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
@@ -608,26 +609,15 @@ export function buildFoldProjections(
     targetTable: "suite_runs",
   });
 
-  // projectDailySdkUsage (global — store baked in)
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { projectDailySdkUsageProjection } = require("./projections/global/projectDailySdkUsage.foldProjection") as {
-      projectDailySdkUsageProjection: { name: string } & Record<string, unknown>;
-    };
-    if (projectDailySdkUsageProjection?.name) {
-      results.push({
-        projectionName: projectDailySdkUsageProjection.name,
-        pipelineName: "global_projections",
-        aggregateType: "global",
-        source: "global",
-        definition: projectDailySdkUsageProjection as any,
-        pauseKey: `global_projections/projection/${projectDailySdkUsageProjection.name}`,
-      });
-    }
-  } catch (e: unknown) {
-    const isModuleNotFound = e instanceof Error && "code" in e && (e as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND";
-    if (!isModuleNotFound) throw e;
-  }
+  // projectDailySdkUsage (global — store baked in, Prisma-backed)
+  results.push({
+    projectionName: projectDailySdkUsageProjection.name,
+    pipelineName: "global_projections",
+    aggregateType: "global",
+    source: "global",
+    definition: projectDailySdkUsageProjection,
+    pauseKey: `global_projections/projection/${projectDailySdkUsageProjection.name}`,
+  });
 
   return results;
 }
