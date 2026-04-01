@@ -1278,7 +1278,6 @@ from .put_api_prompts_by_id_body_outputs_item_type import PutApiPromptsByIdBodyO
 from .put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from .put_api_prompts_by_id_labels_by_label_body import PutApiPromptsByIdLabelsByLabelBody
-from .put_api_prompts_by_id_labels_by_label_label import PutApiPromptsByIdLabelsByLabelLabel
 from .put_api_prompts_by_id_labels_by_label_response_200 import PutApiPromptsByIdLabelsByLabelResponse200
 from .put_api_prompts_by_id_labels_by_label_response_400 import PutApiPromptsByIdLabelsByLabelResponse400
 from .put_api_prompts_by_id_labels_by_label_response_401 import PutApiPromptsByIdLabelsByLabelResponse401
@@ -1975,7 +1974,6 @@ __all__ = (
     "PutApiPromptsByIdBodySchemaVersion",
     "PutApiPromptsByIdBodyScope",
     "PutApiPromptsByIdLabelsByLabelBody",
-    "PutApiPromptsByIdLabelsByLabelLabel",
     "PutApiPromptsByIdLabelsByLabelResponse200",
     "PutApiPromptsByIdLabelsByLabelResponse400",
     "PutApiPromptsByIdLabelsByLabelResponse401",

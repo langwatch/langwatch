@@ -4,22 +4,22 @@ API service layer for managing LangWatch prompts via REST API.
 
 This module provides a focused interface for CRUD operations on prompts via API only,
 handling API communication, error handling, and response unwrapping.
-Uses TypedDict for clean interfaces and from_dict methods for type safety.
+Uses the generated REST API client for all operations.
 
 This service is responsible only for API operations and does not handle local file loading.
 """
-from http import HTTPStatus
 from typing import Any, Dict, List, Literal, Optional
-from urllib.parse import quote
 
 from langwatch.generated.langwatch_rest_api_client.types import UNSET, Response
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
 from langwatch.generated.langwatch_rest_api_client.api.default import (
+    get_api_prompts_by_id,
     post_api_prompts,
     put_api_prompts_by_id,
     delete_api_prompts_by_id,
+    put_api_prompts_by_id_labels_by_label,
 )
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
@@ -61,6 +61,9 @@ from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_
 from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_by_id_response_200 import (
     DeleteApiPromptsByIdResponse200,
 )
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_body import (
+    PutApiPromptsByIdLabelsByLabelBody,
+)
 from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_response_200 import (
     PutApiPromptsByIdLabelsByLabelResponse200,
 )
@@ -69,7 +72,7 @@ from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from .errors import unwrap_response
 from .decorators.prompt_service_tracing import prompt_service_tracing
-from .types import PromptData, Message, Input, Output, MessageDict, InputDict, OutputDict
+from .types import PromptData, MessageDict, InputDict, OutputDict
 
 
 class PromptApiService:
@@ -77,7 +80,7 @@ class PromptApiService:
     API service for managing LangWatch prompts via REST API only.
 
     Provides CRUD operations for prompts with proper error handling and response
-    unwrapping. Uses TypedDict interfaces for clean, type-safe API.
+    unwrapping. Uses the generated REST API client for all operations.
 
     This service handles only API operations and does not handle local file loading.
     """
@@ -97,109 +100,89 @@ class PromptApiService:
             )
         return cls(instance.rest_api_client)
 
-    def _raw_request(
-        self,
-        method: str,
-        url: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Any:
-        """Make a raw HTTP request via the underlying httpx client.
-
-        Bypasses the generated client's enum types so that arbitrary label
-        strings (custom labels) can be passed through to the API.
-        """
-        httpx_client = self._client.get_httpx_client()
-        return httpx_client.request(
-            method=method,
-            url=url,
-            params=params,
-            json=json,
-            headers=headers or {"Content-Type": "application/json"},
-        )
-
     @prompt_service_tracing.get
     def get(
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[str] = None,
+        tag: Optional[str] = None,
     ) -> PromptData:
         """Retrieve a prompt by its handle or ID from the API.
 
-        Uses direct httpx calls instead of the generated client to support
-        arbitrary label strings (the generated client restricts labels to an enum).
+        Args:
+            prompt_id: The prompt handle or ID to retrieve.
+            version_number: Optional specific version number.
+            tag: Optional tag to fetch a specific tagged version (e.g. "production").
+
+        Returns:
+            PromptData with the prompt configuration.
+
+        Raises:
+            ValueError: If the prompt is not found (404) or request is invalid (400/422).
+            RuntimeError: For auth (401), server (5xx), or unexpected errors.
         """
-        if version_number is not None and label is not None:
-            raise ValueError("Cannot specify both version_number and label")
-
-        params: Dict[str, Any] = {}
-        if version_number is not None:
-            params["version"] = version_number
-        if label is not None:
-            params["label"] = label
-
-        raw_resp = self._raw_request(
-            method="get",
-            url=f"/api/prompts/{quote(prompt_id, safe='')}",
-            params=params,
+        resp = get_api_prompts_by_id.sync_detailed(
+            id=prompt_id,
+            client=self._client,
+            version=version_number or UNSET,
+            tag=tag or UNSET,
         )
-
-        if raw_resp.status_code != 200:
-            resp = Response(
-                status_code=HTTPStatus(raw_resp.status_code),
-                content=raw_resp.content,
-                headers=raw_resp.headers,
-                parsed=None,
-            )
-            unwrap_response(
-                resp,
-                ok_type=GetApiPromptsByIdResponse200,
-                subject=f'handle_or_id="{prompt_id}"',
-                op="fetch",
-            )
+        ok = unwrap_response(
+            resp,
+            ok_type=GetApiPromptsByIdResponse200,
+            subject=f'handle_or_id="{prompt_id}"',
+            op="fetch",
+        )
+        if ok is None:
             raise RuntimeError(
                 f"Failed to fetch prompt with handle_or_id={prompt_id}"
             )
+        return PromptData.from_api_response(ok)
 
-        parsed = GetApiPromptsByIdResponse200.from_dict(raw_resp.json())
-        return PromptData.from_api_response(parsed)
-
-    def assign_label(
+    def assign_tag(
         self,
         prompt_id: str,
-        label: str,
+        tag: str,
         version_id: str,
     ) -> Dict[str, str]:
-        """Assign a label to a specific prompt version.
+        """Assign a tag to a specific prompt version.
 
-        Uses direct httpx calls to support arbitrary label strings.
+        Args:
+            prompt_id: The prompt ID or handle.
+            tag: The tag to assign (e.g. "production", "staging", or any custom tag).
+            version_id: The version ID to assign the tag to.
+
+        Returns:
+            Dictionary with assignment details (config_id, version_id, tag, updated_at).
+
+        Raises:
+            ValueError: If the prompt is not found (404) or request is invalid (400/422).
+            RuntimeError: For auth (401), server (5xx), or unexpected errors.
         """
-        raw_resp = self._raw_request(
-            method="put",
-            url=f"/api/prompts/{quote(prompt_id, safe='')}/labels/{quote(label, safe='')}",
-            json={"versionId": version_id},
+        resp = put_api_prompts_by_id_labels_by_label.sync_detailed(
+            id=prompt_id,
+            tag=tag,
+            client=self._client,
+            body=PutApiPromptsByIdLabelsByLabelBody(version_id=version_id),
         )
-
-        if raw_resp.status_code != 200:
-            resp = Response(
-                status_code=HTTPStatus(raw_resp.status_code),
-                content=raw_resp.content,
-                headers=raw_resp.headers,
-                parsed=None,
-            )
-            unwrap_response(
-                resp,
-                ok_type=PutApiPromptsByIdLabelsByLabelResponse200,
-                subject=f'id="{prompt_id}" label="{label}"',
-                op="assign_label",
-            )
+        ok = unwrap_response(
+            resp,
+            ok_type=PutApiPromptsByIdLabelsByLabelResponse200,
+            subject=f'id="{prompt_id}" tag="{tag}"',
+            op="assign_tag",
+        )
+        if ok is None:
             raise RuntimeError(
-                f"Failed to assign label '{label}' to prompt '{prompt_id}'"
+                f"Failed to assign tag '{tag}' to prompt '{prompt_id}'"
             )
-
-        return raw_resp.json()
+        result: Dict[str, str] = {
+            "configId": ok.config_id,
+            "versionId": ok.version_id,
+            "updatedAt": ok.updated_at,
+        }
+        if ok.tag is not UNSET:
+            result["tag"] = ok.tag
+        return result
 
     def create(
         self,
@@ -210,12 +193,22 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
     ) -> PromptData:
-        """Create a new prompt with clean dictionary interfaces.
+        """Create a new prompt via API.
 
-        When labels are provided, uses direct httpx to bypass the generated
-        client's enum restriction on label values.
+        Args:
+            handle: Unique identifier for the prompt.
+            author_id: ID of the author.
+            scope: Scope of the prompt ('PROJECT' or 'ORGANIZATION').
+            prompt: The prompt text content.
+            messages: List of message dicts with 'role' and 'content' keys.
+            inputs: List of input dicts with 'identifier' and 'type' keys.
+            outputs: List of output dicts with 'identifier', 'type', and optional 'json_schema' keys.
+            tags: Optional list of tags to assign to the initial version.
+
+        Returns:
+            PromptData with the created prompt data.
         """
         api_messages = UNSET
         if messages:
@@ -238,69 +231,29 @@ class PromptApiService:
                 for out in outputs
             ]
 
-        if labels is not None:
-            # Bypass generated enum — build body dict and make raw request
-            body_dict: Dict[str, Any] = {
-                "handle": handle,
-                "scope": scope,
-            }
-            if author_id:
-                body_dict["authorId"] = author_id
-            if prompt:
-                body_dict["prompt"] = prompt
-            if messages:
-                body_dict["messages"] = [msg.model_dump() for msg in messages]
-            if inputs:
-                body_dict["inputs"] = [inp.model_dump() for inp in inputs]
-            if outputs:
-                body_dict["outputs"] = [out.model_dump() for out in outputs]
-            body_dict["labels"] = labels
+        resp = post_api_prompts.sync_detailed(
+            client=self._client,
+            body=PostApiPromptsBody(
+                handle=handle,
+                scope=PostApiPromptsBodyScope(scope),
+                author_id=author_id or UNSET,
+                prompt=prompt or UNSET,
+                messages=api_messages,
+                inputs=api_inputs,
+                outputs=api_outputs,
+                tags=tags or UNSET,
+            ),
+        )
+        ok = unwrap_response(
+            resp,
+            ok_type=PostApiPromptsResponse200,
+            subject=f'handle="{handle}"',
+            op="create",
+        )
+        if ok is None:
+            raise RuntimeError(f"Failed to create prompt with handle={handle}")
 
-            raw_resp = self._raw_request(
-                method="post",
-                url="/api/prompts",
-                json=body_dict,
-            )
-            if raw_resp.status_code != 200:
-                resp = Response(
-                    status_code=HTTPStatus(raw_resp.status_code),
-                    content=raw_resp.content,
-                    headers=raw_resp.headers,
-                    parsed=None,
-                )
-                unwrap_response(
-                    resp,
-                    ok_type=PostApiPromptsResponse200,
-                    subject=f'handle="{handle}"',
-                    op="create",
-                )
-                raise RuntimeError(f"Failed to create prompt with handle={handle}")
-
-            parsed = PostApiPromptsResponse200.from_dict(raw_resp.json())
-            return PromptData.from_api_response(parsed)
-        else:
-            resp = post_api_prompts.sync_detailed(
-                client=self._client,
-                body=PostApiPromptsBody(
-                    handle=handle,
-                    scope=PostApiPromptsBodyScope(scope),
-                    author_id=author_id or UNSET,
-                    prompt=prompt or UNSET,
-                    messages=api_messages,
-                    inputs=api_inputs,
-                    outputs=api_outputs,
-                ),
-            )
-            ok = unwrap_response(
-                resp,
-                ok_type=PostApiPromptsResponse200,
-                subject=f'handle="{handle}"',
-                op="create",
-            )
-            if ok is None:
-                raise RuntimeError(f"Failed to create prompt with handle={handle}")
-
-            return PromptData.from_api_response(ok)
+        return PromptData.from_api_response(ok)
 
     def update(
         self,
@@ -312,12 +265,23 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
     ) -> PromptData:
-        """Update an existing prompt with clean dictionary interfaces.
+        """Update an existing prompt via API.
 
-        When labels are provided, uses direct httpx to bypass the generated
-        client's enum restriction on label values.
+        Args:
+            prompt_id_or_handle: ID or handle of the prompt to update.
+            scope: Scope of the prompt.
+            commit_message: Commit message for the update.
+            handle: New handle for the prompt.
+            prompt: New prompt text content.
+            messages: New list of message dicts.
+            inputs: New list of input dicts.
+            outputs: New list of output dicts.
+            tags: Optional list of tags to assign to the new version.
+
+        Returns:
+            PromptData with the updated prompt data.
         """
         api_messages = UNSET
         if messages:
@@ -340,75 +304,33 @@ class PromptApiService:
                 for out in outputs
             ]
 
-        if labels is not None:
-            # Bypass generated enum — build body dict and make raw request
-            body_dict: Dict[str, Any] = {
-                "commitMessage": commit_message,
-                "scope": scope,
-            }
-            if handle:
-                body_dict["handle"] = handle
-            if prompt:
-                body_dict["prompt"] = prompt
-            if messages:
-                body_dict["messages"] = [msg.model_dump() for msg in messages]
-            if inputs:
-                body_dict["inputs"] = [inp.model_dump() for inp in inputs]
-            if outputs:
-                body_dict["outputs"] = [out.model_dump() for out in outputs]
-            body_dict["labels"] = labels
+        resp = put_api_prompts_by_id.sync_detailed(
+            id=prompt_id_or_handle,
+            client=self._client,
+            body=PutApiPromptsByIdBody(
+                commit_message=commit_message,
+                handle=handle or UNSET,
+                scope=PutApiPromptsByIdBodyScope[scope],
+                prompt=prompt or UNSET,
+                messages=api_messages,
+                inputs=api_inputs,
+                outputs=api_outputs,
+                tags=tags or UNSET,
+            ),
+        )
 
-            raw_resp = self._raw_request(
-                method="put",
-                url=f"/api/prompts/{quote(prompt_id_or_handle, safe='')}",
-                json=body_dict,
-            )
-            if raw_resp.status_code != 200:
-                resp = Response(
-                    status_code=HTTPStatus(raw_resp.status_code),
-                    content=raw_resp.content,
-                    headers=raw_resp.headers,
-                    parsed=None,
-                )
-                unwrap_response(
-                    resp,
-                    ok_type=PutApiPromptsByIdResponse200,
-                    subject=f'id="{prompt_id_or_handle}"',
-                    op="update",
-                )
-                raise RuntimeError(
-                    f"Failed to update prompt with id={prompt_id_or_handle}"
-                )
-
-            parsed = PutApiPromptsByIdResponse200.from_dict(raw_resp.json())
-            return PromptData.from_api_response(parsed)
-        else:
-            resp = put_api_prompts_by_id.sync_detailed(
-                id=prompt_id_or_handle,
-                client=self._client,
-                body=PutApiPromptsByIdBody(
-                    commit_message=commit_message,
-                    handle=handle or UNSET,
-                    scope=PutApiPromptsByIdBodyScope[scope],
-                    prompt=prompt or UNSET,
-                    messages=api_messages,
-                    inputs=api_inputs,
-                    outputs=api_outputs,
-                ),
+        ok = unwrap_response(
+            resp,
+            ok_type=PutApiPromptsByIdResponse200,
+            subject=f'id="{prompt_id_or_handle}"',
+            op="update",
+        )
+        if ok is None:
+            raise RuntimeError(
+                f"Failed to update prompt with id={prompt_id_or_handle}"
             )
 
-            ok = unwrap_response(
-                resp,
-                ok_type=PutApiPromptsByIdResponse200,
-                subject=f'id="{prompt_id_or_handle}"',
-                op="update",
-            )
-            if ok is None:
-                raise RuntimeError(
-                    f"Failed to update prompt with id={prompt_id_or_handle}"
-                )
-
-            return PromptData.from_api_response(ok)
+        return PromptData.from_api_response(ok)
 
     def delete(self, prompt_id: str) -> Dict[str, bool]:
         """Delete a prompt by its ID."""

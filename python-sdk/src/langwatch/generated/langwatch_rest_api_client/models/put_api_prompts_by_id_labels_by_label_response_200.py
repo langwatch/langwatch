@@ -1,8 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse200")
 
@@ -13,14 +15,14 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
     Attributes:
         config_id (str):
         version_id (str):
-        label (str):
         updated_at (str):
+        tag (Union[Unset, str]):
     """
 
     config_id: str
     version_id: str
-    label: str
     updated_at: str
+    tag: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -28,9 +30,9 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
 
         version_id = self.version_id
 
-        label = self.label
-
         updated_at = self.updated_at
+
+        tag = self.tag
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -38,10 +40,11 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
             {
                 "configId": config_id,
                 "versionId": version_id,
-                "label": label,
                 "updatedAt": updated_at,
             }
         )
+        if tag is not UNSET:
+            field_dict["tag"] = tag
 
         return field_dict
 
@@ -52,15 +55,15 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
 
         version_id = d.pop("versionId")
 
-        label = d.pop("label")
-
         updated_at = d.pop("updatedAt")
+
+        tag = d.pop("tag", UNSET)
 
         put_api_prompts_by_id_labels_by_label_response_200 = cls(
             config_id=config_id,
             version_id=version_id,
-            label=label,
             updated_at=updated_at,
+            tag=tag,
         )
 
         put_api_prompts_by_id_labels_by_label_response_200.additional_properties = d
