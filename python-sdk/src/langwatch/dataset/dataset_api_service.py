@@ -8,6 +8,8 @@ Uses rest_api_client.get_httpx_client() for transport (like the experiment modul
 and _raise_for_api_status() for error surfacing.
 """
 
+import os
+import urllib.parse
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -83,6 +85,11 @@ class DatasetApiService:
     def _http(self) -> httpx.Client:
         return self._client.get_httpx_client()
 
+    @staticmethod
+    def _quote(value: str) -> str:
+        """URL-quote a path segment so special characters are percent-encoded."""
+        return urllib.parse.quote(value, safe="")
+
     # ── datasets ────────────────────────────────────────────────────
 
     def list_datasets(
@@ -119,12 +126,19 @@ class DatasetApiService:
             _raise_for_api_status(response)
             return response.json()
 
-    def get_dataset(self, slug_or_id: str) -> Dict[str, Any]:
+    def get_dataset(
+        self,
+        slug_or_id: str,
+        *,
+        tracer: Optional[trace.Tracer] = None,
+    ) -> Dict[str, Any]:
         """GET /api/dataset/{slugOrId} -- get a dataset with its entries."""
-        with _tracer.start_as_current_span("dataset.get_dataset") as span:
+        active_tracer = tracer or _tracer
+        with active_tracer.start_as_current_span("dataset.get_dataset") as span:
             span.set_attribute("inputs.slug_or_id", slug_or_id)
 
-            response = self._http().get(f"/api/dataset/{slug_or_id}")
+            quoted = self._quote(slug_or_id)
+            response = self._http().get(f"/api/dataset/{quoted}")
             _raise_for_api_status(response)
             return response.json()
 
@@ -143,14 +157,16 @@ class DatasetApiService:
             if columns is not None:
                 body["columnTypes"] = columns
 
-            response = self._http().patch(f"/api/dataset/{slug_or_id}", json=body)
+            quoted = self._quote(slug_or_id)
+            response = self._http().patch(f"/api/dataset/{quoted}", json=body)
             _raise_for_api_status(response)
             return response.json()
 
     def delete_dataset(self, slug_or_id: str) -> None:
         """DELETE /api/dataset/{slugOrId} -- archive a dataset."""
         with _tracer.start_as_current_span("dataset.delete_dataset"):
-            response = self._http().delete(f"/api/dataset/{slug_or_id}")
+            quoted = self._quote(slug_or_id)
+            response = self._http().delete(f"/api/dataset/{quoted}")
             _raise_for_api_status(response)
 
     # ── records ─────────────────────────────────────────────────────
@@ -165,8 +181,9 @@ class DatasetApiService:
         with _tracer.start_as_current_span("dataset.create_records"):
             body: Dict[str, Any] = {"entries": entries}
 
+            quoted = self._quote(slug_or_id)
             response = self._http().post(
-                f"/api/dataset/{slug_or_id}/entries", json=body
+                f"/api/dataset/{quoted}/entries", json=body
             )
             _raise_for_api_status(response)
 
@@ -181,8 +198,10 @@ class DatasetApiService:
         with _tracer.start_as_current_span("dataset.update_record"):
             body: Dict[str, Any] = {"entry": entry}
 
+            quoted_slug = self._quote(slug_or_id)
+            quoted_record = self._quote(record_id)
             response = self._http().patch(
-                f"/api/dataset/{slug_or_id}/records/{record_id}", json=body
+                f"/api/dataset/{quoted_slug}/records/{quoted_record}", json=body
             )
             _raise_for_api_status(response)
             return response.json()
@@ -201,9 +220,10 @@ class DatasetApiService:
         with _tracer.start_as_current_span("dataset.delete_records"):
             body: Dict[str, Any] = {"recordIds": record_ids}
 
+            quoted = self._quote(slug_or_id)
             response = self._http().request(
                 "DELETE",
-                f"/api/dataset/{slug_or_id}/records",
+                f"/api/dataset/{quoted}/records",
                 json=body,
             )
             _raise_for_api_status(response)
@@ -220,10 +240,11 @@ class DatasetApiService:
     ) -> Dict[str, Any]:
         """POST /api/dataset/{slugOrId}/upload -- upload a file to an existing dataset."""
         with _tracer.start_as_current_span("dataset.upload"):
+            quoted = self._quote(slug_or_id)
             with open(file_path, "rb") as f:
                 response = self._http().post(
-                    f"/api/dataset/{slug_or_id}/upload",
-                    files={"file": (file_path.split("/")[-1], f)},
+                    f"/api/dataset/{quoted}/upload",
+                    files={"file": (os.path.basename(file_path), f)},
                 )
             _raise_for_api_status(response)
             return response.json()
@@ -240,7 +261,7 @@ class DatasetApiService:
                 response = self._http().post(
                     "/api/dataset/upload",
                     data={"name": name},
-                    files={"file": (file_path.split("/")[-1], f)},
+                    files={"file": (os.path.basename(file_path), f)},
                 )
             _raise_for_api_status(response)
             return response.json()

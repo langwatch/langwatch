@@ -8,8 +8,7 @@ Covers @integration scenarios from dataset-python-sdk.feature.
 """
 
 import json
-import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -43,6 +42,7 @@ def _error_response(status_code, message="error"):
     return response
 
 
+@pytest.mark.unit
 class TestRaiseForApiStatus:
     """_raise_for_api_status()"""
 
@@ -75,6 +75,7 @@ class TestRaiseForApiStatus:
             _raise_for_api_status(_error_response(500, "internal error"))
 
 
+@pytest.mark.integration
 class TestDatasetApiService:
     """DatasetApiService"""
 
@@ -112,7 +113,7 @@ class TestDatasetApiService:
                 {"data": [], "pagination": {"page": 2, "limit": 5, "total": 15, "totalPages": 3}}
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            result = svc.list_datasets(page=2, limit=5)
+            svc.list_datasets(page=2, limit=5)
             mock_httpx.get.assert_called_once_with(
                 "/api/dataset", params={"page": 2, "limit": 5}
             )
@@ -474,30 +475,50 @@ class TestDatasetApiService:
                 svc.create_dataset_from_file(name="Existing", file_path=str(csv_file))
 
 
+@pytest.mark.integration
 class TestSDKInitialization:
     """SDK initialization"""
 
-    def test_auto_initializes_from_environment_variables(self):
+    def test_auto_initializes_from_environment_variables(self, monkeypatch):
         """@integration Scenario: SDK auto-initializes from environment variables"""
         import langwatch.dataset as dataset_module
+
+        monkeypatch.setenv("LANGWATCH_API_KEY", "fake-key")
 
         # Reset the cached facade so from_global() is called
         dataset_module._facade_instance = None
 
         mock_facade = MagicMock()
-        mock_facade.list_datasets.return_value = MagicMock(data=[], pagination=MagicMock(total=0))
+        mock_facade.list_datasets.return_value = MagicMock(
+            data=[], pagination=MagicMock(total=0)
+        )
 
-        with patch.object(
-            dataset_module, "_get_facade", return_value=mock_facade
-        ):
-            result = dataset_module.list_datasets()
-            mock_facade.list_datasets.assert_called_once()
+        # Patch from_global to return our mock facade (avoids real HTTP calls)
+        monkeypatch.setattr(
+            dataset_module.DatasetsFacade,
+            "from_global",
+            classmethod(lambda cls: mock_facade),
+        )
 
-    def test_raises_error_when_no_api_key(self):
+        dataset_module.list_datasets()
+        mock_facade.list_datasets.assert_called_once()
+
+    def test_raises_error_when_no_api_key(self, monkeypatch):
         """@integration Scenario: SDK raises error when no API key is available"""
+        import langwatch.dataset as dataset_module
         from langwatch.dataset.dataset_facade import DatasetsFacade
 
-        with patch("langwatch.dataset.dataset_facade.ensure_setup"), \
-             patch("langwatch.dataset.dataset_facade.get_instance", return_value=None):
-            with pytest.raises(RuntimeError, match="LANGWATCH_API_KEY"):
-                DatasetsFacade.from_global()
+        monkeypatch.delenv("LANGWATCH_API_KEY", raising=False)
+
+        # Reset state so from_global() is triggered fresh
+        dataset_module._facade_instance = None
+
+        monkeypatch.setattr(
+            "langwatch.dataset.dataset_facade.ensure_setup", lambda: None
+        )
+        monkeypatch.setattr(
+            "langwatch.dataset.dataset_facade.get_instance", lambda: None
+        )
+
+        with pytest.raises(RuntimeError, match="LANGWATCH_API_KEY"):
+            DatasetsFacade.from_global()

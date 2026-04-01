@@ -9,6 +9,9 @@ Covers:
 """
 
 import pytest
+
+pytestmark = pytest.mark.unit
+
 from langwatch.dataset.types import (
     ColumnType,
     Dataset,
