@@ -133,7 +133,7 @@ export class PromptTagRepository {
   }
 
   /**
-   * Deletes a custom tag definition and cascades to PromptVersionTag rows
+   * Deletes a custom tag definition and cascades to PromptTagAssignment rows
    * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
    */
   async delete({
@@ -162,7 +162,7 @@ export class PromptTagRepository {
       const projectIds = projects.map((p) => p.id);
 
       if (projectIds.length > 0) {
-        await tx.promptVersionTag.deleteMany({
+        await tx.promptTagAssignment.deleteMany({
           where: {
             tag: tag.name,
             projectId: { in: projectIds },

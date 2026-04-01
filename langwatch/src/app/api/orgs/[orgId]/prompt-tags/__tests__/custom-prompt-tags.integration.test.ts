@@ -161,7 +161,7 @@ describe("Custom Prompt Tags API", () => {
       },
     });
 
-    await prisma.promptVersionTag.deleteMany({
+    await prisma.promptTagAssignment.deleteMany({
       where: { projectId: project.id },
     });
 
@@ -489,7 +489,7 @@ describe("Custom Prompt Tags API", () => {
     });
 
     describe("when deleting a custom tag that has assignments", () => {
-      it("cascades to remove PromptVersionTag rows", async () => {
+      it("cascades to remove PromptTagAssignment rows", async () => {
         asAdmin();
 
         const tag = await prisma.promptTag.create({
@@ -501,7 +501,7 @@ describe("Custom Prompt Tags API", () => {
         });
 
         // Create an assignment
-        await prisma.promptVersionTag.create({
+        await prisma.promptTagAssignment.create({
           data: {
             id: `vtag_${nanoid()}`,
             configId: promptConfig.id,
@@ -518,7 +518,7 @@ describe("Custom Prompt Tags API", () => {
 
         expect(res.status).toBe(204);
 
-        const assignment = await prisma.promptVersionTag.findFirst({
+        const assignment = await prisma.promptTagAssignment.findFirst({
           where: { configId: promptConfig.id, tag: "canary", projectId: project.id },
         });
         expect(assignment).toBeNull();

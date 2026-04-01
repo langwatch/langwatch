@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, PromptVersionTag } from "@prisma/client";
+import type { Prisma, PrismaClient, PromptTagAssignment } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
 import { PromptTagRepository } from "./prompt-tag.repository";
@@ -19,7 +19,7 @@ export class TagValidationError extends Error {
  * Custom tags are valid when a PromptTag definition exists for the org.
  * "latest" is resolved at query time (highest version number), never stored.
  */
-export class PromptVersionTagRepository {
+export class PromptTagAssignmentRepository {
   private readonly tagDefinitionRepo: PromptTagRepository;
 
   constructor(private readonly prisma: PrismaClient) {
@@ -108,7 +108,7 @@ export class PromptVersionTagRepository {
     userId?: string;
     organizationId?: string;
     tx?: Prisma.TransactionClient;
-  }): Promise<PromptVersionTag> {
+  }): Promise<PromptTagAssignment> {
     if (organizationId) {
       const valid = await this.isValidTag({ tag, organizationId });
       if (!valid) {
@@ -130,7 +130,7 @@ export class PromptVersionTagRepository {
       tx,
     });
 
-    const result = await client.promptVersionTag.upsert({
+    const result = await client.promptTagAssignment.upsert({
       where: {
         projectId,
         configId_tag: { configId, tag },
@@ -164,8 +164,8 @@ export class PromptVersionTagRepository {
   }: {
     configId: string;
     projectId: string;
-  }): Promise<PromptVersionTag[]> {
-    return this.prisma.promptVersionTag.findMany({
+  }): Promise<PromptTagAssignment[]> {
+    return this.prisma.promptTagAssignment.findMany({
       where: { configId, projectId },
     });
   }
@@ -181,8 +181,8 @@ export class PromptVersionTagRepository {
     configId: string;
     tag: string;
     projectId: string;
-  }): Promise<PromptVersionTag | null> {
-    const result = await this.prisma.promptVersionTag.findFirst({
+  }): Promise<PromptTagAssignment | null> {
+    const result = await this.prisma.promptTagAssignment.findFirst({
       where: {
         configId,
         tag,

@@ -58,7 +58,7 @@ describe("Feature: Prompt version tags", () => {
 
   afterEach(async () => {
     // Clean up tags/versions/configs for both projects
-    await prisma.promptVersionTag.deleteMany({
+    await prisma.promptTagAssignment.deleteMany({
       where: { projectId: { in: [testProject.id, otherProject.id] } },
     });
     await prisma.llmPromptConfigVersion.deleteMany({
@@ -115,7 +115,7 @@ describe("Feature: Prompt version tags", () => {
   }
 
   describe("when assigning a tag to a specific version", () => {
-    it("creates a PromptVersionTag record with configId, tag, and versionId", async () => {
+    it("creates a PromptTagAssignment record with configId, tag, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
         versionCount: 3,

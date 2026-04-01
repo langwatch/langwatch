@@ -24,7 +24,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
-import { PromptVersionTagRepository } from "./repositories/llm-config-tag.repository";
+import { PromptTagAssignmentRepository } from "./repositories/llm-config-tag.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -108,12 +108,12 @@ export type VersionedPrompt = {
 export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
-  readonly tagRepository: PromptVersionTagRepository;
+  readonly tagRepository: PromptTagAssignmentRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
-    this.tagRepository = new PromptVersionTagRepository(prisma);
+    this.tagRepository = new PromptTagAssignmentRepository(prisma);
   }
 
   /**

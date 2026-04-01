@@ -77,8 +77,8 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
-    versionTagsCreated      PromptVersionTag[]     @relation("versionTagCreatedBy")
-    versionTagsUpdated      PromptVersionTag[]     @relation("versionTagUpdatedBy")
+    versionTagsCreated      PromptTagAssignment[]  @relation("versionTagCreatedBy")
+    versionTagsUpdated      PromptTagAssignment[]  @relation("versionTagUpdatedBy")
     promptTagsCreated       PromptTag[]            @relation("promptTagCreatedBy")
     promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
 
@@ -943,7 +943,7 @@ model LlmPromptConfig {
     versions LlmPromptConfigVersion[] @relation("Versions")
 
     // Relation to labels (e.g., "production", "staging")
-    versionTags PromptVersionTag[] @relation("VersionTags")
+    versionTags PromptTagAssignment[] @relation("VersionTags")
 
     @@unique([handle], map: "LlmPromptConfig_handle_key")
     @@index([projectId])
@@ -970,7 +970,7 @@ model LlmPromptConfigVersion {
     projectId String
 
     // Tags pointing to this version
-    versionTags PromptVersionTag[]
+    versionTags PromptTagAssignment[]
 
     @@unique([configId, version]) // Each version number must be unique per config
     @@index([configId])
@@ -978,7 +978,7 @@ model LlmPromptConfigVersion {
     @@index([createdAt]) // Index important for finding the latest efficiently
 }
 
-model PromptVersionTag {
+model PromptTagAssignment {
     id          String   @id @default(nanoid())
     configId    String
     config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
