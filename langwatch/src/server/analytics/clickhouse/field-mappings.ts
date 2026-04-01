@@ -37,6 +37,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "TopicId",
   "SubTopicId",
   "AnnotationIds",
+  "HasAnnotation",
   "Models",
   "Attributes",
 ] as const;

@@ -339,13 +339,13 @@ export const clickHouseFilters: Record<
       const { sql: scopeSql } = buildScopeConditions(params);
       return `
         SELECT
-          if(length(ts.AnnotationIds) > 0, 'true', 'false') as field,
-          if(length(ts.AnnotationIds) > 0, 'Has Annotation', 'No Annotation') as label,
+          if(ts.HasAnnotation = true, 'true', 'false') as field,
+          if(ts.HasAnnotation = true, 'Has Annotation', 'No Annotation') as label,
           count() as count
         FROM trace_summaries ts
         WHERE ${buildTraceSummariesConditions(params)}
           ${scopeSql}
-        GROUP BY (length(ts.AnnotationIds) > 0)
+        GROUP BY ts.HasAnnotation
         ORDER BY field DESC
       `;
     },

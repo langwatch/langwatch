@@ -682,13 +682,13 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
 
   if (hasTrue && !hasFalse) {
     return {
-      whereClause: `length(${ts}.AnnotationIds) > 0`,
+      whereClause: `${ts}.HasAnnotation = true`,
       requiredJoins: [],
       params: {},
     };
   } else if (hasFalse && !hasTrue) {
     return {
-      whereClause: `length(${ts}.AnnotationIds) = 0`,
+      whereClause: `(${ts}.HasAnnotation = false OR ${ts}.HasAnnotation IS NULL)`,
       requiredJoins: [],
       params: {},
     };
