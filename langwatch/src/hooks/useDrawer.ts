@@ -160,6 +160,39 @@ export const useDrawerParams = () => {
 };
 
 // ============================================================================
+// Serialization Helpers
+// ============================================================================
+
+/**
+ * Determines whether a value can be safely serialized into a URL query string.
+ *
+ * Primitives (string, number, boolean, null, undefined) are always serializable.
+ * Arrays of primitives are serializable via qs's `arrayFormat: "comma"`.
+ *
+ * Note: single-element arrays round-trip as plain strings through qs
+ * (e.g., `["a"]` → `"a"`). Consumers must handle both `T` and `T[]`.
+ *
+ * Functions, plain objects, Dates, and arrays containing objects are NOT serializable
+ * and go to `complexProps` (module-level ephemeral store).
+ */
+function isUrlSerializable(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "function") return false;
+  if (typeof value !== "object") return true; // string, number, boolean
+
+  // Arrays of primitives can be comma-serialized by qs
+  if (Array.isArray(value)) {
+    return value.every(
+      (item) =>
+        item === null ||
+        (typeof item !== "object" && typeof item !== "function"),
+    );
+  }
+
+  return false; // Plain objects, Dates, etc.
+}
+
+// ============================================================================
 // Main Hook
 // ============================================================================
 
@@ -190,25 +223,10 @@ export const useDrawer = () => {
       const nonSerializableProps: Record<string, unknown> = {};
 
       for (const [key, value] of Object.entries(props ?? {})) {
-        const isPrimitiveArray =
-          Array.isArray(value) &&
-          value.every(
-            (item) =>
-              item === null ||
-              (typeof item !== "object" && typeof item !== "function"),
-          );
-
-        if (
-          typeof value === "function" ||
-          (typeof value === "object" && value !== null && !isPrimitiveArray)
-        ) {
-          // Functions, non-array objects, and arrays of objects go to complexProps (not URL)
-          nonSerializableProps[key] = value;
-        } else {
-          // Primitives (string, number, boolean, null, undefined) and
-          // primitive arrays (string[], number[], boolean[]) go to URL.
-          // qs.stringify with arrayFormat: "comma" serializes arrays as comma-separated values.
+        if (isUrlSerializable(value)) {
           serializableProps[key] = value;
+        } else {
+          nonSerializableProps[key] = value;
         }
       }
 

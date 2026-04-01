@@ -583,35 +583,35 @@ describe("Complex Props (backward compatibility)", () => {
       expect(pushCall).not.toContain("items");
     });
 
-    it("preserves scalar primitives in the URL", () => {
+    it("serializes single-element arrays into the URL (note: qs parses back as string)", () => {
       const { result } = renderHook(() => useDrawer());
+      const singleId = ["only-trace"];
 
       act(() => {
-        result.current.openDrawer("promptEditor", {
-          promptId: "test-id",
-        });
+        result.current.openDrawer("addDatasetRecord", {
+          singleId,
+        } as never);
       });
 
       const complex = getComplexProps();
-      expect(complex).not.toHaveProperty("promptId");
+      expect(complex).not.toHaveProperty("singleId");
 
       const pushCall = mockPush.mock.calls[0]?.[0] as string;
-      expect(pushCall).toContain("drawer.promptId=test-id");
+      expect(pushCall).toContain("drawer.singleId=only-trace");
     });
 
-    it("keeps functions in complexProps", () => {
+    it("serializes empty arrays into the URL", () => {
       const { result } = renderHook(() => useDrawer());
-      const callback = vi.fn();
+      const emptyIds: string[] = [];
 
       act(() => {
-        result.current.openDrawer("promptEditor", {
-          onSave: callback,
-        });
+        result.current.openDrawer("addDatasetRecord", {
+          emptyIds,
+        } as never);
       });
 
       const complex = getComplexProps();
-      expect(complex).toHaveProperty("onSave");
-      expect(complex.onSave).toBe(callback);
+      expect(complex).not.toHaveProperty("emptyIds");
     });
   });
 });
