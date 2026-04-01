@@ -21,6 +21,8 @@ from langwatch.prompts.prompt_api_service import PromptApiService
 from langwatch.prompts.prompt_facade import PromptsFacade
 from langwatch.prompts.types import FetchPolicy
 
+pytestmark = pytest.mark.unit
+
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -385,7 +387,7 @@ class TestPromptsFacadeGetWithLabel:
         mock_request = Mock()
         facade = self._make_facade_with_mock(mock_request)
 
-        with pytest.raises(ValueError, match="version_number.*label|label.*version_number"):
+        with pytest.raises(ValueError, match=r"version_number.*label|label.*version_number"):
             facade.get("pizza-prompt", version_number=3, label="production")
 
         mock_request.assert_not_called()
@@ -479,7 +481,7 @@ class TestPromptsFacadeEdgeCasesWithLabel:
         )
         facade = self._make_facade_with_mock(mock_request)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             facade.get(
                 "pizza-prompt",
                 label="production",
@@ -496,7 +498,7 @@ class TestPromptsFacadeEdgeCasesWithLabel:
         )
         facade = self._make_facade_with_mock(mock_request)
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             facade.get(
                 "pizza-prompt",
                 label="production",

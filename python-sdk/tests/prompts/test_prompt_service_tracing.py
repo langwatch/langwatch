@@ -10,6 +10,8 @@ from langwatch.attributes import AttributeKey
 
 from fixtures.span_exporter import MockSpanExporter, span_exporter
 
+pytestmark = pytest.mark.unit
+
 
 def _make_api_json(handle="prompt_123", version=1):
     """Build a valid API response JSON dict."""
