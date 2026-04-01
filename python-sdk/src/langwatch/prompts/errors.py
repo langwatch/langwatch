@@ -138,6 +138,9 @@ def unwrap_response(
     if status == 400:
         error_detail = f": {msg}" if msg else ""
         raise ValueError(f"Invalid prompt request{error_detail}")
+    if status == 422:
+        error_detail = f": {msg}" if msg else ""
+        raise ValueError(f"Invalid prompt request{error_detail}")
     if status == 401:
         error_detail = f": {msg}" if msg else ""
         raise RuntimeError(f"Authentication error{error_detail}")

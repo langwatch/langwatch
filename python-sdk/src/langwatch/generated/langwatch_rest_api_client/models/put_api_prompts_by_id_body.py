@@ -30,9 +30,9 @@ class PutApiPromptsByIdBody:
         inputs (Union[Unset, list['PutApiPromptsByIdBodyInputsItem']]):
         outputs (Union[Unset, list['PutApiPromptsByIdBodyOutputsItem']]):
         schema_version (Union[Unset, PutApiPromptsByIdBodySchemaVersion]):
-        tags (Union[Unset, list[str]]):
         scope (Union[Unset, PutApiPromptsByIdBodyScope]):
         handle (Union[Unset, str]):
+        tags (Union[Unset, list[str]]):
     """
 
     commit_message: str
@@ -45,9 +45,9 @@ class PutApiPromptsByIdBody:
     inputs: Union[Unset, list["PutApiPromptsByIdBodyInputsItem"]] = UNSET
     outputs: Union[Unset, list["PutApiPromptsByIdBodyOutputsItem"]] = UNSET
     schema_version: Union[Unset, PutApiPromptsByIdBodySchemaVersion] = UNSET
-    tags: Union[Unset, list[str]] = UNSET
     scope: Union[Unset, PutApiPromptsByIdBodyScope] = UNSET
     handle: Union[Unset, str] = UNSET
+    tags: Union[Unset, list[str]] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         commit_message = self.commit_message
@@ -87,15 +87,15 @@ class PutApiPromptsByIdBody:
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
-        tags: Union[Unset, list[str]] = UNSET
-        if not isinstance(self.tags, Unset):
-            tags = self.tags
-
         scope: Union[Unset, str] = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
 
         handle = self.handle
+
+        tags: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.tags, Unset):
+            tags = self.tags
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
@@ -121,12 +121,12 @@ class PutApiPromptsByIdBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
-        if tags is not UNSET:
-            field_dict["tags"] = tags
         if scope is not UNSET:
             field_dict["scope"] = scope
         if handle is not UNSET:
             field_dict["handle"] = handle
+        if tags is not UNSET:
+            field_dict["tags"] = tags
 
         return field_dict
 
@@ -177,8 +177,6 @@ class PutApiPromptsByIdBody:
         else:
             schema_version = PutApiPromptsByIdBodySchemaVersion(_schema_version)
 
-        tags = cast(list[str], d.pop("tags", UNSET))
-
         _scope = d.pop("scope", UNSET)
         scope: Union[Unset, PutApiPromptsByIdBodyScope]
         if isinstance(_scope, Unset):
@@ -187,6 +185,8 @@ class PutApiPromptsByIdBody:
             scope = PutApiPromptsByIdBodyScope(_scope)
 
         handle = d.pop("handle", UNSET)
+
+        tags = cast(list[str], d.pop("tags", UNSET))
 
         put_api_prompts_by_id_body = cls(
             commit_message=commit_message,
@@ -199,9 +199,9 @@ class PutApiPromptsByIdBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
-            tags=tags,
             scope=scope,
             handle=handle,
+            tags=tags,
         )
 
         return put_api_prompts_by_id_body
