@@ -164,7 +164,7 @@ class DatasetsFacade:
         slug_or_id: str,
         *,
         entries: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> None:
         """
         Add records to an existing dataset.
 
@@ -178,7 +178,7 @@ class DatasetsFacade:
         if not entries:
             raise ValueError("Entries must not be empty.")
 
-        return self._api.create_records(slug_or_id, entries=entries)
+        self._api.create_records(slug_or_id, entries=entries)
 
     def update_record(
         self,
@@ -209,13 +209,16 @@ class DatasetsFacade:
         slug_or_id: str,
         *,
         record_ids: List[str],
-    ) -> Dict[str, Any]:
+    ) -> int:
         """
         Batch-delete records by IDs.
 
         Args:
             slug_or_id: Dataset slug or ID.
             record_ids: Non-empty list of record IDs to delete.
+
+        Returns:
+            The number of records deleted.
 
         Raises:
             ValueError: If record_ids is empty or the dataset is not found.
