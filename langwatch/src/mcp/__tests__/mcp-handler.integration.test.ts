@@ -10,7 +10,6 @@
 import { createServer, type Server } from "node:http";
 import {
   afterAll,
-  afterEach,
   beforeAll,
   beforeEach,
   describe,
