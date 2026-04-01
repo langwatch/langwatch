@@ -31,42 +31,6 @@ import type {
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
 
-type TransactionClient = Omit<
-  PrismaClient,
-  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
->;
-
-async function getUserCustomRolePermissions(
-  tx: TransactionClient,
-  userId: string,
-  organizationId: string,
-): Promise<string[] | undefined> {
-  const teams = await tx.team.findMany({
-    where: { organizationId },
-    select: { id: true },
-  });
-
-  if (teams.length === 0) return undefined;
-
-  const teamUsers = await tx.teamUser.findMany({
-    where: {
-      userId,
-      teamId: { in: teams.map((t) => t.id) },
-      assignedRoleId: { not: null },
-    },
-    include: { assignedRole: true },
-  });
-
-  const allPermissions: string[] = [];
-  for (const tu of teamUsers) {
-    if (tu.assignedRole?.permissions) {
-      allPermissions.push(...(tu.assignedRole.permissions as string[]));
-    }
-  }
-
-  return allPermissions.length > 0 ? allPermissions : undefined;
-}
-
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -254,7 +218,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     demoProjectUserId: string;
     demoProjectId: string;
   }): Promise<unknown[]> {
-    const { userId, isDemo, demoProjectUserId, demoProjectId } = params;
+    const { userId, isDemo, demoProjectId } = params;
 
     return this.prisma.organization.findMany({
       where: {
