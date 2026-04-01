@@ -44,6 +44,12 @@ const EXEMPT_MODELS = [
    * SCIM tokens are organization-level, used for IdP provisioning
    */
   "ScimToken",
+  /**
+   * SCIM group mappings and memberships are organization-level,
+   * linking IdP groups to LangWatch teams
+   */
+  "ScimGroupMapping",
+  "ScimGroupMembership",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
