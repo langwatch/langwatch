@@ -191,6 +191,72 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
+    def test_fetch_by_explicit_version_number(self):
+        """
+        GIVEN a prompt with two versions
+        WHEN I fetch with version_number=1
+        THEN I receive version 1, not the latest
+        """
+        handle = f"e2e-version-{uuid4().hex[:8]}"
+
+        created = langwatch.prompts.create(
+            handle=handle,
+            prompt="Version 1",
+        )
+
+        try:
+            langwatch.prompts.update(
+                handle,
+                scope="PROJECT",
+                commit_message="Create v2",
+                prompt="Version 2",
+            )
+
+            # Fetch v1 explicitly
+            fetched = langwatch.prompts.get(handle, version_number=1)
+
+            assert fetched is not None
+            assert fetched.version == 1
+            assert fetched.version_id == created.version_id
+        finally:
+            try:
+                langwatch.prompts.delete(created.id)
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+
+    def test_shorthand_version_passes_through_as_id(self):
+        """
+        GIVEN a prompt with two versions
+        WHEN SDK calls get("handle:1")
+        THEN the API resolves version 1 via shorthand
+        """
+        handle = f"e2e-shorthand-ver-{uuid4().hex[:8]}"
+
+        created = langwatch.prompts.create(
+            handle=handle,
+            prompt="Version 1",
+        )
+
+        try:
+            langwatch.prompts.update(
+                handle,
+                scope="PROJECT",
+                commit_message="Create v2",
+                prompt="Version 2",
+            )
+
+            # Use version shorthand - SDK passes "handle:1" to the API
+            fetched = langwatch.prompts.get(f"{handle}:1")
+
+            assert fetched is not None
+            assert fetched.version == 1
+            assert fetched.version_id == created.version_id
+        finally:
+            try:
+                langwatch.prompts.delete(created.id)
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+
     def test_shorthand_syntax_passes_through_as_id(self):
         """
         GIVEN a prompt with a tag assigned via explicit assign
