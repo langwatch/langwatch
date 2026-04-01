@@ -80,6 +80,7 @@ model User {
     versionTagsCreated      PromptVersionTag[]     @relation("versionTagCreatedBy")
     versionTagsUpdated      PromptVersionTag[]     @relation("versionTagUpdatedBy")
     promptTagsCreated       PromptTag[]            @relation("promptTagCreatedBy")
+    promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
 
 }
 
@@ -1007,6 +1008,8 @@ model PromptTag {
     updatedAt      DateTime     @default(now()) @updatedAt
     createdById    String?
     createdBy      User?        @relation("promptTagCreatedBy", fields: [createdById], references: [id])
+    updatedById    String?
+    updatedBy      User?        @relation("promptTagUpdatedBy", fields: [updatedById], references: [id])
 
     @@unique([organizationId, name])
     @@index([organizationId])

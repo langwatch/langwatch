@@ -6,6 +6,7 @@ CREATE TABLE "PromptTag" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdById" TEXT,
+    "updatedById" TEXT,
 
     CONSTRAINT "PromptTag_pkey" PRIMARY KEY ("id")
 );
@@ -21,6 +22,9 @@ ALTER TABLE "PromptTag" ADD CONSTRAINT "PromptTag_organizationId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "PromptTag" ADD CONSTRAINT "PromptTag_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PromptTag" ADD CONSTRAINT "PromptTag_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Seed built-in "production" and "staging" tags for every existing organization
 INSERT INTO "PromptTag" (id, "organizationId", name, "createdAt", "updatedAt", "createdById")
