@@ -85,7 +85,7 @@ function makeTestPlan(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("Organization Invites Integration", () => {
+describe("Invite Router Integration", () => {
   const testNamespace = `invite-test-${nanoid(8)}`;
   let organizationId: string;
   let teamId: string;
