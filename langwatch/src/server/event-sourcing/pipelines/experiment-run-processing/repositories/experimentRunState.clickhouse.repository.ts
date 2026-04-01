@@ -277,6 +277,17 @@ export class ExperimentRunStateRepositoryClickHouse<
       "ExperimentRunStateRepositoryClickHouse.storeProjectionBatch",
     );
 
+    for (const projection of projections) {
+      if (projection.tenantId !== context.tenantId) {
+        throw new SecurityError(
+          "storeProjectionBatch",
+          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          projection.tenantId,
+          { contextTenantId: context.tenantId },
+        );
+      }
+    }
+
     try {
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));

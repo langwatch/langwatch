@@ -743,38 +743,15 @@ async function main() {
       const log = new ReplayLog(projections[0]?.projectionName ?? "replay");
       const display = createProgressDisplay({ totalEventsEstimate: plan.totalEvents });
 
-      console.log();
+      try {
+        console.log();
 
-      if (tenantIds.length === 0) {
-        // All-tenants mode
-        display.start();
-        const startMs = Date.now();
-        const result = await runtime.service.replay(
-          { projections, tenantIds: [], since, batchSize, aggregateBatchSize, concurrency, dryRun },
-          {
-            log,
-            onProgress: (p) => display.update(p),
-            onBatchComplete: (info) => display.onBatchComplete(info),
-          },
-        );
-        display.finish(result, (Date.now() - startMs) / 1000);
-      } else {
-        // Per-tenant mode
-        const tenantInfos = await Promise.all(
-          tenantIds.map(async (tid) => ({ tenantId: tid, projectInfo: await fetchProject(tid) })),
-        );
-
-        for (let i = 0; i < tenantInfos.length; i++) {
-          const { tenantId, projectInfo } = tenantInfos[i]!;
-
-          if (tenantInfos.length > 1) {
-            console.log(`  ${BOLD}[${i + 1}/${tenantInfos.length}]${RESET} ${projectInfo ? `${projectInfo.name} (${tenantId})` : tenantId}`);
-          }
-
+        if (tenantIds.length === 0) {
+          // All-tenants mode
           display.start();
           const startMs = Date.now();
           const result = await runtime.service.replay(
-            { projections, tenantIds: [tenantId], since, batchSize, aggregateBatchSize, concurrency, dryRun },
+            { projections, tenantIds: [], since, batchSize, aggregateBatchSize, concurrency, dryRun },
             {
               log,
               onProgress: (p) => display.update(p),
@@ -782,24 +759,50 @@ async function main() {
             },
           );
           display.finish(result, (Date.now() - startMs) / 1000);
+        } else {
+          // Per-tenant mode
+          const tenantInfos = await Promise.all(
+            tenantIds.map(async (tid) => ({ tenantId: tid, projectInfo: await fetchProject(tid) })),
+          );
 
-          if (batchMode && result.batchErrors > 0) {
-            console.error(`  Stopping — errors in ${tenantId}: ${result.firstError ?? "unknown"}`);
-            break;
-          }
+          for (let i = 0; i < tenantInfos.length; i++) {
+            const { tenantId, projectInfo } = tenantInfos[i]!;
 
-          if (!batchMode && i < tenantInfos.length - 1) {
-            const next = tenantInfos[i + 1]!;
-            const choice = await runTenantContinuePrompt(next.tenantId, next.projectInfo);
-            if (choice === "abort") { console.log("  Aborted."); break; }
+            if (tenantInfos.length > 1) {
+              console.log(`  ${BOLD}[${i + 1}/${tenantInfos.length}]${RESET} ${projectInfo ? `${projectInfo.name} (${tenantId})` : tenantId}`);
+            }
+
+            display.start();
+            const startMs = Date.now();
+            const result = await runtime.service.replay(
+              { projections, tenantIds: [tenantId], since, batchSize, aggregateBatchSize, concurrency, dryRun },
+              {
+                log,
+                onProgress: (p) => display.update(p),
+                onBatchComplete: (info) => display.onBatchComplete(info),
+              },
+            );
+            display.finish(result, (Date.now() - startMs) / 1000);
+
+            if (batchMode && result.batchErrors > 0) {
+              console.error(`  Stopping — errors in ${tenantId}: ${result.firstError ?? "unknown"}`);
+              break;
+            }
+
+            if (!batchMode && i < tenantInfos.length - 1) {
+              const next = tenantInfos[i + 1]!;
+              const choice = await runTenantContinuePrompt(next.tenantId, next.projectInfo);
+              if (choice === "abort") { console.log("  Aborted."); break; }
+            }
           }
         }
+      } finally {
+        display.stop();
+        log.close();
+        console.log(`  ${DIM}Log: ${log.filePath}${RESET}`);
+        console.log();
+        await runtime.close();
       }
-
-      log.close();
-      console.log(`  ${DIM}Log: ${log.filePath}${RESET}`);
-      console.log();
-      await runtime.close();
     });
 
   // ─── Cleanup command ──────────────────────────────────────────────────
