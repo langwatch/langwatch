@@ -356,6 +356,11 @@ describe("matchModelCostWithFallbacks", () => {
         const result = matchModelCostWithFallbacks("openai.responses/gpt-5.2-0315", realCosts);
         expect(result?.model).toBe("openai/gpt-5.2");
       });
+
+      it("matches openai.responses/gpt-5.3-chat-latest to openai/gpt-5.3-chat", () => {
+        const result = matchModelCostWithFallbacks("openai.responses/gpt-5.3-chat-latest", realCosts);
+        expect(result?.model).toBe("openai/gpt-5.3-chat");
+      });
     });
 
     describe("when exact model string is used", () => {
