@@ -1,3 +1,4 @@
+import type { AnalyticsEvaluationFactData } from "~/server/app-layer/analytics/types";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
@@ -8,11 +9,13 @@ import {
   ReportEvaluationCommand,
 } from "./commands";
 import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
+import { AnalyticsEvaluationFactsFoldProjection } from "./projections/analyticsEvaluationFacts.foldProjection";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
+  analyticsEvaluationFactsStore?: FoldProjectionStore<AnalyticsEvaluationFactData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
   customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
@@ -38,6 +41,15 @@ export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPip
       store: deps.evalRunStore,
     }))
     .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor);
+
+  if (deps.analyticsEvaluationFactsStore) {
+    builder = builder.withFoldProjection(
+      "analyticsEvaluationFacts",
+      new AnalyticsEvaluationFactsFoldProjection({
+        store: deps.analyticsEvaluationFactsStore,
+      }),
+    );
+  }
 
   if (deps.customerIoEvaluationSyncReactor) {
     builder = builder.withReactor(

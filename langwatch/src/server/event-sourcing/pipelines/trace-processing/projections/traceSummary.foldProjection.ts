@@ -27,9 +27,6 @@ import {
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
-  SpanTimingService,
-  SpanStatusService,
-  SpanCostService,
   TraceOriginService,
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
@@ -38,6 +35,10 @@ import {
   extractIOFromLogRecord,
   OUTPUT_SOURCE,
 } from "./services";
+import {
+  extractSpanMetrics,
+  spanCostService,
+} from "./services/spanMetricsExtractor";
 
 export type { TraceSummaryData };
 
@@ -49,9 +50,6 @@ const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),
 );
 
-const spanTimingService = new SpanTimingService();
-const spanStatusService = new SpanStatusService();
-const spanCostService = new SpanCostService();
 const traceOriginService = new TraceOriginService();
 const traceAttributeAccumulationService =
   new TraceAttributeAccumulationService(traceOriginService);
@@ -71,13 +69,15 @@ export function applySpanToSummary({
   state: TraceSummaryData;
   span: NormalizedSpan;
 }): TraceSummaryData {
-  const timing = spanTimingService.accumulateTiming({ state, span });
+  // Use shared extractor for metrics consistency with analyticsTraceFacts
+  const metrics = extractSpanMetrics({ timingState: state, span });
+
   const tokens = spanCostService.accumulateTokens({
     state,
     span,
-    totalDurationMs: timing.totalDurationMs,
+    totalDurationMs: metrics.timing.totalDurationMs,
   });
-  const status = spanStatusService.accumulateStatus({ state, span });
+
   const io = traceIOAccumulationService.accumulateIO({ state, span });
   const attributes = traceAttributeAccumulationService.accumulateAttributes({
     state,
@@ -85,10 +85,9 @@ export function applySpanToSummary({
     outputSource: io.outputSource,
   });
 
-  const newModels = spanCostService.extractModelsFromSpan(span);
   const models =
-    newModels.length > 0
-      ? [...new Set([...state.models, ...newModels])].sort()
+    metrics.models.length > 0
+      ? [...new Set([...state.models, ...metrics.models])].sort()
       : state.models;
 
   const roleAccumulation = scenarioRoleCostService.accumulateRoleCostLatency({
@@ -101,11 +100,13 @@ export function applySpanToSummary({
     traceId: state.traceId || span.traceId,
     spanCount: state.spanCount + 1,
     computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
-    occurredAt: timing.occurredAt,
-    totalDurationMs: timing.totalDurationMs,
+    occurredAt: metrics.timing.occurredAt,
+    totalDurationMs: metrics.timing.totalDurationMs,
     models,
     ...tokens,
-    ...status,
+    containsErrorStatus: state.containsErrorStatus || metrics.status.hasError,
+    containsOKStatus: state.containsOKStatus || metrics.status.hasOK,
+    errorMessage: state.errorMessage ?? metrics.status.errorMessage,
     computedInput: io.computedInput,
     computedOutput: io.computedOutput,
     outputFromRootSpan: io.outputFromRootSpan,

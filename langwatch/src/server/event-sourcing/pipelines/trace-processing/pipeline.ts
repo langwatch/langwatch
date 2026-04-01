@@ -1,3 +1,4 @@
+import type { AnalyticsTraceFactData } from "~/server/app-layer/analytics/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
@@ -8,6 +9,7 @@ import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
+import { AnalyticsTraceFactsFoldProjection } from "./projections/analyticsTraceFacts.foldProjection";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -22,6 +24,7 @@ export interface TraceProcessingPipelineDeps {
   logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  analyticsTraceFactsStore?: FoldProjectionStore<AnalyticsTraceFactData>;
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
@@ -60,6 +63,15 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
+
+  if (deps.analyticsTraceFactsStore) {
+    builder = builder.withFoldProjection(
+      "analyticsTraceFacts",
+      new AnalyticsTraceFactsFoldProjection({
+        store: deps.analyticsTraceFactsStore,
+      }),
+    );
+  }
 
   if (deps.customerIoTraceSyncReactor) {
     builder = builder.withReactor(
