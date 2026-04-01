@@ -126,11 +126,14 @@ class PromptApiService:
         version_number: Optional[int] = None,
         label: Optional[str] = None,
     ) -> PromptData:
-        """Retrieve a prompt by its ID from the API.
+        """Retrieve a prompt by its handle or ID from the API.
 
         Uses direct httpx calls instead of the generated client to support
         arbitrary label strings (the generated client restricts labels to an enum).
         """
+        if version_number is not None and label is not None:
+            raise ValueError("Cannot specify both version_number and label")
+
         params: Dict[str, Any] = {}
         if version_number is not None:
             params["version"] = version_number

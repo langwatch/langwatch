@@ -269,7 +269,7 @@ class TestPromptApiServiceAssignLabel:
         rest_client = _rest_client_with_mocked_httpx(mock_request)
 
         service = PromptApiService(rest_client)
-        with pytest.raises((ValueError, RuntimeError)):
+        with pytest.raises(ValueError):
             service.assign_label(
                 prompt_id="pizza-prompt",
                 label="production",
