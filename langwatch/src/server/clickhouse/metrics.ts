@@ -259,7 +259,7 @@ export async function collectStorageStats(
             status,
             count() as cnt,
             maxIf(end_time, status = 'BACKUP_CREATED') as last_success_time,
-            maxIf(total_size, status = 'BACKUP_CREATED') as last_success_size
+            argMaxIf(total_size, end_time, status = 'BACKUP_CREATED') as last_success_size
           FROM system.backups
           GROUP BY status
         `,
@@ -267,6 +267,7 @@ export async function collectStorageStats(
 
       const backupRows = await backupResult.json<BackupStats>();
 
+      clickhouseBackupStatusTotal.reset();
       for (const row of backupRows.data) {
         setClickHouseBackupStatusCount(row.status, parseInt(row.cnt, 10));
 
@@ -311,6 +312,9 @@ export async function collectStorageStats(
 
       const diskRows = await diskResult.json<DiskStats>();
 
+      clickhouseDiskTotalBytes.reset();
+      clickhouseDiskUsedBytes.reset();
+      clickhouseDiskFreeBytes.reset();
       for (const row of diskRows.data) {
         setClickHouseDiskTotalBytes(row.name, parseInt(row.total_space, 10));
         setClickHouseDiskUsedBytes(row.name, parseInt(row.used_space, 10));

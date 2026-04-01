@@ -115,79 +115,78 @@ export async function processCommand<EventType extends Event>(
   );
 
   const commandStartTime = performance.now();
-  let events: Awaited<ReturnType<typeof handler.handle>>;
   try {
-    events = await handler.handle(command);
+    const events = await handler.handle(command);
+
+    if (!events) {
+      throw new ValidationError(
+        `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
+        "events",
+        void 0,
+        { commandType },
+      );
+    }
+
+    if (!Array.isArray(events)) {
+      throw new ValidationError(
+        `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
+        "events",
+        undefined,
+        { commandType },
+      );
+    }
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      if (!event) {
+        throw new ValidationError(
+          `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
+          "events",
+          undefined,
+          { commandType, index: i },
+        );
+      }
+
+      if (!EventUtils.isValidEvent(event)) {
+        const parseResult = EventSchema.safeParse(event);
+        const validationError =
+          parseResult.success === false
+            ? `Validation errors: ${parseResult.error.issues
+                .map(
+                  (issue: any) => `${issue.path.join(".")}: ${issue.message}`,
+                )
+                .join(", ")}`
+            : "Unknown validation error";
+
+        throw new ValidationError(
+          `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
+          "events",
+          undefined,
+          {
+            commandType,
+            index: i,
+            zodIssues:
+              parseResult.success === false
+                ? mapZodIssuesToLogContext(parseResult.error.issues)
+                : void 0,
+          },
+        );
+      }
+    }
+
+    if (events.length > 0) {
+      await storeEventsFn(events, { tenantId });
+    }
+
+    const durationMs = performance.now() - commandStartTime;
+    incrementEsCommandTotal(pipelineName, commandType, "completed");
+    observeEsCommandDuration(pipelineName, commandType, durationMs);
   } catch (error) {
     const durationMs = performance.now() - commandStartTime;
     incrementEsCommandTotal(pipelineName, commandType, "failed");
     observeEsCommandDuration(pipelineName, commandType, durationMs);
     throw error;
   }
-
-  if (!events) {
-    throw new ValidationError(
-      `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
-      "events",
-      void 0,
-      { commandType },
-    );
-  }
-
-  if (!Array.isArray(events)) {
-    throw new ValidationError(
-      `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
-      "events",
-      undefined,
-      { commandType },
-    );
-  }
-
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i];
-    if (!event) {
-      throw new ValidationError(
-        `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
-        "events",
-        undefined,
-        { commandType, index: i },
-      );
-    }
-
-    if (!EventUtils.isValidEvent(event)) {
-      const parseResult = EventSchema.safeParse(event);
-      const validationError =
-        parseResult.success === false
-          ? `Validation errors: ${parseResult.error.issues
-              .map(
-                (issue: any) => `${issue.path.join(".")}: ${issue.message}`,
-              )
-              .join(", ")}`
-          : "Unknown validation error";
-
-      throw new ValidationError(
-        `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
-        "events",
-        undefined,
-        {
-          commandType,
-          index: i,
-          zodIssues:
-            parseResult.success === false
-              ? mapZodIssuesToLogContext(parseResult.error.issues)
-              : void 0,
-        },
-      );
-    }
-  }
-
-  if (events.length > 0) {
-    await storeEventsFn(events, { tenantId });
-  }
-
-  const durationMs = performance.now() - commandStartTime;
-  incrementEsCommandTotal(pipelineName, commandType, "completed");
-  observeEsCommandDuration(pipelineName, commandType, durationMs);
 }
 
 /**

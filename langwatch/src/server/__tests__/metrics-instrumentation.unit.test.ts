@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { register } from "prom-client";
 
 // Import all new metric functions to verify they exist and are callable
@@ -15,7 +15,6 @@ import {
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
   incrementEsFoldCacheRedisError,
-  eventSourcingStoreDurationHistogram,
   withMetrics,
 } from "../metrics";
 
