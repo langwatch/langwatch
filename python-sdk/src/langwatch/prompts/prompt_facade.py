@@ -85,7 +85,9 @@ class PromptsFacade:
         """
         # Parse shorthand "handle:label" syntax
         if ":" in prompt_id and label is None:
-            prompt_id, label = prompt_id.rsplit(":", 1)
+            prompt_id, parsed_label = prompt_id.rsplit(":", 1)
+            if parsed_label:
+                label = parsed_label
         elif ":" in prompt_id and label is not None:
             raise ValueError(
                 "Ambiguous label: label specified in both shorthand syntax "
