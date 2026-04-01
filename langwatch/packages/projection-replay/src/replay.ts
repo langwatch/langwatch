@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
 import type { DiscoveredFoldProjection } from "./discovery";
 import {
+  type CutoffInfo,
   type DiscoveredAggregate,
   type ReplayEvent,
   countEventsForAggregates,
@@ -21,6 +22,20 @@ import {
 import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./drain";
 import { replayEvents } from "./replayExecutor";
 import type { ReplayLog } from "./replayLog";
+
+/**
+ * Checks if an event is at or before a cutoff using (timestamp, eventId) ordering,
+ * matching ClickHouse's `ORDER BY EventTimestamp ASC, EventId ASC`.
+ */
+function isAtOrBeforeCutoff(
+  eventTimestamp: number,
+  eventId: string,
+  cutoff: CutoffInfo,
+): boolean {
+  if (eventTimestamp < cutoff.timestamp) return true;
+  if (eventTimestamp > cutoff.timestamp) return false;
+  return eventId <= cutoff.eventId;
+}
 
 export type BatchPhase = "mark" | "pause" | "drain" | "cutoff" | "load" | "replay" | "unmark";
 
@@ -373,7 +388,11 @@ async function replayBatch({
 
   // 5. LOAD — fetch all events into memory (fast)
   emitPhase("load");
-  const maxCutoff = [...cutoffs.values()].reduce((a, b) => (a > b ? a : b));
+  // Use the max eventId across all cutoffs as the upper bound for the CH query.
+  // This is a loose bound — per-aggregate filtering happens in JS below.
+  const maxCutoffEventId = [...cutoffs.values()]
+    .map((c) => c.eventId)
+    .reduce((a, b) => (a > b ? a : b));
   const aggregateIds = batch
     .filter((a) => cutoffs.has(aggregateKey(a)))
     .map((a) => a.aggregateId);
@@ -387,14 +406,14 @@ async function replayBatch({
       tenantId,
       aggregateIds,
       eventTypes: projection.definition.eventTypes,
-      maxCutoffEventId: maxCutoff,
+      maxCutoffEventId,
       cursorEventId,
       batchSize,
     });
 
     if (events.length === 0) break;
 
-    // Filter per-aggregate cutoff in JS
+    // Filter per-aggregate cutoff in JS using (timestamp, eventId) ordering
     for (const e of events) {
       const key = aggregateKey({
         tenantId: e.tenantId,
@@ -402,7 +421,7 @@ async function replayBatch({
         aggregateId: e.aggregateId,
       });
       const cutoff = cutoffs.get(key);
-      if (cutoff != null && e.id <= cutoff) {
+      if (cutoff != null && isAtOrBeforeCutoff(e.timestamp, e.id, cutoff)) {
         allEvents.push(e);
       }
     }

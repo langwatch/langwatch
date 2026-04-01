@@ -39,7 +39,11 @@ export async function markPendingBatch({
   await pipeline.exec();
 }
 
-/** Pipeline HSET cutoffEventId for a batch of aggregate keys. */
+/**
+ * Pipeline HSET cutoff markers for a batch of aggregate keys.
+ * Marker format: `{timestamp}:{eventId}` — matches the comparison in
+ * ReplayMarkerChecker which uses (timestamp, eventId) ordering.
+ */
 export async function markCutoffBatch({
   redis,
   projectionName,
@@ -47,13 +51,13 @@ export async function markCutoffBatch({
 }: {
   redis: IORedis;
   projectionName: string;
-  cutoffs: Map<string, string>;
+  cutoffs: Map<string, { timestamp: number; eventId: string }>;
 }): Promise<void> {
   if (cutoffs.size === 0) return;
   const pipeline = redis.pipeline();
   const key = cutoffKey(projectionName);
-  for (const [aggKey, cutoffEventId] of cutoffs) {
-    pipeline.hset(key, aggKey, cutoffEventId);
+  for (const [aggKey, cutoff] of cutoffs) {
+    pipeline.hset(key, aggKey, `${cutoff.timestamp}:${cutoff.eventId}`);
   }
   await pipeline.exec();
 }

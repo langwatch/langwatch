@@ -144,8 +144,20 @@ export async function countEventsForAggregates({
   return parseInt(rows[0]?.totalEvents ?? "0", 10);
 }
 
+/** Cutoff info for an aggregate: the last event's timestamp and ID. */
+export interface CutoffInfo {
+  timestamp: number;
+  eventId: string;
+}
+
 /**
- * Get cutoff EventIds for a batch of aggregates in one query.
+ * Get cutoff event info for a batch of aggregates in one query.
+ *
+ * Returns the last event per aggregate using the same ordering as the event store:
+ * `EventTimestamp DESC, EventId DESC` — consistent with the marker check's
+ * `(timestamp, eventId)` comparison.
+ *
+ * The marker format stored in Redis is `{timestamp}:{eventId}`.
  */
 export async function batchGetCutoffEventIds({
   client,
@@ -157,13 +169,14 @@ export async function batchGetCutoffEventIds({
   tenantId: string;
   aggregateIds: string[];
   eventTypes: readonly string[];
-}): Promise<Map<string, string>> {
+}): Promise<Map<string, CutoffInfo>> {
   const result = await client.query({
     query: `
       SELECT
         AggregateType AS aggregateType,
         AggregateId AS aggregateId,
-        max(EventId) AS cutoffEventId
+        argMax(EventId, (EventTimestamp, EventId)) AS cutoffEventId,
+        max(EventTimestamp) AS cutoffTimestamp
       FROM event_log
       WHERE TenantId = {tenantId:String}
         AND EventType IN ({eventTypes:Array(String)})
@@ -178,11 +191,15 @@ export async function batchGetCutoffEventIds({
     aggregateType: string;
     aggregateId: string;
     cutoffEventId: string;
+    cutoffTimestamp: string;
   }[];
 
-  const map = new Map<string, string>();
+  const map = new Map<string, CutoffInfo>();
   for (const row of rows) {
-    map.set(`${tenantId}:${row.aggregateType}:${row.aggregateId}`, row.cutoffEventId);
+    map.set(`${tenantId}:${row.aggregateType}:${row.aggregateId}`, {
+      timestamp: parseInt(row.cutoffTimestamp, 10),
+      eventId: row.cutoffEventId,
+    });
   }
   return map;
 }
