@@ -11,7 +11,7 @@ import { PromptsApiError } from "./errors";
 export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
 
 export type AssignLabelResult = NonNullable<
-  operations["putApiPromptsByIdLabelsByLabel"]["responses"]["200"]["content"]["application/json"]
+  operations["putApiPromptsByIdTagsByTag"]["responses"]["200"]["content"]["application/json"]
 >;
 
 export type ConfigData = NonNullable<
@@ -114,7 +114,7 @@ export class PromptsApiService {
           path: { id },
           query: {
             version: Number.isNaN(versionNumber) ? undefined : versionNumber,
-            label: options?.label,
+            tag: options?.label,
           },
         },
       },
@@ -233,9 +233,9 @@ export class PromptsApiService {
     versionId: string;
   }): Promise<AssignLabelResult> {
     const { data, error } = await this.apiClient.PUT(
-      "/api/prompts/{id}/labels/{label}",
+      "/api/prompts/{id}/tags/{tag}",
       {
-        params: { path: { id, label } },
+        params: { path: { id, tag: label } },
         body: { versionId },
       },
     );

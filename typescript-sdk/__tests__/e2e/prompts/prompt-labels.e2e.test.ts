@@ -31,8 +31,7 @@ describe("Prompt labels (real API)", () => {
         versionId: v1VersionId,
       });
 
-      const fetched = await langwatch.prompts.get(handle, {
-        label: "production",
+      const fetched = await langwatch.prompts.get(`${handle}:production`, {
         fetchPolicy: "ALWAYS_FETCH",
       });
 
@@ -62,8 +61,7 @@ describe("Prompt labels (real API)", () => {
         versionId: v2VersionId,
       });
 
-      const fetched = await langwatch.prompts.get(handle, {
-        label: "production",
+      const fetched = await langwatch.prompts.get(`${handle}:production`, {
         fetchPolicy: "ALWAYS_FETCH",
       });
 
@@ -112,8 +110,7 @@ describe("Prompt labels (real API)", () => {
       });
 
       await expect(
-        langwatch.prompts.get(handle, {
-          label: "production",
+        langwatch.prompts.get(`${handle}:production`, {
           fetchPolicy: "ALWAYS_FETCH",
         }),
       ).rejects.toThrow();

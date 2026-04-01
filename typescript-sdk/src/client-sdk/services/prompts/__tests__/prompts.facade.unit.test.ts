@@ -244,6 +244,44 @@ describe("Prompt Retrieval", () => {
     });
   });
 
+  describe("Scenario: Shorthand prompt:label syntax", () => {
+    describe("when fetching with colon-separated handle:label shorthand", () => {
+      it("extracts label from colon-separated handle and calls API with split handle and label", async () => {
+        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        localPromptsService.get.mockResolvedValue(null);
+        promptsApiService.get.mockResolvedValue(productionPrompt);
+
+        const result = await facade.get(`${testHandle}:production`);
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(testHandle, { label: "production" });
+        expect(result).toEqual(new Prompt(productionPrompt));
+      });
+    });
+
+    describe("when explicit label option is also provided alongside shorthand", () => {
+      it("uses explicit label option and ignores the shorthand label", async () => {
+        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        localPromptsService.get.mockResolvedValue(null);
+        promptsApiService.get.mockResolvedValue(productionPrompt);
+
+        await facade.get(`${testHandle}:staging`, { label: "production" });
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(testHandle + ":staging", { label: "production" });
+      });
+    });
+
+    describe("when no colon is present in the handle", () => {
+      it("passes the handle to the API unchanged", async () => {
+        localPromptsService.get.mockResolvedValue(null);
+        promptsApiService.get.mockResolvedValue(mockServerPrompt);
+
+        await facade.get(testHandle);
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(testHandle, undefined);
+      });
+    });
+  });
+
   describe("Scenario: Cache TTL - Version Isolation", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

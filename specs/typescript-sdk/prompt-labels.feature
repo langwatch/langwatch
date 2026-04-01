@@ -11,7 +11,7 @@ Feature: SDK Prompt Label Support
   @unit
   Scenario: Fetch prompt by label
     Given "pizza-prompt" has production=v3 and latest=v4
-    When I call prompts.get("pizza-prompt", { label: "production" })
+    When I call prompts.get("pizza-prompt:production")
     Then I receive version v3 config data
 
   @unit
@@ -30,7 +30,7 @@ Feature: SDK Prompt Label Support
   @unit
   Scenario: Label is included in cache key
     Given "pizza-prompt" has production=v3
-    When I call get("pizza-prompt", { label: "production", fetchPolicy: "CACHE_TTL" })
+    When I call get("pizza-prompt:production", { fetchPolicy: "CACHE_TTL" })
     Then the cache key includes the label
     And it returns v3
 
@@ -49,7 +49,7 @@ Feature: SDK Prompt Label Support
   @unit
   Scenario: Unassigned label returns error
     Given "pizza-prompt" has no version assigned to "production"
-    When I call get("pizza-prompt", { label: "production" })
+    When I call get("pizza-prompt:production")
     Then the API returns an error and the SDK propagates it
 
   # --- Label assignment (sub-resource) ---
@@ -58,7 +58,7 @@ Feature: SDK Prompt Label Support
   Scenario: Assign label to existing version
     Given "pizza-prompt" version v3 exists with a known versionId
     When I call prompts.labels.assign("pizza-prompt", { label: "production", versionId })
-    Then the API receives PUT /api/prompts/pizza-prompt/labels/production
+    Then the API receives PUT /api/prompts/pizza-prompt/tags/production
     And the request body contains the versionId
 
   # Note: assign with custom label uses same code path as built-in labels —
@@ -118,14 +118,14 @@ Feature: SDK Prompt Label Support
   Scenario: Assign label and fetch by label via real API
     Given I create a prompt with two versions via the SDK
     When I assign the "production" label to version 1
-    And I fetch the prompt with label "production"
+    And I fetch the prompt using shorthand "handle:production"
     Then I receive version 1 config data
 
   @e2e
   Scenario: Reassign label to newer version
     Given a prompt with "production" label assigned to version 1
     When I reassign "production" to version 2
-    And I fetch the prompt with label "production"
+    And I fetch the prompt using shorthand "handle:production"
     Then I receive version 2 config data
 
   @e2e
@@ -137,7 +137,7 @@ Feature: SDK Prompt Label Support
   @e2e
   Scenario: Fetch with unassigned label returns error
     Given a prompt with no labels assigned
-    When I fetch the prompt with label "production"
+    When I fetch the prompt using shorthand "handle:production"
     Then I receive an error
 
   @e2e
@@ -145,7 +145,7 @@ Feature: SDK Prompt Label Support
     Given I create a custom label "canary" via the SDK
     And I create a prompt with two versions via the SDK
     When I assign the "canary" label to version 2
-    And I fetch the prompt with label "canary"
+    And I fetch the prompt using shorthand "handle:canary"
     Then I receive version 2 config data
 
   @e2e

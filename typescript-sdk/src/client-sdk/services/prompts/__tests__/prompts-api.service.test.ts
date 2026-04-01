@@ -33,7 +33,7 @@ describe("PromptsApiService.get", () => {
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
-            query: expect.objectContaining({ label: "production" }),
+            query: expect.objectContaining({ tag: "production" }),
           }),
         }),
       );
@@ -50,7 +50,7 @@ describe("PromptsApiService.get", () => {
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
-            query: expect.objectContaining({ label: "production", version: 3 }),
+            query: expect.objectContaining({ tag: "production", version: 3 }),
           }),
         }),
       );

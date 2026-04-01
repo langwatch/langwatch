@@ -27,7 +27,7 @@ describe("Prompt Labels", () => {
         } as InternalConfig);
       });
 
-      it("calls PUT /api/prompts/{id}/labels/{label} with versionId", async () => {
+      it("calls PUT /api/prompts/{id}/tags/{tag} with versionId", async () => {
         mockPut.mockResolvedValue({
           data: {
             configId: "config_abc",
@@ -45,10 +45,10 @@ describe("Prompt Labels", () => {
         });
 
         expect(mockPut).toHaveBeenCalledWith(
-          "/api/prompts/{id}/labels/{label}",
+          "/api/prompts/{id}/tags/{tag}",
           expect.objectContaining({
             params: expect.objectContaining({
-              path: { id: "pizza-prompt", label: "production" },
+              path: { id: "pizza-prompt", tag: "production" },
             }),
             body: { versionId: "prompt_version_abc123" },
           }),
