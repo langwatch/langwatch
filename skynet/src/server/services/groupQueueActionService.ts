@@ -1,7 +1,5 @@
 import type IORedis from "ioredis";
 import { DRAIN_GROUP_LUA, UNBLOCK_LUA, MOVE_TO_DLQ_LUA, REPLAY_FROM_DLQ_LUA } from "./luaScripts.ts";
-import { retryJob } from "./bullmqService.ts";
-import { isGroupQueue } from "./queueDiscovery.ts";
 import { createLogger } from "../logger.ts";
 import { DLQ_TTL_SECONDS } from "../../shared/constants.ts";
 
@@ -88,7 +86,7 @@ export class GroupQueueActionService {
   }): Promise<{ jobsRemoved: number }> {
     const prefix = `${queueName}:gq:`;
     const result = await this.redis.eval(
-      DRAIN_GROUP_LUA, 7,
+      DRAIN_GROUP_LUA, 8,
       `${prefix}group:${groupId}:jobs`,
       `${prefix}group:${groupId}:data`,
       `${prefix}group:${groupId}:active`,
@@ -96,6 +94,7 @@ export class GroupQueueActionService {
       `${prefix}blocked`,
       `${prefix}signal`,
       `${prefix}group:${groupId}:error`,
+      `${prefix}stats:total-pending`,
       groupId,
     );
 
@@ -110,14 +109,10 @@ export class GroupQueueActionService {
     queueName: string;
     groupId: string;
     jobId: string;
-  }): Promise<{ retried: boolean; unblocked: boolean }> {
-    const retried = isGroupQueue(queueName)
-      ? true
-      : await retryJob(this.redis, queueName, jobId);
-
+  }): Promise<{ wasBlocked: boolean }> {
     const { wasBlocked } = await this.unblockGroup({ queueName, groupId });
 
-    return { retried, unblocked: wasBlocked };
+    return { wasBlocked };
   }
 
   async pauseKey({
@@ -234,7 +229,7 @@ export class GroupQueueActionService {
       const drainPipeline = this.redis.pipeline();
       for (const groupId of groupsToDrain) {
         drainPipeline.eval(
-          DRAIN_GROUP_LUA, 7,
+          DRAIN_GROUP_LUA, 8,
           `${prefix}group:${groupId}:jobs`,
           `${prefix}group:${groupId}:data`,
           `${prefix}group:${groupId}:active`,
@@ -242,6 +237,7 @@ export class GroupQueueActionService {
           `${prefix}blocked`,
           `${prefix}signal`,
           `${prefix}group:${groupId}:error`,
+          `${prefix}stats:total-pending`,
           groupId,
         );
       }

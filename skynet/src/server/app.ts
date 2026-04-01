@@ -10,7 +10,6 @@ import { createDashboardRouter } from "./routes/dashboard.ts";
 import { createGroupsRouter } from "./routes/groups.ts";
 import { createJobsRouter } from "./routes/jobs.ts";
 import { createActionsRouter } from "./routes/actions.ts";
-import { createBullMQRouter } from "./routes/bullmq.ts";
 import { createDejaViewRouter } from "./routes/dejaview.ts";
 import type { SSEManager } from "./sse/sseManager.ts";
 import type { MetricsCollector } from "./services/metricsCollector.ts";
@@ -22,10 +21,9 @@ interface AppDeps {
   sseManager: SSEManager;
   metrics: MetricsCollector;
   getGroupQueueNames: () => string[];
-  getQueueNames: () => string[];
 }
 
-export function createApp({ redis, sseManager, metrics, getGroupQueueNames, getQueueNames }: AppDeps): express.Application {
+export function createApp({ redis, sseManager, metrics, getGroupQueueNames }: AppDeps): express.Application {
   const app = express();
 
   app.use(express.json());
@@ -44,7 +42,6 @@ export function createApp({ redis, sseManager, metrics, getGroupQueueNames, getQ
   app.use(createGroupsRouter(redis, metrics, getGroupQueueNames));
   app.use(createJobsRouter(redis, getGroupQueueNames));
   app.use(createActionsRouter(redis, getGroupQueueNames));
-  app.use(createBullMQRouter(redis, getQueueNames));
   app.use(createDejaViewRouter());
 
   // Serve SPA static files (only when built assets exist, i.e. production)

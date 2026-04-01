@@ -449,7 +449,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               });
 
               // Success — complete the group slot
-              await this.scripts.complete({ groupId, stagedJobId });
+              const jobName = typeof jobData.__jobName === "string" ? jobData.__jobName : "";
+              await this.scripts.complete({ groupId, stagedJobId, jobName });
               gqJobsCompletedTotal.inc({ queue_name: this.queueName });
 
               this.logger.debug(

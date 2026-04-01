@@ -2,23 +2,19 @@ import "dotenv/config";
 
 import { DEFAULT_PORT, QUEUE_DISCOVERY_INTERVAL_MS } from "../shared/constants.ts";
 import { getRedis } from "./services/redis.ts";
-import { discoverQueueNames, isGroupQueue } from "./services/queueDiscovery.ts";
+import { discoverQueueNames } from "./services/queueDiscovery.ts";
 import { MetricsCollector } from "./services/metricsCollector.ts";
-import { evictStaleQueueCache } from "./services/bullmqService.ts";
 import { SSEManager } from "./sse/sseManager.ts";
 import { createApp } from "./app.ts";
 
-const PORT = parseInt(process.env.SKYNET_PORT ?? process.env.BULLBOARD_PORT ?? String(DEFAULT_PORT), 10);
+const PORT = parseInt(process.env.SKYNET_PORT ?? String(DEFAULT_PORT), 10);
 
 async function main() {
   const redis = getRedis();
 
-  const allQueueNames = await discoverQueueNames(redis);
-  const groupQueueNames = allQueueNames.filter(isGroupQueue);
-  let currentQueueNames = [...allQueueNames];
-  let currentGroupQueueNames = [...groupQueueNames];
+  let currentGroupQueueNames = await discoverQueueNames(redis);
 
-  console.log(`Discovered ${allQueueNames.length} queues (${groupQueueNames.length} group queues)`);
+  console.log(`Discovered ${currentGroupQueueNames.length} group queues`);
 
   // Auth warning at startup
   if (!process.env.SKYNET_USERNAME || !process.env.SKYNET_PASSWORD) {
@@ -35,20 +31,23 @@ async function main() {
   sseManager.start();
   sseManager.startDashboardBroadcast(metrics);
 
-  // Periodic queue discovery
+  // Periodic queue discovery (single-flight: skip if previous run still in progress)
+  let discoveryInProgress = false;
   setInterval(async () => {
+    if (discoveryInProgress) return;
+    discoveryInProgress = true;
     try {
       const names = await discoverQueueNames(redis);
-      const added = names.filter((n) => !currentQueueNames.includes(n));
-      const removed = currentQueueNames.filter((n) => !names.includes(n));
+      const added = names.filter((n) => !currentGroupQueueNames.includes(n));
+      const removed = currentGroupQueueNames.filter((n) => !names.includes(n));
       if (added.length > 0) console.log(`Discovered ${added.length} new queue(s): ${added.join(", ")}`);
       if (removed.length > 0) console.log(`Removed ${removed.length} stale queue(s): ${removed.join(", ")}`);
-      currentQueueNames = names;
-      currentGroupQueueNames = currentQueueNames.filter(isGroupQueue);
+      currentGroupQueueNames = names;
       metrics.updateGroupQueueNames(currentGroupQueueNames);
-      evictStaleQueueCache(currentQueueNames);
     } catch (err) {
       console.error("Queue discovery error:", err);
+    } finally {
+      discoveryInProgress = false;
     }
   }, QUEUE_DISCOVERY_INTERVAL_MS);
 
@@ -57,7 +56,6 @@ async function main() {
     sseManager,
     metrics,
     getGroupQueueNames: () => currentGroupQueueNames,
-    getQueueNames: () => currentQueueNames,
   });
 
   app.listen(PORT, () => {

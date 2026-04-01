@@ -118,7 +118,7 @@ function PipelineSection({ pipelineName, metrics }: { pipelineName: string; metr
                   Act <SortIndicator column="active" sortKey={sortKey} sortDir={sortDir} />
                 </Th>
                 <Th {...thStyle} isNumeric onClick={() => cycleSort("completedPerSec")}>
-                  Done/s <SortIndicator column="completedPerSec" sortKey={sortKey} sortDir={sortDir} />
+                  Completed/s <SortIndicator column="completedPerSec" sortKey={sortKey} sortDir={sortDir} />
                 </Th>
                 <Th {...thStyle} isNumeric onClick={() => cycleSort("latencyP50Ms")}>
                   p50 <SortIndicator column="latencyP50Ms" sortKey={sortKey} sortDir={sortDir} />
