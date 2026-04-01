@@ -112,6 +112,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -177,6 +178,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/compiled-prompt",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -223,6 +225,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/late-prompt",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -301,6 +304,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -694,6 +698,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "tea-prompt",
         promptVersionNumber: 4,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -740,6 +745,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/nested-prompt",
         promptVersionNumber: 5,
+        promptLabel: null,
         promptVariables: null,
       });
     });
