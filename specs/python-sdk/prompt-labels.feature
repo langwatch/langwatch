@@ -11,13 +11,13 @@ Feature: Python SDK custom label support
   @unit
   Scenario: fetches prompt by built-in label
     Given "pizza-prompt" has production=v3 and latest=v4
-    When I call prompts.get("pizza-prompt", label="production")
+    When I call prompts.get("pizza-prompt:production")
     Then I receive version v3 config data
 
   @unit
   Scenario: fetches prompt by custom label
     Given "pizza-prompt" has custom label "canary" assigned to v2
-    When I call prompts.get("pizza-prompt", label="canary")
+    When I call prompts.get("pizza-prompt:canary")
     Then I receive version v2 config data
 
   @unit
@@ -43,7 +43,7 @@ Feature: Python SDK custom label support
   Scenario: skips local files when label is provided with MATERIALIZED_FIRST
     Given "pizza-prompt" exists in materialized local files
     And the API has "pizza-prompt" with label "production" pointing to v3
-    When I call prompts.get("pizza-prompt", label="production")
+    When I call prompts.get("pizza-prompt:production")
     Then the SDK fetches from the API, not from local files
     And I receive version v3 config data
 
@@ -52,7 +52,7 @@ Feature: Python SDK custom label support
   @unit
   Scenario: includes label in cache key
     Given "pizza-prompt" has production=v3
-    When I call get("pizza-prompt", label="production", fetch_policy=CACHE_TTL)
+    When I call get("pizza-prompt:production", fetch_policy=CACHE_TTL)
     Then the cache key includes the label
     And it returns v3
 
@@ -75,7 +75,7 @@ Feature: Python SDK custom label support
   @unit
   Scenario: propagates error for unassigned label
     Given "pizza-prompt" has no version assigned to "canary"
-    When I call get("pizza-prompt", label="canary")
+    When I call get("pizza-prompt:canary")
     Then the API returns an error and the SDK propagates it
 
   # --- Label assignment (sub-resource) ---

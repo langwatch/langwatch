@@ -11,7 +11,7 @@ Feature: Python SDK Prompt Label Support
   @integration
   Scenario: Fetch prompt by label
     Given the API returns version v3 for "pizza-prompt" with label "production"
-    When I call langwatch.prompts.get("pizza-prompt", label="production")
+    When I call langwatch.prompts.get("pizza-prompt:production")
     Then the SDK sends GET /api/prompts/pizza-prompt?label=production
     And I receive version v3 config data
 
@@ -34,7 +34,7 @@ Feature: Python SDK Prompt Label Support
   @integration
   Scenario: Labeled and unlabeled fetches return independent results
     Given the API returns v3 for label "production" and v4 for no label
-    When I call get("pizza-prompt", label="production") with CACHE_TTL policy
+    When I call get("pizza-prompt:production") with CACHE_TTL policy
     And I call get("pizza-prompt") with CACHE_TTL policy
     Then the API is called twice (no cache collision)
     And the first call returns v3
@@ -43,8 +43,8 @@ Feature: Python SDK Prompt Label Support
   @integration
   Scenario: Fetches with different labels return independent results
     Given the API returns v3 for label "production" and v2 for label "staging"
-    When I call get("pizza-prompt", label="production") with CACHE_TTL policy
-    And I call get("pizza-prompt", label="staging") with CACHE_TTL policy
+    When I call get("pizza-prompt:production") with CACHE_TTL policy
+    And I call get("pizza-prompt:staging") with CACHE_TTL policy
     Then the API is called twice
     And the results are v3 and v2 respectively
 
@@ -52,14 +52,14 @@ Feature: Python SDK Prompt Label Support
 
   @unit
   Scenario: Label with MATERIALIZED_ONLY raises an error
-    When I call get("pizza-prompt", label="production", fetch_policy=MATERIALIZED_ONLY)
+    When I call get("pizza-prompt:production", fetch_policy=MATERIALIZED_ONLY)
     Then the SDK raises a ValueError indicating labels require API access
 
   @integration
   Scenario: Label with MATERIALIZED_FIRST skips local and fetches from API
     Given a local prompt file exists for "pizza-prompt"
     And the API returns v3 for label "production"
-    When I call get("pizza-prompt", label="production", fetch_policy=MATERIALIZED_FIRST)
+    When I call get("pizza-prompt:production", fetch_policy=MATERIALIZED_FIRST)
     Then the SDK fetches from the API (not local files)
     And I receive version v3
 
@@ -68,7 +68,7 @@ Feature: Python SDK Prompt Label Support
   @integration
   Scenario: Unassigned label propagates API error
     Given the API returns a not-found error for label "production" on "pizza-prompt"
-    When I call langwatch.prompts.get("pizza-prompt", label="production")
+    When I call langwatch.prompts.get("pizza-prompt:production")
     Then the SDK raises an error with the API error message
 
   # --- Label Assignment ---
@@ -91,10 +91,3 @@ Feature: Python SDK Prompt Label Support
   Scenario: Update prompt with labels
     When I call langwatch.prompts.update with labels=["staging"]
     Then the SDK sends PUT /api/prompts/{id} with labels ["staging"] in the request body
-
-  # --- Runtime Validation ---
-
-  @unit
-  Scenario: Invalid label value raises an error at runtime
-    When I call langwatch.prompts.get("pizza-prompt", label="canary")
-    Then the SDK raises a ValueError before making any API call
