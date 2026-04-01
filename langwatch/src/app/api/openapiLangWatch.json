@@ -803,6 +803,306 @@
         }
       }
     },
+    "/api/prompts/tags": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "createdAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiPromptsTags",
+        "description": "List all prompt tags (built-in and custom) for the organization"
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Tag already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid tag name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiPromptsTags",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "description": "Create a custom prompt tag for the organization"
+      }
+    },
+    "/api/prompts/tags/{tagId}": {
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tag not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Cannot delete built-in tag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "message": { "type": "string" }
+                  },
+                  "required": ["error"]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteApiPromptsTagsByTagId",
+        "parameters": [
+          {
+            "name": "tagId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "description": "Delete a custom prompt tag for the organization"
+      }
+    },
     "/api/prompts/{id}": {
       "get": {
         "responses": {

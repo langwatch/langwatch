@@ -7,9 +7,9 @@ import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { LocalPromptsService } from "../local-prompts.service";
 
-describe("Prompt Labels", () => {
-  describe("labels.assign()", () => {
-    describe("when assigning a label to a version", () => {
+describe("Prompt Tags", () => {
+  describe("tags.assign()", () => {
+    describe("when assigning a tag to a version", () => {
       let mockPut: ReturnType<typeof vi.fn>;
       let service: PromptsApiService;
 
@@ -32,7 +32,7 @@ describe("Prompt Labels", () => {
           data: {
             configId: "config_abc",
             versionId: "prompt_version_abc123",
-            label: "production",
+            tag: "production",
             updatedAt: "2026-01-01T00:00:00.000Z",
           },
           error: undefined,
@@ -55,11 +55,11 @@ describe("Prompt Labels", () => {
         );
       });
 
-      it("returns the assignment result with configId, versionId, label, updatedAt", async () => {
+      it("returns the assignment result with configId, versionId, tag, updatedAt", async () => {
         const expectedResult = {
           configId: "config_abc",
           versionId: "prompt_version_abc123",
-          label: "production",
+          tag: "production",
           updatedAt: "2026-01-01T00:00:00.000Z",
         };
         mockPut.mockResolvedValue({ data: expectedResult, error: undefined });
@@ -108,7 +108,7 @@ describe("Prompt Labels", () => {
       });
     });
 
-    describe("when accessed via PromptsFacade.labels.assign", () => {
+    describe("when accessed via PromptsFacade.tags.assign", () => {
       let promptsApiService: MockProxy<PromptsApiService>;
       let facade: PromptsFacade;
       let localPromptsService: MockProxy<LocalPromptsService>;
@@ -128,12 +128,12 @@ describe("Prompt Labels", () => {
         const expectedResult = {
           configId: "config_abc",
           versionId: "prompt_version_abc123",
-          label: "production",
+          tag: "production",
           updatedAt: "2026-01-01T00:00:00.000Z",
         };
         promptsApiService.assignLabel.mockResolvedValue(expectedResult);
 
-        const result = await facade.labels.assign("pizza-prompt", {
+        const result = await facade.tags.assign("pizza-prompt", {
           label: "production",
           versionId: "prompt_version_abc123",
         });

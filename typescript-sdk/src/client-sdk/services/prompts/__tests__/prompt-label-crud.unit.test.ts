@@ -8,7 +8,7 @@ import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { LocalPromptsService } from "../local-prompts.service";
 
-describe("Label CRUD", () => {
+describe("Tag CRUD", () => {
   describe("PromptsApiService", () => {
     let mockGet: ReturnType<typeof vi.fn>;
     let mockPost: ReturnType<typeof vi.fn>;
@@ -31,34 +31,34 @@ describe("Label CRUD", () => {
       } as InternalConfig);
     });
 
-    describe("listLabels()", () => {
-      describe("when listing labels succeeds", () => {
-        it("calls GET /api/prompts/labels", async () => {
+    describe("listTags()", () => {
+      describe("when listing tags succeeds", () => {
+        it("calls GET /api/prompts/tags", async () => {
           mockGet.mockResolvedValue({
             data: [
-              { name: "production", type: "built-in" },
-              { name: "staging", type: "built-in" },
-              { id: "plabel_abc", name: "canary", type: "custom", createdAt: "2026-01-01T00:00:00.000Z" },
+              { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
+              { id: "ptag_stg", name: "staging", createdAt: "2026-01-01T00:00:00.000Z" },
+              { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
             ],
             error: undefined,
           });
 
-          await service.listLabels();
+          await service.listTags();
 
-          expect(mockGet).toHaveBeenCalledWith("/api/prompts/labels");
+          expect(mockGet).toHaveBeenCalledWith("/api/prompts/tags");
         });
 
-        it("returns the list of labels", async () => {
-          const expectedLabels = [
-            { name: "production", type: "built-in" },
-            { name: "staging", type: "built-in" },
-            { id: "plabel_abc", name: "canary", type: "custom", createdAt: "2026-01-01T00:00:00.000Z" },
+        it("returns the list of tags", async () => {
+          const expectedTags = [
+            { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
+            { id: "ptag_stg", name: "staging", createdAt: "2026-01-01T00:00:00.000Z" },
+            { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
           ];
-          mockGet.mockResolvedValue({ data: expectedLabels, error: undefined });
+          mockGet.mockResolvedValue({ data: expectedTags, error: undefined });
 
-          const result = await service.listLabels();
+          const result = await service.listTags();
 
-          expect(result).toEqual(expectedLabels);
+          expect(result).toEqual(expectedTags);
         });
       });
 
@@ -69,34 +69,34 @@ describe("Label CRUD", () => {
             error: { error: "Unauthorized" },
           });
 
-          await expect(service.listLabels()).rejects.toThrow(PromptsApiError);
+          await expect(service.listTags()).rejects.toThrow(PromptsApiError);
         });
       });
     });
 
-    describe("createLabel()", () => {
-      describe("when creating a label succeeds", () => {
-        it("calls POST /api/prompts/labels with the label name", async () => {
+    describe("createTag()", () => {
+      describe("when creating a tag succeeds", () => {
+        it("calls POST /api/prompts/tags with the tag name", async () => {
           mockPost.mockResolvedValue({
-            data: { id: "plabel_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
+            data: { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" },
             error: undefined,
           });
 
-          await service.createLabel({ name: "canary" });
+          await service.createTag({ name: "canary" });
 
           expect(mockPost).toHaveBeenCalledWith(
-            "/api/prompts/labels",
+            "/api/prompts/tags",
             expect.objectContaining({ body: { name: "canary" } }),
           );
         });
 
-        it("returns the created label", async () => {
-          const expectedLabel = { id: "plabel_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
-          mockPost.mockResolvedValue({ data: expectedLabel, error: undefined });
+        it("returns the created tag", async () => {
+          const expectedTag = { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
+          mockPost.mockResolvedValue({ data: expectedTag, error: undefined });
 
-          const result = await service.createLabel({ name: "canary" });
+          const result = await service.createTag({ name: "canary" });
 
-          expect(result).toEqual(expectedLabel);
+          expect(result).toEqual(expectedTag);
         });
       });
 
@@ -104,24 +104,24 @@ describe("Label CRUD", () => {
         it("throws PromptsApiError", async () => {
           mockPost.mockResolvedValue({
             data: undefined,
-            error: { error: "Label already exists" },
+            error: { error: "Tag already exists" },
           });
 
-          await expect(service.createLabel({ name: "canary" })).rejects.toThrow(PromptsApiError);
+          await expect(service.createTag({ name: "canary" })).rejects.toThrow(PromptsApiError);
         });
       });
     });
 
-    describe("deleteLabel()", () => {
-      describe("when deleting a label succeeds", () => {
-        it("calls DELETE /api/prompts/labels/:labelId", async () => {
+    describe("deleteTag()", () => {
+      describe("when deleting a tag succeeds", () => {
+        it("calls DELETE /api/prompts/tags/:tagId", async () => {
           mockDelete.mockResolvedValue({ data: undefined, error: undefined });
 
-          await service.deleteLabel("plabel_abc");
+          await service.deleteTag("ptag_abc");
 
           expect(mockDelete).toHaveBeenCalledWith(
-            "/api/prompts/labels/{labelId}",
-            expect.objectContaining({ params: { path: { labelId: "plabel_abc" } } }),
+            "/api/prompts/tags/{tagId}",
+            expect.objectContaining({ params: { path: { tagId: "ptag_abc" } } }),
           );
         });
       });
@@ -130,16 +130,16 @@ describe("Label CRUD", () => {
         it("throws PromptsApiError", async () => {
           mockDelete.mockResolvedValue({
             data: undefined,
-            error: { error: "Label not found" },
+            error: { error: "Tag not found" },
           });
 
-          await expect(service.deleteLabel("plabel_abc")).rejects.toThrow(PromptsApiError);
+          await expect(service.deleteTag("ptag_abc")).rejects.toThrow(PromptsApiError);
         });
       });
     });
   });
 
-  describe("PromptsFacade.labels", () => {
+  describe("PromptsFacade.tags", () => {
     let promptsApiService: MockProxy<PromptsApiService>;
     let facade: PromptsFacade;
     let localPromptsService: MockProxy<LocalPromptsService>;
@@ -155,42 +155,42 @@ describe("Label CRUD", () => {
       });
     });
 
-    describe("labels.list()", () => {
-      it("delegates to PromptsApiService.listLabels", async () => {
-        const expectedLabels = [
-          { name: "production", type: "built-in" as const },
+    describe("tags.list()", () => {
+      it("delegates to PromptsApiService.listTags", async () => {
+        const expectedTags = [
+          { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
         ];
-        promptsApiService.listLabels.mockResolvedValue(expectedLabels);
+        promptsApiService.listTags.mockResolvedValue(expectedTags);
 
-        const result = await facade.labels.list();
+        const result = await facade.tags.list();
 
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.listLabels).toHaveBeenCalled();
-        expect(result).toEqual(expectedLabels);
+        expect(promptsApiService.listTags).toHaveBeenCalled();
+        expect(result).toEqual(expectedTags);
       });
     });
 
-    describe("labels.create()", () => {
-      it("delegates to PromptsApiService.createLabel with name", async () => {
-        const expectedLabel = { id: "plabel_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
-        promptsApiService.createLabel.mockResolvedValue(expectedLabel);
+    describe("tags.create()", () => {
+      it("delegates to PromptsApiService.createTag with name", async () => {
+        const expectedTag = { id: "ptag_abc", name: "canary", createdAt: "2026-01-01T00:00:00.000Z" };
+        promptsApiService.createTag.mockResolvedValue(expectedTag);
 
-        const result = await facade.labels.create({ name: "canary" });
+        const result = await facade.tags.create({ name: "canary" });
 
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.createLabel).toHaveBeenCalledWith({ name: "canary" });
-        expect(result).toEqual(expectedLabel);
+        expect(promptsApiService.createTag).toHaveBeenCalledWith({ name: "canary" });
+        expect(result).toEqual(expectedTag);
       });
     });
 
-    describe("labels.delete()", () => {
-      it("delegates to PromptsApiService.deleteLabel with labelId", async () => {
-        promptsApiService.deleteLabel.mockResolvedValue(undefined);
+    describe("tags.delete()", () => {
+      it("delegates to PromptsApiService.deleteTag with tagId", async () => {
+        promptsApiService.deleteTag.mockResolvedValue(undefined);
 
-        await facade.labels.delete("plabel_abc");
+        await facade.tags.delete("ptag_abc");
 
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.deleteLabel).toHaveBeenCalledWith("plabel_abc");
+        expect(promptsApiService.deleteTag).toHaveBeenCalledWith("ptag_abc");
       });
     });
   });

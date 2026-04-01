@@ -28,7 +28,7 @@ describe("Prompt labels and versions (real API)", () => {
           const v1VersionId = v1.versionId ?? "";
           expect(v1VersionId).not.toBe("");
 
-          await langwatch.prompts.labels.assign(handle, {
+          await langwatch.prompts.tags.assign(handle, {
             label: "production",
             versionId: v1VersionId,
           });
@@ -61,7 +61,7 @@ describe("Prompt labels and versions (real API)", () => {
           const v1VersionId = v1.versionId ?? "";
           expect(v1VersionId).not.toBe("");
 
-          await langwatch.prompts.labels.assign(handle, {
+          await langwatch.prompts.tags.assign(handle, {
             label: "production",
             versionId: v1VersionId,
           });
@@ -147,7 +147,7 @@ describe("Prompt labels and versions (real API)", () => {
         const v1VersionId = v1.versionId ?? "";
         expect(v1VersionId).not.toBe("");
 
-        await langwatch.prompts.labels.assign(handle, {
+        await langwatch.prompts.tags.assign(handle, {
           label: "production",
           versionId: v1VersionId,
         });

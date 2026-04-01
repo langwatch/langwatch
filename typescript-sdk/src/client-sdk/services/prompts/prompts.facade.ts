@@ -1,6 +1,6 @@
 import { PromptsApiService, type AssignLabelResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody, PromptData, LabelDefinition, CreatedLabel } from "./types";
+import type { CreatePromptBody, UpdatePromptBody, PromptData, TagDefinition, CreatedTag } from "./types";
 import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
@@ -38,22 +38,22 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
-  readonly labels: {
+  readonly tags: {
     assign(id: string, params: { label: string; versionId: string }): Promise<AssignLabelResult>;
-    list(): Promise<LabelDefinition[]>;
-    create(params: { name: string }): Promise<CreatedLabel>;
-    delete(labelId: string): Promise<void>;
+    list(): Promise<TagDefinition[]>;
+    create(params: { name: string }): Promise<CreatedTag>;
+    delete(tagId: string): Promise<void>;
   };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
-    this.labels = {
+    this.tags = {
       assign: (id, { label, versionId }) =>
         this.promptsApiService.assignLabel({ id, label, versionId }),
-      list: () => this.promptsApiService.listLabels(),
-      create: ({ name }) => this.promptsApiService.createLabel({ name }),
-      delete: (labelId) => this.promptsApiService.deleteLabel(labelId),
+      list: () => this.promptsApiService.listTags(),
+      create: ({ name }) => this.promptsApiService.createTag({ name }),
+      delete: (tagId) => this.promptsApiService.deleteTag(tagId),
     };
   }
 

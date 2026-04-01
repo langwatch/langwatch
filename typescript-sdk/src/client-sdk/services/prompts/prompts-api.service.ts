@@ -1,5 +1,5 @@
 import type { paths, operations } from "@/internal/generated/openapi/api-client";
-import { type PromptResponse, type LabelDefinition, type CreatedLabel } from "./types";
+import { type PromptResponse, type TagDefinition, type CreatedTag } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
@@ -186,41 +186,41 @@ export class PromptsApiService {
   }
 
   /**
-   * Lists all prompt labels (built-in and custom) for the organization.
-   * @returns Array of label definitions.
+   * Lists all prompt tags (built-in and custom) for the organization.
+   * @returns Array of tag definitions.
    * @throws {PromptsApiError} If the API call fails.
    */
-  async listLabels(): Promise<LabelDefinition[]> {
-    const { data, error } = await this.apiClient.GET("/api/prompts/labels");
-    if (error) this.handleApiError("list labels", error);
+  async listTags(): Promise<TagDefinition[]> {
+    const { data, error } = await this.apiClient.GET("/api/prompts/tags");
+    if (error) this.handleApiError("list tags", error);
     return data;
   }
 
   /**
-   * Creates a custom prompt label for the organization.
-   * @param params.name The label name (must match /^[a-z][a-z0-9_-]*$/).
-   * @returns The created label.
+   * Creates a custom prompt tag for the organization.
+   * @param params.name The tag name (must match /^[a-z][a-z0-9_-]*$/).
+   * @returns The created tag.
    * @throws {PromptsApiError} If the API call fails.
    */
-  async createLabel({ name }: { name: string }): Promise<CreatedLabel> {
-    const { data, error } = await this.apiClient.POST("/api/prompts/labels", {
+  async createTag({ name }: { name: string }): Promise<CreatedTag> {
+    const { data, error } = await this.apiClient.POST("/api/prompts/tags", {
       body: { name },
     });
-    if (error) this.handleApiError("create label", error);
+    if (error) this.handleApiError("create tag", error);
     return data;
   }
 
   /**
-   * Deletes a custom prompt label by ID.
-   * @param labelId The label ID to delete.
+   * Deletes a custom prompt tag by ID.
+   * @param tagId The tag ID to delete.
    * @throws {PromptsApiError} If the API call fails.
    */
-  async deleteLabel(labelId: string): Promise<void> {
+  async deleteTag(tagId: string): Promise<void> {
     const { error } = await this.apiClient.DELETE(
-      "/api/prompts/labels/{labelId}",
-      { params: { path: { labelId } } },
+      "/api/prompts/tags/{tagId}",
+      { params: { path: { tagId } } },
     );
-    if (error) this.handleApiError(`delete label "${labelId}"`, error);
+    if (error) this.handleApiError(`delete tag "${tagId}"`, error);
   }
 
   async assignLabel({
