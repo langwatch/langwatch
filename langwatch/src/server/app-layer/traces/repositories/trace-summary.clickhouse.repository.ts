@@ -108,6 +108,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       "TraceSummaryClickHouseRepository.upsertBatch",
     );
 
+    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
+    if (mixedTenant) {
+      throw new Error(
+        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
+        `Each batch must contain a single tenant to ensure correct DB routing.`,
+      );
+    }
+
     try {
       const client = await this.resolveClient(tenantId);
       const records = entries.map(({ data, tenantId: tid }) => {
