@@ -52,6 +52,7 @@ vi.mock("~/components/ui/toaster", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", apiKey: "test-api-key" },
+    organization: { id: "org-1" },
   }),
 }));
 
@@ -130,17 +131,59 @@ const defaultProps = {
 
 function setupQueries({
   versions = mockVersions,
-  labels = [] as Array<{ label: string; versionId: string }>,
+  tags = [] as Array<{ tag: string; versionId: string }>,
 } = {}) {
   mockUseQuery.mockImplementation((queryName: string) => {
     if (queryName === "getAllVersionsForPrompt") {
       return { data: versions };
     }
     if (queryName === "getTagsForConfig") {
-      return { data: labels };
+      return { data: tags };
     }
     return { data: undefined };
   });
+}
+
+function setupFetch(
+  extraTags: Array<{ name: string; id?: string }> = [],
+) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      const method = options?.method ?? "GET";
+
+      if (method === "GET" && String(url).includes("/prompt-tags")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve([
+              { name: "production" },
+              { name: "staging" },
+              ...extraTags,
+            ]),
+        });
+      }
+
+      if (method === "POST" && String(url).includes("/prompt-tags")) {
+        const body = JSON.parse((options?.body as string) ?? "{}") as { name?: string };
+        const name = body.name ?? "";
+
+        // Simulate duplicate check
+        if (extraTags.some((l) => l.name === name)) {
+          return Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({}) });
+        }
+
+        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ name, id: `id-${name}` }) });
+      }
+
+      if (method === "DELETE" && String(url).includes("/prompt-tags/")) {
+        return Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) });
+      }
+
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+    }),
+  );
 }
 
 function renderDialog(props = {}) {
@@ -153,10 +196,12 @@ function renderDialog(props = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setupFetch();
 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("Feature: Deploy Prompt Dialog", () => {
@@ -172,12 +217,12 @@ describe("Feature: Deploy Prompt Dialog", () => {
         expect(screen.getByText("Deploy prompt")).toBeInTheDocument();
       });
 
-      it("displays the description about assigning versions to labels", () => {
+      it("displays the description about assigning versions to tags", () => {
         renderDialog();
 
         expect(
           screen.getByText(
-            "Use labels to get specific prompt versions via the SDK and API. Prompt versions with the production label are returned by default.",
+            "Use tags to get specific prompt versions via the SDK and API. Prompt versions with the production tag are returned by default.",
           ),
         ).toBeInTheDocument();
       });
@@ -191,7 +236,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
     });
 
-    describe("when showing label rows", () => {
+    describe("when showing tag rows", () => {
       beforeEach(() => {
         setupQueries();
       });
@@ -203,20 +248,24 @@ describe("Feature: Deploy Prompt Dialog", () => {
         expect(screen.getByTestId("latest-version")).toHaveTextContent("v4");
       });
 
-      it("displays the production row with a dropdown", () => {
+      it("displays the production row with a dropdown", async () => {
         renderDialog();
 
-        expect(screen.getByText("production")).toBeInTheDocument();
-        expect(
-          screen.getByLabelText("Production version"),
-        ).toBeInTheDocument();
+        await waitFor(() => {
+          expect(screen.getByText("production")).toBeInTheDocument();
+          expect(
+            screen.getByLabelText("Production version"),
+          ).toBeInTheDocument();
+        });
       });
 
-      it("displays the staging row with a dropdown", () => {
+      it("displays the staging row with a dropdown", async () => {
         renderDialog();
 
-        expect(screen.getByText("staging")).toBeInTheDocument();
-        expect(screen.getByLabelText("Staging version")).toBeInTheDocument();
+        await waitFor(() => {
+          expect(screen.getByText("staging")).toBeInTheDocument();
+          expect(screen.getByLabelText("Staging version")).toBeInTheDocument();
+        });
       });
 
       it("does not render an editable control for the latest row", () => {
@@ -232,8 +281,12 @@ describe("Feature: Deploy Prompt Dialog", () => {
         setupQueries();
       });
 
-      it("lists versions newest first with commit messages", () => {
+      it("lists versions newest first with commit messages", async () => {
         renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+        });
 
         const prodSelect = screen.getByLabelText("Production version");
         const options = prodSelect.querySelectorAll("option");
@@ -249,16 +302,21 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
     });
 
-    describe("when labels are already assigned", () => {
-      it("initializes dropdowns from current label assignments", () => {
+    describe("when tags are already assigned", () => {
+      it("initializes dropdowns from current tag assignments", async () => {
         setupQueries({
-          labels: [
-            { label: "production", versionId: "v2-id" },
-            { label: "staging", versionId: "v3-id" },
+          tags: [
+            { tag:"production", versionId: "v2-id" },
+            { tag:"staging", versionId: "v3-id" },
           ],
         });
 
         renderDialog();
+
+        await waitFor(() => {
+          const prodSelect = screen.getByLabelText("Production version") as HTMLSelectElement;
+          expect(prodSelect.value).toBe("v2-id");
+        });
 
         const prodSelect = screen.getByLabelText(
           "Production version",
@@ -281,7 +339,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
     });
 
-    describe("when save button is clicked", () => {
+    describe("when showing dialog controls", () => {
       it("displays the Save changes button", () => {
         setupQueries();
         renderDialog();
@@ -302,6 +360,10 @@ describe("Feature: Deploy Prompt Dialog", () => {
         setupQueries();
         renderDialog();
 
+        await waitFor(() => {
+          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+        });
+
         const prodSelect = screen.getByLabelText("Production version");
         fireEvent.change(prodSelect, { target: { value: "v3-id" } });
 
@@ -313,7 +375,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
             projectId: "project-1",
             configId: "config-123",
             versionId: "v3-id",
-            label: "production",
+            tag: "production",
           });
         });
       });
@@ -329,6 +391,10 @@ describe("Feature: Deploy Prompt Dialog", () => {
         setupQueries();
         renderDialog();
 
+        await waitFor(() => {
+          expect(screen.getByLabelText("Staging version")).toBeInTheDocument();
+        });
+
         const stagSelect = screen.getByLabelText("Staging version");
         fireEvent.change(stagSelect, { target: { value: "v2-id" } });
 
@@ -340,13 +406,13 @@ describe("Feature: Deploy Prompt Dialog", () => {
             projectId: "project-1",
             configId: "config-123",
             versionId: "v2-id",
-            label: "staging",
+            tag: "staging",
           });
         });
       });
     });
 
-    describe("when user changes both labels and saves", () => {
+    describe("when user changes both tags and saves", () => {
       beforeEach(() => {
         mockMutateAsync.mockClear();
         mockInvalidate.mockClear();
@@ -355,6 +421,10 @@ describe("Feature: Deploy Prompt Dialog", () => {
       it("calls assignTag for both production and staging", async () => {
         setupQueries();
         renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+        });
 
         fireEvent.change(screen.getByLabelText("Production version"), {
           target: { value: "v4-id" },
@@ -368,10 +438,10 @@ describe("Feature: Deploy Prompt Dialog", () => {
         await waitFor(() => {
           expect(mockMutateAsync).toHaveBeenCalledTimes(2);
           expect(mockMutateAsync).toHaveBeenCalledWith(
-            expect.objectContaining({ label: "production", versionId: "v4-id" }),
+            expect.objectContaining({ tag:"production", versionId: "v4-id" }),
           );
           expect(mockMutateAsync).toHaveBeenCalledWith(
-            expect.objectContaining({ label: "staging", versionId: "v1-id" }),
+            expect.objectContaining({ tag:"staging", versionId: "v1-id" }),
           );
         });
       });
@@ -382,7 +452,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         const onClose = vi.fn();
         mockMutateAsync.mockClear();
         setupQueries({
-          labels: [{ label: "production", versionId: "v2-id" }],
+          tags: [{ tag:"production", versionId: "v2-id" }],
         });
         renderDialog({ onClose });
 
@@ -392,6 +462,301 @@ describe("Feature: Deploy Prompt Dialog", () => {
           expect(onClose).toHaveBeenCalled();
         });
         expect(mockMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("Scenario: Deploy dialog renders built-in and custom tag rows", () => {
+      it("renders rows for latest, production, staging, and the custom tag", async () => {
+        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupQueries({
+          tags: [
+            { tag:"production", versionId: "v1-id" },
+            { tag:"canary", versionId: "v2-id" },
+          ],
+        });
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("latest")).toBeInTheDocument();
+          expect(screen.getByText("production")).toBeInTheDocument();
+          expect(screen.getByText("staging")).toBeInTheDocument();
+          expect(screen.getByText("canary")).toBeInTheDocument();
+        });
+      });
+
+      it("renders a version selector for each non-latest tag row", async () => {
+        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByLabelText("Production version")).toBeInTheDocument();
+          expect(screen.getByLabelText("Staging version")).toBeInTheDocument();
+          expect(screen.getByLabelText("Canary version")).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("Scenario: Built-in tags have no delete button", () => {
+      it("does not render a delete button for the latest row", async () => {
+        setupFetch();
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("latest")).toBeInTheDocument();
+        });
+
+        expect(
+          screen.queryByRole("button", { name: /delete tag latest/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      it("does not render a delete button for the production row", async () => {
+        setupFetch();
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("production")).toBeInTheDocument();
+        });
+
+        expect(
+          screen.queryByRole("button", { name: /delete tag production/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      it("does not render a delete button for the staging row", async () => {
+        setupFetch();
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("staging")).toBeInTheDocument();
+        });
+
+        expect(
+          screen.queryByRole("button", { name: /delete tag staging/i }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("Scenario: Deploy dialog shows empty state when no custom tags exist", () => {
+      it("shows only built-in rows and the '+ Add tag' button", async () => {
+        setupFetch();
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("latest")).toBeInTheDocument();
+          expect(screen.getByText("production")).toBeInTheDocument();
+          expect(screen.getByText("staging")).toBeInTheDocument();
+          expect(screen.getByRole("button", { name: /\+ add tag/i })).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("Scenario: Deploy dialog adds a custom tag row when user confirms input", () => {
+      it("adds a new custom tag row when user types and confirms", async () => {
+        // First fetch returns no custom tags; after POST+refetch, returns canary
+        let fetchCallCount = 0;
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+            const method = options?.method ?? "GET";
+
+            if (method === "GET" && String(url).includes("/prompt-tags")) {
+              fetchCallCount++;
+              if (fetchCallCount === 1) {
+                return Promise.resolve({
+                  ok: true,
+                  status: 200,
+                  json: () => Promise.resolve([
+                    { name: "production" },
+                    { name: "staging" },
+                  ]),
+                });
+              }
+              // After POST, return with canary
+              return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve([
+                  { name: "production" },
+                  { name: "staging" },
+                  { name: "canary", id: "canary-id" },
+                ]),
+              });
+            }
+
+            if (method === "POST" && String(url).includes("/prompt-tags")) {
+              return Promise.resolve({
+                ok: true,
+                status: 201,
+                json: () => Promise.resolve({ name: "canary", id: "canary-id" }),
+              });
+            }
+
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+          }),
+        );
+
+        setupQueries();
+        renderDialog();
+
+        // Wait for initial render
+        await waitFor(() => {
+          expect(screen.getByRole("button", { name: /\+ add tag/i })).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /\+ add tag/i }));
+
+        const input = screen.getByPlaceholderText(/tag name/i);
+        fireEvent.change(input, { target: { value: "canary" } });
+        fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+        await waitFor(() => {
+          expect(screen.getByText("canary")).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("Scenario: Deploy dialog rejects duplicate custom tag name", () => {
+      it("shows an error when trying to add an existing tag name", async () => {
+        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByRole("button", { name: /\+ add tag/i })).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /\+ add tag/i }));
+
+        const input = screen.getByPlaceholderText(/tag name/i);
+        fireEvent.change(input, { target: { value: "canary" } });
+        fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+        await waitFor(() => {
+          expect(screen.getByText("canary already exists")).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("Scenario: Deploy dialog removes custom tag row after delete confirmation", () => {
+      it("removes the custom tag row when user confirms deletion", async () => {
+        let fetchCallCount = 0;
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+            const method = options?.method ?? "GET";
+
+            if (method === "GET" && String(url).includes("/prompt-tags")) {
+              fetchCallCount++;
+              if (fetchCallCount === 1) {
+                return Promise.resolve({
+                  ok: true,
+                  status: 200,
+                  json: () => Promise.resolve([
+                    { name: "production" },
+                    { name: "staging" },
+                    { name: "canary", id: "canary-id" },
+                  ]),
+                });
+              }
+              // After DELETE, return without canary
+              return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve([
+                  { name: "production" },
+                  { name: "staging" },
+                ]),
+              });
+            }
+
+            if (method === "DELETE" && String(url).includes("/prompt-tags/")) {
+              return Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) });
+            }
+
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+          }),
+        );
+
+        vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+
+        setupQueries();
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("canary")).toBeInTheDocument();
+        });
+
+        const deleteButton = screen.getByRole("button", {
+          name: /delete tag canary/i,
+        });
+        fireEvent.click(deleteButton);
+
+        await waitFor(() => {
+          expect(screen.queryByText("canary")).not.toBeInTheDocument();
+        });
+      });
+
+      it("shows a confirmation dialog warning that SDK callers may be affected", async () => {
+        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupQueries();
+
+        const confirmFn = vi.fn().mockReturnValue(false);
+        vi.stubGlobal("confirm", confirmFn);
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("canary")).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /delete tag canary/i }));
+
+        expect(confirmFn).toHaveBeenCalledWith(
+          expect.stringContaining("SDK callers using this tag may be affected"),
+        );
+      });
+    });
+
+    describe("Scenario: Custom tag delete button is visible only for custom tags", () => {
+      it("renders a delete button for the custom tag row", async () => {
+        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(
+            screen.getByRole("button", { name: /delete tag canary/i }),
+          ).toBeInTheDocument();
+        });
+      });
+
+      it("does not render a delete button for the production row", async () => {
+        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupQueries();
+
+        renderDialog();
+
+        await waitFor(() => {
+          expect(screen.getByText("production")).toBeInTheDocument();
+        });
+
+        expect(
+          screen.queryByRole("button", { name: /delete tag production/i }),
+        ).not.toBeInTheDocument();
       });
     });
   });

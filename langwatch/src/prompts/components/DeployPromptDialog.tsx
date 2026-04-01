@@ -4,11 +4,12 @@ import {
   createListCollection,
   HStack,
   IconButton,
+  Input,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
-import { UnplugIcon } from "lucide-react";
+import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { CopyButton } from "~/components/CopyButton";
@@ -26,6 +27,7 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { usePromptTags } from "~/prompts/hooks/usePromptTags";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -36,12 +38,6 @@ interface DeployPromptDialogProps {
   projectId: string;
 }
 
-/**
- * DeployPromptDialog
- *
- * Dialog for assigning prompt versions to environment tags (production, staging).
- * The "latest" tag is auto-managed and always points to the highest version number.
- */
 export function DeployPromptDialog({
   isOpen,
   onClose,
@@ -49,7 +45,13 @@ export function DeployPromptDialog({
   handle,
   projectId,
 }: DeployPromptDialogProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
+  const organizationId = organization?.id ?? "";
+
+  const { data: allTags, refetch: refetchTags } = usePromptTags({
+    organizationId,
+    enabled: isOpen && !!organizationId,
+  });
 
   const versionsQuery = api.prompts.getAllVersionsForPrompt.useQuery(
     { idOrHandle: configId, projectId },
@@ -61,18 +63,12 @@ export function DeployPromptDialog({
     { enabled: isOpen && !!configId && !!projectId },
   );
 
-  const orgTagsQuery = api.promptTags.getAll.useQuery(
-    { projectId },
-    { enabled: isOpen && !!projectId },
-  );
-
   const assignTag = api.prompts.assignTag.useMutation();
   const utils = api.useContext();
 
   const versions = versionsQuery.data ?? [];
-  const tags = orgTagsQuery.data?.map((t) => t.name) ?? [];
 
-  const latestVersion = versions.reduce<typeof versions[number] | null>(
+  const latestVersion = versions.reduce<(typeof versions)[number] | null>(
     (max, v) => (!max || v.version > max.version ? v : max),
     null,
   );
@@ -87,35 +83,36 @@ export function DeployPromptDialog({
   // Initialize selections from current tag assignments whenever tags or assignments change
   useEffect(() => {
     if (!isOpen) return;
-    const assignmentData = tagsQuery.data;
-
+    const assignmentData = tagsQuery.data ?? [];
+    const nonLatestTags = allTags.filter((t) => t.name !== "latest");
     const next: TagSelections = {};
-    for (const tag of tags) {
-      const found = assignmentData?.find((t) => t.tag === tag);
-      next[tag] = found?.versionId ?? "";
+    for (const tagDef of nonLatestTags) {
+      const found = assignmentData.find((t) => t.tag === tagDef.name);
+      next[tagDef.name] = found?.versionId ?? "";
     }
     setTagSelections(next);
-    // tags array reference changes when orgTagsQuery resolves, so include it
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, tagsQuery.data, orgTagsQuery.data]);
+  }, [isOpen, tagsQuery.data, allTags]);
 
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = useCallback(async () => {
     const data = tagsQuery.data ?? [];
-
     const mutations: Promise<unknown>[] = [];
+    const nonLatestTags = allTags.filter((t) => t.name !== "latest");
 
-    for (const tag of tags) {
-      const selectedVersionId = tagSelections[tag] ?? "";
-      const currentTag = data.find((t) => t.tag === tag);
-      if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
+    for (const tagDef of nonLatestTags) {
+      const selectedVersionId = tagSelections[tagDef.name] ?? "";
+      const currentTag = data.find((t) => t.tag === tagDef.name);
+      if (
+        selectedVersionId &&
+        selectedVersionId !== (currentTag?.versionId ?? "")
+      ) {
         mutations.push(
           assignTag.mutateAsync({
             projectId,
             configId,
             versionId: selectedVersionId,
-            tag,
+            tag: tagDef.name,
           }),
         );
       }
@@ -150,7 +147,7 @@ export function DeployPromptDialog({
   }, [
     tagsQuery.data,
     tagSelections,
-    tags,
+    allTags,
     assignTag,
     projectId,
     configId,
@@ -175,6 +172,79 @@ export function DeployPromptDialog({
     () => createListCollection({ items: versionItems }),
     [versionItems],
   );
+
+  // Add tag inline state
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [addTagError, setAddTagError] = useState("");
+  const [isSubmittingTag, setIsSubmittingTag] = useState(false);
+
+  const handleAddTagConfirm = useCallback(async () => {
+    const name = newTagName.trim();
+    if (!name) return;
+    setIsSubmittingTag(true);
+    setAddTagError("");
+    try {
+      const response = await fetch(`/api/orgs/${organizationId}/prompt-tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (response.status === 409) {
+        setAddTagError(`${name} already exists`);
+        return;
+      }
+      if (response.status === 422) {
+        const body = (await response.json()) as { message?: string };
+        setAddTagError(body.message ?? "Invalid tag name");
+        return;
+      }
+      if (!response.ok) {
+        setAddTagError("Failed to create tag");
+        return;
+      }
+      await refetchTags();
+      setIsAddingTag(false);
+      setNewTagName("");
+    } finally {
+      setIsSubmittingTag(false);
+    }
+  }, [newTagName, organizationId, refetchTags]);
+
+  const handleDeleteTag = useCallback(
+    async (tagId: string, tagName: string) => {
+      const confirmed = window.confirm(
+        `Delete tag "${tagName}"? SDK callers using this tag may be affected.`,
+      );
+      if (!confirmed) return;
+      try {
+        const response = await fetch(
+          `/api/orgs/${organizationId}/prompt-tags/${tagId}`,
+          { method: "DELETE" },
+        );
+        if (!response.ok) {
+          toaster.create({
+            title: "Failed to delete tag",
+            type: "error",
+            duration: 3000,
+            meta: { closable: true },
+          });
+          return;
+        }
+        await refetchTags();
+      } catch {
+        toaster.create({
+          title: "Failed to delete tag",
+          type: "error",
+          duration: 3000,
+          meta: { closable: true },
+        });
+      }
+    },
+    [organizationId, refetchTags],
+  );
+
+  const nonLatestTags = allTags.filter((t) => t.name !== "latest");
 
   return (
     <DialogRoot
@@ -214,7 +284,7 @@ export function DeployPromptDialog({
               </Box>
             </HStack>
 
-            {/* Label rows */}
+            {/* Tag rows */}
             <VStack align="stretch" gap={3}>
               {/* latest row — auto-managed, not editable */}
               <Box
@@ -250,12 +320,12 @@ export function DeployPromptDialog({
                 </HStack>
               </Box>
 
-              {/* Environment tag rows */}
-              {tags.map((tag) => {
-                const isAssigned = !!(tagSelections[tag]);
+              {/* Environment tag rows (built-in + custom, excluding latest) */}
+              {nonLatestTags.map((tagDef) => {
+                const isAssigned = !!(tagSelections[tagDef.name]);
                 return (
                   <Box
-                    key={tag}
+                    key={tagDef.name}
                     borderWidth="1px"
                     borderColor="border"
                     borderRadius="lg"
@@ -272,77 +342,148 @@ export function DeployPromptDialog({
                           flexShrink={0}
                         />
                         <Text fontWeight="medium" fontSize="sm">
-                          {tag}
+                          {tagDef.name}
                         </Text>
                       </HStack>
                       <HStack gap={2}>
-                      <Select.Root
-                        collection={versionCollection}
-                        size="sm"
-                        width="auto"
-                        minWidth="180px"
-                        value={tagSelections[tag] ? [tagSelections[tag] ?? ""] : []}
-                        onValueChange={(details) => {
-                          setTagVersionId(tag, details.value[0] ?? "");
-                        }}
-                        aria-label={`${tag.charAt(0).toUpperCase()}${tag.slice(1)} version`}
-                      >
-                        <Select.Trigger clearable>
-                          <Select.ValueText placeholder="Select version">
-                            {(items) => {
-                              const item = items[0] as typeof versionItems[number] | undefined;
-                              if (!item) return "Select version";
-                              return (
-                                <HStack gap={1} maxWidth="100%" overflow="hidden">
-                                  <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
-                                    v{item.version}
-                                  </Text>
-                                  <Text as="span" fontSize="sm" color="fg.muted" truncate>
-                                    {item.commitMessage}
-                                  </Text>
-                                </HStack>
-                              );
-                            }}
-                          </Select.ValueText>
-                        </Select.Trigger>
-                        <Select.Content>
-                          {versionItems.map((v) => (
-                            <Select.Item key={v.value} item={v}>
-                              <Tooltip content={v.commitMessage} openDelay={500}>
-                                <HStack gap={2} maxWidth="100%" overflow="hidden">
-                                  <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
-                                    v{v.version}
-                                  </Text>
-                                  <Text as="span" fontSize="sm" color="fg.muted" truncate>
-                                    {v.commitMessage}
-                                  </Text>
-                                </HStack>
-                              </Tooltip>
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Root>
-                      <GeneratePromptApiSnippetDialog
-                        promptHandle={handle}
-                        apiKey={project?.apiKey}
-                        label={tag}
-                      >
-                        <GeneratePromptApiSnippetDialog.Trigger>
+                        <Select.Root
+                          collection={versionCollection}
+                          size="sm"
+                          width="auto"
+                          minWidth="180px"
+                          value={tagSelections[tagDef.name] ? [tagSelections[tagDef.name] ?? ""] : []}
+                          onValueChange={(details) => {
+                            setTagVersionId(tagDef.name, details.value[0] ?? "");
+                          }}
+                          aria-label={`${tagDef.name.charAt(0).toUpperCase()}${tagDef.name.slice(1)} version`}
+                        >
+                          <Select.Trigger clearable>
+                            <Select.ValueText placeholder="Select version">
+                              {(items) => {
+                                const item = items[0] as typeof versionItems[number] | undefined;
+                                if (!item) return "Select version";
+                                return (
+                                  <HStack gap={1} maxWidth="100%" overflow="hidden">
+                                    <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
+                                      v{item.version}
+                                    </Text>
+                                    <Text as="span" fontSize="sm" color="fg.muted" truncate>
+                                      {item.commitMessage}
+                                    </Text>
+                                  </HStack>
+                                );
+                              }}
+                            </Select.ValueText>
+                          </Select.Trigger>
+                          <Select.Content>
+                            {versionItems.map((v) => (
+                              <Select.Item key={v.value} item={v}>
+                                <Tooltip content={v.commitMessage} openDelay={500}>
+                                  <HStack gap={2} maxWidth="100%" overflow="hidden">
+                                    <Text as="span" fontFamily="mono" fontSize="sm" fontWeight="semibold" flexShrink={0}>
+                                      v{v.version}
+                                    </Text>
+                                    <Text as="span" fontSize="sm" color="fg.muted" truncate>
+                                      {v.commitMessage}
+                                    </Text>
+                                  </HStack>
+                                </Tooltip>
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                        <GeneratePromptApiSnippetDialog
+                          promptHandle={handle}
+                          apiKey={project?.apiKey}
+                          label={tagDef.name}
+                        >
+                          <GeneratePromptApiSnippetDialog.Trigger>
+                            <IconButton
+                              variant="ghost"
+                              size="xs"
+                              aria-label="View code snippet"
+                              css={{ boxShadow: "none !important" }}
+                            >
+                              <UnplugIcon size={14} />
+                            </IconButton>
+                          </GeneratePromptApiSnippetDialog.Trigger>
+                        </GeneratePromptApiSnippetDialog>
+                        {tagDef.name !== "latest" && tagDef.id && (
                           <IconButton
                             variant="ghost"
                             size="xs"
-                            aria-label="View code snippet"
+                            aria-label={`Delete tag ${tagDef.name}`}
                             css={{ boxShadow: "none !important" }}
+                            onClick={() =>
+                              void handleDeleteTag(tagDef.id ?? "", tagDef.name)
+                            }
                           >
-                            <UnplugIcon size={14} />
+                            <Trash2 size={14} />
                           </IconButton>
-                        </GeneratePromptApiSnippetDialog.Trigger>
-                      </GeneratePromptApiSnippetDialog>
+                        )}
                       </HStack>
                     </HStack>
                   </Box>
                 );
               })}
+
+              {/* Add tag inline input or button */}
+              {isAddingTag ? (
+                <HStack gap={2}>
+                  <Input
+                    size="sm"
+                    placeholder="Tag name (e.g. canary)"
+                    value={newTagName}
+                    onChange={(e) => {
+                      setNewTagName(e.target.value);
+                      setAddTagError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleAddTagConfirm();
+                      if (e.key === "Escape") {
+                        setIsAddingTag(false);
+                        setNewTagName("");
+                        setAddTagError("");
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    colorPalette="orange"
+                    onClick={() => void handleAddTagConfirm()}
+                    loading={isSubmittingTag}
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setIsAddingTag(false);
+                      setNewTagName("");
+                      setAddTagError("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </HStack>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  alignSelf="flex-start"
+                  onClick={() => setIsAddingTag(true)}
+                >
+                  + Add tag
+                </Button>
+              )}
+
+              {addTagError && (
+                <Text fontSize="sm" color="red.500">
+                  {addTagError}
+                </Text>
+              )}
             </VStack>
           </VStack>
         </DialogBody>
