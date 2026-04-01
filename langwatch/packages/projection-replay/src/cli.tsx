@@ -506,7 +506,6 @@ function createProgressDisplay({ totalEventsEstimate }: { totalEventsEstimate: n
     const statusLine = `  ${CYAN}${spin}${RESET} ${batchLabel}  ${phaseInfo}  ${DIM}${batchElapsed}${RESET}`;
     // Line 2: animation
     const frame = animation.nextFrame();
-    const animLine = `${frame[0]}\n${frame[1]}\n${frame[2]}`;
     // Line 3: overall progress
     const overallLine = `  ${bar}  ${aggInfo}  ${formatNumber(p.totalEventsReplayed)} events  ${elapsed}  ${DIM}${rate}${RESET}`;
 
