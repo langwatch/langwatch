@@ -263,8 +263,8 @@ const groupByExpressions: Partial<
     column: `arrayJoin(
       arrayMap(
         a -> multiIf(
-          toInt32OrNull(a['event.metrics.vote']) = 1, 'thumbs_up',
-          toInt32OrNull(a['event.metrics.vote']) = -1, 'thumbs_down',
+          toInt32OrNull(a['event.metrics.vote']) = 1, 'Thumbs Up',
+          toInt32OrNull(a['event.metrics.vote']) = -1, 'Thumbs Down',
           ''
         ),
         arrayFilter(
