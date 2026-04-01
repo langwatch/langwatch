@@ -59,7 +59,7 @@ describe("RedisCachedFoldStore", () => {
         });
 
         const state: TestState = { count: 5, name: "cached" };
-        redis.data.set("fold:test_table:agg-1", {
+        redis.data.set("fold:test_table:tenant-1:agg-1", {
           value: JSON.stringify(state),
           ttl: 30,
         });
@@ -67,7 +67,7 @@ describe("RedisCachedFoldStore", () => {
         const result = await store.get("agg-1", TEST_CONTEXT);
 
         expect(result).toEqual(state);
-        expect(redis.get).toHaveBeenCalledWith("fold:test_table:agg-1");
+        expect(redis.get).toHaveBeenCalledWith("fold:test_table:tenant-1:agg-1");
         expect(inner.getCalls).toHaveLength(0);
       });
     });
@@ -108,7 +108,7 @@ describe("RedisCachedFoldStore", () => {
 
         // Then Redis cached
         expect(redis.set).toHaveBeenCalledWith(
-          "fold:test_table:agg-1",
+          "fold:test_table:tenant-1:agg-1",
           JSON.stringify(state),
           "EX",
           30,

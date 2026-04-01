@@ -283,6 +283,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
+    redis: redis!,
     broadcast,
     projects,
     monitors,

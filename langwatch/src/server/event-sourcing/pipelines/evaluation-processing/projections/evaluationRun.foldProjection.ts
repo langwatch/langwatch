@@ -125,13 +125,9 @@ export class EvaluationRunFoldProjection
     event: EvaluationCompletedEvent,
     state: EvaluationRunData,
   ): EvaluationRunData {
-    if (!state.evaluationId) {
-      throw new Error(
-        `Received EvaluationCompletedEvent for evaluation ${event.data.evaluationId} but state has no evaluationId — likely a replica lag issue, retrying`,
-      );
-    }
     return {
       ...state,
+      evaluationId: state.evaluationId || event.data.evaluationId,
       status: event.data.status,
       score: typeof event.data.score === 'number' ? event.data.score : null,
       passed: event.data.passed ?? null,
