@@ -403,7 +403,7 @@ class TestPromptsFacadeGetWithLabel:
         mock_request = Mock(return_value=_mock_httpx_response(api_response))
         facade = self._make_facade_with_mock(mock_request)
 
-        result = facade.get("pizza-prompt", label="production", fetch_policy=FetchPolicy.ALWAYS_FETCH)
+        result = facade.get("pizza-prompt:production", fetch_policy=FetchPolicy.ALWAYS_FETCH)
 
         assert result.version == 3
         call_kwargs = mock_request.call_args
@@ -413,14 +413,14 @@ class TestPromptsFacadeGetWithLabel:
     def test_fetches_from_api_with_custom_label(self):
         """
         Given "pizza-prompt" has custom label "canary" pointing to v2
-        When get() is called with label="canary"
+        When get() is called with "pizza-prompt:canary"
         Then v2 data is returned
         """
         api_response = _make_api_response_json(version=2, version_id="v2_id")
         mock_request = Mock(return_value=_mock_httpx_response(api_response))
         facade = self._make_facade_with_mock(mock_request)
 
-        result = facade.get("pizza-prompt", label="canary", fetch_policy=FetchPolicy.ALWAYS_FETCH)
+        result = facade.get("pizza-prompt:canary", fetch_policy=FetchPolicy.ALWAYS_FETCH)
 
         assert result.version == 2
 
@@ -464,8 +464,7 @@ class TestPromptsFacadeEdgeCasesWithLabel:
 
         with pytest.raises(ValueError, match="MATERIALIZED_ONLY"):
             facade.get(
-                "pizza-prompt",
-                label="production",
+                "pizza-prompt:production",
                 fetch_policy=FetchPolicy.MATERIALIZED_ONLY,
             )
 
@@ -483,8 +482,7 @@ class TestPromptsFacadeEdgeCasesWithLabel:
 
         with pytest.raises(ValueError):
             facade.get(
-                "pizza-prompt",
-                label="production",
+                "pizza-prompt:production",
                 fetch_policy=FetchPolicy.ALWAYS_FETCH,
             )
 
@@ -500,8 +498,7 @@ class TestPromptsFacadeEdgeCasesWithLabel:
 
         with pytest.raises(ValueError):
             facade.get(
-                "pizza-prompt",
-                label="production",
+                "pizza-prompt:production",
                 fetch_policy=FetchPolicy.CACHE_TTL,
             )
 
@@ -539,7 +536,7 @@ class TestMaterializedFirstWithLabel:
         rest_client = _rest_client_with_mocked_httpx(mock_request)
         facade = PromptsFacade(rest_client, prompts_path=str(tmp_path))
 
-        result = facade.get("pizza-prompt", label="production")
+        result = facade.get("pizza-prompt:production")
 
         # Should have called the API (not used local file)
         assert mock_request.called
@@ -566,7 +563,7 @@ class TestCacheKeyWithLabels:
         facade = PromptsFacade(rest_client)
 
         with patch("time.time", return_value=0):
-            facade.get("pizza-prompt", label="production", fetch_policy=FetchPolicy.CACHE_TTL)
+            facade.get("pizza-prompt:production", fetch_policy=FetchPolicy.CACHE_TTL)
 
         assert any("::label:production" in k for k in facade._cache.keys())
 
@@ -610,10 +607,10 @@ class TestCacheKeyWithLabels:
 
         with patch("time.time", return_value=0):
             facade.get(
-                "pizza-prompt", label="production", fetch_policy=FetchPolicy.CACHE_TTL
+                "pizza-prompt:production", fetch_policy=FetchPolicy.CACHE_TTL
             )
             facade.get(
-                "pizza-prompt", label="staging", fetch_policy=FetchPolicy.CACHE_TTL
+                "pizza-prompt:staging", fetch_policy=FetchPolicy.CACHE_TTL
             )
 
         production_key = next(
@@ -637,14 +634,12 @@ class TestCacheKeyWithLabels:
 
         with patch("time.time", return_value=0):
             facade.get(
-                "pizza-prompt",
-                label="production",
+                "pizza-prompt:production",
                 fetch_policy=FetchPolicy.CACHE_TTL,
                 cache_ttl_minutes=5,
             )
             facade.get(
-                "pizza-prompt",
-                label="production",
+                "pizza-prompt:production",
                 fetch_policy=FetchPolicy.CACHE_TTL,
                 cache_ttl_minutes=5,
             )
