@@ -58,11 +58,13 @@ Read `dev/docs/adr/` (Architecture Decision Records) to explain decisions:
 │   ├── README.md       # How agents work
 │   ├── coder.md        # TDD implementation agent
 │   ├── repo-sherpa.md  # This file - meta-layer ownership
-│   └── uncle-bob-reviewer.md  # SOLID/clean code reviewer
+│   ├── principles-reviewer.md  # SRP/design reviewer
+│   ├── hygiene-reviewer.md     # Codebase fit reviewer
+│   └── security-reviewer.md    # PII/secrets reviewer
 ├── skills/             # Entry points that invoke agents
 │   ├── README.md       # How skills work
 │   ├── code/           # /code → coder agent
-│   ├── review/         # /review → uncle-bob-reviewer
+│   ├── review/         # /review → parallel reviewers
 │   ├── sherpa/         # /sherpa → repo-sherpa
 │   ├── drive-pr/       # /drive-pr → fix CI failures + address review comments
 │   ├── plan/           # /plan → creates feature files

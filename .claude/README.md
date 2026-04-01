@@ -19,12 +19,12 @@ User Request
      │ /code                   │ /review                 │ /browser-test
      ▼                         ▼                         ▼
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐
-│  CODER AGENT     │  │  UNCLE-BOB-      │  │  BROWSER VERIFICATION    │
-│  (context: fork) │  │  REVIEWER        │  │  (interactive)           │
-│  - TDD workflow  │  │  (context: fork) │  │  - Drives real browser   │
-│  - Returns       │  │  - SOLID/TDD     │  │  - Screenshots + report  │
-│    summary       │  │  - Returns       │  │  - No test files         │
-│                  │  │    findings      │  │                          │
+│  CODER AGENT     │  │  REVIEWERS       │  │  BROWSER VERIFICATION    │
+│  (context: fork) │  │  (context: fork) │  │  (interactive)           │
+│  - TDD workflow  │  │  - Design/       │  │  - Drives real browser   │
+│  - Returns       │  │    Hygiene/      │  │  - Screenshots + report  │
+│    summary       │  │    Security/     │  │  - No test files         │
+│                  │  │    Tests         │  │                          │
 └──────────────────┘  └──────────────────┘  └──────────────────────────┘
 ```
 
@@ -35,7 +35,9 @@ User Request
 ├── agents/         # Agent definitions (personas with workflows)
 │   ├── coder.md
 │   ├── repo-sherpa.md
-│   ├── uncle-bob-reviewer.md
+│   ├── principles-reviewer.md
+│   ├── hygiene-reviewer.md
+│   ├── security-reviewer.md
 │   ├── devils-advocate.md            # Stress-test proposals and plans
 │   ├── playwright-test-planner.md    # Ad-hoc: explores app, creates plans
 │   ├── playwright-test-generator.md  # Ad-hoc: generates tests from plans
@@ -46,7 +48,7 @@ User Request
 │   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
 │   ├── test-review/    # Delegates to test-reviewer agent
-│   ├── review/         # Delegates to uncle-bob-reviewer
+│   ├── review/         # Parallel reviewers (principles, hygiene, security, test)
 │   ├── challenge/      # Delegates to devils-advocate
 │   ├── sherpa/         # Delegates to repo-sherpa
 │   ├── drive-pr/       # Fix CI failures + address review comments
@@ -63,7 +65,9 @@ Agents are **specialized personas** with defined workflows and expertise. They r
 | Agent | Purpose | Model |
 |-------|---------|-------|
 | `coder` | TDD implementation, self-verification | Opus |
-| `uncle-bob-reviewer` | SOLID/Clean Code review | Opus |
+| `principles-reviewer` | SRP, readability, simplicity review | Opus |
+| `hygiene-reviewer` | Reuse, patterns, idioms review | Sonnet |
+| `security-reviewer` | PII, secrets, data exposure review | Sonnet |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | Opus |
 | `repo-sherpa` | Documentation, DX, meta-layer | Opus |
 | `playwright-test-planner` | Explore live app, create test plans (ad-hoc) | Opus |
@@ -212,12 +216,12 @@ ORCHESTRATOR (main thread)
 │                  - TDD workflow
 │                  - Test execution
 │
-├── /review ─────► UNCLE-BOB + CUPID + TEST-REVIEWER
+├── /review ─────► PRINCIPLES + HYGIENE + SECURITY + TEST
 │                  - Quality gate (parallel review)
-│                  - SOLID violations
-│                  - CUPID properties
+│                  - Design quality (principles)
+│                  - Codebase fit (hygiene)
+│                  - Security scan
 │                  - Test pyramid placement
-│                  - Clean code inspection
 │
 ├── /challenge ──► DEVILS-ADVOCATE
 │                  - Stress-test proposals and plans
@@ -255,7 +259,7 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/plan <feature>` | Plan (built-in) | Create feature file (required before /code) |
 | `/test-review <path>` | test-reviewer | Review specs and tests for pyramid placement |
 | `/code <task>` | coder | Implement with TDD |
-| `/review <focus>` | uncle-bob + cupid + test-reviewer | Quality review (parallel) |
+| `/review <focus>` | principles + hygiene + security + test | Quality review (parallel) |
 | `/challenge <proposal>` | devils-advocate | Stress-test proposals and plans |
 | `/browser-test [port] [feature]` | (interactive verification) | Verify feature works in real browser |
 | `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |

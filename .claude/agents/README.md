@@ -8,7 +8,9 @@ Specialized Claude personas with defined workflows. Agents run in isolated conte
 |-------|---------|-------------|
 | `coder` | TDD implementation, self-verification | `/code` skill |
 | `repo-sherpa` | Documentation, DX, meta-layer ownership | `/sherpa` skill |
-| `uncle-bob-reviewer` | SOLID/Clean Code review | `/review` skill |
+| `principles-reviewer` | SRP, readability, simplicity, extensibility review | `/review` skill |
+| `hygiene-reviewer` | Reuse, patterns, idioms, dead code review | `/review` skill |
+| `security-reviewer` | PII, secrets, sensitive data review | `/review` skill |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | `/challenge` skill |
 | `playwright-test-planner` | Creates test plans by exploring the live app | Ad-hoc (via Task) |
 | `playwright-test-generator` | Generates Playwright tests from plans | Ad-hoc (via Task) |
