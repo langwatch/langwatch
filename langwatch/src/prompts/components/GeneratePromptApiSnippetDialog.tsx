@@ -56,7 +56,7 @@ export function GeneratePromptApiSnippetDialog({
     <GenerateApiSnippetDialog
       snippets={snippets}
       targets={targets}
-      title={label ? "Get Prompt by Label" : "Get Prompt by ID"}
+      title={label ? "Get Prompt by Tag" : "Get Prompt by ID"}
       description={description}
     >
       {children}
