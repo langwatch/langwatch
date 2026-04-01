@@ -62,7 +62,7 @@ vi.mock("../../rbac", async (importOriginal) => {
 
 describe("translateRouter.translate()", () => {
   let caller: ReturnType<typeof translateRouter.createCaller>;
-  const mockModel = { modelId: "test-model" };
+  const mockModel = { modelId: "gpt-5-mini" };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,7 +112,7 @@ describe("translateRouter.translate()", () => {
 
   describe("when the model call fails", () => {
     it("throws a TRPCError with a generic message that hides upstream details", async () => {
-      const underlyingError = new Error("Invalid API key: sk-proj-abc123");
+      const underlyingError = new Error("Invalid API key: FAKE_KEY_FOR_TESTING");
       mockGenerateText.mockRejectedValue(underlyingError);
 
       await expect(
@@ -128,7 +128,7 @@ describe("translateRouter.translate()", () => {
     });
 
     it("does not leak the upstream error message to the client", async () => {
-      const underlyingError = new Error("Invalid API key: sk-proj-abc123");
+      const underlyingError = new Error("Invalid API key: FAKE_KEY_FOR_TESTING");
       mockGenerateText.mockRejectedValue(underlyingError);
 
       await expect(
@@ -137,7 +137,7 @@ describe("translateRouter.translate()", () => {
           textToTranslate: "Hola",
         }),
       ).rejects.toMatchObject({
-        message: expect.not.stringContaining("sk-proj-abc123"),
+        message: expect.not.stringContaining("FAKE_KEY_FOR_TESTING"),
       });
     });
 
