@@ -119,20 +119,19 @@ export class PromptTagRepository {
   }
 
   /**
-   * Checks whether a tag name is valid for assignment within an org.
-   * All non-protected tags are validated via DB lookup.
+   * Checks whether a tag definition exists for an org.
    */
-  async isValidTagForOrg({
+  async existsForOrg({
     tag,
     organizationId,
   }: {
     tag: string;
     organizationId: string;
   }): Promise<boolean> {
-    const exists = await this.prisma.promptTag.findFirst({
+    const found = await this.prisma.promptTag.findFirst({
       where: { organizationId, name: tag },
     });
-    return exists !== null;
+    return found !== null;
   }
 
   /**

@@ -29,7 +29,7 @@ function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagReposi
     create: vi.fn().mockResolvedValue(makeTag()),
     delete: vi.fn().mockResolvedValue(undefined),
     seedForOrg: vi.fn().mockResolvedValue(undefined),
-    isValidTagForOrg: vi.fn().mockResolvedValue(true),
+    existsForOrg: vi.fn().mockResolvedValue(true),
     ...overrides,
   } as unknown as PromptTagRepository;
 }

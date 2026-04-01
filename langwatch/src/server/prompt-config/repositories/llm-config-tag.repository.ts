@@ -28,7 +28,7 @@ export class PromptTagAssignmentRepository {
 
   /**
    * Validates that a tag is acceptable for assignment without org context.
-   * For validation that also accepts custom tags, use isValidTag() with organizationId.
+   * For checking custom tag existence, use tagExistsForOrg() with organizationId.
    */
   validateTag(tag: string): void {
     if (!tag) {
@@ -40,17 +40,16 @@ export class PromptTagAssignmentRepository {
   }
 
   /**
-   * Returns true if the tag is valid for the given org.
-   * Delegates to PromptTagRepository.isValidTagForOrg().
+   * Returns true if the tag definition exists for the given org.
    */
-  async isValidTag({
+  async tagExistsForOrg({
     tag,
     organizationId,
   }: {
     tag: string;
     organizationId: string;
   }): Promise<boolean> {
-    return this.tagDefinitionRepo.isValidTagForOrg({
+    return this.tagDefinitionRepo.existsForOrg({
       tag,
       organizationId,
     });
@@ -110,11 +109,11 @@ export class PromptTagAssignmentRepository {
     tx?: Prisma.TransactionClient;
   }): Promise<PromptTagAssignment> {
     if (organizationId) {
-      const valid = await this.isValidTag({ tag, organizationId });
-      if (!valid) {
+      const exists = await this.tagExistsForOrg({ tag, organizationId });
+      if (!exists) {
         logger.warn({ tag }, "Invalid tag name rejected");
         throw new TagValidationError(
-          `Invalid tag "${tag}". Must be a built-in tag or a custom tag defined for this org.`,
+          `Invalid tag "${tag}". Must be a custom tag defined for this org.`,
         );
       }
     } else {
