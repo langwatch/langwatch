@@ -661,6 +661,76 @@ describe("webhookService", () => {
         expect(subRepo.cancel).not.toHaveBeenCalled();
       });
     });
+
+    describe("when subscription is active and gets cancelled", () => {
+      it("sends a cancelled Slack notification", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "cancelled",
+            organizationId: "org_123",
+            organizationName: "Acme",
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+            subscriptionId: "sub_db_1",
+          }),
+        );
+      });
+
+      it("sends notification with cancellation date", async () => {
+        const cancelDate = new Date("2026-03-15T10:00:00Z");
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "cancelled",
+            cancellationDate: expect.any(Date),
+          }),
+        );
+      });
+
+      it("still cancels and notifies even when org name lookup fails", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockResolvedValue(null);
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "cancelled",
+            organizationName: "Unknown",
+          }),
+        );
+      });
+    });
   });
 
   describe("handleSubscriptionUpdated()", () => {

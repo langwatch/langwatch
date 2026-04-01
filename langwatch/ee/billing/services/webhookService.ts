@@ -254,6 +254,19 @@ export class EEWebhookService implements WebhookService {
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
 
+    // Send "Subscription cancelled" Slack notification
+    const org = await this.organizationRepository.findNameById(
+      existingSubscription.organizationId,
+    );
+    await getApp().notifications.sendSlackSubscriptionEvent({
+      type: "cancelled",
+      organizationId: existingSubscription.organizationId,
+      organizationName: org?.name ?? "Unknown",
+      plan: existingSubscription.plan,
+      subscriptionId: existingSubscription.id,
+      cancellationDate: new Date(),
+    });
+
     const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existingSubscription.organizationId,
     );

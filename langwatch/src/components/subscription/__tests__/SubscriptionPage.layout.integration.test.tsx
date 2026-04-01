@@ -17,6 +17,7 @@ import {
   mockCreateSubscription,
   mockDetectCurrency,
   mockGetActivePlan,
+  mockGetLastSubscription,
   mockGetOrganizationWithMembers,
   mockGetPendingInvites,
   mockAddTeamMemberOrEvents,
@@ -542,6 +543,50 @@ describe("<SubscriptionPage/>", () => {
       await waitFor(() => {
         // 2 core members + 0 core pending = 2, maxMembers = 2
         expect(screen.getByTestId("user-count-link")).toHaveTextContent("2/2");
+      });
+    });
+  });
+
+  // ============================================================================
+  // Invoices Visibility After Cancellation (Regression)
+  // ============================================================================
+
+  describe("when organization had a subscription that was cancelled", () => {
+    beforeEach(() => {
+      // Simulate cancelled subscription: plan falls back to free,
+      // getLastSubscription returns null (no non-cancelled subscription)
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({ free: true }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockGetLastSubscription.mockReturnValue({
+        data: null,
+        isLoading: false,
+      });
+      mockListInvoices.mockReturnValue({
+        data: [
+          {
+            id: "inv_1",
+            number: "INV-001",
+            date: 1700000000,
+            amountDue: 4900,
+            currency: "eur",
+            status: "paid",
+            pdfUrl: "https://stripe.com/pdf/inv_1",
+            hostedUrl: null,
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      });
+    });
+
+    it("displays the invoices block even though subscription is cancelled", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("invoices-block")).toBeInTheDocument();
       });
     });
   });
