@@ -193,25 +193,32 @@ class TestPromptTagsE2E:
 
     def test_shorthand_syntax_passes_through_as_id(self):
         """
-        GIVEN a prompt with handle "pizza-prompt"
-        WHEN SDK calls get("pizza-prompt:production")
-        THEN the full string "pizza-prompt:production" is passed as the ID to the API
-        (the API parses it, not the SDK)
+        GIVEN a prompt with a tag assigned via explicit assign
+        WHEN SDK calls get("handle:production")
+        THEN the full string "handle:production" is passed as the ID to the API
+        AND the API resolves it server-side
         """
         handle = f"e2e-shorthand-{uuid4().hex[:8]}"
 
         created = langwatch.prompts.create(
             handle=handle,
             prompt="Shorthand test",
-            tags=["production"],
         )
 
         try:
+            # Assign tag explicitly first (create-with-tags may have timing issues)
+            langwatch.prompts.tags.assign(
+                handle,
+                tag="production",
+                version_id=created.version_id,
+            )
+
             # Use the shorthand syntax - the SDK passes it through to the API
             fetched = langwatch.prompts.get(f"{handle}:production")
 
             assert fetched is not None
             assert fetched.handle == handle
+            assert fetched.version_id == created.version_id
         finally:
             try:
                 langwatch.prompts.delete(created.id)
