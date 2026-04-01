@@ -305,16 +305,12 @@ app.get(
         : undefined;
       const queryTag = c.req.query("tag") ?? undefined;
 
-      // Reject conflicting shorthand + query param
-      if (shorthand.tag && queryTag) {
+      // Reject conflicting shorthand + query param.
+      // hadSuffix is true even for "latest" (which normalizes away), so
+      // "foo:latest?tag=production" is correctly rejected.
+      if (shorthand.hadSuffix && (queryTag || queryVersion)) {
         throw new HTTPException(422, {
-          message: `Conflict: shorthand path specifies tag "${shorthand.tag}" but query parameter also specifies tag "${queryTag}". Use one or the other, not both.`,
-        });
-      }
-
-      if (shorthand.version && queryVersion) {
-        throw new HTTPException(422, {
-          message: `Conflict: shorthand path specifies version ${String(shorthand.version)} but query parameter also specifies version ${String(queryVersion)}. Use one or the other, not both.`,
+          message: `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
         });
       }
 
