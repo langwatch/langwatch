@@ -158,8 +158,8 @@ function setupFetch(
           status: 200,
           json: () =>
             Promise.resolve([
-              { name: "production" },
-              { name: "staging" },
+              { name: "production", id: "production-id" },
+              { name: "staging", id: "staging-id" },
               ...extraTags,
             ]),
         });
@@ -515,7 +515,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         ).not.toBeInTheDocument();
       });
 
-      it("does not render a delete button for the production row", async () => {
+      it("renders a delete button for the production row", async () => {
         setupFetch();
         setupQueries();
 
@@ -526,11 +526,11 @@ describe("Feature: Deploy Prompt Dialog", () => {
         });
 
         expect(
-          screen.queryByRole("button", { name: /delete tag production/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole("button", { name: /delete tag production/i }),
+        ).toBeInTheDocument();
       });
 
-      it("does not render a delete button for the staging row", async () => {
+      it("renders a delete button for the staging row", async () => {
         setupFetch();
         setupQueries();
 
@@ -541,8 +541,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
         });
 
         expect(
-          screen.queryByRole("button", { name: /delete tag staging/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole("button", { name: /delete tag staging/i }),
+        ).toBeInTheDocument();
       });
     });
 
@@ -578,8 +578,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
                   ok: true,
                   status: 200,
                   json: () => Promise.resolve([
-                    { name: "production" },
-                    { name: "staging" },
+                    { name: "production", id: "production-id" },
+                    { name: "staging", id: "staging-id" },
                   ]),
                 });
               }
@@ -588,8 +588,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
                 ok: true,
                 status: 200,
                 json: () => Promise.resolve([
-                  { name: "production" },
-                  { name: "staging" },
+                  { name: "production", id: "production-id" },
+                  { name: "staging", id: "staging-id" },
                   { name: "canary", id: "canary-id" },
                 ]),
               });
@@ -665,8 +665,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
                   ok: true,
                   status: 200,
                   json: () => Promise.resolve([
-                    { name: "production" },
-                    { name: "staging" },
+                    { name: "production", id: "production-id" },
+                    { name: "staging", id: "staging-id" },
                     { name: "canary", id: "canary-id" },
                   ]),
                 });
@@ -676,8 +676,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
                 ok: true,
                 status: 200,
                 json: () => Promise.resolve([
-                  { name: "production" },
-                  { name: "staging" },
+                  { name: "production", id: "production-id" },
+                  { name: "staging", id: "staging-id" },
                 ]),
               });
             }
@@ -690,8 +690,6 @@ describe("Feature: Deploy Prompt Dialog", () => {
           }),
         );
 
-        vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
-
         setupQueries();
         renderDialog();
 
@@ -699,10 +697,16 @@ describe("Feature: Deploy Prompt Dialog", () => {
           expect(screen.getByText("canary")).toBeInTheDocument();
         });
 
-        const deleteButton = screen.getByRole("button", {
-          name: /delete tag canary/i,
+        fireEvent.click(screen.getByRole("button", { name: /delete tag canary/i }));
+
+        // Type "delete" in the confirmation input and confirm
+        await waitFor(() => {
+          expect(screen.getByPlaceholderText(/type 'delete' to confirm/i)).toBeInTheDocument();
         });
-        fireEvent.click(deleteButton);
+        fireEvent.change(screen.getByPlaceholderText(/type 'delete' to confirm/i), {
+          target: { value: "delete" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
 
         await waitFor(() => {
           expect(screen.queryByText("canary")).not.toBeInTheDocument();
@@ -713,9 +717,6 @@ describe("Feature: Deploy Prompt Dialog", () => {
         setupFetch([{ name: "canary", id: "canary-id" }]);
         setupQueries();
 
-        const confirmFn = vi.fn().mockReturnValue(false);
-        vi.stubGlobal("confirm", confirmFn);
-
         renderDialog();
 
         await waitFor(() => {
@@ -724,9 +725,11 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
         fireEvent.click(screen.getByRole("button", { name: /delete tag canary/i }));
 
-        expect(confirmFn).toHaveBeenCalledWith(
-          expect.stringContaining("SDK callers using this tag may be affected"),
-        );
+        await waitFor(() => {
+          expect(
+            screen.getByText(/SDK and API callers using this tag will no longer be able to resolve it/i),
+          ).toBeInTheDocument();
+        });
       });
     });
 
@@ -744,7 +747,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         });
       });
 
-      it("does not render a delete button for the production row", async () => {
+      it("renders a delete button for the production row", async () => {
         setupFetch([{ name: "canary", id: "canary-id" }]);
         setupQueries();
 
@@ -755,8 +758,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
         });
 
         expect(
-          screen.queryByRole("button", { name: /delete tag production/i }),
-        ).not.toBeInTheDocument();
+          screen.getByRole("button", { name: /delete tag production/i }),
+        ).toBeInTheDocument();
       });
     });
   });

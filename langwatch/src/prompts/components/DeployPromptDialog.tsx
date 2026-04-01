@@ -12,6 +12,7 @@ import { Info } from "react-feather";
 import { Trash2, UnplugIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { CopyButton } from "~/components/CopyButton";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -80,17 +81,21 @@ export function DeployPromptDialog({
     setTagSelections((prev) => ({ ...prev, [tag]: versionId }));
   }, []);
 
-  // Initialize selections from current tag assignments whenever tags or assignments change
+  // Initialize selections from current tag assignments whenever tags or assignments change.
+  // Existing user edits (prev) take precedence over freshly derived values so that
+  // a refetch triggered by add/delete does not wipe unsaved version selections.
   useEffect(() => {
     if (!isOpen) return;
     const assignmentData = tagsQuery.data ?? [];
     const nonLatestTags = allTags.filter((t) => t.name !== "latest");
-    const next: TagSelections = {};
-    for (const tagDef of nonLatestTags) {
-      const found = assignmentData.find((t) => t.tag === tagDef.name);
-      next[tagDef.name] = found?.versionId ?? "";
-    }
-    setTagSelections(next);
+    setTagSelections((prev) => {
+      const next: TagSelections = {};
+      for (const tagDef of nonLatestTags) {
+        const found = assignmentData.find((t) => t.tag === tagDef.name);
+        next[tagDef.name] = prev[tagDef.name] ?? found?.versionId ?? "";
+      }
+      return next;
+    });
   }, [isOpen, tagsQuery.data, allTags]);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -178,6 +183,10 @@ export function DeployPromptDialog({
   const [newTagName, setNewTagName] = useState("");
   const [addTagError, setAddTagError] = useState("");
   const [isSubmittingTag, setIsSubmittingTag] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const handleAddTagConfirm = useCallback(async () => {
     const name = newTagName.trim();
@@ -211,12 +220,9 @@ export function DeployPromptDialog({
     }
   }, [newTagName, organizationId, refetchTags]);
 
-  const handleDeleteTag = useCallback(
-    async (tagId: string, tagName: string) => {
-      const confirmed = window.confirm(
-        `Delete tag "${tagName}"? SDK callers using this tag may be affected.`,
-      );
-      if (!confirmed) return;
+  const confirmDeleteTag = useCallback(
+    async (tagId: string) => {
+      setTagToDelete(null);
       try {
         const response = await fetch(
           `/api/orgs/${organizationId}/prompt-tags/${tagId}`,
@@ -415,7 +421,10 @@ export function DeployPromptDialog({
                             aria-label={`Delete tag ${tagDef.name}`}
                             css={{ boxShadow: "none !important" }}
                             onClick={() =>
-                              void handleDeleteTag(tagDef.id ?? "", tagDef.name)
+                              setTagToDelete({
+                                id: tagDef.id ?? "",
+                                name: tagDef.name,
+                              })
                             }
                           >
                             <Trash2 size={14} />
@@ -503,6 +512,18 @@ export function DeployPromptDialog({
           </HStack>
         </DialogFooter>
       </DialogContent>
+
+      <DeleteConfirmationDialog
+        title={`Delete tag "${tagToDelete?.name ?? ""}"?`}
+        description="SDK and API callers using this tag will no longer be able to resolve it to a prompt version. Type 'delete' below to confirm:"
+        open={tagToDelete !== null}
+        onClose={() => setTagToDelete(null)}
+        onConfirm={() => {
+          if (tagToDelete) {
+            void confirmDeleteTag(tagToDelete.id);
+          }
+        }}
+      />
     </DialogRoot>
   );
 }
