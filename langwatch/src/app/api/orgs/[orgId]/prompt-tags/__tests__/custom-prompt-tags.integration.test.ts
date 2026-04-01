@@ -46,7 +46,7 @@ async function makeRequest(
   });
 }
 
-describe("Custom Prompt Labels API", () => {
+describe("Custom Prompt Tags API", () => {
   let org: Organization;
   let otherOrg: Organization;
   let team: Team;
@@ -155,7 +155,7 @@ describe("Custom Prompt Labels API", () => {
   afterEach(async () => {
     vi.clearAllMocks();
 
-    await prisma.promptLabel.deleteMany({
+    await prisma.promptTag.deleteMany({
       where: {
         organizationId: { in: [org.id, otherOrg.id] },
       },
@@ -205,14 +205,14 @@ describe("Custom Prompt Labels API", () => {
 
   // --- Create ---
 
-  describe("POST /api/orgs/:orgId/prompt-labels", () => {
-    describe("when admin creates a valid custom label", () => {
+  describe("POST /api/orgs/:orgId/prompt-tags", () => {
+    describe("when admin creates a valid custom tag", () => {
       it("returns 201 with id and name", async () => {
         asAdmin();
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "canary" },
         );
 
@@ -229,7 +229,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "42" },
         );
 
@@ -245,7 +245,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "" },
         );
 
@@ -259,8 +259,8 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
-          { name: "my label" },
+          `/api/orgs/${org.id}/prompt-tags`,
+          { name: "my tag" },
         );
 
         expect(res.status).toBe(422);
@@ -271,7 +271,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "can/ary" },
         );
 
@@ -283,7 +283,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "CANARY" },
         );
 
@@ -295,9 +295,9 @@ describe("Custom Prompt Labels API", () => {
       it("returns 409 conflict", async () => {
         asAdmin();
 
-        await prisma.promptLabel.create({
+        await prisma.promptTag.create({
           data: {
-            id: `plabel_${nanoid()}`,
+            id: `ptag_${nanoid()}`,
             organizationId: org.id,
             name: "canary",
           },
@@ -305,7 +305,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "canary" },
         );
 
@@ -313,13 +313,13 @@ describe("Custom Prompt Labels API", () => {
       });
     });
 
-    describe("when name clashes with a built-in label", () => {
+    describe("when name clashes with a built-in tag", () => {
       it("returns 422 with error mentioning built-in", async () => {
         asAdmin();
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "production" },
         );
 
@@ -335,7 +335,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "canary" },
         );
 
@@ -349,7 +349,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "POST",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
           { name: "canary" },
         );
 
@@ -360,20 +360,20 @@ describe("Custom Prompt Labels API", () => {
 
   // --- List ---
 
-  describe("GET /api/orgs/:orgId/prompt-labels", () => {
-    describe("when org has custom labels", () => {
-      it("returns built-in and custom labels with correct types", async () => {
+  describe("GET /api/orgs/:orgId/prompt-tags", () => {
+    describe("when org has custom tags", () => {
+      it("returns tags with id, name, and createdAt", async () => {
         asAdmin();
 
-        await prisma.promptLabel.createMany({
+        await prisma.promptTag.createMany({
           data: [
             {
-              id: `plabel_${nanoid()}`,
+              id: `ptag_${nanoid()}`,
               organizationId: org.id,
               name: "canary",
             },
             {
-              id: `plabel_${nanoid()}`,
+              id: `ptag_${nanoid()}`,
               organizationId: org.id,
               name: "ab-test",
             },
@@ -382,56 +382,48 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "GET",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
         );
 
         expect(res.status).toBe(200);
-        const body = (await res.json()) as Array<{ name: string; type: string }>;
-        const names = body.map((l) => l.name);
+        const body = (await res.json()) as Array<{ id: string; name: string; createdAt: string }>;
+        const names = body.map((t) => t.name);
 
-        expect(names).toContain("latest");
-        expect(names).toContain("production");
-        expect(names).toContain("staging");
         expect(names).toContain("canary");
         expect(names).toContain("ab-test");
 
-        const builtIns = body.filter((l) => l.type === "built-in");
-        expect(builtIns.map((l) => l.name).sort()).toEqual(
-          ["latest", "production", "staging"].sort(),
-        );
-
-        const customs = body.filter((l) => l.type === "custom");
-        expect(customs.map((l) => l.name).sort()).toEqual(
-          ["ab-test", "canary"].sort(),
-        );
+        // Each tag has id and createdAt
+        for (const tag of body) {
+          expect(tag.id).toBeDefined();
+          expect(tag.createdAt).toBeDefined();
+        }
       });
     });
 
-    describe("when org has no custom labels", () => {
-      it("returns only built-in labels", async () => {
+    describe("when org has no custom tags", () => {
+      it("returns an empty array", async () => {
         asAdmin();
 
         const res = await makeRequest(
           "GET",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
         );
 
         expect(res.status).toBe(200);
         const body = (await res.json()) as Array<{ name: string }>;
-        const names = body.map((l) => l.name).sort();
 
-        expect(names).toEqual(["latest", "production", "staging"].sort());
+        expect(body).toEqual([]);
       });
     });
 
     describe("when org isolation is required", () => {
-      it("does not return labels from other orgs", async () => {
+      it("does not return tags from other orgs", async () => {
         asAdmin();
 
-        // Create label in other org
-        await prisma.promptLabel.create({
+        // Create tag in other org
+        await prisma.promptTag.create({
           data: {
-            id: `plabel_${nanoid()}`,
+            id: `ptag_${nanoid()}`,
             organizationId: otherOrg.id,
             name: "canary",
           },
@@ -439,12 +431,12 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "GET",
-          `/api/orgs/${org.id}/prompt-labels`,
+          `/api/orgs/${org.id}/prompt-tags`,
         );
 
         expect(res.status).toBe(200);
         const body = (await res.json()) as Array<{ name: string }>;
-        const names = body.map((l) => l.name);
+        const names = body.map((t) => t.name);
 
         expect(names).not.toContain("canary");
       });
@@ -453,14 +445,14 @@ describe("Custom Prompt Labels API", () => {
 
   // --- Delete ---
 
-  describe("DELETE /api/orgs/:orgId/prompt-labels/:labelId", () => {
-    describe("when deleting an existing custom label with no assignments", () => {
+  describe("DELETE /api/orgs/:orgId/prompt-tags/:tagId", () => {
+    describe("when deleting an existing custom tag with no assignments", () => {
       it("returns 204", async () => {
         asAdmin();
 
-        const label = await prisma.promptLabel.create({
+        const tag = await prisma.promptTag.create({
           data: {
-            id: `plabel_${nanoid()}`,
+            id: `ptag_${nanoid()}`,
             organizationId: org.id,
             name: "canary",
           },
@@ -468,25 +460,25 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "DELETE",
-          `/api/orgs/${org.id}/prompt-labels/${label.id}`,
+          `/api/orgs/${org.id}/prompt-tags/${tag.id}`,
         );
 
         expect(res.status).toBe(204);
 
-        const deleted = await prisma.promptLabel.findUnique({
-          where: { id: label.id },
+        const deleted = await prisma.promptTag.findUnique({
+          where: { id: tag.id },
         });
         expect(deleted).toBeNull();
       });
     });
 
-    describe("when deleting a custom label that has assignments", () => {
+    describe("when deleting a custom tag that has assignments", () => {
       it("cascades to remove PromptVersionLabel rows", async () => {
         asAdmin();
 
-        const label = await prisma.promptLabel.create({
+        const tag = await prisma.promptTag.create({
           data: {
-            id: `plabel_${nanoid()}`,
+            id: `ptag_${nanoid()}`,
             organizationId: org.id,
             name: "canary",
           },
@@ -505,7 +497,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "DELETE",
-          `/api/orgs/${org.id}/prompt-labels/${label.id}`,
+          `/api/orgs/${org.id}/prompt-tags/${tag.id}`,
         );
 
         expect(res.status).toBe(204);
@@ -517,28 +509,28 @@ describe("Custom Prompt Labels API", () => {
       });
     });
 
-    describe("when attempting to delete a built-in label", () => {
-      it("returns 422 with error mentioning built-in labels", async () => {
+    describe("when attempting to delete a protected tag", () => {
+      it("returns 422 with error mentioning protected tag", async () => {
         asAdmin();
 
         const res = await makeRequest(
           "DELETE",
-          `/api/orgs/${org.id}/prompt-labels/production`,
+          `/api/orgs/${org.id}/prompt-tags/production`,
         );
 
         expect(res.status).toBe(422);
         const body = await res.json();
-        expect(body.message).toMatch(/built-in/i);
+        expect(body.message).toMatch(/protected/i);
       });
     });
 
-    describe("when deleting another org's label", () => {
+    describe("when deleting another org's tag", () => {
       it("returns 404", async () => {
         asAdmin();
 
-        const otherLabel = await prisma.promptLabel.create({
+        const otherTag = await prisma.promptTag.create({
           data: {
-            id: `plabel_${nanoid()}`,
+            id: `ptag_${nanoid()}`,
             organizationId: otherOrg.id,
             name: "canary",
           },
@@ -546,7 +538,7 @@ describe("Custom Prompt Labels API", () => {
 
         const res = await makeRequest(
           "DELETE",
-          `/api/orgs/${org.id}/prompt-labels/${otherLabel.id}`,
+          `/api/orgs/${org.id}/prompt-tags/${otherTag.id}`,
         );
 
         expect(res.status).toBe(404);

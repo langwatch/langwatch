@@ -11,18 +11,19 @@ import { handleError } from "../../../../middleware/error-handler";
 import { loggerMiddleware } from "../../../../middleware/logger";
 import { tracerMiddleware } from "../../../../middleware/tracer";
 import {
-  BUILT_IN_LABELS,
-  PromptLabelRepository,
-  PromptLabelConflictError,
-  PromptLabelValidationError,
-} from "~/server/prompt-config/repositories/prompt-label.repository";
+  PromptTagRepository,
+  PromptTagConflictError,
+  PromptTagValidationError,
+} from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { createLogger } from "~/utils/logger/server";
 
-const logger = createLogger("langwatch:api:prompt-labels");
+const logger = createLogger("langwatch:api:prompt-tags");
 
-export const app = new Hono().basePath("/api/orgs/:orgId/prompt-labels");
+const PROTECTED_TAGS = ["production", "staging"] as const;
 
-app.use(tracerMiddleware({ name: "prompt-labels" }));
+export const app = new Hono().basePath("/api/orgs/:orgId/prompt-tags");
+
+app.use(tracerMiddleware({ name: "prompt-tags" }));
 app.use(loggerMiddleware());
 app.onError(handleError);
 
@@ -39,8 +40,8 @@ async function requireSession(c: { req: { raw: Request } }) {
 }
 
 /**
- * GET /api/orgs/:orgId/prompt-labels
- * Returns all labels for the org: built-in + custom.
+ * GET /api/orgs/:orgId/prompt-tags
+ * Returns all tags for the org.
  * Requires org member access.
  */
 app.get("/", async (c) => {
@@ -54,36 +55,30 @@ app.get("/", async (c) => {
   );
   if (!permitted) {
     throw new HTTPException(403, {
-      message: "You do not have permission to view labels for this org.",
+      message: "You do not have permission to view tags for this org.",
     });
   }
 
-  const repo = new PromptLabelRepository(prisma);
-  const customLabels = await repo.list({ organizationId: orgId });
-
-  const builtInItems = BUILT_IN_LABELS.map((name) => ({
-    name,
-    type: "built-in" as const,
-  }));
-
-  const customItems = customLabels.map((label) => ({
-    id: label.id,
-    name: label.name,
-    type: "custom" as const,
-    createdAt: label.createdAt,
-  }));
+  const repo = new PromptTagRepository(prisma);
+  const tags = await repo.list({ organizationId: orgId });
 
   logger.info(
-    { orgId, customCount: customLabels.length },
-    "Listed prompt labels",
+    { orgId, count: tags.length },
+    "Listed prompt tags",
   );
 
-  return c.json([...builtInItems, ...customItems]);
+  return c.json(
+    tags.map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      createdAt: tag.createdAt,
+    })),
+  );
 });
 
 /**
- * POST /api/orgs/:orgId/prompt-labels
- * Creates a custom label definition.
+ * POST /api/orgs/:orgId/prompt-tags
+ * Creates a custom tag definition.
  * Requires org admin access.
  */
 app.post(
@@ -100,35 +95,35 @@ app.post(
     );
     if (!permitted) {
       throw new HTTPException(403, {
-        message: "You do not have permission to create labels for this org.",
+        message: "You do not have permission to create tags for this org.",
       });
     }
 
     const { name } = c.req.valid("json");
-    const repo = new PromptLabelRepository(prisma);
+    const repo = new PromptTagRepository(prisma);
 
     try {
-      const label = await repo.create({
+      const tag = await repo.create({
         organizationId: orgId,
         name,
         createdById: session.user.id,
       });
 
-      logger.info({ orgId, name }, "Custom prompt label created via API");
+      logger.info({ orgId, name }, "Custom prompt tag created via API");
 
       return c.json(
         {
-          id: label.id,
-          name: label.name,
-          createdAt: label.createdAt,
+          id: tag.id,
+          name: tag.name,
+          createdAt: tag.createdAt,
         },
         201,
       );
     } catch (error) {
-      if (error instanceof PromptLabelValidationError) {
+      if (error instanceof PromptTagValidationError) {
         throw new HTTPException(422, { message: error.message });
       }
-      if (error instanceof PromptLabelConflictError) {
+      if (error instanceof PromptTagConflictError) {
         throw new HTTPException(409, { message: error.message });
       }
       throw error;
@@ -137,12 +132,12 @@ app.post(
 );
 
 /**
- * DELETE /api/orgs/:orgId/prompt-labels/:labelId
- * Deletes a custom label definition and cascades to assignments.
+ * DELETE /api/orgs/:orgId/prompt-tags/:tagId
+ * Deletes a custom tag definition and cascades to assignments.
  * Requires org admin access.
  */
-app.delete("/:labelId", async (c) => {
-  const { orgId, labelId } = c.req.param();
+app.delete("/:tagId", async (c) => {
+  const { orgId, tagId } = c.req.param();
   const session = await requireSession(c);
 
   const permitted = await hasOrganizationPermission(
@@ -152,32 +147,37 @@ app.delete("/:labelId", async (c) => {
   );
   if (!permitted) {
     throw new HTTPException(403, {
-      message: "You do not have permission to delete labels for this org.",
+      message: "You do not have permission to delete tags for this org.",
     });
   }
 
-  // Reject attempts to delete built-in labels by ID lookup
-  // (built-in labels have no DB rows, so getById returns null, but we check
-  // if the labelId looks like a built-in name to give a clear error)
-  if ((BUILT_IN_LABELS as readonly string[]).includes(labelId)) {
+  // Reject attempts to delete protected tags by name
+  if ((PROTECTED_TAGS as readonly string[]).includes(tagId)) {
     throw new HTTPException(422, {
-      message: `"${labelId}" is a built-in label and cannot be deleted.`,
+      message: `"${tagId}" is a protected tag and cannot be deleted.`,
     });
   }
 
-  const repo = new PromptLabelRepository(prisma);
+  const repo = new PromptTagRepository(prisma);
 
-  const label = await repo.getById({ id: labelId, organizationId: orgId });
+  const tag = await repo.getById({ id: tagId, organizationId: orgId });
 
-  if (!label) {
+  if (!tag) {
     throw new HTTPException(404, {
-      message: `Label not found: ${labelId}`,
+      message: `Tag not found: ${tagId}`,
     });
   }
 
-  await repo.delete({ id: labelId, organizationId: orgId });
+  // Also reject deletion of protected tags found by ID
+  if ((PROTECTED_TAGS as readonly string[]).includes(tag.name)) {
+    throw new HTTPException(422, {
+      message: `"${tag.name}" is a protected tag and cannot be deleted.`,
+    });
+  }
 
-  logger.info({ orgId, labelId }, "Custom prompt label deleted via API");
+  await repo.delete({ id: tagId, organizationId: orgId });
+
+  logger.info({ orgId, tagId }, "Custom prompt tag deleted via API");
 
   return new Response(null, { status: 204 });
 });

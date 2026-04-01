@@ -80,12 +80,12 @@ Not storing `latest` avoids a maintenance burden — auto-updating a label row o
 - Optional `labels` array in `POST /` and `PUT /:id` payloads — assign labels to newly created versions (like Langfuse)
 - Both patterns are needed: sub-resource for label promotion without version changes, payloads for label assignment during version creation
 
-## Revision History — v4 (2026-03-31): Custom label definitions (issue #2821)
+## Revision History — v4 (2026-03-31): Custom tag definitions (issue #2821)
 
-Added the `PromptLabel` table for org-scoped custom label definitions:
+Added the `PromptTag` table for org-scoped custom tag definitions:
 
 ```prisma
-model PromptLabel {
+model PromptTag {
   id             String       @id @default(nanoid())
   organizationId String
   organization   Organization @relation(...)
@@ -93,7 +93,7 @@ model PromptLabel {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @default(now()) @updatedAt
   createdById    String?
-  createdBy      User?        @relation("promptLabelCreatedBy", ...)
+  createdBy      User?        @relation("promptTagCreatedBy", ...)
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -101,22 +101,23 @@ model PromptLabel {
 ```
 
 New API surface added:
-- `POST /api/orgs/:orgId/prompt-labels` — create custom label (admin only)
-- `GET /api/orgs/:orgId/prompt-labels` — list built-in + custom labels
-- `DELETE /api/orgs/:orgId/prompt-labels/:labelId` — delete custom label + cascade assignments
+- `POST /api/orgs/:orgId/prompt-tags` — create custom tag (admin only)
+- `GET /api/orgs/:orgId/prompt-tags` — list all tags for the org
+- `DELETE /api/orgs/:orgId/prompt-tags/:tagId` — delete custom tag + cascade assignments
 
-Built-in labels (`latest`, `production`, `staging`) are still not stored in the database.
-`PromptVersionLabel.label` remains a plain string (no FK to `PromptLabel`). Validation was widened to accept custom labels via org lookup.
+Built-in tags (`production`, `staging`) are seeded into `PromptTag` on org creation and via a data migration.
+`latest` remains code-only (resolved at query time).
+`PromptVersionLabel.label` remains a plain string (no FK to `PromptTag`). Validation was widened to accept custom tags via org lookup.
 
 ## Deferred Scope
 
 The following are explicitly deferred to future issues:
 
-- **FK from PromptVersionLabel.label to PromptLabel** — currently a plain string with soft validation. A FK would enforce referential integrity but requires migrating existing rows.
-- **Label edit/rename** — changing a label name requires updating all assignments. Not implemented.
-- **RBAC** — per-label permissions (who can assign/reassign). See #2713.
+- **FK from PromptVersionLabel.label to PromptTag** — currently a plain string with soft validation. A FK would enforce referential integrity but requires migrating existing rows.
+- **Tag edit/rename** — changing a tag name requires updating all assignments. Not implemented.
+- **RBAC** — per-tag permissions (who can assign/reassign). See #2713.
 - **Archiving** — soft delete on both definitions and assignments.
-- **Label description field** — nice-to-have on the definition table.
+- **Tag description field** — nice-to-have on the definition table.
 
 ### API Surface
 
@@ -125,12 +126,12 @@ The label feature follows both Langfuse's "labels in create payload" pattern and
 | Method | Path / Endpoint | Description |
 |--------|----------------|-------------|
 | `PUT` | `/api/v1/prompts/:id/labels/:label` | Move a label to an existing version |
-| `POST` | `/api/v1/prompts` | Create prompt with optional `labels` array (assigned to v1) |
-| `PUT` | `/api/v1/prompts/:id` | Update prompt with optional `labels` array (assigned to new version) |
+| `POST` | `/api/v1/prompts` | Create prompt with optional `tags` array (assigned to v1) |
+| `PUT` | `/api/v1/prompts/:id` | Update prompt with optional `tags` array (assigned to new version) |
 | `GET` | `/api/v1/prompts/:id?label=production` | Fetch the version a label points to |
 | `GET` | `/api/v1/prompts/:id?version=2` | Fetch a specific version by number |
 | `GET` | `/api/v1/prompts/:id` | Fetch latest version (highest version number) |
-| tRPC mutation | `prompts.assignLabel` | Assign or reassign a label directly |
+| tRPC mutation | `prompts.assignTag` | Assign or reassign a tag directly |
 | tRPC query | `prompts.getByIdOrHandle` | Fetch with optional `label` param |
 
 `version`/`versionId` and `label` are mutually exclusive — providing both returns 422.
@@ -138,10 +139,10 @@ The label feature follows both Langfuse's "labels in create payload" pattern and
 ## Consequences
 
 - A single Prisma model and migration are required.
-- Label assignment is available through both REST and tRPC with upsert semantics.
-- Labels can be assigned at prompt creation time via the `labels` array in the REST create payload.
+- Tag assignment is available through both REST and tRPC with upsert semantics.
+- Tags can be assigned at prompt creation time via the `tags` array in the REST create payload.
 - SDK updates to pass `label` parameters are a separate concern (not covered by this ADR).
-- Future label features (custom labels, RBAC) build on this table by widening the validation or adding permissions.
+- Future tag features (custom tags, RBAC) build on this table by widening the validation or adding permissions.
 
 ## References
 

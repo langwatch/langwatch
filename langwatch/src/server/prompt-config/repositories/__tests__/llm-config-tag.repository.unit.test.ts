@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import {
   PromptVersionLabelRepository,
-  LabelValidationError,
-} from "../llm-config-label.repository";
+  TagValidationError,
+} from "../llm-config-tag.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -20,58 +20,58 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 }
 
 describe("PromptVersionLabelRepository", () => {
-  describe("validateLabel()", () => {
-    describe("when label is 'production'", () => {
+  describe("validateTag()", () => {
+    describe("when tag is 'production'", () => {
       it("does not throw", () => {
         const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabel("production")).not.toThrow();
+        expect(() => repo.validateTag("production")).not.toThrow();
       });
     });
 
-    describe("when label is 'staging'", () => {
+    describe("when tag is 'staging'", () => {
       it("does not throw", () => {
         const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabel("staging")).not.toThrow();
+        expect(() => repo.validateTag("staging")).not.toThrow();
       });
     });
 
-    describe("when label is 'canary'", () => {
+    describe("when tag is 'canary'", () => {
       it("throws a validation error", () => {
         const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabel("canary")).toThrow(
+        expect(() => repo.validateTag("canary")).toThrow(
           expect.objectContaining({
-            name: "LabelValidationError",
+            name: "TagValidationError",
             message: expect.stringContaining('Invalid label "canary"'),
           }),
         );
       });
     });
 
-    describe("when label is 'latest'", () => {
+    describe("when tag is 'latest'", () => {
       it("throws a validation error", () => {
         const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabel("latest")).toThrow(
-          LabelValidationError,
+        expect(() => repo.validateTag("latest")).toThrow(
+          TagValidationError,
         );
       });
     });
 
-    describe("when label is an arbitrary string", () => {
+    describe("when tag is an arbitrary string", () => {
       it("throws a validation error", () => {
         const repo = new PromptVersionLabelRepository(makeMockPrisma());
 
-        expect(() => repo.validateLabel("custom-release")).toThrow(
-          LabelValidationError,
+        expect(() => repo.validateTag("custom-release")).toThrow(
+          TagValidationError,
         );
       });
     });
   });
 
-  describe("assignLabel()", () => {
+  describe("assignTag()", () => {
     describe("when version does not belong to the prompt", () => {
       it("throws a validation error", async () => {
         const prisma = makeMockPrisma();
@@ -81,7 +81,7 @@ describe("PromptVersionLabelRepository", () => {
         const repo = new PromptVersionLabelRepository(prisma);
 
         await expect(
-          repo.assignLabel({
+          repo.assignTag({
             configId: "config-1",
             versionId: "version-from-other-prompt",
             label: "production",
@@ -89,7 +89,7 @@ describe("PromptVersionLabelRepository", () => {
           }),
         ).rejects.toThrow(
           expect.objectContaining({
-            name: "LabelValidationError",
+            name: "TagValidationError",
             message: expect.stringContaining(
               "Version does not belong to this prompt config",
             ),
@@ -98,19 +98,19 @@ describe("PromptVersionLabelRepository", () => {
       });
     });
 
-    describe("when label is invalid", () => {
+    describe("when tag is invalid", () => {
       it("throws a validation error without hitting the database", async () => {
         const prisma = makeMockPrisma();
         const repo = new PromptVersionLabelRepository(prisma);
 
         await expect(
-          repo.assignLabel({
+          repo.assignTag({
             configId: "config-1",
             versionId: "v1",
             label: "canary",
             projectId: "project-1",
           }),
-        ).rejects.toThrow(LabelValidationError);
+        ).rejects.toThrow(TagValidationError);
 
         expect(
           prisma.llmPromptConfigVersion.findFirst,
@@ -118,8 +118,8 @@ describe("PromptVersionLabelRepository", () => {
       });
     });
 
-    describe("when label and version are valid", () => {
-      it("assigns the label to the version", async () => {
+    describe("when tag and version are valid", () => {
+      it("assigns the tag to the version", async () => {
         const prisma = makeMockPrisma();
         (
           prisma.llmPromptConfigVersion.findFirst as ReturnType<typeof vi.fn>
@@ -136,7 +136,7 @@ describe("PromptVersionLabelRepository", () => {
         ).mockResolvedValue(mockLabel);
         const repo = new PromptVersionLabelRepository(prisma);
 
-        const result = await repo.assignLabel({
+        const result = await repo.assignTag({
           configId: "config-1",
           versionId: "v1",
           label: "production",
@@ -167,8 +167,8 @@ describe("PromptVersionLabelRepository", () => {
     });
   });
 
-  describe("getLabelsForConfig()", () => {
-    describe("when no labels are assigned", () => {
+  describe("getTagsForConfig()", () => {
+    describe("when no tags are assigned", () => {
       it("returns an empty list", async () => {
         const prisma = makeMockPrisma();
         (
@@ -176,7 +176,7 @@ describe("PromptVersionLabelRepository", () => {
         ).mockResolvedValue([]);
         const repo = new PromptVersionLabelRepository(prisma);
 
-        const result = await repo.getLabelsForConfig({
+        const result = await repo.getTagsForConfig({
           configId: "config-1",
           projectId: "project-1",
         });
@@ -188,8 +188,8 @@ describe("PromptVersionLabelRepository", () => {
       });
     });
 
-    describe("when labels are assigned", () => {
-      it("returns all labels for the config", async () => {
+    describe("when tags are assigned", () => {
+      it("returns all tags for the config", async () => {
         const prisma = makeMockPrisma();
         const mockLabels = [
           {
@@ -212,7 +212,7 @@ describe("PromptVersionLabelRepository", () => {
         ).mockResolvedValue(mockLabels);
         const repo = new PromptVersionLabelRepository(prisma);
 
-        const result = await repo.getLabelsForConfig({
+        const result = await repo.getTagsForConfig({
           configId: "config-1",
           projectId: "project-1",
         });

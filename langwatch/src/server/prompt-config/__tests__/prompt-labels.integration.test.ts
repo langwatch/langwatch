@@ -113,7 +113,7 @@ describe("Feature: Prompt version labels", () => {
       const v2 = allVersions[1];
       if (!v2) throw new Error("test setup failed: missing version 1");
 
-      const label = await service.assignLabel({
+      const label = await service.assignTag({
         configId,
         versionId: v2.versionId,
         label: "production",
@@ -141,14 +141,14 @@ describe("Feature: Prompt version labels", () => {
       const v3 = allVersions[2];
       if (!v3) throw new Error("test setup failed: missing version 2");
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v2.versionId,
         label: "production",
         projectId: testProject.id,
       });
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v3.versionId,
         label: "production",
@@ -188,14 +188,14 @@ describe("Feature: Prompt version labels", () => {
       const emailV5 = emailVersions[4];
       if (!emailV5) throw new Error("test setup failed: missing email version 4");
 
-      await service.assignLabel({
+      await service.assignTag({
         configId: pizzaConfigId,
         versionId: pizzaV2.versionId,
         label: "production",
         projectId: testProject.id,
       });
 
-      await service.assignLabel({
+      await service.assignTag({
         configId: emailConfigId,
         versionId: emailV5.versionId,
         label: "production",
@@ -234,14 +234,14 @@ describe("Feature: Prompt version labels", () => {
       const v3 = allVersions[2];
       if (!v3) throw new Error("test setup failed: missing version 2");
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v2.versionId,
         label: "production",
         projectId: testProject.id,
       });
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v3.versionId,
         label: "staging",
@@ -338,7 +338,7 @@ describe("Feature: Prompt version labels", () => {
       // Simulate the API handler scenario: the auth context project (otherProject)
       // differs from the config's actual projectId (testProject).
       // The bug was passing project.id (otherProject) instead of config.projectId (testProject).
-      const label = await service.assignLabel({
+      const label = await service.assignTag({
         configId: prompt.id,
         versionId: prompt.versionId,
         label: "production",
@@ -352,7 +352,7 @@ describe("Feature: Prompt version labels", () => {
       // Verify the label is NOT found when using the wrong projectId
       // (this is what the bug caused — using project.id from auth context)
       await expect(
-        service.assignLabel({
+        service.assignTag({
           configId: prompt.id,
           versionId: prompt.versionId,
           label: "staging",

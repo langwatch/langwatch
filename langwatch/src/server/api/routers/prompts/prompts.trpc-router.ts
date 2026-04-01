@@ -14,7 +14,7 @@ import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreati
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
-import { LabelValidationError } from "~/server/prompt-config/repositories/llm-config-label.repository";
+import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
@@ -335,7 +335,7 @@ export const promptsRouter = createTRPCRouter({
         const service = new PromptService(ctx.prisma);
         return await service.getPromptByIdOrHandle(input);
       } catch (error) {
-        if (error instanceof LabelValidationError) {
+        if (error instanceof TagValidationError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: error.message,
@@ -864,27 +864,27 @@ export const promptsRouter = createTRPCRouter({
       };
     }),
 
-  // --- Label Operations ---
+  // --- Tag Operations ---
 
   /**
-   * Get all labels for a prompt config.
+   * Get all tags for a prompt config.
    */
-  getLabelsForConfig: protectedProcedure
+  getTagsForConfig: protectedProcedure
     .input(z.object({ projectId: z.string(), configId: z.string() }))
     .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
-      return service.getLabelsForConfig({
+      return service.getTagsForConfig({
         configId: input.configId,
         projectId: input.projectId,
       });
     }),
 
   /**
-   * Assign (or reassign) a label to a specific prompt version.
-   * Accepts built-in labels (production, staging) and custom labels defined for the org.
+   * Assign (or reassign) a tag to a specific prompt version.
+   * Accepts built-in tags (production, staging) and custom tags defined for the org.
    */
-  assignLabel: protectedProcedure
+  assignTag: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -898,7 +898,7 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
 
       try {
-        return await service.assignLabel({
+        return await service.assignTag({
           configId: input.configId,
           versionId: input.versionId,
           label: input.label,
@@ -906,7 +906,7 @@ export const promptsRouter = createTRPCRouter({
           userId: ctx.session?.user?.id,
         });
       } catch (error) {
-        if (error instanceof LabelValidationError) {
+        if (error instanceof TagValidationError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: error.message,

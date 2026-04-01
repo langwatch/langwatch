@@ -26,7 +26,7 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { VALID_LABELS } from "~/prompts/constants/labels";
+import { VALID_TAGS } from "~/prompts/constants/tags";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -57,12 +57,12 @@ export function DeployPromptDialog({
     { enabled: isOpen && !!configId && !!projectId },
   );
 
-  const labelsQuery = api.prompts.getLabelsForConfig.useQuery(
+  const labelsQuery = api.prompts.getTagsForConfig.useQuery(
     { configId, projectId },
     { enabled: isOpen && !!configId && !!projectId },
   );
 
-  const assignLabel = api.prompts.assignLabel.useMutation();
+  const assignTag = api.prompts.assignTag.useMutation();
   const utils = api.useContext();
 
   const versions = versionsQuery.data ?? [];
@@ -74,7 +74,7 @@ export function DeployPromptDialog({
 
   type LabelSelections = Record<string, string>;
   const [labelSelections, setLabelSelections] = useState<LabelSelections>(
-    () => Object.fromEntries(VALID_LABELS.map((l) => [l, ""])),
+    () => Object.fromEntries(VALID_TAGS.map((l) => [l, ""])),
   );
 
   const setLabelVersionId = useCallback((label: string, versionId: string) => {
@@ -86,12 +86,12 @@ export function DeployPromptDialog({
     if (!isOpen) return;
     const data = labelsQuery.data;
     if (!data?.length) {
-      setLabelSelections(Object.fromEntries(VALID_LABELS.map((l) => [l, ""])));
+      setLabelSelections(Object.fromEntries(VALID_TAGS.map((l) => [l, ""])));
       return;
     }
 
     const next: LabelSelections = {};
-    for (const label of VALID_LABELS) {
+    for (const label of VALID_TAGS) {
       const found = data.find((l) => l.label === label);
       next[label] = found?.versionId ?? "";
     }
@@ -105,12 +105,12 @@ export function DeployPromptDialog({
 
     const mutations: Promise<unknown>[] = [];
 
-    for (const label of VALID_LABELS) {
+    for (const label of VALID_TAGS) {
       const selectedVersionId = labelSelections[label] ?? "";
       const currentLabel = data.find((l) => l.label === label);
       if (selectedVersionId && selectedVersionId !== (currentLabel?.versionId ?? "")) {
         mutations.push(
-          assignLabel.mutateAsync({
+          assignTag.mutateAsync({
             projectId,
             configId,
             versionId: selectedVersionId,
@@ -128,7 +128,7 @@ export function DeployPromptDialog({
     setIsSaving(true);
     try {
       await Promise.all(mutations);
-      await utils.prompts.getLabelsForConfig.invalidate({ configId, projectId });
+      await utils.prompts.getTagsForConfig.invalidate({ configId, projectId });
       toaster.create({
         title: "Labels saved",
         type: "success",
@@ -149,7 +149,7 @@ export function DeployPromptDialog({
   }, [
     labelsQuery.data,
     labelSelections,
-    assignLabel,
+    assignTag,
     projectId,
     configId,
     onClose,
@@ -249,7 +249,7 @@ export function DeployPromptDialog({
               </Box>
 
               {/* Environment label rows */}
-              {VALID_LABELS.map((label) => {
+              {VALID_TAGS.map((label) => {
                 const isAssigned = !!(labelSelections[label]);
                 return (
                   <Box

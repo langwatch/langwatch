@@ -16,7 +16,7 @@ import {
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
-import { LabelValidationError } from "./repositories/llm-config-label.repository";
+import { TagValidationError } from "./repositories/llm-config-tag.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
@@ -24,7 +24,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
-import { PromptVersionLabelRepository } from "./repositories/llm-config-label.repository";
+import { PromptVersionLabelRepository } from "./repositories/llm-config-tag.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -108,12 +108,12 @@ export type VersionedPrompt = {
 export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
-  readonly labelRepository: PromptVersionLabelRepository;
+  readonly tagRepository: PromptVersionLabelRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
-    this.labelRepository = new PromptVersionLabelRepository(prisma);
+    this.tagRepository = new PromptVersionLabelRepository(prisma);
   }
 
   /**
@@ -163,7 +163,7 @@ export class PromptService {
         { idOrHandle, label: params.label, version: params.version, versionId: params.versionId },
         "Mutual exclusion: cannot specify both version/versionId and label",
       );
-      throw new LabelValidationError(
+      throw new TagValidationError(
         "Cannot specify both 'version'/'versionId' and 'label'. Use one or the other.",
       );
     }
@@ -185,7 +185,7 @@ export class PromptService {
         return null;
       }
 
-      const label = await this.labelRepository.getByConfigAndLabel({
+      const label = await this.tagRepository.getByConfigAndLabel({
         configId: config.id,
         label: params.label,
         projectId,
@@ -1057,15 +1057,15 @@ export class PromptService {
     });
   }
 
-  // --- Label operations ---
+  // --- Tag operations ---
 
-  /** Get all labels for a prompt config. */
-  async getLabelsForConfig(params: { configId: string; projectId: string }) {
-    return this.labelRepository.getLabelsForConfig(params);
+  /** Get all tags for a prompt config. */
+  async getTagsForConfig(params: { configId: string; projectId: string }) {
+    return this.tagRepository.getTagsForConfig(params);
   }
 
-  /** Assign (or reassign) a label to a specific prompt version. */
-  async assignLabel(params: {
+  /** Assign (or reassign) a tag to a specific prompt version. */
+  async assignTag(params: {
     configId: string;
     versionId: string;
     label: string;
@@ -1078,7 +1078,7 @@ export class PromptService {
       params.projectId,
     );
 
-    return this.labelRepository.assignLabel({
+    return this.tagRepository.assignTag({
       ...params,
       organizationId,
     });

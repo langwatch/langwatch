@@ -35,8 +35,8 @@ export const createPromptInputSchema = z.strictObject({
   inputs: z.array(inputsSchema).optional(),
   outputs: z.array(outputsSchema).optional(),
   schemaVersion: schemaVersionSchema.optional(),
-  /** Labels to assign to the initial version (e.g. ["production", "staging", "canary"]) */
-  labels: z.array(z.string().min(1)).optional(),
+  /** Tags to assign to the initial version (e.g. ["production", "staging", "canary"]) */
+  tags: z.array(z.string().min(1)).optional(),
 });
 
 export const updatePromptInputSchema = createPromptInputSchema

@@ -45,10 +45,10 @@ const EXEMPT_MODELS = [
    */
   "ScimToken",
   /**
-   * Custom prompt label definitions are organization-level, not project-level.
+   * Custom prompt tag definitions are organization-level, not project-level.
    * They are scoped by organizationId.
    */
-  "PromptLabel",
+  "PromptTag",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
