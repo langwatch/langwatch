@@ -15,11 +15,10 @@ import {
   PromptTagConflictError,
   PromptTagValidationError,
 } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { VALID_TAGS } from "~/prompts/constants/tags";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:prompt-tags");
-
-const PROTECTED_TAGS = ["production", "staging"] as const;
 
 export const app = new Hono().basePath("/api/orgs/:orgId/prompt-tags");
 
@@ -152,7 +151,7 @@ app.delete("/:tagId", async (c) => {
   }
 
   // Reject attempts to delete protected tags by name
-  if ((PROTECTED_TAGS as readonly string[]).includes(tagId)) {
+  if ((VALID_TAGS as readonly string[]).includes(tagId)) {
     throw new HTTPException(422, {
       message: `"${tagId}" is a protected tag and cannot be deleted.`,
     });
@@ -169,7 +168,7 @@ app.delete("/:tagId", async (c) => {
   }
 
   // Also reject deletion of protected tags found by ID
-  if ((PROTECTED_TAGS as readonly string[]).includes(tag.name)) {
+  if ((VALID_TAGS as readonly string[]).includes(tag.name)) {
     throw new HTTPException(422, {
       message: `"${tag.name}" is a protected tag and cannot be deleted.`,
     });
