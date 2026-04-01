@@ -22,7 +22,7 @@ export function _resetSubmittedInviteCodesForTests(): void {
 }
 
 type AcceptInviteMutation = ReturnType<
-  typeof api.organization.acceptInvite.useMutation
+  typeof api.invite.acceptInvite.useMutation
 >;
 type AcceptInviteMutationResult = Pick<
   AcceptInviteMutation,
@@ -76,7 +76,7 @@ export function useAcceptInviteOnce({
   inviteCode,
   enabled,
 }: UseAcceptInviteOnceOptions): UseAcceptInviteOnceResult {
-  const mutation = api.organization.acceptInvite.useMutation({
+  const mutation = api.invite.acceptInvite.useMutation({
     onSuccess: (data) => {
       toaster.create({
         title: "Invite Accepted",
