@@ -263,8 +263,8 @@ const groupByExpressions: Partial<
     column: `arrayJoin(
       arrayMap(
         a -> multiIf(
-          toInt32OrNull(a['event.metrics.vote']) = 1, 'thumbs_up',
-          toInt32OrNull(a['event.metrics.vote']) = -1, 'thumbs_down',
+          toInt32OrNull(a['event.metrics.vote']) = 1, 'Thumbs Up',
+          toInt32OrNull(a['event.metrics.vote']) = -1, 'Thumbs Down',
           ''
         ),
         arrayFilter(
@@ -1445,6 +1445,26 @@ function transformMetricForDedup(
       const hasCoalesce = /\bcoalesce\s*\(/.test(selectExpression);
       const result = hasCoalesce ? `coalesce(${transformed}, 0)` : transformed;
       return `${result} AS ${alias}`;
+    }
+  }
+
+  // Handle event-based metrics that reference stored_spans columns (ss."Events.Name", etc.)
+  // In the CTE context with arrayJoin grouping, the group_key already filters to matching events.
+  // Only rewrite count-like metrics — their semantics map to uniqExact(trace_id)
+  // in the CTE context where group_key already filters to matching events.
+  // Value-based aggregations (avgArray, sumArray, etc.) pass through unchanged
+  // because rewriting them would silently change "average score" to "count of traces".
+  const ss = tableAliases.stored_spans;
+  if (
+    selectExpression.includes(`${ss}."Events.Name"`) ||
+    selectExpression.includes(`${ss}."Events.Attributes"`)
+  ) {
+    if (
+      /\bcountIf\s*\(/.test(selectExpression) ||
+      /\bcount\s*\(/.test(selectExpression) ||
+      /\buniq/.test(selectExpression)
+    ) {
+      return `uniqExact(trace_id) AS ${alias}`;
     }
   }
 
