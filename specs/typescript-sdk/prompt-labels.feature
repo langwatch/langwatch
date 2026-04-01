@@ -121,29 +121,47 @@ Feature: SDK Prompt Label Support
   # --- E2E (real API) ---
 
   @e2e
-  Scenario: Assign label and fetch by label via real API
+  Scenario: Fetch labeled version via explicit label option
     Given I create a prompt with two versions via the SDK
-    When I assign the "production" label to version 1
-    And I fetch the prompt using shorthand "handle:production"
+    And the "production" label is assigned to version 1
+    When I fetch the prompt using get(handle, { label: "production" })
     Then I receive version 1 config data
 
   @e2e
-  Scenario: Reassign label to newer version
-    Given a prompt with "production" label assigned to version 1
-    When I reassign "production" to version 2
-    And I fetch the prompt using shorthand "handle:production"
-    Then I receive version 2 config data
+  Scenario: Fetch labeled version via shorthand syntax
+    Given I create a prompt with two versions via the SDK
+    And the "production" label is assigned to version 1
+    When I fetch the prompt using get("handle:production")
+    Then I receive version 1 config data
+
+  @e2e
+  Scenario: Fetch specific version via explicit version option
+    Given I create a prompt with two versions via the SDK
+    When I fetch the prompt using get(handle, { version: "1" })
+    Then I receive version 1 config data
+
+  @e2e
+  Scenario: Fetch specific version via shorthand syntax
+    Given I create a prompt with two versions via the SDK
+    When I fetch the prompt using get("handle:1")
+    Then I receive version 1 config data
 
   @e2e
   Scenario: Fetch without label returns latest version
     Given a prompt with "production" label assigned to version 1 and latest is version 2
-    When I fetch the prompt without a label
+    When I fetch the prompt without a label or version
     Then I receive version 2 config data
 
   @e2e
-  Scenario: Fetch with unassigned label returns error
+  Scenario: Fetch with unassigned label returns error via shorthand
     Given a prompt with no labels assigned
-    When I fetch the prompt using shorthand "handle:production"
+    When I fetch the prompt using get("handle:production")
+    Then I receive an error
+
+  @e2e
+  Scenario: Fetch with unassigned label returns error via explicit option
+    Given a prompt with no labels assigned
+    When I fetch the prompt using get(handle, { label: "production" })
     Then I receive an error
 
   @e2e
@@ -151,7 +169,7 @@ Feature: SDK Prompt Label Support
     Given I create a custom label "canary" via the SDK
     And I create a prompt with two versions via the SDK
     When I assign the "canary" label to version 2
-    And I fetch the prompt using shorthand "handle:canary"
+    And I fetch the prompt using get("handle:canary")
     Then I receive version 2 config data
 
   @e2e
