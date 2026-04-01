@@ -37,6 +37,9 @@ export async function searchTracesWithInternals({
   { trace: Trace; hit: T.SearchHit; source: ElasticSearchTrace }[]
 > {
   const client = await esClient(connConfig);
+  if (!client) {
+    throw new Error("Elasticsearch is not configured");
+  }
   const result = await client.search<ElasticSearchTrace>({
     index,
     size,
@@ -101,6 +104,9 @@ export async function aggregateTraces<
   Record<keyof Aggs, (T.AggregationsMultiBucketBase & { key: string })[]>
 > {
   const client = await esClient(connConfig);
+  if (!client) {
+    throw new Error("Elasticsearch is not configured");
+  }
   const result = await client.search<
     unknown,
     Record<
@@ -273,6 +279,9 @@ export async function getDistinctFieldNames({
   metadataKeys: Array<{ key: string; label: string }>;
 }> {
   const client = await esClient(connConfig);
+  if (!client) {
+    throw new Error("Elasticsearch is not configured");
+  }
 
   const dateFilter = {
     range: {

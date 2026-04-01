@@ -1063,6 +1063,9 @@ export const fetchExistingMD5s = async (
     }
   | undefined
 > => {
+  // Dedup check only works when ES is configured — without it, treat every trace as new
+  if (!env.ELASTICSEARCH_NODE_URL) return undefined;
+
   const existingTracesWithInternals = await searchTracesWithInternals({
     connConfig: { projectId },
     protections: {
