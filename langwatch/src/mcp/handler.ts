@@ -40,7 +40,7 @@ const TOKEN_TTL_SECONDS = 3600;
 interface SessionState {
   transport: StreamableHTTPServerTransport;
   apiKey: string;
-  createdAt: number;
+  lastActivityAt: number;
 }
 
 /** OAuth token entry stored in memory and Redis. */
@@ -94,7 +94,7 @@ export function createMcpHandler(): McpHandler {
 
     // Sweep expired sessions
     for (const [id, session] of Object.entries(sessions)) {
-      if (now - session.createdAt > SESSION_MAX_AGE_MS) {
+      if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
         session.transport.close().catch(() => {});
         delete sessions[id];
       }
@@ -140,6 +140,7 @@ export function createMcpHandler(): McpHandler {
       "Access-Control-Allow-Headers",
       "Content-Type, Authorization, mcp-session-id, MCP-Protocol-Version",
     );
+    res.setHeader("Access-Control-Expose-Headers", "mcp-session-id");
   }
 
   // -------------------------------------------------------------------------
@@ -159,10 +160,21 @@ export function createMcpHandler(): McpHandler {
     res.end(body);
   }
 
+  const MAX_BODY_BYTES = 1_048_576; // 1 MB
+
   function readBody(req: IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
-      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let totalBytes = 0;
+      req.on("data", (chunk: Buffer) => {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_BODY_BYTES) {
+          req.destroy();
+          reject(new Error("Request body too large"));
+          return;
+        }
+        chunks.push(chunk);
+      });
       req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
       req.on("error", reject);
     });
@@ -219,11 +231,10 @@ export function createMcpHandler(): McpHandler {
           return null;
         }
       } catch (err) {
-        // Fail closed: if Redis is down we cannot distinguish an OAuth token
-        // from a direct API key, so reject rather than risk accepting an
-        // arbitrary string as a valid key.
+        // Redis is down — fall through to treat token as a direct API key.
+        // This is safe because validateApiKey() will still check the key
+        // against the database, rejecting any invalid tokens.
         logger.error({ error: err }, "Redis token lookup failed");
-        return null;
       }
     }
 
@@ -366,7 +377,16 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     setCorsHeaders(res);
-    const raw = await readBody(req);
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request body too large") {
+        sendJson(res, 413, { error: "Request body too large" });
+        return;
+      }
+      throw err;
+    }
     const params = parseFormBody(raw);
 
     if (params.grant_type !== "client_credentials") {
@@ -417,7 +437,16 @@ export function createMcpHandler(): McpHandler {
   ): Promise<void> {
     setCorsHeaders(res);
 
-    const raw = await readBody(req);
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request body too large") {
+        sendJson(res, 413, { error: "Request body too large" });
+        return;
+      }
+      throw err;
+    }
     let body: unknown;
     try {
       body = JSON.parse(raw);
@@ -431,6 +460,7 @@ export function createMcpHandler(): McpHandler {
     // Existing session — handle request
     if (sessionId && sessions[sessionId]) {
       const session = sessions[sessionId];
+      session.lastActivityAt = Date.now();
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res, body),
       );
@@ -445,7 +475,7 @@ export function createMcpHandler(): McpHandler {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
-          sessions[id] = { transport, apiKey, createdAt: Date.now() };
+          sessions[id] = { transport, apiKey, lastActivityAt: Date.now() };
         },
       });
 
@@ -480,6 +510,7 @@ export function createMcpHandler(): McpHandler {
 
     if (sessionId && sessions[sessionId]) {
       const session = sessions[sessionId];
+      session.lastActivityAt = Date.now();
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res),
       );
@@ -497,6 +528,7 @@ export function createMcpHandler(): McpHandler {
 
     if (sessionId && sessions[sessionId]) {
       const session = sessions[sessionId];
+      session.lastActivityAt = Date.now();
       await session.transport.close();
       delete sessions[sessionId];
       sendJson(res, 200, { status: "session closed" });
