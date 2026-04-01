@@ -11,8 +11,7 @@ Covers:
 - Backward-compatible labels alias
 """
 import json
-from typing import Any, Dict
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
