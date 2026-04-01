@@ -92,24 +92,24 @@ app.get(
   },
 );
 
-// Assign label to a prompt version
+// Assign tag to a prompt version
 const assignTagResponseSchema = z.object({
   configId: z.string(),
   versionId: z.string(),
-  label: z.string(),
+  tag: z.string(),
   updatedAt: z.date(),
 });
 
 app.put(
-  "/:id{.+?}/labels/:label",
+  "/:id{.+?}/tags/:tag",
   describeRoute({
     description:
-      'Assign a label (e.g. "production", "staging") to a specific prompt version',
+      'Assign a tag (e.g. "production", "staging") to a specific prompt version',
     parameters: [
       {
-        name: "label",
+        name: "tag",
         in: "path",
-        description: 'The label to assign (e.g., "production", "staging", or a custom label)',
+        description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
         required: true,
         schema: { type: "string" },
       },
@@ -124,7 +124,7 @@ app.put(
         },
       },
       422: {
-        description: "Invalid label or version",
+        description: "Invalid tag or version",
         content: {
           "application/json": { schema: resolver(badRequestSchema) },
         },
@@ -136,12 +136,12 @@ app.put(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const { id, label } = c.req.param();
+    const { id, tag } = c.req.param();
     const { versionId } = c.req.valid("json");
 
     logger.info(
-      { projectId: project.id, promptId: id, label, versionId },
-      "Assigning label to prompt version",
+      { projectId: project.id, promptId: id, tag, versionId },
+      "Assigning tag to prompt version",
     );
 
     try {
@@ -160,21 +160,21 @@ app.put(
       const result = await service.assignTag({
         configId: config.id,
         versionId,
-        label,
+        tag,
         projectId: config.projectId,
         organizationId: organization.id,
       });
 
       logger.info(
-        { projectId: project.id, configId: config.id, label, versionId },
-        "Successfully assigned label to prompt version",
+        { projectId: project.id, configId: config.id, tag, versionId },
+        "Successfully assigned tag to prompt version",
       );
 
       return c.json(
         assignTagResponseSchema.parse({
           configId: result.configId,
           versionId: result.versionId,
-          label: result.label,
+          tag: result.tag,
           updatedAt: result.updatedAt,
         }),
       );
@@ -250,10 +250,10 @@ app.get(
         schema: { type: "integer", minimum: 0 },
       },
       {
-        name: "label",
+        name: "tag",
         in: "query",
         description:
-          'Fetch the version pointed to by this label (e.g., "production", "staging", or a custom label)',
+          'Fetch the version pointed to by this tag (e.g., "production", "staging", or a custom tag)',
         required: false,
         schema: { type: "string" },
       },
@@ -277,10 +277,10 @@ app.get(
     const version = c.req.query("version")
       ? parseInt(c.req.query("version")!)
       : undefined;
-    const label = c.req.query("label") ?? undefined;
+    const tag = c.req.query("tag") ?? undefined;
 
     logger.info(
-      { projectId: project.id, id, version, label },
+      { projectId: project.id, id, version, tag },
       "Getting prompt",
     );
 
@@ -290,7 +290,7 @@ app.get(
         projectId: project.id,
         organizationId: organization.id,
         version,
-        label,
+        tag,
       });
 
       if (!config) {
@@ -364,7 +364,7 @@ app.post(
             service.assignTag({
               configId: newConfig.id,
               versionId: newConfig.versionId,
-              label: tag,
+              tag,
               projectId: newConfig.projectId,
               organizationId: organization.id,
             }),
@@ -578,7 +578,7 @@ app.put(
             service.assignTag({
               configId: updatedConfig.id,
               versionId: updatedConfig.versionId,
-              label: tag,
+              tag,
               projectId: updatedConfig.projectId,
               organizationId: organization.id,
             }),

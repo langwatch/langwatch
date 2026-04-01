@@ -14,11 +14,11 @@ Three options were considered:
 
 2. **Labels as tags on `LlmPromptConfigVersion`** — a string array column on the version table. Simple, but "one version per label per prompt" is hard to enforce at the DB level, and moving a label requires updating two rows.
 
-3. **Separate `PromptVersionLabel` table** — a dedicated join table with `configId`, `versionId`, `label`, and a unique constraint on `(configId, label)`.
+3. **Separate `PromptVersionTag` table** — a dedicated join table with `configId`, `versionId`, `label`, and a unique constraint on `(configId, label)`.
 
 ## Decision
 
-We use a single `PromptVersionLabel` table (option 3) with a hardcoded label vocabulary.
+We use a single `PromptVersionTag` table (option 3) with a hardcoded label vocabulary.
 
 ### Key design rules
 
@@ -26,14 +26,14 @@ We use a single `PromptVersionLabel` table (option 3) with a hardcoded label voc
 - **No `latest` in DB** — resolved at query time by selecting the version with the highest version number. Only explicitly assigned labels are persisted.
 - **Two REST patterns for label assignment** — labels in create/update payloads (assign to new versions) and a dedicated `PUT /:id/labels/:label` sub-resource (move labels between existing versions). Plus a tRPC `assignLabel` mutation.
 - **No archiving** — reassignment updates the existing row (upsert on `configId_label`).
-- **No built-in label seeding** — labels are not auto-created when a prompt is created. They are only created when explicitly assigned.
+- **No built-in tag seeding** — labels are not auto-created when a prompt is created. They are only created when explicitly assigned.
 - **Unique constraint: `(configId, label)`** — one version per label per prompt.
 - **Audit fields: `createdById`, `updatedById`** — nullable, track who assigned/reassigned.
 
 ### Model
 
 ```prisma
-model PromptVersionLabel {
+model PromptVersionTag {
   id          String   @id @default(nanoid())
   configId    String
   config      LlmPromptConfig        @relation(fields: [configId], references: [id], onDelete: Cascade)
@@ -61,17 +61,17 @@ The separate table was chosen because:
 - **Query flexibility** — "which prompts have production pointing to version X?" is a simple WHERE clause, not a JSON path query.
 - **Referential integrity** — FK constraints on both `configId` and `versionId` with cascade delete.
 
-Hardcoding the label vocabulary (production, staging) in code avoids over-engineering. Custom labels can be added later by widening the validation, no schema change required.
+Hardcoding the label vocabulary (production, staging) in code avoids over-engineering. Custom tags can be added later by widening the validation, no schema change required.
 
 Not storing `latest` avoids a maintenance burden — auto-updating a label row on every version save adds transaction complexity for something trivially derived from `ORDER BY version DESC LIMIT 1`.
 
 ## Revision History
 
 **v2 (2026-03-27):** Simplified from the original design:
-- Renamed table from `LlmPromptConfigLabel` to `PromptVersionLabel`
+- Renamed table from `LlmPromptConfigLabel` to `PromptVersionTag`
 - Renamed `name` column to `label` for clarity
 - Removed label CRUD endpoints (createLabel, listLabels, updateLabel, deleteLabel) — replaced with single `assignLabel` upsert
-- Removed built-in label auto-seeding on prompt creation
+- Removed built-in tag auto-seeding on prompt creation
 - Removed `LabelConflictError` and `LabelNotFoundError` (upsert eliminates conflicts; `NotFoundError` covers not-found)
 - Hardcoded valid labels to `production` and `staging` only (was open-ended with regex validation)
 
@@ -107,13 +107,13 @@ New API surface added:
 
 Built-in tags (`production`, `staging`) are seeded into `PromptTag` on org creation and via a data migration.
 `latest` remains code-only (resolved at query time).
-`PromptVersionLabel.label` remains a plain string (no FK to `PromptTag`). Validation was widened to accept custom tags via org lookup.
+`PromptVersionTag.label` remains a plain string (no FK to `PromptTag`). Validation was widened to accept custom tags via org lookup.
 
 ## Deferred Scope
 
 The following are explicitly deferred to future issues:
 
-- **FK from PromptVersionLabel.label to PromptTag** — currently a plain string with soft validation. A FK would enforce referential integrity but requires migrating existing rows.
+- **FK from PromptVersionTag.label to PromptTag** — currently a plain string with soft validation. A FK would enforce referential integrity but requires migrating existing rows.
 - **Tag edit/rename** — changing a tag name requires updating all assignments. Not implemented.
 - **RBAC** — per-tag permissions (who can assign/reassign). See #2713.
 - **Archiving** — soft delete on both definitions and assignments.

@@ -53,7 +53,7 @@ Feature: Custom prompt tag definitions (CRUD)
   Scenario: Assign a custom tag to a prompt version
     Given a custom tag "canary" exists
     When I assign "canary" to v2 of "pizza-prompt"
-    Then fetching "pizza-prompt" with label "canary" returns v2
+    Then fetching "pizza-prompt" with tag "canary" returns v2
 
   # --- List ---
 

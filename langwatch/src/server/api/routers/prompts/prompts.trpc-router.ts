@@ -325,8 +325,8 @@ export const promptsRouter = createTRPCRouter({
         versionId: z.string().optional(),
         /** Optional: fetch a specific version by number */
         version: z.number().optional(),
-        /** Optional: fetch the version pointed to by this label */
-        label: z.string().optional(),
+        /** Optional: fetch the version pointed to by this tag */
+        tag: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("prompts:view"))
@@ -890,7 +890,7 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
         configId: z.string(),
         versionId: z.string(),
-        label: z.string().min(1),
+        tag: z.string().min(1),
       }),
     )
     .use(checkProjectPermission("prompts:update"))
@@ -901,7 +901,7 @@ export const promptsRouter = createTRPCRouter({
         return await service.assignTag({
           configId: input.configId,
           versionId: input.versionId,
-          label: input.label,
+          tag: input.tag,
           projectId: input.projectId,
           userId: ctx.session?.user?.id,
         });

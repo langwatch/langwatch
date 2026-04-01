@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, PromptVersionLabel } from "@prisma/client";
+import type { Prisma, PrismaClient, PromptVersionTag } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
 import { VALID_TAGS, type ValidTag } from "~/prompts/constants/tags";
@@ -23,7 +23,7 @@ export class TagValidationError extends Error {
  * Custom tags are valid when a PromptTag definition exists for the org.
  * "latest" is resolved at query time (highest version number), never stored.
  */
-export class PromptVersionLabelRepository {
+export class PromptVersionTagRepository {
   private readonly tagDefinitionRepo: PromptTagRepository;
 
   constructor(private readonly prisma: PrismaClient) {
@@ -34,11 +34,11 @@ export class PromptVersionLabelRepository {
    * Validates that a tag is one of the built-in assignable values.
    * For validation that also accepts custom tags, use isValidTag() with organizationId.
    */
-  validateTag(label: string): asserts label is ValidTag {
-    if (!VALID_TAGS.includes(label as ValidTag)) {
-      logger.warn({ label }, "Invalid tag name rejected");
+  validateTag(tag: string): asserts tag is ValidTag {
+    if (!VALID_TAGS.includes(tag as ValidTag)) {
+      logger.warn({ tag }, "Invalid tag name rejected");
       throw new TagValidationError(
-        `Invalid label "${label}". Must be a built-in tag ("production", "staging") or a custom tag defined for this org.`,
+        `Invalid tag "${tag}". Must be a built-in tag ("production", "staging") or a custom tag defined for this org.`,
       );
     }
   }
@@ -48,14 +48,14 @@ export class PromptVersionLabelRepository {
    * Delegates to PromptTagRepository.isValidTagForOrg().
    */
   async isValidTag({
-    label,
+    tag,
     organizationId,
   }: {
-    label: string;
+    tag: string;
     organizationId: string;
   }): Promise<boolean> {
     return this.tagDefinitionRepo.isValidTagForOrg({
-      label,
+      tag,
       organizationId,
     });
   }
@@ -99,7 +99,7 @@ export class PromptVersionLabelRepository {
   async assignTag({
     configId,
     versionId,
-    label,
+    tag,
     projectId,
     userId,
     organizationId,
@@ -107,22 +107,22 @@ export class PromptVersionLabelRepository {
   }: {
     configId: string;
     versionId: string;
-    label: string;
+    tag: string;
     projectId: string;
     userId?: string;
     organizationId?: string;
     tx?: Prisma.TransactionClient;
-  }): Promise<PromptVersionLabel> {
+  }): Promise<PromptVersionTag> {
     if (organizationId) {
-      const valid = await this.isValidTag({ label, organizationId });
+      const valid = await this.isValidTag({ tag, organizationId });
       if (!valid) {
-        logger.warn({ label }, "Invalid tag name rejected");
+        logger.warn({ tag }, "Invalid tag name rejected");
         throw new TagValidationError(
-          `Invalid label "${label}". Must be a built-in tag or a custom tag defined for this org.`,
+          `Invalid tag "${tag}". Must be a built-in tag or a custom tag defined for this org.`,
         );
       }
     } else {
-      this.validateTag(label);
+      this.validateTag(tag);
     }
 
     const client = tx ?? this.prisma;
@@ -134,16 +134,16 @@ export class PromptVersionLabelRepository {
       tx,
     });
 
-    const result = await client.promptVersionLabel.upsert({
+    const result = await client.promptVersionTag.upsert({
       where: {
         projectId,
-        configId_label: { configId, label },
+        configId_tag: { configId, tag },
       },
       create: {
-        id: `label_${nanoid()}`,
+        id: `vtag_${nanoid()}`,
         configId,
         versionId,
-        label,
+        tag,
         projectId,
         createdById: userId ?? null,
         updatedById: userId ?? null,
@@ -154,7 +154,7 @@ export class PromptVersionLabelRepository {
       },
     });
 
-    logger.info({ configId, versionId, label, projectId }, "Tag assigned to prompt version");
+    logger.info({ configId, versionId, tag, projectId }, "Tag assigned to prompt version");
 
     return result;
   }
@@ -168,8 +168,8 @@ export class PromptVersionLabelRepository {
   }: {
     configId: string;
     projectId: string;
-  }): Promise<PromptVersionLabel[]> {
-    return this.prisma.promptVersionLabel.findMany({
+  }): Promise<PromptVersionTag[]> {
+    return this.prisma.promptVersionTag.findMany({
       where: { configId, projectId },
     });
   }
@@ -177,24 +177,24 @@ export class PromptVersionLabelRepository {
   /**
    * Get a tag by config ID and tag name.
    */
-  async getByConfigAndLabel({
+  async getByConfigAndTag({
     configId,
-    label,
+    tag,
     projectId,
   }: {
     configId: string;
-    label: string;
+    tag: string;
     projectId: string;
-  }): Promise<PromptVersionLabel | null> {
-    const result = await this.prisma.promptVersionLabel.findFirst({
+  }): Promise<PromptVersionTag | null> {
+    const result = await this.prisma.promptVersionTag.findFirst({
       where: {
         configId,
-        label,
+        tag,
         projectId,
       },
     });
 
-    logger.info({ configId, label }, "Tag lookup completed");
+    logger.info({ configId, tag }, "Tag lookup completed");
 
     return result;
   }

@@ -133,7 +133,7 @@ export class PromptTagRepository {
   }
 
   /**
-   * Deletes a custom tag definition and cascades to PromptVersionLabel rows
+   * Deletes a custom tag definition and cascades to PromptVersionTag rows
    * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
    */
   async delete({
@@ -162,9 +162,9 @@ export class PromptTagRepository {
       const projectIds = projects.map((p) => p.id);
 
       if (projectIds.length > 0) {
-        await tx.promptVersionLabel.deleteMany({
+        await tx.promptVersionTag.deleteMany({
           where: {
-            label: tag.name,
+            tag: tag.name,
             projectId: { in: projectIds },
           },
         });
@@ -185,18 +185,18 @@ export class PromptTagRepository {
    * "latest" is resolved at query time and never assigned.
    */
   async isValidTagForOrg({
-    label,
+    tag,
     organizationId,
   }: {
-    label: string;
+    tag: string;
     organizationId: string;
   }): Promise<boolean> {
-    if (VALID_TAGS.includes(label as ValidTag)) {
+    if (VALID_TAGS.includes(tag as ValidTag)) {
       return true;
     }
 
     const custom = await this.prisma.promptTag.findFirst({
-      where: { organizationId, name: label },
+      where: { organizationId, name: tag },
     });
 
     return custom !== null;
