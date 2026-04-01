@@ -2,9 +2,10 @@ import type { Snippet } from "../../types";
 
 /**
  * Returns code snippets for getting prompts from the LangWatch API
- * @param promptHandle - The handle of the prompt to retrieve (defaults to "{id}")
+ * @param promptHandle - The handle of the prompt to retrieve (defaults to "{handle}")
  * @param apiKey - The API key to use for authentication (defaults to "YOUR_API_KEY")
- * @param label - Optional label to filter by (e.g. "production", "staging")
+ * @param label - Optional label/tag to fetch (e.g. "production", "staging").
+ *   When provided, uses shorthand syntax: "handle:tag" in both SDK and REST snippets.
  * @returns Array of code snippets for getting prompts
  */
 export function getGetPromptSnippets(params?: {
@@ -12,8 +13,16 @@ export function getGetPromptSnippets(params?: {
   apiKey?: string;
   label?: string;
 }): Snippet[] {
-  const { promptHandle = "{id}", apiKey = "YOUR_API_KEY", label } = params ?? {};
-  const urlSuffix = label ? `?label=${label}` : "";
+  const {
+    promptHandle = "{handle}",
+    apiKey = "YOUR_API_KEY",
+    label,
+  } = params ?? {};
+
+  // Shorthand syntax: "my-prompt:production" instead of query params
+  const shorthand = label
+    ? `${promptHandle}:${label}`
+    : promptHandle;
 
   return [
     {
@@ -22,8 +31,8 @@ export function getGetPromptSnippets(params?: {
 # Setup LangWatch (ensure LANGWATCH_API_KEY is set in environment)
 langwatch.setup(api_key="${apiKey}")
 
-# Fetch prompt${label ? `\n# Note: To fetch by label, use the REST API: GET /api/prompts/${promptHandle}?label=${label}` : ""}
-prompt = langwatch.prompts.get("${promptHandle}")
+# Fetch prompt${label ? ` (tagged "${label}")` : ""}
+prompt = langwatch.prompts.get("${shorthand}")
 
 # Access prompt properties
 print(f"Prompt Name: {prompt.name}")
@@ -45,7 +54,7 @@ print(f"Compiled messages: {compiled.messages}")
     },
     {
       content: `curl --request GET \\
-  --url https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix} \\
+  --url https://app.langwatch.ai/api/prompts/${shorthand} \\
   --header 'X-Auth-Token: ${apiKey}'
 `,
       target: "shell_curl",
@@ -61,8 +70,8 @@ const langwatch = new LangWatch({
   apiKey: '${apiKey}'
 });
 
-// Fetch prompt${label ? `\n// Note: To fetch by label, use the REST API: GET /api/prompts/${promptHandle}?label=${label}` : ""}
-const prompt = await langwatch.prompts.get('${promptHandle}');
+// Fetch prompt${label ? ` (tagged "${label}")` : ""}
+const prompt = await langwatch.prompts.get('${shorthand}');
 
 // Access prompt properties
 console.log(\`Prompt Name: \${prompt.name}\`);
@@ -89,7 +98,7 @@ console.log(\`Compiled messages: \${compiled.messages}\`);
 $curl = curl_init();
 
 curl_setopt_array($curl, [
-  CURLOPT_URL => "https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix}",
+  CURLOPT_URL => "https://app.langwatch.ai/api/prompts/${shorthand}",
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_ENCODING => "",
   CURLOPT_MAXREDIRS => 10,
@@ -127,7 +136,7 @@ import (
 )
 
 func main() {
-	url := "https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix}"
+	url := "https://app.langwatch.ai/api/prompts/${shorthand}"
 
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("X-Auth-Token", "${apiKey}")
@@ -154,7 +163,7 @@ import com.mashape.unirest.http.exceptions.UnirestException;
 public class GetPrompt {
     public static void main(String[] args) {
         try {
-            HttpResponse<String> response = Unirest.get("https://app.langwatch.ai/api/prompts/${promptHandle}${urlSuffix}")
+            HttpResponse<String> response = Unirest.get("https://app.langwatch.ai/api/prompts/${shorthand}")
                 .header("X-Auth-Token", "${apiKey}")
                 .asString();
 

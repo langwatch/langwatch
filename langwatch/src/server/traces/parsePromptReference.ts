@@ -1,27 +1,32 @@
+import { parsePromptShorthand } from "../prompt-config/parsePromptShorthand";
+
 /**
  * Result of parsing prompt reference from span attributes.
  */
 export interface PromptReference {
   promptHandle: string | null;
   promptVersionNumber: number | null;
+  promptLabel: string | null;
   promptVariables: Record<string, string> | null;
 }
 
 /**
- * Parses prompt handle and version number from span attributes.
+ * Parses prompt handle, version number, and label from span attributes.
  *
- * Supports two formats:
- * 1. New combined format: `langwatch.prompt.id = "handle:version_number"`
- * 2. Old separate format: `langwatch.prompt.handle` + `langwatch.prompt.version.number`
+ * Supports three formats:
+ * 1. New combined format with version: `langwatch.prompt.id = "handle:version_number"`
+ * 2. New combined format with label: `langwatch.prompt.id = "handle:label_name"`
+ * 3. Old separate format: `langwatch.prompt.handle` + `langwatch.prompt.version.number`
  *
  * Also extracts `langwatch.prompt.variables` when present.
  * The format is: `'{"type":"json","value":{"name":"Alice","topic":"AI"}}'`
  *
  * Uses `lastIndexOf(':')` to split because handles may contain `/` but never `:`.
- * Version must be a positive integer.
+ * Disambiguation: positive integer suffix -> version; otherwise -> label.
+ * "latest" suffix is treated as a no-op (no label, no version).
  *
  * @param attrs - Span attributes record
- * @returns Parsed prompt reference with handle, version, and variables, or nulls if not found
+ * @returns Parsed prompt reference with handle, version, label, and variables, or nulls if not found
  */
 export function parsePromptReference(
   attrs: Record<string, unknown>,
@@ -31,27 +36,29 @@ export function parsePromptReference(
   const nullResult: PromptReference = {
     promptHandle: null,
     promptVersionNumber: null,
+    promptLabel: null,
     promptVariables: variables,
   };
 
   // Try new combined format first
   const promptId = attrs["langwatch.prompt.id"];
   if (typeof promptId === "string" && promptId.includes(":")) {
-    const colonIndex = promptId.lastIndexOf(":");
-    const handle = promptId.substring(0, colonIndex);
-    const versionStr = promptId.substring(colonIndex + 1);
-
-    if (handle.length > 0) {
-      const version = Number(versionStr);
-      if (Number.isInteger(version) && version > 0) {
-        return {
-          promptHandle: handle,
-          promptVersionNumber: version,
-          promptVariables: variables,
-        };
-      }
+    try {
+      const shorthand = parsePromptShorthand(promptId);
+      return {
+        promptHandle: shorthand.slug,
+        promptVersionNumber: shorthand.version ?? null,
+        promptLabel: shorthand.tag ?? null,
+        promptVariables: variables,
+      };
+    } catch {
+      // Invalid shorthand (e.g., empty slug) — fall through to nullResult
+      return nullResult;
     }
+  }
 
+  // Bare slug without colon is not a valid combined format — fall through to old format
+  if (typeof promptId === "string" && promptId.length > 0 && !promptId.includes(":")) {
     return nullResult;
   }
 
@@ -65,6 +72,7 @@ export function parsePromptReference(
       return {
         promptHandle: handle,
         promptVersionNumber: version,
+        promptLabel: null,
         promptVariables: variables,
       };
     }

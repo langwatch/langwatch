@@ -34,6 +34,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
+        promptLabel: null,
         promptVariables: { name: "Alice" },
       });
     });
@@ -72,6 +73,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "org/deep-prompt",
         promptVersionNumber: 7,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -110,6 +112,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -175,6 +178,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/compiled-prompt",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -221,6 +225,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/late-prompt",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -299,6 +304,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/sibling-prompt",
         promptVersionNumber: 1,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -380,6 +386,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/old-prompt",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -420,6 +427,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/nearest",
         promptVersionNumber: 2,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -539,6 +547,7 @@ describe("findPromptReferenceInAncestors()", () => {
       // LLM span often start at the exact same millisecond in practice.
       expect(result).toEqual({
         promptHandle: "team/same-time-prompt",
+        promptLabel: null,
         promptVersionNumber: 1,
         promptVariables: null,
       });
@@ -581,6 +590,7 @@ describe("findPromptReferenceInAncestors()", () => {
 
       expect(result).toEqual({
         promptHandle: "tea-prompt",
+        promptLabel: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -635,6 +645,7 @@ describe("findPromptReferenceInAncestors()", () => {
       // qualifies. The closest preceding (highest startTime) wins: Prompt.compile.
       expect(result).toEqual({
         promptHandle: "tea-prompt",
+        promptLabel: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -690,6 +701,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "tea-prompt",
         promptVersionNumber: 4,
+        promptLabel: null,
         promptVariables: null,
       });
     });
@@ -736,6 +748,7 @@ describe("findPromptReferenceInAncestors()", () => {
       expect(result).toEqual({
         promptHandle: "team/nested-prompt",
         promptVersionNumber: 5,
+        promptLabel: null,
         promptVariables: null,
       });
     });

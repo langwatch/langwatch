@@ -1001,6 +1001,7 @@ export class ClickHouseTraceService {
             if (ancestorRef?.promptHandle) {
               result.promptHandle = ancestorRef.promptHandle;
               result.promptVersionNumber = ancestorRef.promptVersionNumber;
+              result.promptLabel = ancestorRef.promptLabel;
               result.promptVariables = ancestorRef.promptVariables;
             }
           }
@@ -1172,6 +1173,7 @@ export class ClickHouseTraceService {
           : null,
       promptHandle: promptRef.promptHandle,
       promptVersionNumber: promptRef.promptVersionNumber,
+      promptLabel: promptRef.promptLabel,
       promptVariables: promptRef.promptVariables,
     };
   }

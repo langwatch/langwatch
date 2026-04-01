@@ -15,6 +15,7 @@ import { prisma } from "~/server/db";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { createLogger } from "~/utils/logger/server";
+import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
@@ -240,12 +241,31 @@ app.get(
 app.get(
   "/:id{.+}",
   describeRoute({
-    description: "Get a specific prompt",
+    description:
+      "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
+      'Pass a bare slug like "pizza-prompt" to get the latest version, ' +
+      '"pizza-prompt:production" to resolve a tagged version, or ' +
+      '"pizza-prompt:2" to fetch version 2. ' +
+      "Alternatively, use the tag or version query parameters with a bare slug.",
     parameters: [
+      {
+        name: "id",
+        in: "path",
+        description:
+          "Prompt slug or shorthand. Supports three formats: " +
+          '(1) bare slug — "pizza-prompt" returns the latest version; ' +
+          '(2) slug:tag — "pizza-prompt:production" returns the version pointed to by that tag; ' +
+          '(3) slug:version — "pizza-prompt:2" returns that specific version number. ' +
+          '"slug:latest" is equivalent to the bare slug. ' +
+          "Cannot be combined with the tag or version query parameters.",
+        required: true,
+        schema: { type: "string" },
+      },
       {
         name: "version",
         in: "query",
-        description: "Specific version number to retrieve",
+        description:
+          "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
         schema: { type: "integer", minimum: 0 },
       },
@@ -253,7 +273,8 @@ app.get(
         name: "tag",
         in: "query",
         description:
-          'Fetch the version pointed to by this tag (e.g., "production", "staging", or a custom tag)',
+          "Fetch the version pointed to by this tag (e.g., \"production\", \"staging\"). " +
+          "Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
         schema: { type: "string" },
       },
@@ -274,19 +295,35 @@ app.get(
     const project = c.get("project");
     const organization = c.get("organization");
     const { id } = c.req.param();
-    const version = c.req.query("version")
-      ? parseInt(c.req.query("version")!)
-      : undefined;
-    const tag = c.req.query("tag") ?? undefined;
-
-    logger.info(
-      { projectId: project.id, id, version, tag },
-      "Getting prompt",
-    );
 
     try {
+      // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
+      const shorthand = parsePromptShorthand(id);
+
+      const queryVersion = c.req.query("version")
+        ? parseInt(c.req.query("version") ?? "")
+        : undefined;
+      const queryTag = c.req.query("tag") ?? undefined;
+
+      // Reject conflicting shorthand + query param.
+      // hadSuffix is true even for "latest" (which normalizes away), so
+      // "foo:latest?tag=production" is correctly rejected.
+      if (shorthand.hadSuffix && (queryTag || queryVersion)) {
+        throw new HTTPException(422, {
+          message: `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
+        });
+      }
+
+      const version = shorthand.version ?? queryVersion;
+      const tag = shorthand.tag ?? queryTag;
+
+      logger.info(
+        { projectId: project.id, id: shorthand.slug, version, tag },
+        "Getting prompt",
+      );
+
       const config = await service.getPromptByIdOrHandle({
-        idOrHandle: id,
+        idOrHandle: shorthand.slug,
         projectId: project.id,
         organizationId: organization.id,
         version,
@@ -301,6 +338,9 @@ app.get(
 
       return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
     } catch (error: unknown) {
+      if (error instanceof HTTPException) {
+        throw error;
+      }
       if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
@@ -308,6 +348,11 @@ app.get(
       }
       if (error instanceof NotFoundError) {
         throw new HTTPException(404, {
+          message: error.message,
+        });
+      }
+      if (error instanceof Error) {
+        throw new HTTPException(422, {
           message: error.message,
         });
       }
