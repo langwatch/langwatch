@@ -130,12 +130,11 @@ export const getLLMModelCosts = async ({
 }: {
   projectId: string;
 }): Promise<MaybeStoredLLMModelCost[]> => {
-  const importedData = getImportedModelCosts();
   const llmModelCostsCustomData = await prisma.customLLMModelCost.findMany({
     where: { projectId },
   });
 
-  const data = llmModelCostsCustomData
+  const customCosts = llmModelCostsCustomData
     .map(
       (record) =>
         ({
@@ -149,16 +148,7 @@ export const getLLMModelCosts = async ({
           createdAt: record.createdAt,
         }) as MaybeStoredLLMModelCost,
     )
-    .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
-    .concat(
-      Object.entries(importedData).map(([key, value]) => ({
-        projectId,
-        model: key,
-        regex: value.regex,
-        inputCostPerToken: value.inputCostPerToken,
-        outputCostPerToken: value.outputCostPerToken,
-      })),
-    );
+    .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime());
 
-  return data;
+  return [...customCosts, ...getStaticModelCosts()];
 };
