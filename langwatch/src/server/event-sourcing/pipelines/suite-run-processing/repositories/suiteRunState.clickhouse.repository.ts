@@ -236,4 +236,33 @@ export class SuiteRunStateRepositoryClickHouse<
       );
     }
   }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (projections.length === 0) return;
+
+    EventUtils.validateTenantId(
+      context,
+      "SuiteRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
+
+    const records = projections.map((projection) =>
+      this.mapProjectionDataToClickHouseRecord(
+        projection.data as SuiteRunStateData,
+        String(context.tenantId),
+        projection.id,
+        projection.version,
+      ),
+    );
+
+    const client = await this.resolveClient(context.tenantId);
+    await client.insert({
+      table: TABLE_NAME,
+      values: records,
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+    });
+  }
 }

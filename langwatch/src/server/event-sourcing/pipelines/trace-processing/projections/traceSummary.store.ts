@@ -23,6 +23,14 @@ export class TraceSummaryStore
     await this.repo.upsert(stateWithId, String(context.tenantId));
   }
 
+  async storeBatch(
+    entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    await Promise.all(
+      entries.map(({ state, context }) => this.store(state, context)),
+    );
+  }
+
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,

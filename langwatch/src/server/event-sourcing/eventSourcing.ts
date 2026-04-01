@@ -22,6 +22,7 @@ import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/p
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import type { ReactorDefinition } from "./reactors/reactor.types";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
@@ -284,6 +285,9 @@ export class EventSourcing {
           featureFlagService: definition.featureFlagService,
           globalRegistry: this.projectionRegistry,
           processRole: this._processRole,
+          replayMarkerChecker: this._redis
+            ? new RedisReplayMarkerChecker(this._redis)
+            : undefined,
         });
 
         // Get command dispatchers
