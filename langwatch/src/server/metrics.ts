@@ -74,16 +74,6 @@ export const traceSpanCountHistogram = new Histogram({
   ],
 });
 
-// Histogram for collector index delay
-register.removeSingleMetric("collector_index_delay_milliseconds");
-export const collectorIndexDelayHistogram = new Histogram({
-  name: "collector_index_delay_milliseconds",
-  help: "Delay between a trace being received and being indexed",
-  buckets: [
-    100, 1000, 2000, 3000, 5000, 10_000, 30_000, 60_000, 120_000, 300_000,
-    600_000, 1_200_000, 3_600_000, 10_800_000,
-  ],
-});
 
 type JobType =
   | "collector"
@@ -237,36 +227,6 @@ export const getBullMQJobStalledCounter = (queueName: string) =>
 // Event Sourcing Metrics
 // ============================================================================
 
-// Gauge for checkpoint lag (number of unprocessed events)
-register.removeSingleMetric("event_sourcing_checkpoint_lag");
-const eventSourcingCheckpointLag = new Gauge({
-  name: "event_sourcing_checkpoint_lag",
-  help: "Number of unprocessed events (lag) for event sourcing processors",
-  labelNames: ["pipeline_name", "processor_name", "processor_type"] as const,
-});
-
-export const setEventSourcingCheckpointLag = (
-  pipelineName: string,
-  processorName: string,
-  processorType: string,
-  lag: number,
-) =>
-  eventSourcingCheckpointLag
-    .labels(pipelineName, processorName, processorType)
-    .set(lag);
-
-// Counter for lock contention events
-register.removeSingleMetric("event_sourcing_lock_contention_total");
-const eventSourcingLockContentionTotal = new Counter({
-  name: "event_sourcing_lock_contention_total",
-  help: "Total number of lock contention events in event sourcing",
-  labelNames: ["pipeline_name", "processor_name"] as const,
-});
-
-export const getEventSourcingLockContentionCounter = (
-  pipelineName: string,
-  processorName: string,
-) => eventSourcingLockContentionTotal.labels(pipelineName, processorName);
 
 // Counter for events stored (tracks throughput at event level, not job level)
 register.removeSingleMetric("event_sourcing_events_stored_total");
@@ -287,3 +247,179 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
   labelNames: ["pipeline_name"] as const,
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
 });
+
+// ============================================================================
+// Event Sourcing Pipeline Metrics (command, fold, map, reactor)
+// ============================================================================
+
+type ESStatus = "completed" | "failed";
+
+// --- Command metrics ---
+register.removeSingleMetric("es_command_total");
+const esCommandTotal = new Counter({
+  name: "es_command_total",
+  help: "Total number of commands processed",
+  labelNames: ["pipeline_name", "command_type", "status"] as const,
+});
+
+export const incrementEsCommandTotal = (
+  pipelineName: string,
+  commandType: string,
+  status: ESStatus,
+) => esCommandTotal.labels(pipelineName, commandType, status).inc();
+
+register.removeSingleMetric("es_command_duration_milliseconds");
+const esCommandDuration = new Histogram({
+  name: "es_command_duration_milliseconds",
+  help: "Duration of command processing in milliseconds",
+  labelNames: ["pipeline_name", "command_type"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsCommandDuration = (
+  pipelineName: string,
+  commandType: string,
+  durationMs: number,
+) => esCommandDuration.labels(pipelineName, commandType).observe(durationMs);
+
+// --- Fold projection metrics ---
+register.removeSingleMetric("es_fold_projection_total");
+const esFoldProjectionTotal = new Counter({
+  name: "es_fold_projection_total",
+  help: "Total number of fold projection executions",
+  labelNames: ["pipeline_name", "projection_name", "status"] as const,
+});
+
+export const incrementEsFoldProjectionTotal = (
+  pipelineName: string,
+  projectionName: string,
+  status: ESStatus,
+) => esFoldProjectionTotal.labels(pipelineName, projectionName, status).inc();
+
+register.removeSingleMetric("es_fold_projection_duration_milliseconds");
+const esFoldProjectionDuration = new Histogram({
+  name: "es_fold_projection_duration_milliseconds",
+  help: "Duration of fold projection execution in milliseconds",
+  labelNames: ["pipeline_name", "projection_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+});
+
+export const observeEsFoldProjectionDuration = (
+  pipelineName: string,
+  projectionName: string,
+  durationMs: number,
+) =>
+  esFoldProjectionDuration
+    .labels(pipelineName, projectionName)
+    .observe(durationMs);
+
+// --- Map projection metrics ---
+register.removeSingleMetric("es_map_projection_total");
+const esMapProjectionTotal = new Counter({
+  name: "es_map_projection_total",
+  help: "Total number of map projection executions",
+  labelNames: ["pipeline_name", "projection_name", "status"] as const,
+});
+
+export const incrementEsMapProjectionTotal = (
+  pipelineName: string,
+  projectionName: string,
+  status: ESStatus,
+) => esMapProjectionTotal.labels(pipelineName, projectionName, status).inc();
+
+register.removeSingleMetric("es_map_projection_duration_milliseconds");
+const esMapProjectionDuration = new Histogram({
+  name: "es_map_projection_duration_milliseconds",
+  help: "Duration of map projection execution in milliseconds",
+  labelNames: ["pipeline_name", "projection_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
+});
+
+export const observeEsMapProjectionDuration = (
+  pipelineName: string,
+  projectionName: string,
+  durationMs: number,
+) =>
+  esMapProjectionDuration
+    .labels(pipelineName, projectionName)
+    .observe(durationMs);
+
+// --- Reactor metrics ---
+register.removeSingleMetric("es_reactor_total");
+const esReactorTotal = new Counter({
+  name: "es_reactor_total",
+  help: "Total number of reactor executions",
+  labelNames: ["pipeline_name", "reactor_name", "status"] as const,
+});
+
+export const incrementEsReactorTotal = (
+  pipelineName: string,
+  reactorName: string,
+  status: ESStatus,
+) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
+
+register.removeSingleMetric("es_reactor_duration_milliseconds");
+const esReactorDuration = new Histogram({
+  name: "es_reactor_duration_milliseconds",
+  help: "Duration of reactor execution in milliseconds",
+  labelNames: ["pipeline_name", "reactor_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
+});
+
+export const observeEsReactorDuration = (
+  pipelineName: string,
+  reactorName: string,
+  durationMs: number,
+) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
+
+// --- Fold cache metrics ---
+register.removeSingleMetric("es_fold_cache_total");
+const esFoldCacheTotal = new Counter({
+  name: "es_fold_cache_total",
+  help: "Total number of fold cache lookups",
+  labelNames: ["projection_name", "result"] as const,
+});
+
+export const incrementEsFoldCacheTotal = (
+  projectionName: string,
+  result: "hit" | "miss" | "fallback_error",
+) => esFoldCacheTotal.labels(projectionName, result).inc();
+
+register.removeSingleMetric("es_fold_cache_get_duration_milliseconds");
+const esFoldCacheGetDuration = new Histogram({
+  name: "es_fold_cache_get_duration_milliseconds",
+  help: "Duration of fold cache get operations in milliseconds",
+  labelNames: ["projection_name", "source"] as const,
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
+export const observeEsFoldCacheGetDuration = (
+  projectionName: string,
+  source: "redis" | "clickhouse",
+  durationMs: number,
+) => esFoldCacheGetDuration.labels(projectionName, source).observe(durationMs);
+
+register.removeSingleMetric("es_fold_cache_store_duration_milliseconds");
+const esFoldCacheStoreDuration = new Histogram({
+  name: "es_fold_cache_store_duration_milliseconds",
+  help: "Duration of fold cache store operations in milliseconds",
+  labelNames: ["projection_name"] as const,
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
+export const observeEsFoldCacheStoreDuration = (
+  projectionName: string,
+  durationMs: number,
+) => esFoldCacheStoreDuration.labels(projectionName).observe(durationMs);
+
+register.removeSingleMetric("es_fold_cache_redis_error_total");
+const esFoldCacheRedisErrorTotal = new Counter({
+  name: "es_fold_cache_redis_error_total",
+  help: "Total number of Redis errors in fold cache operations",
+  labelNames: ["projection_name", "operation"] as const,
+});
+
+export const incrementEsFoldCacheRedisError = (
+  projectionName: string,
+  operation: "get" | "set",
+) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();

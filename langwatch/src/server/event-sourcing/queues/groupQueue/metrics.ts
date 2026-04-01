@@ -1,4 +1,4 @@
-import { Counter, Gauge, register } from "prom-client";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 // Remove existing metrics if they exist (for hot reload)
 const metricNames = [
@@ -14,6 +14,12 @@ const metricNames = [
   "gq_jobs_non_retryable_total",
   "gq_fastq_pending",
   "gq_fastq_active",
+  "gq_jobs_delayed_total",
+  "gq_job_delay_milliseconds",
+  "gq_retry_attempt",
+  "gq_retry_backoff_milliseconds",
+  "gq_job_duration_milliseconds",
+  "gq_oldest_pending_age_milliseconds",
 ] as const;
 
 for (const name of metricNames) {
@@ -89,5 +95,49 @@ export const gqFastqPending = new Gauge({
 export const gqFastqActive = new Gauge({
   name: "gq_fastq_active",
   help: "Number of jobs currently being processed by fastq workers",
+  labelNames: ["queue_name"] as const,
+});
+
+// --- Delayed job metrics ---
+export const gqJobsDelayedTotal = new Counter({
+  name: "gq_jobs_delayed_total",
+  help: "Total number of jobs staged with an intentional delay",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqJobDelayMilliseconds = new Histogram({
+  name: "gq_job_delay_milliseconds",
+  help: "Duration of intentional delays applied to staged jobs",
+  labelNames: ["queue_name"] as const,
+  buckets: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000],
+});
+
+// --- Retry metrics ---
+export const gqRetryAttempt = new Histogram({
+  name: "gq_retry_attempt",
+  help: "Distribution of retry attempt numbers",
+  labelNames: ["queue_name"] as const,
+  buckets: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+});
+
+export const gqRetryBackoffMilliseconds = new Histogram({
+  name: "gq_retry_backoff_milliseconds",
+  help: "Duration of retry backoff delays in milliseconds",
+  labelNames: ["queue_name"] as const,
+  buckets: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000],
+});
+
+// --- Per-job duration metric ---
+export const gqJobDurationMilliseconds = new Histogram({
+  name: "gq_job_duration_milliseconds",
+  help: "Duration of individual job processing in milliseconds",
+  labelNames: ["queue_name", "pipeline_name", "job_type"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000],
+});
+
+// --- Oldest pending age gauge ---
+export const gqOldestPendingAgeMilliseconds = new Gauge({
+  name: "gq_oldest_pending_age_milliseconds",
+  help: "Age of the oldest pending job in the ready sorted set (milliseconds)",
   labelNames: ["queue_name"] as const,
 });

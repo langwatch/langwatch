@@ -7,6 +7,7 @@ import {
   gqFastqActive,
   gqFastqPending,
   gqPendingGroups,
+  gqOldestPendingAgeMilliseconds,
 } from "./metrics";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
 
@@ -68,6 +69,27 @@ export class GroupQueueMetricsCollector {
         { queue_name: this.params.queueName },
         this.params.activeJobCountFn(),
       );
+
+      // Oldest pending age: query minimum score from the ready sorted set
+      const oldestEntry = await this.params.redisConnection.zrange(
+        readyKey,
+        0,
+        0,
+        "WITHSCORES",
+      );
+      if (oldestEntry.length >= 2) {
+        const oldestScore = Number(oldestEntry[1]);
+        const age = Date.now() - oldestScore;
+        gqOldestPendingAgeMilliseconds.set(
+          { queue_name: this.params.queueName },
+          Math.max(0, age),
+        );
+      } else {
+        gqOldestPendingAgeMilliseconds.set(
+          { queue_name: this.params.queueName },
+          0,
+        );
+      }
     } catch (error) {
       this.params.logger.debug(
         {
