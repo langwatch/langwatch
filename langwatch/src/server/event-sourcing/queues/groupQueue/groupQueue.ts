@@ -1,4 +1,4 @@
-import { context as otelContext, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
+import { context as otelContext, ROOT_CONTEXT, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
 import fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -381,6 +381,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
     const attempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
+    const jobType = jobData.__jobType as string | undefined;
     const payload = this.stripInternalFields(jobData);
 
     const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
@@ -532,8 +533,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         );
       };
 
-      // Restore parent OTEL context if available
-      if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
+      // Trace boundary: commands and reactors start a NEW trace (linked to parent),
+      // while projections (fold/map) continue the parent trace for causal grouping.
+      const startsNewTrace = jobType === "command" || jobType === "reactor";
+
+      if (contextMetadata?.traceId && contextMetadata?.parentSpanId && !startsNewTrace) {
+        // Non-command/non-reactor jobs (projections, handlers): restore parent context so spans stay in the same trace
         const parentContext = trace.setSpanContext(otelContext.active(), {
           traceId: contextMetadata.traceId,
           spanId: contextMetadata.parentSpanId,
@@ -542,7 +547,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         await otelContext.with(parentContext, executeWithSpan);
       } else {
-        await executeWithSpan();
+        // Commands & reactors: run with a fresh ROOT context → new traceId.
+        // The link to the parent trace is already added via span.addLink() above.
+        await otelContext.with(ROOT_CONTEXT, executeWithSpan);
       }
     } finally {
       clearInterval(heartbeat);
