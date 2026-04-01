@@ -26,7 +26,6 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { SEEDED_TAGS } from "~/prompts/constants/tags";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -62,10 +61,16 @@ export function DeployPromptDialog({
     { enabled: isOpen && !!configId && !!projectId },
   );
 
+  const orgTagsQuery = api.promptTags.getAll.useQuery(
+    { projectId },
+    { enabled: isOpen && !!projectId },
+  );
+
   const assignTag = api.prompts.assignTag.useMutation();
   const utils = api.useContext();
 
   const versions = versionsQuery.data ?? [];
+  const tags = orgTagsQuery.data?.map((t) => t.name) ?? [];
 
   const latestVersion = versions.reduce<typeof versions[number] | null>(
     (max, v) => (!max || v.version > max.version ? v : max),
@@ -73,30 +78,26 @@ export function DeployPromptDialog({
   );
 
   type TagSelections = Record<string, string>;
-  const [tagSelections, setTagSelections] = useState<TagSelections>(
-    () => Object.fromEntries(SEEDED_TAGS.map((t) => [t, ""])),
-  );
+  const [tagSelections, setTagSelections] = useState<TagSelections>({});
 
   const setTagVersionId = useCallback((tag: string, versionId: string) => {
     setTagSelections((prev) => ({ ...prev, [tag]: versionId }));
   }, []);
 
-  // Initialize selections from current tag assignments
+  // Initialize selections from current tag assignments whenever tags or assignments change
   useEffect(() => {
     if (!isOpen) return;
-    const data = tagsQuery.data;
-    if (!data?.length) {
-      setTagSelections(Object.fromEntries(SEEDED_TAGS.map((t) => [t, ""])));
-      return;
-    }
+    const assignmentData = tagsQuery.data;
 
     const next: TagSelections = {};
-    for (const tag of SEEDED_TAGS) {
-      const found = data.find((t) => t.tag === tag);
+    for (const tag of tags) {
+      const found = assignmentData?.find((t) => t.tag === tag);
       next[tag] = found?.versionId ?? "";
     }
     setTagSelections(next);
-  }, [isOpen, tagsQuery.data]);
+    // tags array reference changes when orgTagsQuery resolves, so include it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, tagsQuery.data, orgTagsQuery.data]);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -105,7 +106,7 @@ export function DeployPromptDialog({
 
     const mutations: Promise<unknown>[] = [];
 
-    for (const tag of SEEDED_TAGS) {
+    for (const tag of tags) {
       const selectedVersionId = tagSelections[tag] ?? "";
       const currentTag = data.find((t) => t.tag === tag);
       if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
@@ -149,6 +150,7 @@ export function DeployPromptDialog({
   }, [
     tagsQuery.data,
     tagSelections,
+    tags,
     assignTag,
     projectId,
     configId,
@@ -249,7 +251,7 @@ export function DeployPromptDialog({
               </Box>
 
               {/* Environment tag rows */}
-              {SEEDED_TAGS.map((tag) => {
+              {tags.map((tag) => {
                 const isAssigned = !!(tagSelections[tag]);
                 return (
                   <Box
