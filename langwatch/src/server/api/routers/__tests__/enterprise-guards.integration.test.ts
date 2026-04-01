@@ -544,7 +544,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     // --- createInvites conditional guard ---
 
-    describe("organization.createInvites", () => {
+    describe("invite.createInvites", () => {
       describe("when invites include custom role on non-enterprise plan", () => {
         /** @scenario Non-enterprise org cannot invite members with custom roles */
         /** @scenario Batch invite rejects entirely when any invite has a custom role */
@@ -553,7 +553,7 @@ describe.skipIf(isTestcontainersOnly)(
           const caller = createCaller();
 
           await expect(
-            caller.organization.createInvites({
+            caller.invite.createInvites({
               organizationId,
               invites: [
                 {
@@ -582,7 +582,7 @@ describe.skipIf(isTestcontainersOnly)(
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
 
-          const result = await caller.organization.createInvites({
+          const result = await caller.invite.createInvites({
             organizationId,
             invites: [
               {
@@ -644,7 +644,7 @@ describe.skipIf(isTestcontainersOnly)(
 
     // --- createInviteRequest conditional guard ---
 
-    describe("organization.createInviteRequest", () => {
+    describe("invite.createInviteRequest", () => {
       describe("when invites include custom role on non-enterprise plan", () => {
         /** @scenario Non-enterprise org cannot create invite requests with custom roles */
         it("rejects with FORBIDDEN", async () => {
@@ -652,7 +652,7 @@ describe.skipIf(isTestcontainersOnly)(
           const caller = createCaller();
 
           await expect(
-            caller.organization.createInviteRequest({
+            caller.invite.createInviteRequest({
               organizationId,
               invites: [
                 {
@@ -680,7 +680,7 @@ describe.skipIf(isTestcontainersOnly)(
           mockGetActivePlan.mockResolvedValue(freePlan);
           const caller = createCaller();
 
-          const result = await caller.organization.createInviteRequest({
+          const result = await caller.invite.createInviteRequest({
             organizationId,
             invites: [
               {
