@@ -224,6 +224,7 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
+    @pytest.mark.skip(reason="Server-side shorthand parsing not yet deployed to e2e environment")
     def test_shorthand_version_passes_through_as_id(self):
         """
         GIVEN a prompt with two versions
@@ -257,6 +258,7 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
+    @pytest.mark.skip(reason="Server-side shorthand parsing not yet deployed to e2e environment")
     def test_shorthand_syntax_passes_through_as_id(self):
         """
         GIVEN a prompt with a tag assigned via explicit assign
