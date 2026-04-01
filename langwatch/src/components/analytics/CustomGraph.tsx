@@ -508,10 +508,6 @@ const CustomGraph_ = React.memo(
             return "0a";
           }
           const metric = getMetric(series.metric);
-          // Count aggregations should use integer format regardless of metric's default
-          if (series.aggregation === "cardinality") {
-            return "0a";
-          }
           return metric?.format ?? "0a";
         }),
       ),
