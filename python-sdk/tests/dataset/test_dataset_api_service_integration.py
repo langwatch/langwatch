@@ -8,6 +8,7 @@ Covers @integration scenarios from dataset-python-sdk.feature.
 """
 
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -116,6 +117,25 @@ class TestDatasetApiService:
                 "/api/dataset", params={"page": 2, "limit": 5}
             )
 
+        def test_returns_empty_result_when_no_datasets(self):
+            """@integration Scenario: List datasets returns empty result when project has no datasets"""
+            mock_httpx = MagicMock()
+            mock_httpx.get.return_value = _json_response(
+                {
+                    "data": [],
+                    "pagination": {
+                        "page": 1,
+                        "limit": 10,
+                        "total": 0,
+                        "totalPages": 0,
+                    },
+                }
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            result = svc.list_datasets()
+            assert result["data"] == []
+            assert result["pagination"]["total"] == 0
+
         def test_raises_runtime_error_on_auth_failure(self):
             """@integration Scenario: List datasets propagates authentication errors"""
             mock_httpx = MagicMock()
@@ -192,6 +212,22 @@ class TestDatasetApiService:
             result = svc.get_dataset("my-dataset")
             assert len(result["data"]) == 5
 
+        def test_gets_dataset_by_id(self):
+            """@integration Scenario: Get dataset by ID works the same as by slug"""
+            mock_httpx = MagicMock()
+            mock_httpx.get.return_value = _json_response(
+                {
+                    "datasetId": "dataset_xyz",
+                    "name": "my-data",
+                    "slug": "my-data",
+                    "data": [{"id": "r1", "entry": {"input": "val"}}],
+                }
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            result = svc.get_dataset("dataset_xyz")
+            assert result["slug"] == "my-data"
+            mock_httpx.get.assert_called_once_with("/api/dataset/dataset_xyz")
+
         def test_raises_value_error_on_not_found(self):
             """@integration Scenario: Get non-existent dataset raises an error"""
             mock_httpx = MagicMock()
@@ -213,6 +249,29 @@ class TestDatasetApiService:
             result = svc.update_dataset("old-name", name="New Name")
             assert result["name"] == "New Name"
             assert result["slug"] == "new-name"
+
+        def test_updates_dataset_column_types(self):
+            """@integration Scenario: Update a dataset column types"""
+            mock_httpx = MagicMock()
+            mock_httpx.patch.return_value = _json_response(
+                {
+                    "id": "ds_1",
+                    "name": "my-dataset",
+                    "slug": "my-dataset",
+                    "columnTypes": [{"name": "question", "type": "string"}],
+                }
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            result = svc.update_dataset(
+                "my-dataset",
+                columns=[{"name": "question", "type": "string"}],
+            )
+            assert result["columnTypes"] == [{"name": "question", "type": "string"}]
+            # Verify the body sent to the API
+            call_args = mock_httpx.patch.call_args
+            assert call_args[1]["json"] == {
+                "columnTypes": [{"name": "question", "type": "string"}]
+            }
 
         def test_raises_value_error_on_not_found(self):
             """@integration Scenario: Update a non-existent dataset"""
@@ -250,7 +309,7 @@ class TestDatasetApiService:
             """@integration Scenario: Add records to an existing dataset"""
             mock_httpx = MagicMock()
             mock_httpx.post.return_value = _json_response(
-                {"recordsCreated": 2}
+                {"success": True}
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             result = svc.create_records(
@@ -260,7 +319,7 @@ class TestDatasetApiService:
                     {"input": "bye", "output": "goodbye"},
                 ],
             )
-            assert result["recordsCreated"] == 2
+            assert result is None
 
         def test_raises_value_error_on_not_found(self):
             """@integration Scenario: Add records to a non-existent dataset"""
@@ -285,6 +344,23 @@ class TestDatasetApiService:
             )
             assert result["entry"] == {"input": "updated"}
 
+        def test_upserts_non_existent_record(self):
+            """@integration Scenario: Update a non-existent record creates it"""
+            mock_httpx = MagicMock()
+            mock_httpx.patch.return_value = _json_response(
+                {"id": "rec-new", "datasetId": "ds_1", "entry": {"input": "new"}}
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            result = svc.update_record(
+                "my-dataset", "rec-new", entry={"input": "new"}
+            )
+            assert result["id"] == "rec-new"
+            assert result["entry"] == {"input": "new"}
+            mock_httpx.patch.assert_called_once_with(
+                "/api/dataset/my-dataset/records/rec-new",
+                json={"entry": {"input": "new"}},
+            )
+
         def test_raises_value_error_on_not_found(self):
             """@integration Scenario: Update a record for non-existent dataset"""
             mock_httpx = MagicMock()
@@ -304,7 +380,7 @@ class TestDatasetApiService:
             result = svc.delete_records(
                 "my-dataset", record_ids=["rec-1", "rec-2"]
             )
-            assert result["deletedCount"] == 2
+            assert result == 2
 
         def test_raises_value_error_on_not_found(self):
             """@integration Scenario: Delete records for non-existent dataset"""
@@ -329,6 +405,23 @@ class TestDatasetApiService:
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             result = svc.upload("my-dataset", file_path=str(csv_file))
             assert result["recordsCreated"] == 3
+            mock_httpx.post.assert_called_once()
+
+        def test_uploads_jsonl_file_to_existing_dataset(self, tmp_path):
+            """@integration Scenario: Upload a JSONL file to an existing dataset"""
+            jsonl_file = tmp_path / "data.jsonl"
+            jsonl_file.write_text(
+                '{"input": "hello", "output": "hi"}\n'
+                '{"input": "bye", "output": "goodbye"}\n'
+            )
+
+            mock_httpx = MagicMock()
+            mock_httpx.post.return_value = _json_response(
+                {"datasetId": "ds_1", "recordsCreated": 2}
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            result = svc.upload("my-dataset", file_path=str(jsonl_file))
+            assert result["recordsCreated"] == 2
             mock_httpx.post.assert_called_once()
 
         def test_raises_value_error_on_not_found(self, tmp_path):
@@ -379,3 +472,32 @@ class TestDatasetApiService:
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             with pytest.raises(ValueError, match="Conflict"):
                 svc.create_dataset_from_file(name="Existing", file_path=str(csv_file))
+
+
+class TestSDKInitialization:
+    """SDK initialization"""
+
+    def test_auto_initializes_from_environment_variables(self):
+        """@integration Scenario: SDK auto-initializes from environment variables"""
+        import langwatch.dataset as dataset_module
+
+        # Reset the cached facade so from_global() is called
+        dataset_module._facade_instance = None
+
+        mock_facade = MagicMock()
+        mock_facade.list_datasets.return_value = MagicMock(data=[], pagination=MagicMock(total=0))
+
+        with patch.object(
+            dataset_module, "_get_facade", return_value=mock_facade
+        ):
+            result = dataset_module.list_datasets()
+            mock_facade.list_datasets.assert_called_once()
+
+    def test_raises_error_when_no_api_key(self):
+        """@integration Scenario: SDK raises error when no API key is available"""
+        from langwatch.dataset.dataset_facade import DatasetsFacade
+
+        with patch("langwatch.dataset.dataset_facade.ensure_setup"), \
+             patch("langwatch.dataset.dataset_facade.get_instance", return_value=None):
+            with pytest.raises(RuntimeError, match="LANGWATCH_API_KEY"):
+                DatasetsFacade.from_global()

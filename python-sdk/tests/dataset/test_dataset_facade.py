@@ -48,6 +48,14 @@ class TestDatasetsFacade:
             with pytest.raises(ValueError, match="Entries must not be empty"):
                 facade.create_records("my-dataset", entries=[])
 
+        def test_returns_none(self, facade):
+            """create_records() returns None"""
+            facade._api.create_records = MagicMock(return_value=None)
+            result = facade.create_records(
+                "my-dataset", entries=[{"input": "hello"}]
+            )
+            assert result is None
+
     class TestDeleteRecords:
         """delete_records()"""
 
@@ -55,6 +63,15 @@ class TestDatasetsFacade:
             """@unit Scenario: Delete records validates record_ids is not empty"""
             with pytest.raises(ValueError, match="record_ids must not be empty"):
                 facade.delete_records("my-dataset", record_ids=[])
+
+        def test_returns_deleted_count_as_int(self, facade):
+            """delete_records() returns int (deleted count)"""
+            facade._api.delete_records = MagicMock(return_value=3)
+            result = facade.delete_records(
+                "my-dataset", record_ids=["r1", "r2", "r3"]
+            )
+            assert result == 3
+            assert isinstance(result, int)
 
     class TestUpload:
         """upload()"""
@@ -145,6 +162,23 @@ class TestDatasetsFacade:
             assert result.data[0].name == "Dataset 1"
             assert result.pagination.total == 1
 
+        def test_returns_empty_result(self, facade):
+            """list_datasets() returns empty .data and .pagination.total is 0"""
+            facade._api.list_datasets = MagicMock(
+                return_value={
+                    "data": [],
+                    "pagination": {
+                        "page": 1,
+                        "limit": 10,
+                        "total": 0,
+                        "totalPages": 0,
+                    },
+                }
+            )
+            result = facade.list_datasets()
+            assert result.data == []
+            assert result.pagination.total == 0
+
     class TestGetDataset:
         """get_dataset()"""
 
@@ -165,6 +199,21 @@ class TestDatasetsFacade:
             assert ds.entries[0].id == "r1"
             assert ds.entries[0].entry == {"input": "hello"}
 
+        def test_gets_dataset_by_id(self, facade):
+            """get_dataset() by ID works the same as by slug"""
+            facade._api.get_dataset = MagicMock(
+                return_value={
+                    "datasetId": "dataset_xyz",
+                    "name": "my-data",
+                    "slug": "my-data",
+                    "data": [],
+                }
+            )
+            ds = facade.get_dataset("dataset_xyz")
+            assert ds.slug == "my-data"
+            assert ds.id == "dataset_xyz"
+            facade._api.get_dataset.assert_called_once_with("dataset_xyz")
+
     class TestUpdateDataset:
         """update_dataset()"""
 
@@ -180,6 +229,24 @@ class TestDatasetsFacade:
             info = facade.update_dataset("old-name", name="New Name")
             assert info.name == "New Name"
             assert info.slug == "new-name"
+
+        def test_updates_column_types(self, facade):
+            """update_dataset() with column types returns updated DatasetInfo"""
+            facade._api.update_dataset = MagicMock(
+                return_value={
+                    "id": "ds_1",
+                    "name": "my-dataset",
+                    "slug": "my-dataset",
+                    "columnTypes": [{"name": "question", "type": "string"}],
+                }
+            )
+            info = facade.update_dataset(
+                "my-dataset",
+                columns=[{"name": "question", "type": "string"}],
+            )
+            assert len(info.columnTypes) == 1
+            assert info.columnTypes[0].name == "question"
+            assert info.columnTypes[0].type == "string"
 
     class TestDeleteDataset:
         """delete_dataset()"""
@@ -206,3 +273,18 @@ class TestDatasetsFacade:
             )
             assert record.id == "rec-1"
             assert record.entry == {"input": "updated"}
+
+        def test_upserts_non_existent_record(self, facade):
+            """update_record() for non-existent record creates it (upsert)"""
+            facade._api.update_record = MagicMock(
+                return_value={
+                    "id": "rec-new",
+                    "datasetId": "ds_1",
+                    "entry": {"input": "new"},
+                }
+            )
+            record = facade.update_record(
+                "my-dataset", "rec-new", entry={"input": "new"}
+            )
+            assert record.id == "rec-new"
+            assert record.entry == {"input": "new"}

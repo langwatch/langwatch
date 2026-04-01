@@ -16,7 +16,7 @@ Feature: Dataset Python SDK
   # HTTP calls: Hand-rolled httpx via rest_api_client.get_httpx_client()
   # (like experiment module), since the generated OpenAPI client only
   # covers 2 of 9 dataset endpoints. DatasetApiService encapsulates all
-  # raw HTTP calls using better_raise_for_status() from utils/exceptions.
+  # raw HTTP calls using _raise_for_api_status() for error surfacing.
   #
   # Error handling: Follows existing SDK conventions:
   #   - ValueError for 400/404/409/422 (client errors)

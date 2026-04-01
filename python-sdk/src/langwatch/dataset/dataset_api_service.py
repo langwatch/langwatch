@@ -5,7 +5,7 @@ Encapsulates all HTTP calls to dataset endpoints using hand-rolled httpx,
 since the generated OpenAPI client only covers a subset of dataset endpoints.
 
 Uses rest_api_client.get_httpx_client() for transport (like the experiment module)
-and better_raise_for_status() for error surfacing.
+and _raise_for_api_status() for error surfacing.
 """
 
 from typing import Any, Dict, List, Optional
@@ -16,7 +16,6 @@ from opentelemetry import trace
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
-from langwatch.utils.exceptions import better_raise_for_status
 
 _tracer = trace.get_tracer(__name__)
 
@@ -161,7 +160,7 @@ class DatasetApiService:
         slug_or_id: str,
         *,
         entries: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> None:
         """POST /api/dataset/{slug}/entries -- add records to a dataset."""
         with _tracer.start_as_current_span("dataset.create_records"):
             body: Dict[str, Any] = {"entries": entries}
@@ -170,7 +169,6 @@ class DatasetApiService:
                 f"/api/dataset/{slug_or_id}/entries", json=body
             )
             _raise_for_api_status(response)
-            return response.json()
 
     def update_record(
         self,
@@ -194,8 +192,12 @@ class DatasetApiService:
         slug_or_id: str,
         *,
         record_ids: List[str],
-    ) -> Dict[str, Any]:
-        """DELETE /api/dataset/{slugOrId}/records -- batch-delete records."""
+    ) -> int:
+        """DELETE /api/dataset/{slugOrId}/records -- batch-delete records.
+
+        Returns:
+            The number of records deleted.
+        """
         with _tracer.start_as_current_span("dataset.delete_records"):
             body: Dict[str, Any] = {"recordIds": record_ids}
 
@@ -205,7 +207,8 @@ class DatasetApiService:
                 json=body,
             )
             _raise_for_api_status(response)
-            return response.json()
+            data = response.json()
+            return int(data.get("deletedCount", 0))
 
     # ── file upload ─────────────────────────────────────────────────
 
