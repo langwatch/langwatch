@@ -12,7 +12,7 @@ import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositorie
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { prisma } from "~/server/db";
-import { NotFoundError } from "~/server/prompt-config/errors";
+import { NotFoundError, ShorthandParseError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { createLogger } from "~/utils/logger/server";
 import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
@@ -351,7 +351,7 @@ app.get(
           message: error.message,
         });
       }
-      if (error instanceof Error) {
+      if (error instanceof ShorthandParseError) {
         throw new HTTPException(422, {
           message: error.message,
         });

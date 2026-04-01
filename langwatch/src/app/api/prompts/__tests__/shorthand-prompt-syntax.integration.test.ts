@@ -1,8 +1,9 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { PromptService } from "~/server/prompt-config/prompt.service";
 import { app } from "../[[...route]]/app";
 
 /**
@@ -163,6 +164,27 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       expect(tagRes.status).toBe(200);
       const body = await tagRes.json();
       expect(body.tag).toBe("production");
+    });
+  });
+
+  describe("when an unexpected server error occurs during GET /:id", () => {
+    let spy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      spy = vi
+        .spyOn(PromptService.prototype, "getPromptByIdOrHandle")
+        .mockRejectedValue(new Error("database connection lost"));
+    });
+
+    afterEach(() => {
+      spy.mockRestore();
+    });
+
+    it("returns 500 for unexpected server errors", async () => {
+      const res = await makeRequest("/api/prompts/some-id");
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toMatch(/internal server error/i);
     });
   });
 });
