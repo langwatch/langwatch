@@ -2074,7 +2074,8 @@
                   "tags": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "scope": {
@@ -4386,6 +4387,118 @@
           }
         ],
         "description": "Get a dataset by its slug or id."
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiDatasetBySlugOrId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Update a dataset by its slug or id",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "columnTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "string"
+                            },
+                            {
+                              "type": "string",
+                              "const": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "const": "number"
+                            },
+                            {
+                              "type": "string",
+                              "const": "date"
+                            },
+                            {
+                              "type": "string",
+                              "const": "list"
+                            },
+                            {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            {
+                              "type": "string",
+                              "const": "spans"
+                            },
+                            {
+                              "type": "string",
+                              "const": "rag_contexts"
+                            },
+                            {
+                              "type": "string",
+                              "const": "chat_messages"
+                            },
+                            {
+                              "type": "string",
+                              "const": "annotations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "evaluations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "image"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "type"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiDatasetBySlugOrId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Archive a dataset (soft-delete)"
       }
     },
     "/api/prompts": {
@@ -5595,7 +5708,8 @@
                   "tags": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     }
                   }
                 },
@@ -11671,6 +11785,450 @@
         }
       }
     },
+    "/api/prompts/{id}/labels/{label}": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configId": {
+                      "type": "string"
+                    },
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configId",
+                    "versionId",
+                    "label",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid label or version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putApiPromptsByIdLabelsByLabel",
+        "parameters": [
+          {
+            "name": "label",
+            "in": "path",
+            "description": "The label to assign (e.g., \"production\", \"staging\")",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "production",
+                "staging"
+              ]
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Assign a label (e.g. \"production\", \"staging\") to a specific prompt version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "versionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "versionId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiDataset",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all non-archived datasets for the project (paginated)"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiDataset",
+        "parameters": [],
+        "description": "Create a new dataset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "columnTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "string"
+                            },
+                            {
+                              "type": "string",
+                              "const": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "const": "number"
+                            },
+                            {
+                              "type": "string",
+                              "const": "date"
+                            },
+                            {
+                              "type": "string",
+                              "const": "list"
+                            },
+                            {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            {
+                              "type": "string",
+                              "const": "spans"
+                            },
+                            {
+                              "type": "string",
+                              "const": "rag_contexts"
+                            },
+                            {
+                              "type": "string",
+                              "const": "chat_messages"
+                            },
+                            {
+                              "type": "string",
+                              "const": "annotations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "evaluations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "image"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "type"
+                      ]
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset/upload": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiDatasetUpload",
+        "parameters": [],
+        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)"
+      }
+    },
+    "/api/dataset/{slugOrId}/upload": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiDatasetBySlugOrIdUpload",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset"
+      }
+    },
+    "/api/dataset/{slugOrId}/records": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiDatasetBySlugOrIdRecords",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "List records for a dataset (paginated)"
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiDatasetBySlugOrIdRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Delete records from a dataset by IDs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recordIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  }
+                },
+                "required": [
+                  "recordIds"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset/{slugOrId}/records/{recordId}": {
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiDatasetBySlugOrIdRecordsByRecordId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "recordId",
+            "required": true
+          }
+        ],
+        "description": "Update or create a record in a dataset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entry": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "entry"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/prompts/{id}/tags/{tag}": {
       "put": {
         "responses": {
@@ -11768,7 +12326,7 @@
             }
           },
           "422": {
-            "description": "Invalid label or version",
+            "description": "Invalid tag or version",
             "content": {
               "application/json": {
                 "schema": {
