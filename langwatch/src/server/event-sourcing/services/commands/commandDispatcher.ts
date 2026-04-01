@@ -47,7 +47,7 @@ export interface ProcessCommandParams<EventType extends Event> {
   ) => Promise<void>;
   aggregateType: AggregateType;
   commandName: string;
-  pipelineName?: string;
+  pipelineName: string;
   featureFlagService?: FeatureFlagServiceInterface;
   killSwitchOptions?: KillSwitchOptions;
   logger?: ReturnType<typeof createLogger>;
@@ -119,11 +119,9 @@ export async function processCommand<EventType extends Event>(
   try {
     events = await handler.handle(command);
   } catch (error) {
-    if (pipelineName) {
-      const durationMs = performance.now() - commandStartTime;
-      incrementEsCommandTotal(pipelineName, commandType, "failed");
-      observeEsCommandDuration(pipelineName, commandType, durationMs);
-    }
+    const durationMs = performance.now() - commandStartTime;
+    incrementEsCommandTotal(pipelineName, commandType, "failed");
+    observeEsCommandDuration(pipelineName, commandType, durationMs);
     throw error;
   }
 
@@ -187,11 +185,9 @@ export async function processCommand<EventType extends Event>(
     await storeEventsFn(events, { tenantId });
   }
 
-  if (pipelineName) {
-    const durationMs = performance.now() - commandStartTime;
-    incrementEsCommandTotal(pipelineName, commandType, "completed");
-    observeEsCommandDuration(pipelineName, commandType, durationMs);
-  }
+  const durationMs = performance.now() - commandStartTime;
+  incrementEsCommandTotal(pipelineName, commandType, "completed");
+  observeEsCommandDuration(pipelineName, commandType, durationMs);
 }
 
 /**

@@ -41,7 +41,7 @@ export const gqPendingGroups = new Gauge({
 export const gqGroupsBlockedTotal = new Counter({
   name: "gq_groups_blocked_total",
   help: "Total number of groups that have been blocked due to exhausted retries",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 export const gqJobsStagedTotal = new Counter({
@@ -59,7 +59,7 @@ export const gqJobsDispatchedTotal = new Counter({
 export const gqJobsCompletedTotal = new Counter({
   name: "gq_jobs_completed_total",
   help: "Total number of jobs completed successfully",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 export const gqJobsDedupedTotal = new Counter({
@@ -71,19 +71,19 @@ export const gqJobsDedupedTotal = new Counter({
 export const gqJobsRetriedTotal = new Counter({
   name: "gq_jobs_retried_total",
   help: "Total number of intermediate retry attempts",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 export const gqJobsExhaustedTotal = new Counter({
   name: "gq_jobs_exhausted_total",
   help: "Total number of jobs that exhausted all retry attempts",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 export const gqJobsNonRetryableTotal = new Counter({
   name: "gq_jobs_non_retryable_total",
   help: "Total number of jobs that failed with non-retryable (critical) errors",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 export const gqFastqPending = new Gauge({
@@ -102,13 +102,13 @@ export const gqFastqActive = new Gauge({
 export const gqJobsDelayedTotal = new Counter({
   name: "gq_jobs_delayed_total",
   help: "Total number of jobs staged with an intentional delay",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
 export const gqJobDelayMilliseconds = new Histogram({
   name: "gq_job_delay_milliseconds",
   help: "Duration of intentional delays applied to staged jobs",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
   buckets: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000],
 });
 
@@ -116,14 +116,14 @@ export const gqJobDelayMilliseconds = new Histogram({
 export const gqRetryAttempt = new Histogram({
   name: "gq_retry_attempt",
   help: "Distribution of retry attempt numbers",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
   buckets: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
 });
 
 export const gqRetryBackoffMilliseconds = new Histogram({
   name: "gq_retry_backoff_milliseconds",
   help: "Duration of retry backoff delays in milliseconds",
-  labelNames: ["queue_name"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
   buckets: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000],
 });
 
@@ -131,7 +131,7 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of individual job processing in milliseconds",
-  labelNames: ["queue_name", "pipeline_name", "job_type"] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000],
 });
 

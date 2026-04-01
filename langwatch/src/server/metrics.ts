@@ -423,3 +423,32 @@ export const incrementEsFoldCacheRedisError = (
   projectionName: string,
   operation: "get" | "set",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
+
+// ============================================================================
+// withMetrics utility
+// ============================================================================
+
+/**
+ * Wraps an async operation with timing, calling onComplete or onFail with the
+ * elapsed duration in milliseconds. Re-throws on failure so callers still
+ * observe the original error.
+ */
+export async function withMetrics<T>({
+  fn,
+  onComplete,
+  onFail,
+}: {
+  fn: () => Promise<T>;
+  onComplete: (durationMs: number) => void;
+  onFail: (durationMs: number) => void;
+}): Promise<T> {
+  const start = performance.now();
+  try {
+    const result = await fn();
+    onComplete(performance.now() - start);
+    return result;
+  } catch (error) {
+    onFail(performance.now() - start);
+    throw error;
+  }
+}

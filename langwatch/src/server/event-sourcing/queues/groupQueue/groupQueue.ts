@@ -400,6 +400,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const attempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
     const jobType = (jobData.__jobType as string) ?? "unknown";
+    const jobName = (jobData.__jobName as string) ?? "unknown";
+    const routingLabels = { queue_name: this.queueName, pipeline_name: pipelineName, job_type: jobType, job_name: jobName };
     const payload = this.stripInternalFields(jobData);
 
     const jobStartTime = performance.now();
@@ -470,7 +472,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Success — complete the group slot
               await this.scripts.complete({ groupId, stagedJobId });
-              gqJobsCompletedTotal.inc({ queue_name: this.queueName });
+              gqJobsCompletedTotal.inc(routingLabels);
 
               this.logger.debug(
                 {
@@ -488,11 +490,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
                 // Re-stage with backoff — frees the worker slot immediately
-                gqJobsRetriedTotal.inc({ queue_name: this.queueName });
+                gqJobsRetriedTotal.inc(routingLabels);
 
                 const backoffMs = getBackoffMs(attempt);
-                gqRetryAttempt.observe({ queue_name: this.queueName }, attempt);
-                gqRetryBackoffMilliseconds.observe({ queue_name: this.queueName }, backoffMs);
+                gqRetryAttempt.observe(routingLabels, attempt);
+                gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
                 const retryJobData = JSON.stringify({
                   ...(payload as Record<string, unknown>),
@@ -526,7 +528,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 span.setAttribute("error.message", error.message);
 
                 if (!isRetryable) {
-                  gqJobsNonRetryableTotal.inc({ queue_name: this.queueName });
+                  gqJobsNonRetryableTotal.inc(routingLabels);
                   this.logger.error(
                     {
                       queueName: this.queueName,
@@ -547,6 +549,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   originalScore,
                   lastError: error,
                   contextMetadata,
+                  routingLabels,
                 });
               }
             }
@@ -570,10 +573,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       clearInterval(heartbeat);
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
-      gqJobDurationMilliseconds.observe(
-        { queue_name: this.queueName, pipeline_name: pipelineName, job_type: jobType },
-        jobDurationMs,
-      );
+      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
     }
   }
 
@@ -633,6 +633,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore,
     lastError,
     contextMetadata,
+    routingLabels,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -640,6 +641,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore: number;
     lastError: Error | undefined;
     contextMetadata: JobContextMetadata | undefined;
+    routingLabels: Record<string, string>;
   }): Promise<void> {
     const score =
       typeof originalScore === "number"
@@ -663,8 +665,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       errorStack: lastError?.stack,
     });
 
-    gqGroupsBlockedTotal.inc({ queue_name: this.queueName });
-    gqJobsExhaustedTotal.inc({ queue_name: this.queueName });
+    gqGroupsBlockedTotal.inc(routingLabels);
+    gqJobsExhaustedTotal.inc(routingLabels);
 
     this.logger.error(
       {

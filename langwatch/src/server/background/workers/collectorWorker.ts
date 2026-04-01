@@ -476,10 +476,6 @@ const processCollectorJob_ = async (
     );
   }
 
-  if (!existingTrace?.inserted_at) {
-    // Collector index delay metric was removed (deprecated collector).
-  }
-
   void markProjectFirstMessage(project, trace.metadata);
 
   if (env.IS_QUICKWIT || esWriteDisabled) {
