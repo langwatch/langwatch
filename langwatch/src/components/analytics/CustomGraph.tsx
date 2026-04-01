@@ -504,11 +504,10 @@ const CustomGraph_ = React.memo(
     const valueFormats = Array.from(
       new Set(
         input.series.map((series) => {
-          const metric = getMetric(series.metric);
-          // Count aggregations should use integer format regardless of metric's default
           if (series.aggregation === "cardinality") {
             return "0a";
           }
+          const metric = getMetric(series.metric);
           return metric?.format ?? "0a";
         }),
       ),
@@ -548,8 +547,10 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
+      const effectiveFormat =
+        series?.aggregation === "cardinality" ? "0a" : metric?.format;
 
-      return formatWith(metric?.format, value as number);
+      return formatWith(effectiveFormat, value as number);
     };
 
     const container = (child: React.ReactNode) => {
@@ -1154,11 +1155,9 @@ const shapeDataForSummary = (
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
       // Count aggregations should use integer format regardless of metric's default
-      const isCountAggregation = input.series.some(
-        (s) => s.aggregation === "cardinality",
-      );
+      const isCardinalitySeries = series?.aggregation === "cardinality";
       const formatOverride =
-        isCountAggregation && metric ? { ...metric, format: "0a" } : metric;
+        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
 
       return {
         key: aggKey,
