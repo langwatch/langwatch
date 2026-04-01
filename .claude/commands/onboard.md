@@ -1,4 +1,4 @@
 # Onboard
 
-1. Invoke **repo-sherpa** for orientation
-2. Summarize findings
+1. Read CLAUDE.md and AGENTS.md for orientation
+2. Summarize project structure and key workflows

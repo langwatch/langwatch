@@ -34,7 +34,6 @@ User Request
 .claude/
 ├── agents/         # Agent definitions (personas with workflows)
 │   ├── coder.md
-│   ├── repo-sherpa.md
 │   ├── devils-advocate.md            # Stress-test proposals and plans
 │   ├── playwright-test-planner.md    # Ad-hoc: explores app, creates plans
 │   ├── playwright-test-generator.md  # Ad-hoc: generates tests from plans
@@ -44,7 +43,6 @@ User Request
 │   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
 │   ├── challenge/      # Delegates to devils-advocate
-│   ├── sherpa/         # Delegates to repo-sherpa
 │   ├── drive-pr/       # Fix CI failures + address review comments
 │   └── browser-test/   # Interactive browser verification
 └── commands/       # Slash commands (non-agent utilities)
@@ -60,7 +58,6 @@ Agents are **specialized personas** with defined workflows and expertise. They r
 |-------|---------|-------|
 | `coder` | TDD implementation, self-verification | Opus |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | Opus |
-| `repo-sherpa` | Documentation, DX, meta-layer | Opus |
 | `playwright-test-planner` | Explore live app, create test plans (ad-hoc) | Opus |
 | `playwright-test-generator` | Generate Playwright tests from plans (ad-hoc) | Sonnet |
 | `playwright-test-healer` | Debug and fix failing tests (ad-hoc) | Sonnet |
@@ -70,7 +67,7 @@ Agents are invoked **only through skills**, never directly.
 ### Skills (.claude/skills/)
 
 Skills are **entry points** that:
-1. Accept user commands (`/code`, `/sherpa`, `/challenge`)
+1. Accept user commands (`/code`, `/challenge`)
 2. Invoke agents via `context: fork` + `agent: <name>`
 3. Pass arguments to the agent
 
@@ -188,26 +185,11 @@ ORCHESTRATOR (main thread)
 │                  - Failure mode analysis
 │                  - Alternative approaches
 │
-├── /browser-test ► BROWSER VERIFICATION (interactive)
-│                  - Drives real browser via Playwright MCP
-│                  - Screenshots + report to browser-tests/
-│                  - No test files generated
-│
-└── /sherpa ─────► REPO-SHERPA
-                   - Documentation
-                   - DX improvements
-                   - Meta-layer ownership
+└── /browser-test ► BROWSER VERIFICATION (interactive)
+                   - Drives real browser via Playwright MCP
+                   - Screenshots + report to browser-tests/
+                   - No test files generated
 ```
-
-## Meta-Layer Ownership
-
-The **repo-sherpa** agent owns the "meta-layer":
-- Repository structure and organization
-- Agent and skill definitions (`.claude/agents/`, `.claude/skills/`)
-- Documentation (`README`, `CLAUDE.md`, `AGENTS.md`, `dev/docs/`)
-- Developer experience and workflows
-
-When changes touch these areas, invoke `/sherpa` for guidance.
 
 ## Quick Reference
 
@@ -219,7 +201,6 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/code <task>` | coder | Implement with TDD |
 | `/challenge <proposal>` | devils-advocate | Stress-test proposals and plans |
 | `/browser-test [port] [feature]` | (interactive verification) | Verify feature works in real browser |
-| `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |
 
 ## Token-Conscious Principle
 

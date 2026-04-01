@@ -7,7 +7,6 @@ Specialized Claude personas with defined workflows. Agents run in isolated conte
 | Agent | Purpose | Invoked via |
 |-------|---------|-------------|
 | `coder` | TDD implementation, self-verification | `/code` skill |
-| `repo-sherpa` | Documentation, DX, meta-layer ownership | `/sherpa` skill |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | `/challenge` skill |
 | `playwright-test-planner` | Creates test plans by exploring the live app | Ad-hoc (via Task) |
 | `playwright-test-generator` | Generates Playwright tests from plans | Ad-hoc (via Task) |
@@ -40,6 +39,6 @@ Do not explain standard concepts - agents already know them.
 
 ## Related
 
-- `.claude/skills/` - Skills that invoke agents (`code`, `sherpa`, `challenge`, `browser-test`)
+- `.claude/skills/` - Skills that invoke agents (`code`, `challenge`, `browser-test`)
 - `.claude/README.md` - Full orchestration system documentation
 - `dev/docs/adr/010-e2e-testing-strategy.md` - Why browser verification replaced E2E test generation

@@ -12,7 +12,6 @@ These skills use `context: fork` to spawn agents in isolated contexts:
 |-------|-------|---------|
 | `/code` | coder | Implement with TDD, self-verification |
 | `/challenge` | devils-advocate | Stress-test proposals and architecture decisions |
-| `/sherpa` | repo-sherpa | Documentation, DX, meta-layer |
 
 ### Self-Contained Skills
 

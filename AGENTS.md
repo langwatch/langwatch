@@ -138,6 +138,5 @@ Implementation tasks use `/orchestrate` to manage work. The orchestrator detects
 
 Agents:
 - **coder** (`.claude/agents/coder.md`): Implements features with TDD. Reads requirements, writes failing tests first, implements minimal code to pass, refactors, and self-verifies before returning.
-- **repo-sherpa** (`.claude/agents/repo-sherpa.md`): Answers questions about repository structure, documentation, and developer experience. Owns the meta-layer (agents, skills, docs).
 
 See `.claude/README.md` for full orchestration documentation.
