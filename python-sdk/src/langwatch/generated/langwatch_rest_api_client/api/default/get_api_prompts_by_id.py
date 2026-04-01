@@ -115,7 +115,10 @@ def sync_detailed(
         GetApiPromptsByIdResponse500,
     ]
 ]:
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
@@ -159,7 +162,10 @@ def sync(
         GetApiPromptsByIdResponse500,
     ]
 ]:
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
@@ -198,7 +204,10 @@ async def asyncio_detailed(
         GetApiPromptsByIdResponse500,
     ]
 ]:
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
@@ -240,7 +249,10 @@ async def asyncio(
         GetApiPromptsByIdResponse500,
     ]
 ]:
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
