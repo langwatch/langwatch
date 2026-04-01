@@ -1,8 +1,9 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
+from ..models.put_api_prompts_by_id_body_labels_item import PutApiPromptsByIdBodyLabelsItem
 from ..models.put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from ..models.put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from ..types import UNSET, Unset
@@ -30,7 +31,7 @@ class PutApiPromptsByIdBody:
         inputs (Union[Unset, list['PutApiPromptsByIdBodyInputsItem']]):
         outputs (Union[Unset, list['PutApiPromptsByIdBodyOutputsItem']]):
         schema_version (Union[Unset, PutApiPromptsByIdBodySchemaVersion]):
-        tags (Union[Unset, list[str]]):
+        labels (Union[Unset, list[PutApiPromptsByIdBodyLabelsItem]]):
         scope (Union[Unset, PutApiPromptsByIdBodyScope]):
         handle (Union[Unset, str]):
     """
@@ -45,7 +46,7 @@ class PutApiPromptsByIdBody:
     inputs: Union[Unset, list["PutApiPromptsByIdBodyInputsItem"]] = UNSET
     outputs: Union[Unset, list["PutApiPromptsByIdBodyOutputsItem"]] = UNSET
     schema_version: Union[Unset, PutApiPromptsByIdBodySchemaVersion] = UNSET
-    tags: Union[Unset, list[str]] = UNSET
+    labels: Union[Unset, list[PutApiPromptsByIdBodyLabelsItem]] = UNSET
     scope: Union[Unset, PutApiPromptsByIdBodyScope] = UNSET
     handle: Union[Unset, str] = UNSET
 
@@ -87,9 +88,12 @@ class PutApiPromptsByIdBody:
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
-        tags: Union[Unset, list[str]] = UNSET
-        if not isinstance(self.tags, Unset):
-            tags = self.tags
+        labels: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = []
+            for labels_item_data in self.labels:
+                labels_item = labels_item_data.value
+                labels.append(labels_item)
 
         scope: Union[Unset, str] = UNSET
         if not isinstance(self.scope, Unset):
@@ -121,8 +125,8 @@ class PutApiPromptsByIdBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
-        if tags is not UNSET:
-            field_dict["tags"] = tags
+        if labels is not UNSET:
+            field_dict["labels"] = labels
         if scope is not UNSET:
             field_dict["scope"] = scope
         if handle is not UNSET:
@@ -177,7 +181,12 @@ class PutApiPromptsByIdBody:
         else:
             schema_version = PutApiPromptsByIdBodySchemaVersion(_schema_version)
 
-        tags = cast(list[str], d.pop("tags", UNSET))
+        labels = []
+        _labels = d.pop("labels", UNSET)
+        for labels_item_data in _labels or []:
+            labels_item = PutApiPromptsByIdBodyLabelsItem(labels_item_data)
+
+            labels.append(labels_item)
 
         _scope = d.pop("scope", UNSET)
         scope: Union[Unset, PutApiPromptsByIdBodyScope]
@@ -199,7 +208,7 @@ class PutApiPromptsByIdBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
-            tags=tags,
+            labels=labels,
             scope=scope,
             handle=handle,
         )

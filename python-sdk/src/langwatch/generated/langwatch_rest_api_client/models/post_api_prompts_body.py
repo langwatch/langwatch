@@ -1,8 +1,9 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
+from ..models.post_api_prompts_body_labels_item import PostApiPromptsBodyLabelsItem
 from ..models.post_api_prompts_body_schema_version import PostApiPromptsBodySchemaVersion
 from ..models.post_api_prompts_body_scope import PostApiPromptsBodyScope
 from ..types import UNSET, Unset
@@ -32,7 +33,7 @@ class PostApiPromptsBody:
         inputs (Union[Unset, list['PostApiPromptsBodyInputsItem']]):
         outputs (Union[Unset, list['PostApiPromptsBodyOutputsItem']]):
         schema_version (Union[Unset, PostApiPromptsBodySchemaVersion]):
-        tags (Union[Unset, list[str]]):
+        labels (Union[Unset, list[PostApiPromptsBodyLabelsItem]]):
     """
 
     handle: str
@@ -47,7 +48,7 @@ class PostApiPromptsBody:
     inputs: Union[Unset, list["PostApiPromptsBodyInputsItem"]] = UNSET
     outputs: Union[Unset, list["PostApiPromptsBodyOutputsItem"]] = UNSET
     schema_version: Union[Unset, PostApiPromptsBodySchemaVersion] = UNSET
-    tags: Union[Unset, list[str]] = UNSET
+    labels: Union[Unset, list[PostApiPromptsBodyLabelsItem]] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -93,9 +94,12 @@ class PostApiPromptsBody:
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
-        tags: Union[Unset, list[str]] = UNSET
-        if not isinstance(self.tags, Unset):
-            tags = self.tags
+        labels: Union[Unset, list[str]] = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = []
+            for labels_item_data in self.labels:
+                labels_item = labels_item_data.value
+                labels.append(labels_item)
 
         field_dict: dict[str, Any] = {}
         field_dict.update(
@@ -125,8 +129,8 @@ class PostApiPromptsBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
-        if tags is not UNSET:
-            field_dict["tags"] = tags
+        if labels is not UNSET:
+            field_dict["labels"] = labels
 
         return field_dict
 
@@ -186,7 +190,12 @@ class PostApiPromptsBody:
         else:
             schema_version = PostApiPromptsBodySchemaVersion(_schema_version)
 
-        tags = cast(list[str], d.pop("tags", UNSET))
+        labels = []
+        _labels = d.pop("labels", UNSET)
+        for labels_item_data in _labels or []:
+            labels_item = PostApiPromptsBodyLabelsItem(labels_item_data)
+
+            labels.append(labels_item)
 
         post_api_prompts_body = cls(
             handle=handle,
@@ -201,7 +210,7 @@ class PostApiPromptsBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
-            tags=tags,
+            labels=labels,
         )
 
         return post_api_prompts_body
