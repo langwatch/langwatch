@@ -18,13 +18,12 @@ Simple slash commands that provide instructions to Claude without spawning agent
 
 | Command | Purpose |
 |---------|---------|
-| `/onboard` | Orientation via sherpa + code review |
+| `/onboard` | Orientation via sherpa |
 | `/refocus` | Compact context and realign with BDD workflow |
 | `/worktree` | Create git worktree with proper setup |
-| `/review` | Quick review invocation (same thread) |
 | `/sherpa` | Quick sherpa invocation (same thread) |
 
-Note: `/review` and `/sherpa` commands run in the same thread. The skills (`skills/review/`, `skills/sherpa/`) use `context: fork` for isolated agent runs - prefer skills when you need clean separation or are delegating from an orchestrator.
+Note: `/sherpa` command runs in the same thread. The skill (`skills/sherpa/`) uses `context: fork` for isolated agent runs - prefer the skill when you need clean separation or are delegating from an orchestrator.
 
 ## Writing Commands
 

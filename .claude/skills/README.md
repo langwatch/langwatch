@@ -11,7 +11,6 @@ These skills use `context: fork` to spawn agents in isolated contexts:
 | Skill | Agent | Purpose |
 |-------|-------|---------|
 | `/code` | coder | Implement with TDD, self-verification |
-| `/review` | principles + hygiene + security + test reviewers | Parallel code review |
 | `/challenge` | devils-advocate | Stress-test proposals and architecture decisions |
 | `/sherpa` | repo-sherpa | Documentation, DX, meta-layer |
 
@@ -28,7 +27,7 @@ These skills use `context: fork` but contain their own instructions:
 
 | Skill | Trigger | Purpose |
 |-------|---------|---------|
-| `/orchestrate` | Manual (`/orchestrate <requirements>`) | Manages plan/code/review loop |
+| `/orchestrate` | Manual (`/orchestrate <requirements>`) | Manages plan/code/browser-verify loop |
 | `/implement` | Manual (`/implement #123`) | Entry point for GitHub issues (invokes `/orchestrate`) |
 
 ## The context:fork + agent Pattern

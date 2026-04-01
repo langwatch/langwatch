@@ -15,17 +15,17 @@ User Request
 │  - Verifies outcomes                                                │
 │  - Does NOT read/write code directly                                │
 └─────────────────────────────────────────────────────────────────────┘
-     │                         │                         │
-     │ /code                   │ /review                 │ /browser-test
-     ▼                         ▼                         ▼
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐
-│  CODER AGENT     │  │  REVIEWERS       │  │  BROWSER VERIFICATION    │
-│  (context: fork) │  │  (context: fork) │  │  (interactive)           │
-│  - TDD workflow  │  │  - Design/       │  │  - Drives real browser   │
-│  - Returns       │  │    Hygiene/      │  │  - Screenshots + report  │
-│    summary       │  │    Security/     │  │  - No test files         │
-│                  │  │    Tests         │  │                          │
-└──────────────────┘  └──────────────────┘  └──────────────────────────┘
+     │                                           │
+     │ /code                                     │ /browser-test
+     ▼                                           ▼
+┌──────────────────┐              ┌──────────────────────────┐
+│  CODER AGENT     │              │  BROWSER VERIFICATION    │
+│  (context: fork) │              │  (interactive)           │
+│  - TDD workflow  │              │  - Drives real browser   │
+│  - Returns       │              │  - Screenshots + report  │
+│    summary       │              │  - No test files         │
+│                  │              │                          │
+└──────────────────┘              └──────────────────────────┘
 ```
 
 ## Directory Structure
@@ -35,20 +35,14 @@ User Request
 ├── agents/         # Agent definitions (personas with workflows)
 │   ├── coder.md
 │   ├── repo-sherpa.md
-│   ├── principles-reviewer.md
-│   ├── hygiene-reviewer.md
-│   ├── security-reviewer.md
 │   ├── devils-advocate.md            # Stress-test proposals and plans
 │   ├── playwright-test-planner.md    # Ad-hoc: explores app, creates plans
 │   ├── playwright-test-generator.md  # Ad-hoc: generates tests from plans
-│   ├── playwright-test-healer.md     # Ad-hoc: fixes failing tests
-│   └── test-reviewer.md              # Reviews test quality
+│   └── playwright-test-healer.md     # Ad-hoc: fixes failing tests
 ├── skills/         # Skills (entry points that invoke agents)
 │   ├── orchestrate/    # Manual: /orchestrate <requirements>
 │   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
-│   ├── test-review/    # Delegates to test-reviewer agent
-│   ├── review/         # Parallel reviewers (principles, hygiene, security, test)
 │   ├── challenge/      # Delegates to devils-advocate
 │   ├── sherpa/         # Delegates to repo-sherpa
 │   ├── drive-pr/       # Fix CI failures + address review comments
@@ -65,22 +59,18 @@ Agents are **specialized personas** with defined workflows and expertise. They r
 | Agent | Purpose | Model |
 |-------|---------|-------|
 | `coder` | TDD implementation, self-verification | Opus |
-| `principles-reviewer` | SRP, readability, simplicity review | Opus |
-| `hygiene-reviewer` | Reuse, patterns, idioms review | Sonnet |
-| `security-reviewer` | PII, secrets, data exposure review | Sonnet |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | Opus |
 | `repo-sherpa` | Documentation, DX, meta-layer | Opus |
 | `playwright-test-planner` | Explore live app, create test plans (ad-hoc) | Opus |
 | `playwright-test-generator` | Generate Playwright tests from plans (ad-hoc) | Sonnet |
 | `playwright-test-healer` | Debug and fix failing tests (ad-hoc) | Sonnet |
-| `test-reviewer` | Review test quality and pyramid placement | Opus |
 
 Agents are invoked **only through skills**, never directly.
 
 ### Skills (.claude/skills/)
 
 Skills are **entry points** that:
-1. Accept user commands (`/code`, `/review`, `/sherpa`)
+1. Accept user commands (`/code`, `/sherpa`, `/challenge`)
 2. Invoke agents via `context: fork` + `agent: <name>`
 3. Pass arguments to the agent
 
@@ -134,23 +124,14 @@ Orchestration mode is explicit - use one of:
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 2. TEST-REVIEW                                          │
-│    - /test-review validates pyramid placement           │
-│    - Checks @integration, @unit appropriateness           │
-│    - Violations? → fix feature file, re-review          │
-│    - Approved? → Continue                               │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 3. IMPLEMENT                                            │
+│ 2. IMPLEMENT                                            │
 │    - /code with feature file and requirements           │
 │    - Coder implements with TDD, returns summary         │
 └─────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 4. VERIFY                                               │
+│ 3. VERIFY                                               │
 │    - Check summary against acceptance criteria          │
 │    - Incomplete? → /code again with feedback            │
 │    - Max 3 iterations, then escalate                    │
@@ -158,15 +139,7 @@ Orchestration mode is explicit - use one of:
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 5. REVIEW                                               │
-│    - /review for quality gate                           │
-│    - Issues? → /code with reviewer feedback             │
-│    - Approved? → Continue                               │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 6. BROWSER VERIFICATION                                 │
+│ 4. BROWSER VERIFICATION                                 │
 │    - dev-up.sh → /browser-test → dev-down.sh           │
 │    - Drives real browser, takes screenshots             │
 │    - Pass? → Complete                                   │
@@ -177,11 +150,11 @@ Orchestration mode is explicit - use one of:
                           │    ┌────────────────────┘
                           │    │ (loop back to implement)
                           │    ▼
-                          │  Step 3 → 4 → 5 → 6
+                          │  Step 2 → 3 → 4
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 7. COMPLETE                                             │
+│ 5. COMPLETE                                             │
 │    - Report summary to user (code + verification)       │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -190,9 +163,7 @@ Orchestration mode is explicit - use one of:
 
 The orchestrator delegates, it doesn't implement:
 - `/plan` creates feature files
-- `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
-- `/review` checks quality
 - `/browser-test` verifies features work in a real browser
 
 The orchestrator reads only feature files and planning docs, not source code.
@@ -206,22 +177,10 @@ ORCHESTRATOR (main thread)
 │                  - Feature file creation
 │                  - Acceptance criteria
 │
-├── /test-review ► TEST-REVIEWER AGENT
-│                  - Pyramid placement validation
-│                  - Spec review decision tree
-│                  - Runs before implementation
-│
 ├── /code  ──────► CODER AGENT
 │                  - Implementation work
 │                  - TDD workflow
 │                  - Test execution
-│
-├── /review ─────► PRINCIPLES + HYGIENE + SECURITY + TEST
-│                  - Quality gate (parallel review)
-│                  - Design quality (principles)
-│                  - Codebase fit (hygiene)
-│                  - Security scan
-│                  - Test pyramid placement
 │
 ├── /challenge ──► DEVILS-ADVOCATE
 │                  - Stress-test proposals and plans
@@ -257,9 +216,7 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/orchestrate <req>` | (orchestrator mode) | Enter orchestration mode with requirements |
 | `/implement #123` | (orchestrator mode) | Fetch issue → invoke `/orchestrate` |
 | `/plan <feature>` | Plan (built-in) | Create feature file (required before /code) |
-| `/test-review <path>` | test-reviewer | Review specs and tests for pyramid placement |
 | `/code <task>` | coder | Implement with TDD |
-| `/review <focus>` | principles + hygiene + security + test | Quality review (parallel) |
 | `/challenge <proposal>` | devils-advocate | Stress-test proposals and plans |
 | `/browser-test [port] [feature]` | (interactive verification) | Verify feature works in real browser |
 | `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |

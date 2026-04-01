@@ -58,21 +58,18 @@ Read `dev/docs/adr/` (Architecture Decision Records) to explain decisions:
 │   ├── README.md       # How agents work
 │   ├── coder.md        # TDD implementation agent
 │   ├── repo-sherpa.md  # This file - meta-layer ownership
-│   ├── principles-reviewer.md  # SRP/design reviewer
-│   ├── hygiene-reviewer.md     # Codebase fit reviewer
-│   └── security-reviewer.md    # PII/secrets reviewer
+│   └── devils-advocate.md  # Stress-test proposals and plans
 ├── skills/             # Entry points that invoke agents
 │   ├── README.md       # How skills work
 │   ├── code/           # /code → coder agent
-│   ├── review/         # /review → parallel reviewers
 │   ├── sherpa/         # /sherpa → repo-sherpa
 │   ├── drive-pr/       # /drive-pr → fix CI failures + address review comments
 │   ├── plan/           # /plan → creates feature files
-│   ├── orchestrate/    # /orchestrate → manages plan/code/review loop
+│   ├── orchestrate/    # /orchestrate → manages plan/code loop
 │   └── implement/      # /implement #123 → fetches issue, invokes orchestrate
 └── commands/           # Simple slash commands (no forks)
     ├── README.md       # Commands vs Skills
-    ├── onboard.md      # /onboard - orientation + review
+    ├── onboard.md      # /onboard - orientation
     ├── refocus.md      # /refocus - realign with BDD
     └── worktree.md     # /worktree - create git worktree
 ```
@@ -110,8 +107,7 @@ dev/docs/
 1. `/implement #123` - Start from GitHub issue
 2. Orchestrator checks for feature file → `/plan` if missing
 3. `/code` implements with TDD
-4. `/review` for quality gate
-5. Loop until complete
+4. Loop until complete
 
 **Updating meta-layer:**
 1. `/sherpa` with the change request

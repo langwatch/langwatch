@@ -28,5 +28,4 @@ Skill(skill: "orchestrate", args: "Issue #N: <title>\n\n<issue body/description>
 The orchestrator will manage the full implementation loop:
 1. `/plan` - Create feature file with acceptance criteria
 2. `/code` - Delegate implementation to coder agent
-3. `/review` - Quality gate with parallel reviewers
-4. Loop until complete
+3. Loop until complete

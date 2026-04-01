@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Orchestration mode for implementation tasks. Manages the plan → code → review loop. Use /orchestrate <requirements> or let /implement invoke it."
+description: "Orchestration mode for implementation tasks. Manages the plan → code → browser-verify loop. Use /orchestrate <requirements> or let /implement invoke it."
 user-invocable: true
 argument-hint: "[requirements or feature description]"
 ---
@@ -64,7 +64,7 @@ Otherwise → use the **Feature Workflow** (the full plan → code → review lo
 
 ## Bug-Fix Workflow
 
-A shorter workflow for bug fixes. Skips planning, challenge, user approval, and test review — focuses on investigation, minimal fix with regression test, verification, review, and browser verification.
+A shorter workflow for bug fixes. Skips planning, challenge, and user approval — focuses on investigation, minimal fix with regression test, verification, and browser verification.
 
 ### 1. Investigate
 - Mark task as `in_progress`
@@ -91,12 +91,7 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
 - If failures → invoke `/code` with the errors
 - Max 3 iterations, then escalate to user
 
-### 4. Review
-- Invoke `/review` to run quality gate
-- If issues found → invoke `/code` with reviewer feedback
-- If approved → mark task as `completed`
-
-### 5. Browser Verification (Conditional)
+### 4. Browser Verification (Conditional)
 **Only when the bug affects browser-observable behavior** (UI rendering, user interactions, page navigation, etc.). Skip for backend-only, infra, script, or docs changes.
 
 - Invoke `/browser-test` with the bug description
@@ -163,35 +158,20 @@ Used for feature requests, enhancements, and all non-bug issues.
   - Update the feature file accordingly
   - Show the updated version
   - Ask for approval again
-- Only after explicit approval → proceed to Test Review
+- Only after explicit approval → proceed to Implement
 
-### 4. Test Review (Required)
-- Invoke `/test-review` on the feature file
-- Validates pyramid placement before any implementation begins
-- Checks that `@integration`, `@unit` tags are appropriate
-- If violations found:
-  - Update the feature file to fix tag placement
-  - Re-run `/test-review` to confirm fixes
-- If approved → proceed to Implement
-
-### 5. Implement
+### 4. Implement
 - Mark task as `in_progress`
 - Invoke `/code` with the feature file path and requirements
 - Coder agent implements with TDD and returns a summary
 - Mark task as `completed` when done
 
-### 6. Verify
+### 5. Verify
 - Check the coder's summary against acceptance criteria
 - If incomplete → invoke `/code` again with specific feedback
 - Max 3 iterations, then escalate to user
 
-### 7. Review (Required)
-- Mark review task as `in_progress`
-- Invoke `/review` to run quality gate
-- If issues found → invoke `/code` with reviewer feedback
-- If approved → mark task as `completed`
-
-### 8. Browser Verification (Conditional)
+### 6. Browser Verification (Conditional)
 **Only when acceptance criteria describe browser-observable behavior** (UI rendering, user interactions, page navigation, visual changes). Skip for backend-only, infra, script, or docs features.
 
 - Mark browser-test task as `in_progress`
@@ -203,14 +183,9 @@ Used for feature requests, enhancements, and all non-bug issues.
   - Max 2 iterations, then escalate to user
 - If all scenarios pass → mark task as `completed`
 
-### 9. Self-Check (Required)
+### 7. Self-Check (Required)
 
 Before completing, verify you didn't make mistakes:
-
-**Review Compliance:**
-- Did you address ALL items marked "Should fix (Important)"?
-- Did you ask the user about items marked "NEEDS USER DECISION"?
-- Did you skip any reviewer recommendations without justification?
 
 **Test Coverage:**
 - Check the feature file for `@unit`, `@integration`, and `@e2e` tags
@@ -223,22 +198,22 @@ Before completing, verify you didn't make mistakes:
 
 If ANY check fails:
 1. Do NOT proceed to Complete
-2. Go back to the appropriate step (Implement, Review, or Browser Verification)
+2. Go back to the appropriate step (Implement or Browser Verification)
 3. Fix the gap before continuing
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
-### 10. Finalize and Mark Ready
+### 8. Finalize and Mark Ready
 - Mark PR as ready for review: `gh pr ready`
 - Invoke `/drive-pr --once` to fix any CI failures and address review comments
 
-### 11. Verify and Finish
+### 9. Verify and Finish
 
 Before reporting done, run through this checklist. **Every item must pass** — if any fails, go back to the appropriate step.
 
 **Deliverables:**
 - [ ] All tasks in the task list are marked `completed`
-- [ ] Self-check (step 9) passed
+- [ ] Self-check (step 7) passed
 - [ ] `git status` is clean — no uncommitted changes
 - [ ] `git push` is up to date with remote — no unpushed commits
 - [ ] Draft PR was created after first commit and is now marked ready
@@ -264,9 +239,7 @@ If everything passes → report summary to user (include PR URL and browser veri
 
 You delegate, you don't implement:
 - `/plan` creates feature files
-- `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
-- `/review` checks quality
 - `/browser-test` verifies features work in a real browser
 - `/drive-pr` fixes CI failures and addresses review comments
 
