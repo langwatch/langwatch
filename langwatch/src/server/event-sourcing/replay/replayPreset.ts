@@ -1,4 +1,3 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import IORedis from "ioredis";
 import { buildFoldProjections, type FoldProjectionRepositories } from "../pipelineRegistry";
 import { ReplayService } from "./replayService";
@@ -8,7 +7,7 @@ import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/r
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
-import type { ClickHouseClientResolver } from "../../clickhouse/clickhouseClient";
+import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 
 export interface ReplayRuntime {
   service: ReplayService;
@@ -17,52 +16,37 @@ export interface ReplayRuntime {
 }
 
 /**
- * Create a replay runtime with a tenant-aware ClickHouse resolver.
+ * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
+ * Every CH query routes through getClickHouseClientForProject, which
+ * resolves project → org → private CH instance (or shared fallback).
  */
-export function createReplayRuntimeWithResolver(config: {
-  clickhouseClientResolver: ClickHouseClientResolver;
+export function createReplayRuntime(config: {
   redisUrl: string;
-  close?: () => Promise<void>;
 }): ReplayRuntime {
   const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
 
+  const clientResolver = async (tenantId: string) => {
+    const client = await getClickHouseClientForProject(tenantId);
+    if (!client) throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
+    return client;
+  };
+
   const repos: FoldProjectionRepositories = {
-    traceSummaryFold: new TraceSummaryClickHouseRepository(config.clickhouseClientResolver),
-    evaluationRun: new EvaluationRunClickHouseRepository(config.clickhouseClientResolver),
-    experimentRunState: new ExperimentRunStateRepositoryClickHouse(config.clickhouseClientResolver),
-    simulationRunState: new SimulationRunStateRepositoryClickHouse(config.clickhouseClientResolver),
-    suiteRunState: new SuiteRunStateRepositoryClickHouse(config.clickhouseClientResolver),
+    traceSummaryFold: new TraceSummaryClickHouseRepository(clientResolver),
+    evaluationRun: new EvaluationRunClickHouseRepository(clientResolver),
+    experimentRunState: new ExperimentRunStateRepositoryClickHouse(clientResolver),
+    simulationRunState: new SimulationRunStateRepositoryClickHouse(clientResolver),
+    suiteRunState: new SuiteRunStateRepositoryClickHouse(clientResolver),
   };
 
   const projections = buildFoldProjections(repos);
-  const service = new ReplayService({ clickhouseClientResolver: config.clickhouseClientResolver, redis });
+  const service = new ReplayService({ clickhouseClientResolver: clientResolver, redis });
 
   return {
     service,
     projections,
     close: async () => {
       redis.disconnect();
-      await config.close?.();
     },
   };
-}
-
-/**
- * Create a replay runtime with a single ClickHouse URL (all tenants same DB).
- * For local dev or when you know all target tenants share one database.
- */
-export function createReplayRuntime(config: {
-  clickhouseUrl: string;
-  redisUrl: string;
-}): ReplayRuntime {
-  const client = createClient({
-    url: config.clickhouseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
-
-  return createReplayRuntimeWithResolver({
-    clickhouseClientResolver: async () => client,
-    redisUrl: config.redisUrl,
-    close: () => client.close(),
-  });
 }

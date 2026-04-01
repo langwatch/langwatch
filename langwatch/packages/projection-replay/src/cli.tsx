@@ -18,28 +18,8 @@ import type {
   BatchCompleteInfo,
 } from "../../../src/server/event-sourcing/replay";
 
-async function loadReplayRuntime(config: {
-  clickhouseUrl: string;
-  redisUrl: string;
-}): Promise<ReplayRuntime> {
-  const { createReplayRuntime } = await import("../../../src/server/event-sourcing/replay/replayPreset");
-  return createReplayRuntime(config);
-}
-
-async function loadReplayRuntimeForTenant(config: {
-  redisUrl: string;
-}): Promise<ReplayRuntime> {
-  const { getClickHouseClientForProject } = await import("../../../src/server/clickhouse/clickhouseClient");
-  const { createReplayRuntimeWithResolver } = await import("../../../src/server/event-sourcing/replay/replayPreset");
-  return createReplayRuntimeWithResolver({
-    clickhouseClientResolver: async (tenantId: string) => {
-      const client = await getClickHouseClientForProject(tenantId);
-      if (!client) throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
-      return client;
-    },
-    redisUrl: config.redisUrl,
-  });
-}
+import { createReplayRuntime } from "../../../src/server/event-sourcing/replay/replayPreset";
+import { prisma } from "../../../src/server/db";
 import { ReplayLog } from "./replayLog";
 import {
   ReplayWizard,
@@ -262,15 +242,6 @@ function confirm(question: string): Promise<boolean> {
 
 // ─── Connection helpers ───────────────────────────────────────────────────
 
-function resolveClickHouseUrl(opts: { clickhouseUrl?: string }): string {
-  const url = opts.clickhouseUrl ?? process.env.CLICKHOUSE_URL;
-  if (!url) {
-    console.error("ClickHouse URL is required. Pass --clickhouse-url or set CLICKHOUSE_URL.");
-    process.exit(1);
-  }
-  return url;
-}
-
 function resolveRedisUrl(opts: { redisUrl?: string }): string {
   const url = opts.redisUrl ?? process.env.REDIS_URL;
   if (!url) {
@@ -290,22 +261,12 @@ function resolveDatabaseUrl(opts: { databaseUrl?: string }): string {
   return url;
 }
 
-async function initRuntime(opts: {
-  clickhouseUrl?: string;
-  redisUrl?: string;
-  tenantAware?: boolean;
-}): Promise<ReplayRuntime> {
-  if (opts.tenantAware) {
-    return loadReplayRuntimeForTenant({ redisUrl: resolveRedisUrl(opts) });
-  }
-  return loadReplayRuntime({
-    clickhouseUrl: resolveClickHouseUrl(opts),
-    redisUrl: resolveRedisUrl(opts),
-  });
+function initRuntime(opts: { redisUrl?: string; databaseUrl?: string }): ReplayRuntime {
+  resolveDatabaseUrl(opts);
+  return createReplayRuntime({ redisUrl: resolveRedisUrl(opts) });
 }
 
 async function fetchProject(tenantId: string): Promise<{ name: string; slug: string } | null> {
-  const { prisma } = await import("~/server/db");
   return prisma.project.findUnique({ where: { id: tenantId }, select: { name: true, slug: true } });
 }
 
@@ -649,7 +610,6 @@ async function main() {
     .option("--tenant-id <ids>", "Tenant ID(s), comma-separated (all tenants if omitted)")
     .option("--tenant-file <path>", "File with tenant IDs (one per line, unattended mode)")
     .option("--since <date>", "Discover aggregates with events from this date (YYYY-MM-DD)")
-    .option("--clickhouse-url <url>", "ClickHouse URL (or CLICKHOUSE_URL env)")
     .option("--redis-url <url>", "Redis URL (or REDIS_URL env)")
     .option("--database-url <url>", "Database URL (or DATABASE_URL env)")
     .option("--batch-size <number>", "Events per ClickHouse page", "5000")
@@ -662,7 +622,6 @@ async function main() {
       tenantId?: string;
       tenantFile?: string;
       since?: string;
-      clickhouseUrl?: string;
       redisUrl?: string;
       databaseUrl?: string;
       batchSize: string;
@@ -675,8 +634,6 @@ async function main() {
         console.error("--tenant-id and --tenant-file are mutually exclusive.");
         process.exit(1);
       }
-
-      resolveDatabaseUrl(opts);
 
       const cliTenantIds = opts.tenantFile
         ? readTenantFile(opts.tenantFile)
@@ -691,10 +648,8 @@ async function main() {
 
       const batchMode = !!opts.tenantFile;
       const needsWizard = !opts.projection || !opts.since;
-      const hasTenants = cliTenantIds && cliTenantIds.length > 0;
 
-      resolveDatabaseUrl(opts);
-      const runtime = await initRuntime({ ...opts, tenantAware: !!hasTenants });
+      const runtime = initRuntime(opts);
 
       let tenantIds: string[];
       let projections: RegisteredFoldProjection[];
@@ -837,17 +792,15 @@ async function main() {
   program
     .command("cleanup")
     .option("--projection <name>", "Projection name(s), comma-separated")
-    .option("--clickhouse-url <url>", "ClickHouse URL (or CLICKHOUSE_URL env)")
     .option("--redis-url <url>", "Redis URL (or REDIS_URL env)")
     .option("--database-url <url>", "Database URL (or DATABASE_URL env)")
-    .action(async (opts: { projection?: string; clickhouseUrl?: string; redisUrl?: string; databaseUrl?: string }) => {
-      const runtime = await initRuntime(opts);
+    .action(async (opts: { projection?: string; redisUrl?: string; databaseUrl?: string }) => {
+      const runtime = initRuntime(opts);
       let projectionNames: string[];
 
       if (opts.projection) {
         projectionNames = opts.projection.split(",").map((n) => n.trim());
       } else {
-        resolveDatabaseUrl(opts);
         const selected = await runProjectionPicker({
           tenantId: "unknown",
           projectInfo: null,
@@ -869,10 +822,10 @@ async function main() {
   program
     .command("list")
     .description("List all discovered fold projections")
-    .option("--clickhouse-url <url>", "ClickHouse URL (or CLICKHOUSE_URL env)")
     .option("--redis-url <url>", "Redis URL (or REDIS_URL env)")
-    .action(async (opts: { clickhouseUrl?: string; redisUrl?: string }) => {
-      const runtime = await initRuntime(opts);
+    .option("--database-url <url>", "Database URL (or DATABASE_URL env)")
+    .action(async (opts: { redisUrl?: string; databaseUrl?: string }) => {
+      const runtime = initRuntime(opts);
       const all = runtime.projections;
 
       if (all.length === 0) { console.log("No fold projections found."); await runtime.close(); return; }
