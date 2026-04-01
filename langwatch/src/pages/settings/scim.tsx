@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   Card,
+  createListCollection,
   Heading,
   HStack,
   Input,
@@ -11,11 +12,13 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Key, Link, Plus, Trash2, Unlink } from "lucide-react";
-import { useState } from "react";
+import { TeamUserRole } from "@prisma/client";
+import { Key, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { CopyInput } from "../../components/CopyInput";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
+import { Select } from "../../components/ui/select";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -322,73 +325,43 @@ function ScimSettingsContent({
   );
 }
 
+type MappingRow = {
+  id: string;
+  externalGroupId: string;
+  externalGroupName: string;
+  teamId: string | null;
+  teamName: string | null;
+  projectName: string | null;
+  role: TeamUserRole | null;
+  customRoleId: string | null;
+  customRoleName: string | null;
+  memberCount: number;
+  mapped: boolean;
+};
+
+const CREATE_NEW_TEAM_VALUE = "__create_new_team__";
+
 function GroupMappingsSection({
   organizationId,
 }: {
   organizationId: string;
 }) {
-  const teamMappings = api.scimToken.listTeamMappings.useQuery({
-    organizationId,
-  });
-  const linkMutation = api.scimToken.linkTeam.useMutation();
-  const unlinkMutation = api.scimToken.unlinkTeam.useMutation();
+  const mappings = api.scimGroupMapping.listAll.useQuery({ organizationId });
   const queryClient = api.useContext();
 
-  const [linkingTeamId, setLinkingTeamId] = useState<string | null>(null);
-  const [scimGroupId, setScimGroupId] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingMapping, setDeletingMapping] = useState<MappingRow | null>(
+    null,
+  );
 
-  const handleLink = (teamId: string) => {
-    if (!scimGroupId.trim()) return;
-
-    linkMutation.mutate(
-      { organizationId, teamId, externalScimId: scimGroupId.trim() },
-      {
-        onSuccess: () => {
-          setLinkingTeamId(null);
-          setScimGroupId("");
-          toaster.create({
-            title: "Team linked to SCIM group",
-            type: "success",
-            duration: 3000,
-            meta: { closable: true },
-          });
-          void queryClient.scimToken.listTeamMappings.invalidate();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Failed to link team",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
-      },
-    );
+  const handleSaved = () => {
+    setEditingId(null);
+    void queryClient.scimGroupMapping.listAll.invalidate();
   };
 
-  const handleUnlink = (teamId: string) => {
-    unlinkMutation.mutate(
-      { organizationId, teamId },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Team unlinked from SCIM group",
-            type: "success",
-            duration: 3000,
-            meta: { closable: true },
-          });
-          void queryClient.scimToken.listTeamMappings.invalidate();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Failed to unlink team",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
-      },
-    );
+  const handleDeleted = () => {
+    setDeletingMapping(null);
+    void queryClient.scimGroupMapping.listAll.invalidate();
   };
 
   return (
@@ -400,9 +373,8 @@ function GroupMappingsSection({
 
       <Text fontSize="sm" color="gray.500">
         SCIM groups from your identity provider are mapped to LangWatch teams.
-        When users are added to or removed from a group in Okta/Azure AD, their
-        team membership in LangWatch is updated automatically. Groups are linked
-        automatically by name when pushed, or you can link them manually below.
+        When users are added to or removed from a group in Entra/Okta, their
+        team membership in LangWatch is updated automatically.
       </Text>
 
       <Card.Root width="full" overflow="hidden">
@@ -410,116 +382,574 @@ function GroupMappingsSection({
           <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>
-                <Table.ColumnHeader>Team</Table.ColumnHeader>
-                <Table.ColumnHeader>SCIM Group ID</Table.ColumnHeader>
+                <Table.ColumnHeader>Entra Group Name</Table.ColumnHeader>
                 <Table.ColumnHeader>Status</Table.ColumnHeader>
-                <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+                <Table.ColumnHeader>Team</Table.ColumnHeader>
+                <Table.ColumnHeader>Project</Table.ColumnHeader>
+                <Table.ColumnHeader>Role</Table.ColumnHeader>
+                <Table.ColumnHeader>Members</Table.ColumnHeader>
+                <Table.ColumnHeader width="120px"></Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {teamMappings.data?.length === 0 && (
+              {mappings.data?.length === 0 && (
                 <Table.Row>
-                  <Table.Cell colSpan={4}>
+                  <Table.Cell colSpan={7}>
                     <Text color="gray.500" textAlign="center" paddingY={4}>
-                      No teams found. Create teams first, then map them to SCIM
-                      groups.
+                      No SCIM groups have been pushed yet. Groups will appear
+                      here once your identity provider pushes them via SCIM.
                     </Text>
                   </Table.Cell>
                 </Table.Row>
               )}
-              {teamMappings.data?.map((team) => (
-                <Table.Row key={team.id}>
-                  <Table.Cell>
-                    <Text fontWeight="500">{team.name}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {linkingTeamId === team.id ? (
-                      <HStack>
-                        <Input
-                          size="sm"
-                          placeholder="Enter SCIM Group ID"
-                          value={scimGroupId}
-                          onChange={(e) => setScimGroupId(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleLink(team.id);
-                            if (e.key === "Escape") {
-                              setLinkingTeamId(null);
-                              setScimGroupId("");
-                            }
-                          }}
-                          autoFocus
-                        />
-                        <Button
-                          size="xs"
-                          onClick={() => handleLink(team.id)}
-                          disabled={!scimGroupId.trim()}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => {
-                            setLinkingTeamId(null);
-                            setScimGroupId("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </HStack>
-                    ) : (
-                      <Text
-                        fontSize="sm"
-                        color={team.externalScimId ? "inherit" : "gray.400"}
-                        fontFamily={team.externalScimId ? "mono" : undefined}
-                      >
-                        {team.externalScimId ?? "Not linked"}
-                      </Text>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {team.externalScimId ? (
-                      <Badge colorPalette="green" size="sm">
-                        Linked
-                      </Badge>
-                    ) : (
-                      <Badge colorPalette="gray" size="sm">
-                        Unlinked
-                      </Badge>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {team.externalScimId ? (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        onClick={() => handleUnlink(team.id)}
-                        disabled={unlinkMutation.isLoading}
-                      >
-                        <Unlink size={14} />
-                        Unlink
-                      </Button>
-                    ) : (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        onClick={() => {
-                          setLinkingTeamId(team.id);
-                          setScimGroupId("");
-                        }}
-                      >
-                        <Link size={14} />
-                        Link
-                      </Button>
-                    )}
-                  </Table.Cell>
-                </Table.Row>
+              {mappings.data?.map((mapping) => (
+                <MappingTableRow
+                  key={mapping.id}
+                  mapping={mapping}
+                  organizationId={organizationId}
+                  isEditing={editingId === mapping.id}
+                  onEdit={() => setEditingId(mapping.id)}
+                  onCancelEdit={() => setEditingId(null)}
+                  onSaved={handleSaved}
+                  onDelete={() => setDeletingMapping(mapping)}
+                />
               ))}
             </Table.Body>
           </Table.Root>
         </Card.Body>
       </Card.Root>
+
+      <DeleteMappingDialog
+        mapping={deletingMapping}
+        organizationId={organizationId}
+        onClose={() => setDeletingMapping(null)}
+        onDeleted={handleDeleted}
+      />
     </>
+  );
+}
+
+function MappingTableRow({
+  mapping,
+  organizationId,
+  isEditing,
+  onEdit,
+  onCancelEdit,
+  onSaved,
+  onDelete,
+}: {
+  mapping: MappingRow;
+  organizationId: string;
+  isEditing: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSaved: () => void;
+  onDelete: () => void;
+}) {
+  if (isEditing) {
+    return (
+      <Table.Row>
+        <Table.Cell colSpan={7}>
+          <MappingInlineForm
+            mapping={mapping}
+            organizationId={organizationId}
+            onSaved={onSaved}
+            onCancel={onCancelEdit}
+          />
+        </Table.Cell>
+      </Table.Row>
+    );
+  }
+
+  const roleName = mapping.role === TeamUserRole.CUSTOM
+    ? mapping.customRoleName ?? "Custom"
+    : mapping.role ?? "-";
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <Text fontWeight="500">{mapping.externalGroupName}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        {mapping.mapped ? (
+          <Badge colorPalette="green" size="sm">Mapped</Badge>
+        ) : (
+          <Badge colorPalette="yellow" size="sm">Unmapped</Badge>
+        )}
+      </Table.Cell>
+      <Table.Cell>{mapping.teamName ?? "-"}</Table.Cell>
+      <Table.Cell>{mapping.projectName ?? "-"}</Table.Cell>
+      <Table.Cell>{roleName}</Table.Cell>
+      <Table.Cell>{mapping.memberCount}</Table.Cell>
+      <Table.Cell>
+        <HStack gap={1}>
+          <Button size="xs" variant="ghost" onClick={onEdit} aria-label="Edit mapping">
+            <Pencil size={14} />
+          </Button>
+          <Button
+            size="xs"
+            variant="ghost"
+            colorPalette="red"
+            onClick={onDelete}
+            aria-label="Delete mapping"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </HStack>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+function MappingInlineForm({
+  mapping,
+  organizationId,
+  onSaved,
+  onCancel,
+}: {
+  mapping: MappingRow;
+  organizationId: string;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
+  const customRoles = api.role.getAll.useQuery({ organizationId });
+  const createMutation = api.scimGroupMapping.create.useMutation();
+  const createWithNewTeamMutation =
+    api.scimGroupMapping.createWithNewTeam.useMutation();
+  const updateMutation = api.scimGroupMapping.update.useMutation();
+
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(
+    mapping.teamId,
+  );
+  const [isCreatingNewTeam, setIsCreatingNewTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
+  const [selectedRole, setSelectedRole] = useState<string>(
+    mapping.role === TeamUserRole.CUSTOM && mapping.customRoleId
+      ? `custom:${mapping.customRoleId}`
+      : (mapping.role ?? "MEMBER"),
+  );
+
+  const teamsByProject = useMemo(() => {
+    if (!teams.data) return [];
+    const projectMap = new Map<
+      string,
+      { projectId: string; projectName: string; teams: { id: string; name: string }[] }
+    >();
+
+    for (const team of teams.data) {
+      for (const project of team.projects) {
+        const existing = projectMap.get(project.id);
+        if (existing) {
+          existing.teams.push({ id: team.id, name: team.name });
+        } else {
+          projectMap.set(project.id, {
+            projectId: project.id,
+            projectName: project.name,
+            teams: [{ id: team.id, name: team.name }],
+          });
+        }
+      }
+      // Teams without projects
+      if (team.projects.length === 0) {
+        const existing = projectMap.get("__no_project__");
+        if (existing) {
+          existing.teams.push({ id: team.id, name: team.name });
+        } else {
+          projectMap.set("__no_project__", {
+            projectId: "__no_project__",
+            projectName: "No Project",
+            teams: [{ id: team.id, name: team.name }],
+          });
+        }
+      }
+    }
+
+    return Array.from(projectMap.values());
+  }, [teams.data]);
+
+  const teamItems = useMemo(() => {
+    const items: { label: string; value: string }[] = [];
+    for (const group of teamsByProject) {
+      for (const team of group.teams) {
+        items.push({
+          label: `${team.name} (${group.projectName})`,
+          value: team.id,
+        });
+      }
+    }
+    items.push({ label: "Create new team...", value: CREATE_NEW_TEAM_VALUE });
+    return items;
+  }, [teamsByProject]);
+
+  const teamCollection = useMemo(
+    () => createListCollection({ items: teamItems }),
+    [teamItems],
+  );
+
+  const projectItems = useMemo(() => {
+    return teamsByProject
+      .filter((g) => g.projectId !== "__no_project__")
+      .map((g) => ({ label: g.projectName, value: g.projectId }));
+  }, [teamsByProject]);
+
+  const projectCollection = useMemo(
+    () => createListCollection({ items: projectItems }),
+    [projectItems],
+  );
+
+  const roleItems = useMemo(() => {
+    const items = [
+      { label: "Admin", value: "ADMIN" },
+      { label: "Member", value: "MEMBER" },
+      { label: "Viewer", value: "VIEWER" },
+      ...(customRoles.data ?? []).map((role) => ({
+        label: role.name,
+        value: `custom:${role.id}`,
+      })),
+    ];
+    return items;
+  }, [customRoles.data]);
+
+  const roleCollection = useMemo(
+    () => createListCollection({ items: roleItems }),
+    [roleItems],
+  );
+
+  const isSaving =
+    createMutation.isLoading ||
+    createWithNewTeamMutation.isLoading ||
+    updateMutation.isLoading;
+
+  const handleSave = () => {
+    const roleEnum = selectedRole.startsWith("custom:")
+      ? TeamUserRole.CUSTOM
+      : (selectedRole as TeamUserRole);
+    const customRoleId = selectedRole.startsWith("custom:")
+      ? selectedRole.replace("custom:", "")
+      : undefined;
+
+    if (isCreatingNewTeam) {
+      if (!selectedProjectId || !newTeamName.trim()) return;
+      createWithNewTeamMutation.mutate(
+        {
+          organizationId,
+          mappingId: mapping.id,
+          projectId: selectedProjectId,
+          teamName: newTeamName.trim(),
+          role: roleEnum,
+          customRoleId,
+        },
+        {
+          onSuccess: () => {
+            toaster.create({
+              title: "Mapping saved",
+              type: "success",
+              duration: 3000,
+              meta: { closable: true },
+            });
+            onSaved();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Failed to save mapping",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+          },
+        },
+      );
+    } else if (mapping.mapped) {
+      // Update existing mapping
+      updateMutation.mutate(
+        {
+          organizationId,
+          mappingId: mapping.id,
+          role: roleEnum,
+          customRoleId,
+        },
+        {
+          onSuccess: () => {
+            toaster.create({
+              title: "Mapping updated",
+              type: "success",
+              duration: 3000,
+              meta: { closable: true },
+            });
+            onSaved();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Failed to update mapping",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+          },
+        },
+      );
+    } else {
+      // Create new mapping with existing team
+      if (!selectedTeamId) return;
+      createMutation.mutate(
+        {
+          organizationId,
+          mappingId: mapping.id,
+          teamId: selectedTeamId,
+          role: roleEnum,
+          customRoleId,
+        },
+        {
+          onSuccess: () => {
+            toaster.create({
+              title: "Mapping saved",
+              type: "success",
+              duration: 3000,
+              meta: { closable: true },
+            });
+            onSaved();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Failed to save mapping",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+          },
+        },
+      );
+    }
+  };
+
+  return (
+    <VStack gap={3} align="start" paddingY={2}>
+      <Text fontWeight="600">{mapping.externalGroupName}</Text>
+
+      {!isCreatingNewTeam && (
+        <HStack gap={3} align="end" width="full">
+          <VStack align="start" gap={1}>
+            <Text fontSize="sm" fontWeight="500">Team</Text>
+            <Select.Root
+              collection={teamCollection}
+              value={selectedTeamId ? [selectedTeamId] : []}
+              onValueChange={(details) => {
+                const val = details.value[0];
+                if (val === CREATE_NEW_TEAM_VALUE) {
+                  setIsCreatingNewTeam(true);
+                  setSelectedTeamId(null);
+                } else if (val) {
+                  setSelectedTeamId(val);
+                }
+              }}
+              disabled={mapping.mapped}
+            >
+              <Select.Trigger width="250px" background="bg">
+                <Select.ValueText placeholder="Select team" />
+              </Select.Trigger>
+              <Select.Content width="300px" paddingY={2}>
+                {teamItems.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </VStack>
+
+          <VStack align="start" gap={1}>
+            <Text fontSize="sm" fontWeight="500">Role</Text>
+            <Select.Root
+              collection={roleCollection}
+              value={[selectedRole]}
+              onValueChange={(details) => {
+                const val = details.value[0];
+                if (val) setSelectedRole(val);
+              }}
+            >
+              <Select.Trigger width="180px" background="bg">
+                <Select.ValueText placeholder="Select role" />
+              </Select.Trigger>
+              <Select.Content width="250px" paddingY={2}>
+                {roleItems.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </VStack>
+        </HStack>
+      )}
+
+      {isCreatingNewTeam && (
+        <HStack gap={3} align="end" width="full" flexWrap="wrap">
+          <VStack align="start" gap={1}>
+            <Text fontSize="sm" fontWeight="500">Project</Text>
+            <Select.Root
+              collection={projectCollection}
+              value={selectedProjectId ? [selectedProjectId] : []}
+              onValueChange={(details) => {
+                const val = details.value[0];
+                if (val) setSelectedProjectId(val);
+              }}
+            >
+              <Select.Trigger width="200px" background="bg">
+                <Select.ValueText placeholder="Select project" />
+              </Select.Trigger>
+              <Select.Content width="250px" paddingY={2}>
+                {projectItems.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </VStack>
+
+          <VStack align="start" gap={1}>
+            <Text fontSize="sm" fontWeight="500">Team name</Text>
+            <Input
+              size="sm"
+              width="200px"
+              placeholder="Enter team name"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+            />
+          </VStack>
+
+          <VStack align="start" gap={1}>
+            <Text fontSize="sm" fontWeight="500">Role</Text>
+            <Select.Root
+              collection={roleCollection}
+              value={[selectedRole]}
+              onValueChange={(details) => {
+                const val = details.value[0];
+                if (val) setSelectedRole(val);
+              }}
+            >
+              <Select.Trigger width="180px" background="bg">
+                <Select.ValueText placeholder="Select role" />
+              </Select.Trigger>
+              <Select.Content width="250px" paddingY={2}>
+                {roleItems.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </VStack>
+        </HStack>
+      )}
+
+      <HStack gap={2}>
+        <Button size="sm" onClick={handleSave} disabled={isSaving}>
+          Save
+        </Button>
+        <Button size="sm" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        {isCreatingNewTeam && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setIsCreatingNewTeam(false);
+              setNewTeamName("");
+              setSelectedProjectId(null);
+            }}
+          >
+            Back to team list
+          </Button>
+        )}
+      </HStack>
+    </VStack>
+  );
+}
+
+function DeleteMappingDialog({
+  mapping,
+  organizationId,
+  onClose,
+  onDeleted,
+}: {
+  mapping: MappingRow | null;
+  organizationId: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const deleteMutation = api.scimGroupMapping.delete.useMutation();
+
+  const handleDelete = () => {
+    if (!mapping) return;
+    deleteMutation.mutate(
+      { organizationId, mappingId: mapping.id },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: "Mapping deleted",
+            type: "success",
+            duration: 3000,
+            meta: { closable: true },
+          });
+          onDeleted();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to delete mapping",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog.Root
+      open={!!mapping}
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
+    >
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>
+            <Heading size="md">Delete Mapping</Heading>
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body paddingBottom={6}>
+          <VStack gap={4} align="start">
+            <Text>
+              Are you sure you want to delete the mapping for group{" "}
+              <Text as="span" fontWeight="600">
+                {mapping?.externalGroupName}
+              </Text>
+              ? Members who were only in the team via this mapping will be
+              removed.
+            </Text>
+            <HStack width="full" justify="end" gap={2}>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="red"
+                onClick={handleDelete}
+                disabled={deleteMutation.isLoading}
+              >
+                Delete
+              </Button>
+            </HStack>
+          </VStack>
+        </Dialog.Body>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
