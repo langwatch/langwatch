@@ -547,6 +547,7 @@ describe("findPromptReferenceInAncestors()", () => {
       // LLM span often start at the exact same millisecond in practice.
       expect(result).toEqual({
         promptHandle: "team/same-time-prompt",
+        promptLabel: null,
         promptVersionNumber: 1,
         promptVariables: null,
       });
@@ -589,6 +590,7 @@ describe("findPromptReferenceInAncestors()", () => {
 
       expect(result).toEqual({
         promptHandle: "tea-prompt",
+        promptLabel: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
@@ -643,6 +645,7 @@ describe("findPromptReferenceInAncestors()", () => {
       // qualifies. The closest preceding (highest startTime) wins: Prompt.compile.
       expect(result).toEqual({
         promptHandle: "tea-prompt",
+        promptLabel: null,
         promptVersionNumber: 4,
         promptVariables: null,
       });
