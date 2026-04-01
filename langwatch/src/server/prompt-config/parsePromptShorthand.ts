@@ -1,3 +1,5 @@
+import { ShorthandParseError } from "./errors/shorthand-parse-error";
+
 /**
  * Result of parsing a prompt shorthand string like "slug:tag" or "slug:version".
  */
@@ -27,7 +29,7 @@ export interface PromptShorthand {
  *
  * @param input - The shorthand string to parse
  * @returns Parsed shorthand with slug, optional tag, and optional version
- * @throws Error if the slug portion is empty
+ * @throws ShorthandParseError if the slug or suffix portion is empty
  */
 export function parsePromptShorthand(input: string): PromptShorthand {
   const colonIndex = input.lastIndexOf(":");
@@ -40,13 +42,13 @@ export function parsePromptShorthand(input: string): PromptShorthand {
   const suffix = input.substring(colonIndex + 1);
 
   if (slug.length === 0) {
-    throw new Error(
+    throw new ShorthandParseError(
       `Invalid format: slug must not be empty. Received "${input}"`,
     );
   }
 
   if (suffix.length === 0) {
-    throw new Error(
+    throw new ShorthandParseError(
       `Invalid format: suffix after colon must not be empty. Received "${input}"`,
     );
   }
