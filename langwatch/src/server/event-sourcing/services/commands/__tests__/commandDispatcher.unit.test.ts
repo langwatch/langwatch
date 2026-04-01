@@ -84,6 +84,7 @@ describe("processCommand", () => {
       storeEventsFn: vi.fn().mockResolvedValue(undefined),
       aggregateType,
       commandName,
+      pipelineName: "test-pipeline",
       ...overrides,
     };
   }

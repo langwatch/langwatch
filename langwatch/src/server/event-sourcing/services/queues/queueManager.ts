@@ -436,6 +436,7 @@ export class QueueManager<EventType extends Event = Event> {
             storeEventsFn: storeEvents,
             aggregateType: this.aggregateType,
             commandName: cmdEntry.commandName,
+            pipelineName: this.pipelineName,
             featureFlagService: this.featureFlagService,
             killSwitchOptions: cmdEntry.killSwitchOptions,
             logger,

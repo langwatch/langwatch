@@ -1,4 +1,5 @@
-import { context as otelContext, ROOT_CONTEXT, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
+import { performance } from "node:perf_hooks";
+import { context as otelContext, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
 import fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -29,6 +30,11 @@ import {
   gqJobsRetriedTotal,
   gqJobsNonRetryableTotal,
   gqJobsStagedTotal,
+  gqJobsDelayedTotal,
+  gqJobDelayMilliseconds,
+  gqRetryAttempt,
+  gqRetryBackoffMilliseconds,
+  gqJobDurationMilliseconds,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import { type DispatchResult, GroupStagingScripts } from "./scripts";
@@ -266,6 +272,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
+      if (delay && delay > 0) {
+        gqJobsDelayedTotal.inc({ queue_name: this.queueName });
+        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, delay);
+      }
     } else {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName });
     }
@@ -342,6 +352,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName }, newStagedCount);
+      const effectiveDelay = options?.delay ?? this.delay;
+      if (effectiveDelay && effectiveDelay > 0) {
+        gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
+        for (let i = 0; i < newStagedCount; i++) {
+          gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
+        }
+      }
     }
     if (dedupedCount > 0) {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
@@ -381,9 +398,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
     const attempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
-    const jobType = jobData.__jobType as string | undefined;
+    const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
+    const jobType = (jobData.__jobType as string) ?? "unknown";
+    const jobName = (jobData.__jobName as string) ?? "unknown";
+    const routingLabels = { queue_name: this.queueName, pipeline_name: pipelineName, job_type: jobType, job_name: jobName };
     const payload = this.stripInternalFields(jobData);
 
+    const jobStartTime = performance.now();
     const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
     this.activeJobCount++;
 
@@ -451,7 +472,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Success — complete the group slot
               await this.scripts.complete({ groupId, stagedJobId });
-              gqJobsCompletedTotal.inc({ queue_name: this.queueName });
+              gqJobsCompletedTotal.inc(routingLabels);
 
               this.logger.debug(
                 {
@@ -469,9 +490,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
                 // Re-stage with backoff — frees the worker slot immediately
-                gqJobsRetriedTotal.inc({ queue_name: this.queueName });
+                gqJobsRetriedTotal.inc(routingLabels);
 
                 const backoffMs = getBackoffMs(attempt);
+                gqRetryAttempt.observe(routingLabels, attempt);
+                gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
                 const retryJobData = JSON.stringify({
                   ...(payload as Record<string, unknown>),
@@ -505,7 +528,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 span.setAttribute("error.message", error.message);
 
                 if (!isRetryable) {
-                  gqJobsNonRetryableTotal.inc({ queue_name: this.queueName });
+                  gqJobsNonRetryableTotal.inc(routingLabels);
                   this.logger.error(
                     {
                       queueName: this.queueName,
@@ -526,6 +549,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   originalScore,
                   lastError: error,
                   contextMetadata,
+                  routingLabels,
                 });
               }
             }
@@ -533,12 +557,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         );
       };
 
-      // Trace boundary: commands and reactors start a NEW trace (linked to parent),
-      // while projections (fold/map) continue the parent trace for causal grouping.
-      const startsNewTrace = jobType === "command" || jobType === "reactor";
-
-      if (contextMetadata?.traceId && contextMetadata?.parentSpanId && !startsNewTrace) {
-        // Non-command/non-reactor jobs (projections, handlers): restore parent context so spans stay in the same trace
+      // Restore parent OTEL context if available
+      if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
         const parentContext = trace.setSpanContext(otelContext.active(), {
           traceId: contextMetadata.traceId,
           spanId: contextMetadata.parentSpanId,
@@ -547,13 +567,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         await otelContext.with(parentContext, executeWithSpan);
       } else {
-        // Commands & reactors: run with a fresh ROOT context → new traceId.
-        // The link to the parent trace is already added via span.addLink() above.
-        await otelContext.with(ROOT_CONTEXT, executeWithSpan);
+        await executeWithSpan();
       }
     } finally {
       clearInterval(heartbeat);
       this.activeJobCount--;
+      const jobDurationMs = performance.now() - jobStartTime;
+      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
     }
   }
 
@@ -613,6 +633,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore,
     lastError,
     contextMetadata,
+    routingLabels,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -620,6 +641,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore: number;
     lastError: Error | undefined;
     contextMetadata: JobContextMetadata | undefined;
+    routingLabels: Record<string, string>;
   }): Promise<void> {
     const score =
       typeof originalScore === "number"
@@ -643,8 +665,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       errorStack: lastError?.stack,
     });
 
-    gqGroupsBlockedTotal.inc({ queue_name: this.queueName });
-    gqJobsExhaustedTotal.inc({ queue_name: this.queueName });
+    gqGroupsBlockedTotal.inc(routingLabels);
+    gqJobsExhaustedTotal.inc(routingLabels);
 
     this.logger.error(
       {

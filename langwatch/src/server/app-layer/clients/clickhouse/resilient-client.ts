@@ -1,5 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
+import {
+  observeClickHouseQueryDuration,
+  incrementClickHouseQueryCount,
+} from "~/server/clickhouse/metrics";
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
@@ -153,6 +157,21 @@ function extractReadBytes(result: unknown): number | undefined {
   }
 }
 
+function extractQueryType(params: unknown): "SELECT" | "INSERT" | "OTHER" {
+  if (!params || typeof params !== "object") return "OTHER";
+  const p = params as Record<string, unknown>;
+  if (typeof p.query !== "string") return "OTHER";
+  const trimmed = p.query.trimStart().toUpperCase();
+  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH")) return "SELECT";
+  if (trimmed.startsWith("INSERT")) return "INSERT";
+  return "OTHER";
+}
+
+function extractTableName(params: unknown): string {
+  const meta = safeQueryMeta(params);
+  return meta.table ?? "unknown";
+}
+
 function extractQueryPreview(params: unknown): string | undefined {
   if (!params || typeof params !== "object") return undefined;
   const p = params as Record<string, unknown>;
@@ -272,6 +291,8 @@ export function createResilientClickHouseClient({
 
   wrapper.query = async (params) => {
     const cleanedParams = stripLangwatchSettings(params as Record<string, unknown>);
+    const queryType = extractQueryType(params);
+    const table = extractTableName(params);
     const start = performance.now();
     try {
       const result = await client.query(cleanedParams as Parameters<typeof client.query>[0]);
@@ -279,15 +300,20 @@ export function createResilientClickHouseClient({
       const readBytes = extractReadBytes(result);
       // params (not cleanedParams) so extractExpectations can read langwatch_* keys
       logSuccess({ operation: "query", durationMs, params, readBytes });
+      observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
+      incrementClickHouseQueryCount(queryType, "success");
       return result;
     } catch (error) {
       const durationMs = performance.now() - start;
       logFailure({ operation: "query", error, durationMs, params });
+      observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
+      incrementClickHouseQueryCount(queryType, "error");
       throw error;
     }
   };
 
   wrapper.insert = async (params) => {
+    const insertTable = (params as unknown as Record<string, unknown>).table as string ?? "unknown";
     const start = performance.now();
     let lastError: unknown;
 
@@ -296,6 +322,8 @@ export function createResilientClickHouseClient({
         const result = await client.insert(params);
         const durationMs = performance.now() - start;
         logSuccess({ operation: "insert", durationMs, params });
+        observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
+        incrementClickHouseQueryCount("INSERT", "success");
         return result;
       } catch (error) {
         lastError = error;
@@ -303,6 +331,8 @@ export function createResilientClickHouseClient({
         if (!isTransientError(error) || attempt === maxRetries) {
           const durationMs = performance.now() - start;
           logFailure({ operation: "insert", error, durationMs, params });
+          observeClickHouseQueryDuration("INSERT", insertTable, durationMs / 1000);
+          incrementClickHouseQueryCount("INSERT", "error");
           throw error;
         }
 
