@@ -23,7 +23,7 @@ import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-proce
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
+import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
@@ -35,7 +35,7 @@ import {
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
-import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
+import { SuiteRunStateFoldProjection, type SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
@@ -52,16 +52,18 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { EvaluationRunFoldProjection } from "./pipelines/evaluation-processing/projections/evaluationRun.foldProjection";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
-import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
+import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import { TraceSummaryFoldProjection } from "./pipelines/trace-processing/projections/traceSummary.foldProjection";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
@@ -76,6 +78,8 @@ import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { AppendStore } from "./projections/mapProjection.types";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
+import type { RegisteredFoldProjection } from "./replay/types";
+import type { EvaluationRunRepository } from "../app-layer/evaluations/repositories/evaluation-run.repository";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -509,6 +513,122 @@ export class PipelineRegistry {
       }),
     );
   }
+}
+
+/**
+ * Repositories needed exclusively for fold projection construction.
+ * Used by `buildFoldProjections()` for replay — no Redis, no queues.
+ */
+export interface FoldProjectionRepositories {
+  traceSummaryFold: TraceSummaryRepository;
+  evaluationRun: EvaluationRunRepository;
+  experimentRunState: ExperimentRunStateRepository;
+  simulationRunState: SimulationRunStateRepository;
+  suiteRunState: SuiteRunStateRepository;
+}
+
+/**
+ * Constructs fold projections with raw CH stores (no Redis cache).
+ *
+ * This is the **single source of truth** for which fold projections exist.
+ * When adding a new fold projection to registerAll(), add it here too.
+ */
+export function buildFoldProjections(
+  repos: FoldProjectionRepositories,
+): RegisteredFoldProjection[] {
+  const results: RegisteredFoldProjection[] = [];
+
+  // traceSummary
+  const traceSummaryDef = new TraceSummaryFoldProjection({
+    store: new TraceSummaryStore(repos.traceSummaryFold),
+  });
+  results.push({
+    projectionName: traceSummaryDef.name,
+    pipelineName: "trace_processing",
+    aggregateType: "trace",
+    source: "pipeline",
+    definition: traceSummaryDef,
+    pauseKey: `trace_processing/projection/${traceSummaryDef.name}`,
+    targetTable: "trace_summaries",
+  });
+
+  // evaluationRun
+  const evalRunDef = new EvaluationRunFoldProjection({
+    store: new EvaluationRunStore(repos.evaluationRun),
+  });
+  results.push({
+    projectionName: evalRunDef.name,
+    pipelineName: "evaluation_processing",
+    aggregateType: "evaluation",
+    source: "pipeline",
+    definition: evalRunDef,
+    pauseKey: `evaluation_processing/projection/${evalRunDef.name}`,
+    targetTable: "evaluation_runs",
+  });
+
+  // experimentRunState
+  const expRunDef = new ExperimentRunStateFoldProjection({
+    store: createExperimentRunStateFoldStore(repos.experimentRunState),
+  });
+  results.push({
+    projectionName: expRunDef.name,
+    pipelineName: "experiment_run_processing",
+    aggregateType: "experiment_run",
+    source: "pipeline",
+    definition: expRunDef,
+    pauseKey: `experiment_run_processing/projection/${expRunDef.name}`,
+    targetTable: "experiment_runs",
+  });
+
+  // simulationRunState
+  const simRunDef = new SimulationRunStateFoldProjection({
+    store: new RepositoryFoldStore(repos.simulationRunState, SIMULATION_PROJECTION_VERSIONS.RUN_STATE),
+  });
+  results.push({
+    projectionName: simRunDef.name,
+    pipelineName: "simulation_processing",
+    aggregateType: "simulation_run",
+    source: "pipeline",
+    definition: simRunDef,
+    pauseKey: `simulation_processing/projection/${simRunDef.name}`,
+    targetTable: "simulation_runs",
+  });
+
+  // suiteRunState
+  const suiteRunDef = new SuiteRunStateFoldProjection({
+    store: new RepositoryFoldStore(repos.suiteRunState, SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE),
+  });
+  results.push({
+    projectionName: suiteRunDef.name,
+    pipelineName: "suite_run_processing",
+    aggregateType: "suite_run",
+    source: "pipeline",
+    definition: suiteRunDef,
+    pauseKey: `suite_run_processing/projection/${suiteRunDef.name}`,
+    targetTable: "suite_runs",
+  });
+
+  // projectDailySdkUsage (global — store baked in)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { projectDailySdkUsageProjection } = require("./projections/global/projectDailySdkUsage.foldProjection") as {
+      projectDailySdkUsageProjection: { name: string } & Record<string, unknown>;
+    };
+    if (projectDailySdkUsageProjection?.name) {
+      results.push({
+        projectionName: projectDailySdkUsageProjection.name,
+        pipelineName: "global_projections",
+        aggregateType: "global",
+        source: "global",
+        definition: projectDailySdkUsageProjection as any,
+        pauseKey: `global_projections/projection/${projectDailySdkUsageProjection.name}`,
+      });
+    }
+  } catch {
+    // Skip if unavailable
+  }
+
+  return results;
 }
 
 export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;

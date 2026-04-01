@@ -26,9 +26,26 @@ export class TraceSummaryStore
   async storeBatch(
     entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
   ): Promise<void> {
-    await Promise.all(
-      entries.map(({ state, context }) => this.store(state, context)),
-    );
+    const batchEntries = entries
+      .filter(({ state }) => state.spanCount > 0)
+      .map(({ state, context }) => ({
+        data: state.traceId
+          ? state
+          : { ...state, traceId: String(context.aggregateId) },
+        tenantId: String(context.tenantId),
+      }));
+
+    if (batchEntries.length === 0) return;
+
+    if (this.repo.upsertBatch) {
+      await this.repo.upsertBatch(batchEntries);
+    } else {
+      await Promise.all(
+        batchEntries.map(({ data, tenantId }) =>
+          this.repo.upsert(data, tenantId),
+        ),
+      );
+    }
   }
 
   async get(

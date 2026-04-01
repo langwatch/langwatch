@@ -1,4 +1,4 @@
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 
 /** ClickHouse event_log row shape. */
 export interface ClickHouseEventRow {
@@ -60,10 +60,6 @@ function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
       ? { processingTraceparent: row.ProcessingTraceparent }
       : undefined,
   };
-}
-
-export function createClickHouseClient(url: string): ClickHouseClient {
-  return createClient({ url });
 }
 
 /**
@@ -152,12 +148,6 @@ export interface CutoffInfo {
 
 /**
  * Get cutoff event info for a batch of aggregates in one query.
- *
- * Returns the last event per aggregate using the same ordering as the event store:
- * `EventTimestamp DESC, EventId DESC` — consistent with the marker check's
- * `(timestamp, eventId)` comparison.
- *
- * The marker format stored in Redis is `{timestamp}:{eventId}`.
  */
 export async function batchGetCutoffEventIds({
   client,

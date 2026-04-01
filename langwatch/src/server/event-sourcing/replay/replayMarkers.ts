@@ -1,15 +1,12 @@
 import type IORedis from "ioredis";
-
-/** Safety TTL for replay markers — prevents orphaned markers from permanently
- *  blocking live processing if a replay is abandoned without cleanup. */
-const MARKER_TTL_SECONDS = 7 * 24 * 3600; // 7 days
+import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX, MARKER_TTL_SECONDS } from "./replayConstants";
 
 function cutoffKey(projectionName: string): string {
-  return `projection-replay:cutoff:${projectionName}`;
+  return `${CUTOFF_KEY_PREFIX}${projectionName}`;
 }
 
 function completedKey(projectionName: string): string {
-  return `projection-replay:completed:${projectionName}`;
+  return `${COMPLETED_KEY_PREFIX}${projectionName}`;
 }
 
 export function aggregateKey({

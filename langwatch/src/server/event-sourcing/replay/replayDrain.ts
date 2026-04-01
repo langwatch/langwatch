@@ -1,5 +1,5 @@
 import type IORedis from "ioredis";
-import type { DiscoveredAggregate } from "./clickhouse";
+import type { DiscoveredAggregate } from "./replayEventLoader";
 
 /**
  * The GroupQueue's global key prefix. All event-sourcing jobs share one queue
@@ -9,17 +9,6 @@ const GQ_KEY_PREFIX = "{event-sourcing/jobs}:gq:";
 
 /**
  * Pause a specific fold projection in the GroupQueue.
- *
- * The Lua dispatch script checks `{keyPrefix}paused-jobs` for hierarchical
- * matches: `{pipelineName}`, `{pipelineName}/{jobType}`, or
- * `{pipelineName}/{jobType}/{jobName}`.
- *
- * For fold projections, QueueManager injects:
- * - `__pipelineName` = pipeline name
- * - `__jobType` = "projection"
- * - `__jobName` = projection name
- *
- * So the pause key is: `{pipelineName}/projection/{projectionName}`
  */
 export async function pauseProjection({
   redis,
@@ -58,11 +47,6 @@ export async function unpauseProjection({
 
 /**
  * Wait until all active (in-flight) jobs for the given aggregates have completed.
- *
- * After pausing, no NEW jobs will be dispatched for this projection.
- * We only need to wait for jobs that are already being processed (active).
- *
- * Group ID format: `${tenantId}/fold/${projectionName}/${aggregateType}:${aggregateId}`
  */
 export async function waitForActiveJobs({
   redis,

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import type { DiscoveredFoldProjection } from "../discovery";
+import type { RegisteredFoldProjection as DiscoveredFoldProjection } from "../../../../src/server/event-sourcing/replay";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -62,26 +62,26 @@ function TenantIdInput({
   const parsed = parseTenantIds(value);
 
   const handleSubmit = () => {
-    if (parsed.length > 0) {
-      onComplete(parsed);
-    }
+    onComplete(parsed); // empty = all tenants
   };
 
   return (
     <Box flexDirection="column">
       <Box>
         <Text bold>Tenant ID(s) </Text>
-        <Text dimColor>(comma or newline separated): </Text>
+        <Text dimColor>(comma separated, blank for all): </Text>
         <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
       </Box>
-      {parsed.length > 0 && (
+      {parsed.length > 0 ? (
         <Box flexDirection="column" marginTop={1}>
           <Text dimColor>{parsed.length} tenant(s) parsed:</Text>
           {parsed.map((id) => (
             <Text key={id} dimColor>  {id}</Text>
           ))}
         </Box>
-      )}
+      ) : value.trim().length === 0 ? (
+        <Text dimColor color="yellow">  press enter to discover across all tenants</Text>
+      ) : null}
     </Box>
   );
 }
