@@ -98,10 +98,19 @@ const makeSubscriptionWithOrg = (overrides: Record<string, unknown> = {}): Subsc
   } as unknown as SubscriptionWithOrg;
 };
 
+const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
+  subscriptions: {
+    retrieve: vi.fn().mockResolvedValue({ id: "sub_stripe_1", status: "active" }),
+    cancel: vi.fn().mockResolvedValue({}),
+  },
+  ...overrides,
+});
+
 describe("webhookService", () => {
   let subRepo: ReturnType<typeof createMockSubscriptionRepository>;
   let orgRepo: ReturnType<typeof createMockOrganizationRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
+  let mockStripeInstance: ReturnType<typeof createMockStripe>;
   let service: EEWebhookService;
 
   beforeEach(() => {
@@ -110,10 +119,11 @@ describe("webhookService", () => {
     subRepo = createMockSubscriptionRepository();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
+    mockStripeInstance = createMockStripe();
     service = new EEWebhookService({
       subscriptionRepository: subRepo as unknown as SubscriptionRepository,
       organizationRepository: orgRepo as unknown as OrganizationRepository,
-      stripe: {} as any,
+      stripe: mockStripeInstance as any,
       itemCalculator,
     });
   });
@@ -225,7 +235,7 @@ describe("webhookService", () => {
         service = new EEWebhookService({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
           organizationRepository: orgRepo as unknown as OrganizationRepository,
-          stripe: {} as any,
+          stripe: mockStripeInstance as any,
           itemCalculator,
           inviteApprover: mockInviteApprover,
         });
@@ -348,15 +358,11 @@ describe("webhookService", () => {
 
     describe("when subscription is a growth seat-event plan", () => {
       it("migrates tiered subscriptions and cancels old Stripe subs", async () => {
-        const mockStripe = {
-          subscriptions: {
-            cancel: vi.fn().mockResolvedValue({}),
-          },
-        };
+        const localStripe = createMockStripe();
         service = new EEWebhookService({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
           organizationRepository: orgRepo as unknown as OrganizationRepository,
-          stripe: mockStripe as any,
+          stripe: localStripe as any,
           itemCalculator,
         });
 
@@ -382,20 +388,17 @@ describe("webhookService", () => {
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_1", { prorate: true });
-        expect(mockStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_2", { prorate: true });
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_1", { prorate: true });
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_2", { prorate: true });
       });
 
       it("logs but does not fail when Stripe cancellation fails", async () => {
-        const mockStripe = {
-          subscriptions: {
-            cancel: vi.fn().mockRejectedValue(new Error("Stripe error")),
-          },
-        };
+        const localStripe = createMockStripe();
+        localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
         service = new EEWebhookService({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
           organizationRepository: orgRepo as unknown as OrganizationRepository,
-          stripe: mockStripe as any,
+          stripe: localStripe as any,
           itemCalculator,
         });
 
@@ -418,6 +421,89 @@ describe("webhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("handleInvoicePaymentSucceeded() — cancellation regression", () => {
+    describe("when subscription is already CANCELLED in DB and Stripe subscription is canceled", () => {
+      it("skips activation and does not send Slack notification", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
+          id: "sub_stripe_1",
+          status: "canceled",
+        });
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.CANCELLED,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when subscription is ACTIVE in DB but Stripe subscription is canceled", () => {
+      it("skips activation and does not send Slack notification", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
+          id: "sub_stripe_1",
+          status: "canceled",
+        });
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Stripe subscription is active (normal renewal)", () => {
+      it("activates the subscription as usual", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.PENDING,
+        });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "confirmed",
+            organizationId: "org_123",
+          }),
+        );
       });
     });
   });
