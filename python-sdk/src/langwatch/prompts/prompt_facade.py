@@ -65,7 +65,7 @@ class PromptsFacade:
         version_number: Optional[int] = None,
         fetch_policy: Optional[FetchPolicy] = None,
         cache_ttl_minutes: Optional[int] = None,
-        tag: Optional[str] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """
         Retrieve a prompt by its ID with configurable fetch policy.
@@ -75,56 +75,65 @@ class PromptsFacade:
             version_number: Optional specific version number to retrieve
             fetch_policy: How to fetch the prompt. Defaults to MATERIALIZED_FIRST.
             cache_ttl_minutes: Cache TTL in minutes (only used with CACHE_TTL policy). Defaults to 5.
-            tag: Optional tag to fetch a specific tagged version (e.g. "production", "staging", or any custom tag).
+            label: Optional label to fetch a specific labeled version (e.g. "production", "staging", or any custom label).
 
         Raises:
-            ValueError: If both version_number and tag are provided.
-            ValueError: If tag is used with MATERIALIZED_ONLY policy.
+            ValueError: If both version_number and label are provided.
+            ValueError: If label is used with MATERIALIZED_ONLY policy.
             ValueError: If the prompt is not found (404 error).
             RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
         """
-        if tag is not None and version_number is not None:
+        # Parse shorthand "handle:label" syntax
+        if ":" in prompt_id and label is None:
+            prompt_id, label = prompt_id.rsplit(":", 1)
+        elif ":" in prompt_id and label is not None:
             raise ValueError(
-                "Cannot specify both version_number and tag"
+                "Ambiguous label: label specified in both shorthand syntax "
+                f"('{prompt_id}') and label parameter ('{label}')"
+            )
+
+        if label is not None and version_number is not None:
+            raise ValueError(
+                "Cannot specify both version_number and label"
             )
 
         fetch_policy = fetch_policy or FetchPolicy.MATERIALIZED_FIRST
 
-        if tag is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
+        if label is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
             raise ValueError(
-                "Tag-based fetch requires API access; incompatible with MATERIALIZED_ONLY policy"
+                "Label-based fetch requires API access; incompatible with MATERIALIZED_ONLY policy"
             )
 
         if fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
             return self._get_materialized_only(prompt_id)
         elif fetch_policy == FetchPolicy.ALWAYS_FETCH:
-            return self._get_always_fetch(prompt_id, version_number, tag)
+            return self._get_always_fetch(prompt_id, version_number, label)
         elif fetch_policy == FetchPolicy.CACHE_TTL:
             return self._get_cache_ttl(
-                prompt_id, version_number, cache_ttl_minutes or 5, tag
+                prompt_id, version_number, cache_ttl_minutes or 5, label
             )
         else:  # MATERIALIZED_FIRST (default)
-            return self._get_materialized_first(prompt_id, version_number, tag)
+            return self._get_materialized_first(prompt_id, version_number, label)
 
     def _get_materialized_first(
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        tag: Optional[str] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using MATERIALIZED_FIRST policy (local first, API fallback).
 
-        When a tag is provided, skips local loading and fetches directly from API
-        since tags require API access to resolve.
+        When a label is provided, skips local loading and fetches directly from API
+        since labels require API access to resolve.
         """
-        # When tag is provided, skip local and go straight to API
-        if tag is None:
+        # When label is provided, skip local and go straight to API
+        if label is None:
             local_data = self._local_loader.load_prompt(prompt_id)
             if local_data is not None:
                 return Prompt(local_data)
 
-        # Fall back to API if not found locally (or tag was provided)
-        api_data = self._api_service.get(prompt_id, version_number, tag=tag)
+        # Fall back to API if not found locally (or label was provided)
+        api_data = self._api_service.get(prompt_id, version_number, label=label)
         return Prompt(api_data)
 
     def _get_materialized_only(self, prompt_id: str) -> Prompt:
@@ -139,11 +148,11 @@ class PromptsFacade:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        tag: Optional[str] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using ALWAYS_FETCH policy (API first, local fallback)."""
         try:
-            api_data = self._api_service.get(prompt_id, version_number, tag=tag)
+            api_data = self._api_service.get(prompt_id, version_number, label=label)
             return Prompt(api_data)
         except Exception:
             # Fall back to local if API fails
@@ -157,10 +166,10 @@ class PromptsFacade:
         prompt_id: str,
         version_number: Optional[int] = None,
         cache_ttl_minutes: int = 5,
-        tag: Optional[str] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using CACHE_TTL policy (cache with TTL, fallback to local)."""
-        cache_key = f"{prompt_id}::version:{version_number or ''}::tag:{tag or ''}"
+        cache_key = f"{prompt_id}::version:{version_number or ''}::label:{label or ''}"
         ttl_ms = cache_ttl_minutes * 60 * 1000
         now = time.time() * 1000  # Convert to milliseconds
 
@@ -169,7 +178,7 @@ class PromptsFacade:
             return Prompt(cached["data"])
 
         try:
-            api_data = self._api_service.get(prompt_id, version_number, tag=tag)
+            api_data = self._api_service.get(prompt_id, version_number, label=label)
             self._cache[cache_key] = {"data": api_data, "timestamp": now}
             return Prompt(api_data)
         except Exception:
@@ -181,7 +190,7 @@ class PromptsFacade:
                     "prompt_id": prompt_id,
                     "version_number": version_number,
                     "cache_ttl_minutes": cache_ttl_minutes,
-                    "tag": tag,
+                    "label": label,
                 },
             )
             # Fall back to local if API fails
@@ -191,9 +200,9 @@ class PromptsFacade:
             raise ValueError(f"Prompt '{prompt_id}' not found locally or on server")
 
     @property
-    def tags(self) -> "PromptTagsNamespace":
-        """Access the tags sub-resource for assigning tags to prompt versions."""
-        return PromptTagsNamespace(self._api_service)
+    def labels(self) -> "PromptLabelsNamespace":
+        """Access the labels sub-resource for assigning labels to prompt versions."""
+        return PromptLabelsNamespace(self._api_service)
 
     def create(
         self,
@@ -204,7 +213,7 @@ class PromptsFacade:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        tags: Optional[List[str]] = None,
+        labels: Optional[List[str]] = None,
     ) -> Prompt:
         """
         Create a new prompt via API.
@@ -229,7 +238,7 @@ class PromptsFacade:
             messages=messages,
             inputs=inputs,
             outputs=outputs,
-            tags=tags,
+            labels=labels,
         )
         return Prompt(data)
 
@@ -242,7 +251,7 @@ class PromptsFacade:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        tags: Optional[List[str]] = None,
+        labels: Optional[List[str]] = None,
         *,
         commit_message: str = "",
     ) -> Prompt:
@@ -270,7 +279,7 @@ class PromptsFacade:
             messages=messages,
             inputs=inputs,
             outputs=outputs,
-            tags=tags,
+            labels=labels,
         )
         return Prompt(data)
 
@@ -279,8 +288,8 @@ class PromptsFacade:
         return self._api_service.delete(prompt_id)
 
 
-class PromptTagsNamespace:
-    """Lightweight namespace for tag assignment operations on prompts."""
+class PromptLabelsNamespace:
+    """Lightweight namespace for label assignment operations on prompts."""
 
     def __init__(self, api_service: PromptApiService):
         self._api_service = api_service
@@ -289,18 +298,18 @@ class PromptTagsNamespace:
         self,
         prompt_id: str,
         *,
-        tag: str,
+        label: str,
         version_id: str,
     ) -> Dict[str, str]:
         """
-        Assign a tag to a specific prompt version.
+        Assign a label to a specific prompt version.
 
         Args:
             prompt_id: The prompt ID or handle
-            tag: The tag to assign (e.g., "production", "staging", or a custom tag)
-            version_id: The version ID to assign the tag to
+            label: The label to assign ("production" or "staging")
+            version_id: The version ID to assign the label to
 
         Returns:
-            Dictionary with assignment details (configId, versionId, tag, updatedAt)
+            Dictionary with assignment details (configId, versionId, label, updatedAt)
         """
-        return self._api_service.assign_tag(prompt_id, tag, version_id)
+        return self._api_service.assign_label(prompt_id, label, version_id)

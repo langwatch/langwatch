@@ -1,12 +1,12 @@
 """
-End-to-End Tests for Prompt Tags
+End-to-End Tests for Prompt Labels
 
-These tests verify that prompt tag operations work against the real API:
-fetching by tag, assigning tags, and creating/updating prompts with tags.
+These tests verify that prompt label operations work against the real API:
+fetching by label, assigning labels, and creating/updating prompts with labels.
 
 Prerequisites:
 - LANGWATCH_API_KEY environment variable must be set
-- The LangWatch server must have tag support deployed
+- The LangWatch server must have label support deployed
 """
 
 import os
@@ -35,13 +35,13 @@ def api_key():
 
 
 @pytest.mark.e2e
-class TestPromptTagsE2E:
+class TestPromptLabelsE2E:
     """
-    End-to-end tests for prompt tag operations.
+    End-to-end tests for prompt label operations.
 
     To run these tests:
         export LANGWATCH_API_KEY="your-api-key"
-        pytest tests/e2e/test_prompt_tags_e2e.py -v
+        pytest tests/e2e/test_prompt_labels_e2e.py -v
     """
 
     @pytest.fixture(autouse=True)
@@ -54,30 +54,30 @@ class TestPromptTagsE2E:
         LocalPromptLoader._cached_project_root = None
         LocalPromptLoader._warned_no_prompts_path = False
 
-    def test_assign_tag_then_fetch_by_tag(self):
+    def test_assign_label_then_fetch_by_label(self):
         """
         GIVEN a prompt with a version on the server
-        WHEN I assign the "production" tag to that version
-        AND I fetch the prompt with tag="production"
-        THEN I receive the tagged version
+        WHEN I assign the "production" label to that version
+        AND I fetch the prompt with label="production"
+        THEN I receive the labeled version
         """
-        handle = f"e2e-tag-assign-{uuid4().hex[:8]}"
+        handle = f"e2e-label-assign-{uuid4().hex[:8]}"
 
         created = langwatch.prompts.create(
             handle=handle,
-            prompt="Hello from tag assignment e2e test",
+            prompt="Hello from label assignment e2e test",
         )
 
         try:
-            # Assign "production" tag to the created version
-            langwatch.prompts.tags.assign(
+            # Assign "production" label to the created version
+            langwatch.prompts.labels.assign(
                 handle,
-                tag="production",
+                label="production",
                 version_id=created.version_id,
             )
 
-            # Fetch by tag
-            fetched = langwatch.prompts.get(handle, tag="production")
+            # Fetch by label
+            fetched = langwatch.prompts.get(f"{handle}:production")
 
             assert fetched is not None
             assert fetched.handle == handle
@@ -88,13 +88,13 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
-    def test_fetch_without_tag_returns_latest(self):
+    def test_fetch_without_label_returns_latest(self):
         """
         GIVEN a prompt with two versions, where "production" is assigned to v1
-        WHEN I fetch without a tag
-        THEN I receive the latest version (v2), not the tagged one
+        WHEN I fetch without a label
+        THEN I receive the latest version (v2), not the labeled one
         """
-        handle = f"e2e-tag-latest-{uuid4().hex[:8]}"
+        handle = f"e2e-label-latest-{uuid4().hex[:8]}"
 
         created = langwatch.prompts.create(
             handle=handle,
@@ -103,9 +103,9 @@ class TestPromptTagsE2E:
 
         try:
             # Assign production to v1
-            langwatch.prompts.tags.assign(
+            langwatch.prompts.labels.assign(
                 handle,
-                tag="production",
+                label="production",
                 version_id=created.version_id,
             )
 
@@ -113,11 +113,11 @@ class TestPromptTagsE2E:
             updated = langwatch.prompts.update(
                 handle,
                 scope="PROJECT",
-                commit_message="Create v2 for tag test",
+                commit_message="Create v2 for label test",
                 prompt="Version 2 content",
             )
 
-            # Fetch without tag — expect latest (v2)
+            # Fetch without label — expect latest (v2)
             fetched = langwatch.prompts.get(handle)
 
             assert fetched is not None
@@ -129,24 +129,24 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
-    def test_create_prompt_with_tags(self):
+    def test_create_prompt_with_labels(self):
         """
         GIVEN a new prompt
-        WHEN I create it with tags=["production"]
-        THEN the created version has the production tag assigned
-        AND fetching by tag="production" returns it
+        WHEN I create it with labels=["production"]
+        THEN the created version has the production label assigned
+        AND fetching by label="production" returns it
         """
-        handle = f"e2e-create-tags-{uuid4().hex[:8]}"
+        handle = f"e2e-create-labels-{uuid4().hex[:8]}"
 
         created = langwatch.prompts.create(
             handle=handle,
-            prompt="Created with production tag",
-            tags=["production"],
+            prompt="Created with production label",
+            labels=["production"],
         )
 
         try:
-            # Fetch by tag to verify assignment
-            fetched = langwatch.prompts.get(handle, tag="production")
+            # Fetch by label to verify assignment
+            fetched = langwatch.prompts.get(f"{handle}:production")
 
             assert fetched is not None
             assert fetched.handle == handle
@@ -157,13 +157,13 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
-    def test_update_prompt_with_tags(self):
+    def test_update_prompt_with_labels(self):
         """
         GIVEN an existing prompt
-        WHEN I update it with tags=["staging"]
-        THEN fetching by tag="staging" returns the updated version
+        WHEN I update it with labels=["staging"]
+        THEN fetching by label="staging" returns the updated version
         """
-        handle = f"e2e-update-tags-{uuid4().hex[:8]}"
+        handle = f"e2e-update-labels-{uuid4().hex[:8]}"
 
         created = langwatch.prompts.create(
             handle=handle,
@@ -174,13 +174,13 @@ class TestPromptTagsE2E:
             updated = langwatch.prompts.update(
                 handle,
                 scope="PROJECT",
-                commit_message="Update with staging tag",
-                prompt="Updated with staging tag",
-                tags=["staging"],
+                commit_message="Update with staging label",
+                prompt="Updated with staging label",
+                labels=["staging"],
             )
 
-            # Fetch by staging tag
-            fetched = langwatch.prompts.get(handle, tag="staging")
+            # Fetch by staging label
+            fetched = langwatch.prompts.get(f"{handle}:staging")
 
             assert fetched is not None
             assert fetched.handle == handle
