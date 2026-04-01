@@ -23,12 +23,27 @@ function getClickHouseClient(): ClickHouseClient | null {
   if (!clickHouseClient) {
     const clickHouseUrl = process.env.CLICKHOUSE_URL;
     if (!clickHouseUrl) {
-      // TODO: see the ClickHouse migration and setup guide:
-      // https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/004-docker-dev-environment.md
-      throw new Error(
-        "CLICKHOUSE_URL environment variable is required. " +
-        "ClickHouse is the primary data store — see dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
-      );
+      const banner = [
+        "",
+        "╔══════════════════════════════════════════════════════════════╗",
+        "║                                                            ║",
+        "║   CLICKHOUSE_URL is not set                                ║",
+        "║                                                            ║",
+        "║   ClickHouse is the primary data store for LangWatch.      ║",
+        "║   The application cannot start without it.                 ║",
+        "║                                                            ║",
+        "║   Quick start:                                             ║",
+        "║     docker run -d -p 8123:8123 clickhouse/clickhouse-server║",
+        "║     export CLICKHOUSE_URL=http://localhost:8123/langwatch  ║",
+        "║                                                            ║",
+        "║   Full guide:                                              ║",
+        "║     dev/docs/adr/004-docker-dev-environment.md             ║",
+        "║                                                            ║",
+        "╚══════════════════════════════════════════════════════════════╝",
+        "",
+      ].join("\n");
+      console.error(banner);
+      throw new Error("CLICKHOUSE_URL environment variable is required.");
     }
 
     let url: URL | string = clickHouseUrl;

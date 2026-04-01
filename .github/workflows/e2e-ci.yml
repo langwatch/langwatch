@@ -24,6 +24,7 @@ jobs:
     env:
       # App configuration
       DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
+      CLICKHOUSE_URL: "http://localhost:8123/langwatch"
       ELASTICSEARCH_NODE_URL: "http://localhost:9201"
       IS_OPENSEARCH: "true"
       REDIS_URL: "redis://localhost:6380"
@@ -35,7 +36,6 @@ jobs:
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
       NODE_ENV: "development"
-      SKIP_CLICKHOUSE_MIGRATE: "true"
       # Test runner configuration
       BASE_URL: "http://localhost:5570"
       CI: "true"
@@ -61,6 +61,16 @@ jobs:
           - 6380:6379
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -116,9 +126,17 @@ jobs:
         working-directory: langwatch
         run: pnpm start:prepare:files
 
+      - name: Install goose
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/pressly/goose/master/install.sh | sh
+
       - name: Setup database
         working-directory: langwatch
         run: pnpm prisma:migrate
+
+      - name: Setup ClickHouse
+        working-directory: langwatch
+        run: pnpm clickhouse:migrate
 
       - name: Setup Elasticsearch
         working-directory: langwatch
