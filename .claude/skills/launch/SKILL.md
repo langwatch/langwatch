@@ -53,7 +53,7 @@ tmux send-keys -t "$SESSION" "claude --dangerously-skip-permissions" Enter
 sleep 10
 
 # Send the command text WITHOUT Enter
-tmux send-keys -t "$SESSION" "/implement #<N>"
+tmux send-keys -t "$SESSION" "Implement issue #<N>"
 sleep 1
 
 # Send Enter separately — twice, because the first may be swallowed

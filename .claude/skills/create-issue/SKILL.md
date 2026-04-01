@@ -196,8 +196,4 @@ Issue created: #<NUMBER> — <TITLE>
   Parent: #<PARENT> (sub-issue linked) <if set>
 ```
 
-Then ask the user:
-
-**Would you like to start implementing this issue? I can run `/implement #<NUMBER>` to begin.**
-
-If the user says yes, tell them to run `/implement #<NUMBER>`.
+Then ask the user if they'd like to start working on it.

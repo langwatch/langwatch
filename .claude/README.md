@@ -39,8 +39,6 @@ User Request
 │   ├── playwright-test-generator.md  # Ad-hoc: generates tests from plans
 │   └── playwright-test-healer.md     # Ad-hoc: fixes failing tests
 ├── skills/         # Skills (entry points that invoke agents)
-│   ├── orchestrate/    # Manual: /orchestrate <requirements>
-│   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
 │   ├── code/           # Delegates to coder agent
 │   ├── challenge/      # Delegates to devils-advocate
 │   ├── drive-pr/       # Fix CI failures + address review comments
@@ -99,105 +97,10 @@ agents/coder.md (runs in fork)
 Returns summary to main thread
 ```
 
-## Orchestration Workflow
-
-When implementing features, the main thread becomes an **orchestrator** that manages the loop:
-
-### Activation (Opt-In)
-
-Orchestration mode is explicit - use one of:
-1. `/orchestrate <requirements>` - Direct entry with any requirements
-2. `/implement #123` - Entry point for GitHub issues (invokes `/orchestrate`)
-
-### The Loop
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ 1. PLAN                                                 │
-│    - Check for feature file in specs/features/         │
-│    - If missing → /plan to create one                   │
-│    - Read feature file for acceptance criteria          │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 2. IMPLEMENT                                            │
-│    - /code with feature file and requirements           │
-│    - Coder implements with TDD, returns summary         │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 3. VERIFY                                               │
-│    - Check summary against acceptance criteria          │
-│    - Incomplete? → /code again with feedback            │
-│    - Max 3 iterations, then escalate                    │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 4. BROWSER VERIFICATION                                 │
-│    - dev-up.sh → /browser-test → dev-down.sh           │
-│    - Drives real browser, takes screenshots             │
-│    - Pass? → Complete                                   │
-│    - Fail? → /code with findings ────────────────┐      │
-│    - Max 2 iterations, then escalate             │      │
-└──────────────────────────────────────────────────│──────┘
-                          │                         │
-                          │    ┌────────────────────┘
-                          │    │ (loop back to implement)
-                          │    ▼
-                          │  Step 2 → 3 → 4
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│ 5. COMPLETE                                             │
-│    - Report summary to user (code + verification)       │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Orchestrator Boundaries
-
-The orchestrator delegates, it doesn't implement:
-- `/plan` creates feature files
-- `/code` writes code and runs tests
-- `/browser-test` verifies features work in a real browser
-
-The orchestrator reads only feature files and planning docs, not source code.
-
-## Role Hierarchy
-
-```
-ORCHESTRATOR (main thread)
-│
-├── /plan  ──────► (self-contained skill)
-│                  - Feature file creation
-│                  - Acceptance criteria
-│
-├── /code  ──────► CODER AGENT
-│                  - Implementation work
-│                  - TDD workflow
-│                  - Test execution
-│
-├── /challenge ──► DEVILS-ADVOCATE
-│                  - Stress-test proposals and plans
-│                  - Find hidden assumptions
-│                  - Failure mode analysis
-│                  - Alternative approaches
-│
-└── /browser-test ► BROWSER VERIFICATION (interactive)
-                   - Drives real browser via Playwright MCP
-                   - Screenshots + report to browser-tests/
-                   - No test files generated
-```
-
 ## Quick Reference
 
 | Command | Agent | Purpose |
 |---------|-------|---------|
-| `/orchestrate <req>` | (orchestrator mode) | Enter orchestration mode with requirements |
-| `/implement #123` | (orchestrator mode) | Fetch issue → invoke `/orchestrate` |
-| `/plan <feature>` | Plan (built-in) | Create feature file (required before /code) |
 | `/code <task>` | coder | Implement with TDD |
 | `/challenge <proposal>` | devils-advocate | Stress-test proposals and plans |
 | `/browser-test [port] [feature]` | (interactive verification) | Verify feature works in real browser |

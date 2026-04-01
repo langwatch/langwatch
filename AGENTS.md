@@ -114,29 +114,8 @@ specs/               # BDD feature specs
 | Using `max(column)` for pagination sort keys on deduped tables | Use `argMax(column, UpdatedAt)` to derive sort keys from the latest version only. `max()` may pick values from stale versions, causing cursor pagination to skip/duplicate rows |
 | Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 
-## Orchestration Model
+## Agents
 
-Implementation tasks use `/orchestrate` to manage work. The orchestrator detects whether an issue is a **bug fix** or a **feature** and selects the appropriate workflow.
-
-- `/orchestrate <requirements>` - Enter orchestration mode
-- `/implement #123` - Fetch GitHub issue → invoke `/orchestrate`
-
-**Bug detection:** Issues are classified as bugs when they have a "bug" label, title keywords ("fix", "bug", "broken"), or use a bug report issue template. Everything else follows the feature workflow.
-
-**Bug-fix workflow:** investigate → fix → verify → browser-verify
-1. Investigates the root cause using `/code` (coder agent)
-2. Applies the fix and runs existing tests to verify
-3. **Verifies in a real browser** via `dev-up.sh` + `/browser-test`
-4. Skips `/plan` and spec creation — bugs fix existing behavior, not add new behavior
-
-**Feature workflow:** plan → code → browser-verify
-1. **Creates a task checklist** using TaskCreate to map acceptance criteria
-2. Delegates to `/plan` (self-contained), `/code` (coder agent)
-3. **Verifies in a real browser** via `dev-up.sh` + `/browser-test` — spins up an isolated dev instance, drives the browser to verify acceptance criteria, saves screenshots to `browser-tests/`
-4. Tracks progress via task status updates
-5. Does NOT read or write code directly
-
-Agents:
 - **coder** (`.claude/agents/coder.md`): Implements features with TDD. Reads requirements, writes failing tests first, implements minimal code to pass, refactors, and self-verifies before returning.
 
-See `.claude/README.md` for full orchestration documentation.
+See `.claude/README.md` for agent and skill documentation.

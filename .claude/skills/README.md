@@ -22,13 +22,6 @@ These skills use `context: fork` but contain their own instructions:
 | `/drive-pr` | Drive a PR to mergeable state — fix CI failures and address review comments |
 | `/plan` | Create feature file with acceptance criteria |
 
-### Orchestration Skills (Opt-In)
-
-| Skill | Trigger | Purpose |
-|-------|---------|---------|
-| `/orchestrate` | Manual (`/orchestrate <requirements>`) | Manages plan/code/browser-verify loop |
-| `/implement` | Manual (`/implement #123`) | Entry point for GitHub issues (invokes `/orchestrate`) |
-
 ## The context:fork + agent Pattern
 
 Skills bridge user commands to agents:
