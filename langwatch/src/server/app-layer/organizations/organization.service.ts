@@ -1,7 +1,8 @@
 import { PricingModel, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { slugify } from "~/utils/slugify";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import { isCustomRole } from "../../api/enterprise";
@@ -88,19 +89,17 @@ export class OrganizationService {
   }): Promise<CreateAndAssignResult> {
     const orgName =
       params.orgName ?? params.userDisplayName ?? "My Organization";
-    const orgNanoId = nanoid();
-    const orgId = `organization_${orgNanoId}`;
+    const orgId = generate(KSUID_RESOURCES.ORGANIZATION).toString();
     const orgSlug =
       slugify(orgName, { lower: true, strict: true }) +
       "-" +
-      orgNanoId.substring(0, 6);
+      orgId.substring(orgId.length - 6);
 
-    const teamNanoId = nanoid();
-    const teamId = `team_${teamNanoId}`;
+    const teamId = generate(KSUID_RESOURCES.TEAM).toString();
     const teamSlug =
       slugify(orgName, { lower: true, strict: true }) +
       "-" +
-      teamNanoId.substring(0, 6);
+      teamId.substring(teamId.length - 6);
 
     return this.repo.createAndAssign({
       userId: params.userId,
