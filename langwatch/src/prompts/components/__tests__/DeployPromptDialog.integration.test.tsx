@@ -17,10 +17,10 @@ vi.mock("~/utils/api", () => ({
       getAllVersionsForPrompt: {
         useQuery: (...args: unknown[]) => mockUseQuery("getAllVersionsForPrompt", ...args),
       },
-      getLabelsForConfig: {
-        useQuery: (...args: unknown[]) => mockUseQuery("getLabelsForConfig", ...args),
+      getTagsForConfig: {
+        useQuery: (...args: unknown[]) => mockUseQuery("getTagsForConfig", ...args),
       },
-      assignLabel: {
+      assignTag: {
         useMutation: () => ({
           mutateAsync: mockMutateAsync,
           isLoading: false,
@@ -29,7 +29,7 @@ vi.mock("~/utils/api", () => ({
     },
     useContext: () => ({
       prompts: {
-        getLabelsForConfig: {
+        getTagsForConfig: {
           invalidate: mockInvalidate,
         },
       },
@@ -136,7 +136,7 @@ function setupQueries({
     if (queryName === "getAllVersionsForPrompt") {
       return { data: versions };
     }
-    if (queryName === "getLabelsForConfig") {
+    if (queryName === "getTagsForConfig") {
       return { data: labels };
     }
     return { data: undefined };
@@ -298,7 +298,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         mockInvalidate.mockClear();
       });
 
-      it("calls assignLabel with the selected production version", async () => {
+      it("calls assignTag with the selected production version", async () => {
         setupQueries();
         renderDialog();
 
@@ -325,7 +325,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         mockInvalidate.mockClear();
       });
 
-      it("calls assignLabel with the selected staging version", async () => {
+      it("calls assignTag with the selected staging version", async () => {
         setupQueries();
         renderDialog();
 
@@ -352,7 +352,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         mockInvalidate.mockClear();
       });
 
-      it("calls assignLabel for both production and staging", async () => {
+      it("calls assignTag for both production and staging", async () => {
         setupQueries();
         renderDialog();
 
@@ -378,7 +378,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
     });
 
     describe("when no changes are made and save is clicked", () => {
-      it("closes the dialog without calling assignLabel", async () => {
+      it("closes the dialog without calling assignTag", async () => {
         const onClose = vi.fn();
         mockMutateAsync.mockClear();
         setupQueries({

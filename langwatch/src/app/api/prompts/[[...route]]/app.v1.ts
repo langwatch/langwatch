@@ -13,7 +13,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { prisma } from "~/server/db";
 import { NotFoundError } from "~/server/prompt-config/errors";
-import { LabelValidationError } from "~/server/prompt-config/repositories/llm-config-label.repository";
+import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
@@ -92,31 +92,31 @@ app.get(
   },
 );
 
-// Assign label to a prompt version
-const assignLabelResponseSchema = z.object({
+// Assign tag to a prompt version
+const assignTagResponseSchema = z.object({
   configId: z.string(),
   versionId: z.string(),
-  label: z.string(),
+  tag: z.string(),
   updatedAt: z.date(),
 });
 
 app.put(
-  "/:id{.+?}/labels/:label",
+  "/:id{.+?}/tags/:tag",
   describeRoute({
     description:
-      'Assign a label (e.g. "production", "staging") to a specific prompt version',
+      'Assign a tag (e.g. "production", "staging") to a specific prompt version',
     parameters: [
       {
-        name: "label",
+        name: "tag",
         in: "path",
-        description: 'The label to assign (e.g., "production", "staging")',
+        description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
         required: true,
-        schema: { type: "string", enum: ["production", "staging"] },
+        schema: { type: "string" },
       },
     ],
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(assignLabelResponseSchema),
+      200: buildStandardSuccessResponse(assignTagResponseSchema),
       404: {
         description: "Prompt not found",
         content: {
@@ -124,7 +124,7 @@ app.put(
         },
       },
       422: {
-        description: "Invalid label or version",
+        description: "Invalid tag or version",
         content: {
           "application/json": { schema: resolver(badRequestSchema) },
         },
@@ -136,12 +136,12 @@ app.put(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const { id, label } = c.req.param();
+    const { id, tag } = c.req.param();
     const { versionId } = c.req.valid("json");
 
     logger.info(
-      { projectId: project.id, promptId: id, label, versionId },
-      "Assigning label to prompt version",
+      { projectId: project.id, promptId: id, tag, versionId },
+      "Assigning tag to prompt version",
     );
 
     try {
@@ -157,28 +157,29 @@ app.put(
         });
       }
 
-      const result = await service.assignLabel({
+      const result = await service.assignTag({
         configId: config.id,
         versionId,
-        label,
+        tag,
         projectId: config.projectId,
+        organizationId: organization.id,
       });
 
       logger.info(
-        { projectId: project.id, configId: config.id, label, versionId },
-        "Successfully assigned label to prompt version",
+        { projectId: project.id, configId: config.id, tag, versionId },
+        "Successfully assigned tag to prompt version",
       );
 
       return c.json(
-        assignLabelResponseSchema.parse({
+        assignTagResponseSchema.parse({
           configId: result.configId,
           versionId: result.versionId,
-          label: result.label,
+          tag: result.tag,
           updatedAt: result.updatedAt,
         }),
       );
     } catch (error: unknown) {
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });
@@ -249,12 +250,12 @@ app.get(
         schema: { type: "integer", minimum: 0 },
       },
       {
-        name: "label",
+        name: "tag",
         in: "query",
         description:
-          'Fetch the version pointed to by this label (e.g., "production", "staging")',
+          'Fetch the version pointed to by this tag (e.g., "production", "staging", or a custom tag)',
         required: false,
-        schema: { type: "string", enum: ["production", "staging"] },
+        schema: { type: "string" },
       },
     ],
     responses: {
@@ -276,10 +277,10 @@ app.get(
     const version = c.req.query("version")
       ? parseInt(c.req.query("version")!)
       : undefined;
-    const label = c.req.query("label") ?? undefined;
+    const tag = c.req.query("tag") ?? undefined;
 
     logger.info(
-      { projectId: project.id, id, version, label },
+      { projectId: project.id, id, version, tag },
       "Getting prompt",
     );
 
@@ -289,7 +290,7 @@ app.get(
         projectId: project.id,
         organizationId: organization.id,
         version,
-        label,
+        tag,
       });
 
       if (!config) {
@@ -300,7 +301,7 @@ app.get(
 
       return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
     } catch (error: unknown) {
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });
@@ -332,7 +333,7 @@ app.post(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const { labels, ...data } = c.req.valid("json");
+    const { tags, ...data } = c.req.valid("json");
 
     logger.info(
       {
@@ -340,7 +341,7 @@ app.post(
         scope: data.scope,
         projectId: project.id,
         organizationId: organization.id,
-        labels,
+        tags,
       },
       "Creating new prompt with initial version",
     );
@@ -357,21 +358,22 @@ app.post(
         "Successfully created prompt with initial version",
       );
 
-      if (labels && labels.length > 0) {
+      if (tags && tags.length > 0) {
         await Promise.all(
-          labels.map((label) =>
-            service.assignLabel({
+          tags.map((tag) =>
+            service.assignTag({
               configId: newConfig.id,
               versionId: newConfig.versionId,
-              label,
+              tag,
               projectId: newConfig.projectId,
+              organizationId: organization.id,
             }),
           ),
         );
 
         logger.info(
-          { promptId: newConfig.id, labels },
-          "Assigned labels to initial version",
+          { promptId: newConfig.id, tags },
+          "Assigned tags to initial version",
         );
       }
 
@@ -383,7 +385,7 @@ app.post(
       return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });
@@ -536,8 +538,9 @@ app.put(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
-    const { labels, ...data } = c.req.valid("json");
+    const { tags, ...data } = c.req.valid("json");
     const projectId = project.id;
 
     if (Object.keys(data).length === 0) {
@@ -551,7 +554,7 @@ app.put(
         projectId: project.id,
         handleOrId: id,
         data,
-        labels,
+        tags,
       },
       "Updating prompt",
     );
@@ -569,21 +572,22 @@ app.put(
         });
       }
 
-      if (labels && labels.length > 0) {
+      if (tags && tags.length > 0) {
         await Promise.all(
-          labels.map((label) =>
-            service.assignLabel({
+          tags.map((tag) =>
+            service.assignTag({
               configId: updatedConfig.id,
               versionId: updatedConfig.versionId,
-              label,
+              tag,
               projectId: updatedConfig.projectId,
+              organizationId: organization.id,
             }),
           ),
         );
 
         logger.info(
-          { projectId, promptId: id, labels, versionId: updatedConfig.versionId },
-          "Assigned labels to updated version",
+          { projectId, promptId: id, tags, versionId: updatedConfig.versionId },
+          "Assigned tags to updated version",
         );
       }
 
@@ -602,7 +606,7 @@ app.put(
       );
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });

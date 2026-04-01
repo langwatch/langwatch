@@ -26,7 +26,6 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { VALID_LABELS } from "~/prompts/constants/labels";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -40,8 +39,8 @@ interface DeployPromptDialogProps {
 /**
  * DeployPromptDialog
  *
- * Dialog for assigning prompt versions to environment labels (production, staging).
- * The "latest" label is auto-managed and always points to the highest version number.
+ * Dialog for assigning prompt versions to environment tags (production, staging).
+ * The "latest" tag is auto-managed and always points to the highest version number.
  */
 export function DeployPromptDialog({
   isOpen,
@@ -57,64 +56,66 @@ export function DeployPromptDialog({
     { enabled: isOpen && !!configId && !!projectId },
   );
 
-  const labelsQuery = api.prompts.getLabelsForConfig.useQuery(
+  const tagsQuery = api.prompts.getTagsForConfig.useQuery(
     { configId, projectId },
     { enabled: isOpen && !!configId && !!projectId },
   );
 
-  const assignLabel = api.prompts.assignLabel.useMutation();
+  const orgTagsQuery = api.promptTags.getAll.useQuery(
+    { projectId },
+    { enabled: isOpen && !!projectId },
+  );
+
+  const assignTag = api.prompts.assignTag.useMutation();
   const utils = api.useContext();
 
   const versions = versionsQuery.data ?? [];
+  const tags = orgTagsQuery.data?.map((t) => t.name) ?? [];
 
   const latestVersion = versions.reduce<typeof versions[number] | null>(
     (max, v) => (!max || v.version > max.version ? v : max),
     null,
   );
 
-  type LabelSelections = Record<string, string>;
-  const [labelSelections, setLabelSelections] = useState<LabelSelections>(
-    () => Object.fromEntries(VALID_LABELS.map((l) => [l, ""])),
-  );
+  type TagSelections = Record<string, string>;
+  const [tagSelections, setTagSelections] = useState<TagSelections>({});
 
-  const setLabelVersionId = useCallback((label: string, versionId: string) => {
-    setLabelSelections((prev) => ({ ...prev, [label]: versionId }));
+  const setTagVersionId = useCallback((tag: string, versionId: string) => {
+    setTagSelections((prev) => ({ ...prev, [tag]: versionId }));
   }, []);
 
-  // Initialize selections from current label assignments
+  // Initialize selections from current tag assignments whenever tags or assignments change
   useEffect(() => {
     if (!isOpen) return;
-    const data = labelsQuery.data;
-    if (!data?.length) {
-      setLabelSelections(Object.fromEntries(VALID_LABELS.map((l) => [l, ""])));
-      return;
-    }
+    const assignmentData = tagsQuery.data;
 
-    const next: LabelSelections = {};
-    for (const label of VALID_LABELS) {
-      const found = data.find((l) => l.label === label);
-      next[label] = found?.versionId ?? "";
+    const next: TagSelections = {};
+    for (const tag of tags) {
+      const found = assignmentData?.find((t) => t.tag === tag);
+      next[tag] = found?.versionId ?? "";
     }
-    setLabelSelections(next);
-  }, [isOpen, labelsQuery.data]);
+    setTagSelections(next);
+    // tags array reference changes when orgTagsQuery resolves, so include it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, tagsQuery.data, orgTagsQuery.data]);
 
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = useCallback(async () => {
-    const data = labelsQuery.data ?? [];
+    const data = tagsQuery.data ?? [];
 
     const mutations: Promise<unknown>[] = [];
 
-    for (const label of VALID_LABELS) {
-      const selectedVersionId = labelSelections[label] ?? "";
-      const currentLabel = data.find((l) => l.label === label);
-      if (selectedVersionId && selectedVersionId !== (currentLabel?.versionId ?? "")) {
+    for (const tag of tags) {
+      const selectedVersionId = tagSelections[tag] ?? "";
+      const currentTag = data.find((t) => t.tag === tag);
+      if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
         mutations.push(
-          assignLabel.mutateAsync({
+          assignTag.mutateAsync({
             projectId,
             configId,
             versionId: selectedVersionId,
-            label,
+            tag,
           }),
         );
       }
@@ -128,9 +129,9 @@ export function DeployPromptDialog({
     setIsSaving(true);
     try {
       await Promise.all(mutations);
-      await utils.prompts.getLabelsForConfig.invalidate({ configId, projectId });
+      await utils.prompts.getTagsForConfig.invalidate({ configId, projectId });
       toaster.create({
-        title: "Labels saved",
+        title: "Tags saved",
         type: "success",
         duration: 2000,
         meta: { closable: true },
@@ -138,7 +139,7 @@ export function DeployPromptDialog({
       onClose();
     } catch {
       toaster.create({
-        title: "Failed to save labels",
+        title: "Failed to save tags",
         type: "error",
         duration: 3000,
         meta: { closable: true },
@@ -147,9 +148,10 @@ export function DeployPromptDialog({
       setIsSaving(false);
     }
   }, [
-    labelsQuery.data,
-    labelSelections,
-    assignLabel,
+    tagsQuery.data,
+    tagSelections,
+    tags,
+    assignTag,
     projectId,
     configId,
     onClose,
@@ -188,8 +190,8 @@ export function DeployPromptDialog({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              Use labels to get specific prompt versions via the SDK and API.
-              Prompt versions with the production label are returned by default.
+              Use tags to get specific prompt versions via the SDK and API.
+              Prompt versions with the production tag are returned by default.
             </Text>
 
             <HStack gap={2}>
@@ -248,12 +250,12 @@ export function DeployPromptDialog({
                 </HStack>
               </Box>
 
-              {/* Environment label rows */}
-              {VALID_LABELS.map((label) => {
-                const isAssigned = !!(labelSelections[label]);
+              {/* Environment tag rows */}
+              {tags.map((tag) => {
+                const isAssigned = !!(tagSelections[tag]);
                 return (
                   <Box
-                    key={label}
+                    key={tag}
                     borderWidth="1px"
                     borderColor="border"
                     borderRadius="lg"
@@ -270,7 +272,7 @@ export function DeployPromptDialog({
                           flexShrink={0}
                         />
                         <Text fontWeight="medium" fontSize="sm">
-                          {label}
+                          {tag}
                         </Text>
                       </HStack>
                       <HStack gap={2}>
@@ -279,11 +281,11 @@ export function DeployPromptDialog({
                         size="sm"
                         width="auto"
                         minWidth="180px"
-                        value={labelSelections[label] ? [labelSelections[label]!] : []}
+                        value={tagSelections[tag] ? [tagSelections[tag] ?? ""] : []}
                         onValueChange={(details) => {
-                          setLabelVersionId(label, details.value[0] ?? "");
+                          setTagVersionId(tag, details.value[0] ?? "");
                         }}
-                        aria-label={`${label.charAt(0).toUpperCase()}${label.slice(1)} version`}
+                        aria-label={`${tag.charAt(0).toUpperCase()}${tag.slice(1)} version`}
                       >
                         <Select.Trigger clearable>
                           <Select.ValueText placeholder="Select version">
@@ -323,7 +325,7 @@ export function DeployPromptDialog({
                       <GeneratePromptApiSnippetDialog
                         promptHandle={handle}
                         apiKey={project?.apiKey}
-                        label={label}
+                        label={tag}
                       >
                         <GeneratePromptApiSnippetDialog.Trigger>
                           <IconButton

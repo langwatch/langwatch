@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { projectFactory } from "~/factories/project.factory";
 import { PromptService } from "../prompt.service";
+import { SEEDED_TAGS } from "~/prompts/constants/tags";
 
-describe("Feature: Prompt version labels", () => {
+describe("Feature: Prompt version tags", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
@@ -42,12 +43,22 @@ describe("Feature: Prompt version labels", () => {
       },
     });
 
+    // Seed production and staging tags for the test org
+    await prisma.promptTag.createMany({
+      data: SEEDED_TAGS.map((tag) => ({
+        id: `ptag_${nanoid()}`,
+        organizationId: testOrganization.id,
+        name: tag,
+      })),
+      skipDuplicates: true,
+    });
+
     service = new PromptService(prisma);
   });
 
   afterEach(async () => {
-    // Clean up labels/versions/configs for both projects
-    await prisma.promptVersionLabel.deleteMany({
+    // Clean up tags/versions/configs for both projects
+    await prisma.promptTagAssignment.deleteMany({
       where: { projectId: { in: [testProject.id, otherProject.id] } },
     });
     await prisma.llmPromptConfigVersion.deleteMany({
@@ -55,6 +66,9 @@ describe("Feature: Prompt version labels", () => {
     });
     await prisma.llmPromptConfig.deleteMany({
       where: { projectId: { in: [testProject.id, otherProject.id] } },
+    });
+    await prisma.promptTag.deleteMany({
+      where: { organizationId: testOrganization.id },
     });
     await prisma.project.deleteMany({
       where: { id: { in: [testProject.id, otherProject.id] } },
@@ -100,8 +114,8 @@ describe("Feature: Prompt version labels", () => {
     return { prompt: latest, allVersions: versions };
   }
 
-  describe("when assigning a label to a specific version", () => {
-    it("creates a PromptVersionLabel record with configId, label, and versionId", async () => {
+  describe("when assigning a tag to a specific version", () => {
+    it("creates a PromptTagAssignment record with configId, tag, and versionId", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
         versionCount: 3,
@@ -113,21 +127,21 @@ describe("Feature: Prompt version labels", () => {
       const v2 = allVersions[1];
       if (!v2) throw new Error("test setup failed: missing version 1");
 
-      const label = await service.assignLabel({
+      const versionTag = await service.assignTag({
         configId,
         versionId: v2.versionId,
-        label: "production",
+        tag: "production",
         projectId: testProject.id,
       });
 
-      expect(label.label).toBe("production");
-      expect(label.versionId).toBe(v2.versionId);
-      expect(label.configId).toBe(configId);
+      expect(versionTag.tag).toBe("production");
+      expect(versionTag.versionId).toBe(v2.versionId);
+      expect(versionTag.configId).toBe(configId);
     });
   });
 
-  describe("when reassigning a label to a different version", () => {
-    it("returns the new version when fetching by label", async () => {
+  describe("when reassigning a tag to a different version", () => {
+    it("returns the new version when fetching by tag", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
         versionCount: 3,
@@ -141,31 +155,31 @@ describe("Feature: Prompt version labels", () => {
       const v3 = allVersions[2];
       if (!v3) throw new Error("test setup failed: missing version 2");
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v2.versionId,
-        label: "production",
+        tag: "production",
         projectId: testProject.id,
       });
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v3.versionId,
-        label: "production",
+        tag: "production",
         projectId: testProject.id,
       });
 
       const result = await service.getPromptByIdOrHandle({
         idOrHandle: configId,
         projectId: testProject.id,
-        label: "production",
+        tag: "production",
       });
 
       expect(result?.version).toBe(3);
     });
   });
 
-  describe("when two prompts each have the same label name", () => {
+  describe("when two prompts each have the same tag name", () => {
     it("returns the correct version for each prompt independently", async () => {
       const { allVersions: pizzaVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
@@ -188,30 +202,30 @@ describe("Feature: Prompt version labels", () => {
       const emailV5 = emailVersions[4];
       if (!emailV5) throw new Error("test setup failed: missing email version 4");
 
-      await service.assignLabel({
+      await service.assignTag({
         configId: pizzaConfigId,
         versionId: pizzaV2.versionId,
-        label: "production",
+        tag: "production",
         projectId: testProject.id,
       });
 
-      await service.assignLabel({
+      await service.assignTag({
         configId: emailConfigId,
         versionId: emailV5.versionId,
-        label: "production",
+        tag: "production",
         projectId: testProject.id,
       });
 
       const pizzaResult = await service.getPromptByIdOrHandle({
         idOrHandle: pizzaConfigId,
         projectId: testProject.id,
-        label: "production",
+        tag: "production",
       });
 
       const emailResult = await service.getPromptByIdOrHandle({
         idOrHandle: emailConfigId,
         projectId: testProject.id,
-        label: "production",
+        tag: "production",
       });
 
       expect(pizzaResult?.version).toBe(2);
@@ -219,8 +233,8 @@ describe("Feature: Prompt version labels", () => {
     });
   });
 
-  describe("when fetching a prompt via service with a label parameter", () => {
-    it("returns the version pointed to by the label", async () => {
+  describe("when fetching a prompt via service with a tag parameter", () => {
+    it("returns the version pointed to by the tag", async () => {
       const { allVersions } = await createPromptWithVersions({
         handle: `pizza-prompt-${nanoid()}`,
         versionCount: 3,
@@ -234,32 +248,32 @@ describe("Feature: Prompt version labels", () => {
       const v3 = allVersions[2];
       if (!v3) throw new Error("test setup failed: missing version 2");
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v2.versionId,
-        label: "production",
+        tag: "production",
         projectId: testProject.id,
       });
 
-      await service.assignLabel({
+      await service.assignTag({
         configId,
         versionId: v3.versionId,
-        label: "staging",
+        tag: "staging",
         projectId: testProject.id,
       });
 
       const result = await service.getPromptByIdOrHandle({
         idOrHandle: configId,
         projectId: testProject.id,
-        label: "production",
+        tag: "production",
       });
 
       expect(result?.version).toBe(2);
     });
   });
 
-  describe("when fetching with both version and label", () => {
-    it("rejects with a validation error for version + label", async () => {
+  describe("when fetching with both version and tag", () => {
+    it("rejects with a validation error for version + tag", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,
         organizationId: testOrganization.id,
@@ -273,12 +287,12 @@ describe("Feature: Prompt version labels", () => {
           idOrHandle: prompt.id,
           projectId: testProject.id,
           version: 1,
-          label: "production",
+          tag: "production",
         }),
-      ).rejects.toThrow("Cannot specify both 'version'/'versionId' and 'label'");
+      ).rejects.toThrow("Cannot specify both 'version'/'versionId' and 'tag'");
     });
 
-    it("rejects with a validation error for versionId + label", async () => {
+    it("rejects with a validation error for versionId + tag", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,
         organizationId: testOrganization.id,
@@ -292,13 +306,13 @@ describe("Feature: Prompt version labels", () => {
           idOrHandle: prompt.id,
           projectId: testProject.id,
           versionId: prompt.versionId,
-          label: "production",
+          tag: "production",
         }),
-      ).rejects.toThrow("Cannot specify both 'version'/'versionId' and 'label'");
+      ).rejects.toThrow("Cannot specify both 'version'/'versionId' and 'tag'");
     });
   });
 
-  describe("when fetching with an unassigned label", () => {
+  describe("when fetching with an unassigned tag", () => {
     it("throws a not-found error", async () => {
       const prompt = await service.createPrompt({
         projectId: testProject.id,
@@ -312,18 +326,18 @@ describe("Feature: Prompt version labels", () => {
         service.getPromptByIdOrHandle({
           idOrHandle: prompt.id,
           projectId: testProject.id,
-          label: "production",
+          tag: "production",
         }),
       ).rejects.toThrow(
         expect.objectContaining({
           name: "NotFoundError",
-          message: expect.stringContaining('Label "production" not found'),
+          message: expect.stringContaining('Tag "production" not found'),
         }),
       );
     });
   });
 
-  describe("when assigning a label to an organization-scoped prompt", () => {
+  describe("when assigning a tag to an organization-scoped prompt", () => {
     it("succeeds even when the requesting project differs from the config project", async () => {
       // Create an org-scoped prompt owned by testProject
       const prompt = await service.createPrompt({
@@ -338,24 +352,24 @@ describe("Feature: Prompt version labels", () => {
       // Simulate the API handler scenario: the auth context project (otherProject)
       // differs from the config's actual projectId (testProject).
       // The bug was passing project.id (otherProject) instead of config.projectId (testProject).
-      const label = await service.assignLabel({
+      const versionTag = await service.assignTag({
         configId: prompt.id,
         versionId: prompt.versionId,
-        label: "production",
+        tag: "production",
         projectId: prompt.projectId, // correct: use the config's own projectId
       });
 
-      expect(label.label).toBe("production");
-      expect(label.versionId).toBe(prompt.versionId);
-      expect(label.configId).toBe(prompt.id);
+      expect(versionTag.tag).toBe("production");
+      expect(versionTag.versionId).toBe(prompt.versionId);
+      expect(versionTag.configId).toBe(prompt.id);
 
-      // Verify the label is NOT found when using the wrong projectId
+      // Verify the tag is NOT found when using the wrong projectId
       // (this is what the bug caused — using project.id from auth context)
       await expect(
-        service.assignLabel({
+        service.assignTag({
           configId: prompt.id,
           versionId: prompt.versionId,
-          label: "staging",
+          tag: "staging",
           projectId: otherProject.id, // wrong: different project than the config's
         }),
       ).rejects.toThrow("Version does not belong to this prompt config");

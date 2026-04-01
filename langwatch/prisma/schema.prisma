@@ -77,8 +77,10 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
-    labelsCreated           PromptVersionLabel[]   @relation("labelCreatedBy")
-    labelsUpdated           PromptVersionLabel[]   @relation("labelUpdatedBy")
+    versionTagsCreated      PromptTagAssignment[]  @relation("versionTagCreatedBy")
+    versionTagsUpdated      PromptTagAssignment[]  @relation("versionTagUpdatedBy")
+    promptTagsCreated       PromptTag[]            @relation("promptTagCreatedBy")
+    promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
 
 }
 
@@ -183,6 +185,7 @@ model Organization {
     notifications Notification[]
     subscriptions Subscription[]
     scimTokens    ScimToken[]
+    promptTags    PromptTag[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -940,7 +943,7 @@ model LlmPromptConfig {
     versions LlmPromptConfigVersion[] @relation("Versions")
 
     // Relation to labels (e.g., "production", "staging")
-    labels PromptVersionLabel[] @relation("Labels")
+    versionTags PromptTagAssignment[] @relation("VersionTags")
 
     @@unique([handle], map: "LlmPromptConfig_handle_key")
     @@index([projectId])
@@ -966,8 +969,8 @@ model LlmPromptConfigVersion {
     // Required for multi-tenancy
     projectId String
 
-    // Labels pointing to this version
-    labels PromptVersionLabel[]
+    // Tags pointing to this version
+    versionTags PromptTagAssignment[]
 
     @@unique([configId, version]) // Each version number must be unique per config
     @@index([configId])
@@ -975,25 +978,41 @@ model LlmPromptConfigVersion {
     @@index([createdAt]) // Index important for finding the latest efficiently
 }
 
-model PromptVersionLabel {
+model PromptTagAssignment {
     id          String   @id @default(nanoid())
     configId    String
-    config      LlmPromptConfig        @relation("Labels", fields: [configId], references: [id], onDelete: Cascade)
+    config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
     versionId   String
     version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-    label       String
+    tag         String
     projectId   String
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now()) @updatedAt
     createdById String?
-    createdBy   User?    @relation("labelCreatedBy", fields: [createdById], references: [id])
+    createdBy   User?    @relation("versionTagCreatedBy", fields: [createdById], references: [id])
     updatedById String?
-    updatedBy   User?    @relation("labelUpdatedBy", fields: [updatedById], references: [id])
+    updatedBy   User?    @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([configId, label])
+    @@unique([configId, tag])
     @@index([configId])
     @@index([versionId])
     @@index([projectId])
+}
+
+model PromptTag {
+    id             String       @id @default(nanoid())
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    name           String
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
+    createdById    String?
+    createdBy      User?        @relation("promptTagCreatedBy", fields: [createdById], references: [id])
+    updatedById    String?
+    updatedBy      User?        @relation("promptTagUpdatedBy", fields: [updatedById], references: [id])
+
+    @@unique([organizationId, name])
+    @@index([organizationId])
 }
 
 model Analytics {
