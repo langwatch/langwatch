@@ -9,6 +9,9 @@ const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY;
 
 const NUMBER_OF_RUNS = parseInt(process.env.NUMBER_OF_RUNS ?? "100");
 
+/** Proportion of feedback events that are thumbs-up (rest are thumbs-down) */
+const THUMBS_UP_RATIO = 0.8;
+
 function makeOtelTraceId(): string {
   return nanoid(16)
     .split("")
@@ -43,7 +46,7 @@ describe("OTEL traces API stress test", () => {
     apiKey = LANGWATCH_API_KEY;
   });
 
-  test(`benchmarks ${NUMBER_OF_RUNS} OTEL trace insertions`, async () => {
+  test(`stress-tests ${NUMBER_OF_RUNS} OTEL traces with thumbs feedback`, async () => {
     const traceIds: string[] = [];
 
     const makeApiCall = async (): Promise<number> => {
@@ -135,17 +138,19 @@ describe("OTEL traces API stress test", () => {
         .map(() => makeApiCall()),
     );
 
+    console.log("OTEL trace insertion benchmark:");
     printStats(responseTimes);
 
-    // Send thumbs up/down events for each trace (80% up, 20% down)
-    const thumbsUpCount = Math.round(traceIds.length * 0.8);
+    // Send thumbs up/down events for each trace
+    const thumbsUpCount = Math.round(traceIds.length * THUMBS_UP_RATIO);
     console.log(
       `Sending ${traceIds.length} thumbs up/down events (${thumbsUpCount} up, ${traceIds.length - thumbsUpCount} down)...`,
     );
 
-    await Promise.all(
-      traceIds.map((traceId, i) =>
-        fetch(`${LANGWATCH_ENDPOINT}/api/track_event`, {
+    const feedbackTimes = await Promise.all(
+      traceIds.map(async (traceId, i) => {
+        const start = Date.now();
+        const r = await fetch(`${LANGWATCH_ENDPOINT}/api/track_event`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -157,12 +162,14 @@ describe("OTEL traces API stress test", () => {
             metrics: { vote: i < thumbsUpCount ? 1 : -1 },
             timestamp: Date.now(),
           }),
-        }).then((r) => {
-          expect(r.ok).toBe(true);
-        }),
-      ),
+        });
+        const elapsed = Date.now() - start;
+        expect(r.ok).toBe(true);
+        return elapsed;
+      }),
     );
 
-    console.log("Thumbs up/down events sent.");
+    console.log("Thumbs up/down feedback benchmark:");
+    printStats(feedbackTimes);
   });
 });
