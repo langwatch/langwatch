@@ -49,7 +49,7 @@ export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
-// ─── Composition root ────────────────────────────────────────────────
+// ─── Main composition ───────────────────────────────────────────────
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
   new CanonicalizeSpanAttributesService(),
@@ -330,7 +330,7 @@ export class TraceSummaryFoldProjection
     event: AnnotationAddedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
-    const ids = state.annotationIds;
+    const ids = state.annotationIds ?? [];
     if (ids.includes(event.data.annotationId)) return state;
     return { ...state, annotationIds: [...ids, event.data.annotationId] };
   }
@@ -339,9 +339,10 @@ export class TraceSummaryFoldProjection
     event: AnnotationRemovedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
+    const ids = state.annotationIds ?? [];
     return {
       ...state,
-      annotationIds: state.annotationIds.filter(
+      annotationIds: ids.filter(
         (id) => id !== event.data.annotationId,
       ),
     };
@@ -351,7 +352,7 @@ export class TraceSummaryFoldProjection
     event: AnnotationsBulkSyncedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
-    const merged = [...new Set([...state.annotationIds, ...event.data.annotationIds])];
+    const merged = [...new Set([...(state.annotationIds ?? []), ...event.data.annotationIds])];
     return { ...state, annotationIds: merged };
   }
 }
