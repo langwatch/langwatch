@@ -146,7 +146,10 @@ export function findPromptReferenceInAncestors({
 
 /**
  * Among the children of a given parent, finds the one with a prompt reference
- * that started most recently before the target span's startTime.
+ * that started at or most recently before the target span's startTime.
+ *
+ * Same-millisecond siblings are included because SDK patterns like
+ * `Prompt.compile` and the LLM span often start at the exact same ms.
  */
 function findClosestPrecedingSibling({
   parentId,
@@ -167,7 +170,7 @@ function findClosestPrecedingSibling({
 
   for (const child of children) {
     if (excludeSpanIds.has(child.spanId)) continue;
-    if (child.startTime >= targetStartTime) continue;
+    if (child.startTime > targetStartTime) continue;
 
     const ref = parsePromptReference(child.attributes);
     if (ref.promptHandle && child.startTime > bestStartTime) {
