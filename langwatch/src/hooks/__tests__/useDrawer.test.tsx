@@ -524,4 +524,94 @@ describe("Complex Props (backward compatibility)", () => {
     expect(getComplexProps()).not.toHaveProperty("onSave");
     expect(getComplexProps().onSelect).toBe(onSave2);
   });
+
+  describe("when props contain primitive arrays", () => {
+    it("serializes string arrays into the URL instead of complexProps", () => {
+      const { result } = renderHook(() => useDrawer());
+      const selectedTraceIds = ["trace-1", "trace-2", "trace-3"];
+
+      act(() => {
+        result.current.openDrawer("addDatasetRecord", {
+          selectedTraceIds,
+        } as never);
+      });
+
+      // Primitive arrays should NOT be in complexProps
+      const complex = getComplexProps();
+      expect(complex).not.toHaveProperty("selectedTraceIds");
+
+      // Primitive arrays should be serialized into the URL
+      const pushCall = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushCall).toContain("drawer.selectedTraceIds=");
+      expect(pushCall).toContain("trace-1");
+      expect(pushCall).toContain("trace-2");
+      expect(pushCall).toContain("trace-3");
+    });
+
+    it("serializes number arrays into the URL instead of complexProps", () => {
+      const { result } = renderHook(() => useDrawer());
+      const ids = [1, 2, 3];
+
+      act(() => {
+        result.current.openDrawer("addDatasetRecord", {
+          ids,
+        } as never);
+      });
+
+      const complex = getComplexProps();
+      expect(complex).not.toHaveProperty("ids");
+
+      const pushCall = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushCall).toContain("drawer.ids=");
+    });
+
+    it("keeps non-primitive arrays (objects) in complexProps", () => {
+      const { result } = renderHook(() => useDrawer());
+      const items = [{ id: "1", name: "Item 1" }];
+
+      act(() => {
+        result.current.openDrawer("addDatasetRecord", {
+          items,
+        } as never);
+      });
+
+      const complex = getComplexProps();
+      expect(complex).toHaveProperty("items");
+      expect(complex.items).toBe(items);
+
+      const pushCall = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushCall).not.toContain("items");
+    });
+
+    it("preserves scalar primitives in the URL", () => {
+      const { result } = renderHook(() => useDrawer());
+
+      act(() => {
+        result.current.openDrawer("promptEditor", {
+          promptId: "test-id",
+        });
+      });
+
+      const complex = getComplexProps();
+      expect(complex).not.toHaveProperty("promptId");
+
+      const pushCall = mockPush.mock.calls[0]?.[0] as string;
+      expect(pushCall).toContain("drawer.promptId=test-id");
+    });
+
+    it("keeps functions in complexProps", () => {
+      const { result } = renderHook(() => useDrawer());
+      const callback = vi.fn();
+
+      act(() => {
+        result.current.openDrawer("promptEditor", {
+          onSave: callback,
+        });
+      });
+
+      const complex = getComplexProps();
+      expect(complex).toHaveProperty("onSave");
+      expect(complex.onSave).toBe(callback);
+    });
+  });
 });

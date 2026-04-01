@@ -190,11 +190,24 @@ export const useDrawer = () => {
       const nonSerializableProps: Record<string, unknown> = {};
 
       for (const [key, value] of Object.entries(props ?? {})) {
-        if (typeof value === "function" || typeof value === "object") {
-          // Functions and objects go to complexProps (not URL)
+        const isPrimitiveArray =
+          Array.isArray(value) &&
+          value.every(
+            (item) =>
+              item === null ||
+              (typeof item !== "object" && typeof item !== "function"),
+          );
+
+        if (
+          typeof value === "function" ||
+          (typeof value === "object" && value !== null && !isPrimitiveArray)
+        ) {
+          // Functions, non-array objects, and arrays of objects go to complexProps (not URL)
           nonSerializableProps[key] = value;
         } else {
-          // Primitives (string, number, boolean, null, undefined) go to URL
+          // Primitives (string, number, boolean, null, undefined) and
+          // primitive arrays (string[], number[], boolean[]) go to URL.
+          // qs.stringify with arrayFormat: "comma" serializes arrays as comma-separated values.
           serializableProps[key] = value;
         }
       }
