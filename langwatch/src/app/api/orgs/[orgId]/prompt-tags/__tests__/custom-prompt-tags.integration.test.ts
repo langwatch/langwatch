@@ -313,8 +313,24 @@ describe("Custom Prompt Tags API", () => {
       });
     });
 
-    describe("when name clashes with a built-in tag", () => {
-      it("returns 422 with error mentioning built-in", async () => {
+    describe("when name clashes with a protected tag", () => {
+      it("returns 422 with error mentioning protected for 'latest'", async () => {
+        asAdmin();
+
+        const res = await makeRequest(
+          "POST",
+          `/api/orgs/${org.id}/prompt-tags`,
+          { name: "latest" },
+        );
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.message).toMatch(/protected/i);
+      });
+    });
+
+    describe("when name is 'production' (seeded tag, not protected)", () => {
+      it("returns 201 when no existing production tag exists", async () => {
         asAdmin();
 
         const res = await makeRequest(
@@ -323,9 +339,9 @@ describe("Custom Prompt Tags API", () => {
           { name: "production" },
         );
 
-        expect(res.status).toBe(422);
+        expect(res.status).toBe(201);
         const body = await res.json();
-        expect(body.message).toMatch(/built-in/i);
+        expect(body.name).toBe("production");
       });
     });
 
@@ -509,18 +525,61 @@ describe("Custom Prompt Tags API", () => {
       });
     });
 
-    describe("when attempting to delete a protected tag", () => {
-      it("returns 422 with error mentioning protected tag", async () => {
+    describe("when attempting to delete a tag that does not exist", () => {
+      it("returns 404 for an unknown tagId", async () => {
         asAdmin();
 
         const res = await makeRequest(
           "DELETE",
-          `/api/orgs/${org.id}/prompt-tags/production`,
+          `/api/orgs/${org.id}/prompt-tags/ptag_nonexistent`,
+        );
+
+        expect(res.status).toBe(404);
+      });
+    });
+
+    describe("when attempting to delete the 'latest' protected tag", () => {
+      it("returns 422 with error mentioning protected", async () => {
+        asAdmin();
+
+        // Manually insert a tag named "latest" to test the guard
+        const latestTag = await prisma.promptTag.create({
+          data: {
+            id: `ptag_latest_${nanoid()}`,
+            organizationId: org.id,
+            name: "latest",
+          },
+        });
+
+        const res = await makeRequest(
+          "DELETE",
+          `/api/orgs/${org.id}/prompt-tags/${latestTag.id}`,
         );
 
         expect(res.status).toBe(422);
         const body = await res.json();
         expect(body.message).toMatch(/protected/i);
+      });
+    });
+
+    describe("when deleting a 'production' tag that was seeded", () => {
+      it("returns 204 and removes the tag", async () => {
+        asAdmin();
+
+        const productionTag = await prisma.promptTag.create({
+          data: {
+            id: `ptag_prod_${nanoid()}`,
+            organizationId: org.id,
+            name: "production",
+          },
+        });
+
+        const res = await makeRequest(
+          "DELETE",
+          `/api/orgs/${org.id}/prompt-tags/${productionTag.id}`,
+        );
+
+        expect(res.status).toBe(204);
       });
     });
 

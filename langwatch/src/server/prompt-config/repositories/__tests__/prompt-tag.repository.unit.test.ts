@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   validateTagName,
   PromptTagValidationError,
-  BUILT_IN_TAGS,
+  PROTECTED_TAGS,
 } from "../prompt-tag.repository";
 
 describe("validateTagName()", () => {
@@ -25,6 +25,14 @@ describe("validateTagName()", () => {
 
     it("does not throw for 'a1b2c3'", () => {
       expect(() => validateTagName("a1b2c3")).not.toThrow();
+    });
+
+    it("does not throw for 'production'", () => {
+      expect(() => validateTagName("production")).not.toThrow();
+    });
+
+    it("does not throw for 'staging'", () => {
+      expect(() => validateTagName("staging")).not.toThrow();
     });
   });
 
@@ -81,16 +89,24 @@ describe("validateTagName()", () => {
     });
   });
 
-  describe("when name is a built-in tag", () => {
-    for (const builtin of BUILT_IN_TAGS) {
-      it(`throws for '${builtin}' with message mentioning built-in`, () => {
-        expect(() => validateTagName(builtin)).toThrow(
+  describe("when name is a protected tag", () => {
+    for (const protected_ of PROTECTED_TAGS) {
+      it(`throws for '${protected_}' with message mentioning protected`, () => {
+        expect(() => validateTagName(protected_)).toThrow(
           expect.objectContaining({
             name: "PromptTagValidationError",
-            message: expect.stringMatching(/built-in/i),
+            message: expect.stringMatching(/protected/i),
           }),
         );
       });
     }
+
+    it("does not throw for 'production' (seeded tag, not protected)", () => {
+      expect(() => validateTagName("production")).not.toThrow();
+    });
+
+    it("does not throw for 'staging' (seeded tag, not protected)", () => {
+      expect(() => validateTagName("staging")).not.toThrow();
+    });
   });
 });

@@ -3,6 +3,7 @@ import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 import { OrganizationService } from "../organization.service";
+import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 
 // Bypass the traced() proxy for unit tests
 vi.mock("../../tracing", () => ({
@@ -35,11 +36,15 @@ describe("OrganizationService", () => {
     getAuditLogs: vi.fn(),
   };
 
+  const mockPromptTagRepo = {
+    seedForOrg: vi.fn(),
+  } as unknown as PromptTagRepository;
+
   let service: OrganizationService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new OrganizationService(mockRepo);
+    service = new OrganizationService(mockRepo, mockPromptTagRepo);
   });
 
   describe("getOrganizationIdByTeamId", () => {

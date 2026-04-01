@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { projectFactory } from "~/factories/project.factory";
 import { PromptService } from "../prompt.service";
+import { SEEDED_TAGS } from "~/prompts/constants/tags";
 
 describe("Feature: Prompt version tags", () => {
   let testOrganization: Organization;
@@ -42,6 +43,16 @@ describe("Feature: Prompt version tags", () => {
       },
     });
 
+    // Seed production and staging tags for the test org
+    await prisma.promptTag.createMany({
+      data: SEEDED_TAGS.map((tag) => ({
+        id: `ptag_${nanoid()}`,
+        organizationId: testOrganization.id,
+        name: tag,
+      })),
+      skipDuplicates: true,
+    });
+
     service = new PromptService(prisma);
   });
 
@@ -55,6 +66,9 @@ describe("Feature: Prompt version tags", () => {
     });
     await prisma.llmPromptConfig.deleteMany({
       where: { projectId: { in: [testProject.id, otherProject.id] } },
+    });
+    await prisma.promptTag.deleteMany({
+      where: { organizationId: testOrganization.id },
     });
     await prisma.project.deleteMany({
       where: { id: { in: [testProject.id, otherProject.id] } },

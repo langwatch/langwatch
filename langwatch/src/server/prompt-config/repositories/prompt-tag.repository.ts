@@ -1,13 +1,13 @@
 import type { PrismaClient, PromptTag } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
-import { VALID_TAGS, type ValidTag } from "~/prompts/constants/tags";
+import { SEEDED_TAGS } from "~/prompts/constants/tags";
 
 const logger = createLogger("langwatch:prompt-tags");
 
-/** Tags that are always available and cannot be created or deleted as custom tags. */
-export const BUILT_IN_TAGS = ["latest", ...VALID_TAGS] as const;
-export type BuiltInTag = (typeof BUILT_IN_TAGS)[number];
+/** Tags that cannot be created or deleted. Only 'latest' is protected — it is resolved at query time. */
+export const PROTECTED_TAGS = ["latest"] as const;
+export type ProtectedTag = (typeof PROTECTED_TAGS)[number];
 
 const TAG_NAME_REGEX = /^[a-z][a-z0-9_-]*$/;
 const PURELY_NUMERIC_REGEX = /^\d+$/;
@@ -31,7 +31,7 @@ export class PromptTagConflictError extends Error {
  * - Must not be empty
  * - Must not be purely numeric
  * - Must match /^[a-z][a-z0-9_-]*$/
- * - Must not clash with built-in tags
+ * - Must not clash with protected tags
  */
 export function validateTagName(name: string): void {
   if (!name) {
@@ -52,16 +52,16 @@ export function validateTagName(name: string): void {
     );
   }
 
-  if (BUILT_IN_TAGS.includes(name as BuiltInTag)) {
+  if (PROTECTED_TAGS.includes(name as ProtectedTag)) {
     throw new PromptTagValidationError(
-      `"${name}" is a built-in tag and cannot be created as a custom tag.`,
+      `"${name}" is a protected tag and cannot be created as a custom tag.`,
     );
   }
 }
 
 /**
- * Repository for managing custom prompt tag definitions.
- * Built-in tags (latest, production, staging) are not stored in the database.
+ * Repository for managing prompt tag definitions.
+ * Production and staging are seeded as custom tags per org.
  */
 export class PromptTagRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -180,9 +180,7 @@ export class PromptTagRepository {
 
   /**
    * Checks whether a tag name is valid for assignment within an org.
-   * Built-in tags (production, staging) are always valid.
-   * Custom tags are valid if a definition exists for the org.
-   * "latest" is resolved at query time and never assigned.
+   * All non-protected tags are validated via DB lookup.
    */
   async isValidTagForOrg({
     tag,
@@ -191,15 +189,24 @@ export class PromptTagRepository {
     tag: string;
     organizationId: string;
   }): Promise<boolean> {
-    if (VALID_TAGS.includes(tag as ValidTag)) {
-      return true;
-    }
-
-    const custom = await this.prisma.promptTag.findFirst({
+    const exists = await this.prisma.promptTag.findFirst({
       where: { organizationId, name: tag },
     });
+    return exists !== null;
+  }
 
-    return custom !== null;
+  /**
+   * Seeds default tags (production, staging) for a new org.
+   */
+  async seedForOrg({ organizationId }: { organizationId: string }): Promise<void> {
+    await this.prisma.promptTag.createMany({
+      data: SEEDED_TAGS.map((tag) => ({
+        id: `ptag_${nanoid()}`,
+        organizationId,
+        name: tag,
+      })),
+      skipDuplicates: true,
+    });
   }
 }
 

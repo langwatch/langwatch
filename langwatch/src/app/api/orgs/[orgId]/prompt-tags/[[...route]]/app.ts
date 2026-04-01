@@ -14,8 +14,9 @@ import {
   PromptTagRepository,
   PromptTagConflictError,
   PromptTagValidationError,
+  PROTECTED_TAGS,
+  type ProtectedTag,
 } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import { VALID_TAGS } from "~/prompts/constants/tags";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:prompt-tags");
@@ -150,13 +151,6 @@ app.delete("/:tagId", async (c) => {
     });
   }
 
-  // Reject attempts to delete protected tags by name
-  if ((VALID_TAGS as readonly string[]).includes(tagId)) {
-    throw new HTTPException(422, {
-      message: `"${tagId}" is a protected tag and cannot be deleted.`,
-    });
-  }
-
   const repo = new PromptTagRepository(prisma);
 
   const tag = await repo.getById({ id: tagId, organizationId: orgId });
@@ -167,8 +161,7 @@ app.delete("/:tagId", async (c) => {
     });
   }
 
-  // Also reject deletion of protected tags found by ID
-  if ((VALID_TAGS as readonly string[]).includes(tag.name)) {
+  if (PROTECTED_TAGS.includes(tag.name as ProtectedTag)) {
     throw new HTTPException(422, {
       message: `"${tag.name}" is a protected tag and cannot be deleted.`,
     });

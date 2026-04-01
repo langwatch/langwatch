@@ -26,7 +26,7 @@ import {
 } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
-import { VALID_TAGS } from "~/prompts/constants/tags";
+import { SEEDED_TAGS } from "~/prompts/constants/tags";
 import { api } from "~/utils/api";
 
 interface DeployPromptDialogProps {
@@ -74,7 +74,7 @@ export function DeployPromptDialog({
 
   type TagSelections = Record<string, string>;
   const [tagSelections, setTagSelections] = useState<TagSelections>(
-    () => Object.fromEntries(VALID_TAGS.map((t) => [t, ""])),
+    () => Object.fromEntries(SEEDED_TAGS.map((t) => [t, ""])),
   );
 
   const setTagVersionId = useCallback((tag: string, versionId: string) => {
@@ -86,12 +86,12 @@ export function DeployPromptDialog({
     if (!isOpen) return;
     const data = tagsQuery.data;
     if (!data?.length) {
-      setTagSelections(Object.fromEntries(VALID_TAGS.map((t) => [t, ""])));
+      setTagSelections(Object.fromEntries(SEEDED_TAGS.map((t) => [t, ""])));
       return;
     }
 
     const next: TagSelections = {};
-    for (const tag of VALID_TAGS) {
+    for (const tag of SEEDED_TAGS) {
       const found = data.find((t) => t.tag === tag);
       next[tag] = found?.versionId ?? "";
     }
@@ -105,7 +105,7 @@ export function DeployPromptDialog({
 
     const mutations: Promise<unknown>[] = [];
 
-    for (const tag of VALID_TAGS) {
+    for (const tag of SEEDED_TAGS) {
       const selectedVersionId = tagSelections[tag] ?? "";
       const currentTag = data.find((t) => t.tag === tag);
       if (selectedVersionId && selectedVersionId !== (currentTag?.versionId ?? "")) {
@@ -249,7 +249,7 @@ export function DeployPromptDialog({
               </Box>
 
               {/* Environment tag rows */}
-              {VALID_TAGS.map((tag) => {
+              {SEEDED_TAGS.map((tag) => {
                 const isAssigned = !!(tagSelections[tag]);
                 return (
                   <Box

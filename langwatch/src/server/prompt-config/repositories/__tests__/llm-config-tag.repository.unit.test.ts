@@ -37,36 +37,19 @@ describe("PromptVersionTagRepository", () => {
       });
     });
 
-    describe("when tag is 'canary'", () => {
-      it("throws a validation error", () => {
+    describe("when tag is a custom tag name", () => {
+      it("does not throw", () => {
         const repo = new PromptVersionTagRepository(makeMockPrisma());
 
-        expect(() => repo.validateTag("canary")).toThrow(
-          expect.objectContaining({
-            name: "TagValidationError",
-            message: expect.stringContaining('Invalid tag "canary"'),
-          }),
-        );
+        expect(() => repo.validateTag("canary")).not.toThrow();
       });
     });
 
-    describe("when tag is 'latest'", () => {
+    describe("when tag is empty", () => {
       it("throws a validation error", () => {
         const repo = new PromptVersionTagRepository(makeMockPrisma());
 
-        expect(() => repo.validateTag("latest")).toThrow(
-          TagValidationError,
-        );
-      });
-    });
-
-    describe("when tag is an arbitrary string", () => {
-      it("throws a validation error", () => {
-        const repo = new PromptVersionTagRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("custom-release")).toThrow(
-          TagValidationError,
-        );
+        expect(() => repo.validateTag("")).toThrow(TagValidationError);
       });
     });
   });
@@ -95,26 +78,6 @@ describe("PromptVersionTagRepository", () => {
             ),
           }),
         );
-      });
-    });
-
-    describe("when tag is invalid", () => {
-      it("throws a validation error without hitting the database", async () => {
-        const prisma = makeMockPrisma();
-        const repo = new PromptVersionTagRepository(prisma);
-
-        await expect(
-          repo.assignTag({
-            configId: "config-1",
-            versionId: "v1",
-            tag: "canary",
-            projectId: "project-1",
-          }),
-        ).rejects.toThrow(TagValidationError);
-
-        expect(
-          prisma.llmPromptConfigVersion.findFirst,
-        ).not.toHaveBeenCalled();
       });
     });
 

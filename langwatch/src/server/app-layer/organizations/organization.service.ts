@@ -21,6 +21,7 @@ import type {
   UpdateTeamMemberRoleInput,
 } from "./repositories/organization.repository";
 import type { User } from "@prisma/client";
+import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 
 export type OrganizationFeatureName = "billable_events_usage";
 
@@ -29,7 +30,10 @@ export type OrganizationFeatureName = "billable_events_usage";
  * License checks remain in the router layer (they require request-scoped user context).
  */
 export class OrganizationService {
-  constructor(private readonly repo: OrganizationRepository) {}
+  constructor(
+    private readonly repo: OrganizationRepository,
+    private readonly promptTagRepo: PromptTagRepository,
+  ) {}
 
   async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
     return this.repo.getOrganizationIdByTeamId(teamId);
@@ -101,7 +105,7 @@ export class OrganizationService {
       "-" +
       teamId.substring(teamId.length - 6);
 
-    return this.repo.createAndAssign({
+    const result = await this.repo.createAndAssign({
       userId: params.userId,
       orgId,
       orgName,
@@ -112,6 +116,12 @@ export class OrganizationService {
       signUpData: params.signUpData,
       pricingModel: PricingModel.SEAT_EVENT,
     });
+
+    await this.promptTagRepo.seedForOrg({
+      organizationId: result.organization.id,
+    });
+
+    return result;
   }
 
   /**

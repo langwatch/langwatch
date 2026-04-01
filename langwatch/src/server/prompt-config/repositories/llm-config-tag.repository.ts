@@ -1,11 +1,7 @@
 import type { Prisma, PrismaClient, PromptVersionTag } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
-import { VALID_TAGS, type ValidTag } from "~/prompts/constants/tags";
 import { PromptTagRepository } from "./prompt-tag.repository";
-
-export { VALID_TAGS } from "~/prompts/constants/tags";
-export type { ValidTag } from "~/prompts/constants/tags";
 
 const logger = createLogger("langwatch:prompt-version-tags");
 
@@ -31,14 +27,14 @@ export class PromptVersionTagRepository {
   }
 
   /**
-   * Validates that a tag is one of the built-in assignable values.
+   * Validates that a tag is acceptable for assignment without org context.
    * For validation that also accepts custom tags, use isValidTag() with organizationId.
    */
-  validateTag(tag: string): asserts tag is ValidTag {
-    if (!VALID_TAGS.includes(tag as ValidTag)) {
+  validateTag(tag: string): void {
+    if (!tag) {
       logger.warn({ tag }, "Invalid tag name rejected");
       throw new TagValidationError(
-        `Invalid tag "${tag}". Must be a built-in tag ("production", "staging") or a custom tag defined for this org.`,
+        `Invalid tag "${tag}". Must be a custom tag defined for this org.`,
       );
     }
   }
