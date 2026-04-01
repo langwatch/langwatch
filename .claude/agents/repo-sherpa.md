@@ -1,7 +1,7 @@
 ---
 name: repo-sherpa
-description: "Use this agent when the user needs help understanding the repository, its structure, purpose, or how to use it. Also use when the user wants to run commands, make changes to the codebase, needs documentation updated, or has questions about developer experience. This agent handles all README, /docs folder, CLAUDE.md, sub-agent maintenance, and DX improvements."
-model: opus
+description: "Repository structure, documentation, DX, and meta-layer (agents/skills/docs) maintenance."
+model: sonnet
 color: pink
 ---
 

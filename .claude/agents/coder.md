@@ -18,7 +18,6 @@ Before writing ANY code:
 
 ### 2. Read Project Standards
 
-- `AGENTS.md` - commands, structure, common mistakes
 - `dev/docs/CODING_STANDARDS.md` - clean code, SOLID
 - `dev/docs/TESTING_PHILOSOPHY.md` - Outside-In TDD
 
