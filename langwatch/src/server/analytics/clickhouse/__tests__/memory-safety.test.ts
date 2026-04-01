@@ -84,11 +84,9 @@ describe("memory-safety", () => {
         aggregation: "sum",
         label: "event_type (joins stored_spans for Events)",
       },
-      {
-        metric: "metadata.span_type" as FlattenAnalyticsMetricsEnum,
-        aggregation: "cardinality",
-        label: "span_type (joins stored_spans)",
-      },
+      // metadata.span_type with cardinality no longer joins stored_spans
+      // (fix: span_type cardinality uses uniq(TraceId) from trace_summaries only).
+      // Non-cardinality aggregations still join — covered by the groupBy test below.
     ];
 
     for (const { metric, aggregation, label } of metricsRequiringSpans) {
