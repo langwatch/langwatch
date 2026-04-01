@@ -42,5 +42,9 @@ export function isAtOrBeforeCutoffMarker(
   const cutoffTimestamp = parseInt(cutoffMarker.slice(0, colonIdx), 10);
   const cutoffEventId = cutoffMarker.slice(colonIdx + 1);
 
+  if (!Number.isFinite(cutoffTimestamp) || cutoffEventId.length === 0) {
+    return false; // Corrupted marker
+  }
+
   return isAtOrBeforeCutoff(eventTimestamp, eventId, cutoffTimestamp, cutoffEventId);
 }

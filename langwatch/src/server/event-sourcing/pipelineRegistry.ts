@@ -624,8 +624,9 @@ export function buildFoldProjections(
         pauseKey: `global_projections/projection/${projectDailySdkUsageProjection.name}`,
       });
     }
-  } catch {
-    // Skip if unavailable
+  } catch (e: unknown) {
+    const isModuleNotFound = e instanceof Error && "code" in e && (e as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND";
+    if (!isModuleNotFound) throw e;
   }
 
   return results;

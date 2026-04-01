@@ -14,10 +14,12 @@ import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
 
 describe("replayEventLoader", () => {
   let tenantId: string;
+  let otherTenantId: string;
 
   beforeAll(async () => {
     await startTestContainers();
     tenantId = generateTestTenantId();
+    otherTenantId = generateTestTenantId();
 
     const client = getTestClickHouseClient()!;
 
@@ -56,6 +58,18 @@ describe("replayEventLoader", () => {
         EventVersion: "2025-01-01",
         EventPayload: JSON.stringify({ value: 30 }),
       },
+      // Second tenant with colliding aggregate ID to verify tenant isolation
+      {
+        TenantId: otherTenantId,
+        AggregateType: "test",
+        AggregateId: "agg-1",
+        EventId: "evt-other-001",
+        EventType: "test.event",
+        EventTimestamp: 1700000000500,
+        EventOccurredAt: 1700000000500,
+        EventVersion: "2025-01-01",
+        EventPayload: JSON.stringify({ value: 999 }),
+      },
     ];
 
     await client.insert({
@@ -69,8 +83,8 @@ describe("replayEventLoader", () => {
     const client = getTestClickHouseClient();
     if (client) {
       await client.exec({
-        query: `ALTER TABLE event_log DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
+        query: `ALTER TABLE event_log DELETE WHERE TenantId IN ({tenantId:String}, {otherTenantId:String})`,
+        query_params: { tenantId, otherTenantId },
       });
     }
     await stopTestContainers();
@@ -260,6 +274,42 @@ describe("replayEventLoader", () => {
         expect(events).toHaveLength(1);
         expect(events[0]!.id).toBe("evt-001");
       });
+    });
+
+    describe("when another tenant has the same aggregateId", () => {
+      it("returns only the requested tenant's events", async () => {
+        const client = getTestClickHouseClient()!;
+        const events = await batchLoadAggregateEvents({
+          client,
+          tenantId,
+          aggregateIds: ["agg-1"],
+          eventTypes: ["test.event"],
+          maxCutoffEventId: "zzz",
+          cursorEventId: "",
+          batchSize: 100,
+        });
+
+        // Only tenant's events, not otherTenantId's evt-other-001
+        expect(events.every((e) => e.tenantId === tenantId)).toBe(true);
+        expect(events).toHaveLength(2);
+      });
+    });
+  });
+
+  describe("tenant isolation across queries", () => {
+    it("batchGetCutoffEventIds excludes other tenant's events", async () => {
+      const client = getTestClickHouseClient()!;
+      const cutoffs = await batchGetCutoffEventIds({
+        client,
+        tenantId,
+        aggregateIds: ["agg-1"],
+        eventTypes: ["test.event"],
+      });
+
+      const cutoff = cutoffs.get(`${tenantId}:test:agg-1`);
+      expect(cutoff).toBeDefined();
+      // Must be evt-002 (tenant's last), not evt-other-001 (other tenant's)
+      expect(cutoff!.eventId).toBe("evt-002");
     });
   });
 });

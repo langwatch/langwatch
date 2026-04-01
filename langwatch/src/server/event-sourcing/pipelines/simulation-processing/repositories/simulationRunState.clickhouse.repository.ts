@@ -306,23 +306,41 @@ export class SimulationRunStateRepositoryClickHouse<
       "SimulationRunStateRepositoryClickHouse.storeProjectionBatch",
     );
 
-    const records = projections.map((projection) => {
-      const scenarioRunId = String(projection.aggregateId);
-      return this.mapProjectionDataToClickHouseRecord(
-        projection.data as SimulationRunStateData,
-        String(context.tenantId),
-        projection.id,
-        projection.version,
-        scenarioRunId,
-      );
-    });
+    try {
+      const records = projections.map((projection) => {
+        const scenarioRunId = String(projection.aggregateId);
+        return this.mapProjectionDataToClickHouseRecord(
+          projection.data as SimulationRunStateData,
+          String(context.tenantId),
+          projection.id,
+          projection.version,
+          scenarioRunId,
+        );
+      });
 
-    const client = await this.resolveClient(context.tenantId);
-    await client.insert({
-      table: TABLE_NAME,
-      values: records,
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-    });
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({
+        tenantId: context.tenantId,
+        count: projections.length,
+        error: errorMessage,
+      }, "Failed to batch store simulation projections in ClickHouse");
+      throw new StoreError(
+        "storeProjectionBatch",
+        "SimulationRunStateRepositoryClickHouse",
+        `Failed to batch store ${projections.length} projections: ${errorMessage}`,
+        ErrorCategory.CRITICAL,
+        { count: projections.length },
+        error,
+      );
+    }
   }
 }

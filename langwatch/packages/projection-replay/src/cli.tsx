@@ -659,6 +659,11 @@ async function main() {
           ? parseTenantIds(opts.tenantId)
           : undefined;
 
+      if (opts.tenantFile && (!cliTenantIds || cliTenantIds.length === 0)) {
+        console.error("--tenant-file is empty or contains only comments. Refusing to replay all tenants in unattended mode.");
+        process.exit(1);
+      }
+
       const batchMode = !!opts.tenantFile;
       const needsWizard = !opts.projection || !opts.since;
 

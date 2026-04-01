@@ -92,7 +92,7 @@ After all projections complete, the service runs `OPTIMIZE TABLE {table}` (witho
 
 **Why stream events instead of loading all into memory?** With 70M events, a batch of 1000 aggregates could have 100K+ events with large JSON payloads. Loading all into memory risks OOM. Streaming through `FoldAccumulator` keeps memory bounded by the number of fold states (≤ batch size), not the number of events.
 
-**Why not FINAL on OPTIMIZE?** `OPTIMIZE TABLE ... FINAL` forces a synchronous full merge which can be very expensive on large tables and block other operations. Without FINAL, ClickHouse schedules the merge in the background, which is sufficient since ReplacingMergeTree dedup is eventually consistent and queries already handle duplicates via `LIMIT 1 BY` or `argMax`.
+**Why not FINAL on OPTIMIZE?** `OPTIMIZE TABLE ... FINAL` forces a synchronous full merge which can be very expensive on large tables and block other operations. Without FINAL, ClickHouse schedules the merge in the background, which is sufficient since ReplacingMergeTree dedup is eventually consistent and queries already handle duplicates via the IN-tuple dedup pattern (`GROUP BY key + max(UpdatedAt)` in subquery) or `argMax`.
 
 **Why per-tenant CH client resolution?** Some tenants have dedicated ClickHouse databases (for data residency or performance isolation). The `clickhouseClientResolver: (tenantId: string) => Promise<ClickHouseClient>` pattern lets the replay service route writes to the correct database without hardcoding the topology.
 

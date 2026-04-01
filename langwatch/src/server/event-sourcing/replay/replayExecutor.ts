@@ -49,7 +49,8 @@ export class FoldAccumulator {
   }
 
   async flush(writeBatchSize = DEFAULT_WRITE_BATCH_SIZE): Promise<void> {
-    if (this.touchedKeys.size === 0 || !this.projection.store.storeBatch) return;
+    if (this.touchedKeys.size === 0) return;
+    if (writeBatchSize <= 0) throw new Error("writeBatchSize must be > 0");
 
     // Group by tenant so each CH INSERT targets a single tenant
     const byTenant = new Map<string, Array<{ state: any; context: ProjectionStoreContext }>>();
@@ -76,10 +77,18 @@ export class FoldAccumulator {
       list.push(entry);
     }
 
+    const store = this.projection.store;
     for (const [_tenantId, entries] of byTenant) {
-      for (let i = 0; i < entries.length; i += writeBatchSize) {
-        const chunk = entries.slice(i, i + writeBatchSize);
-        await this.projection.store.storeBatch(chunk);
+      if (store.storeBatch) {
+        for (let i = 0; i < entries.length; i += writeBatchSize) {
+          const chunk = entries.slice(i, i + writeBatchSize);
+          await store.storeBatch(chunk);
+        }
+      } else {
+        // Fallback: sequential single-entry writes
+        for (const entry of entries) {
+          await store.store(entry.state, entry.context);
+        }
       }
     }
   }
