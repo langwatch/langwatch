@@ -254,6 +254,26 @@ export class EEWebhookService implements WebhookService {
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
 
+    // Send "Subscription cancelled" Slack notification
+    try {
+      const org = await this.organizationRepository.findNameById(
+        existingSubscription.organizationId,
+      );
+      await getApp().notifications.sendSlackSubscriptionEvent({
+        type: "cancelled",
+        organizationId: existingSubscription.organizationId,
+        organizationName: org?.name ?? "Unknown",
+        plan: existingSubscription.plan,
+        subscriptionId: existingSubscription.id,
+        cancellationDate: new Date(),
+      });
+    } catch (err) {
+      logger.error(
+        { stripeSubscriptionId, err },
+        "[stripeWebhook] Failed to send cancellation notification",
+      );
+    }
+
     const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existingSubscription.organizationId,
     );
@@ -392,6 +412,36 @@ export class EEWebhookService implements WebhookService {
       logger.warn(
         { subscriptionId },
         "[stripeWebhook] No subscription record found, skipping sync",
+      );
+      return;
+    }
+
+    // Guard: a $0 invoice generated during cancellation must not reactivate the subscription.
+    // Stripe fires invoice.payment_succeeded for $0 prorated invoices even when the subscription
+    // is being cancelled. Check the authoritative Stripe status before activating.
+    let stripeCanceled = false;
+    try {
+      const stripeSubscription =
+        await this.stripe.subscriptions.retrieve(subscriptionId);
+      stripeCanceled = stripeSubscription.status === "canceled";
+    } catch (err) {
+      logger.warn(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
+      );
+      if (previousSubscription.status === SubscriptionStatus.CANCELLED) {
+        logger.info(
+          { subscriptionId },
+          "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
+        );
+        return;
+      }
+    }
+
+    if (stripeCanceled) {
+      logger.info(
+        { subscriptionId },
+        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
       );
       return;
     }

@@ -104,14 +104,6 @@ export function SubscriptionPage() {
   }, []);
 
 
-  // Fetch last Stripe-linked subscription
-  const lastSubscription = api.subscription.getLastSubscription.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization },
-  );
-
-  const hasStripeSubscription = !!lastSubscription.data?.stripeSubscriptionId;
-
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -477,10 +469,8 @@ export function SubscriptionPage() {
           }
         />
 
-        {/* Invoices Block - only for paying customers with a Stripe subscription */}
-        {!isDeveloperPlan && hasStripeSubscription && (
-          <InvoicesBlock organizationId={organization.id} onViewAllInStripe={handleManageSubscription} />
-        )}
+        {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}
+        <InvoicesBlock organizationId={organization.id} onViewAllInStripe={handleManageSubscription} />
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
         {(isUpgradePlanRequired) && (
