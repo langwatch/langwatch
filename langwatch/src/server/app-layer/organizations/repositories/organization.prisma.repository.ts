@@ -22,14 +22,18 @@ import type {
   CreateAndAssignResult,
   DeleteMemberInput,
   EnrichedAuditLog,
+  FullyLoadedOrganization,
   OrganizationFeatureRow,
   OrganizationForBilling,
+  OrganizationMemberWithUser,
   OrganizationRepository,
   OrganizationWithAdmins,
+  OrganizationWithMembersAndTheirTeams,
   UpdateMemberRoleInput,
   UpdateOrganizationInput,
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
+import type { User } from "@prisma/client";
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -217,7 +221,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     isDemo: boolean;
     demoProjectUserId: string;
     demoProjectId: string;
-  }): Promise<unknown[]> {
+  }): Promise<FullyLoadedOrganization[]> {
     const { userId, isDemo, demoProjectId } = params;
 
     return this.prisma.organization.findMany({
@@ -271,14 +275,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       },
-    }) as Promise<unknown[]>;
+    }) as Promise<FullyLoadedOrganization[]>;
   }
 
   async getOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
-  }): Promise<unknown | null> {
+  }): Promise<OrganizationWithMembersAndTheirTeams | null> {
     const { organizationId, userId, includeDeactivated } = params;
 
     return this.prisma.organization.findFirst({
@@ -310,14 +314,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       },
-    });
+    }) as Promise<OrganizationWithMembersAndTheirTeams | null>;
   }
 
   async getMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
-  }): Promise<unknown | null> {
+  }): Promise<OrganizationMemberWithUser | null> {
     const { organizationId, userId, currentUserId } = params;
 
     const currentUserMembership =
@@ -350,10 +354,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       },
-    });
+    }) as Promise<OrganizationMemberWithUser | null>;
   }
 
-  async getAllMembers(organizationId: string): Promise<unknown[]> {
+  async getAllMembers(organizationId: string): Promise<User[]> {
     return this.prisma.user.findMany({
       where: {
         deactivatedAt: null,
@@ -949,6 +953,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       projectId: log.projectId,
       action: log.action,
       payload: log.args,
+      ipAddress: log.ipAddress,
+      userAgent: log.userAgent,
+      error: log.error,
+      args: log.args,
       user: userMap.get(log.userId) ?? null,
       project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
     }));

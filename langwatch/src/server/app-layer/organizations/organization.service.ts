@@ -9,13 +9,17 @@ import type {
   AuditLogFilters,
   CreateAndAssignResult,
   EnrichedAuditLog,
+  FullyLoadedOrganization,
   OrganizationForBilling,
+  OrganizationMemberWithUser,
   OrganizationRepository,
   OrganizationWithAdmins,
+  OrganizationWithMembersAndTheirTeams,
   UpdateMemberRoleInput,
   UpdateOrganizationInput,
   UpdateTeamMemberRoleInput,
 } from "./repositories/organization.repository";
+import type { User } from "@prisma/client";
 
 export type OrganizationFeatureName = "billable_events_usage";
 
@@ -120,7 +124,7 @@ export class OrganizationService {
     isDemo: boolean;
     demoProjectUserId: string;
     demoProjectId: string;
-  }): Promise<unknown[]> {
+  }): Promise<FullyLoadedOrganization[]> {
     return this.repo.getAllForUser(params);
   }
 
@@ -132,7 +136,7 @@ export class OrganizationService {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
-  }): Promise<unknown | null> {
+  }): Promise<OrganizationWithMembersAndTheirTeams | null> {
     return this.repo.getOrganizationWithMembers(params);
   }
 
@@ -145,14 +149,14 @@ export class OrganizationService {
     organizationId: string;
     userId: string;
     currentUserId: string;
-  }): Promise<unknown | null> {
+  }): Promise<OrganizationMemberWithUser | null> {
     return this.repo.getMemberById(params);
   }
 
   /**
    * Returns all active (non-deactivated) users in an organization.
    */
-  async getAllMembers(organizationId: string): Promise<unknown[]> {
+  async getAllMembers(organizationId: string): Promise<User[]> {
     return this.repo.getAllMembers(organizationId);
   }
 

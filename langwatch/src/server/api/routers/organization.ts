@@ -1,13 +1,6 @@
 import {
-  type CustomRole,
-  type Organization,
-  type OrganizationUser,
   OrganizationUserRole,
-  type Project,
-  type Team,
-  type TeamUser,
   TeamUserRole,
-  type User,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -48,53 +41,8 @@ import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
+import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 
-export type TeamWithProjects = Team & {
-  projects: Project[];
-};
-
-export type TeamWithProjectsAndMembers = TeamWithProjects & {
-  members: (TeamUser & {
-    assignedRole?: CustomRole | null;
-  })[];
-};
-
-export type OrganizationFeature = {
-  feature: string;
-  trialEndDate: Date | null;
-};
-
-export type FullyLoadedOrganization = Organization & {
-  members: OrganizationUser[];
-  teams: TeamWithProjectsAndMembers[];
-  features: OrganizationFeature[];
-};
-
-export type TeamMemberWithUser = TeamUser & {
-  user: User;
-  assignedRole?: CustomRole | null;
-};
-
-export type TeamMemberWithTeam = TeamUser & {
-  team: Team;
-};
-
-export type TeamWithProjectsAndMembersAndUsers = Team & {
-  members: TeamMemberWithUser[];
-  projects: Project[];
-};
-
-export type UserWithTeams = User & {
-  teamMemberships: TeamMemberWithTeam[];
-};
-
-export type OrganizationMemberWithUser = OrganizationUser & {
-  user: UserWithTeams;
-};
-
-export type OrganizationWithMembersAndTheirTeams = Organization & {
-  members: OrganizationMemberWithUser[];
-};
 
 const customTeamRoleInputSchema = z
   .string()

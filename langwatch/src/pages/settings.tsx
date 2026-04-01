@@ -40,7 +40,7 @@ import { useActivePlan } from "../hooks/useActivePlan";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
-import type { FullyLoadedOrganization } from "../server/api/routers/organization";
+import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 
 type OrganizationFormData = {

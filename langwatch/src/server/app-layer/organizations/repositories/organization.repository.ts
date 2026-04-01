@@ -1,10 +1,64 @@
 import type {
+  CustomRole,
+  Organization,
+  OrganizationUser,
   OrganizationUserRole,
-  Prisma,
   PricingModel,
+  Project,
+  Team,
+  TeamUser,
   TeamUserRole,
+  User,
 } from "@prisma/client";
 import type { OrganizationFeatureName } from "../organization.service";
+
+export type TeamWithProjects = Team & {
+  projects: Project[];
+};
+
+export type TeamWithProjectsAndMembers = TeamWithProjects & {
+  members: (TeamUser & {
+    assignedRole?: CustomRole | null;
+  })[];
+};
+
+export type OrganizationFeature = {
+  feature: string;
+  trialEndDate: Date | null;
+};
+
+export type FullyLoadedOrganization = Organization & {
+  members: OrganizationUser[];
+  teams: TeamWithProjectsAndMembers[];
+  features: OrganizationFeature[];
+};
+
+export type TeamMemberWithUser = TeamUser & {
+  user: User;
+  assignedRole?: CustomRole | null;
+};
+
+export type TeamMemberWithTeam = TeamUser & {
+  team: Team;
+  assignedRole?: CustomRole | null;
+};
+
+export type TeamWithProjectsAndMembersAndUsers = Team & {
+  members: TeamMemberWithUser[];
+  projects: Project[];
+};
+
+export type UserWithTeams = User & {
+  teamMemberships: TeamMemberWithTeam[];
+};
+
+export type OrganizationMemberWithUser = OrganizationUser & {
+  user: UserWithTeams;
+};
+
+export type OrganizationWithMembersAndTheirTeams = Organization & {
+  members: OrganizationMemberWithUser[];
+};
 
 export interface OrganizationFeatureRow {
   feature: string;
@@ -87,6 +141,10 @@ export interface EnrichedAuditLog {
   projectId: string | null;
   action: string;
   payload: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  error: string | null;
+  args: unknown;
   user: { id: string; name: string | null; email: string | null } | null;
   project: { id: string; name: string } | null;
 }
@@ -181,21 +239,21 @@ export interface OrganizationRepository {
     isDemo: boolean;
     demoProjectUserId: string;
     demoProjectId: string;
-  }): Promise<unknown[]>;
+  }): Promise<FullyLoadedOrganization[]>;
 
   getOrganizationWithMembers(params: {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
-  }): Promise<unknown | null>;
+  }): Promise<OrganizationWithMembersAndTheirTeams | null>;
 
   getMemberById(params: {
     organizationId: string;
     userId: string;
     currentUserId: string;
-  }): Promise<unknown | null>;
+  }): Promise<OrganizationMemberWithUser | null>;
 
-  getAllMembers(organizationId: string): Promise<unknown[]>;
+  getAllMembers(organizationId: string): Promise<User[]>;
 
   update(input: UpdateOrganizationInput): Promise<void>;
 
@@ -286,7 +344,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     isDemo: boolean;
     demoProjectUserId: string;
     demoProjectId: string;
-  }): Promise<unknown[]> {
+  }): Promise<FullyLoadedOrganization[]> {
     return [];
   }
 
@@ -294,7 +352,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     organizationId: string;
     userId: string;
     includeDeactivated: boolean;
-  }): Promise<unknown | null> {
+  }): Promise<OrganizationWithMembersAndTheirTeams | null> {
     return null;
   }
 
@@ -302,11 +360,11 @@ export class NullOrganizationRepository implements OrganizationRepository {
     organizationId: string;
     userId: string;
     currentUserId: string;
-  }): Promise<unknown | null> {
+  }): Promise<OrganizationMemberWithUser | null> {
     return null;
   }
 
-  async getAllMembers(_organizationId: string): Promise<unknown[]> {
+  async getAllMembers(_organizationId: string): Promise<User[]> {
     return [];
   }
 
