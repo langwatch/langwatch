@@ -21,7 +21,7 @@ Feature: TraceMessage error state UX
     Then the button remains rendered with disabled state
     And the button shows a loading indicator
 
-  Scenario: retry failure shows an error toast
+  Scenario: retry failure keeps the error alert visible with updated message
     Given the trace query has errored
     When the user clicks the retry button and the retry also fails
-    Then an error toast notification is shown to the user
+    Then the error alert remains visible with the appropriate error message

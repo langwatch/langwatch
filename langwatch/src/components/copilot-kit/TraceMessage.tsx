@@ -10,7 +10,6 @@ import { LuListTree, LuRefreshCw } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { easyCatchToast } from "../../utils/easyCatchToast";
 import { getTraceErrorMessage } from "./getTraceErrorMessage";
 
 // Constants
@@ -44,13 +43,7 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
         traceId={traceId}
         error={traceQuery.error}
         isRefetching={traceQuery.isRefetching}
-        onRetry={() =>
-          void traceQuery.refetch().then((result) => {
-            if (result.error) {
-              easyCatchToast(result.error, "TraceMessage refetch");
-            }
-          })
-        }
+        onRetry={() => void traceQuery.refetch()}
       />
     );
   }
