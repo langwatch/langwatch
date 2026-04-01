@@ -4,22 +4,22 @@ import {
   authenticateScimRequest,
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
-import { ScimService } from "~/server/scim/scim.service";
-import { scimCreateUserRequestSchema } from "~/server/scim/scim.types";
+import { ScimGroupService } from "~/server/scim/scim-group.service";
+import { scimCreateGroupRequestSchema } from "~/server/scim/scim.types";
 import type { ScimError } from "~/server/scim/scim.types";
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
   if (isAuthError(auth)) return auth;
 
-  const scimService = ScimService.create(prisma);
+  const service = ScimGroupService.create(prisma);
 
   const searchParams = request.nextUrl.searchParams;
   const filter = searchParams.get("filter") ?? undefined;
   const startIndex = parseInt(searchParams.get("startIndex") ?? "1", 10) || 1;
   const count = parseInt(searchParams.get("count") ?? "100", 10) || 100;
 
-  const result = await scimService.listUsers({
+  const result = await service.listGroups({
     organizationId: auth.organizationId,
     filter,
     startIndex,
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
   if (isAuthError(auth)) return auth;
 
-  const scimService = ScimService.create(prisma);
+  const service = ScimGroupService.create(prisma);
 
   let body: unknown;
   try {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = scimCreateUserRequestSchema.safeParse(body);
+  const parsed = scimCreateGroupRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await scimService.createUser({
+  const result = await service.createGroup({
     request: parsed.data,
     organizationId: auth.organizationId,
   });

@@ -60,4 +60,57 @@ export const scimTokenRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+
+  listTeamMappings: enterpriseScimProcedure
+    .query(async ({ ctx, input }) => {
+      const teams = await ctx.prisma.team.findMany({
+        where: {
+          organizationId: input.organizationId,
+          archivedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          externalScimId: true,
+        },
+        orderBy: { name: "asc" },
+      });
+      return teams;
+    }),
+
+  linkTeam: enterpriseScimProcedure
+    .input(
+      z.object({
+        teamId: z.string(),
+        externalScimId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.team.update({
+        where: {
+          id: input.teamId,
+          organizationId: input.organizationId,
+        },
+        data: { externalScimId: input.externalScimId },
+      });
+      return { success: true };
+    }),
+
+  unlinkTeam: enterpriseScimProcedure
+    .input(
+      z.object({
+        teamId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.team.update({
+        where: {
+          id: input.teamId,
+          organizationId: input.organizationId,
+        },
+        data: { externalScimId: null },
+      });
+      return { success: true };
+    }),
 });

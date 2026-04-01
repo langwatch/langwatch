@@ -79,6 +79,7 @@ model User {
     savedViews              SavedView[]
     labelsCreated           PromptVersionLabel[]   @relation("labelCreatedBy")
     labelsUpdated           PromptVersionLabel[]   @relation("labelUpdatedBy")
+    scimGroupMemberships    ScimGroupMembership[]
 
 }
 
@@ -135,17 +136,20 @@ model OrganizationUser {
 }
 
 model Team {
-    id             String       @id @default(nanoid())
-    name           String
-    slug           String       @unique
-    members        TeamUser[]
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    projects       Project[]
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    archivedAt     DateTime?
+    id              String       @id @default(nanoid())
+    name            String
+    slug            String       @unique
+    members         TeamUser[]
+    organizationId  String
+    organization    Organization @relation(fields: [organizationId], references: [id])
+    projects        Project[]
+    createdAt       DateTime     @default(now())
+    updatedAt       DateTime     @default(now()) @updatedAt
+    archivedAt      DateTime?
+    externalScimId    String?
+    scimGroupMappings ScimGroupMapping[]
 
+    @@unique([organizationId, externalScimId])
     @@index([organizationId])
 }
 
@@ -182,7 +186,8 @@ model Organization {
     CustomRoles   CustomRole[]
     notifications Notification[]
     subscriptions Subscription[]
-    scimTokens    ScimToken[]
+    scimTokens         ScimToken[]
+    scimGroupMappings  ScimGroupMapping[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -1020,7 +1025,8 @@ model CustomRole {
     permissions    Json // Array of Permission strings
     createdAt      DateTime     @default(now())
     updatedAt      DateTime     @default(now()) @updatedAt
-    assignedUsers  TeamUser[]
+    assignedUsers      TeamUser[]
+    scimGroupMappings  ScimGroupMapping[]
 
     @@unique([organizationId, name])
     @@index([organizationId])
@@ -1211,6 +1217,37 @@ model InvoiceItem {
     @@index([invoiceId])
 }
 
+
+model ScimGroupMapping {
+    id                String               @id @default(nanoid())
+    organizationId    String
+    organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    externalGroupId   String
+    externalGroupName String
+    teamId            String?
+    team              Team?                @relation(fields: [teamId], references: [id])
+    role              TeamUserRole?
+    customRoleId      String?
+    customRole        CustomRole?          @relation(fields: [customRoleId], references: [id])
+    createdAt         DateTime             @default(now())
+    updatedAt         DateTime             @updatedAt
+    memberships       ScimGroupMembership[]
+
+    @@unique([organizationId, externalGroupId])
+    @@index([organizationId])
+    @@index([teamId])
+}
+
+model ScimGroupMembership {
+    scimGroupMappingId String
+    scimGroupMapping   ScimGroupMapping @relation(fields: [scimGroupMappingId], references: [id], onDelete: Cascade)
+    userId             String
+    user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt          DateTime         @default(now())
+
+    @@id([scimGroupMappingId, userId])
+    @@index([userId])
+}
 
 model BillingMeterCheckpoint {
     id                   String   @id @default(cuid())

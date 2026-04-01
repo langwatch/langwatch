@@ -4,8 +4,11 @@ import {
   authenticateScimRequest,
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
-import { ScimService } from "~/server/scim/scim.service";
-import { scimCreateUserRequestSchema, scimPatchRequestSchema } from "~/server/scim/scim.types";
+import { ScimGroupService } from "~/server/scim/scim-group.service";
+import {
+  scimPatchRequestSchema,
+  scimReplaceGroupRequestSchema,
+} from "~/server/scim/scim.types";
 import type { ScimError } from "~/server/scim/scim.types";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,10 +18,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (isAuthError(auth)) return auth;
 
   const { id } = await context.params;
-  const scimService = ScimService.create(prisma);
+  const service = ScimGroupService.create(prisma);
 
-  const result = await scimService.getUser({
-    id,
+  const result = await service.getGroup({
+    externalScimId: id,
     organizationId: auth.organizationId,
   });
 
@@ -34,7 +37,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (isAuthError(auth)) return auth;
 
   const { id } = await context.params;
-  const scimService = ScimService.create(prisma);
+  const service = ScimGroupService.create(prisma);
 
   let body: unknown;
   try {
@@ -50,7 +53,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const parsed = scimCreateUserRequestSchema.safeParse(body);
+  const parsed = scimReplaceGroupRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -62,8 +65,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const result = await scimService.replaceUser({
-    id,
+  const result = await service.replaceGroup({
+    externalScimId: id,
     organizationId: auth.organizationId,
     request: parsed.data,
   });
@@ -80,7 +83,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (isAuthError(auth)) return auth;
 
   const { id } = await context.params;
-  const scimService = ScimService.create(prisma);
+  const service = ScimGroupService.create(prisma);
 
   let body: unknown;
   try {
@@ -108,8 +111,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const result = await scimService.updateUser({
-    id,
+  const result = await service.updateGroup({
+    externalScimId: id,
     organizationId: auth.organizationId,
     patchRequest: parsed.data,
   });
@@ -126,10 +129,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   if (isAuthError(auth)) return auth;
 
   const { id } = await context.params;
-  const scimService = ScimService.create(prisma);
+  const service = ScimGroupService.create(prisma);
 
-  const result = await scimService.deleteUser({
-    id,
+  const result = await service.deleteGroup({
+    externalScimId: id,
     organizationId: auth.organizationId,
   });
 

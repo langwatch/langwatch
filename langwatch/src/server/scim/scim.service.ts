@@ -6,7 +6,6 @@ import type {
   ScimListResponse,
   ScimError,
   ScimCreateUserRequest,
-  ScimPatchOperation,
   ScimPatchRequest,
 } from "./scim.types";
 
@@ -229,8 +228,33 @@ export class ScimService {
     }
 
     for (const operation of patchRequest.Operations) {
-      if (operation.op === "replace") {
-        await this.applyReplaceOperation({ id, operation });
+      if (operation.op === "replace" && operation.value != null && typeof operation.value === "object") {
+        const value = operation.value as Record<string, unknown>;
+        const updates: { name?: string; email?: string } = {};
+
+        if ("active" in value) {
+          if (value.active === false) {
+            await this.userService.deactivate({ id });
+          } else {
+            await this.userService.reactivate({ id });
+          }
+        }
+
+        if ("userName" in value && typeof value.userName === "string") {
+          updates.email = value.userName;
+        }
+
+        if ("name" in value && typeof value.name === "object") {
+          const nameObj = value.name as Record<string, string>;
+          const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
+          if (parts.length > 0) {
+            updates.name = parts.join(" ");
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await this.userService.updateProfile({ id, ...updates });
+        }
       }
     }
 
@@ -290,56 +314,6 @@ export class ScimService {
         lastModified: user.updatedAt.toISOString(),
       },
     };
-  }
-
-  private async applyReplaceOperation({
-    id,
-    operation,
-  }: {
-    id: string;
-    operation: ScimPatchOperation;
-  }): Promise<void> {
-    // Path-based replace with primitive value, e.g. { op: "replace", path: "active", value: false }
-    if (operation.path && typeof operation.value !== "object") {
-      if (operation.path === "active") {
-        if (operation.value === false) {
-          await this.userService.deactivate({ id });
-        } else {
-          await this.userService.reactivate({ id });
-        }
-      }
-      return;
-    }
-
-    // Object-based replace, e.g. { op: "replace", value: { active: false, userName: "..." } }
-    if (operation.value != null && typeof operation.value === "object") {
-      const value = operation.value as Record<string, unknown>;
-      const updates: { name?: string; email?: string } = {};
-
-      if ("active" in value) {
-        if (value.active === false) {
-          await this.userService.deactivate({ id });
-        } else {
-          await this.userService.reactivate({ id });
-        }
-      }
-
-      if ("userName" in value && typeof value.userName === "string") {
-        updates.email = value.userName;
-      }
-
-      if ("name" in value && typeof value.name === "object") {
-        const nameObj = value.name as Record<string, string>;
-        const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
-        if (parts.length > 0) {
-          updates.name = parts.join(" ");
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await this.userService.updateProfile({ id, ...updates });
-      }
-    }
   }
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {
