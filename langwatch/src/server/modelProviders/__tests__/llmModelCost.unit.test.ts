@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getStaticModelCosts } from "../llmModelCost";
 
 describe("getStaticModelCosts", () => {
@@ -71,8 +71,8 @@ describe("getStaticModelCosts", () => {
       );
     });
 
-    it("does not match openai/gpt-4o against a different model", () => {
-      expect(matches("openai/gpt-4o", "gpt-4o-mini")).toBe(false);
+    it("still matches longer prefixed variants, which downstream lookup disambiguates by order", () => {
+      expect(matches("openai/gpt-4o", "gpt-4o-mini")).toBe(true);
     });
   });
 
@@ -98,13 +98,55 @@ describe("getStaticModelCosts", () => {
     });
   });
 
-  describe("regex does not allow overly broad matches", () => {
-    it("does not match a model that only shares a prefix", () => {
-      expect(matches("openai/gpt-4o", "gpt-4o-turbo")).toBe(false);
+  describe("regex anchoring", () => {
+    it("matches prefix variants from the start of the model string", () => {
+      expect(matches("openai/gpt-4o", "gpt-4o-turbo")).toBe(true);
     });
 
     it("does not match a model that only shares a suffix", () => {
       expect(matches("openai/gpt-4o", "my-custom-gpt-4o")).toBe(false);
+    });
+  });
+
+  describe("sorting by specificity", () => {
+    afterEach(() => {
+      vi.doUnmock("../llmModels.json");
+      vi.resetModules();
+    });
+
+    it("orders entries by matched model suffix, not vendor-prefixed key length", async () => {
+      vi.resetModules();
+      vi.doMock("../llmModels.json", () => ({
+        default: {
+          models: {
+            "verylongvendor/abc": {
+              pricing: {
+                inputCostPerToken: 0.001,
+                outputCostPerToken: 0.002,
+              },
+            },
+            "x/abc-def": {
+              pricing: {
+                inputCostPerToken: 0.003,
+                outputCostPerToken: 0.004,
+              },
+            },
+          },
+        },
+      }));
+
+      const { getStaticModelCosts: getMockedStaticModelCosts } = await import(
+        "../llmModelCost"
+      );
+      const mockedCosts = getMockedStaticModelCosts();
+
+      expect(mockedCosts.map((entry) => entry.model)).toEqual([
+        "x/abc-def",
+        "verylongvendor/abc",
+      ]);
+      expect(
+        mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))?.model
+      ).toBe("x/abc-def");
     });
   });
 });

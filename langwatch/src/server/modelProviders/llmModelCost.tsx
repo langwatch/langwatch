@@ -103,6 +103,9 @@ export type MaybeStoredLLMModelCost = {
 
 let cachedStaticModelCosts: MaybeStoredLLMModelCost[] | null = null;
 
+const getStaticSpecificityKey = (model: string) =>
+  model.includes("/") ? model.split("/").slice(1).join("/") : model;
+
 /**
  * Returns static model costs from llmModels.json (no DB query).
  * Cached at module level since the JSON registry is immutable at runtime.
@@ -118,9 +121,17 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
       }))
-      // Sort by model key length descending so longer (more specific)
-      // patterns match before shorter ones (e.g. "gpt-5-mini" before "gpt-5")
-      .sort((a, b) => b.model.length - a.model.length);
+      // Sort by the matched model suffix, not raw registry key length,
+      // because vendor prefixes are optional in the generated regex.
+      .sort((a, b) => {
+        const aKey = getStaticSpecificityKey(a.model);
+        const bKey = getStaticSpecificityKey(b.model);
+
+        return (
+          bKey.length - aKey.length ||
+          Number(a.model.includes("/")) - Number(b.model.includes("/"))
+        );
+      });
   }
   return cachedStaticModelCosts;
 };
