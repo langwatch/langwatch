@@ -1356,16 +1356,12 @@
             }
           },
           {
-            "name": "label",
+            "name": "tag",
             "in": "query",
-            "description": "Fetch the version pointed to by this label (e.g., \"production\", \"staging\")",
+            "description": "Fetch the version pointed to by this tag (e.g., \"production\", \"staging\", or a custom tag)",
             "required": false,
             "schema": {
-              "type": "string",
-              "enum": [
-                "production",
-                "staging"
-              ]
+              "type": "string"
             }
           },
           {
@@ -2075,14 +2071,10 @@
                       "1.0"
                     ]
                   },
-                  "labels": {
+                  "tags": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "enum": [
-                        "production",
-                        "staging"
-                      ]
+                      "type": "string"
                     }
                   },
                   "scope": {
@@ -5600,14 +5592,10 @@
                       "1.0"
                     ]
                   },
-                  "labels": {
+                  "tags": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "enum": [
-                        "production",
-                        "staging"
-                      ]
+                      "type": "string"
                     }
                   }
                 },
@@ -11683,7 +11671,7 @@
         }
       }
     },
-    "/api/prompts/{id}/labels/{label}": {
+    "/api/prompts/{id}/tags/{tag}": {
       "put": {
         "responses": {
           "200": {
@@ -11699,7 +11687,7 @@
                     "versionId": {
                       "type": "string"
                     },
-                    "label": {
+                    "tag": {
                       "type": "string"
                     },
                     "updatedAt": {
@@ -11709,7 +11697,7 @@
                   "required": [
                     "configId",
                     "versionId",
-                    "label",
+                    "tag",
                     "updatedAt"
                   ]
                 }
@@ -11822,19 +11810,15 @@
             }
           }
         },
-        "operationId": "putApiPromptsByIdLabelsByLabel",
+        "operationId": "putApiPromptsByIdTagsByTag",
         "parameters": [
           {
-            "name": "label",
+            "name": "tag",
             "in": "path",
-            "description": "The label to assign (e.g., \"production\", \"staging\")",
+            "description": "The tag to assign (e.g., \"production\", \"staging\", or a custom tag)",
             "required": true,
             "schema": {
-              "type": "string",
-              "enum": [
-                "production",
-                "staging"
-              ]
+              "type": "string"
             }
           },
           {
@@ -11846,7 +11830,7 @@
             "required": true
           }
         ],
-        "description": "Assign a label (e.g. \"production\", \"staging\") to a specific prompt version",
+        "description": "Assign a tag (e.g. \"production\", \"staging\") to a specific prompt version",
         "requestBody": {
           "content": {
             "application/json": {

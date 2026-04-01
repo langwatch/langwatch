@@ -27,57 +27,6 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 
-def parse_prompt_shorthand(input_str: str) -> Dict[str, Any]:
-    """
-    Parse a shorthand prompt reference string.
-
-    Supported formats:
-    - ``"pizza-prompt:production"`` -> slug with label
-    - ``"pizza-prompt:2"`` -> slug with version (positive integer)
-    - ``"pizza-prompt"`` -> bare slug
-    - ``"pizza-prompt:latest"`` -> treated as bare slug (no-op)
-    - ``"my-org/prompt:staging"`` -> slug with slash preserved
-
-    Args:
-        input_str: The shorthand string to parse.
-
-    Returns:
-        Dict with keys: slug (str), label (Optional[str]), version (Optional[int]).
-
-    Raises:
-        ValueError: If the slug portion is empty.
-    """
-    colon_index = input_str.rfind(":")
-
-    if colon_index == -1:
-        return {"slug": input_str, "label": None, "version": None}
-
-    slug = input_str[:colon_index]
-    suffix = input_str[colon_index + 1:]
-
-    if len(slug) == 0:
-        raise ValueError(
-            f'Invalid format: slug must not be empty. Received "{input_str}"'
-        )
-
-    if len(suffix) == 0:
-        raise ValueError(
-            f'Invalid format: suffix after colon must not be empty. Received "{input_str}"'
-        )
-
-    if suffix == "latest":
-        return {"slug": slug, "label": None, "version": None}
-
-    try:
-        parsed = int(suffix)
-        if parsed > 0:
-            return {"slug": slug, "label": None, "version": parsed}
-    except ValueError:
-        pass  # Not a valid integer — treat suffix as a label name
-
-    return {"slug": slug, "label": suffix, "version": None}
-
-
 class PromptsFacade:
     """
     Facade service for managing LangWatch prompts with guaranteed availability.
@@ -114,63 +63,48 @@ class PromptsFacade:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[str] = None,
         fetch_policy: Optional[FetchPolicy] = None,
         cache_ttl_minutes: Optional[int] = None,
+        label: Optional[str] = None,
     ) -> Prompt:
         """
         Retrieve a prompt by its ID with configurable fetch policy.
 
-        Supports shorthand syntax: ``"pizza-prompt:production"`` resolves to the
-        version labeled "production". ``"pizza-prompt:2"`` resolves to version 2.
-
         Args:
-            prompt_id: The prompt ID, handle, or shorthand (e.g., "slug:label").
-            version_number: Optional specific version number to retrieve.
-            label: Optional label to fetch (e.g., "production", "staging").
+            prompt_id: The prompt ID to retrieve
+            version_number: Optional specific version number to retrieve
             fetch_policy: How to fetch the prompt. Defaults to MATERIALIZED_FIRST.
             cache_ttl_minutes: Cache TTL in minutes (only used with CACHE_TTL policy). Defaults to 5.
+            label: Optional label to fetch a specific labeled version (e.g. "production", "staging", or any custom label).
 
         Raises:
-            ValueError: If conflicting shorthand and explicit options are provided.
-            ValueError: If both version_number and label are specified.
+            ValueError: If both version_number and label are provided.
             ValueError: If label is used with MATERIALIZED_ONLY policy.
             ValueError: If the prompt is not found (404 error).
             RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
         """
-        shorthand = parse_prompt_shorthand(prompt_id)
-        resolved_id = shorthand["slug"]
-        has_shorthand_version = shorthand.get("version") is not None
-        has_shorthand_label = shorthand.get("label") is not None
-
-        # Conflict: shorthand carries version or label AND explicit options also specify version or label
-        if (has_shorthand_version or has_shorthand_label) and (version_number is not None or label is not None):
-            raise ValueError("Cannot combine shorthand with explicit version/label options")
-
-        # Conflict: both explicit version AND explicit label
-        if version_number is not None and label is not None:
-            raise ValueError("Cannot specify both version and label")
-
-        resolved_version = version_number if version_number is not None else shorthand.get("version")
-        resolved_label = label if label is not None else shorthand.get("label")
+        if label is not None and version_number is not None:
+            raise ValueError(
+                "Cannot specify both version_number and label"
+            )
 
         fetch_policy = fetch_policy or FetchPolicy.MATERIALIZED_FIRST
 
-        if resolved_label is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
+        if label is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
             raise ValueError(
                 "Label-based fetch requires API access; incompatible with MATERIALIZED_ONLY policy"
             )
 
         if fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
-            return self._get_materialized_only(resolved_id)
+            return self._get_materialized_only(prompt_id)
         elif fetch_policy == FetchPolicy.ALWAYS_FETCH:
-            return self._get_always_fetch(resolved_id, resolved_version, resolved_label)
+            return self._get_always_fetch(prompt_id, version_number, label)
         elif fetch_policy == FetchPolicy.CACHE_TTL:
             return self._get_cache_ttl(
-                resolved_id, resolved_version, resolved_label, cache_ttl_minutes or 5
+                prompt_id, version_number, cache_ttl_minutes or 5, label
             )
         else:  # MATERIALIZED_FIRST (default)
-            return self._get_materialized_first(resolved_id, resolved_version, resolved_label)
+            return self._get_materialized_first(prompt_id, version_number, label)
 
     def _get_materialized_first(
         self,
@@ -222,8 +156,8 @@ class PromptsFacade:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[str] = None,
         cache_ttl_minutes: int = 5,
+        label: Optional[str] = None,
     ) -> Prompt:
         """Get prompt using CACHE_TTL policy (cache with TTL, fallback to local)."""
         cache_key = f"{prompt_id}::version:{version_number or ''}::label:{label or ''}"
@@ -246,8 +180,8 @@ class PromptsFacade:
                 extra={
                     "prompt_id": prompt_id,
                     "version_number": version_number,
-                    "label": label,
                     "cache_ttl_minutes": cache_ttl_minutes,
+                    "label": label,
                 },
             )
             # Fall back to local if API fails
