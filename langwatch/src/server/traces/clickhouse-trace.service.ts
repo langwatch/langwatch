@@ -914,8 +914,8 @@ export class ClickHouseTraceService {
                 ParentSpanId,
                 SpanName,
                 SpanAttributes,
-                StartTime,
-                EndTime,
+                toUnixTimestamp64Milli(StartTime) AS StartTime,
+                toUnixTimestamp64Milli(EndTime) AS EndTime,
                 DurationMs,
                 StatusCode,
                 StatusMessage

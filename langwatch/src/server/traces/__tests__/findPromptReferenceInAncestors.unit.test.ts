@@ -506,7 +506,7 @@ describe("findPromptReferenceInAncestors()", () => {
   });
 
   describe("when sibling prompt ref has same startTime as target", () => {
-    it("ignores the sibling (must be strictly before)", () => {
+    it("finds the sibling (same-ms siblings are included)", () => {
       const spans = [
         {
           spanId: "parent-span",
@@ -535,10 +535,109 @@ describe("findPromptReferenceInAncestors()", () => {
         spans,
       });
 
-      // Same startTime should not be considered "before" -- but it's ambiguous.
-      // For safety, we include same-startTime siblings since they were likely
-      // created as part of the same prompt flow.
-      expect(result).toBeNull();
+      // Same startTime siblings are included because Prompt.compile and the
+      // LLM span often start at the exact same millisecond in practice.
+      expect(result).toEqual({
+        promptHandle: "team/same-time-prompt",
+        promptVersionNumber: 1,
+        promptVariables: null,
+      });
+    });
+  });
+
+  describe("when Prompt.compile has the same startTime as the LLM span", () => {
+    it("finds the Prompt.compile sibling (not skipped)", () => {
+      // Regression: Prompt.compile and the llm span often start at the
+      // exact same millisecond. The old `>=` guard skipped same-ms siblings.
+      const spans = [
+        {
+          spanId: "parent",
+          parentSpanId: null,
+          startTime: 1000,
+          attributes: {},
+        },
+        {
+          spanId: "prompt-compile",
+          parentSpanId: "parent",
+          startTime: 1050,
+          attributes: {
+            "langwatch.prompt.id": "tea-prompt:4",
+            "langwatch.prompt.handle": "tea-prompt",
+            "langwatch.prompt.version.number": "4",
+          },
+        },
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent",
+          startTime: 1050, // same millisecond as Prompt.compile
+          attributes: {},
+        },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result).toEqual({
+        promptHandle: "tea-prompt",
+        promptVersionNumber: 4,
+        promptVariables: null,
+      });
+    });
+  });
+
+  describe("when PromptApiService.get starts first, then llm and Prompt.compile at same ms", () => {
+    it("prefers Prompt.compile because it has more detail", () => {
+      // Real trace pattern: PromptApiService.get started first (has prompt id),
+      // then Prompt.compile and llm span at the same millisecond.
+      // Prompt.compile has handle + version, so it should be preferred.
+      const spans = [
+        {
+          spanId: "parent",
+          parentSpanId: null,
+          startTime: 1000,
+          attributes: {},
+        },
+        {
+          spanId: "prompt-api-get",
+          parentSpanId: "parent",
+          startTime: 1010,
+          attributes: {
+            "langwatch.prompt.id": "tea-prompt:4",
+          },
+        },
+        {
+          spanId: "prompt-compile",
+          parentSpanId: "parent",
+          startTime: 1050,
+          attributes: {
+            "langwatch.prompt.id": "tea-prompt:4",
+            "langwatch.prompt.handle": "tea-prompt",
+            "langwatch.prompt.version.number": "4",
+          },
+        },
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent",
+          startTime: 1050, // same as Prompt.compile
+          attributes: {},
+        },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      // Prompt.compile (startTime=1050) is at the same ms as llm (1050),
+      // but it's included now. PromptApiService.get (startTime=1010) also
+      // qualifies. The closest preceding (highest startTime) wins: Prompt.compile.
+      expect(result).toEqual({
+        promptHandle: "tea-prompt",
+        promptVersionNumber: 4,
+        promptVariables: null,
+      });
     });
   });
 
