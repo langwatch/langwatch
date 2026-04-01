@@ -11,12 +11,11 @@ import { handleError } from "../../../../middleware/error-handler";
 import { loggerMiddleware } from "../../../../middleware/logger";
 import { tracerMiddleware } from "../../../../middleware/tracer";
 import {
-  PromptTagRepository,
   PromptTagConflictError,
+  PromptTagProtectedError,
+  PromptTagService,
   PromptTagValidationError,
-  PROTECTED_TAGS,
-  type ProtectedTag,
-} from "~/server/prompt-config/repositories/prompt-tag.repository";
+} from "~/server/prompt-config/prompt-tag.service";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:prompt-tags");
@@ -59,8 +58,8 @@ app.get("/", async (c) => {
     });
   }
 
-  const repo = new PromptTagRepository(prisma);
-  const tags = await repo.list({ organizationId: orgId });
+  const service = PromptTagService.create(prisma);
+  const tags = await service.getAll({ organizationId: orgId });
 
   logger.info(
     { orgId, count: tags.length },
@@ -100,10 +99,10 @@ app.post(
     }
 
     const { name } = c.req.valid("json");
-    const repo = new PromptTagRepository(prisma);
+    const service = PromptTagService.create(prisma);
 
     try {
-      const tag = await repo.create({
+      const tag = await service.create({
         organizationId: orgId,
         name,
         createdById: session.user.id,
@@ -151,25 +150,24 @@ app.delete("/:tagId", async (c) => {
     });
   }
 
-  const repo = new PromptTagRepository(prisma);
+  const service = PromptTagService.create(prisma);
 
-  const tag = await repo.getById({ id: tagId, organizationId: orgId });
+  try {
+    const tag = await service.delete({ id: tagId, organizationId: orgId });
 
-  if (!tag) {
-    throw new HTTPException(404, {
-      message: `Tag not found: ${tagId}`,
-    });
+    if (!tag) {
+      throw new HTTPException(404, {
+        message: `Tag not found: ${tagId}`,
+      });
+    }
+
+    logger.info({ orgId, tagId }, "Custom prompt tag deleted via API");
+
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    if (error instanceof PromptTagProtectedError) {
+      throw new HTTPException(422, { message: error.message });
+    }
+    throw error;
   }
-
-  if (PROTECTED_TAGS.includes(tag.name as ProtectedTag)) {
-    throw new HTTPException(422, {
-      message: `"${tag.name}" is a protected tag and cannot be deleted.`,
-    });
-  }
-
-  await repo.delete({ id: tagId, organizationId: orgId });
-
-  logger.info({ orgId, tagId }, "Custom prompt tag deleted via API");
-
-  return new Response(null, { status: 204 });
 });

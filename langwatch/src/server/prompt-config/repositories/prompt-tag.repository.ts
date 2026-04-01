@@ -9,56 +9,6 @@ const logger = createLogger("langwatch:prompt-tags");
 export const PROTECTED_TAGS = ["latest"] as const;
 export type ProtectedTag = (typeof PROTECTED_TAGS)[number];
 
-const TAG_NAME_REGEX = /^[a-z][a-z0-9_-]*$/;
-const PURELY_NUMERIC_REGEX = /^\d+$/;
-
-export class PromptTagValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "PromptTagValidationError";
-  }
-}
-
-export class PromptTagConflictError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "PromptTagConflictError";
-  }
-}
-
-/**
- * Validates a custom tag name.
- * - Must not be empty
- * - Must not be purely numeric
- * - Must match /^[a-z][a-z0-9_-]*$/
- * - Must not clash with protected tags
- */
-export function validateTagName(name: string): void {
-  if (!name) {
-    throw new PromptTagValidationError(
-      `Invalid tag name. Tag name must not be empty.`,
-    );
-  }
-
-  if (PURELY_NUMERIC_REGEX.test(name)) {
-    throw new PromptTagValidationError(
-      `Invalid tag name "${name}". Tag names must not be purely numeric.`,
-    );
-  }
-
-  if (!TAG_NAME_REGEX.test(name)) {
-    throw new PromptTagValidationError(
-      `Invalid tag name "${name}". Tag names must start with a lowercase letter and contain only lowercase letters, digits, hyphens, or underscores.`,
-    );
-  }
-
-  if (PROTECTED_TAGS.includes(name as ProtectedTag)) {
-    throw new PromptTagValidationError(
-      `"${name}" is a protected tag and cannot be created as a custom tag.`,
-    );
-  }
-}
-
 /**
  * Repository for managing prompt tag definitions.
  * Production and staging are seeded as custom tags per org.
@@ -68,6 +18,7 @@ export class PromptTagRepository {
 
   /**
    * Creates a custom tag definition for an org.
+   * Name validation is the caller's responsibility.
    */
   async create({
     organizationId,
@@ -78,35 +29,24 @@ export class PromptTagRepository {
     name: string;
     createdById?: string;
   }): Promise<PromptTag> {
-    validateTagName(name);
+    const tag = await this.prisma.promptTag.create({
+      data: {
+        id: `ptag_${nanoid()}`,
+        organizationId,
+        name,
+        createdById: createdById ?? null,
+      },
+    });
 
-    try {
-      const tag = await this.prisma.promptTag.create({
-        data: {
-          id: `ptag_${nanoid()}`,
-          organizationId,
-          name,
-          createdById: createdById ?? null,
-        },
-      });
+    logger.info({ organizationId, name }, "Custom prompt tag created");
 
-      logger.info({ organizationId, name }, "Custom prompt tag created");
-
-      return tag;
-    } catch (error: unknown) {
-      if (isUniqueConstraintError(error)) {
-        throw new PromptTagConflictError(
-          `A tag with name "${name}" already exists in this org.`,
-        );
-      }
-      throw error;
-    }
+    return tag;
   }
 
   /**
    * Lists all custom tag definitions for an org.
    */
-  async list({
+  async findAll({
     organizationId,
   }: {
     organizationId: string;
@@ -120,7 +60,7 @@ export class PromptTagRepository {
   /**
    * Fetches a single custom tag by ID and org (for auth scoping).
    */
-  async getById({
+  async findById({
     id,
     organizationId,
   }: {
@@ -208,13 +148,4 @@ export class PromptTagRepository {
       skipDuplicates: true,
     });
   }
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code: string }).code === "P2002"
-  );
 }

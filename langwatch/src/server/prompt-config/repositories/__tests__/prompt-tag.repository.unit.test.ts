@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   validateTagName,
   PromptTagValidationError,
-  PROTECTED_TAGS,
-} from "../prompt-tag.repository";
+} from "../../prompt-tag.service";
+import { PROTECTED_TAGS } from "../prompt-tag.repository";
 
 describe("validateTagName()", () => {
   describe("when name is a valid custom tag", () => {
