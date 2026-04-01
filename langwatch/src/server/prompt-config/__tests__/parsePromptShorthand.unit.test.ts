@@ -7,60 +7,55 @@ import {
 describe("parsePromptShorthand()", () => {
   describe("when input is slug:tag format", () => {
     it("returns slug with tag", () => {
-      const result = parsePromptShorthand("pizza-prompt:production");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("pizza-prompt:production")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: "production",
         version: undefined,
+        hadSuffix: true,
       });
     });
   });
 
   describe("when input is slug:number format", () => {
     it("returns slug with version", () => {
-      const result = parsePromptShorthand("pizza-prompt:2");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("pizza-prompt:2")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: undefined,
         version: 2,
+        hadSuffix: true,
       });
     });
   });
 
   describe("when input is a bare slug", () => {
     it("returns slug with no tag or version", () => {
-      const result = parsePromptShorthand("pizza-prompt");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("pizza-prompt")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: undefined,
         version: undefined,
+        hadSuffix: false,
       });
     });
   });
 
   describe("when input has 'latest' suffix", () => {
-    it("returns slug with no tag or version", () => {
-      const result = parsePromptShorthand("pizza-prompt:latest");
-
-      expect(result).toEqual<PromptShorthand>({
+    it("returns slug with no tag or version but hadSuffix true", () => {
+      expect(parsePromptShorthand("pizza-prompt:latest")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: undefined,
         version: undefined,
+        hadSuffix: true,
       });
     });
   });
 
   describe("when slug contains a slash", () => {
     it("preserves the full slug and extracts the tag", () => {
-      const result = parsePromptShorthand("my-org/prompt:staging");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("my-org/prompt:staging")).toEqual<PromptShorthand>({
         slug: "my-org/prompt",
         tag: "staging",
         version: undefined,
+        hadSuffix: true,
       });
     });
   });
@@ -83,36 +78,33 @@ describe("parsePromptShorthand()", () => {
 
   describe("when input is slug with version 0", () => {
     it("treats 0 as a tag since version must be positive", () => {
-      const result = parsePromptShorthand("pizza-prompt:0");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("pizza-prompt:0")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: "0",
         version: undefined,
+        hadSuffix: true,
       });
     });
   });
 
   describe("when input is slug with negative number", () => {
     it("treats negative number as a tag since version must be positive", () => {
-      const result = parsePromptShorthand("pizza-prompt:-1");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("pizza-prompt:-1")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: "-1",
         version: undefined,
+        hadSuffix: true,
       });
     });
   });
 
   describe("when input is slug with float version", () => {
     it("treats float as a tag", () => {
-      const result = parsePromptShorthand("pizza-prompt:1.5");
-
-      expect(result).toEqual<PromptShorthand>({
+      expect(parsePromptShorthand("pizza-prompt:1.5")).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: "1.5",
         version: undefined,
+        hadSuffix: true,
       });
     });
   });

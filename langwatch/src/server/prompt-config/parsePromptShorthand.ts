@@ -7,6 +7,8 @@ export interface PromptShorthand {
   slug: string;
   tag: string | undefined;
   version: number | undefined;
+  /** Whether the input contained a colon suffix (true even for "latest" which normalizes away). */
+  hadSuffix: boolean;
 }
 
 /**
@@ -33,7 +35,7 @@ export function parsePromptShorthand(input: string): PromptShorthand {
   const colonIndex = input.lastIndexOf(":");
 
   if (colonIndex === -1) {
-    return { slug: input, tag: undefined, version: undefined };
+    return { slug: input, tag: undefined, version: undefined, hadSuffix: false };
   }
 
   const slug = input.substring(0, colonIndex);
@@ -52,13 +54,13 @@ export function parsePromptShorthand(input: string): PromptShorthand {
   }
 
   if (suffix === "latest") {
-    return { slug, tag: undefined, version: undefined };
+    return { slug, tag: undefined, version: undefined, hadSuffix: true };
   }
 
   const parsed = Number(suffix);
   if (Number.isInteger(parsed) && parsed > 0) {
-    return { slug, tag: undefined, version: parsed };
+    return { slug, tag: undefined, version: parsed, hadSuffix: true };
   }
 
-  return { slug, tag: suffix, version: undefined };
+  return { slug, tag: suffix, version: undefined, hadSuffix: true };
 }
