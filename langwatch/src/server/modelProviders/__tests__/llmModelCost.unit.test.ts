@@ -108,45 +108,47 @@ describe("getStaticModelCosts", () => {
     });
   });
 
-  describe("sorting by specificity", () => {
+  describe("given model entries whose vendor-prefixed key length hides the matched suffix length", () => {
     afterEach(() => {
       vi.doUnmock("../llmModels.json");
       vi.resetModules();
     });
 
-    it("orders entries by matched model suffix, not vendor-prefixed key length", async () => {
-      vi.resetModules();
-      vi.doMock("../llmModels.json", () => ({
-        default: {
-          models: {
-            "verylongvendor/abc": {
-              pricing: {
-                inputCostPerToken: 0.001,
-                outputCostPerToken: 0.002,
+    describe("when static model costs are built", () => {
+      it("orders entries by matched model suffix, not vendor-prefixed key length", async () => {
+        vi.resetModules();
+        vi.doMock("../llmModels.json", () => ({
+          default: {
+            models: {
+              "verylongvendor/abc": {
+                pricing: {
+                  inputCostPerToken: 0.001,
+                  outputCostPerToken: 0.002,
+                },
               },
-            },
-            "x/abc-def": {
-              pricing: {
-                inputCostPerToken: 0.003,
-                outputCostPerToken: 0.004,
+              "x/abc-def": {
+                pricing: {
+                  inputCostPerToken: 0.003,
+                  outputCostPerToken: 0.004,
+                },
               },
             },
           },
-        },
-      }));
+        }));
 
-      const { getStaticModelCosts: getMockedStaticModelCosts } = await import(
-        "../llmModelCost"
-      );
-      const mockedCosts = getMockedStaticModelCosts();
+        const { getStaticModelCosts: getMockedStaticModelCosts } = await import(
+          "../llmModelCost"
+        );
+        const mockedCosts = getMockedStaticModelCosts();
 
-      expect(mockedCosts.map((entry) => entry.model)).toEqual([
-        "x/abc-def",
-        "verylongvendor/abc",
-      ]);
-      expect(
-        mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))?.model
-      ).toBe("x/abc-def");
+        expect(mockedCosts.map((entry) => entry.model)).toEqual([
+          "x/abc-def",
+          "verylongvendor/abc",
+        ]);
+        expect(
+          mockedCosts.find((entry) => new RegExp(entry.regex).test("abc-def"))?.model
+        ).toBe("x/abc-def");
+      });
     });
   });
 });
