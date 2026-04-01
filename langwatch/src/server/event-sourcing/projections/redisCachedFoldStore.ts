@@ -39,7 +39,7 @@ export class RedisCachedFoldStore<State>
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<State | null> {
-    const key = this.redisKey(aggregateId);
+    const key = this.redisKey(aggregateId, context);
     const cached = await this.redis.get(key);
     if (cached !== null) {
       return JSON.parse(cached) as State;
@@ -59,7 +59,7 @@ export class RedisCachedFoldStore<State>
 
     // 2. Redis second — cache for fast reads on next fold step
     try {
-      const key = this.redisKey(aggregateId);
+      const key = this.redisKey(aggregateId, context);
       await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
     } catch (error) {
       logger.warn(
@@ -69,7 +69,7 @@ export class RedisCachedFoldStore<State>
     }
   }
 
-  private redisKey(aggregateId: string): string {
-    return `fold:${this.keyPrefix}:${aggregateId}`;
+  private redisKey(aggregateId: string, context: ProjectionStoreContext): string {
+    return `fold:${this.keyPrefix}:${String(context.tenantId)}:${aggregateId}`;
   }
 }

@@ -59,7 +59,7 @@ describe("RedisCachedFoldStore", () => {
         });
 
         const state: TestState = { count: 5, name: "cached" };
-        redis.data.set("fold:test_table:agg-1", {
+        redis.data.set("fold:test_table:tenant-1:agg-1", {
           value: JSON.stringify(state),
           ttl: 30,
         });
@@ -67,7 +67,7 @@ describe("RedisCachedFoldStore", () => {
         const result = await store.get("agg-1", TEST_CONTEXT);
 
         expect(result).toEqual(state);
-        expect(redis.get).toHaveBeenCalledWith("fold:test_table:agg-1");
+        expect(redis.get).toHaveBeenCalledWith("fold:test_table:tenant-1:agg-1");
         expect(inner.getCalls).toHaveLength(0);
       });
     });
@@ -108,7 +108,7 @@ describe("RedisCachedFoldStore", () => {
 
         // Then Redis cached
         expect(redis.set).toHaveBeenCalledWith(
-          "fold:test_table:agg-1",
+          "fold:test_table:tenant-1:agg-1",
           JSON.stringify(state),
           "EX",
           30,
@@ -160,6 +160,37 @@ describe("RedisCachedFoldStore", () => {
       const state2 = await store.get("agg-1", TEST_CONTEXT);
       expect(state2).toEqual(newState);
       expect(inner.getCalls).toHaveLength(1);
+    });
+  });
+
+  describe("tenant isolation", () => {
+    it("different tenants with the same aggregateId get separate cache entries", async () => {
+      const redis = createMockRedis();
+      const inner = createMockInnerStore();
+      const store = new RedisCachedFoldStore<TestState>(inner, redis as any, {
+        keyPrefix: "test_table",
+      });
+
+      const tenantA: ProjectionStoreContext = {
+        aggregateId: "shared-trace-id",
+        tenantId: createTenantId("tenant-A"),
+      };
+      const tenantB: ProjectionStoreContext = {
+        aggregateId: "shared-trace-id",
+        tenantId: createTenantId("tenant-B"),
+      };
+
+      // Store state for tenant A
+      await store.store({ count: 10, name: "tenant-A-state" }, tenantA);
+      // Store state for tenant B (same aggregateId)
+      await store.store({ count: 20, name: "tenant-B-state" }, tenantB);
+
+      // Each tenant reads their own state
+      const stateA = await store.get("shared-trace-id", tenantA);
+      const stateB = await store.get("shared-trace-id", tenantB);
+
+      expect(stateA).toEqual({ count: 10, name: "tenant-A-state" });
+      expect(stateB).toEqual({ count: 20, name: "tenant-B-state" });
     });
   });
 });
