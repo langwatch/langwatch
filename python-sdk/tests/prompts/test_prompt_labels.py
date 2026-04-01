@@ -795,6 +795,22 @@ class TestShorthandLabelSyntax:
         params = call_kwargs[1].get("params") or {}
         assert "label" not in params
 
+    def test_trailing_colon_treated_as_no_label(self):
+        """
+        When get() is called with "pizza-prompt:" (trailing colon, empty label)
+        Then it fetches latest (no label sent to API)
+        """
+        api_response = _make_api_response_json(version=4, version_id="v4_id")
+        mock_request = Mock(return_value=_mock_httpx_response(api_response))
+        facade = self._make_facade_with_mock(mock_request)
+
+        result = facade.get("pizza-prompt:", fetch_policy=FetchPolicy.ALWAYS_FETCH)
+
+        assert result.version == 4
+        call_kwargs = mock_request.call_args
+        params = call_kwargs[1].get("params") or {}
+        assert "label" not in params
+
 
 # ---------------------------------------------------------------------------
 # Integration with langwatch.prompts (global interface)
