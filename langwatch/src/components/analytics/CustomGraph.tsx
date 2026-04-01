@@ -547,8 +547,10 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
+      const effectiveFormat =
+        series?.aggregation === "cardinality" ? "0a" : metric?.format;
 
-      return formatWith(metric?.format, value as number);
+      return formatWith(effectiveFormat, value as number);
     };
 
     const container = (child: React.ReactNode) => {
