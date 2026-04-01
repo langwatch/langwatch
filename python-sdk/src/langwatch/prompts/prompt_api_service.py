@@ -10,6 +10,7 @@ This service is responsible only for API operations and does not handle local fi
 """
 from http import HTTPStatus
 from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import quote
 
 from langwatch.generated.langwatch_rest_api_client.types import UNSET, Response
 from langwatch.generated.langwatch_rest_api_client.client import (
@@ -138,7 +139,7 @@ class PromptApiService:
 
         raw_resp = self._raw_request(
             method="get",
-            url=f"/api/prompts/{prompt_id}",
+            url=f"/api/prompts/{quote(prompt_id, safe='')}",
             params=params,
         )
 
@@ -174,7 +175,7 @@ class PromptApiService:
         """
         raw_resp = self._raw_request(
             method="put",
-            url=f"/api/prompts/{prompt_id}/labels/{label}",
+            url=f"/api/prompts/{quote(prompt_id, safe='')}/labels/{quote(label, safe='')}",
             json={"versionId": version_id},
         )
 
@@ -356,7 +357,7 @@ class PromptApiService:
 
             raw_resp = self._raw_request(
                 method="put",
-                url=f"/api/prompts/{prompt_id_or_handle}",
+                url=f"/api/prompts/{quote(prompt_id_or_handle, safe='')}",
                 json=body_dict,
             )
             if raw_resp.status_code != 200:
