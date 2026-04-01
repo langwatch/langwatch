@@ -113,30 +113,4 @@ specs/               # BDD feature specs
 
 ## Orchestration Model
 
-Implementation tasks use `/orchestrate` to manage work. The orchestrator detects whether an issue is a **bug fix** or a **feature** and selects the appropriate workflow.
-
-- `/orchestrate <requirements>` - Enter orchestration mode
-- `/implement #123` - Fetch GitHub issue → invoke `/orchestrate`
-
-**Bug detection:** Issues are classified as bugs when they have a "bug" label, title keywords ("fix", "bug", "broken"), or use a bug report issue template. Everything else follows the feature workflow.
-
-**Bug-fix workflow:** investigate → fix → verify → review → browser-verify
-1. Investigates the root cause using `/code` (coder agent)
-2. Applies the fix and runs existing tests to verify
-3. Delegates to `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
-4. **Verifies in a real browser** via `dev-up.sh` + `/browser-test`
-5. Skips `/plan` and spec creation — bugs fix existing behavior, not add new behavior
-
-**Feature workflow:** plan → code → review → browser-verify
-1. **Creates a task checklist** using TaskCreate to map acceptance criteria
-2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
-3. **Verifies in a real browser** via `dev-up.sh` + `/browser-test` — spins up an isolated dev instance, drives the browser to verify acceptance criteria, saves screenshots to `browser-tests/`
-4. Tracks progress via task status updates
-5. Does NOT read or write code directly
-
-Agents:
-- **coder** (`.claude/agents/coder.md`): Implements features with TDD. Reads requirements, writes failing tests first, implements minimal code to pass, refactors, and self-verifies before returning.
-- **uncle-bob-reviewer** (`.claude/agents/uncle-bob-reviewer.md`): Reviews code for SOLID principles, clean code violations, and TDD practices. Provides uncompromising feedback on software craftsmanship.
-- **repo-sherpa** (`.claude/agents/repo-sherpa.md`): Answers questions about repository structure, documentation, and developer experience. Owns the meta-layer (agents, skills, docs).
-
-See `.claude/README.md` for full orchestration documentation.
+Use `/orchestrate <requirements>` or `/implement #123` to enter orchestration mode. See `.claude/skills/orchestrate/SKILL.md` for the full workflow (bug-fix vs feature detection, agent delegation, verification checklists).
