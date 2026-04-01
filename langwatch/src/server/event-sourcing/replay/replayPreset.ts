@@ -1,4 +1,5 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import IORedis from "ioredis";
 import { buildFoldProjections, type FoldProjectionRepositories } from "../pipelineRegistry";
 import { ReplayService } from "./replayService";
 import type { RegisteredFoldProjection } from "./types";
@@ -7,6 +8,7 @@ import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/r
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
+import type { ClickHouseClientResolver } from "../../clickhouse/clickhouseClient";
 
 export interface ReplayRuntime {
   service: ReplayService;
@@ -15,37 +17,16 @@ export interface ReplayRuntime {
 }
 
 /**
- * Create a replay runtime with a fixed ClickHouse URL (all tenants use same DB).
- */
-export function createReplayRuntime(config: {
-  clickhouseUrl: string;
-  redisUrl: string;
-}): ReplayRuntime {
-  const { createClient } = require("@clickhouse/client") as typeof import("@clickhouse/client");
-  const client = createClient({
-    url: config.clickhouseUrl,
-    clickhouse_settings: { date_time_input_format: "best_effort" },
-  });
-  const clientResolver = async () => client;
-
-  return createReplayRuntimeWithResolver({
-    clickhouseClientResolver: clientResolver,
-    redisUrl: config.redisUrl,
-    closeClickhouse: () => client.close(),
-  });
-}
-
-/**
- * Create a replay runtime with a tenant-aware ClickHouse resolver.
- * Use this when tenants may have separate CH databases.
+ * Create a replay runtime using the app's tenant-aware CH client resolver.
+ * This is the preferred entry point — it respects per-tenant DB routing
+ * via `CLICKHOUSE_URL__<label>__<orgId>` env vars.
  */
 export function createReplayRuntimeWithResolver(config: {
-  clickhouseClientResolver: (tenantId: string) => Promise<ClickHouseClient>;
+  clickhouseClientResolver: ClickHouseClientResolver;
   redisUrl: string;
   closeClickhouse?: () => Promise<void>;
 }): ReplayRuntime {
-  const IORedis = require("ioredis") as typeof import("ioredis");
-  const redis = new IORedis.default(config.redisUrl, { maxRetriesPerRequest: null });
+  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
 
   const repos: FoldProjectionRepositories = {
     traceSummaryFold: new TraceSummaryClickHouseRepository(config.clickhouseClientResolver),
@@ -66,4 +47,27 @@ export function createReplayRuntimeWithResolver(config: {
       await config.closeClickhouse?.();
     },
   };
+}
+
+/**
+ * Create a replay runtime with a single ClickHouse URL.
+ * Only use this when ALL tenants share the same DB (e.g. local dev).
+ * For production with per-tenant DBs, use createReplayRuntimeWithResolver
+ * with getClickHouseClientForProject from clickhouseClient.ts.
+ */
+export function createReplayRuntime(config: {
+  clickhouseUrl: string;
+  redisUrl: string;
+}): ReplayRuntime {
+  const client = createClient({
+    url: config.clickhouseUrl,
+    clickhouse_settings: { date_time_input_format: "best_effort" },
+  });
+  const clientResolver: ClickHouseClientResolver = async () => client;
+
+  return createReplayRuntimeWithResolver({
+    clickhouseClientResolver: clientResolver,
+    redisUrl: config.redisUrl,
+    closeClickhouse: () => client.close(),
+  });
 }

@@ -18,7 +18,26 @@ import type {
   BatchCompleteInfo,
 } from "../../../src/server/event-sourcing/replay";
 
-async function loadReplayRuntime(config: { clickhouseUrl: string; redisUrl: string }): Promise<ReplayRuntime> {
+async function loadReplayRuntime(config: {
+  clickhouseUrl: string;
+  redisUrl: string;
+  useTenantRouting: boolean;
+}): Promise<ReplayRuntime> {
+  if (config.useTenantRouting) {
+    // Production: use the app's tenant-aware CH resolver (respects CLICKHOUSE_URL__<label>__<orgId>)
+    const { getClickHouseClientForProject } = await import("../../../src/server/clickhouse/clickhouseClient");
+    const { createReplayRuntimeWithResolver } = await import("../../../src/server/event-sourcing/replay/replayPreset");
+    return createReplayRuntimeWithResolver({
+      clickhouseClientResolver: async (tenantId: string) => {
+        const client = await getClickHouseClientForProject(tenantId);
+        if (!client) throw new Error(`No ClickHouse client available for tenant ${tenantId}`);
+        return client;
+      },
+      redisUrl: config.redisUrl,
+    });
+  }
+
+  // Local dev / simple mode: single CH URL for all tenants
   const { createReplayRuntime } = await import("../../../src/server/event-sourcing/replay/replayPreset");
   return createReplayRuntime(config);
 }
@@ -272,10 +291,19 @@ function resolveDatabaseUrl(opts: { databaseUrl?: string }): string {
   return url;
 }
 
-async function initRuntime(opts: { clickhouseUrl?: string; redisUrl?: string }): Promise<ReplayRuntime> {
+async function initRuntime(opts: { clickhouseUrl?: string; redisUrl?: string; databaseUrl?: string }): Promise<ReplayRuntime> {
+  const hasDatabaseUrl = !!(opts.databaseUrl || process.env.DATABASE_URL);
+  const hasPrivateCHEnvVars = Object.keys(process.env).some((k) => k.startsWith("CLICKHOUSE_URL__"));
+  const useTenantRouting = hasDatabaseUrl && hasPrivateCHEnvVars;
+
+  if (useTenantRouting) {
+    console.log(`  ${DIM}Using tenant-aware ClickHouse routing${RESET}`);
+  }
+
   return loadReplayRuntime({
     clickhouseUrl: resolveClickHouseUrl(opts),
     redisUrl: resolveRedisUrl(opts),
+    useTenantRouting,
   });
 }
 
