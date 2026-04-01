@@ -731,6 +731,77 @@ class TestPromptsFacadeLabelsAssign:
 
 
 # ---------------------------------------------------------------------------
+# Shorthand "handle:label" syntax
+# ---------------------------------------------------------------------------
+
+
+class TestShorthandLabelSyntax:
+    """Tests for the 'handle:label' shorthand syntax in PromptsFacade.get()."""
+
+    def _make_facade_with_mock(self, mock_request: Mock) -> PromptsFacade:
+        rest_client = _rest_client_with_mocked_httpx(mock_request)
+        return PromptsFacade(rest_client)
+
+    def test_parses_shorthand_and_passes_label(self):
+        """
+        When get() is called with "pizza-prompt:production"
+        Then the API receives label="production" in query params
+        """
+        api_response = _make_api_response_json(version=3, version_id="v3_id")
+        mock_request = Mock(return_value=_mock_httpx_response(api_response))
+        facade = self._make_facade_with_mock(mock_request)
+
+        result = facade.get("pizza-prompt:production", fetch_policy=FetchPolicy.ALWAYS_FETCH)
+
+        assert result.version == 3
+        call_kwargs = mock_request.call_args
+        params = call_kwargs[1].get("params", {})
+        assert params.get("label") == "production"
+
+    def test_shorthand_with_custom_label(self):
+        """
+        When get() is called with "pizza-prompt:canary"
+        Then the API receives label="canary"
+        """
+        api_response = _make_api_response_json(version=2, version_id="v2_id")
+        mock_request = Mock(return_value=_mock_httpx_response(api_response))
+        facade = self._make_facade_with_mock(mock_request)
+
+        result = facade.get("pizza-prompt:canary", fetch_policy=FetchPolicy.ALWAYS_FETCH)
+
+        assert result.version == 2
+
+    def test_raises_when_both_shorthand_and_explicit_label(self):
+        """
+        When get() is called with "pizza-prompt:production" AND label="staging"
+        Then a ValueError is raised (ambiguous)
+        """
+        mock_request = Mock()
+        facade = self._make_facade_with_mock(mock_request)
+
+        with pytest.raises(ValueError, match="Ambiguous"):
+            facade.get("pizza-prompt:production", label="staging")
+
+        mock_request.assert_not_called()
+
+    def test_no_colon_unchanged_behavior(self):
+        """
+        When get() is called with "pizza-prompt" (no colon)
+        Then behavior is unchanged (latest version)
+        """
+        api_response = _make_api_response_json(version=4, version_id="v4_id")
+        mock_request = Mock(return_value=_mock_httpx_response(api_response))
+        facade = self._make_facade_with_mock(mock_request)
+
+        result = facade.get("pizza-prompt", fetch_policy=FetchPolicy.ALWAYS_FETCH)
+
+        assert result.version == 4
+        call_kwargs = mock_request.call_args
+        params = call_kwargs[1].get("params") or {}
+        assert "label" not in params
+
+
+# ---------------------------------------------------------------------------
 # Integration with langwatch.prompts (global interface)
 # ---------------------------------------------------------------------------
 

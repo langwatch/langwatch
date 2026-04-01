@@ -26,6 +26,17 @@ Feature: Python SDK custom label support
     When I call prompts.get("pizza-prompt")
     Then I receive version v4 config data (unchanged behavior)
 
+  @unit
+  Scenario: fetches prompt by label using shorthand syntax
+    Given "pizza-prompt" has production=v3
+    When I call prompts.get("pizza-prompt:production")
+    Then I receive version v3 config data
+
+  @unit
+  Scenario: rejects ambiguous shorthand with explicit label
+    When I call prompts.get("pizza-prompt:production", label="staging")
+    Then the SDK raises a ValueError before calling the API
+
   # --- Label + fetch policy interactions ---
 
   @unit
