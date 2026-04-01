@@ -446,12 +446,31 @@ app.get(
 app.get(
   "/:id{.+}",
   describeRoute({
-    description: "Get a specific prompt",
+    description:
+      "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
+      'Pass a bare slug like "pizza-prompt" to get the latest version, ' +
+      '"pizza-prompt:production" to resolve a tagged version, or ' +
+      '"pizza-prompt:2" to fetch version 2. ' +
+      "Alternatively, use the tag or version query parameters with a bare slug.",
     parameters: [
+      {
+        name: "id",
+        in: "path",
+        description:
+          "Prompt slug or shorthand. Supports three formats: " +
+          '(1) bare slug — "pizza-prompt" returns the latest version; ' +
+          '(2) slug:tag — "pizza-prompt:production" returns the version pointed to by that tag; ' +
+          '(3) slug:version — "pizza-prompt:2" returns that specific version number. ' +
+          '"slug:latest" is equivalent to the bare slug. ' +
+          "Cannot be combined with the tag or version query parameters.",
+        required: true,
+        schema: { type: "string" },
+      },
       {
         name: "version",
         in: "query",
-        description: "Specific version number to retrieve",
+        description:
+          "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
         schema: { type: "integer", minimum: 0 },
       },
@@ -459,7 +478,8 @@ app.get(
         name: "tag",
         in: "query",
         description:
-          'Fetch the version pointed to by this tag (e.g., "production", "staging", or a custom tag)',
+          "Fetch the version pointed to by this tag (e.g., \"production\", \"staging\"). " +
+          "Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
         schema: { type: "string" },
       },
