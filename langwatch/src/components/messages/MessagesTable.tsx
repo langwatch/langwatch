@@ -575,54 +575,50 @@ export function MessagesTable({
 
       value: (trace: Trace) => getSafeRenderOutputValueFromTrace(trace),
     },
-    ...(project?.featureClickHouseDataSourceTraces
-      ? {
-          "traces.origin": {
-            name: "Origin",
-            sortable: false,
-            width: 120,
-            render: (trace: TraceWithGuardrail, index: number) => {
-              const rawOrigin = trace.metadata["langwatch.origin"];
-              const displayOrigin =
-                typeof rawOrigin === "string" && rawOrigin !== ""
-                  ? rawOrigin
-                  : null;
+    "traces.origin": {
+      name: "Origin",
+      sortable: false,
+      width: 120,
+      render: (trace: TraceWithGuardrail, index: number) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        const displayOrigin =
+          typeof rawOrigin === "string" && rawOrigin !== ""
+            ? rawOrigin
+            : null;
 
+        return (
+          <Table.Cell
+            key={index}
+            onClick={() =>
+              openTraceDetailsDrawer({
+                traceId: trace.trace_id,
+              })
+            }
+          >
+            {displayOrigin && (() => {
+              const colors = getOriginColor(displayOrigin);
               return (
-                <Table.Cell
-                  key={index}
-                  onClick={() =>
-                    openTraceDetailsDrawer({
-                      traceId: trace.trace_id,
-                    })
-                  }
+                <Badge
+                  size="sm"
+                  paddingX={2}
+                  background={colors.background}
+                  color={colors.color}
+                  fontSize="12px"
                 >
-                  {displayOrigin && (() => {
-                    const colors = getOriginColor(displayOrigin);
-                    return (
-                      <Badge
-                        size="sm"
-                        paddingX={2}
-                        background={colors.background}
-                        color={colors.color}
-                        fontSize="12px"
-                      >
-                        {getOriginLabel(displayOrigin)}
-                      </Badge>
-                    );
-                  })()}
-                </Table.Cell>
+                  {getOriginLabel(displayOrigin)}
+                </Badge>
               );
-            },
-            value: (trace: Trace) => {
-              const rawOrigin = trace.metadata["langwatch.origin"];
-              return typeof rawOrigin === "string" && rawOrigin !== ""
-                ? rawOrigin
-                : "";
-            },
-          } satisfies HeaderColumn,
-        }
-      : {}),
+            })()}
+          </Table.Cell>
+        );
+      },
+      value: (trace: Trace) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        return typeof rawOrigin === "string" && rawOrigin !== ""
+          ? rawOrigin
+          : "";
+      },
+    } satisfies HeaderColumn,
     "metadata.labels": {
       name: "Labels",
       sortable: true,

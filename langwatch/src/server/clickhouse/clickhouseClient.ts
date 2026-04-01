@@ -106,10 +106,17 @@ export async function getClickHouseClientForProject(
  */
 export async function getClickHouseClientForOrganization(
   organizationId: string,
-): Promise<ClickHouseClient | null> {
+): Promise<ClickHouseClient> {
   const privateUrl = privateClickHouseUrls.get(organizationId);
   if (!privateUrl) {
-    return _getSharedClickHouseClient();
+    const shared = _getSharedClickHouseClient();
+    if (!shared) {
+      throw new Error(
+        "ClickHouse is not configured. Set the CLICKHOUSE_URL environment variable. " +
+        "See dev/docs/adr/004-docker-dev-environment.md for setup instructions.",
+      );
+    }
+    return shared;
   }
 
   return getOrCreateCustomClient(organizationId, privateUrl);

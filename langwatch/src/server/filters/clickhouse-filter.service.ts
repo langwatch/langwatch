@@ -67,22 +67,8 @@ export class ClickHouseFilterService {
         attributes: { "tenant.id": projectId },
       },
       async (span) => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
-        if (!clickHouseClient) {
-          return false;
-        }
-
-        const project = await this.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { featureClickHouseDataSourceTraces: true },
-        });
-
-        span.setAttribute(
-          "project.feature.clickhouse",
-          project?.featureClickHouseDataSourceTraces === true,
-        );
-
-        return project?.featureClickHouseDataSourceTraces === true;
+        span.setAttribute("project.feature.clickhouse", true);
+        return true;
       },
     );
   }

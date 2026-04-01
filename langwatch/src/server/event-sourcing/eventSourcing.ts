@@ -329,7 +329,7 @@ export class EventSourcing {
     this._initialized = true;
 
     if (!this._enabled) {
-      logger.info("Event sourcing is disabled via ENABLE_EVENT_SOURCING=false");
+      logger.info("Event sourcing is disabled (enabled=false)");
       return;
     }
 
@@ -390,6 +390,8 @@ export class EventSourcing {
       logger.debug("Using in-memory event store (non-production)");
     } else {
       // In production without ClickHouse, leave stores undefined
+      // TODO: if you're hitting this, see the ClickHouse migration and setup guide:
+      // https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/004-docker-dev-environment.md
       logger.warn(
         "ClickHouse not available in production - event sourcing will be disabled. " +
           "Set CLICKHOUSE_URL to enable event sourcing.",
@@ -461,7 +463,7 @@ export class EventSourcing {
     if (!this._loggedDisabledWarning) {
       logger.warn(
         context,
-        "Event sourcing is disabled via ENABLE_EVENT_SOURCING=false. Operations will be no-ops.",
+        "Event sourcing is disabled. Operations will be no-ops.",
       );
       this._loggedDisabledWarning = true;
     } else {

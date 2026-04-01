@@ -7,7 +7,7 @@ import { createLogger } from "~/utils/logger/server";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
-import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClickHouseReadEnabled";
+
 
 /**
  * Service for fetching per-trace evaluation runs from ClickHouse.
@@ -45,19 +45,8 @@ export class ClickHouseEvaluationService {
       "ClickHouseEvaluationService.isClickHouseEnabled",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
-        if (!clickHouseClient) {
-          return false;
-        }
-
-        const enabled = await isClickHouseReadEnabled(this.prisma, projectId);
-
-        span.setAttribute(
-          "project.feature.clickhouse.evaluations",
-          enabled,
-        );
-
-        return enabled;
+        span.setAttribute("project.feature.clickhouse.evaluations", true);
+        return true;
       },
     );
   }
