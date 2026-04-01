@@ -262,7 +262,7 @@ export class SuiteRunStateRepositoryClickHouse<
       table: TABLE_NAME,
       values: records,
       format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
   }
 }

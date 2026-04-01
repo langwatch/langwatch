@@ -70,13 +70,21 @@ export async function waitForActiveJobs({
       pipeline.get(`${GQ_KEY_PREFIX}group:${groupId}:active`);
     }
     const results = await pipeline.exec();
-    if (!results) break;
+    if (!results) {
+      throw new Error(
+        `Failed to inspect active jobs while draining projection ${projectionName}`,
+      );
+    }
 
     const allDrained = results.every(([_err, val]) => val === null);
     if (allDrained) return;
 
     await sleep(200);
   }
+
+  throw new Error(
+    `Timed out waiting for active jobs to drain for projection ${projectionName} after ${maxWaitMs}ms`,
+  );
 }
 
 function sleep(ms: number): Promise<void> {

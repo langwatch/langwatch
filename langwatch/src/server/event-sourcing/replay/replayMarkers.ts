@@ -1,6 +1,14 @@
 import type IORedis from "ioredis";
 import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX, MARKER_TTL_SECONDS } from "./replayConstants";
 
+/** Throw if any command in a pipeline result has an error. */
+function checkPipelineErrors(results: [error: Error | null, result: unknown][] | null, operation: string): void {
+  if (!results) throw new Error(`Pipeline returned null during ${operation}`);
+  for (const [err] of results) {
+    if (err) throw new Error(`Pipeline command failed during ${operation}: ${err.message}`);
+  }
+}
+
 function cutoffKey(projectionName: string): string {
   return `${CUTOFF_KEY_PREFIX}${projectionName}`;
 }
@@ -38,7 +46,8 @@ export async function markPendingBatch({
     pipeline.hset(key, aggKey, "pending");
   }
   pipeline.expire(key, MARKER_TTL_SECONDS);
-  await pipeline.exec();
+  const markResults = await pipeline.exec();
+  checkPipelineErrors(markResults, "markPendingBatch");
 }
 
 /**
@@ -62,7 +71,8 @@ export async function markCutoffBatch({
     pipeline.hset(key, aggKey, `${cutoff.timestamp}:${cutoff.eventId}`);
   }
   pipeline.expire(key, MARKER_TTL_SECONDS);
-  await pipeline.exec();
+  const cutoffResults = await pipeline.exec();
+  checkPipelineErrors(cutoffResults, "markCutoffBatch");
 }
 
 /** Pipeline HDEL + SADD for a batch of aggregate keys. */
@@ -83,7 +93,8 @@ export async function unmarkBatch({
     pipeline.hdel(cKey, aggKey);
     pipeline.sadd(compKey, aggKey);
   }
-  await pipeline.exec();
+  const unmarkResults = await pipeline.exec();
+  checkPipelineErrors(unmarkResults, "unmarkBatch");
 }
 
 /** Get the set of completed aggregate keys for a projection. */

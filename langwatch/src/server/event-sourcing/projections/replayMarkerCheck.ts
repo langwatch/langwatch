@@ -17,6 +17,9 @@ export class ReplayDeferralError extends RecoverableError {
   }
 }
 
+/** Outcome of a replay marker check. */
+export type ReplayMarkerDecision = "process" | "skip";
+
 /**
  * Interface for checking replay markers. Implementations determine
  * how markers are stored and looked up.
@@ -25,14 +28,14 @@ export interface ReplayMarkerChecker {
   /**
    * Check if projection-replay is active for the given event.
    *
-   * - No marker → normal processing (resolve).
-   * - "pending" → throw ReplayDeferralError (cutoff being recorded).
-   * - Event at or before cutoff → skip (resolve, replay handles it).
-   * - Event after cutoff → throw ReplayDeferralError (defer until replay done).
+   * Returns:
+   * - `"process"` → no replay active, continue normal fold processing.
+   * - `"skip"` → event is at or before the cutoff, replay handles it.
+   * - throws `ReplayDeferralError` → "pending" or event is after cutoff, defer.
    *
    * Cost when no replay is active: single HGET returning null (~0.1ms).
    */
-  check(projectionName: string, event: Event): Promise<void>;
+  check(projectionName: string, event: Event): Promise<ReplayMarkerDecision>;
 }
 
 /**
@@ -49,14 +52,14 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
     private readonly redis: { hget(key: string, field: string): Promise<string | null> },
   ) {}
 
-  async check(projectionName: string, event: Event): Promise<void> {
+  async check(projectionName: string, event: Event): Promise<ReplayMarkerDecision> {
     const aggregateKey = `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
     const cutoff = await this.redis.hget(
       `${CUTOFF_KEY_PREFIX}${projectionName}`,
       aggregateKey,
     );
 
-    if (!cutoff) return;
+    if (!cutoff) return "process";
 
     if (cutoff === "pending") {
       throw new ReplayDeferralError(
@@ -67,7 +70,7 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
     }
 
     if (isAtOrBeforeCutoffMarker(event.createdAt, event.id, cutoff)) {
-      return; // Skip — replay handles this event
+      return "skip";
     }
 
     throw new ReplayDeferralError(
@@ -83,7 +86,7 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
  * coordination is needed. Always allows events through.
  */
 export class NoopReplayMarkerChecker implements ReplayMarkerChecker {
-  async check(_projectionName: string, _event: Event): Promise<void> {
-    // No-op — always allow
+  async check(_projectionName: string, _event: Event): Promise<ReplayMarkerDecision> {
+    return "process";
   }
 }

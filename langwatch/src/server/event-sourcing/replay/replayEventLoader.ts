@@ -114,7 +114,6 @@ export async function countEventsForAggregates({
   sinceMs: number;
   tenantId?: string;
 }): Promise<number> {
-  const tenantFilter = tenantId ? "AND TenantId = {tenantId:String}" : "";
   const params: Record<string, unknown> = { eventTypes: [...eventTypes], sinceMs };
   if (tenantId) params.tenantId = tenantId;
 
@@ -122,14 +121,12 @@ export async function countEventsForAggregates({
     query: `
       SELECT count() as totalEvents
       FROM event_log
-      WHERE EventType IN ({eventTypes:Array(String)})
-        ${tenantId ? "AND TenantId = {tenantId:String}" : ""}
+      WHERE ${tenantId ? "TenantId = {tenantId:String} AND" : ""} EventType IN ({eventTypes:Array(String)})
         AND (AggregateType, AggregateId) IN (
           SELECT DISTINCT AggregateType, AggregateId
           FROM event_log
-          WHERE EventType IN ({eventTypes:Array(String)})
+          WHERE ${tenantId ? "TenantId = {tenantId:String} AND" : ""} EventType IN ({eventTypes:Array(String)})
             AND EventTimestamp >= {sinceMs:UInt64}
-            ${tenantFilter}
         )
     `,
     query_params: params,

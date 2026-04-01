@@ -290,15 +290,18 @@ export function ReplayWizard(props: ReplayWizardProps) {
 
   const currentStep = steps[stepIndex];
 
-  const advance = () => {
+  const advance = (overrides: Partial<ReplayConfig> = {}) => {
+    const config: ReplayConfig = {
+      tenantIds,
+      projections,
+      since,
+      concurrency,
+      dryRun,
+      ...overrides,
+    };
+
     if (stepIndex + 1 >= steps.length) {
-      onComplete({
-        tenantIds,
-        projections,
-        since,
-        concurrency,
-        dryRun,
-      });
+      onComplete(config);
     } else {
       setStepIndex((i) => i + 1);
     }
@@ -329,7 +332,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
           <TenantIdInput
             onComplete={(ids) => {
               setTenantIds(ids);
-              advance();
+              advance({ tenantIds: ids });
             }}
             onCancel={onCancel}
           />
@@ -340,7 +343,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
             projections={availableProjections}
             onComplete={(selected) => {
               setProjections(selected);
-              advance();
+              advance({ projections: selected });
             }}
             onCancel={onCancel}
           />
@@ -350,7 +353,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
           <SinceInput
             onComplete={(val) => {
               setSince(val);
-              advance();
+              advance({ since: val });
             }}
             onCancel={onCancel}
           />
@@ -360,7 +363,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
           <ConcurrencyInput
             onComplete={(val) => {
               setConcurrency(val);
-              advance();
+              advance({ concurrency: val });
             }}
             onCancel={onCancel}
           />
@@ -370,7 +373,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
           <DryRunToggle
             onComplete={(val) => {
               setDryRun(val);
-              advance();
+              advance({ dryRun: val });
             }}
             onCancel={onCancel}
           />

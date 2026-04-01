@@ -568,7 +568,8 @@ export class ProjectionRouter<
 
         // Defer or skip if projection-replay is active for this aggregate
         if (this.replayMarkerChecker) {
-          await this.replayMarkerChecker.check(projectionName, event);
+          const decision = await this.replayMarkerChecker.check(projectionName, event);
+          if (decision === "skip") return;
         }
 
         const key = fold.key ? fold.key(event) : undefined;

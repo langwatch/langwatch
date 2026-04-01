@@ -63,18 +63,18 @@ describe("isAtOrBeforeCutoffMarker", () => {
 
 describe("RedisReplayMarkerChecker", () => {
   function createChecker() {
-    const hget = vi.fn<[string, string], Promise<string | null>>();
+    const hget = vi.fn<(key: string, field: string) => Promise<string | null>>();
     const redis = { hget };
     const checker = new RedisReplayMarkerChecker(redis);
     return { checker, hget };
   }
 
   describe("when no marker exists", () => {
-    it("allows the event through (resolves)", async () => {
+    it("returns 'process'", async () => {
       const { checker, hget } = createChecker();
       hget.mockResolvedValue(null);
 
-      await expect(checker.check("traceSummary", makeEvent())).resolves.toBeUndefined();
+      await expect(checker.check("traceSummary", makeEvent())).resolves.toBe("process");
       expect(hget).toHaveBeenCalledWith(
         "projection-replay:cutoff:traceSummary",
         "tenant-1:trace:agg-1",
@@ -93,7 +93,7 @@ describe("RedisReplayMarkerChecker", () => {
   });
 
   describe("when event is at or before cutoff", () => {
-    it("allows the event through (replay handles it)", async () => {
+    it("returns 'skip' (replay handles it)", async () => {
       const { checker, hget } = createChecker();
       // Cutoff: timestamp 1700000001000, eventId evt-010
       // Event:  timestamp 1700000000000, eventId evt-001 → before cutoff
@@ -101,7 +101,7 @@ describe("RedisReplayMarkerChecker", () => {
 
       await expect(
         checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe("skip");
     });
   });
 
@@ -133,13 +133,13 @@ describe("RedisReplayMarkerChecker", () => {
   });
 
   describe("when event has same timestamp and same eventId", () => {
-    it("allows the event through (at cutoff boundary)", async () => {
+    it("returns 'skip' (at cutoff boundary)", async () => {
       const { checker, hget } = createChecker();
       hget.mockResolvedValue("1700000000000:evt-001");
 
       await expect(
         checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
-      ).resolves.toBeUndefined();
+      ).resolves.toBe("skip");
     });
   });
 
