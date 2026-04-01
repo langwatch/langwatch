@@ -79,7 +79,8 @@ def get_dataset(
     the facade delegation (which routes here).
     """
     facade = _get_facade()
-    return facade.get_dataset(slug_or_id)
+    ignore_tracing = bool(options and options.ignore_tracing)
+    return facade.get_dataset(slug_or_id, ignore_tracing=ignore_tracing)
 
 
 # ── Module-level facade delegation ────────────────────────────────

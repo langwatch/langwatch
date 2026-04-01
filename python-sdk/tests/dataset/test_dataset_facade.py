@@ -11,9 +11,11 @@ Covers:
 
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 from langwatch.dataset.dataset_facade import DatasetsFacade
 
@@ -212,7 +214,23 @@ class TestDatasetsFacade:
             ds = facade.get_dataset("dataset_xyz")
             assert ds.slug == "my-data"
             assert ds.id == "dataset_xyz"
-            facade._api.get_dataset.assert_called_once_with("dataset_xyz")
+            facade._api.get_dataset.assert_called_once_with("dataset_xyz", tracer=None)
+
+        def test_forwards_ignore_tracing_as_noop_tracer(self, facade):
+            """get_dataset(ignore_tracing=True) passes a NoOpTracer to the API service"""
+            from opentelemetry.trace import NoOpTracer
+
+            facade._api.get_dataset = MagicMock(
+                return_value={
+                    "datasetId": "ds_1",
+                    "name": "test",
+                    "slug": "test",
+                    "data": [],
+                }
+            )
+            facade.get_dataset("test", ignore_tracing=True)
+            call_kwargs = facade._api.get_dataset.call_args
+            assert isinstance(call_kwargs.kwargs["tracer"], NoOpTracer)
 
     class TestUpdateDataset:
         """update_dataset()"""

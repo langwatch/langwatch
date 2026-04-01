@@ -13,6 +13,8 @@ Follows the same 3-layer pattern as the prompts module:
 import os
 from typing import Any, Dict, List, Optional
 
+from opentelemetry.trace import NoOpTracer
+
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
@@ -102,12 +104,19 @@ class DatasetsFacade:
         raw = self._api.create_dataset(name=name, columns=columns)
         return DatasetInfo(**raw)
 
-    def get_dataset(self, slug_or_id: str) -> Dataset:
+    def get_dataset(
+        self,
+        slug_or_id: str,
+        *,
+        ignore_tracing: bool = False,
+    ) -> Dataset:
         """
         Get a dataset by slug or ID, including its entries.
 
         Args:
             slug_or_id: Dataset slug or ID.
+            ignore_tracing: When True, uses a NoOpTracer so no span is emitted
+                for this call. Matches the legacy GetDatasetOptions behavior.
 
         Returns:
             Dataset object with entries.
@@ -115,7 +124,8 @@ class DatasetsFacade:
         Raises:
             ValueError: If the dataset is not found (404).
         """
-        raw = self._api.get_dataset(slug_or_id)
+        tracer = NoOpTracer() if ignore_tracing else None
+        raw = self._api.get_dataset(slug_or_id, tracer=tracer)
         entries = [DatasetEntry(**item) for item in raw.get("data", [])]
         return Dataset(
             id=raw.get("datasetId", ""),
