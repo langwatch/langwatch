@@ -423,11 +423,9 @@ describe("webhookService", () => {
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
     });
-  });
 
-  describe("handleInvoicePaymentSucceeded() — cancellation regression", () => {
     describe("when subscription is already CANCELLED in DB and Stripe subscription is canceled", () => {
-      it("skips activation and does not send Slack notification", async () => {
+      it("does not reactivate a cancelled subscription", async () => {
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
           id: "sub_stripe_1",
           status: "canceled",
@@ -453,7 +451,7 @@ describe("webhookService", () => {
     });
 
     describe("when subscription is ACTIVE in DB but Stripe subscription is canceled", () => {
-      it("skips activation and does not send Slack notification", async () => {
+      it("does not reactivate a cancelling subscription", async () => {
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
           id: "sub_stripe_1",
           status: "canceled",
@@ -475,6 +473,39 @@ describe("webhookService", () => {
 
         expect(subRepo.activate).not.toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Stripe subscription status check fails", () => {
+      it("proceeds with activation (fail-open)", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockRejectedValue(
+          new Error("Stripe API unreachable"),
+        );
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.PENDING,
+        });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "confirmed",
+            organizationId: "org_123",
+          }),
+        );
       });
     });
 

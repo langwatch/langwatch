@@ -1,7 +1,7 @@
 Feature: Subscription cancellation revokes access and sends correct notifications
 
   When a customer cancels their subscription, the platform must:
-  - Revoke paid-tier access immediately
+  - Revoke paid-tier access when cancellation becomes effective (e.g., at period end)
   - Not reactivate the subscription from $0 invoices generated during cancellation
   - Send correct notifications (not "activated" messages)
 

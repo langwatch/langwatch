@@ -399,8 +399,19 @@ export class EEWebhookService implements WebhookService {
     // Guard: a $0 invoice generated during cancellation must not reactivate the subscription.
     // Stripe fires invoice.payment_succeeded for $0 prorated invoices even when the subscription
     // is being cancelled. Check the authoritative Stripe status before activating.
-    const stripeSubscription = await this.stripe.subscriptions.retrieve(subscriptionId);
-    if (stripeSubscription.status === "canceled") {
+    let stripeCanceled = false;
+    try {
+      const stripeSubscription =
+        await this.stripe.subscriptions.retrieve(subscriptionId);
+      stripeCanceled = stripeSubscription.status === "canceled";
+    } catch (err) {
+      logger.warn(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
+      );
+    }
+
+    if (stripeCanceled) {
       logger.info(
         { subscriptionId },
         "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
