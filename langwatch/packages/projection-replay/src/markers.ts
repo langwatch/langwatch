@@ -1,5 +1,9 @@
 import type IORedis from "ioredis";
 
+/** Safety TTL for replay markers — prevents orphaned markers from permanently
+ *  blocking live processing if a replay is abandoned without cleanup. */
+const MARKER_TTL_SECONDS = 7 * 24 * 3600; // 7 days
+
 function cutoffKey(projectionName: string): string {
   return `projection-replay:cutoff:${projectionName}`;
 }
@@ -36,6 +40,7 @@ export async function markPendingBatch({
   for (const aggKey of aggKeys) {
     pipeline.hset(key, aggKey, "pending");
   }
+  pipeline.expire(key, MARKER_TTL_SECONDS);
   await pipeline.exec();
 }
 
@@ -59,6 +64,7 @@ export async function markCutoffBatch({
   for (const [aggKey, cutoff] of cutoffs) {
     pipeline.hset(key, aggKey, `${cutoff.timestamp}:${cutoff.eventId}`);
   }
+  pipeline.expire(key, MARKER_TTL_SECONDS);
   await pipeline.exec();
 }
 

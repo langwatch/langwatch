@@ -551,6 +551,6 @@ async function main() {
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error("Fatal error:", error);
+    console.error("Fatal error:", error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
