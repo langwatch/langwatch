@@ -85,6 +85,24 @@ describe("metric-translator", () => {
           "Attributes['gen_ai.conversation.id']"
         );
       });
+
+      describe("metadata.span_type", () => {
+        // @regression: metadata.span_type with cardinality aggregation translates to
+        // uniq(ts.TraceId) which only uses trace_summaries. The stored_spans JOIN was
+        // incorrectly required, causing fan-out that inflated trace-level SUM metrics
+        // (TotalCost, TotalTokens) when combined in the same query.
+        it("does not require stored_spans JOIN for cardinality aggregation", () => {
+          const result = translateMetric("metadata.span_type", "cardinality", 0);
+          expect(result.selectExpression).toContain("uniq(");
+          expect(result.selectExpression).toContain("ts.TraceId");
+          expect(result.requiredJoins).not.toContain("stored_spans");
+        });
+
+        it("requires stored_spans JOIN for non-cardinality aggregations", () => {
+          const result = translateMetric("metadata.span_type", "terms", 0);
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
     });
 
     describe("performance metrics", () => {

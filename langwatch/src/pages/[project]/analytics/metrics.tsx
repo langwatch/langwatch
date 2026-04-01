@@ -27,8 +27,7 @@ const LLMMetrics = {
   series: [
     {
       name: "LLM Calls",
-      metric: "metadata.span_type",
-      key: "llm",
+      metric: "metadata.trace_id",
       aggregation: "cardinality",
       colorSet: "colors",
     },
