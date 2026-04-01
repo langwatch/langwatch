@@ -11,7 +11,7 @@ import { api } from "../../utils/api";
 export default function Accept() {
   const router = useRouter();
   const { inviteCode } = router.query;
-  const acceptInviteMutation = api.organization.acceptInvite.useMutation();
+  const acceptInviteMutation = api.invite.acceptInvite.useMutation();
 
   const { data: session } = useRequiredSession();
   const triggerInvite = typeof inviteCode === "string" && !!session;

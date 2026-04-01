@@ -252,7 +252,7 @@ describe("Organization Invites Integration", () => {
     describe("when member requests invitation with ADMIN role", () => {
       it("fails with validation error", async () => {
         await expect(
-          memberCaller.organization.createInviteRequest({
+          memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               {
@@ -269,7 +269,7 @@ describe("Organization Invites Integration", () => {
 
     describe("when member requests invitation with MEMBER role", () => {
       it("creates invitation with WAITING_APPROVAL status", async () => {
-        const results = await memberCaller.organization.createInviteRequest({
+        const results = await memberCaller.invite.createInviteRequest({
           organizationId,
           invites: [
             { email: "user@example.com", role: "MEMBER", teamIds: teamId },
@@ -280,7 +280,7 @@ describe("Organization Invites Integration", () => {
       });
 
       it("sets requestedBy to the requesting user's ID", async () => {
-        const results = await memberCaller.organization.createInviteRequest({
+        const results = await memberCaller.invite.createInviteRequest({
           organizationId,
           invites: [
             { email: "user@example.com", role: "MEMBER", teamIds: teamId },
@@ -291,7 +291,7 @@ describe("Organization Invites Integration", () => {
       });
 
       it("creates invitation with null expiration", async () => {
-        const results = await memberCaller.organization.createInviteRequest({
+        const results = await memberCaller.invite.createInviteRequest({
           organizationId,
           invites: [
             { email: "user@example.com", role: "MEMBER", teamIds: teamId },
@@ -302,7 +302,7 @@ describe("Organization Invites Integration", () => {
       });
 
       it("does not send invitation email", async () => {
-        await memberCaller.organization.createInviteRequest({
+        await memberCaller.invite.createInviteRequest({
           organizationId,
           invites: [
             { email: "user@example.com", role: "MEMBER", teamIds: teamId },
@@ -315,7 +315,7 @@ describe("Organization Invites Integration", () => {
 
     describe("when member requests multiple invitations at once", () => {
       it("creates a WAITING_APPROVAL record for each email", async () => {
-        const results = await memberCaller.organization.createInviteRequest({
+        const results = await memberCaller.invite.createInviteRequest({
           organizationId,
           invites: [
             { email: "multi-a@example.com", role: "MEMBER", teamIds: teamId },
@@ -335,7 +335,7 @@ describe("Organization Invites Integration", () => {
 
       it("rejects duplicate emails in a single payload and creates no invites", async () => {
         await expect(
-          memberCaller.organization.createInviteRequest({
+          memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "dupe@example.com", role: "MEMBER", teamIds: teamId },
@@ -362,7 +362,7 @@ describe("Organization Invites Integration", () => {
     describe("when duplicate invitation exists with WAITING_APPROVAL status", () => {
       it("fails with duplicate invitation error", async () => {
         // Create initial WAITING_APPROVAL invite
-        await memberCaller.organization.createInviteRequest({
+        await memberCaller.invite.createInviteRequest({
           organizationId,
           invites: [
             { email: "existing@example.com", role: "MEMBER", teamIds: teamId },
@@ -371,7 +371,7 @@ describe("Organization Invites Integration", () => {
 
         // Try to create another for the same email
         await expect(
-          memberCaller.organization.createInviteRequest({
+          memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               {
@@ -398,14 +398,14 @@ describe("Organization Invites Integration", () => {
       it("transitions status to PENDING", async () => {
         // Create WAITING_APPROVAL invite
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "user@example.com", role: "MEMBER", teamIds: teamId },
             ],
           });
 
-        const result = await adminCaller.organization.approveInvite({
+        const result = await adminCaller.invite.approveInvite({
           inviteId: results[0]!.invite.id,
           organizationId,
         });
@@ -417,14 +417,14 @@ describe("Organization Invites Integration", () => {
         const beforeApproval = Date.now();
 
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "user@example.com", role: "MEMBER", teamIds: teamId },
             ],
           });
 
-        const result = await adminCaller.organization.approveInvite({
+        const result = await adminCaller.invite.approveInvite({
           inviteId: results[0]!.invite.id,
           organizationId,
         });
@@ -439,14 +439,14 @@ describe("Organization Invites Integration", () => {
 
       it("sends invitation email", async () => {
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "user@example.com", role: "MEMBER", teamIds: teamId },
             ],
           });
 
-        await adminCaller.organization.approveInvite({
+        await adminCaller.invite.approveInvite({
           inviteId: results[0]!.invite.id,
           organizationId,
         });
@@ -476,7 +476,7 @@ describe("Organization Invites Integration", () => {
         });
 
         await expect(
-          memberCaller.organization.approveInvite({
+          memberCaller.invite.approveInvite({
             inviteId: invite.id,
             organizationId,
           })
@@ -492,7 +492,7 @@ describe("Organization Invites Integration", () => {
         mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
 
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               {
@@ -510,7 +510,7 @@ describe("Organization Invites Integration", () => {
         mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 2 }));
 
         await expect(
-          adminCaller.organization.approveInvite({
+          adminCaller.invite.approveInvite({
             inviteId,
             organizationId,
           })
@@ -549,7 +549,7 @@ describe("Organization Invites Integration", () => {
           },
         });
 
-        await adminCaller.organization.deleteInvite({
+        await adminCaller.invite.deleteInvite({
           inviteId: invite.id,
           organizationId,
         });
@@ -598,7 +598,7 @@ describe("Organization Invites Integration", () => {
         });
 
         const invites =
-          await adminCaller.organization.getOrganizationPendingInvites({
+          await adminCaller.invite.getOrganizationPendingInvites({
             organizationId,
           });
 
@@ -622,7 +622,7 @@ describe("Organization Invites Integration", () => {
         });
 
         const invites =
-          await adminCaller.organization.getOrganizationPendingInvites({
+          await adminCaller.invite.getOrganizationPendingInvites({
             organizationId,
           });
 
@@ -649,7 +649,7 @@ describe("Organization Invites Integration", () => {
           callOrder.push("email-sent");
         });
 
-        const results = await adminCaller.organization.createInvites({
+        const results = await adminCaller.invite.createInvites({
           organizationId,
           invites: [
             { email: "batch-a@example.com", role: "MEMBER", teamIds: teamId },
@@ -677,7 +677,7 @@ describe("Organization Invites Integration", () => {
           .mockResolvedValueOnce(undefined) // first email succeeds
           .mockRejectedValueOnce(new Error("SMTP failure")); // second email fails
 
-        const results = await adminCaller.organization.createInvites({
+        const results = await adminCaller.invite.createInvites({
           organizationId,
           invites: [
             { email: "ok-email@example.com", role: "MEMBER", teamIds: teamId },
@@ -726,7 +726,7 @@ describe("Organization Invites Integration", () => {
       it("still approves the invitation", async () => {
         // Create WAITING_APPROVAL invite
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "user@example.com", role: "MEMBER", teamIds: teamId },
@@ -738,7 +738,7 @@ describe("Organization Invites Integration", () => {
           new Error("Email service unavailable")
         );
 
-        const result = await adminCaller.organization.approveInvite({
+        const result = await adminCaller.invite.approveInvite({
           inviteId: results[0]!.invite.id,
           organizationId,
         });
@@ -755,7 +755,7 @@ describe("Organization Invites Integration", () => {
 
       it("returns emailNotSent as fallback indicator", async () => {
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "user@example.com", role: "MEMBER", teamIds: teamId },
@@ -766,7 +766,7 @@ describe("Organization Invites Integration", () => {
           new Error("Email service unavailable")
         );
 
-        const result = await adminCaller.organization.approveInvite({
+        const result = await adminCaller.invite.approveInvite({
           inviteId: results[0]!.invite.id,
           organizationId,
         });
@@ -787,7 +787,7 @@ describe("Organization Invites Integration", () => {
         mockGetActivePlan.mockResolvedValue(makeTestPlan({ maxMembers: 10 }));
 
         const results =
-          await memberCaller.organization.createInviteRequest({
+          await memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               {
@@ -808,7 +808,7 @@ describe("Organization Invites Integration", () => {
 
         // Step 3: Admin attempts to approve the invite
         await expect(
-          adminCaller.organization.approveInvite({
+          adminCaller.invite.approveInvite({
             inviteId,
             organizationId,
           })
@@ -840,7 +840,7 @@ describe("Organization Invites Integration", () => {
         });
 
         await expect(
-          memberCaller.organization.createInviteRequest({
+          memberCaller.invite.createInviteRequest({
             organizationId,
             invites: [
               { email: "new@example.com", role: "MEMBER", teamIds: teamId },
