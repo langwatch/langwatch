@@ -72,7 +72,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
    * Retrieves a prompt by handle or ID.
    *
    * Supports shorthand `handle:label` syntax — e.g. `get("pizza-prompt:production")`.
-   * If an explicit `label` option is also provided, it takes precedence over the shorthand.
+   * Shorthand is parsed server-side; the SDK passes the string through as-is.
    *
    * @param handleOrId The prompt's handle, unique identifier, or `handle:label` shorthand.
    * @param options Optional parameters for the request.
@@ -83,40 +83,22 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     handleOrId: string,
     options?: GetPromptOptions,
   ): Promise<Prompt> {
-    const { handle, options: resolvedOptions } = this.parseHandleAndLabel(handleOrId, options);
-    const fetchPolicy = resolvedOptions?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
+    const fetchPolicy = options?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
 
     switch (fetchPolicy) {
       case FetchPolicy.MATERIALIZED_ONLY:
-        return this.getMaterializedOnly(handle);
+        return this.getMaterializedOnly(handleOrId);
 
       case FetchPolicy.ALWAYS_FETCH:
-        return this.getAlwaysFetch(handle, resolvedOptions);
+        return this.getAlwaysFetch(handleOrId, options);
 
       case FetchPolicy.CACHE_TTL:
-        return this.getCacheTtl(handle, resolvedOptions);
+        return this.getCacheTtl(handleOrId, options);
 
       case FetchPolicy.MATERIALIZED_FIRST:
       default:
-        return this.getMaterializedFirst(handle, resolvedOptions);
+        return this.getMaterializedFirst(handleOrId, options);
     }
-  }
-
-  /**
-   * Parses an optional `handle:label` shorthand from `handleOrId`.
-   * If an explicit `label` option is present, it takes precedence and no parsing occurs.
-   */
-  private parseHandleAndLabel(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): { handle: string; options?: GetPromptOptions } {
-    if (options?.label != null || !handleOrId.includes(':')) {
-      return { handle: handleOrId, options };
-    }
-    const colonIndex = handleOrId.lastIndexOf(':');
-    const handle = handleOrId.slice(0, colonIndex);
-    const label = handleOrId.slice(colonIndex + 1);
-    return { handle, options: { ...options, label } };
   }
 
   private async getMaterializedFirst(

@@ -9,10 +9,16 @@ Feature: SDK Prompt Label Support
   # --- Fetch by label ---
 
   @unit
-  Scenario: Fetch prompt by label
+  Scenario: Fetch prompt by label via options
     Given "pizza-prompt" has production=v3 and latest=v4
-    When I call prompts.get("pizza-prompt:production")
+    When I call prompts.get("pizza-prompt", { label: "production" })
     Then I receive version v3 config data
+
+  @unit
+  Scenario: Shorthand syntax passes through to API without client-side parsing
+    When I call prompts.get("pizza-prompt:production")
+    Then the SDK passes "pizza-prompt:production" as the ID to the API
+    And the API resolves it server-side
 
   @unit
   Scenario: Fetch without label returns latest
@@ -30,7 +36,7 @@ Feature: SDK Prompt Label Support
   @unit
   Scenario: Label is included in cache key
     Given "pizza-prompt" has production=v3
-    When I call get("pizza-prompt:production", { fetchPolicy: "CACHE_TTL" })
+    When I call get("pizza-prompt", { label: "production", fetchPolicy: "CACHE_TTL" })
     Then the cache key includes the label
     And it returns v3
 
@@ -49,8 +55,8 @@ Feature: SDK Prompt Label Support
   @unit
   Scenario: Unassigned label returns error
     Given "pizza-prompt" has no version assigned to "production"
-    When I call get("pizza-prompt:production")
-    Then the API returns an error and the SDK propagates it
+    When I call get("pizza-prompt", { label: "production" })
+    Then the API returns an error and the SDK surfaces it cleanly
 
   # --- Label assignment (sub-resource) ---
 
