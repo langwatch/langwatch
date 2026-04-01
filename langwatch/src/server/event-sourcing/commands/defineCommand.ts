@@ -58,7 +58,6 @@ export function defineCommand<
   schema,
   aggregateId,
   idempotencyKey,
-  groupKey,
   spanAttributes,
   makeJobId,
 }: {
@@ -69,7 +68,6 @@ export function defineCommand<
   schema: TEventDataSchema;
   aggregateId: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
   idempotencyKey: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
-  groupKey?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
   spanAttributes?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => Record<string, string | number | boolean>;
   makeJobId?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
 }): DefinedCommandClass<z.infer<TEventDataSchema> & CommandEnvelope, TCmdType> {
@@ -88,9 +86,6 @@ export function defineCommand<
     static getAggregateId(payload: CommandData): string {
       return aggregateId(payload);
     }
-
-    static getGroupKey: ((payload: CommandData) => string) | undefined =
-      groupKey;
 
     static getSpanAttributes: ((payload: CommandData) => Record<string, string | number | boolean>) | undefined =
       spanAttributes;

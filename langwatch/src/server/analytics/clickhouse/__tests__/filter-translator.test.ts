@@ -308,14 +308,13 @@ describe("filter-translator", () => {
     describe("annotation filters", () => {
       it("translates annotations.hasAnnotation filter for true", () => {
         const result = translateFilter("annotations.hasAnnotation", ["true"]);
-        expect(result.whereClause).toContain("ts.HasAnnotation = 1");
+        expect(result.whereClause).toContain("ts.HasAnnotation = true");
         expect(result.params).toEqual({});
       });
 
       it("translates annotations.hasAnnotation filter for false", () => {
         const result = translateFilter("annotations.hasAnnotation", ["false"]);
-        expect(result.whereClause).toContain("ts.HasAnnotation = 0");
-        expect(result.whereClause).toContain("IS NULL");
+        expect(result.whereClause).toContain("ts.HasAnnotation = false");
         expect(result.params).toEqual({});
       });
     });

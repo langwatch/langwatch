@@ -15,8 +15,8 @@ import { makeExperimentRunKey } from "./utils/compositeKey";
  */
 
 export const StartExperimentRunCommand = defineCommand({
-  commandType: "lw.experiment_run.start",
-  eventType: "lw.experiment_run.started",
+  commandType: "lw.experiment_run.start" as const,
+  eventType: "lw.experiment_run.started" as const,
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: experimentRunStartedEventDataSchema,
@@ -31,13 +31,12 @@ export const StartExperimentRunCommand = defineCommand({
 });
 
 export const RecordTargetResultCommand = defineCommand({
-  commandType: "lw.experiment_run.record_target_result",
-  eventType: "lw.experiment_run.target_result",
+  commandType: "lw.experiment_run.record_target_result" as const,
+  eventType: "lw.experiment_run.target_result" as const,
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: targetResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
-  groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
   idempotencyKey: (d) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
@@ -49,13 +48,12 @@ export const RecordTargetResultCommand = defineCommand({
 });
 
 export const RecordEvaluatorResultCommand = defineCommand({
-  commandType: "lw.experiment_run.record_evaluator_result",
-  eventType: "lw.experiment_run.evaluator_result",
+  commandType: "lw.experiment_run.record_evaluator_result" as const,
+  eventType: "lw.experiment_run.evaluator_result" as const,
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: evaluatorResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
-  groupKey: (d) => `${d.experimentId}:${d.runId}:item:${d.index}`,
   idempotencyKey: (d) => `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
   spanAttributes: (d) => ({
     "payload.run.id": d.runId,
@@ -67,8 +65,8 @@ export const RecordEvaluatorResultCommand = defineCommand({
 });
 
 export const CompleteExperimentRunCommand = defineCommand({
-  commandType: "lw.experiment_run.complete",
-  eventType: "lw.experiment_run.completed",
+  commandType: "lw.experiment_run.complete" as const,
+  eventType: "lw.experiment_run.completed" as const,
   eventVersion: "2025-02-01",
   aggregateType: "experiment_run",
   schema: experimentRunCompletedEventDataSchema,

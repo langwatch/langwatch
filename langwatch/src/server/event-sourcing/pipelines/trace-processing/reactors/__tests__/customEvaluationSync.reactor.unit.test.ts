@@ -64,7 +64,7 @@ function createFoldState(
     blockedByGuardrail: false,
     topicId: null,
     subTopicId: null,
-    hasAnnotation: null,
+    annotationIds: [],
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),

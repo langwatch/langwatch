@@ -56,7 +56,7 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
     blockedByGuardrail: false,
     topicId: null,
     subTopicId: null,
-    hasAnnotation: null,
+    annotationIds: [],
     attributes: {},
     scenarioRoleCosts: { Agent: 0.003 },
     scenarioRoleLatencies: { Agent: 4000 },

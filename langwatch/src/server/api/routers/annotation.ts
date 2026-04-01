@@ -10,11 +10,15 @@ import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
+import { getApp } from "~/server/app-layer/app";
+import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../elasticsearch/protections";
 import { checkPermissionOrPubliclyShared } from "../rbac";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
+
+const logger = createLogger("langwatch:api:annotation");
 
 const scoreOptionSchema = z.object({
   value: z
@@ -115,7 +119,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      return service.create({
+      const createdAnnotation = await service.create({
         id: nanoid(),
         projectId: input.projectId,
         traceId: input.traceId,
@@ -125,6 +129,26 @@ export const annotationRouter = createTRPCRouter({
         scoreOptions: input.scoreOptions ?? {},
         expectedOutput: input.expectedOutput ?? null,
       });
+
+      // Best-effort ClickHouse sync: Prisma is the source of truth.
+      // Failures are logged but don't fail the mutation — the backfill task
+      // can reconcile any missed syncs.
+      try {
+        const app = getApp();
+        await app.traces.addAnnotation({
+          tenantId: input.projectId,
+          traceId: input.traceId,
+          annotationId: createdAnnotation.id,
+          occurredAt: Date.now(),
+        });
+      } catch (error) {
+        logger.error(
+          { error, traceId: input.traceId, projectId: input.projectId },
+          "Failed to sync annotation to ClickHouse",
+        );
+      }
+
+      return createdAnnotation;
     }),
   updateByTraceId: protectedProcedure
     .input(
@@ -229,10 +253,28 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      return service.delete({
+      const deletedAnnotation = await service.delete({
         id: input.annotationId,
         projectId: input.projectId,
       });
+
+      // Best-effort ClickHouse sync (see create mutation comment above).
+      try {
+        const app = getApp();
+        await app.traces.removeAnnotation({
+          tenantId: input.projectId,
+          traceId: deletedAnnotation.traceId,
+          annotationId: deletedAnnotation.id,
+          occurredAt: Date.now(),
+        });
+      } catch (error) {
+        logger.error(
+          { error, traceId: deletedAnnotation.traceId, projectId: input.projectId },
+          "Failed to sync annotation removal to ClickHouse",
+        );
+      }
+
+      return deletedAnnotation;
     }),
   getAll: protectedProcedure
     .input(

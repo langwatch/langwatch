@@ -48,6 +48,7 @@ interface ClickHouseSummaryRecord {
   BlockedByGuardrail: number;
   TopicId: string | null;
   SubTopicId: string | null;
+  AnnotationIds: string[];
   HasAnnotation: number | null;
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
@@ -140,6 +141,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
+            AnnotationIds,
             HasAnnotation,
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
@@ -198,8 +200,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       blockedByGuardrail: !!record.BlockedByGuardrail,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
-      hasAnnotation:
-        record.HasAnnotation != null ? !!record.HasAnnotation : null,
+      annotationIds: record.AnnotationIds ?? [],
       attributes: record.Attributes ?? {},
       scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
@@ -247,8 +248,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
-      HasAnnotation:
-        data.hasAnnotation != null ? (data.hasAnnotation ? 1 : 0) : null,
+      AnnotationIds: data.annotationIds,
+      HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},

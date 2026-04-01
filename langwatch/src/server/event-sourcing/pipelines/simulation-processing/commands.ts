@@ -17,8 +17,8 @@ import {
  */
 
 export const QueueRunCommand = defineCommand({
-  commandType: "lw.simulation_run.queue",
-  eventType: "lw.simulation_run.queued",
+  commandType: "lw.simulation_run.queue" as const,
+  eventType: "lw.simulation_run.queued" as const,
   eventVersion: "2026-03-08",
   aggregateType: "simulation_run",
   schema: simulationRunQueuedEventDataSchema,
@@ -33,8 +33,8 @@ export const QueueRunCommand = defineCommand({
 });
 
 export const StartRunCommand = defineCommand({
-  commandType: "lw.simulation_run.start",
-  eventType: "lw.simulation_run.started",
+  commandType: "lw.simulation_run.start" as const,
+  eventType: "lw.simulation_run.started" as const,
   eventVersion: "2026-02-01",
   aggregateType: "simulation_run",
   schema: simulationRunStartedEventDataSchema,
@@ -49,8 +49,8 @@ export const StartRunCommand = defineCommand({
 });
 
 export const MessageSnapshotCommand = defineCommand({
-  commandType: "lw.simulation_run.message_snapshot",
-  eventType: "lw.simulation_run.message_snapshot",
+  commandType: "lw.simulation_run.message_snapshot" as const,
+  eventType: "lw.simulation_run.message_snapshot" as const,
   eventVersion: "2026-02-01",
   aggregateType: "simulation_run",
   schema: simulationMessageSnapshotEventDataSchema,
@@ -64,8 +64,8 @@ export const MessageSnapshotCommand = defineCommand({
 });
 
 export const TextMessageStartCommand = defineCommand({
-  commandType: "lw.simulation_run.text_message_start",
-  eventType: "lw.simulation_run.text_message_start",
+  commandType: "lw.simulation_run.text_message_start" as const,
+  eventType: "lw.simulation_run.text_message_start" as const,
   eventVersion: "2026-02-01",
   aggregateType: "simulation_run",
   schema: simulationTextMessageStartEventDataSchema,
@@ -80,8 +80,8 @@ export const TextMessageStartCommand = defineCommand({
 });
 
 export const TextMessageEndCommand = defineCommand({
-  commandType: "lw.simulation_run.text_message_end",
-  eventType: "lw.simulation_run.text_message_end",
+  commandType: "lw.simulation_run.text_message_end" as const,
+  eventType: "lw.simulation_run.text_message_end" as const,
   eventVersion: "2026-02-01",
   aggregateType: "simulation_run",
   schema: simulationTextMessageEndEventDataSchema,
@@ -96,8 +96,8 @@ export const TextMessageEndCommand = defineCommand({
 });
 
 export const FinishRunCommand = defineCommand({
-  commandType: "lw.simulation_run.finish",
-  eventType: "lw.simulation_run.finished",
+  commandType: "lw.simulation_run.finish" as const,
+  eventType: "lw.simulation_run.finished" as const,
   eventVersion: "2026-02-01",
   aggregateType: "simulation_run",
   schema: simulationRunFinishedEventDataSchema,
@@ -110,8 +110,8 @@ export const FinishRunCommand = defineCommand({
 });
 
 export const DeleteRunCommand = defineCommand({
-  commandType: "lw.simulation_run.delete",
-  eventType: "lw.simulation_run.deleted",
+  commandType: "lw.simulation_run.delete" as const,
+  eventType: "lw.simulation_run.deleted" as const,
   eventVersion: "2026-02-01",
   aggregateType: "simulation_run",
   schema: simulationRunDeletedEventDataSchema,

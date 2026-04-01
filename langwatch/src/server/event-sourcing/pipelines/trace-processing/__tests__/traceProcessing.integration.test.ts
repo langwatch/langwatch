@@ -40,17 +40,6 @@ function generateTestPipelineName(): string {
   return `trace_processing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-class TestRecordSpanCommand extends RecordSpanCommand {
-  static override readonly schema = RecordSpanCommand.schema;
-  constructor() {
-    super({
-      piiRedactionService: { redactSpan: async () => {} },
-      costEnrichmentService: { enrichSpan: async () => {} },
-      tokenEstimationService: { estimateSpanTokens: async () => {} },
-    });
-  }
-}
-
 /**
  * Builds a minimal valid OTLP span for testing.
  */
@@ -141,7 +130,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     .withAggregateType("trace" as AggregateType)
     .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
     .withMapProjection("spanStorage", new SpanStorageMapProjection({ store: spanAppendStore }) as any)
-    .withCommand("recordSpan", TestRecordSpanCommand as any)
+    .withCommand("recordSpan", RecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)
     .build();
 

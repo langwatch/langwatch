@@ -3,6 +3,7 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
@@ -75,5 +76,8 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
     .withCommand("resolveOrigin", ResolveOriginCommand)
+    .withCommand("addAnnotation", AddAnnotationCommand)
+    .withCommand("removeAnnotation", RemoveAnnotationCommand)
+    .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
     .build();
 }
