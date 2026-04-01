@@ -371,6 +371,15 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.free).toBe(true);
         expect(plan.maxMembers).toBe(2);
         expect(plan.maxMessagesPerMonth).toBe(50_000);
+
+        // Lock in the query filter: only ACTIVE subscriptions are fetched
+        expect(db.subscription.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              status: { in: [SubscriptionStatus.ACTIVE] },
+            }),
+          }),
+        );
       });
     });
   });

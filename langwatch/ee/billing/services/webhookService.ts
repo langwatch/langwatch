@@ -255,17 +255,24 @@ export class EEWebhookService implements WebhookService {
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
 
     // Send "Subscription cancelled" Slack notification
-    const org = await this.organizationRepository.findNameById(
-      existingSubscription.organizationId,
-    );
-    await getApp().notifications.sendSlackSubscriptionEvent({
-      type: "cancelled",
-      organizationId: existingSubscription.organizationId,
-      organizationName: org?.name ?? "Unknown",
-      plan: existingSubscription.plan,
-      subscriptionId: existingSubscription.id,
-      cancellationDate: new Date(),
-    });
+    try {
+      const org = await this.organizationRepository.findNameById(
+        existingSubscription.organizationId,
+      );
+      await getApp().notifications.sendSlackSubscriptionEvent({
+        type: "cancelled",
+        organizationId: existingSubscription.organizationId,
+        organizationName: org?.name ?? "Unknown",
+        plan: existingSubscription.plan,
+        subscriptionId: existingSubscription.id,
+        cancellationDate: new Date(),
+      });
+    } catch (err) {
+      logger.error(
+        { stripeSubscriptionId, err },
+        "[stripeWebhook] Failed to send cancellation notification",
+      );
+    }
 
     const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existingSubscription.organizationId,
@@ -422,6 +429,13 @@ export class EEWebhookService implements WebhookService {
         { subscriptionId, err },
         "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
       );
+      if (previousSubscription.status === SubscriptionStatus.CANCELLED) {
+        logger.info(
+          { subscriptionId },
+          "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
+        );
+        return;
+      }
     }
 
     if (stripeCanceled) {

@@ -451,7 +451,7 @@ describe("webhookService", () => {
     });
 
     describe("when subscription is ACTIVE in DB but Stripe subscription is canceled", () => {
-      it("does not reactivate a cancelling subscription", async () => {
+      it("does not reactivate when Stripe status is canceled", async () => {
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
           id: "sub_stripe_1",
           status: "canceled",
@@ -506,6 +506,29 @@ describe("webhookService", () => {
             organizationId: "org_123",
           }),
         );
+      });
+
+      it("skips activation when DB status is CANCELLED", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockRejectedValue(
+          new Error("Stripe API unreachable"),
+        );
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.CANCELLED,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
     });
 
@@ -688,7 +711,6 @@ describe("webhookService", () => {
       });
 
       it("sends notification with cancellation date", async () => {
-        const cancelDate = new Date("2026-03-15T10:00:00Z");
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
         );
@@ -729,6 +751,23 @@ describe("webhookService", () => {
             organizationName: "Unknown",
           }),
         );
+      });
+
+      it("completes cancellation even when notification throws", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockRejectedValue(new Error("DB connection lost"));
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        // Should not throw — notification error is caught
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
       });
     });
   });

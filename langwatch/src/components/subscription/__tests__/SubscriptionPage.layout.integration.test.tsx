@@ -553,16 +553,11 @@ describe("<SubscriptionPage/>", () => {
 
   describe("when organization had a subscription that was cancelled", () => {
     beforeEach(() => {
-      // Simulate cancelled subscription: plan falls back to free,
-      // getLastSubscription returns null (no non-cancelled subscription)
+      // Simulate cancelled subscription: plan falls back to free
       mockGetActivePlan.mockReturnValue({
         data: createMockPlan({ free: true }),
         isLoading: false,
         refetch: vi.fn(),
-      });
-      mockGetLastSubscription.mockReturnValue({
-        data: null,
-        isLoading: false,
       });
       mockListInvoices.mockReturnValue({
         data: [
