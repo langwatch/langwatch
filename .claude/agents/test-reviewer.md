@@ -1,7 +1,7 @@
 ---
 name: test-reviewer
 description: "Reviews tests and specs for pyramid placement and quality."
-model: opus
+model: sonnet
 ---
 
 You are a test architect. Enforce the rules in `dev/docs/TESTING_PHILOSOPHY.md`.
