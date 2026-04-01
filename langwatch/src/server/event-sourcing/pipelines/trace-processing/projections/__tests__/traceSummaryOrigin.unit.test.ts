@@ -1,51 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
-import {
-  applySpanToSummary,
-  TraceSummaryFoldProjection,
-  type TraceSummaryData,
-} from "../traceSummary.foldProjection";
-
-const traceSummaryProjection = new TraceSummaryFoldProjection({
-  store: { store: async () => {}, get: async () => null },
-});
-
-function createInitState(): TraceSummaryData {
-  return traceSummaryProjection.init();
-}
-
-function createTestSpan(
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan {
-  return {
-    id: "span-1",
-    traceId: "trace-1",
-    spanId: "span-1",
-    tenantId: "tenant-1",
-    parentSpanId: "parent-1",
-    parentTraceId: null,
-    parentIsRemote: null,
-    sampled: true,
-    startTimeUnixMs: 1000,
-    endTimeUnixMs: 2000,
-    durationMs: 1000,
-    name: "test-span",
-    kind: NormalizedSpanKind.INTERNAL,
-    resourceAttributes: {},
-    spanAttributes: {},
-    events: [],
-    links: [],
-    statusMessage: null,
-    statusCode: NormalizedStatusCode.UNSET,
-    instrumentationScope: { name: "test", version: null },
-    droppedAttributesCount: 0 as const,
-    droppedEventsCount: 0 as const,
-    droppedLinksCount: 0 as const,
-    ...overrides,
-  };
-}
+import { applySpanToSummary } from "../traceSummary.foldProjection";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {
   beforeEach(() => {
@@ -529,6 +485,36 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
       state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
+    });
+  });
+
+  describe("when child with sdk.name arrives before root with legacy marker", () => {
+    it("overrides provisional 'application' origin with root's inferred origin", () => {
+      // Child arrives first — sdk.name heuristic sets origin to "application"
+      const childSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "root-1",
+        resourceAttributes: {
+          "telemetry.sdk.name": "@langwatch/scenario",
+        },
+        spanAttributes: {},
+      });
+
+      // Root arrives later — has legacy marker for simulation
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        instrumentationScope: { name: "@langwatch/scenario", version: null },
+        spanAttributes: {},
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("application");
+
+      state = applySpanToSummary({ state, span: rootSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
 });
