@@ -1,5 +1,5 @@
 import type { paths, operations } from "@/internal/generated/openapi/api-client";
-import { type PromptResponse } from "./types";
+import { type PromptResponse, type LabelDefinition, type CreatedLabel } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
@@ -101,7 +101,7 @@ export class PromptsApiService {
    * @returns Raw PromptResponse data.
    * @throws {PromptsApiError} If the API call fails.
    */
-  get = async (id: string, options?: { version?: string; label?: "production" | "staging" }): Promise<PromptResponse> => {
+  get = async (id: string, options?: { version?: string; label?: string }): Promise<PromptResponse> => {
     // Parse version to number, skip for "latest" or invalid values
     const versionNumber = options?.version && options.version !== "latest"
       ? parseInt(options.version, 10)
@@ -185,13 +185,51 @@ export class PromptsApiService {
     return updatedPrompt;
   }
 
+  /**
+   * Lists all prompt labels (built-in and custom) for the organization.
+   * @returns Array of label definitions.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async listLabels(): Promise<LabelDefinition[]> {
+    const { data, error } = await this.apiClient.GET("/api/prompts/labels");
+    if (error) this.handleApiError("list labels", error);
+    return data;
+  }
+
+  /**
+   * Creates a custom prompt label for the organization.
+   * @param params.name The label name (must match /^[a-z][a-z0-9_-]*$/).
+   * @returns The created label.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async createLabel({ name }: { name: string }): Promise<CreatedLabel> {
+    const { data, error } = await this.apiClient.POST("/api/prompts/labels", {
+      body: { name },
+    });
+    if (error) this.handleApiError("create label", error);
+    return data;
+  }
+
+  /**
+   * Deletes a custom prompt label by ID.
+   * @param labelId The label ID to delete.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async deleteLabel(labelId: string): Promise<void> {
+    const { error } = await this.apiClient.DELETE(
+      "/api/prompts/labels/{labelId}",
+      { params: { path: { labelId } } },
+    );
+    if (error) this.handleApiError(`delete label "${labelId}"`, error);
+  }
+
   async assignLabel({
     id,
     label,
     versionId,
   }: {
     id: string;
-    label: "production" | "staging";
+    label: string;
     versionId: string;
   }): Promise<AssignLabelResult> {
     const { data, error } = await this.apiClient.PUT(

@@ -1,6 +1,6 @@
 import { PromptsApiService, type AssignLabelResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
+import type { CreatePromptBody, UpdatePromptBody, PromptData, LabelDefinition, CreatedLabel } from "./types";
 import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
@@ -12,8 +12,8 @@ import { PromptsError } from "./errors";
 export interface GetPromptOptions {
   /** Specific version to fetch */
   version?: string;
-  /** Label to fetch (e.g., "production", "staging") */
-  label?: "production" | "staging";
+  /** Label to fetch (e.g., "production", "staging", or a custom label) */
+  label?: string;
   /** Fetch policy to use */
   fetchPolicy?: FetchPolicy;
   /** Cache TTL in minutes (only used with CACHE_TTL policy) */
@@ -39,7 +39,10 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
   readonly labels: {
-    assign(id: string, params: { label: "production" | "staging"; versionId: string }): Promise<AssignLabelResult>;
+    assign(id: string, params: { label: string; versionId: string }): Promise<AssignLabelResult>;
+    list(): Promise<LabelDefinition[]>;
+    create(params: { name: string }): Promise<CreatedLabel>;
+    delete(labelId: string): Promise<void>;
   };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
@@ -48,6 +51,9 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     this.labels = {
       assign: (id, { label, versionId }) =>
         this.promptsApiService.assignLabel({ id, label, versionId }),
+      list: () => this.promptsApiService.listLabels(),
+      create: ({ name }) => this.promptsApiService.createLabel({ name }),
+      delete: (labelId) => this.promptsApiService.deleteLabel(labelId),
     };
   }
 
