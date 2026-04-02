@@ -91,7 +91,7 @@ export function DeployPromptDialog({
     setTagSelections((prev) => {
       const next: TagSelections = {};
       for (const tagDef of nonLatestTags) {
-        const found = assignmentData.find((t) => t.tag === tagDef.name);
+        const found = assignmentData.find((t) => t.promptTag.name === tagDef.name);
         next[tagDef.name] = prev[tagDef.name] ?? found?.versionId ?? "";
       }
       return next;
@@ -107,7 +107,7 @@ export function DeployPromptDialog({
 
     for (const tagDef of nonLatestTags) {
       const selectedVersionId = tagSelections[tagDef.name] ?? "";
-      const currentTag = data.find((t) => t.tag === tagDef.name);
+      const currentTag = data.find((t) => t.promptTag.name === tagDef.name);
       if (
         selectedVersionId &&
         selectedVersionId !== (currentTag?.versionId ?? "")

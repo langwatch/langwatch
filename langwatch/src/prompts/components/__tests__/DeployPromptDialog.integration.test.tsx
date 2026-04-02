@@ -131,7 +131,7 @@ const defaultProps = {
 
 function setupQueries({
   versions = mockVersions,
-  tags = [] as Array<{ tag: string; versionId: string }>,
+  tags = [] as Array<{ tagId: string; promptTag: { name: string }; versionId: string }>,
 } = {}) {
   mockUseQuery.mockImplementation((queryName: string) => {
     if (queryName === "getAllVersionsForPrompt") {
@@ -306,8 +306,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
       it("initializes dropdowns from current tag assignments", async () => {
         setupQueries({
           tags: [
-            { tag:"production", versionId: "v2-id" },
-            { tag:"staging", versionId: "v3-id" },
+            { tagId: "production-id", promptTag: { name: "production" }, versionId: "v2-id" },
+            { tagId: "staging-id", promptTag: { name: "staging" }, versionId: "v3-id" },
           ],
         });
 
@@ -452,7 +452,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
         const onClose = vi.fn();
         mockMutateAsync.mockClear();
         setupQueries({
-          tags: [{ tag:"production", versionId: "v2-id" }],
+          tags: [{ tagId: "production-id", promptTag: { name: "production" }, versionId: "v2-id" }],
         });
         renderDialog({ onClose });
 
@@ -470,8 +470,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
         setupFetch([{ name: "canary", id: "canary-id" }]);
         setupQueries({
           tags: [
-            { tag:"production", versionId: "v1-id" },
-            { tag:"canary", versionId: "v2-id" },
+            { tagId: "production-id", promptTag: { name: "production" }, versionId: "v1-id" },
+            { tagId: "canary-id", promptTag: { name: "canary" }, versionId: "v2-id" },
           ],
         });
 

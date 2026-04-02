@@ -73,8 +73,8 @@ export class PromptTagRepository {
   }
 
   /**
-   * Deletes a custom tag definition and cascades to PromptTagAssignment rows
-   * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
+   * Deletes a custom tag definition.
+   * PromptTagAssignment rows are removed automatically via the FK onDelete: Cascade.
    */
   async delete({
     id,
@@ -83,39 +83,19 @@ export class PromptTagRepository {
     id: string;
     organizationId: string;
   }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const tag = await tx.promptTag.findFirst({
-        where: { id, organizationId },
-      });
-
-      if (!tag) {
-        return;
-      }
-
-      const projects = await tx.project.findMany({
-        where: {
-          team: { organizationId },
-        },
-        select: { id: true },
-      });
-
-      const projectIds = projects.map((p) => p.id);
-
-      if (projectIds.length > 0) {
-        await tx.promptTagAssignment.deleteMany({
-          where: {
-            tag: tag.name,
-            projectId: { in: projectIds },
-          },
-        });
-      }
-
-      await tx.promptTag.delete({
-        where: { id },
-      });
-
-      logger.info({ organizationId, id, name: tag.name }, "Custom prompt tag deleted");
+    const tag = await this.prisma.promptTag.findFirst({
+      where: { id, organizationId },
     });
+
+    if (!tag) {
+      return;
+    }
+
+    await this.prisma.promptTag.delete({
+      where: { id },
+    });
+
+    logger.info({ organizationId, id, name: tag.name }, "Custom prompt tag deleted");
   }
 
   /**

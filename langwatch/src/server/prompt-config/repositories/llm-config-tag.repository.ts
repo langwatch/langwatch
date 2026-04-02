@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, PromptTagAssignment } from "@prisma/client";
+import type { Prisma, PrismaClient, PromptTag, PromptTagAssignment } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
 import { PromptTagRepository } from "./prompt-tag.repository";
@@ -89,37 +89,23 @@ export class PromptTagAssignmentRepository {
   /**
    * Assign a tag to a specific version.
    * If the tag already exists for the config, it is reassigned (upsert).
-   * When organizationId is provided, custom tags are also accepted.
+   * Callers must resolve tag name → tagId before calling this method.
    */
   async assignTag({
     configId,
     versionId,
-    tag,
+    tagId,
     projectId,
     userId,
-    organizationId,
     tx,
   }: {
     configId: string;
     versionId: string;
-    tag: string;
+    tagId: string;
     projectId: string;
     userId?: string;
-    organizationId?: string;
     tx?: Prisma.TransactionClient;
-  }): Promise<PromptTagAssignment> {
-    if (organizationId) {
-      const exists = await this.tagExistsForOrg({ tag, organizationId });
-      if (!exists) {
-        logger.warn({ tag }, "Invalid tag name rejected");
-        throw new TagValidationError(
-          `Invalid tag "${tag}". Must be a custom tag defined for this org.`,
-        );
-      }
-    } else {
-      this.validateTag(tag);
-    }
-
+  }): Promise<PromptTagAssignment & { promptTag: PromptTag }> {
     const client = tx ?? this.prisma;
 
     await this.validateVersionBelongsToConfig({
@@ -132,13 +118,13 @@ export class PromptTagAssignmentRepository {
     const result = await client.promptTagAssignment.upsert({
       where: {
         projectId,
-        configId_tag: { configId, tag },
+        configId_tagId: { configId, tagId },
       },
       create: {
         id: `vtag_${nanoid()}`,
         configId,
         versionId,
-        tag,
+        tagId,
         projectId,
         createdById: userId ?? null,
         updatedById: userId ?? null,
@@ -147,15 +133,16 @@ export class PromptTagAssignmentRepository {
         versionId,
         updatedById: userId ?? null,
       },
+      include: { promptTag: true },
     });
 
-    logger.info({ configId, versionId, tag, projectId }, "Tag assigned to prompt version");
+    logger.info({ configId, versionId, tagId, projectId }, "Tag assigned to prompt version");
 
     return result;
   }
 
   /**
-   * Get all tags for a prompt config.
+   * Get all tags for a prompt config, including the tag name via the promptTag relation.
    */
   async getTagsForConfig({
     configId,
@@ -163,33 +150,35 @@ export class PromptTagAssignmentRepository {
   }: {
     configId: string;
     projectId: string;
-  }): Promise<PromptTagAssignment[]> {
+  }): Promise<(PromptTagAssignment & { promptTag: PromptTag })[]> {
     return this.prisma.promptTagAssignment.findMany({
       where: { configId, projectId },
+      include: { promptTag: true },
     });
   }
 
   /**
-   * Get a tag by config ID and tag name.
+   * Get a tag assignment by config ID and tagId.
+   * Callers must resolve tag name → tagId before calling this method.
    */
-  async getByConfigAndTag({
+  async getByConfigAndTagId({
     configId,
-    tag,
+    tagId,
     projectId,
   }: {
     configId: string;
-    tag: string;
+    tagId: string;
     projectId: string;
   }): Promise<PromptTagAssignment | null> {
     const result = await this.prisma.promptTagAssignment.findFirst({
       where: {
         configId,
-        tag,
+        tagId,
         projectId,
       },
     });
 
-    logger.info({ configId, tag }, "Tag lookup completed");
+    logger.info({ configId, tagId }, "Tag lookup completed");
 
     return result;
   }

@@ -134,7 +134,7 @@ describe("Feature: Prompt version tags", () => {
         projectId: testProject.id,
       });
 
-      expect(versionTag.tag).toBe("production");
+      expect(versionTag.promptTag.name).toBe("production");
       expect(versionTag.versionId).toBe(v2.versionId);
       expect(versionTag.configId).toBe(configId);
     });
@@ -359,7 +359,7 @@ describe("Feature: Prompt version tags", () => {
         projectId: prompt.projectId, // correct: use the config's own projectId
       });
 
-      expect(versionTag.tag).toBe("production");
+      expect(versionTag.promptTag.name).toBe("production");
       expect(versionTag.versionId).toBe(prompt.versionId);
       expect(versionTag.configId).toBe(prompt.id);
 

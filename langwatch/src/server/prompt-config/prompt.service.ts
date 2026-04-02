@@ -25,6 +25,7 @@ import {
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import { PromptTagAssignmentRepository } from "./repositories/llm-config-tag.repository";
+import { PromptTagRepository } from "./repositories/prompt-tag.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -109,11 +110,13 @@ export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
   readonly tagRepository: PromptTagAssignmentRepository;
+  readonly promptTagRepository: PromptTagRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
     this.tagRepository = new PromptTagAssignmentRepository(prisma);
+    this.promptTagRepository = new PromptTagRepository(prisma);
   }
 
   /**
@@ -185,9 +188,20 @@ export class PromptService {
         return null;
       }
 
-      const versionTag = await this.tagRepository.getByConfigAndTag({
+      const tagId = await this.resolveTagNameToId({
+        tagName: params.tag,
+        organizationId,
+      });
+
+      if (!tagId) {
+        throw new NotFoundError(
+          `Tag "${params.tag}" not found for prompt "${idOrHandle}"`,
+        );
+      }
+
+      const versionTag = await this.tagRepository.getByConfigAndTagId({
         configId: config.id,
-        tag: params.tag,
+        tagId,
         projectId,
       });
 
@@ -1078,9 +1092,41 @@ export class PromptService {
       params.projectId,
     );
 
-    return this.tagRepository.assignTag({
-      ...params,
+    const tagId = await this.resolveTagNameToId({
+      tagName: params.tag,
       organizationId,
     });
+
+    if (!tagId) {
+      throw new TagValidationError(
+        `Invalid tag "${params.tag}". Must be a custom tag defined for this org.`,
+      );
+    }
+
+    return this.tagRepository.assignTag({
+      configId: params.configId,
+      versionId: params.versionId,
+      tagId,
+      projectId: params.projectId,
+      userId: params.userId,
+    });
+  }
+
+  /**
+   * Resolves a tag name to its PromptTag ID for the given org.
+   * Returns null if no matching tag definition exists.
+   */
+  private async resolveTagNameToId({
+    tagName,
+    organizationId,
+  }: {
+    tagName: string;
+    organizationId: string;
+  }): Promise<string | null> {
+    const promptTag = await this.prisma.promptTag.findFirst({
+      where: { organizationId, name: tagName },
+      select: { id: true },
+    });
+    return promptTag?.id ?? null;
   }
 }

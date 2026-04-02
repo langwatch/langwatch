@@ -175,7 +175,7 @@ app.put(
         assignTagResponseSchema.parse({
           configId: result.configId,
           versionId: result.versionId,
-          tag: result.tag,
+          tag: result.promptTag.name,
           updatedAt: result.updatedAt,
         }),
       );

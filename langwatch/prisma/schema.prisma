@@ -984,7 +984,8 @@ model PromptTagAssignment {
     config      LlmPromptConfig        @relation("VersionTags", fields: [configId], references: [id], onDelete: Cascade)
     versionId   String
     version     LlmPromptConfigVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
-    tag         String
+    tagId       String
+    promptTag   PromptTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
     projectId   String
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now()) @updatedAt
@@ -993,7 +994,7 @@ model PromptTagAssignment {
     updatedById String?
     updatedBy   User?    @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([configId, tag])
+    @@unique([configId, tagId])
     @@index([configId])
     @@index([versionId])
     @@index([projectId])
@@ -1004,6 +1005,7 @@ model PromptTag {
     organizationId String
     organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
     name           String
+    assignments    PromptTagAssignment[]
     createdAt      DateTime     @default(now())
     updatedAt      DateTime     @default(now()) @updatedAt
     createdById    String?
