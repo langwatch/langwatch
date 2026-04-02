@@ -16,19 +16,13 @@ import { NotFoundError, ShorthandParseError } from "~/server/prompt-config/error
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import {
   PromptTagConflictError,
+  PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagService,
   PromptTagValidationError,
 } from "~/server/prompt-config/prompt-tag.service";
 import { createLogger } from "~/utils/logger/server";
 import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
-import {
-  PromptTagConflictError,
-  PromptTagNotFoundError,
-  PromptTagProtectedError,
-  PromptTagService,
-  PromptTagValidationError,
-} from "~/server/prompt-config/prompt-tag.service";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
@@ -445,139 +439,6 @@ app.get(
     return c.json(
       apiResponsePromptWithVersionDataSchema.array().parse(versions),
     );
-  },
-);
-
-// List all prompt tags (built-in and custom) for the organization
-app.get(
-  "/tags",
-  describeRoute({
-    description: "List all prompt tags (built-in and custom) for the organization",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(
-              z.array(
-                z.object({
-                  id: z.string(),
-                  name: z.string(),
-                  createdAt: z.date(),
-                }),
-              ),
-            ),
-          },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const organization = c.get("organization");
-    const service = PromptTagService.create(prisma);
-    const tags = await service.getAll({ organizationId: organization.id });
-    return c.json(
-      tags.map((tag) => ({
-        id: tag.id,
-        name: tag.name,
-        createdAt: tag.createdAt,
-      })),
-    );
-  },
-);
-
-// Create a custom prompt tag for the organization
-app.post(
-  "/tags",
-  describeRoute({
-    description: "Create a custom prompt tag for the organization",
-    responses: {
-      ...baseResponses,
-      201: {
-        description: "Created",
-        content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                id: z.string(),
-                name: z.string(),
-                createdAt: z.date(),
-              }),
-            ),
-          },
-        },
-      },
-      409: {
-        description: "Tag already exists",
-        content: { "application/json": { schema: resolver(badRequestSchema) } },
-      },
-      422: {
-        description: "Invalid tag name",
-        content: { "application/json": { schema: resolver(badRequestSchema) } },
-      },
-    },
-  }),
-  zValidator("json", z.object({ name: z.string() })),
-  async (c) => {
-    const organization = c.get("organization");
-    const { name } = c.req.valid("json");
-    const service = PromptTagService.create(prisma);
-
-    try {
-      const tag = await service.create({
-        organizationId: organization.id,
-        name,
-        createdById: organization.id,
-      });
-      return c.json({ id: tag.id, name: tag.name, createdAt: tag.createdAt }, 201);
-    } catch (error) {
-      if (error instanceof PromptTagValidationError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      if (error instanceof PromptTagConflictError) {
-        throw new HTTPException(409, { message: error.message });
-      }
-      throw error;
-    }
-  },
-);
-
-// Delete a custom prompt tag for the organization
-app.delete(
-  "/tags/:tagId",
-  describeRoute({
-    description: "Delete a custom prompt tag for the organization",
-    responses: {
-      ...baseResponses,
-      204: { description: "Deleted" },
-      404: {
-        description: "Tag not found",
-        content: { "application/json": { schema: resolver(badRequestSchema) } },
-      },
-      422: {
-        description: "Cannot delete built-in tag",
-        content: { "application/json": { schema: resolver(badRequestSchema) } },
-      },
-    },
-  }),
-  async (c) => {
-    const organization = c.get("organization");
-    const { tagId } = c.req.param();
-    const service = PromptTagService.create(prisma);
-
-    try {
-      const tag = await service.delete({ id: tagId, organizationId: organization.id });
-      if (!tag) {
-        throw new HTTPException(404, { message: `Tag not found: ${tagId}` });
-      }
-      return new Response(null, { status: 204 });
-    } catch (error) {
-      if (error instanceof PromptTagProtectedError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      throw error;
-    }
   },
 );
 
