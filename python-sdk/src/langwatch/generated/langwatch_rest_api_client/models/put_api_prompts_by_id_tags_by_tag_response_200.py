@@ -4,22 +4,22 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse200")
+T = TypeVar("T", bound="PutApiPromptsByIdTagsByTagResponse200")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse200:
+class PutApiPromptsByIdTagsByTagResponse200:
     """
     Attributes:
         config_id (str):
         version_id (str):
-        label (str):
+        tag (str):
         updated_at (str):
     """
 
     config_id: str
     version_id: str
-    label: str
+    tag: str
     updated_at: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -28,7 +28,7 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
 
         version_id = self.version_id
 
-        label = self.label
+        tag = self.tag
 
         updated_at = self.updated_at
 
@@ -38,7 +38,7 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
             {
                 "configId": config_id,
                 "versionId": version_id,
-                "label": label,
+                "tag": tag,
                 "updatedAt": updated_at,
             }
         )
@@ -52,19 +52,19 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
 
         version_id = d.pop("versionId")
 
-        label = d.pop("label")
+        tag = d.pop("tag")
 
         updated_at = d.pop("updatedAt")
 
-        put_api_prompts_by_id_labels_by_label_response_200 = cls(
+        put_api_prompts_by_id_tags_by_tag_response_200 = cls(
             config_id=config_id,
             version_id=version_id,
-            label=label,
+            tag=tag,
             updated_at=updated_at,
         )
 
-        put_api_prompts_by_id_labels_by_label_response_200.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_200
+        put_api_prompts_by_id_tags_by_tag_response_200.additional_properties = d
+        return put_api_prompts_by_id_tags_by_tag_response_200
 
     @property
     def additional_keys(self) -> list[str]:

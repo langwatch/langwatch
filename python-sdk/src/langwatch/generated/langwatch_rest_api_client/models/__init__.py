@@ -4,6 +4,7 @@ from .annotation import Annotation
 from .dataset_post_entries import DatasetPostEntries
 from .dataset_post_entries_entries_item import DatasetPostEntriesEntriesItem
 from .delete_api_annotations_id_response_200 import DeleteApiAnnotationsIdResponse200
+from .delete_api_dataset_by_slug_or_id_records_body import DeleteApiDatasetBySlugOrIdRecordsBody
 from .delete_api_evaluators_by_id_response_200 import DeleteApiEvaluatorsByIdResponse200
 from .delete_api_evaluators_by_id_response_400 import DeleteApiEvaluatorsByIdResponse400
 from .delete_api_evaluators_by_id_response_401 import DeleteApiEvaluatorsByIdResponse401
@@ -53,7 +54,6 @@ from .get_api_evaluators_response_400 import GetApiEvaluatorsResponse400
 from .get_api_evaluators_response_401 import GetApiEvaluatorsResponse401
 from .get_api_evaluators_response_422 import GetApiEvaluatorsResponse422
 from .get_api_evaluators_response_500 import GetApiEvaluatorsResponse500
-from .get_api_prompts_by_id_label import GetApiPromptsByIdLabel
 from .get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 from .get_api_prompts_by_id_response_200_demonstrations import GetApiPromptsByIdResponse200Demonstrations
 from .get_api_prompts_by_id_response_200_demonstrations_inline import GetApiPromptsByIdResponse200DemonstrationsInline
@@ -273,6 +273,12 @@ from .output import Output
 from .pagination import Pagination
 from .patch_api_annotations_id_body import PatchApiAnnotationsIdBody
 from .patch_api_annotations_id_response_200 import PatchApiAnnotationsIdResponse200
+from .patch_api_dataset_by_slug_or_id_body import PatchApiDatasetBySlugOrIdBody
+from .patch_api_dataset_by_slug_or_id_body_column_types_item import PatchApiDatasetBySlugOrIdBodyColumnTypesItem
+from .patch_api_dataset_by_slug_or_id_records_by_record_id_body import PatchApiDatasetBySlugOrIdRecordsByRecordIdBody
+from .patch_api_dataset_by_slug_or_id_records_by_record_id_body_entry import (
+    PatchApiDatasetBySlugOrIdRecordsByRecordIdBodyEntry,
+)
 from .post_api_analytics_timeseries_body import PostApiAnalyticsTimeseriesBody
 from .post_api_analytics_timeseries_body_filters import PostApiAnalyticsTimeseriesBodyFilters
 from .post_api_analytics_timeseries_body_filters_annotations_has_annotation_type_1 import (
@@ -733,6 +739,8 @@ from .post_api_analytics_timeseries_response_401 import PostApiAnalyticsTimeseri
 from .post_api_analytics_timeseries_response_422 import PostApiAnalyticsTimeseriesResponse422
 from .post_api_analytics_timeseries_response_500 import PostApiAnalyticsTimeseriesResponse500
 from .post_api_annotations_trace_id_body import PostApiAnnotationsTraceIdBody
+from .post_api_dataset_body import PostApiDatasetBody
+from .post_api_dataset_body_column_types_item import PostApiDatasetBodyColumnTypesItem
 from .post_api_evaluators_body import PostApiEvaluatorsBody
 from .post_api_evaluators_body_config import PostApiEvaluatorsBodyConfig
 from .post_api_evaluators_response_200 import PostApiEvaluatorsResponse200
@@ -746,7 +754,6 @@ from .post_api_evaluators_response_500 import PostApiEvaluatorsResponse500
 from .post_api_prompts_body import PostApiPromptsBody
 from .post_api_prompts_body_inputs_item import PostApiPromptsBodyInputsItem
 from .post_api_prompts_body_inputs_item_type import PostApiPromptsBodyInputsItemType
-from .post_api_prompts_body_labels_item import PostApiPromptsBodyLabelsItem
 from .post_api_prompts_body_messages_item import PostApiPromptsBodyMessagesItem
 from .post_api_prompts_body_messages_item_role import PostApiPromptsBodyMessagesItemRole
 from .post_api_prompts_body_outputs_item import PostApiPromptsBodyOutputsItem
@@ -1263,7 +1270,6 @@ from .put_api_evaluators_by_id_response_500 import PutApiEvaluatorsByIdResponse5
 from .put_api_prompts_by_id_body import PutApiPromptsByIdBody
 from .put_api_prompts_by_id_body_inputs_item import PutApiPromptsByIdBodyInputsItem
 from .put_api_prompts_by_id_body_inputs_item_type import PutApiPromptsByIdBodyInputsItemType
-from .put_api_prompts_by_id_body_labels_item import PutApiPromptsByIdBodyLabelsItem
 from .put_api_prompts_by_id_body_messages_item import PutApiPromptsByIdBodyMessagesItem
 from .put_api_prompts_by_id_body_messages_item_role import PutApiPromptsByIdBodyMessagesItemRole
 from .put_api_prompts_by_id_body_outputs_item import PutApiPromptsByIdBodyOutputsItem
@@ -1271,14 +1277,6 @@ from .put_api_prompts_by_id_body_outputs_item_json_schema import PutApiPromptsBy
 from .put_api_prompts_by_id_body_outputs_item_type import PutApiPromptsByIdBodyOutputsItemType
 from .put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
-from .put_api_prompts_by_id_labels_by_label_body import PutApiPromptsByIdLabelsByLabelBody
-from .put_api_prompts_by_id_labels_by_label_label import PutApiPromptsByIdLabelsByLabelLabel
-from .put_api_prompts_by_id_labels_by_label_response_200 import PutApiPromptsByIdLabelsByLabelResponse200
-from .put_api_prompts_by_id_labels_by_label_response_400 import PutApiPromptsByIdLabelsByLabelResponse400
-from .put_api_prompts_by_id_labels_by_label_response_401 import PutApiPromptsByIdLabelsByLabelResponse401
-from .put_api_prompts_by_id_labels_by_label_response_404 import PutApiPromptsByIdLabelsByLabelResponse404
-from .put_api_prompts_by_id_labels_by_label_response_422 import PutApiPromptsByIdLabelsByLabelResponse422
-from .put_api_prompts_by_id_labels_by_label_response_500 import PutApiPromptsByIdLabelsByLabelResponse500
 from .put_api_prompts_by_id_response_200 import PutApiPromptsByIdResponse200
 from .put_api_prompts_by_id_response_200_demonstrations import PutApiPromptsByIdResponse200Demonstrations
 from .put_api_prompts_by_id_response_200_demonstrations_inline import PutApiPromptsByIdResponse200DemonstrationsInline
@@ -1328,6 +1326,13 @@ from .put_api_prompts_by_id_response_404 import PutApiPromptsByIdResponse404
 from .put_api_prompts_by_id_response_409 import PutApiPromptsByIdResponse409
 from .put_api_prompts_by_id_response_422 import PutApiPromptsByIdResponse422
 from .put_api_prompts_by_id_response_500 import PutApiPromptsByIdResponse500
+from .put_api_prompts_by_id_tags_by_tag_body import PutApiPromptsByIdTagsByTagBody
+from .put_api_prompts_by_id_tags_by_tag_response_200 import PutApiPromptsByIdTagsByTagResponse200
+from .put_api_prompts_by_id_tags_by_tag_response_400 import PutApiPromptsByIdTagsByTagResponse400
+from .put_api_prompts_by_id_tags_by_tag_response_401 import PutApiPromptsByIdTagsByTagResponse401
+from .put_api_prompts_by_id_tags_by_tag_response_404 import PutApiPromptsByIdTagsByTagResponse404
+from .put_api_prompts_by_id_tags_by_tag_response_422 import PutApiPromptsByIdTagsByTagResponse422
+from .put_api_prompts_by_id_tags_by_tag_response_500 import PutApiPromptsByIdTagsByTagResponse500
 from .put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from .search_request import SearchRequest
 from .search_request_filters import SearchRequestFilters
@@ -1340,6 +1345,7 @@ __all__ = (
     "DatasetPostEntries",
     "DatasetPostEntriesEntriesItem",
     "DeleteApiAnnotationsIdResponse200",
+    "DeleteApiDatasetBySlugOrIdRecordsBody",
     "DeleteApiEvaluatorsByIdResponse200",
     "DeleteApiEvaluatorsByIdResponse400",
     "DeleteApiEvaluatorsByIdResponse401",
@@ -1385,7 +1391,6 @@ __all__ = (
     "GetApiEvaluatorsResponse401",
     "GetApiEvaluatorsResponse422",
     "GetApiEvaluatorsResponse500",
-    "GetApiPromptsByIdLabel",
     "GetApiPromptsByIdResponse200",
     "GetApiPromptsByIdResponse200Demonstrations",
     "GetApiPromptsByIdResponse200DemonstrationsInline",
@@ -1519,6 +1524,10 @@ __all__ = (
     "Pagination",
     "PatchApiAnnotationsIdBody",
     "PatchApiAnnotationsIdResponse200",
+    "PatchApiDatasetBySlugOrIdBody",
+    "PatchApiDatasetBySlugOrIdBodyColumnTypesItem",
+    "PatchApiDatasetBySlugOrIdRecordsByRecordIdBody",
+    "PatchApiDatasetBySlugOrIdRecordsByRecordIdBodyEntry",
     "PostApiAnalyticsTimeseriesBody",
     "PostApiAnalyticsTimeseriesBodyFilters",
     "PostApiAnalyticsTimeseriesBodyFiltersAnnotationsHasAnnotationType1",
@@ -1681,6 +1690,8 @@ __all__ = (
     "PostApiAnalyticsTimeseriesResponse422",
     "PostApiAnalyticsTimeseriesResponse500",
     "PostApiAnnotationsTraceIdBody",
+    "PostApiDatasetBody",
+    "PostApiDatasetBodyColumnTypesItem",
     "PostApiEvaluatorsBody",
     "PostApiEvaluatorsBodyConfig",
     "PostApiEvaluatorsResponse200",
@@ -1694,7 +1705,6 @@ __all__ = (
     "PostApiPromptsBody",
     "PostApiPromptsBodyInputsItem",
     "PostApiPromptsBodyInputsItemType",
-    "PostApiPromptsBodyLabelsItem",
     "PostApiPromptsBodyMessagesItem",
     "PostApiPromptsBodyMessagesItemRole",
     "PostApiPromptsBodyOutputsItem",
@@ -1949,7 +1959,6 @@ __all__ = (
     "PutApiPromptsByIdBody",
     "PutApiPromptsByIdBodyInputsItem",
     "PutApiPromptsByIdBodyInputsItemType",
-    "PutApiPromptsByIdBodyLabelsItem",
     "PutApiPromptsByIdBodyMessagesItem",
     "PutApiPromptsByIdBodyMessagesItemRole",
     "PutApiPromptsByIdBodyOutputsItem",
@@ -1957,14 +1966,6 @@ __all__ = (
     "PutApiPromptsByIdBodyOutputsItemType",
     "PutApiPromptsByIdBodySchemaVersion",
     "PutApiPromptsByIdBodyScope",
-    "PutApiPromptsByIdLabelsByLabelBody",
-    "PutApiPromptsByIdLabelsByLabelLabel",
-    "PutApiPromptsByIdLabelsByLabelResponse200",
-    "PutApiPromptsByIdLabelsByLabelResponse400",
-    "PutApiPromptsByIdLabelsByLabelResponse401",
-    "PutApiPromptsByIdLabelsByLabelResponse404",
-    "PutApiPromptsByIdLabelsByLabelResponse422",
-    "PutApiPromptsByIdLabelsByLabelResponse500",
     "PutApiPromptsByIdResponse200",
     "PutApiPromptsByIdResponse200Demonstrations",
     "PutApiPromptsByIdResponse200DemonstrationsInline",
@@ -1994,6 +1995,13 @@ __all__ = (
     "PutApiPromptsByIdResponse409",
     "PutApiPromptsByIdResponse422",
     "PutApiPromptsByIdResponse500",
+    "PutApiPromptsByIdTagsByTagBody",
+    "PutApiPromptsByIdTagsByTagResponse200",
+    "PutApiPromptsByIdTagsByTagResponse400",
+    "PutApiPromptsByIdTagsByTagResponse401",
+    "PutApiPromptsByIdTagsByTagResponse404",
+    "PutApiPromptsByIdTagsByTagResponse422",
+    "PutApiPromptsByIdTagsByTagResponse500",
     "PutApiScenariosByIdBody",
     "SearchRequest",
     "SearchRequestFilters",

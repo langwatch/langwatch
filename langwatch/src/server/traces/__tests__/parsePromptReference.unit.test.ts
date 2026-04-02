@@ -8,7 +8,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -18,7 +18,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "my-org/deep/nested-prompt",
         promptVersionNumber: 12,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -28,7 +28,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "simple-prompt",
         promptVersionNumber: 1,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -38,7 +38,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "abc",
+        promptTag: "abc",
         promptVariables: null,
       });
     });
@@ -48,7 +48,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "0",
+        promptTag: "0",
         promptVariables: null,
       });
     });
@@ -58,7 +58,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "-1",
+        promptTag: "-1",
         promptVariables: null,
       });
     });
@@ -68,7 +68,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -78,7 +78,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "1.5",
+        promptTag: "1.5",
         promptVariables: null,
       });
     });
@@ -90,7 +90,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: null,
-        promptLabel: "production",
+        promptTag: "production",
         promptVariables: null,
       });
     });
@@ -100,7 +100,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: 3,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -110,7 +110,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -125,7 +125,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 2,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -138,7 +138,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 5,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -148,7 +148,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -158,7 +158,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -169,7 +169,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference({})).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -182,7 +182,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -198,7 +198,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/new-prompt",
         promptVersionNumber: 5,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -293,7 +293,7 @@ describe("parsePromptReference()", () => {
       const result = parsePromptReference(attrs);
       expect(result.promptHandle).toBeNull();
       expect(result.promptVersionNumber).toBeNull();
-      expect(result.promptLabel).toBeNull();
+      expect(result.promptTag).toBeNull();
       expect(result.promptVariables).toEqual({ name: "Alice" });
     });
   });

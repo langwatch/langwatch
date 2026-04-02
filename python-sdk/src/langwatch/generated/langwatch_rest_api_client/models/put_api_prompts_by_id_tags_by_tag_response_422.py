@@ -1,46 +1,57 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelBody")
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="PutApiPromptsByIdTagsByTagResponse422")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelBody:
+class PutApiPromptsByIdTagsByTagResponse422:
     """
     Attributes:
-        version_id (str):
+        error (str):
+        message (Union[Unset, str]):
     """
 
-    version_id: str
+    error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        version_id = self.version_id
+        error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "versionId": version_id,
+                "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        version_id = d.pop("versionId")
+        error = d.pop("error")
 
-        put_api_prompts_by_id_labels_by_label_body = cls(
-            version_id=version_id,
+        message = d.pop("message", UNSET)
+
+        put_api_prompts_by_id_tags_by_tag_response_422 = cls(
+            error=error,
+            message=message,
         )
 
-        put_api_prompts_by_id_labels_by_label_body.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_body
+        put_api_prompts_by_id_tags_by_tag_response_422.additional_properties = d
+        return put_api_prompts_by_id_tags_by_tag_response_422
 
     @property
     def additional_keys(self) -> list[str]:

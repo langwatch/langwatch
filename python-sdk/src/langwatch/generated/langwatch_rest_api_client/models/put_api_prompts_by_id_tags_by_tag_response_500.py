@@ -6,11 +6,11 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse401")
+T = TypeVar("T", bound="PutApiPromptsByIdTagsByTagResponse500")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse401:
+class PutApiPromptsByIdTagsByTagResponse500:
     """
     Attributes:
         error (str):
@@ -45,13 +45,13 @@ class PutApiPromptsByIdLabelsByLabelResponse401:
 
         message = d.pop("message", UNSET)
 
-        put_api_prompts_by_id_labels_by_label_response_401 = cls(
+        put_api_prompts_by_id_tags_by_tag_response_500 = cls(
             error=error,
             message=message,
         )
 
-        put_api_prompts_by_id_labels_by_label_response_401.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_401
+        put_api_prompts_by_id_tags_by_tag_response_500.additional_properties = d
+        return put_api_prompts_by_id_tags_by_tag_response_500
 
     @property
     def additional_keys(self) -> list[str]:

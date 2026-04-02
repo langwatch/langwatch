@@ -6,7 +6,7 @@ import { parsePromptShorthand } from "../prompt-config/parsePromptShorthand";
 export interface PromptReference {
   promptHandle: string | null;
   promptVersionNumber: number | null;
-  promptLabel: string | null;
+  promptTag: string | null;
   promptVariables: Record<string, string> | null;
 }
 
@@ -36,7 +36,7 @@ export function parsePromptReference(
   const nullResult: PromptReference = {
     promptHandle: null,
     promptVersionNumber: null,
-    promptLabel: null,
+    promptTag: null,
     promptVariables: variables,
   };
 
@@ -48,7 +48,7 @@ export function parsePromptReference(
       return {
         promptHandle: shorthand.slug,
         promptVersionNumber: shorthand.version ?? null,
-        promptLabel: shorthand.tag ?? null,
+        promptTag: shorthand.tag ?? null,
         promptVariables: variables,
       };
     } catch {
@@ -72,7 +72,7 @@ export function parsePromptReference(
       return {
         promptHandle: handle,
         promptVersionNumber: version,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: variables,
       };
     }

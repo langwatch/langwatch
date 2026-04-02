@@ -1,57 +1,31 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse500")
+T = TypeVar("T", bound="PatchApiDatasetBySlugOrIdRecordsByRecordIdBodyEntry")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse500:
-    """
-    Attributes:
-        error (str):
-        message (Union[Unset, str]):
-    """
+class PatchApiDatasetBySlugOrIdRecordsByRecordIdBodyEntry:
+    """ """
 
-    error: str
-    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error
-
-        message = self.message
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "error": error,
-            }
-        )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = d.pop("error")
+        patch_api_dataset_by_slug_or_id_records_by_record_id_body_entry = cls()
 
-        message = d.pop("message", UNSET)
-
-        put_api_prompts_by_id_labels_by_label_response_500 = cls(
-            error=error,
-            message=message,
-        )
-
-        put_api_prompts_by_id_labels_by_label_response_500.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_500
+        patch_api_dataset_by_slug_or_id_records_by_record_id_body_entry.additional_properties = d
+        return patch_api_dataset_by_slug_or_id_records_by_record_id_body_entry
 
     @property
     def additional_keys(self) -> list[str]:
