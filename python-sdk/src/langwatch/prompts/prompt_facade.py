@@ -11,7 +11,6 @@ Follows the facade pattern to coordinate between LocalPromptLoader and PromptApi
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 import time
-import warnings
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
@@ -72,18 +71,29 @@ class PromptsFacade:
         Retrieve a prompt by its ID with configurable fetch policy.
 
         Args:
-            prompt_id: The prompt ID to retrieve. Pass the full string through to the API
-                (e.g. "my-prompt" or "my-prompt:production").
-            version_number: Optional specific version number to retrieve.
+            prompt_id: The prompt ID to retrieve
+            version_number: Optional specific version number to retrieve
             fetch_policy: How to fetch the prompt. Defaults to MATERIALIZED_FIRST.
             cache_ttl_minutes: Cache TTL in minutes (only used with CACHE_TTL policy). Defaults to 5.
-            tag: Optional tag to fetch a specific tagged version (e.g. "production", "staging").
+            tag: Optional tag to fetch a specific tagged version (e.g. "production", "staging", or any custom tag).
 
         Raises:
+            ValueError: If both version_number and tag are provided.
+            ValueError: If tag is used with MATERIALIZED_ONLY policy.
             ValueError: If the prompt is not found (404 error).
             RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
         """
+        if tag is not None and version_number is not None:
+            raise ValueError(
+                "Cannot specify both version_number and tag"
+            )
+
         fetch_policy = fetch_policy or FetchPolicy.MATERIALIZED_FIRST
+
+        if tag is not None and fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
+            raise ValueError(
+                "Tag-based fetch requires API access; incompatible with MATERIALIZED_ONLY policy"
+            )
 
         if fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
             return self._get_materialized_only(prompt_id)
@@ -185,15 +195,6 @@ class PromptsFacade:
         """Access the tags sub-resource for assigning tags to prompt versions."""
         return PromptTagsNamespace(self._api_service)
 
-    @property
-    def labels(self) -> "PromptTagsNamespace":
-        """Backward-compatible alias for the tags sub-resource.
-
-        .. deprecated::
-            Use ``tags`` instead. This alias will be removed in a future release.
-        """
-        return PromptTagsNamespace(self._api_service)
-
     def create(
         self,
         handle: str,
@@ -204,7 +205,6 @@ class PromptsFacade:
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         tags: Optional[List[str]] = None,
-        labels: Optional[List[str]] = None,
     ) -> Prompt:
         """
         Create a new prompt via API.
@@ -217,13 +217,10 @@ class PromptsFacade:
             messages: List of message dicts with 'role' and 'content' keys
             inputs: List of input dicts with 'identifier' and 'type' keys
             outputs: List of output dicts with 'identifier', 'type', and optional 'json_schema' keys
-            tags: Optional list of tags to assign to the initial version
-            labels: Deprecated alias for tags. Use ``tags`` instead.
 
         Returns:
             Prompt object containing the created prompt data
         """
-        resolved_tags = _resolve_tags(tags=tags, labels=labels)
         data = self._api_service.create(
             handle=handle,
             author_id=author_id,
@@ -232,7 +229,7 @@ class PromptsFacade:
             messages=messages,
             inputs=inputs,
             outputs=outputs,
-            tags=resolved_tags,
+            tags=tags,
         )
         return Prompt(data)
 
@@ -246,7 +243,6 @@ class PromptsFacade:
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
         tags: Optional[List[str]] = None,
-        labels: Optional[List[str]] = None,
         *,
         commit_message: str = "",
     ) -> Prompt:
@@ -261,13 +257,10 @@ class PromptsFacade:
             messages: New list of message dicts
             inputs: New list of input dicts
             outputs: New list of output dicts
-            tags: Optional list of tags to assign to the new version
-            labels: Deprecated alias for tags. Use ``tags`` instead.
 
         Returns:
             Prompt object containing the updated prompt data
         """
-        resolved_tags = _resolve_tags(tags=tags, labels=labels)
         data = self._api_service.update(
             prompt_id_or_handle=prompt_id_or_handle,
             scope=scope,
@@ -277,7 +270,7 @@ class PromptsFacade:
             messages=messages,
             inputs=inputs,
             outputs=outputs,
-            tags=resolved_tags,
+            tags=tags,
         )
         return Prompt(data)
 
@@ -296,51 +289,18 @@ class PromptTagsNamespace:
         self,
         prompt_id: str,
         *,
-        tag: Optional[str] = None,
+        tag: str,
         version_id: str,
-        label: Optional[str] = None,
     ) -> Dict[str, str]:
         """
         Assign a tag to a specific prompt version.
 
         Args:
             prompt_id: The prompt ID or handle
-            tag: The tag to assign (e.g. "production", "staging", or any custom tag)
+            tag: The tag to assign (e.g., "production", "staging", or a custom tag)
             version_id: The version ID to assign the tag to
-            label: Deprecated alias for tag. Use ``tag`` instead.
 
         Returns:
             Dictionary with assignment details (configId, versionId, tag, updatedAt)
         """
-        resolved_tag = tag
-        if resolved_tag is None and label is not None:
-            warnings.warn(
-                "The 'label' parameter is deprecated. Use 'tag' instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            resolved_tag = label
-        if resolved_tag is None:
-            raise ValueError("Either 'tag' or 'label' must be provided")
-        return self._api_service.assign_tag(prompt_id, resolved_tag, version_id)
-
-
-def _resolve_tags(
-    tags: Optional[List[str]] = None,
-    labels: Optional[List[str]] = None,
-) -> Optional[List[str]]:
-    """Resolve tags from either ``tags`` or deprecated ``labels`` parameter.
-
-    If ``labels`` is provided instead of ``tags``, emits a deprecation warning
-    and uses the labels value.
-    """
-    if tags is not None:
-        return tags
-    if labels is not None:
-        warnings.warn(
-            "The 'labels' parameter is deprecated. Use 'tags' instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return labels
-    return None
+        return self._api_service.assign_tag(prompt_id, tag, version_id)
