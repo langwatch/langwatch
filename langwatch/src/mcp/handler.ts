@@ -18,8 +18,6 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
-import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
 import { createLogger } from "../utils/logger/server";
@@ -31,6 +29,40 @@ const REDIS_TOKEN_PREFIX = "mcp:oauth:token:";
 
 /** OAuth token TTL in seconds. */
 const TOKEN_TTL_SECONDS = 3600;
+
+// ---------------------------------------------------------------------------
+// Lazy-loaded mcp-server functions. Loaded at runtime via dynamic import to
+// avoid dragging mcp-server source (and its deps like zod v4) into the main
+// app's TypeScript compilation scope.
+// ---------------------------------------------------------------------------
+
+interface McpConfig {
+  apiKey: string | undefined;
+  endpoint: string;
+}
+
+let _createMcpServer: (() => { connect: (t: StreamableHTTPServerTransport) => Promise<void> }) | undefined;
+let _getConfig: (() => McpConfig) | undefined;
+let _initConfig: ((args: { apiKey?: string; endpoint?: string }) => void) | undefined;
+let _runWithConfig: (<T>(config: McpConfig, fn: () => T) => T) | undefined;
+
+async function loadMcpServerModules(): Promise<void> {
+  if (_createMcpServer) return;
+
+  // Dynamic imports resolve via tsx at runtime — the mcp-server source
+  // is in a sibling directory, not a workspace dependency.
+  const createMod = await import(
+    /* webpackIgnore: true */ "../../../mcp-server/src/create-mcp-server"
+  );
+  const configMod = await import(
+    /* webpackIgnore: true */ "../../../mcp-server/src/config"
+  );
+
+  _createMcpServer = createMod.createMcpServer;
+  _getConfig = configMod.getConfig;
+  _initConfig = configMod.initConfig;
+  _runWithConfig = configMod.runWithConfig;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,17 +101,10 @@ export interface McpHandler {
  * and routes for the Streamable HTTP transport.
  */
 export function createMcpHandler(): McpHandler {
-  // Ensure the MCP config is initialized with the app's endpoint
-  try {
-    getConfig();
-  } catch {
-    initConfig({
-      endpoint: process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai",
-    });
-  }
-
-  const sessions: Record<string, SessionState> = {};
+  // Use Map to avoid prototype pollution — sessionId comes from user input
+  const sessions = new Map<string, SessionState>();
   const oauthTokens = new Map<string, OAuthTokenEntry>();
+  let mcpModulesLoaded = false;
 
   // -------------------------------------------------------------------------
   // Session & token reaper — prevents unbounded memory from abandoned sessions
@@ -92,11 +117,11 @@ export function createMcpHandler(): McpHandler {
   const reaper = setInterval(() => {
     const now = Date.now();
 
-    // Sweep expired sessions
-    for (const [id, session] of Object.entries(sessions)) {
+    // Sweep idle sessions
+    for (const [id, session] of sessions) {
       if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
         session.transport.close().catch(() => {});
-        delete sessions[id];
+        sessions.delete(id);
       }
     }
 
@@ -110,6 +135,23 @@ export function createMcpHandler(): McpHandler {
 
   // Allow the process to exit naturally even if the reaper is still scheduled
   reaper.unref();
+
+  // -------------------------------------------------------------------------
+  // Lazy init — load mcp-server modules and initialize config
+  // -------------------------------------------------------------------------
+
+  async function ensureMcpModulesLoaded(): Promise<void> {
+    if (mcpModulesLoaded) return;
+    await loadMcpServerModules();
+    try {
+      _getConfig!();
+    } catch {
+      _initConfig!({
+        endpoint: process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai",
+      });
+    }
+    mcpModulesLoaded = true;
+  }
 
   // -------------------------------------------------------------------------
   // Route matching
@@ -127,7 +169,8 @@ export function createMcpHandler(): McpHandler {
   }
 
   // -------------------------------------------------------------------------
-  // CORS
+  // CORS — Access-Control-Allow-Origin: * is intentional; the Bearer token
+  // provides the security boundary, not the origin.
   // -------------------------------------------------------------------------
 
   function setCorsHeaders(res: ServerResponse): void {
@@ -304,8 +347,8 @@ export function createMcpHandler(): McpHandler {
     apiKey: string,
     fn: () => Promise<T>,
   ): Promise<T> {
-    const baseConfig = getConfig();
-    return runWithConfig({ ...baseConfig, apiKey }, fn);
+    const baseConfig = _getConfig!();
+    return _runWithConfig!({ ...baseConfig, apiKey }, fn);
   }
 
   // -------------------------------------------------------------------------
@@ -436,6 +479,7 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     setCorsHeaders(res);
+    await ensureMcpModulesLoaded();
 
     let raw: string;
     try {
@@ -458,8 +502,8 @@ export function createMcpHandler(): McpHandler {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     // Existing session — handle request
-    if (sessionId && sessions[sessionId]) {
-      const session = sessions[sessionId];
+    if (sessionId && sessions.has(sessionId)) {
+      const session = sessions.get(sessionId)!;
       session.lastActivityAt = Date.now();
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res, body),
@@ -475,17 +519,17 @@ export function createMcpHandler(): McpHandler {
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
-          sessions[id] = { transport, apiKey, lastActivityAt: Date.now() };
+          sessions.set(id, { transport, apiKey, lastActivityAt: Date.now() });
         },
       });
 
       transport.onclose = () => {
         if (transport.sessionId) {
-          delete sessions[transport.sessionId];
+          sessions.delete(transport.sessionId);
         }
       };
 
-      const sessionServer = createMcpServer();
+      const sessionServer = _createMcpServer!();
       await handleWithSessionConfig(apiKey, () =>
         sessionServer.connect(transport),
       );
@@ -508,8 +552,8 @@ export function createMcpHandler(): McpHandler {
     setCorsHeaders(res);
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    if (sessionId && sessions[sessionId]) {
-      const session = sessions[sessionId];
+    if (sessionId && sessions.has(sessionId)) {
+      const session = sessions.get(sessionId)!;
       session.lastActivityAt = Date.now();
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res),
@@ -526,11 +570,10 @@ export function createMcpHandler(): McpHandler {
     setCorsHeaders(res);
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    if (sessionId && sessions[sessionId]) {
-      const session = sessions[sessionId];
-      session.lastActivityAt = Date.now();
+    if (sessionId && sessions.has(sessionId)) {
+      const session = sessions.get(sessionId)!;
       await session.transport.close();
-      delete sessions[sessionId];
+      sessions.delete(sessionId);
       sendJson(res, 200, { status: "session closed" });
     } else {
       sendJson(res, 404, { error: "Session not found" });
@@ -543,11 +586,11 @@ export function createMcpHandler(): McpHandler {
 
   function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     const url = req.url ?? "";
-    const pathname = url.split("?")[0];
+    const pathname = url.split("?")[0] ?? "";
     const method = req.method ?? "GET";
 
     // Handle OPTIONS preflight for any MCP route
-    if (method === "OPTIONS" && isMcpRoute(pathname ?? "")) {
+    if (method === "OPTIONS" && isMcpRoute(pathname)) {
       setCorsHeaders(res);
       res.writeHead(200);
       res.end();
@@ -612,9 +655,9 @@ export function createMcpHandler(): McpHandler {
 
   function closeAllSessions(): void {
     clearInterval(reaper);
-    for (const [id, session] of Object.entries(sessions)) {
+    for (const [id, session] of sessions) {
       session.transport.close().catch(() => {});
-      delete sessions[id];
+      sessions.delete(id);
     }
   }
 
