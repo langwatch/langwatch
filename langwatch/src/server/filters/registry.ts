@@ -842,6 +842,11 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         must: [{ exists: { field: "evaluations.label" } }],
         must_not: [
           {
+            term: {
+              "evaluations.label": "",
+            },
+          },
+          {
             terms: {
               "evaluations.label": [...STATUS_LABEL_VALUES],
             },

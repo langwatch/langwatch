@@ -191,6 +191,48 @@ describe("filter-translator", () => {
         expect(result.params).toEqual({ evaluatorIds_0: ["eval-1", "eval-2"] });
       });
 
+      it("translates evaluations.evaluator_id.has_passed filter with Passed IS NOT NULL predicate", () => {
+        const result = translateFilter("evaluations.evaluator_id.has_passed", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("AND Passed IS NOT NULL");
+        expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
+      });
+
+      it("translates evaluations.evaluator_id.has_score filter with Score IS NOT NULL predicate", () => {
+        const result = translateFilter("evaluations.evaluator_id.has_score", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("AND Score IS NOT NULL");
+        expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
+      });
+
+      it("translates evaluations.evaluator_id.has_label filter with Label exclusion predicate", () => {
+        const result = translateFilter("evaluations.evaluator_id.has_label", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("AND Label IS NOT NULL");
+        expect(result.whereClause).toContain("AND Label != ''");
+        expect(result.whereClause).toContain("AND Label NOT IN ('succeeded', 'failed')");
+        expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
+      });
+
+      it("translates base evaluations.evaluator_id without additional predicates", () => {
+        const result = translateFilter("evaluations.evaluator_id", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).not.toContain("Passed IS NOT NULL");
+        expect(result.whereClause).not.toContain("Score IS NOT NULL");
+        expect(result.whereClause).not.toContain("Label IS NOT NULL");
+      });
+
       it("translates evaluations.passed filter with parameterized IN subquery", () => {
         const result = translateFilter("evaluations.passed", ["true"]);
         // Regression guard: issue #2660
