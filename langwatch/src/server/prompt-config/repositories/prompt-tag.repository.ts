@@ -74,7 +74,7 @@ export class PromptTagRepository {
 
   /**
    * Deletes a custom tag definition.
-   * PromptTagAssignment rows are removed automatically via the FK onDelete: Cascade.
+   * PromptTagAssignment rows are removed automatically via Prisma's app-level onDelete: Cascade.
    */
   async delete({
     id,

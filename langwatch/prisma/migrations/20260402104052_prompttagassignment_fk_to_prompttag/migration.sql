@@ -38,8 +38,6 @@ ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT IF EXISTS "PromptTagAssignment
 -- Step 6: Drop the old tag column
 ALTER TABLE "PromptTagAssignment" DROP COLUMN "tag";
 
--- Step 7: Add FK constraint and new unique constraint
-ALTER TABLE "PromptTagAssignment" ADD CONSTRAINT "PromptTagAssignment_tagId_fkey"
-  FOREIGN KEY ("tagId") REFERENCES "PromptTag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Step 7: Add index and new unique constraint (no FK — relationMode = "prisma" handles cascades in app code)
 CREATE INDEX "PromptTagAssignment_tagId_idx" ON "PromptTagAssignment" ("tagId");
 ALTER TABLE "PromptTagAssignment" ADD CONSTRAINT "PromptTagAssignment_configId_tagId_key" UNIQUE ("configId", "tagId");
