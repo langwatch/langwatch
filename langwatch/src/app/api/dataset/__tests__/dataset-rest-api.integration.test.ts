@@ -760,13 +760,20 @@ describe("Feature: Dataset REST API", () => {
       it("creates records with unique IDs and returns them", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
-          { entries: [{ input: "hello", output: "world" }] },
+          {
+            entries: [
+              { input: "hello", output: "world" },
+              { input: "hello-2", output: "world-2" },
+            ],
+          },
         );
 
         expect(res.status).toBe(201);
         const body = await res.json();
-        expect(body.data).toHaveLength(1);
+        expect(body.data).toHaveLength(2);
         expect(body.data[0]).toHaveProperty("id");
+        expect(body.data[1]).toHaveProperty("id");
+        expect(body.data[0].id).not.toBe(body.data[1].id);
         expect(body.data[0].entry).toEqual({
           input: "hello",
           output: "world",
