@@ -453,6 +453,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.headers["access-control-allow-headers"]).toContain(
         "mcp-session-id",
       );
+      expect(res.headers["access-control-expose-headers"]).toContain(
+        "mcp-session-id",
+      );
     });
   });
 
