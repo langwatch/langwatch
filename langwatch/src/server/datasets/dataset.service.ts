@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { slugify } from "~/utils/slugify";
 import {
@@ -633,7 +635,7 @@ export class DatasetService {
         fullEntry[col.name] = entry[col.name] ?? null;
       }
       return {
-        id: nanoid(),
+        id: generate(KSUID_RESOURCES.DATASET_RECORD).toString(),
         entry: fullEntry as Prisma.InputJsonValue,
       };
     });
