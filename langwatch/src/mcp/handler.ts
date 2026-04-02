@@ -209,16 +209,22 @@ export function createMcpHandler(): McpHandler {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       let totalBytes = 0;
+      let rejected = false;
       req.on("data", (chunk: Buffer) => {
+        if (rejected) return;
         totalBytes += chunk.length;
         if (totalBytes > MAX_BODY_BYTES) {
-          req.destroy();
+          rejected = true;
           reject(new Error("Request body too large"));
+          // Resume and discard remaining data so the socket is drained
+          req.resume();
           return;
         }
         chunks.push(chunk);
       });
-      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+      req.on("end", () => {
+        if (!rejected) resolve(Buffer.concat(chunks).toString("utf-8"));
+      });
       req.on("error", reject);
     });
   }
@@ -589,9 +595,11 @@ export function createMcpHandler(): McpHandler {
     const pathname = url.split("?")[0] ?? "";
     const method = req.method ?? "GET";
 
+    // Set CORS headers on all MCP routes (including error responses)
+    setCorsHeaders(res);
+
     // Handle OPTIONS preflight for any MCP route
     if (method === "OPTIONS" && isMcpRoute(pathname)) {
-      setCorsHeaders(res);
       res.writeHead(200);
       res.end();
       return;
