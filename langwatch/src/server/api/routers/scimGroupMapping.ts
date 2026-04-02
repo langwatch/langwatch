@@ -9,6 +9,7 @@ import {
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { resolveHighestRole } from "../../scim/scim-role-resolver";
+import { ScimGroupService } from "../../scim/scim-group.service";
 import { slugify } from "~/utils/slugify";
 
 /**
@@ -348,66 +349,12 @@ export const scimGroupMappingRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Mapping not found" });
       }
 
-      return ctx.prisma.$transaction(async (tx) => {
-        // Get all memberships for this mapping
-        const memberships = await tx.scimGroupMembership.findMany({
-          where: { scimGroupMappingId: mapping.id },
-        });
-
-        // For each member, handle team membership cleanup
-        if (mapping.teamId) {
-          for (const membership of memberships) {
-            // Check if user has memberships from OTHER mappings to the same team
-            const otherMemberships = await tx.scimGroupMembership.findMany({
-              where: {
-                userId: membership.userId,
-                scimGroupMappingId: { not: mapping.id },
-                scimGroupMapping: { teamId: mapping.teamId },
-              },
-              include: { scimGroupMapping: true },
-            });
-
-            if (otherMemberships.length > 0) {
-              // Recalculate role from remaining mappings
-              const roles = otherMemberships
-                .map((m) => m.scimGroupMapping.role)
-                .filter((r): r is TeamUserRole => r !== null);
-
-              if (roles.length > 0) {
-                const effectiveRole = resolveHighestRole(roles);
-                await tx.teamUser.update({
-                  where: {
-                    userId_teamId: {
-                      userId: membership.userId,
-                      teamId: mapping.teamId,
-                    },
-                  },
-                  data: { role: effectiveRole },
-                });
-              }
-            } else {
-              // No other mappings — remove TeamUser
-              await tx.teamUser.deleteMany({
-                where: {
-                  userId: membership.userId,
-                  teamId: mapping.teamId,
-                },
-              });
-            }
-          }
-        }
-
-        // Delete all ScimGroupMembership records for this mapping
-        await tx.scimGroupMembership.deleteMany({
-          where: { scimGroupMappingId: mapping.id },
-        });
-
-        // Delete the mapping
-        await tx.scimGroupMapping.delete({
-          where: { id: mapping.id },
-        });
-
-        return { success: true };
+      const service = ScimGroupService.create(ctx.prisma);
+      await service.deleteMapping({
+        mappingId: input.mappingId,
+        organizationId: input.organizationId,
       });
+
+      return { success: true };
     }),
 });

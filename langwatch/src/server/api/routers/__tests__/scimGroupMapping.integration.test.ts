@@ -242,9 +242,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     }
 
-    // --- listAll ---
-
-    describe("listAll", () => {
+    describe("when admin requests all mappings", () => {
       it("returns mapped and unmapped groups with correct fields", async () => {
         const caller = createAdminCaller();
 
@@ -277,9 +275,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    // --- listUnmapped ---
-
-    describe("listUnmapped", () => {
+    describe("when admin requests unmapped groups", () => {
       it("returns only unmapped groups", async () => {
         const caller = createAdminCaller();
 
@@ -312,9 +308,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    // --- create ---
-
-    describe("create", () => {
+    describe("when admin creates a mapping", () => {
       it("links an unmapped group to an existing team with role", async () => {
         const caller = createAdminCaller();
 
@@ -335,9 +329,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    // --- createWithNewTeam ---
-
-    describe("createWithNewTeam", () => {
+    describe("when admin creates a mapping with new team", () => {
       it("creates a new team and links the mapping to it", async () => {
         const caller = createAdminCaller();
 
@@ -361,9 +353,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    // --- update ---
-
-    describe("update", () => {
+    describe("when admin updates a mapping role", () => {
       it("re-syncs existing members when role changes", async () => {
         const caller = createAdminCaller();
 
@@ -438,9 +428,7 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
-    // --- delete ---
-
-    describe("delete", () => {
+    describe("when admin deletes a mapping", () => {
       it("removes members without other mappings and preserves those with other mappings", async () => {
         const caller = createAdminCaller();
 
@@ -555,6 +543,8 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     describe("when user is not an org admin", () => {
+      // Note: feature spec says FORBIDDEN, but shared checkOrganizationPermission
+      // middleware in rbac.ts throws UNAUTHORIZED. Aligning with actual behavior.
       it("rejects with UNAUTHORIZED", async () => {
         const caller = createMemberCaller();
 

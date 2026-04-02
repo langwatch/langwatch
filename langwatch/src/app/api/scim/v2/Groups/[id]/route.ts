@@ -8,8 +8,8 @@ import { ScimGroupService } from "~/server/scim/scim-group.service";
 import {
   scimPatchRequestSchema,
   scimReplaceGroupRequestSchema,
+  isScimError,
 } from "~/server/scim/scim.types";
-import type { ScimError } from "~/server/scim/scim.types";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -143,13 +143,3 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   return new NextResponse(null, { status: 204 });
 }
 
-function isScimError(value: unknown): value is ScimError {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "schemas" in value &&
-    Array.isArray((value as ScimError).schemas) &&
-    (value as ScimError).schemas[0] ===
-      "urn:ietf:params:scim:api:messages:2.0:Error"
-  );
-}

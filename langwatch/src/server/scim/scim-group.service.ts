@@ -6,6 +6,7 @@ import type {
   ScimCreateGroupRequest,
   ScimReplaceGroupRequest,
   ScimPatchRequest,
+  ScimPatchOperation,
 } from "./scim.types";
 import { resolveHighestRole } from "./scim-role-resolver";
 
@@ -118,7 +119,7 @@ export class ScimGroupService {
     // If members are in the request, process them (will be no-op for unmapped)
     if (request.members?.length) {
       await this.addMembersToMapping({
-        mappingId: mapping.id,
+        mapping,
         organizationId,
         memberIds: request.members.map((m) => m.value),
       });
@@ -167,7 +168,7 @@ export class ScimGroupService {
     const toAdd = [...requestedUserIds].filter((id) => !currentUserIds.has(id));
     if (toAdd.length > 0) {
       await this.addMembersToMapping({
-        mappingId: mapping.id,
+        mapping,
         organizationId,
         memberIds: toAdd,
       });
@@ -210,7 +211,7 @@ export class ScimGroupService {
         const members = this.extractMemberIds(operation.value);
         if (members.length > 0) {
           await this.addMembersToMapping({
-            mappingId: mapping.id,
+            mapping,
             organizationId,
             memberIds: members,
           });
@@ -224,41 +225,7 @@ export class ScimGroupService {
           });
         }
       } else if (operation.op === "replace") {
-        if (operation.path === "displayName" && typeof operation.value === "string") {
-          await this.prisma.scimGroupMapping.update({
-            where: { id: mapping.id },
-            data: { externalGroupName: operation.value },
-          });
-        } else if (operation.path === "members" || !operation.path) {
-          // Full member replace — only if mapped
-          if (!mapping.teamId || !mapping.role) continue;
-
-          const members = this.extractMemberIds(
-            operation.path === "members" ? operation.value : (operation.value as Record<string, unknown> | undefined)?.members
-          );
-          const currentMemberships = await this.prisma.scimGroupMembership.findMany({
-            where: { scimGroupMappingId: mapping.id },
-          });
-          const requestedIds = new Set(members);
-          const currentIds = new Set(currentMemberships.map((m) => m.userId));
-
-          const toAdd = members.filter((id) => !currentIds.has(id));
-          const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
-
-          if (toAdd.length > 0) {
-            await this.addMembersToMapping({
-              mappingId: mapping.id,
-              organizationId,
-              memberIds: toAdd,
-            });
-          }
-          if (toRemove.length > 0) {
-            await this.removeMembersFromMapping({
-              mapping,
-              userIds: toRemove,
-            });
-          }
-        }
+        await this.handleReplaceOperation({ mapping, operation, organizationId });
       }
     }
 
@@ -281,6 +248,32 @@ export class ScimGroupService {
 
     if (!mapping) {
       return this.scimError({ status: "404", detail: "Group not found" });
+    }
+
+    await this.deleteMapping({ mappingId: mapping.id, organizationId });
+    return null;
+  }
+
+  /**
+   * Deletes a ScimGroupMapping by ID, cleaning up member team assignments.
+   * Members with other active mappings to the same team get their role recalculated.
+   * Members with no other mappings to the team are removed from the team.
+   *
+   * Used by both the SCIM DELETE endpoint and the tRPC delete procedure.
+   */
+  async deleteMapping({
+    mappingId,
+    organizationId,
+  }: {
+    mappingId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const mapping = await this.prisma.scimGroupMapping.findFirst({
+      where: { id: mappingId, organizationId },
+    });
+
+    if (!mapping) {
+      return;
     }
 
     // Get all memberships for this mapping
@@ -331,12 +324,14 @@ export class ScimGroupService {
       }
     }
 
-    // Delete the mapping (cascades to ScimGroupMembership)
+    // Delete memberships then mapping
+    await this.prisma.scimGroupMembership.deleteMany({
+      where: { scimGroupMappingId: mapping.id },
+    });
+
     await this.prisma.scimGroupMapping.delete({
       where: { id: mapping.id },
     });
-
-    return null;
   }
 
   /**
@@ -363,20 +358,14 @@ export class ScimGroupService {
    * recalculates the effective role.
    */
   private async addMembersToMapping({
-    mappingId,
+    mapping,
     organizationId,
     memberIds,
   }: {
-    mappingId: string;
+    mapping: ScimGroupMapping;
     organizationId: string;
     memberIds: string[];
   }): Promise<void> {
-    const mapping = await this.prisma.scimGroupMapping.findUnique({
-      where: { id: mappingId },
-    });
-
-    if (!mapping) return;
-
     // If unmapped, do nothing
     if (!mapping.teamId || !mapping.role) return;
 
@@ -396,13 +385,13 @@ export class ScimGroupService {
       await this.prisma.scimGroupMembership.upsert({
         where: {
           scimGroupMappingId_userId: {
-            scimGroupMappingId: mappingId,
+            scimGroupMappingId: mapping.id,
             userId,
           },
         },
         update: {},
         create: {
-          scimGroupMappingId: mappingId,
+          scimGroupMappingId: mapping.id,
           userId,
         },
       });
@@ -508,6 +497,59 @@ export class ScimGroupService {
       where: { userId_teamId: { userId, teamId } },
       data: { role: effectiveRole },
     });
+  }
+
+  /**
+   * Handles a SCIM PATCH "replace" operation on a group mapping.
+   * Supports replacing displayName and full member replacement.
+   */
+  private async handleReplaceOperation({
+    mapping,
+    operation,
+    organizationId,
+  }: {
+    mapping: ScimGroupMapping;
+    operation: ScimPatchOperation;
+    organizationId: string;
+  }): Promise<void> {
+    if (operation.path === "displayName" && typeof operation.value === "string") {
+      await this.prisma.scimGroupMapping.update({
+        where: { id: mapping.id },
+        data: { externalGroupName: operation.value },
+      });
+      return;
+    }
+
+    if (operation.path === "members" || !operation.path) {
+      // Full member replace — only if mapped
+      if (!mapping.teamId || !mapping.role) return;
+
+      const members = this.extractMemberIds(
+        operation.path === "members" ? operation.value : (operation.value as Record<string, unknown> | undefined)?.members
+      );
+      const currentMemberships = await this.prisma.scimGroupMembership.findMany({
+        where: { scimGroupMappingId: mapping.id },
+      });
+      const requestedIds = new Set(members);
+      const currentIds = new Set(currentMemberships.map((m) => m.userId));
+
+      const toAdd = members.filter((id) => !currentIds.has(id));
+      const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
+
+      if (toAdd.length > 0) {
+        await this.addMembersToMapping({
+          mapping,
+          organizationId,
+          memberIds: toAdd,
+        });
+      }
+      if (toRemove.length > 0) {
+        await this.removeMembersFromMapping({
+          mapping,
+          userIds: toRemove,
+        });
+      }
+    }
   }
 
   private extractMemberIds(value: unknown): string[] {

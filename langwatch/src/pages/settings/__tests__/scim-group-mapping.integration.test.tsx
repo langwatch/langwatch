@@ -398,7 +398,7 @@ describe("SCIM Group Mapping UI", () => {
       );
     });
 
-    it("calls create mutation with correct params when Save is clicked", async () => {
+    it("does not call create mutation when no team is selected", async () => {
       const user = userEvent.setup();
       renderPage();
 

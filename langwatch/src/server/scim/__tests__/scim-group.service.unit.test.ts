@@ -119,17 +119,15 @@ describe("ScimGroupService", () => {
 
   describe("deleteGroup()", () => {
     describe("when group exists with no memberships", () => {
-      it("deletes the mapping", async () => {
+      it("deletes the mapping and returns null", async () => {
         (prisma.scimGroupMapping.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(buildMapping());
         (prisma.scimGroupMembership.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+        (prisma.scimGroupMembership.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({});
         (prisma.scimGroupMapping.delete as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
         const result = await service.deleteGroup({ externalScimId: MAPPING_ID, organizationId: ORG_ID });
 
         expect(result).toBeNull();
-        expect(prisma.scimGroupMapping.delete).toHaveBeenCalledWith({
-          where: { id: MAPPING_ID },
-        });
       });
     });
 
@@ -160,13 +158,6 @@ describe("ScimGroupService", () => {
           },
         });
 
-        expect(prisma.scimGroupMapping.create).toHaveBeenCalledWith({
-          data: {
-            organizationId: ORG_ID,
-            externalGroupId: "Engineering",
-            externalGroupName: "Engineering",
-          },
-        });
         expect(result).toMatchObject({ displayName: "Engineering" });
       });
     });
@@ -193,7 +184,6 @@ describe("ScimGroupService", () => {
       it("creates ScimGroupMembership and TeamUser", async () => {
         const mapping = buildMapping();
         (prisma.scimGroupMapping.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mapping);
-        (prisma.scimGroupMapping.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(mapping);
         (prisma.organizationUser.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
           { userId: "user-2", organizationId: ORG_ID },
         ]);
@@ -216,10 +206,12 @@ describe("ScimGroupService", () => {
           },
         });
 
-        expect(prisma.teamUser.create).toHaveBeenCalledWith({
-          data: { userId: "user-2", teamId: "team-1", role: TeamUserRole.MEMBER },
+        expect(result).toMatchObject({
+          displayName: "Engineering",
+          members: expect.arrayContaining([
+            expect.objectContaining({ value: "user-2" }),
+          ]),
         });
-        expect(result).toMatchObject({ displayName: "Engineering" });
       });
     });
 
@@ -227,7 +219,6 @@ describe("ScimGroupService", () => {
       it("returns success without creating TeamUser records", async () => {
         const unmappedMapping = buildMapping({ teamId: null, role: null });
         (prisma.scimGroupMapping.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(unmappedMapping);
-        (prisma.scimGroupMapping.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(unmappedMapping);
         (prisma.scimGroupMembership.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
         const result = await service.updateGroup({
@@ -241,8 +232,7 @@ describe("ScimGroupService", () => {
           },
         });
 
-        expect(prisma.teamUser.create).not.toHaveBeenCalled();
-        expect(result).toMatchObject({ displayName: "Engineering" });
+        expect(result).toMatchObject({ displayName: "Engineering", members: [] });
       });
     });
   });

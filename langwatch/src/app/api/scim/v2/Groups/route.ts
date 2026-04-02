@@ -5,8 +5,7 @@ import {
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
 import { ScimGroupService } from "~/server/scim/scim-group.service";
-import { scimCreateGroupRequestSchema } from "~/server/scim/scim.types";
-import type { ScimError } from "~/server/scim/scim.types";
+import { scimCreateGroupRequestSchema, isScimError } from "~/server/scim/scim.types";
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
@@ -73,13 +72,3 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(result, { status: 201 });
 }
 
-function isScimError(value: unknown): value is ScimError {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "schemas" in value &&
-    Array.isArray((value as ScimError).schemas) &&
-    (value as ScimError).schemas[0] ===
-      "urn:ietf:params:scim:api:messages:2.0:Error"
-  );
-}

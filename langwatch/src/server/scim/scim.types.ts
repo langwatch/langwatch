@@ -110,3 +110,18 @@ export const scimReplaceGroupRequestSchema = z.object({
 });
 
 export type ScimReplaceGroupRequest = z.infer<typeof scimReplaceGroupRequestSchema>;
+
+/**
+ * Type guard that checks whether a value is a SCIM 2.0 Error response.
+ * Shared across all SCIM route handlers.
+ */
+export function isScimError(value: unknown): value is ScimError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "schemas" in value &&
+    Array.isArray((value as ScimError).schemas) &&
+    (value as ScimError).schemas[0] ===
+      "urn:ietf:params:scim:api:messages:2.0:Error"
+  );
+}
