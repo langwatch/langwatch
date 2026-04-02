@@ -189,7 +189,7 @@ function renderDialog(props = {}) {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   setupPromptTags();
 });
 
