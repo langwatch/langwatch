@@ -11,22 +11,22 @@ export interface PromptReference {
 }
 
 /**
- * Parses prompt handle, version number, and label from span attributes.
+ * Parses prompt handle, version number, and tag from span attributes.
  *
  * Supports three formats:
  * 1. New combined format with version: `langwatch.prompt.id = "handle:version_number"`
- * 2. New combined format with label: `langwatch.prompt.id = "handle:label_name"`
+ * 2. New combined format with tag: `langwatch.prompt.id = "handle:tag_name"`
  * 3. Old separate format: `langwatch.prompt.handle` + `langwatch.prompt.version.number`
  *
  * Also extracts `langwatch.prompt.variables` when present.
  * The format is: `'{"type":"json","value":{"name":"Alice","topic":"AI"}}'`
  *
  * Uses `lastIndexOf(':')` to split because handles may contain `/` but never `:`.
- * Disambiguation: positive integer suffix -> version; otherwise -> label.
- * "latest" suffix is treated as a no-op (no label, no version).
+ * Disambiguation: positive integer suffix -> version; otherwise -> tag.
+ * "latest" suffix is treated as a no-op (no tag, no version).
  *
  * @param attrs - Span attributes record
- * @returns Parsed prompt reference with handle, version, label, and variables, or nulls if not found
+ * @returns Parsed prompt reference with handle, version, tag, and variables, or nulls if not found
  */
 export function parsePromptReference(
   attrs: Record<string, unknown>,

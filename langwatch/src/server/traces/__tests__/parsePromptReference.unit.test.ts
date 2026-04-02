@@ -33,7 +33,7 @@ describe("parsePromptReference()", () => {
       });
     });
 
-    it("resolves non-integer suffix as a label", () => {
+    it("resolves non-integer suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:abc" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
@@ -43,7 +43,7 @@ describe("parsePromptReference()", () => {
       });
     });
 
-    it("resolves zero suffix as a label", () => {
+    it("resolves zero suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:0" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
@@ -53,7 +53,7 @@ describe("parsePromptReference()", () => {
       });
     });
 
-    it("resolves negative suffix as a label", () => {
+    it("resolves negative suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:-1" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
@@ -73,7 +73,7 @@ describe("parsePromptReference()", () => {
       });
     });
 
-    it("resolves float suffix as a label", () => {
+    it("resolves float suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:1.5" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
@@ -84,8 +84,8 @@ describe("parsePromptReference()", () => {
     });
   });
 
-  describe("when slug:label shorthand is present", () => {
-    it("resolves to handle and label", () => {
+  describe("when slug:tag shorthand is present", () => {
+    it("resolves to handle and tag", () => {
       const attrs = { "langwatch.prompt.id": "pizza-prompt:production" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
@@ -105,7 +105,7 @@ describe("parsePromptReference()", () => {
       });
     });
 
-    it("treats 'latest' suffix as no label or version", () => {
+    it("treats 'latest' suffix as no tag or version", () => {
       const attrs = { "langwatch.prompt.id": "pizza-prompt:latest" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",

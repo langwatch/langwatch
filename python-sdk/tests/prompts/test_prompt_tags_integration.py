@@ -1,5 +1,5 @@
 """
-Integration tests for prompt label support.
+Integration tests for prompt tag support.
 
 Tests API interaction patterns with mocked HTTP layer.
 """
@@ -41,13 +41,13 @@ def _api_response(version: int, version_id: str = "version_123"):
 
 
 @pytest.mark.integration
-class TestFetchByLabel:
-    """Integration tests for fetching prompts by label."""
+class TestFetchByTag:
+    """Integration tests for fetching prompts by tag."""
 
-    class TestWhenLabelProvided:
-        """Scenario: Fetch prompt by label."""
+    class TestWhenTagProvided:
+        """Scenario: Fetch prompt by tag."""
 
-        def test_sends_label_query_parameter(self, empty_dir, clean_langwatch):
+        def test_sends_tag_query_parameter(self, empty_dir, clean_langwatch):
             original_cwd = Path.cwd()
             try:
                 os.chdir(empty_dir)
@@ -55,22 +55,22 @@ class TestFetchByLabel:
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = _api_response(3)
 
-                    result = prompts.get("pizza-prompt", label="production")
+                    result = prompts.get("pizza-prompt", tag="production")
 
                     assert result.version == 3
 
-                    # Verify the request included the label query param
+                    # Verify the request included the tag query param
                     call_kwargs = mock_request.call_args
                     params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params", {})
-                    assert params.get("label") == "production"
+                    assert params.get("tag") == "production"
 
             finally:
                 os.chdir(original_cwd)
 
-    class TestWhenNoLabelProvided:
-        """Scenario: Fetch without label returns latest."""
+    class TestWhenNoTagProvided:
+        """Scenario: Fetch without tag returns latest."""
 
-        def test_sends_no_label_query_parameter(self, empty_dir, clean_langwatch):
+        def test_sends_no_tag_query_parameter(self, empty_dir, clean_langwatch):
             original_cwd = Path.cwd()
             try:
                 os.chdir(empty_dir)
@@ -82,10 +82,10 @@ class TestFetchByLabel:
 
                     assert result.version == 4
 
-                    # Verify no label param was sent
+                    # Verify no tag param was sent
                     call_kwargs = mock_request.call_args
                     params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params", {})
-                    assert "label" not in params
+                    assert "tag" not in params
 
             finally:
                 os.chdir(original_cwd)
@@ -93,10 +93,10 @@ class TestFetchByLabel:
 
 @pytest.mark.integration
 class TestCacheIsolation:
-    """Integration tests for cache key isolation with labels."""
+    """Integration tests for cache key isolation with tags."""
 
-    class TestWhenLabeledAndUnlabeledFetched:
-        """Scenario: Labeled and unlabeled fetches return independent results."""
+    class TestWhenTaggedAndUntaggedFetched:
+        """Scenario: Tagged and untagged fetches return independent results."""
 
         def test_api_called_twice_no_cache_collision(self):
             mock_client = Mock()
@@ -113,8 +113,8 @@ class TestCacheIsolation:
                 messages=[Message(role="system", content="v4")], prompt="v4",
             )
 
-            def mock_get(prompt_id, version_number=None, label=None):
-                if label == "production":
+            def mock_get(prompt_id, version_number=None, tag=None):
+                if tag == "production":
                     return v3_data
                 return v4_data
 
@@ -122,7 +122,7 @@ class TestCacheIsolation:
 
             with patch("time.time", return_value=0):
                 result1 = facade.get(
-                    "pizza-prompt", label="production",
+                    "pizza-prompt", tag="production",
                     fetch_policy=FetchPolicy.CACHE_TTL, cache_ttl_minutes=5,
                 )
                 result2 = facade.get(
@@ -134,10 +134,10 @@ class TestCacheIsolation:
             assert result1.version == 3
             assert result2.version == 4
 
-    class TestWhenDifferentLabelsFetched:
-        """Scenario: Fetches with different labels return independent results."""
+    class TestWhenDifferentTagsFetched:
+        """Scenario: Fetches with different tags return independent results."""
 
-        def test_api_called_twice_different_labels(self):
+        def test_api_called_twice_different_tags(self):
             mock_client = Mock()
             facade = PromptsFacade(mock_client)
 
@@ -152,10 +152,10 @@ class TestCacheIsolation:
                 messages=[Message(role="system", content="v2")], prompt="v2",
             )
 
-            def mock_get(prompt_id, version_number=None, label=None):
-                if label == "production":
+            def mock_get(prompt_id, version_number=None, tag=None):
+                if tag == "production":
                     return v3_data
-                if label == "staging":
+                if tag == "staging":
                     return v2_data
                 return v3_data
 
@@ -163,11 +163,11 @@ class TestCacheIsolation:
 
             with patch("time.time", return_value=0):
                 result1 = facade.get(
-                    "pizza-prompt", label="production",
+                    "pizza-prompt", tag="production",
                     fetch_policy=FetchPolicy.CACHE_TTL, cache_ttl_minutes=5,
                 )
                 result2 = facade.get(
-                    "pizza-prompt", label="staging",
+                    "pizza-prompt", tag="staging",
                     fetch_policy=FetchPolicy.CACHE_TTL, cache_ttl_minutes=5,
                 )
 
@@ -177,11 +177,11 @@ class TestCacheIsolation:
 
 
 @pytest.mark.integration
-class TestLabelWithMaterializedFirst:
-    """Integration tests for label + MATERIALIZED_FIRST policy."""
+class TestTagWithMaterializedFirst:
+    """Integration tests for tag + MATERIALIZED_FIRST policy."""
 
-    class TestWhenLabelWithMaterializedFirstPolicy:
-        """Scenario: Label with MATERIALIZED_FIRST skips local and fetches from API."""
+    class TestWhenTagWithMaterializedFirstPolicy:
+        """Scenario: Tag with MATERIALIZED_FIRST skips local and fetches from API."""
 
         def test_skips_local_fetches_from_api(self, cli_prompt_setup, clean_langwatch):
             original_cwd = Path.cwd()
@@ -193,7 +193,7 @@ class TestLabelWithMaterializedFirst:
 
                     result = prompts.get(
                         "my-prompt",
-                        label="production",
+                        tag="production",
                         fetch_policy=FetchPolicy.MATERIALIZED_FIRST,
                     )
 
@@ -207,10 +207,10 @@ class TestLabelWithMaterializedFirst:
 
 @pytest.mark.integration
 class TestErrorPropagation:
-    """Integration tests for API error propagation with labels."""
+    """Integration tests for API error propagation with tags."""
 
     class TestWhenApiReturnsNotFound:
-        """Scenario: Unassigned label propagates API error."""
+        """Scenario: Unassigned tag propagates API error."""
 
         def test_raises_error_with_api_message(self, empty_dir, clean_langwatch):
             original_cwd = Path.cwd()
@@ -225,18 +225,18 @@ class TestErrorPropagation:
                     mock_request.return_value = mock_response
 
                     with pytest.raises(ValueError, match="not found"):
-                        prompts.get("pizza-prompt", label="production")
+                        prompts.get("pizza-prompt", tag="production")
 
             finally:
                 os.chdir(original_cwd)
 
 
 @pytest.mark.integration
-class TestLabelAssignment:
-    """Integration tests for label assignment."""
+class TestTagAssignment:
+    """Integration tests for tag assignment."""
 
-    class TestWhenAssigningLabel:
-        """Scenario: Assign label to existing version."""
+    class TestWhenAssigningTag:
+        """Scenario: Assign tag to existing version."""
 
         def test_sends_put_request(self, empty_dir, clean_langwatch):
             original_cwd = Path.cwd()
@@ -248,16 +248,16 @@ class TestLabelAssignment:
                 mock_response.json.return_value = {
                     "configId": "pizza-prompt",
                     "versionId": "prompt_version_abc123",
-                    "label": "production",
+                    "tag": "production",
                     "updatedAt": "2023-01-01T00:00:00Z",
                 }
 
                 with patch("httpx.Client.request") as mock_request:
                     mock_request.return_value = mock_response
 
-                    result = prompts.labels.assign(
+                    result = prompts.tags.assign(
                         "pizza-prompt",
-                        label="production",
+                        tag="production",
                         version_id="prompt_version_abc123",
                     )
 
@@ -265,26 +265,26 @@ class TestLabelAssignment:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/pizza-prompt/labels/production" in url
+                    assert "/api/prompts/pizza-prompt/tags/production" in url
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
                     assert json_body.get("versionId") == "prompt_version_abc123"
 
                     # Verify response
                     assert result["versionId"] == "prompt_version_abc123"
-                    assert result["label"] == "production"
+                    assert result["tag"] == "production"
 
             finally:
                 os.chdir(original_cwd)
 
 
 @pytest.mark.integration
-class TestCreateWithLabels:
-    """Integration tests for creating prompts with labels."""
+class TestCreateWithTags:
+    """Integration tests for creating prompts with tags."""
 
-    class TestWhenCreatingWithLabels:
-        """Scenario: Create prompt with labels."""
+    class TestWhenCreatingWithTags:
+        """Scenario: Create prompt with tags."""
 
-        def test_sends_labels_in_request_body(self, empty_dir, clean_langwatch):
+        def test_sends_tags_in_request_body(self, empty_dir, clean_langwatch):
             original_cwd = Path.cwd()
             try:
                 os.chdir(empty_dir)
@@ -315,25 +315,25 @@ class TestCreateWithLabels:
                     prompts.create(
                         handle="new-prompt",
                         prompt="Hello!",
-                        labels=["production"],
+                        tags=["production"],
                     )
 
                     call_kwargs = mock_request.call_args
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
-                    assert json_body.get("labels") == ["production"]
+                    assert json_body.get("tags") == ["production"]
 
             finally:
                 os.chdir(original_cwd)
 
 
 @pytest.mark.integration
-class TestUpdateWithLabels:
-    """Integration tests for updating prompts with labels."""
+class TestUpdateWithTags:
+    """Integration tests for updating prompts with tags."""
 
-    class TestWhenUpdatingWithLabels:
-        """Scenario: Update prompt with labels."""
+    class TestWhenUpdatingWithTags:
+        """Scenario: Update prompt with tags."""
 
-        def test_sends_labels_in_request_body(self, empty_dir, clean_langwatch):
+        def test_sends_tags_in_request_body(self, empty_dir, clean_langwatch):
             original_cwd = Path.cwd()
             try:
                 os.chdir(empty_dir)
@@ -364,14 +364,14 @@ class TestUpdateWithLabels:
                     prompts.update(
                         prompt_id_or_handle="pizza-prompt",
                         scope="PROJECT",
-                        commit_message="update labels",
+                        commit_message="update tags",
                         prompt="Updated!",
-                        labels=["staging"],
+                        tags=["staging"],
                     )
 
                     call_kwargs = mock_request.call_args
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
-                    assert json_body.get("labels") == ["staging"]
+                    assert json_body.get("tags") == ["staging"]
 
             finally:
                 os.chdir(original_cwd)

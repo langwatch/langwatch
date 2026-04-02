@@ -113,11 +113,11 @@ class TestPromptTagsE2E:
             updated = langwatch.prompts.update(
                 handle,
                 scope="PROJECT",
-                commit_message="Create v2 for label test",
+                commit_message="Create v2 for tag test",
                 prompt="Version 2 content",
             )
 
-            # Fetch without label — expect latest (v2)
+            # Fetch without tag — expect latest (v2)
             fetched = langwatch.prompts.get(handle)
 
             assert fetched is not None
