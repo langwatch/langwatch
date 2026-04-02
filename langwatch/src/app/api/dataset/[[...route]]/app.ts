@@ -21,6 +21,7 @@ import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import {
   BadRequestError,
+  InternalServerError,
   NotFoundError,
   UnprocessableEntityError,
 } from "../../shared/errors";
@@ -318,6 +319,12 @@ export const app = new Hono<{ Variables: Variables }>()
       } catch (error) {
         if (error instanceof Error && error.name === "InvalidColumnError") {
           throw new BadRequestError(error.message);
+        }
+        if (
+          error instanceof Error &&
+          error.name === "MalformedColumnTypesError"
+        ) {
+          throw new InternalServerError(error.message);
         }
         return mapDatasetNotFoundError(error);
       }

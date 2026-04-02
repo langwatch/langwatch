@@ -865,6 +865,56 @@ describe("Feature: Dataset REST API", () => {
       });
     });
 
+    describe("when dataset has malformed columnTypes (not an array)", () => {
+      beforeEach(async () => {
+        await prisma.dataset.create({
+          data: {
+            id: `dataset_${nanoid()}`,
+            name: "malformed-cols",
+            slug: "malformed-cols",
+            projectId: testProjectId,
+            columnTypes: "not-an-array" as any,
+          },
+        });
+      });
+
+      it("returns 500 with a descriptive error instead of crashing", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/malformed-cols/records",
+          { entries: [{ input: "hello" }] },
+        );
+
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.message).toContain("columnTypes");
+      });
+    });
+
+    describe("when dataset columnTypes items are missing name property", () => {
+      beforeEach(async () => {
+        await prisma.dataset.create({
+          data: {
+            id: `dataset_${nanoid()}`,
+            name: "bad-items",
+            slug: "bad-items",
+            projectId: testProjectId,
+            columnTypes: [{ type: "string" }, { notName: "x" }] as any,
+          },
+        });
+      });
+
+      it("returns 500 with a descriptive error instead of crashing", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/bad-items/records",
+          { entries: [{ input: "hello" }] },
+        );
+
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.message).toContain("columnTypes");
+      });
+    });
+
     describe("when entries exceed the maximum batch size of 1000", () => {
       beforeEach(async () => {
         await createDatasetWithColumns("my-dataset", [

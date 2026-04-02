@@ -12,6 +12,7 @@ import {
   DatasetConflictError,
   DatasetNotFoundError,
   InvalidColumnError,
+  MalformedColumnTypesError,
 } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
 import type {
@@ -599,7 +600,21 @@ export class DatasetService {
       projectId: params.projectId,
     });
 
-    const datasetColumns = dataset.columnTypes as DatasetColumns;
+    const rawColumns = dataset.columnTypes;
+    if (
+      !Array.isArray(rawColumns) ||
+      !rawColumns.every(
+        (item) =>
+          typeof item === "object" &&
+          item !== null &&
+          !Array.isArray(item) &&
+          typeof (item as Record<string, unknown>).name === "string",
+      )
+    ) {
+      throw new MalformedColumnTypesError(dataset.name);
+    }
+
+    const datasetColumns = rawColumns as DatasetColumns;
     const validColumnNames = new Set(datasetColumns.map((c) => c.name));
 
     // Validate column names across all entries
