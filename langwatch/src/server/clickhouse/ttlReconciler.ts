@@ -92,6 +92,18 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
+  {
+    table: "analytics_trace_facts",
+    ttlColumn: "OccurredAt",
+    envVar: "TIERED_ANALYTICS_TRACE_FACTS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "analytics_evaluation_facts",
+    ttlColumn: "OccurredAt",
+    envVar: "TIERED_ANALYTICS_EVALUATION_FACTS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
 ] as const;
 
 function parseNonNegativeInt(value: string, label: string): number {

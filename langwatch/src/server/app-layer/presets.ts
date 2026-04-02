@@ -17,6 +17,8 @@ import type { AppDependencies } from "./dependencies";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
+import { AnalyticsEvaluationFactsClickHouseRepository } from "./analytics/repositories/analytics-evaluation-facts.clickhouse.repository";
+import { AnalyticsTraceFactsClickHouseRepository } from "./analytics/repositories/analytics-trace-facts.clickhouse.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
@@ -282,6 +284,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
+    analyticsTraceFacts: clickhouseEnabled
+      ? new AnalyticsTraceFactsClickHouseRepository(resolveClickHouseClient)
+      : undefined,
+    analyticsEvaluationFacts: clickhouseEnabled
+      ? new AnalyticsEvaluationFactsClickHouseRepository(resolveClickHouseClient)
+      : undefined,
   };
 
   const registry = new PipelineRegistry({

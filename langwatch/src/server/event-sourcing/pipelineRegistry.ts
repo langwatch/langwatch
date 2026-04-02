@@ -15,6 +15,8 @@ import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { AnalyticsEvaluationFactsRepository } from "../app-layer/analytics/repositories/analytics-evaluation-facts.repository";
+import type { AnalyticsTraceFactsRepository } from "../app-layer/analytics/repositories/analytics-trace-facts.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
@@ -52,6 +54,7 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { AnalyticsEvaluationFactsStore } from "./pipelines/evaluation-processing/projections/analyticsEvaluationFacts.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
@@ -62,6 +65,7 @@ import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-pr
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import { AnalyticsTraceFactsStore } from "./pipelines/trace-processing/projections/analyticsTraceFacts.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
@@ -94,6 +98,8 @@ export interface PipelineRepositories {
   logRecordStorage: LogRecordStorageRepository;
   metricRecordStorage: MetricRecordStorageRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+  analyticsTraceFacts?: AnalyticsTraceFactsRepository;
+  analyticsEvaluationFacts?: AnalyticsEvaluationFactsRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -175,11 +181,16 @@ export class PipelineRegistry {
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
 
+    const analyticsEvaluationFactsStore = this.deps.repositories.analyticsEvaluationFacts
+      ? new AnalyticsEvaluationFactsStore(this.deps.repositories.analyticsEvaluationFacts)
+      : undefined;
+
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
+        analyticsEvaluationFactsStore,
         executeEvaluationCommand,
         esSyncReactor,
       }),
@@ -258,12 +269,17 @@ export class PipelineRegistry {
       },
     });
 
+    const analyticsTraceFactsStore = this.deps.repositories.analyticsTraceFacts
+      ? new AnalyticsTraceFactsStore(this.deps.repositories.analyticsTraceFacts)
+      : undefined;
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         logRecordAppendStore: new LogRecordAppendStore(this.deps.repositories.logRecordStorage),
         metricRecordAppendStore: new MetricRecordAppendStore(this.deps.repositories.metricRecordStorage),
         traceSummaryStore,
+        analyticsTraceFactsStore,
         evaluationTriggerReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,

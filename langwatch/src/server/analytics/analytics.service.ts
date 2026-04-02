@@ -1,10 +1,12 @@
 /**
  * Analytics Service Facade
  *
- * Routes analytics queries to either Elasticsearch or ClickHouse based on
- * the project's featureClickHouseDataSourceTraces flag.
+ * Routes analytics queries to the appropriate backend based on feature flags:
+ * 1. Projection-based fact tables (PostHog flag: analytics_projections_enabled)
+ * 2. ClickHouse entity tables (Prisma flag: featureClickHouseDataSourceTraces)
+ * 3. Elasticsearch (default fallback)
  *
- * Supports comparison mode for verifying CH results against ES results.
+ * Supports comparison mode for verifying results between backends.
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -21,6 +23,8 @@ import type {
 import type { TimeseriesInputType } from "./registry";
 import { getElasticsearchAnalyticsService } from "./elasticsearch-analytics.service";
 import { getClickHouseAnalyticsService } from "./clickhouse/clickhouse-analytics.service";
+import { getProjectionAnalyticsService } from "./projection/index";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   AnalyticsComparator,
   getAnalyticsComparator,
@@ -35,31 +39,53 @@ export interface AnalyticsServiceConfig {
 }
 
 /**
+ * Minimal interface for feature flag evaluation, allowing injection for testing.
+ */
+export interface AnalyticsFeatureFlagService {
+  isEnabled(
+    flagKey: string,
+    distinctId: string,
+    defaultValue: boolean,
+    options?: { projectId?: string },
+  ): Promise<boolean>;
+}
+
+/**
  * Dependencies required by AnalyticsService
  */
 export interface AnalyticsServiceDependencies {
   esService: AnalyticsBackend;
   chService: AnalyticsBackend;
+  projectionService?: AnalyticsBackend;
   prisma: PrismaClient;
   comparator?: AnalyticsComparator;
+  featureFlagService?: AnalyticsFeatureFlagService;
   config?: AnalyticsServiceConfig;
 }
 
 /**
  * Analytics Service Facade
  *
- * This facade routes analytics requests to either Elasticsearch or ClickHouse
- * based on the project's configuration. It supports:
+ * This facade routes analytics requests to the appropriate backend
+ * based on feature flags. Routing priority:
  *
- * - Feature flag based routing (featureClickHouseDataSourceTraces)
- * - Comparison mode for verifying ClickHouse results against Elasticsearch
- * - Logging of discrepancies for debugging
+ * 1. **Projection service** - PostHog flag `analytics_projections_enabled`
+ *    (or env var `ANALYTICS_PROJECTIONS_ENABLED=1`). Uses pre-built
+ *    denormalized fact tables for fast, JOIN-free queries.
+ * 2. **ClickHouse** - Prisma flag `featureClickHouseDataSourceTraces`.
+ *    Queries entity-oriented tables with JOINs.
+ * 3. **Elasticsearch** - Default fallback.
+ *
+ * In comparison mode, results from the experimental backend are compared
+ * against the baseline and discrepancies are logged.
  */
 export class AnalyticsService {
   private readonly prisma: PrismaClient;
   private readonly esService: AnalyticsBackend;
   private readonly chService: AnalyticsBackend;
+  private readonly projectionService?: AnalyticsBackend;
   private readonly comparator: AnalyticsComparator;
+  private readonly featureFlagService?: AnalyticsFeatureFlagService;
   private readonly config: AnalyticsServiceConfig;
   private readonly logger = createLogger("langwatch:analytics:service");
   private readonly tracer = getLangWatchTracer("langwatch.analytics.service");
@@ -67,8 +93,10 @@ export class AnalyticsService {
   constructor(deps: AnalyticsServiceDependencies) {
     this.esService = deps.esService;
     this.chService = deps.chService;
+    this.projectionService = deps.projectionService;
     this.prisma = deps.prisma;
     this.comparator = deps.comparator ?? getAnalyticsComparator();
+    this.featureFlagService = deps.featureFlagService;
     this.config = deps.config ?? {};
   }
 
@@ -122,11 +150,34 @@ export class AnalyticsService {
     input: unknown,
     esCall: () => Promise<TResult>,
     chCall: () => Promise<TResult>,
+    projectionCall?: () => Promise<TResult>,
   ): Promise<TResult> {
     return this.tracer.withActiveSpan(
       `AnalyticsService.${operationName}`,
       { attributes: { "tenant.id": projectId } },
       async (span) => {
+        // Check projection-based analytics before existing routing
+        const useProjections = await this.isProjectionsEnabled(projectId);
+
+        if (useProjections && projectionCall) {
+          span.setAttribute("backend", "projections");
+          const comparisonMode = this.isComparisonModeEnabled();
+          span.setAttribute("comparison.mode", comparisonMode);
+
+          if (comparisonMode && this.chService.isAvailable()) {
+            // In comparison mode, compare projection results against CH (baseline)
+            return this.runComparison(
+              operationName,
+              input,
+              chCall,
+              projectionCall,
+              true, // useClickHouse=true makes chCall the baseline, projectionCall the primary
+            );
+          }
+
+          return projectionCall();
+        }
+
         const useClickHouse = await this.isClickHouseEnabled(projectId);
         const comparisonMode = this.isComparisonModeEnabled();
 
@@ -149,6 +200,39 @@ export class AnalyticsService {
         return useClickHouse ? chCall() : esCall();
       },
     );
+  }
+
+  /**
+   * Check if projection-based analytics is enabled for the given project.
+   *
+   * Returns true only when:
+   * 1. A projection service is injected and reports itself as available
+   * 2. The PostHog feature flag `analytics_projections_enabled` is on for the project
+   *    (or force-enabled via ANALYTICS_PROJECTIONS_ENABLED=1 env var)
+   */
+  private async isProjectionsEnabled(projectId: string): Promise<boolean> {
+    if (!this.projectionService?.isAvailable()) {
+      return false;
+    }
+
+    if (!this.featureFlagService) {
+      return false;
+    }
+
+    try {
+      return await this.featureFlagService.isEnabled(
+        "analytics_projections_enabled",
+        projectId,
+        false,
+        { projectId },
+      );
+    } catch (error) {
+      this.logger.warn(
+        { projectId, error: error instanceof Error ? error.message : error },
+        "Failed to check projection feature flag, defaulting to off",
+      );
+      return false;
+    }
   }
 
   /**
@@ -214,6 +298,9 @@ export class AnalyticsService {
       input,
       () => this.esService.getTimeseries(input),
       () => this.chService.getTimeseries(input),
+      this.projectionService
+        ? () => this.projectionService!.getTimeseries(input)
+        : undefined,
     );
   }
 
@@ -263,6 +350,19 @@ export class AnalyticsService {
           subkey,
           searchQuery,
         ),
+      this.projectionService
+        ? () =>
+            this.projectionService!.getDataForFilter(
+              projectId,
+              field,
+              startDate,
+              endDate,
+              filters,
+              key,
+              subkey,
+              searchQuery,
+            )
+        : undefined,
     );
   }
 
@@ -300,6 +400,15 @@ export class AnalyticsService {
           endDate,
           filters,
         ),
+      this.projectionService
+        ? () =>
+            this.projectionService!.getTopUsedDocuments(
+              projectId,
+              startDate,
+              endDate,
+              filters,
+            )
+        : undefined,
     );
   }
 
@@ -325,6 +434,15 @@ export class AnalyticsService {
       { projectId, startDate, endDate },
       () => this.esService.getFeedbacks(projectId, startDate, endDate, filters),
       () => this.chService.getFeedbacks(projectId, startDate, endDate, filters),
+      this.projectionService
+        ? () =>
+            this.projectionService!.getFeedbacks(
+              projectId,
+              startDate,
+              endDate,
+              filters,
+            )
+        : undefined,
     );
   }
 }
@@ -339,7 +457,9 @@ export function createAnalyticsService(
   return new AnalyticsService({
     esService: getElasticsearchAnalyticsService(),
     chService: getClickHouseAnalyticsService(),
+    projectionService: getProjectionAnalyticsService(),
     prisma,
+    featureFlagService,
     config: {
       comparisonModeEnabled: process.env.ANALYTICS_COMPARISON_MODE === "true",
       ...config,
