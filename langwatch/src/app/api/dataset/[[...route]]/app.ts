@@ -64,6 +64,13 @@ const deleteRecordsSchema = z.object({
   recordIds: z.array(z.string()).min(1, "recordIds is required").max(1000, "Maximum 1000 records per batch delete"),
 });
 
+const batchCreateRecordsSchema = z.object({
+  entries: z
+    .array(z.record(z.string(), z.any()))
+    .min(1, "entries is required")
+    .max(1000, "Maximum batch size is 1000 entries"),
+});
+
 /**
  * Validation hook that returns 422 instead of the default 400 for Zod validation errors.
  * Used on endpoints where the feature spec requires 422 Unprocessable Entity.
@@ -283,6 +290,36 @@ export const app = new Hono<{ Variables: Variables }>()
           throw new UnprocessableEntityError(error.message);
         }
         throw error;
+      }
+    },
+  )
+
+  // ── Batch Create Records ──────────────────────────────────────
+  .post(
+    "/:slugOrId/records",
+    describeRoute({
+      description: "Create records in a dataset in batch",
+    }),
+    zValidator("json", batchCreateRecordsSchema, validationHook),
+    async (c) => {
+      const { slugOrId } = c.req.param();
+      const project = c.get("project");
+      const { entries } = c.req.valid("json");
+      const service = c.get("datasetService");
+
+      try {
+        const records = await service.batchCreateRecords({
+          slugOrId,
+          projectId: project.id,
+          entries,
+        });
+
+        return c.json({ data: records }, 201);
+      } catch (error) {
+        if (error instanceof Error && error.name === "InvalidColumnError") {
+          throw new BadRequestError(error.message);
+        }
+        return mapDatasetNotFoundError(error);
       }
     },
   )

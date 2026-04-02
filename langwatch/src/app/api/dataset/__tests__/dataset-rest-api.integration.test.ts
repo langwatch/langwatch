@@ -729,6 +729,166 @@ describe("Feature: Dataset REST API", () => {
     });
   });
 
+  // ── Batch Create Records ──────────────────────────────────────
+
+  describe("POST /api/dataset/:slugOrId/records", () => {
+    // Helper to create a dataset with specific columns
+    async function createDatasetWithColumns(
+      slug: string,
+      columns: Array<{ name: string; type: string }>,
+      id?: string,
+    ) {
+      return await prisma.dataset.create({
+        data: {
+          id: id ?? `dataset_${nanoid()}`,
+          name: slug,
+          slug,
+          projectId: testProjectId,
+          columnTypes: columns,
+        },
+      });
+    }
+
+    describe("when given valid entries matching the dataset schema", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+          { name: "output", type: "string" },
+        ]);
+      });
+
+      it("creates records with unique IDs and returns them", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          { entries: [{ input: "hello", output: "world" }] },
+        );
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0]).toHaveProperty("id");
+        expect(body.data[0].entry).toEqual({
+          input: "hello",
+          output: "world",
+        });
+      });
+    });
+
+    describe("when using dataset ID instead of slug", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns(
+          "my-data",
+          [{ name: "input", type: "string" }],
+          "dataset_xyz",
+        );
+      });
+
+      it("creates records for the matching dataset", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/dataset_xyz/records",
+          { entries: [{ input: "test" }] },
+        );
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.data).toHaveLength(1);
+      });
+    });
+
+    describe("when entries contain unknown column names", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+          { name: "output", type: "string" },
+        ]);
+      });
+
+      it("returns 400 Bad Request identifying the invalid column", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          { entries: [{ input: "hi", foo: "bar" }] },
+        );
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.message).toContain("foo");
+      });
+    });
+
+    describe("when entries have a subset of columns", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+          { name: "output", type: "string" },
+        ]);
+      });
+
+      it("creates records with missing columns defaulting to null", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          { entries: [{ input: "hi" }] },
+        );
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0].entry.input).toBe("hi");
+        expect(body.data[0].entry.output).toBeNull();
+      });
+    });
+
+    describe("when the dataset does not exist", () => {
+      it("returns 404 Not Found", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/ghost/records",
+          { entries: [{ input: "hello" }] },
+        );
+
+        expect(res.status).toBe(404);
+      });
+    });
+
+    describe("when entries are missing from the body", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+        ]);
+      });
+
+      it("returns 422 Unprocessable Entity for empty body", async () => {
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          {},
+        );
+
+        expect(res.status).toBe(422);
+      });
+    });
+
+    describe("when entries exceed the maximum batch size of 1000", () => {
+      beforeEach(async () => {
+        await createDatasetWithColumns("my-dataset", [
+          { name: "input", type: "string" },
+        ]);
+      });
+
+      it("returns 422 Unprocessable Entity", async () => {
+        const entries = Array.from({ length: 1001 }, (_, i) => ({
+          input: `item-${i}`,
+        }));
+
+        const res = await helpers.api.post(
+          "/api/dataset/my-dataset/records",
+          { entries },
+        );
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.message).toMatch(/batch size|1000/i);
+      });
+    });
+  });
+
   // ── Cross-Cutting: Slug or ID Resolution ───────────────────────
 
   describe("Slug or ID resolution", () => {

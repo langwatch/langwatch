@@ -8,7 +8,11 @@ import {
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
-import { DatasetConflictError, DatasetNotFoundError } from "./errors";
+import {
+  DatasetConflictError,
+  DatasetNotFoundError,
+  InvalidColumnError,
+} from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
 import type {
   DatasetColumns,
@@ -572,6 +576,64 @@ export class DatasetService {
       entry: params.entry,
     });
     return { record: created, created: true };
+  }
+
+  /**
+   * Batch creates records for a dataset.
+   *
+   * Business rules:
+   * - Validates column names against dataset schema, rejects unknown columns
+   * - Fills missing columns with null
+   * - Generates nanoid() IDs for each record
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   * @returns the created records with IDs and timestamps
+   */
+  async batchCreateRecords(params: {
+    slugOrId: string;
+    projectId: string;
+    entries: Array<Record<string, unknown>>;
+  }) {
+    const dataset = await this.getBySlugOrId({
+      slugOrId: params.slugOrId,
+      projectId: params.projectId,
+    });
+
+    const datasetColumns = dataset.columnTypes as DatasetColumns;
+    const validColumnNames = new Set(datasetColumns.map((c) => c.name));
+
+    // Validate column names across all entries
+    for (const entry of params.entries) {
+      for (const key of Object.keys(entry)) {
+        if (!validColumnNames.has(key)) {
+          throw new InvalidColumnError(key, dataset.name);
+        }
+      }
+    }
+
+    // Build records with missing columns filled as null and generated IDs
+    const records = params.entries.map((entry) => {
+      const fullEntry: Record<string, unknown> = {};
+      for (const col of datasetColumns) {
+        fullEntry[col.name] = entry[col.name] ?? null;
+      }
+      return {
+        id: nanoid(),
+        entry: fullEntry as Prisma.InputJsonValue,
+      };
+    });
+
+    const created = await this.recordRepository.createMany({
+      records,
+      datasetId: dataset.id,
+      projectId: params.projectId,
+    });
+
+    return created.map((record) => ({
+      id: record.id,
+      entry: record.entry,
+      createdAt: record.createdAt,
+    }));
   }
 
   /**

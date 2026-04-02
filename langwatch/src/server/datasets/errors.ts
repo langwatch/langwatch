@@ -16,3 +16,18 @@ export class DatasetConflictError extends Error {
     this.name = "DatasetConflictError";
   }
 }
+
+/**
+ * Thrown when a record entry contains a column name not defined in the dataset schema.
+ */
+export class InvalidColumnError extends Error {
+  readonly columnName: string;
+
+  constructor(columnName: string, datasetName: string) {
+    super(
+      `Column "${columnName}" is not defined in the "${datasetName}" dataset schema`,
+    );
+    this.name = "InvalidColumnError";
+    this.columnName = columnName;
+  }
+}
