@@ -54,7 +54,6 @@ export default defineConfig({
         __dirname,
         "./src/injection/injection.server.ts",
       ),
-      "@langwatch/mcp-server": join(__dirname, "../mcp-server/src"),
     },
   },
 });

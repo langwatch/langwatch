@@ -27,8 +27,7 @@
 				"./node_modules/@trpc/server/dist/core/internals/utils"
 			],
 			"zod/lib/helpers/errorUtil": ["./node_modules/zod/lib/helpers/errorUtil"],
-			"@langwatch-oss/*": ["./*"],
-			"@langwatch/mcp-server/*": ["../mcp-server/src/*"]
+			"@langwatch-oss/*": ["./*"]
 		},
 		"plugins": [
 			{

@@ -29,7 +29,6 @@ export default defineConfig({
     alias: {
       "~/": join(__dirname, "./src/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),
-      "@langwatch/mcp-server": join(__dirname, "../mcp-server/src"),
       "@injected-dependencies.client": join(
         __dirname,
         "./src/injection/injection.client.ts",
