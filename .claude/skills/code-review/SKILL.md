@@ -7,7 +7,7 @@ argument-hint: "[diff, branch, or commit range]"
 
 Review code changes and sign off on each rule below.
 
-**What to diff:** Use the provided argument if given (a diff, branch, or commit range). Otherwise diff against `origin/main`, or the PR base branch if on a PR branch. If ambiguous, ask.
+**What to diff:** If `$ARGUMENTS` is provided, use it as the diff target (a branch, commit range, or raw diff). Otherwise diff against `origin/main`, or the PR base branch if on a PR branch. If ambiguous, ask.
 
 For each rule: **PASS** if no violations, or **FAIL** with every violation listed — one per line with `file:line`.
 
