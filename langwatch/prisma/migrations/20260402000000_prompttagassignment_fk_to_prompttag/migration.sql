@@ -31,13 +31,14 @@ WHERE a."projectId" = p.id
 -- Step 4: Set tagId NOT NULL
 ALTER TABLE "PromptTagAssignment" ALTER COLUMN "tagId" SET NOT NULL;
 
--- Step 5: Drop the old tag column
+-- Step 5: Drop old unique constraint (must happen before dropping column, as PG
+-- auto-drops constraints on column drop and the explicit DROP would then fail)
+ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT IF EXISTS "PromptTagAssignment_configId_tag_key";
+
+-- Step 6: Drop the old tag column
 ALTER TABLE "PromptTagAssignment" DROP COLUMN "tag";
 
--- Step 6: Add FK constraint
+-- Step 7: Add FK constraint and new unique constraint
 ALTER TABLE "PromptTagAssignment" ADD CONSTRAINT "PromptTagAssignment_tagId_fkey"
   FOREIGN KEY ("tagId") REFERENCES "PromptTag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- Step 7: Drop old unique constraint and add new one
-ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT "PromptTagAssignment_configId_tag_key";
 ALTER TABLE "PromptTagAssignment" ADD CONSTRAINT "PromptTagAssignment_configId_tagId_key" UNIQUE ("configId", "tagId");
