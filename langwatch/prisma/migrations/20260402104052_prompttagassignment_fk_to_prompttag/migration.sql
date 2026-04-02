@@ -41,4 +41,5 @@ ALTER TABLE "PromptTagAssignment" DROP COLUMN "tag";
 -- Step 7: Add FK constraint and new unique constraint
 ALTER TABLE "PromptTagAssignment" ADD CONSTRAINT "PromptTagAssignment_tagId_fkey"
   FOREIGN KEY ("tagId") REFERENCES "PromptTag"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE INDEX "PromptTagAssignment_tagId_idx" ON "PromptTagAssignment" ("tagId");
 ALTER TABLE "PromptTagAssignment" ADD CONSTRAINT "PromptTagAssignment_configId_tagId_key" UNIQUE ("configId", "tagId");

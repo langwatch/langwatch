@@ -998,6 +998,7 @@ model PromptTagAssignment {
     @@index([configId])
     @@index([versionId])
     @@index([projectId])
+    @@index([tagId])
 }
 
 model PromptTag {
