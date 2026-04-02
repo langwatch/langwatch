@@ -19,13 +19,9 @@ import type {
 } from "./types";
 
 /**
- * Unified service for fetching traces from either ClickHouse or Elasticsearch.
+ * Unified service for fetching traces from ClickHouse.
  *
- * This service acts as a facade that:
- * 1. Checks if ClickHouse Traces Data Source is enabled for the project (via featureClickHouseDataSourceTraces flag)
- * 2. Routes requests to the appropriate backend based on the feature flag
- *
- * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
+ * This service acts as a facade that routes all requests to the ClickHouse backend.
  *
  * @example
  * ```ts
@@ -57,16 +53,6 @@ export class TraceService {
   }
 
   /**
-   * Check if ClickHouse is enabled for the given project.
-   *
-   * @param projectId - The project ID
-   * @returns True if ClickHouse is enabled, false otherwise
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return this.clickHouseService.isClickHouseEnabled(projectId);
-  }
-
-  /**
    * Get a single trace by ID.
    *
    * @param projectId - The project ID
@@ -83,31 +69,19 @@ export class TraceService {
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesWithSpans(
-            projectId,
-            [traceId],
-            protections,
-          );
-          if (traces === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getById — check ClickHouse client configuration",
-            );
-          }
-          return traces[0];
-        }
-
-        return this.elasticsearchService.getById(
+        const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
-          traceId,
+          [traceId],
           protections,
         );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getById — check ClickHouse client configuration",
+          );
+        }
+        return traces[0];
       },
     );
   }
@@ -131,31 +105,19 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesWithSpans(
-            projectId,
-            traceIds,
-            protections,
-          );
-          if (traces === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getTracesWithSpans — check ClickHouse client configuration",
-            );
-          }
-          return traces;
-        }
-
-        return this.elasticsearchService.getTracesWithSpans(
+        const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
           traceIds,
           protections,
         );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTracesWithSpans — check ClickHouse client configuration",
+          );
+        }
+        return traces;
       },
     );
   }
@@ -177,31 +139,19 @@ export class TraceService {
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces = await this.clickHouseService.getTracesByThreadId(
-            projectId,
-            threadId,
-            protections,
-          );
-          if (traces === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getTracesByThreadId — check ClickHouse client configuration",
-            );
-          }
-          return traces;
-        }
-
-        return this.elasticsearchService.getTracesByThreadId(
+        const traces = await this.clickHouseService.getTracesByThreadId(
           projectId,
           threadId,
           protections,
         );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTracesByThreadId — check ClickHouse client configuration",
+          );
+        }
+        return traces;
       },
     );
   }
@@ -227,32 +177,20 @@ export class TraceService {
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result = await this.clickHouseService.getAllTracesForProject(
-            input,
-            protections,
-            options,
-          );
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getAllTracesForProject — check ClickHouse client configuration",
-            );
-          }
-
-          return result;
-        }
-
-        return this.elasticsearchService.getAllTracesForProject(
+        const result = await this.clickHouseService.getAllTracesForProject(
           input,
           protections,
           options,
         );
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getAllTracesForProject — check ClickHouse client configuration",
+          );
+        }
+
+        return result;
       },
     );
   }
@@ -276,12 +214,7 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async (span) => {
-        const useClickHouse =
-          await this.evaluationService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
         const result = await this.evaluationService.getEvaluationsMultiple({
           projectId,
@@ -316,32 +249,20 @@ export class TraceService {
         },
       },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const traces =
-            await this.clickHouseService.getTracesWithSpansByThreadIds(
-              projectId,
-              threadIds,
-              protections,
-            );
-          if (traces === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getTracesWithSpansByThreadIds — check ClickHouse client configuration",
-            );
-          }
-          return traces;
+        const traces =
+          await this.clickHouseService.getTracesWithSpansByThreadIds(
+            projectId,
+            threadIds,
+            protections,
+          );
+        if (traces === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTracesWithSpansByThreadIds — check ClickHouse client configuration",
+          );
         }
-
-        return this.elasticsearchService.getTracesWithSpansByThreadIds(
-          projectId,
-          threadIds,
-          protections,
-        );
+        return traces;
       },
     );
   }
@@ -359,23 +280,15 @@ export class TraceService {
       "TraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result = await this.clickHouseService.getTopicCounts(input);
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getTopicCounts — check ClickHouse client configuration",
-            );
-          }
-          return result;
+        const result = await this.clickHouseService.getTopicCounts(input);
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getTopicCounts — check ClickHouse client configuration",
+          );
         }
-
-        return this.elasticsearchService.getTopicCounts(input);
+        return result;
       },
     );
   }
@@ -393,24 +306,16 @@ export class TraceService {
       "TraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getCustomersAndLabels(input);
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getCustomersAndLabels — check ClickHouse client configuration",
-            );
-          }
-          return result;
+        const result =
+          await this.clickHouseService.getCustomersAndLabels(input);
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getCustomersAndLabels — check ClickHouse client configuration",
+          );
         }
-
-        return this.elasticsearchService.getCustomersAndLabels(input);
+        return result;
       },
     );
   }
@@ -432,32 +337,20 @@ export class TraceService {
       "TraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getDistinctFieldNames(
-              projectId,
-              startDate,
-              endDate,
-            );
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",
-            );
-          }
-          return result;
+        const result =
+          await this.clickHouseService.getDistinctFieldNames(
+            projectId,
+            startDate,
+            endDate,
+          );
+        if (result === null) {
+          throw new Error(
+            "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",
+          );
         }
-
-        return this.elasticsearchService.getDistinctFieldNames(
-          projectId,
-          startDate,
-          endDate,
-        );
+        return result;
       },
     );
   }
@@ -479,21 +372,9 @@ export class TraceService {
       "TraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+        span.setAttribute("backend", "clickhouse");
 
-        if (useClickHouse) {
-          return this.clickHouseService.getSpanForPromptStudio(
-            projectId,
-            spanId,
-            protections,
-          );
-        }
-
-        return this.elasticsearchService.getSpanForPromptStudio(
+        return this.clickHouseService.getSpanForPromptStudio(
           projectId,
           spanId,
           protections,

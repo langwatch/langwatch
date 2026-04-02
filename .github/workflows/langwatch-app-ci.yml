@@ -261,10 +261,10 @@ jobs:
             -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
             clickhouse/clickhouse-server:latest
 
-          # Wait for ClickHouse to be ready
+          # Wait for ClickHouse to be ready (use HTTP port — native port 9000 is unreliable with --network host)
           echo "Waiting for ClickHouse to be ready..."
           for i in {1..60}; do
-            if docker exec clickhouse clickhouse-client --password=ci_password --query "SELECT 1" 2>/dev/null; then
+            if curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT 1" >/dev/null 2>&1; then
               echo "ClickHouse is ready"
               break
             fi
@@ -274,7 +274,7 @@ jobs:
 
           # Verify storage policy is available
           echo "Verifying storage policy..."
-          docker exec clickhouse clickhouse-client --password=ci_password --query "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"
+          curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"
 
       - name: Run ClickHouse migrations
         working-directory: langwatch

@@ -42,8 +42,9 @@ export function createEnvConfig() {
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
-      ELASTICSEARCH_NODE_URL: optionalIfBuildTime(z.string().min(1)),
+      ELASTICSEARCH_NODE_URL: z.string().optional(),
       ELASTICSEARCH_API_KEY: z.string().optional(),
+      ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
@@ -105,10 +106,6 @@ export function createEnvConfig() {
       // Observability
       OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
 
-      // Event Sourcing
-      ENABLE_EVENT_SOURCING: z.boolean().optional(),
-      ENABLE_CLICKHOUSE: z.boolean().optional(),
-
       // ClickHouse Migration Configuration
       CLICKHOUSE_CLUSTER: z.string().optional(),
 
@@ -166,6 +163,7 @@ export function createEnvConfig() {
       API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
       ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
       ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
+      ELASTICSEARCH_CONFIGURED: !!(process.env.ELASTICSEARCH_NODE_URL),
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -229,12 +227,6 @@ export function createEnvConfig() {
       OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
       OKTA_ISSUER: process.env.OKTA_ISSUER,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      ENABLE_EVENT_SOURCING:
-        process.env.ENABLE_EVENT_SOURCING === "true" ||
-        process.env.ENABLE_EVENT_SOURCING?.toLowerCase() === "true",
-      ENABLE_CLICKHOUSE:
-        process.env.ENABLE_CLICKHOUSE === "true" ||
-        process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
       LANGWATCH_LICENSE_PRIVATE_KEY: process.env.LANGWATCH_LICENSE_PRIVATE_KEY,

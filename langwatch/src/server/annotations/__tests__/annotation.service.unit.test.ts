@@ -3,7 +3,6 @@ import type { AnnotationRepository } from "../annotation.repository";
 import type { AnnotationEsSync } from "../annotationEsSync";
 import { AnnotationService } from "../annotation.service";
 
-vi.mock("~/server/elasticsearch/isElasticSearchWriteDisabled");
 vi.mock("~/utils/logger/server", () => ({
   createLogger: () => ({
     info: vi.fn(),
@@ -208,23 +207,14 @@ describe("AnnotationService", () => {
   });
 
   describe("static create() factory", () => {
-    describe("when isElasticSearchWriteDisabled rejects", () => {
-      it("returns a working service instead of propagating the error", async () => {
-        const { isElasticSearchWriteDisabled } = await import(
-          "~/server/elasticsearch/isElasticSearchWriteDisabled"
-        );
-        vi.mocked(isElasticSearchWriteDisabled).mockRejectedValue(
-          new Error("DB connection failed"),
-        );
-
-        const mockPrisma = {} as any;
-        const service = await AnnotationService.create({
-          prisma: mockPrisma,
-          projectId: "proj-1",
-        });
-
-        expect(service).toBeInstanceOf(AnnotationService);
+    it("returns a working service with esSync set to null", async () => {
+      const mockPrisma = {} as any;
+      const service = await AnnotationService.create({
+        prisma: mockPrisma,
+        projectId: "proj-1",
       });
+
+      expect(service).toBeInstanceOf(AnnotationService);
     });
   });
 });

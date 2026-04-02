@@ -9,16 +9,13 @@ import { TraceService } from "../trace.service";
 // ---------------------------------------------------------------------------
 const {
   mockGetAllTracesForProjectCH,
-  mockIsClickHouseEnabled,
   mockGetAllTracesForProjectES,
 } = vi.hoisted(() => ({
   mockGetAllTracesForProjectCH: vi.fn(),
-  mockIsClickHouseEnabled: vi.fn(),
   mockGetAllTracesForProjectES: vi.fn(),
 }));
 
 const mockClickHouseInstance = {
-  isClickHouseEnabled: mockIsClickHouseEnabled,
   getAllTracesForProject: mockGetAllTracesForProjectCH,
 };
 
@@ -26,9 +23,7 @@ const mockElasticInstance = {
   getAllTracesForProject: mockGetAllTracesForProjectES,
 };
 
-const mockEvalInstance = {
-  isClickHouseEnabled: vi.fn().mockResolvedValue(false),
-};
+const mockEvalInstance = {};
 
 vi.mock("../clickhouse-trace.service", () => ({
   ClickHouseTraceService: Object.assign(vi.fn(), {
@@ -86,43 +81,47 @@ describe("TraceService", () => {
   });
 
   describe("getAllTracesForProject()", () => {
-    describe("when ClickHouse is enabled", () => {
-      beforeEach(() => {
-        mockIsClickHouseEnabled.mockResolvedValue(true);
+    it("passes options to the ClickHouse service", async () => {
+      const options = { includeSpans: true };
+      mockGetAllTracesForProjectCH.mockResolvedValue({
+        groups: [],
+        totalHits: 0,
+        traceChecks: {},
       });
 
-      it("passes options to the ClickHouse service", async () => {
-        const options = { includeSpans: true };
-        mockGetAllTracesForProjectCH.mockResolvedValue({
-          groups: [],
-          totalHits: 0,
-          traceChecks: {},
-        });
+      await service.getAllTracesForProject(input, protections, options);
 
-        await service.getAllTracesForProject(input, protections, options);
+      expect(mockGetAllTracesForProjectCH).toHaveBeenCalledWith(
+        input,
+        protections,
+        options,
+      );
+    });
 
-        expect(mockGetAllTracesForProjectCH).toHaveBeenCalledWith(
-          input,
-          protections,
-          options,
-        );
+    it("passes empty options when none provided", async () => {
+      mockGetAllTracesForProjectCH.mockResolvedValue({
+        groups: [],
+        totalHits: 0,
+        traceChecks: {},
       });
 
-      it("passes empty options when none provided", async () => {
-        mockGetAllTracesForProjectCH.mockResolvedValue({
-          groups: [],
-          totalHits: 0,
-          traceChecks: {},
-        });
+      await service.getAllTracesForProject(input, protections);
 
-        await service.getAllTracesForProject(input, protections);
+      expect(mockGetAllTracesForProjectCH).toHaveBeenCalledWith(
+        input,
+        protections,
+        {},
+      );
+    });
 
-        expect(mockGetAllTracesForProjectCH).toHaveBeenCalledWith(
-          input,
-          protections,
-          {},
-        );
-      });
+    it("throws when ClickHouse returns null", async () => {
+      mockGetAllTracesForProjectCH.mockResolvedValue(null);
+
+      await expect(
+        service.getAllTracesForProject(input, protections),
+      ).rejects.toThrow(
+        "ClickHouse is enabled but returned null for getAllTracesForProject",
+      );
     });
   });
 });

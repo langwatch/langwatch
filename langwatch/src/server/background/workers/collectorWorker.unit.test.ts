@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { asNonEmptyIO } from "./collectorWorker";
+import { describe, expect, it, vi } from "vitest";
+import { asNonEmptyIO, fetchExistingMD5s } from "./collectorWorker";
 
 describe("collectorWorker unit tests", () => {
   describe("asNonEmptyIO helper function", () => {
@@ -33,6 +33,19 @@ describe("collectorWorker unit tests", () => {
     it("should return the object as-is for string with only whitespace but non-empty after trim", () => {
       const input = { value: "  Hello  " };
       expect(asNonEmptyIO(input)).toBe(input);
+    });
+  });
+
+  describe("fetchExistingMD5s", () => {
+    describe("when ELASTICSEARCH_NODE_URL is unset", () => {
+      it("returns undefined without attempting ES query", async () => {
+        vi.mock("../../../env.mjs", () => ({
+          env: { ELASTICSEARCH_NODE_URL: undefined },
+        }));
+
+        const result = await fetchExistingMD5s("trace-123", "project-456");
+        expect(result).toBeUndefined();
+      });
     });
   });
 });
