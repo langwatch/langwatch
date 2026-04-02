@@ -30,6 +30,7 @@ import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
+import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
 import { subscriptionRouter } from "./routers/subscription";
@@ -92,6 +93,7 @@ const coreRouters = {
   suites: suiteRouter,
   role: roleRouter,
   prompts: promptsRouter,
+  promptTags: promptTagsRouter,
   savedViews: savedViewsRouter,
   sdkRadar: sdkRadarRouter,
   secrets: secretsRouter,

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
 import {
-  clearMonthCountCache,
   TraceUsageService,
 } from "../trace-usage.service";
 
@@ -55,7 +54,6 @@ describe("TraceUsageService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    clearMonthCountCache();
     // Default: no ClickHouse (ES path) — pass false so splitProjectsByFlag returns early
     mockIsClickHouseEnabled.mockReturnValue(false);
     mockGetClickHouseClientForProject.mockResolvedValue(null);

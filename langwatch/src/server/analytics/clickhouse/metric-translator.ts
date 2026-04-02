@@ -338,9 +338,15 @@ function translateMetadataMetric(
       };
 
     case "metadata.span_type":
-      // Requires JOIN with stored_spans
-      // Use the requested aggregation on TraceId to match ES behavior
-      requiredJoins.push("stored_spans");
+      // Cardinality aggregation translates to uniq(ts.TraceId) which only
+      // needs trace_summaries. Joining stored_spans would fan out rows and
+      // inflate trace-level SUM metrics (TotalCost, TotalTokens) when
+      // combined in the same query.
+      // Non-cardinality aggregations (e.g. groupBy) need the JOIN to access
+      // span-level SpanType data.
+      if (aggregation !== "cardinality") {
+        requiredJoins.push("stored_spans");
+      }
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.TraceId`,

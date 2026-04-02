@@ -13,6 +13,11 @@ import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import {
+  findPromptReferenceInAncestors,
+  flattenParamsToPromptAttributes,
+  type PromptLookupSpan,
+} from "../../server/traces/findPromptReferenceInAncestors";
 import type {
   ErrorCapture,
   EvaluationResult,
@@ -62,36 +67,40 @@ export function SpanDetails({
     return span.type === "llm" && !!span.span_id;
   }, [span]);
 
-  /** Extract prompt reference from span params, walking up parent spans if needed */
+  /** Extract prompt reference from span params, searching siblings and ancestors */
   const promptRef = useMemo(() => {
     // Check the span's own params first
-    const promptId = (span.params as Record<string, any>)?.langwatch?.prompt
-      ?.id as string | undefined;
+    const ownAttrs = flattenParamsToPromptAttributes(
+      span.params as Record<string, unknown> | null,
+    );
+    const promptId = ownAttrs["langwatch.prompt.id"];
     if (typeof promptId === "string" && promptId.includes(":")) {
       return promptId;
     }
 
-    // Walk up parent spans to find the prompt reference
+    // Search ancestors, siblings, and cousins using the shared function
     if (allSpans) {
-      const spanMap = new Map(allSpans.map((s) => [s.span_id, s]));
-      const visited = new Set<string>([span.span_id]);
-      let currentId: string | null | undefined = span.parent_id;
-      while (currentId) {
-        if (visited.has(currentId)) break;
-        visited.add(currentId);
-        const parent = spanMap.get(currentId);
-        if (!parent) break;
-        const parentPromptId = (parent.params as Record<string, any>)
-          ?.langwatch?.prompt?.id as string | undefined;
-        if (typeof parentPromptId === "string" && parentPromptId.includes(":")) {
-          return parentPromptId;
-        }
-        currentId = parent.parent_id;
+      const lookupSpans: PromptLookupSpan[] = allSpans.map((s) => ({
+        spanId: s.span_id,
+        parentSpanId: s.parent_id ?? null,
+        startTime: s.timestamps.started_at,
+        attributes: flattenParamsToPromptAttributes(
+          s.params as Record<string, unknown> | null,
+        ),
+      }));
+
+      const ref = findPromptReferenceInAncestors({
+        targetSpanId: span.span_id,
+        spans: lookupSpans,
+      });
+
+      if (ref?.promptHandle && ref.promptVersionNumber != null) {
+        return `${ref.promptHandle}:${ref.promptVersionNumber}`;
       }
     }
 
     return null;
-  }, [span.params, span.parent_id, allSpans]);
+  }, [span.params, span.span_id, span.parent_id, allSpans]);
 
   return (
     <VStack flexGrow={1} gap={3} align="start">

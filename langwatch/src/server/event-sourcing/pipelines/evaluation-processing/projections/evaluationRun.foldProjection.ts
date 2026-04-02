@@ -49,20 +49,17 @@ const evaluationRunEvents = [
  * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export class EvaluationRunFoldProjection
-  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents>
+  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents, "createdAt", "updatedAt">
   implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
 {
   readonly name = "evaluationRun";
   readonly version = EVALUATION_PROJECTION_VERSIONS.STATE;
   readonly store: FoldProjectionStore<EvaluationRunData>;
-  // TODO: normalize all state types to camelCase and push PascalCase conversion
-  // to the ClickHouse repository layer, then remove timestampStyle entirely
-  protected override readonly timestampStyle = "camel" as const;
 
   protected readonly events = evaluationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
-    super();
+    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
     this.store = deps.store;
   }
 

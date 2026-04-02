@@ -8,6 +8,22 @@ import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import type { SimulationRunService } from "../../simulations/simulation-run.service";
 
+const { mockRedisStore } = vi.hoisted(() => {
+  const mockRedisStore = new Map<string, string>();
+  return { mockRedisStore };
+});
+
+vi.mock("~/server/redis", () => {
+  const fakeRedis = {
+    get: vi.fn(async (key: string) => mockRedisStore.get(key) ?? null),
+    setex: vi.fn(async (_key: string, _ttl: number, value: string) => {
+      mockRedisStore.set(_key, value);
+    }),
+    del: vi.fn(async (key: string) => { mockRedisStore.delete(key); }),
+  };
+  return { isBuildOrNoRedis: false, connection: fakeRedis };
+});
+
 vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
@@ -66,6 +82,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRedisStore.clear();
     for (const key of Object.keys(mockEnv)) {
       delete mockEnv[key];
     }
@@ -199,10 +216,9 @@ describe("UsageService.checkScenarioSetLimit", () => {
     describe("when scenario set is already in cache", () => {
       it("allows without querying the database", async () => {
         // Pre-populate cache
-        const cachedSets = new Set(["my-set", "other-set"]);
-        (
-          service as unknown as { scenarioSetCache: TtlCache<Set<string>> }
-        ).scenarioSetCache.set("org-1", cachedSets);
+        await (
+          service as unknown as { scenarioSetCache: TtlCache<string[]> }
+        ).scenarioSetCache.set("org-1", ["my-set", "other-set"]);
 
         await service.checkScenarioSetLimit({
           organizationId: "org-1",
@@ -252,12 +268,12 @@ describe("UsageService.checkScenarioSetLimit", () => {
         });
 
         // Cache should now contain both sets
-        const cached = (
-          service as unknown as { scenarioSetCache: TtlCache<Set<string>> }
+        const cached = await (
+          service as unknown as { scenarioSetCache: TtlCache<string[]> }
         ).scenarioSetCache.get("org-1");
         expect(cached).toBeDefined();
-        expect(cached!.has("brand-new")).toBe(true);
-        expect(cached!.has("existing-set")).toBe(true);
+        expect(cached).toContain("brand-new");
+        expect(cached).toContain("existing-set");
       });
     });
   });

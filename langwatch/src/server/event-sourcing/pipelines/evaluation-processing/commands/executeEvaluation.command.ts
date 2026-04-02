@@ -304,4 +304,3 @@ function emitReported(
 
   return [event];
 }
-

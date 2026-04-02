@@ -28,6 +28,7 @@ const baseCHRow: ClickHouseEvaluationRunRow = {
   Label: "good",
   Details: "Looks correct",
   Error: null,
+  Inputs: null,
   ScheduledAt: "2024-01-15 10:30:00.000",
   StartedAt: "2024-01-15 10:30:01.000",
   CompletedAt: "2024-01-15 10:30:02.000",

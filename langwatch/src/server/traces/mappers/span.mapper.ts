@@ -5,11 +5,7 @@ import type {
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   BaseSpan,
   ChatMessage,
@@ -259,44 +255,6 @@ function extractOutput(
   return null;
 }
 
-/**
- * Computes per-span cost using the same priority as the fold projection:
- * 1. Custom cost rates from attributes
- * 2. Static model registry lookup
- * 3. SDK-provided cost fallback
- */
-function computeSpanCost({
-  spanAttributes,
-  promptTokens,
-  completionTokens,
-}: {
-  spanAttributes: NormalizedAttributes;
-  promptTokens: number | null;
-  completionTokens: number | null;
-}): number | null {
-  // Priority 1: Custom cost rates
-  const inputRate = coerceToNumber(spanAttributes["langwatch.model.inputCostPerToken"]);
-  const outputRate = coerceToNumber(spanAttributes["langwatch.model.outputCostPerToken"]);
-  if (inputRate !== null || outputRate !== null) {
-    return (promptTokens ?? 0) * (inputRate ?? 0) + (completionTokens ?? 0) * (outputRate ?? 0);
-  }
-
-  // Priority 2: Static model registry
-  const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
-  if (typeof model === "string" && ((promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0)) {
-    const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
-    if (matched) {
-      const computed = estimateCost({ llmModelCost: matched, inputTokens: promptTokens ?? 0, outputTokens: completionTokens ?? 0 });
-      if (computed !== undefined && computed > 0) return computed;
-    }
-  }
-
-  // Priority 3: SDK-provided cost fallback
-  const sdkCost = coerceToNumber(spanAttributes["langwatch.span.cost"]);
-  if (sdkCost !== null && sdkCost > 0) return sdkCost;
-
-  return null;
-}
 
 /**
  * Extracts metrics from canonical span attributes only.
@@ -330,7 +288,8 @@ function extractMetrics(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 
-  const cost = computeSpanCost({ spanAttributes, promptTokens, completionTokens });
+  const rawCost = computeSpanCost({ attrs: spanAttributes, promptTokens, completionTokens });
+  const cost = rawCost > 0 ? rawCost : null;
 
   if (
     promptTokens === null &&

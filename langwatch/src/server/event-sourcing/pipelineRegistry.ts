@@ -128,11 +128,11 @@ export interface PipelineRegistryDeps {
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
-  private cachedFoldStore<State>(
+  private cached<State>(
     inner: FoldProjectionStore<State>,
     keyPrefix: string,
-  ): RedisCachedFoldStore<State> {
-    return new RedisCachedFoldStore<State>(inner, this.deps.redis as any, {
+  ): FoldProjectionStore<State> {
+    return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
       keyPrefix,
     });
   }
@@ -191,7 +191,7 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const traceSummaryStore = this.cachedFoldStore<TraceSummaryData>(
+    const traceSummaryStore = this.cached<TraceSummaryData>(
       new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
       "trace_summaries",
     );
@@ -338,17 +338,15 @@ export class PipelineRegistry {
   }
 
   private registerSuiteRunPipeline() {
-    const suiteRunStore = this.cachedFoldStore<SuiteRunStateData>(
-      new RepositoryFoldStore<SuiteRunStateData>(
-        this.deps.repositories.suiteRunState,
-        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-      ),
-      "suite_runs",
-    );
-
     return this.deps.eventSourcing.register(
       createSuiteRunProcessingPipeline({
-        suiteRunStateFoldStore: suiteRunStore,
+        suiteRunStateFoldStore: this.cached<SuiteRunStateData>(
+          new RepositoryFoldStore<SuiteRunStateData>(
+            this.deps.repositories.suiteRunState,
+            SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+          ),
+          "suite_runs",
+        ),
       }),
     );
   }
@@ -358,7 +356,7 @@ export class PipelineRegistry {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
     wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
   }) {
-    const simulationRunStore = this.cachedFoldStore<SimulationRunStateData>(
+    const simulationRunStore = this.cached<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
         this.deps.repositories.simulationRunState,
         SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
@@ -493,7 +491,7 @@ export class PipelineRegistry {
   }
 
   private registerExperimentRunPipeline() {
-    const experimentRunStore = this.cachedFoldStore<ExperimentRunStateData>(
+    const experimentRunStore = this.cached<ExperimentRunStateData>(
       createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
       "experiment_runs",
     );

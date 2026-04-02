@@ -45,8 +45,13 @@ const EXEMPT_MODELS = [
    */
   "ScimToken",
   /**
+   * Custom prompt tag definitions are organization-level, not project-level.
+   * They are scoped by organizationId.
+   */
+  "PromptTag",
+  /**
    * SCIM group mappings and memberships are organization-level,
-   * linking IdP groups to LangWatch teams
+   * linking IdP groups to LangWatch teams.
    */
   "ScimGroupMapping",
   "ScimGroupMembership",

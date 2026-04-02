@@ -100,3 +100,25 @@ make down             # Stop all
 
 **Performance optimization:**
 The `pnpm_store` named volume persists downloaded packages across container restarts and is shared across all worktrees (`name: langwatch-pnpm-store`). After first install, subsequent `pnpm install` runs are significantly faster.
+
+## Amendment: Worktree Isolation (2026-03)
+
+### Context
+
+The original design used `VOLUME_PREFIX` for volume naming but `scripts/dev.sh` did not set it when running from worktrees, causing container and volume collisions between parallel worktrees.
+
+### Changes
+
+1. **Auto-detect worktree name** — `dev.sh` detects the git worktree directory name and sets `COMPOSE_PROJECT_NAME` and `VOLUME_PREFIX` for container and volume isolation.
+2. **Idempotent init** — The init container hashes `pnpm-lock.yaml` and skips `pnpm install` when unchanged, reducing restart time.
+3. **DRY environment variables** — Shared env vars extracted to `x-common-env` YAML anchor.
+4. **Port scan fix** — BULLBOARD_PORT scan starts at 6380 (matching container port) instead of 3000.
+
+### Decision: Named Volumes over Bind Mounts
+
+We considered switching node_modules to bind mounts for automatic per-worktree isolation. This was rejected because:
+- macOS VirtioFS performance degrades with 50K+ small files in node_modules
+- pnpm hard-links from store to node_modules break across filesystem boundaries (named volume is ext4, bind mount is macOS APFS)
+- Collapses the host/container node_modules separation (Linux ELF binaries would appear on host, breaking IDE tooling)
+
+Instead, we use per-worktree named volumes via `VOLUME_PREFIX`, which gives the same isolation without these downsides.

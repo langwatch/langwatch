@@ -2,6 +2,15 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { createLogger } from "~/utils/logger/server";
+import {
+  incrementEsFoldProjectionTotal,
+  observeEsFoldProjectionDuration,
+  incrementEsMapProjectionTotal,
+  observeEsMapProjectionDuration,
+  incrementEsReactorTotal,
+  observeEsReactorDuration,
+  withMetrics,
+} from "~/server/metrics";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
@@ -197,7 +206,11 @@ export class ProjectionRouter<
             { reactorName },
           );
         }
-        await reactorDef.handler.handle(payload);
+        await withMetrics({
+          fn: () => reactorDef.handler.handle(payload),
+          onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactorName, "completed"); observeEsReactorDuration(this.pipelineName, reactorName, ms); },
+          onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactorName, "failed"); observeEsReactorDuration(this.pipelineName, reactorName, ms); },
+        });
       },
     );
   }
@@ -266,7 +279,11 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             };
-            const record = await this.mapExecutor.execute(mapProj, event, context);
+            const record = await withMetrics({
+              fn: () => this.mapExecutor.execute(mapProj, event, context),
+              onComplete: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "completed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
+              onFail: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "failed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
+            });
 
             // Dispatch to map reactors after map execute succeeds
             const mapReactors = this.reactorsForMap.get(name);
@@ -503,7 +520,11 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             };
-            const record = await this.mapExecutor.execute(mapProj, event, storeContext);
+            const record = await withMetrics({
+              fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
+              onComplete: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "completed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
+              onFail: (ms) => { incrementEsMapProjectionTotal(this.pipelineName, name, "failed"); observeEsMapProjectionDuration(this.pipelineName, name, ms); },
+            });
 
             // Dispatch to map reactors after map execute succeeds
             const mapReactors = this.reactorsForMap.get(name);
@@ -571,7 +592,11 @@ export class ProjectionRouter<
           key,
         };
 
-        const foldState = await this.foldExecutor.execute(fold, event, storeContext);
+        const foldState = await withMetrics({
+          fn: () => this.foldExecutor.execute(fold, event, storeContext),
+          onComplete: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "completed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
+          onFail: (ms) => { incrementEsFoldProjectionTotal(this.pipelineName, projectionName, "failed"); observeEsFoldProjectionDuration(this.pipelineName, projectionName, ms); },
+        });
 
         // After fold succeeds, dispatch to reactors for this fold
         const reactors = this.reactorsForFold.get(projectionName);
@@ -627,10 +652,14 @@ export class ProjectionRouter<
             "Reactor queue not found, falling back to inline execution",
           );
           try {
-            await reactor.handle(event, {
-              tenantId: event.tenantId,
-              aggregateId: String(event.aggregateId),
-              foldState,
+            await withMetrics({
+              fn: () => reactor.handle(event, {
+                tenantId: event.tenantId,
+                aggregateId: String(event.aggregateId),
+                foldState,
+              }),
+              onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
+              onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
             });
           } catch (error) {
             this.logger.error(
@@ -651,10 +680,14 @@ export class ProjectionRouter<
       } else {
         // Inline mode: call reactor directly
         try {
-          await reactor.handle(event, {
-            tenantId: event.tenantId,
-            aggregateId: String(event.aggregateId),
-            foldState,
+          await withMetrics({
+            fn: () => reactor.handle(event, {
+              tenantId: event.tenantId,
+              aggregateId: String(event.aggregateId),
+              foldState,
+            }),
+            onComplete: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "completed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
+            onFail: (ms) => { incrementEsReactorTotal(this.pipelineName, reactor.name, "failed"); observeEsReactorDuration(this.pipelineName, reactor.name, ms); },
           });
         } catch (error) {
           this.logger.error(

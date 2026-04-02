@@ -360,29 +360,32 @@ export const batchPresidioClearPII = async (
     remaining: t.slice(250_000),
   }));
 
-  const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: truncated.map((t) => ({ input: t.input })),
-        settings: {
-          entities: Object.fromEntries(
-            (piiRedactionLevel === "ESSENTIAL"
-              ? essentialInfoTypes
-              : strictInfoTypes
-            ).presidio.map((name) => [name.toLowerCase(), true]),
-          ),
-          min_threshold: 0.5,
-        },
-        env: {},
-      }),
-      signal: controller.signal,
-    },
-  );
-
-  clearTimeout(timeoutId);
+  let response: Response;
+  try {
+    response = await fetch(
+      `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: truncated.map((t) => ({ input: t.input })),
+          settings: {
+            entities: Object.fromEntries(
+              (piiRedactionLevel === "ESSENTIAL"
+                ? essentialInfoTypes
+                : strictInfoTypes
+              ).presidio.map((name) => [name.toLowerCase(), true]),
+            ),
+            min_threshold: 0.5,
+          },
+          env: {},
+        }),
+        signal: controller.signal,
+      },
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const duration = performance.now() - startTime;
   evaluationDurationHistogram

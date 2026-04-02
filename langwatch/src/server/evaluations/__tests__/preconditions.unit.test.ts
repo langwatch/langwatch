@@ -32,7 +32,7 @@ function makeTraceData(
     spanTypes: undefined,
     spanModels: undefined,
     customMetadata: undefined,
-    hasAnnotation: undefined,
+    annotationIds: undefined,
     ...overrides,
   };
 }
@@ -1080,9 +1080,9 @@ describe("evaluatePreconditions()", () => {
       },
     ];
 
-    describe("when trace has hasAnnotation = true", () => {
+    describe("when trace has annotations", () => {
       it("passes the precondition", () => {
-        const traceData = makeTraceData({ hasAnnotation: true });
+        const traceData = makeTraceData({ annotationIds: ["ann-1"] });
         expect(
           evaluatePreconditions({
             traceData,
@@ -1092,9 +1092,9 @@ describe("evaluatePreconditions()", () => {
       });
     });
 
-    describe("when trace has hasAnnotation = false", () => {
+    describe("when trace has no annotations", () => {
       it("fails the precondition", () => {
-        const traceData = makeTraceData({ hasAnnotation: false });
+        const traceData = makeTraceData({ annotationIds: [] });
         expect(
           evaluatePreconditions({
             traceData,
@@ -1104,9 +1104,9 @@ describe("evaluatePreconditions()", () => {
       });
     });
 
-    describe("when trace has hasAnnotation = null", () => {
+    describe("when trace annotationIds is undefined", () => {
       it("fails the precondition", () => {
-        const traceData = makeTraceData({ hasAnnotation: null });
+        const traceData = makeTraceData({ annotationIds: undefined });
         expect(
           evaluatePreconditions({
             traceData,

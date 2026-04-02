@@ -28,7 +28,6 @@ import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { isElasticSearchWriteDisabled } from "../../elasticsearch/isElasticSearchWriteDisabled";
 import {
-  collectorIndexDelayHistogram,
   recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
@@ -475,11 +474,6 @@ const processCollectorJob_ = async (
       { projectId: project.id, traceId },
       "Skipping ES trace write — disableElasticSearchTraceWriting is enabled",
     );
-  }
-
-  if (!existingTrace?.inserted_at) {
-    const delay = Date.now() - data.collectedAt;
-    collectorIndexDelayHistogram.observe(delay);
   }
 
   void markProjectFirstMessage(project, trace.metadata);

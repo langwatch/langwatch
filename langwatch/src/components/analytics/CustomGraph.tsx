@@ -441,6 +441,7 @@ const CustomGraph_ = React.memo(
               .replace("Evaluation passed failed", "Evaluation Failed")
               .replace("Contains error", "Traces")
               .replace(/^Evaluation label /i, "")
+              .replace(/^Thumbs up\/down /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -503,6 +504,9 @@ const CustomGraph_ = React.memo(
     const valueFormats = Array.from(
       new Set(
         input.series.map((series) => {
+          if (series.aggregation === "cardinality") {
+            return "0a";
+          }
           const metric = getMetric(series.metric);
           return metric?.format ?? "0a";
         }),
@@ -543,8 +547,10 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
+      const effectiveFormat =
+        series?.aggregation === "cardinality" ? "0a" : metric?.format;
 
-      return formatWith(metric?.format, value as number);
+      return formatWith(effectiveFormat, value as number);
     };
 
     const container = (child: React.ReactNode) => {
@@ -593,7 +599,7 @@ const CustomGraph_ = React.memo(
                   </Badge>
                 </button>
               )}
-              {allEmpty ? (
+              {allEmpty && input.graphType !== "monitor_graph" ? (
                 <Box
                   position="absolute"
                   top="50%"
@@ -1148,10 +1154,15 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
+      // Count aggregations should use integer format regardless of metric's default
+      const isCardinalitySeries = series?.aggregation === "cardinality";
+      const formatOverride =
+        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
+
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric,
+        metric: formatOverride,
         value: totalValue,
       };
     });
@@ -1296,6 +1307,7 @@ function MonitorGraph({
     : currentAndPreviousData
       ?.map((entry) => entry[firstKey]!)
       .filter((x) => x !== undefined && x !== null);
+  const hasData = allValues !== undefined && allValues.length > 0;
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -1307,7 +1319,7 @@ function MonitorGraph({
   // TODO: allow user to define the thresholds instead of hardcoded amounts
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
-    : average > 0.8 || !hasLoaded
+    : !hasData || average > 0.8 || !hasLoaded
       ? "greenTones"
       : average < 0.4
         ? "redTones"
@@ -1376,7 +1388,11 @@ function MonitorGraph({
         <HStack gap={2}>
           <Text fontSize="2xl" fontWeight="bold">
             {hasLoaded ? (
-              numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              hasData ? (
+                numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              ) : (
+                "-"
+              )
             ) : (
               <Skeleton
                 width="56px"
@@ -1386,7 +1402,11 @@ function MonitorGraph({
             )}
           </Text>
           <Text fontSize="xs">
-            {isPassRate ? "Pass Rate" : "Average Score"}
+            {hasData
+              ? isPassRate
+                ? "Pass Rate"
+                : "Average Score"
+              : "No data yet"}
           </Text>
         </HStack>
         <Text fontSize="xs">

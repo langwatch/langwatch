@@ -54,6 +54,10 @@ import {
 } from "../../metrics";
 import { connection } from "../../redis";
 import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../../evaluations/threadMappingResolver";
+import {
   type MappingState,
   mapTraceToDatasetEntry,
   SERVER_ONLY_THREAD_SOURCES,
@@ -113,19 +117,6 @@ export async function runEvaluationJob(
     workflowId,
   });
 }
-
-/**
- * Check if any mapping has type "thread"
- * Single Responsibility: Detect if thread-based mappings are present
- */
-const hasThreadMappings = (mappingState: MappingState | null): boolean => {
-  if (!mappingState) {
-    return false;
-  }
-  return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread",
-  );
-};
 
 /**
  * Build thread-based data for evaluation
@@ -385,6 +376,22 @@ const buildDataForEvaluation = async (
     }
 
     data = mappedData;
+
+    // Resolve any thread-typed mappings mixed into trace-level evaluations
+    if (mappings && hasThreadMappings(mappings)) {
+      await resolveThreadMappingsIntoData({
+        data: data as Record<string, unknown>,
+        trace,
+        mappings,
+        getThreadTraces: (threadId) =>
+          getTracesGroupedByThreadId({
+            connConfig: { projectId },
+            threadId,
+            protections,
+            includeSpans: true,
+          }),
+      });
+    }
   }
 
   // Workflow evaluators and custom evaluators pass data through as-is

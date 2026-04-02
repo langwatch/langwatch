@@ -1,5 +1,12 @@
+import { performance } from "node:perf_hooks";
 import type { Redis } from "ioredis";
 import { createLogger } from "~/utils/logger/server";
+import {
+  incrementEsFoldCacheTotal,
+  observeEsFoldCacheGetDuration,
+  observeEsFoldCacheStoreDuration,
+  incrementEsFoldCacheRedisError,
+} from "~/server/metrics";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
@@ -39,13 +46,35 @@ export class RedisCachedFoldStore<State>
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<State | null> {
-    const key = this.redisKey(aggregateId);
-    const cached = await this.redis.get(key);
+    const key = this.redisKey(aggregateId, context);
+    const getStartTime = performance.now();
+    let cached: string | null;
+    try {
+      cached = await this.redis.get(key);
+    } catch (_error) {
+      incrementEsFoldCacheRedisError(this.keyPrefix, "get");
+      incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
+      // Fall through to inner store
+      const innerStartTime = performance.now();
+      const result = await this.inner.get(aggregateId, context);
+      const innerDurationMs = performance.now() - innerStartTime;
+      observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", innerDurationMs);
+      return result;
+    }
+
     if (cached !== null) {
+      const getDurationMs = performance.now() - getStartTime;
+      incrementEsFoldCacheTotal(this.keyPrefix, "hit");
+      observeEsFoldCacheGetDuration(this.keyPrefix, "redis", getDurationMs);
       return JSON.parse(cached) as State;
     }
 
-    return this.inner.get(aggregateId, context);
+    incrementEsFoldCacheTotal(this.keyPrefix, "miss");
+    const innerStartTime = performance.now();
+    const result = await this.inner.get(aggregateId, context);
+    const innerDurationMs = performance.now() - innerStartTime;
+    observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", innerDurationMs);
+    return result;
   }
 
   async store(
@@ -53,23 +82,28 @@ export class RedisCachedFoldStore<State>
     context: ProjectionStoreContext,
   ): Promise<void> {
     const aggregateId = context.key ?? context.aggregateId;
+    const storeStartTime = performance.now();
 
     // 1. ClickHouse first — throws on failure, event retried by queue
     await this.inner.store(state, context);
 
     // 2. Redis second — cache for fast reads on next fold step
     try {
-      const key = this.redisKey(aggregateId);
+      const key = this.redisKey(aggregateId, context);
       await this.redis.set(key, JSON.stringify(state), "EX", this.ttlSeconds);
     } catch (error) {
+      incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(
         { aggregateId, error: String(error) },
         "Redis SET failed after CH write — next read will fall back to CH",
       );
     }
+
+    const storeDurationMs = performance.now() - storeStartTime;
+    observeEsFoldCacheStoreDuration(this.keyPrefix, storeDurationMs);
   }
 
-  private redisKey(aggregateId: string): string {
-    return `fold:${this.keyPrefix}:${aggregateId}`;
+  private redisKey(aggregateId: string, context: ProjectionStoreContext): string {
+    return `fold:${this.keyPrefix}:${String(context.tenantId)}:${aggregateId}`;
   }
 }

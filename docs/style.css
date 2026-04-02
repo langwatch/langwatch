@@ -233,3 +233,207 @@ code {
 .dark .lw-inline-copy-btn:hover {
   color: #d1d5db;
 }
+
+/* ── InfoBox (bug-free <Info> replacement) ── */
+.lw-info-box {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+  margin-bottom: 16px;
+  margin-top: 32px;
+}
+.lw-info-box-icon {
+  flex-shrink: 0;
+  color: #6b7280;
+  margin-top: 6px;
+}
+.lw-info-box-content {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+.lw-info-box-content p { margin: 0 0 8px; }
+.lw-info-box-content p:last-child { margin-bottom: 0; }
+.lw-info-box-content pre {
+  margin: 8px 0 0 !important;
+}
+.lw-info-box-content [data-component-part="code-block-root"] {
+  padding-top: 6px !important;
+}
+.lw-info-box-content .code-block {
+  margin-bottom: 0 !important;
+}
+
+.dark .lw-info-box {
+  border-color: #374151;
+  background: rgba(255, 255, 255, 0.03);
+}
+.dark .lw-info-box-icon { color: #9ca3af; }
+
+/* ── Skill Accordion ── */
+.lw-accordion {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+/* highlighted is intentionally unstyled — star prefix handles emphasis */
+
+/* Header / summary */
+.lw-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  list-style: none;
+}
+.lw-accordion-header::-webkit-details-marker { display: none; }
+.lw-accordion-header:hover { background: #f9fafb; }
+
+.lw-accordion-title { font-size: 14px; }
+
+.lw-accordion-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+  color: #9ca3af;
+}
+.lw-accordion[open] .lw-accordion-chevron { transform: rotate(180deg); }
+
+/* Body */
+.lw-accordion-body {
+  padding: 0 16px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Install + Usage command row */
+.lw-accordion-commands {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+.lw-accordion-cmd-col {
+  flex: 1;
+  min-width: 0;
+}
+.lw-accordion-cmd-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+.lw-accordion-cmd-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.lw-accordion-cmd-box:hover { border-color: #d1d5db; }
+.lw-accordion-cmd-box code {
+  font-size: 13px;
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* Slash command color */
+.lw-slash-command {
+  color: #e17100;
+  font-weight: 600;
+}
+
+/* Copied state for command boxes */
+.lw-accordion-cmd-box[data-copied] { border-color: #059669; background: #ecfdf5; }
+.lw-accordion-cmd-box[data-copied] .lw-copy-line-icon { display: none !important; }
+.lw-accordion-cmd-box[data-copied] .lw-copy-line-check { display: inline-flex !important; }
+
+/* Action buttons */
+.lw-accordion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.lw-accordion-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s;
+  text-align: left;
+}
+.lw-accordion-action:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+.lw-accordion-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+.lw-accordion-action-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.lw-accordion-action-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.lw-accordion-action-subtitle {
+  font-size: 11px;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+/* Copied state for action buttons */
+.lw-accordion-action[data-copied] {
+  background: #ecfdf5;
+  border-color: #059669;
+}
+.lw-accordion-action[data-copied] .lw-copy-line-icon { display: none !important; }
+.lw-accordion-action[data-copied] .lw-copy-line-check { display: flex !important; }
+
+/* Dark mode — accordion */
+.dark .lw-accordion { border-color: #374151; }
+.dark .lw-accordion-header:hover { background: rgba(255, 255, 255, 0.03); }
+.dark .lw-accordion-body { border-top-color: #374151; }
+.dark .lw-accordion-cmd-box { background: rgba(255, 255, 255, 0.05); border-color: #374151; }
+.dark .lw-accordion-cmd-box:hover { border-color: #6b7280; }
+.dark .lw-accordion-cmd-box[data-copied] { background: rgba(5, 150, 105, 0.15); border-color: rgba(5, 150, 105, 0.4); }
+.dark .lw-accordion-action { border-color: #374151; }
+.dark .lw-accordion-action-icon { border-color: #374151; }
+.dark .lw-accordion-action:hover { background: rgba(255, 255, 255, 0.03); border-color: #6b7280; }
+.dark .lw-accordion-action[data-copied] { background: rgba(5, 150, 105, 0.15); border-color: rgba(5, 150, 105, 0.4); }
+.dark .lw-accordion-chevron { color: #6b7280; }
+.dark .lw-slash-command { color: #fe9a00; }

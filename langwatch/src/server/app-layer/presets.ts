@@ -24,6 +24,7 @@ import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
@@ -145,7 +146,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
 
   const organizations = traced(
-    new OrganizationService(new PrismaOrganizationRepository(prisma)),
+    new OrganizationService(
+      new PrismaOrganizationRepository(prisma),
+      new PromptTagRepository(prisma),
+    ),
     "OrganizationService",
   );
   const projects = traced(
@@ -420,7 +424,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   };
 
   const nullOrganizations = traced(
-    new OrganizationService(new NullOrganizationRepository()),
+    new OrganizationService(
+      new NullOrganizationRepository(),
+      { seedForOrg: async () => { } } as unknown as PromptTagRepository,
+    ),
     "OrganizationService",
   );
   const nullProjects = traced(
@@ -483,7 +490,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop } satisfies AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,

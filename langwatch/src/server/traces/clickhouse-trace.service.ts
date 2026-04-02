@@ -588,8 +588,13 @@ export class ClickHouseTraceService {
                 FROM evaluation_runs
                 WHERE TenantId = {tenantId:String}
                   AND TraceId IN ({traceIds:Array(String)})
-                ORDER BY EvaluationId, UpdatedAt DESC
-                LIMIT 1 BY TenantId, EvaluationId
+                  AND (TenantId, EvaluationId, UpdatedAt) IN (
+                    SELECT TenantId, EvaluationId, max(UpdatedAt)
+                    FROM evaluation_runs
+                    WHERE TenantId = {tenantId:String}
+                      AND TraceId IN ({traceIds:Array(String)})
+                    GROUP BY TenantId, EvaluationId
+                  )
               `,
               query_params: {
                 tenantId: input.projectId,
@@ -909,8 +914,8 @@ export class ClickHouseTraceService {
                 ParentSpanId,
                 SpanName,
                 SpanAttributes,
-                StartTime,
-                EndTime,
+                toUnixTimestamp64Milli(StartTime) AS StartTime,
+                toUnixTimestamp64Milli(EndTime) AS EndTime,
                 DurationMs,
                 StatusCode,
                 StatusMessage
@@ -964,7 +969,8 @@ export class ClickHouseTraceService {
           );
 
           // If the LLM span itself doesn't have a prompt reference,
-          // walk up ancestor spans to find it (SDK sets it on the parent span)
+          // search ancestors and their siblings to find it (SDK sets it on
+          // sibling spans like Prompt.compile or PromptApiService.get)
           if (!result.promptHandle) {
             const ancestorSpans = allRows.map((r) => {
               const attributes: Record<string, unknown> = {};
@@ -983,6 +989,7 @@ export class ClickHouseTraceService {
               return {
                 spanId: r.SpanId,
                 parentSpanId: r.ParentSpanId ?? null,
+                startTime: r.StartTime,
                 attributes,
               };
             });
@@ -994,6 +1001,7 @@ export class ClickHouseTraceService {
             if (ancestorRef?.promptHandle) {
               result.promptHandle = ancestorRef.promptHandle;
               result.promptVersionNumber = ancestorRef.promptVersionNumber;
+              result.promptLabel = ancestorRef.promptLabel;
               result.promptVariables = ancestorRef.promptVariables;
             }
           }
@@ -1165,6 +1173,7 @@ export class ClickHouseTraceService {
           : null,
       promptHandle: promptRef.promptHandle,
       promptVersionNumber: promptRef.promptVersionNumber,
+      promptLabel: promptRef.promptLabel,
       promptVariables: promptRef.promptVariables,
     };
   }
@@ -1407,6 +1416,7 @@ export class ClickHouseTraceService {
                 ts.TopicId AS ts_TopicId,
                 ts.SubTopicId AS ts_SubTopicId,
                 ts.HasAnnotation AS ts_HasAnnotation,
+                ts.AnnotationIds AS ts_AnnotationIds,
                 ts.ComputedInput AS ts_ComputedInput,
                 ts.ComputedOutput AS ts_ComputedOutput,
                 ts.Attributes AS ts_Attributes,
@@ -1504,7 +1514,7 @@ export class ClickHouseTraceService {
       blockedByGuardrail: false,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
-      hasAnnotation: row.ts_HasAnnotation,
+      annotationIds: row.ts_AnnotationIds ?? [],
       attributes: row.ts_Attributes,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
@@ -1629,6 +1639,7 @@ export class ClickHouseTraceService {
           TopicId AS ts_TopicId,
           SubTopicId AS ts_SubTopicId,
           HasAnnotation AS ts_HasAnnotation,
+          AnnotationIds AS ts_AnnotationIds,
           Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
@@ -1783,7 +1794,7 @@ export class ClickHouseTraceService {
       blockedByGuardrail: false,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
-      hasAnnotation: row.ts_HasAnnotation,
+      annotationIds: row.ts_AnnotationIds ?? [],
       attributes: row.ts_Attributes,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
@@ -1996,6 +2007,7 @@ interface TraceSummaryRow {
   ts_TopicId: string | null;
   ts_SubTopicId: string | null;
   ts_HasAnnotation: boolean | null;
+  ts_AnnotationIds: string[];
   ts_Attributes: Record<string, string>;
   ts_OccurredAt: number;
   ts_CreatedAt: number;

@@ -74,7 +74,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           "feature.flag.project_id": options?.projectId ?? "",
           "feature.flag.organization_id": options?.organizationId ?? "",
           "tenant.id": options?.projectId ?? "",
-          "cache.redis_available": this.cache.isRedisAvailable(),
+          "cache.backend": "redis",
         },
       },
       async (span) => {
@@ -90,11 +90,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         // Check hybrid cache first
         const cachedResult = await this.cache.get(cacheKey);
         if (cachedResult !== undefined) {
-          const cacheType = this.cache.isRedisAvailable() ? "redis" : "memory";
-          span.setAttribute(
-            "feature.flag.source",
-            `posthog-cached-${cacheType}`,
-          );
+          span.setAttribute("feature.flag.source", "posthog-cached");
           span.setAttribute("feature.flag.enabled", cachedResult.value);
           return cachedResult.value;
         }
@@ -155,24 +151,10 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   }
 
   /**
-   * Clear the hybrid cache (both Redis and memory).
-   */
-  async clearCache(): Promise<void> {
-    await this.cache.clear();
-    this.logger.debug("Cleared hybrid feature flag cache");
-  }
-
-  /**
    * Check if PostHog is available.
    */
   isAvailable(): boolean {
     return this.posthog !== null;
   }
 
-  /**
-   * Check if Redis is available (false means using memory cache).
-   */
-  isRedisAvailable(): boolean {
-    return this.cache.isRedisAvailable();
-  }
 }

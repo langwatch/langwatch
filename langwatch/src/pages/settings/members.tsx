@@ -35,7 +35,7 @@ import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
-} from "../../server/api/routers/organization";
+} from "../../server/app-layer/organizations/repositories/organization.repository";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 

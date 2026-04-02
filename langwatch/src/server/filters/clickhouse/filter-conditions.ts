@@ -129,11 +129,7 @@ export const clickHouseFilterConditions: Record<
     const hasFalse = values.includes("false");
     if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
     if (hasTrue) return { sql: "ts.HasAnnotation = true", params: {} };
-    if (hasFalse)
-      return {
-        sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)",
-        params: {},
-      };
+    if (hasFalse) return { sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)", params: {} };
     return { sql: "1=0", params: {} };
   },
 

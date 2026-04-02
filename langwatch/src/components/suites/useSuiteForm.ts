@@ -52,6 +52,7 @@ interface Scenario {
 interface Agent {
   id: string;
   name: string;
+  type: string;
 }
 
 interface Prompt {
@@ -121,6 +122,7 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
+        if (agent.type !== "http") continue;
         result.push({ name: agent.name, type: "http", referenceId: agent.id });
       }
     }

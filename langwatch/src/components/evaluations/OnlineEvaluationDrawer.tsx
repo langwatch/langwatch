@@ -55,9 +55,10 @@ import {
 } from "~/components/preconditions/preconditionFieldUtils";
 import {
   type MappingState,
-  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
+import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
+import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -507,33 +508,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       // Load existing mappings
       const existingMappings = monitorQuery.data
         .mappings as MappingState | null;
-      const uiMappings: Record<string, UIFieldMapping> = {};
       if (existingMappings?.mapping) {
-        for (const [field, mapping] of Object.entries(
-          existingMappings.mapping,
-        )) {
-          if (mapping.source) {
-            const pathParts: string[] = [mapping.source as string];
-            if ("type" in mapping && mapping.type === "thread") {
-              // Thread mappings use selectedFields instead of key/subkey
-              if (
-                "selectedFields" in mapping &&
-                mapping.selectedFields?.length
-              ) {
-                pathParts.push(...mapping.selectedFields);
-              }
-            } else {
-              if ("key" in mapping && mapping.key) pathParts.push(mapping.key);
-              if ("subkey" in mapping && mapping.subkey)
-                pathParts.push(mapping.subkey);
-            }
-            uiMappings[field] = {
-              type: "source",
-              sourceId: monitorLevel === "trace" ? "trace" : "thread",
-              path: pathParts,
-            };
-          }
-        }
+        const uiMappings = deserializeMappingStateToUI(
+          existingMappings,
+          monitorLevel as "trace" | "thread",
+        );
         setMappings(uiMappings);
       }
 
@@ -979,35 +958,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format
-    const mappingState: MappingState = {
-      mapping: {},
-      expansions: [],
-    };
-    for (const [field, mapping] of Object.entries(mappings)) {
-      if (mapping.type === "source" && mapping.path.length > 0) {
-        const parts = mapping.path;
-        const source = parts[0]!;
-
-        // Check if this is a thread-level mapping source (e.g., "traces", "thread_id")
-        if (source in THREAD_MAPPINGS) {
-          // For "traces" with sub-paths like "traces.input", "traces.output",
-          // convert to selectedFields format
-          const selectedFields =
-            parts.length > 1 ? parts.slice(1) : undefined;
-          mappingState.mapping[field] = {
-            type: "thread" as const,
-            source: source as keyof typeof THREAD_MAPPINGS,
-            selectedFields,
-          };
-        } else {
-          mappingState.mapping[field] = {
-            source: source as keyof typeof TRACE_MAPPINGS,
-            key: parts[1],
-            subkey: parts[2],
-          };
-        }
-      }
-    }
+    const mappingState = serializeMappingsToMappingState(mappings);
 
     if (monitorId) {
       // Update existing monitor

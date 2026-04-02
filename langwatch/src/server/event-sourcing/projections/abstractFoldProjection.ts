@@ -86,31 +86,30 @@ export type FoldEventHandlers<
  *
  * **Timestamp management:**
  * - `initState()` returns state WITHOUT timestamp fields (type-enforced)
- * - `init()` adds timestamps automatically (PascalCase by default)
+ * - `init()` adds timestamps automatically
  * - `apply()` auto-sets monotonic updatedAt: `Math.max(Date.now(), prev + 1)`
- * - For camelCase: override `timestampStyle` to `"camel"`
+ *
+ * For camelCase timestamps, pass `'createdAt'` and `'updatedAt'` as CK/UK.
  */
 export abstract class AbstractFoldProjection<
-  State,
+  State extends Record<CK | UK, number>,
   Schemas extends readonly AnyEventSchema[],
+  CK extends string = "CreatedAt",
+  UK extends string = "UpdatedAt",
 > {
   abstract readonly name: string;
   abstract readonly version: string;
   abstract readonly store: FoldProjectionStore<State>;
 
-  /**
-   * Timestamp field naming convention. Override to `"camel"` for
-   * states with `createdAt`/`updatedAt` instead of `CreatedAt`/`UpdatedAt`.
-   * @default `"pascal"`
-   */
-  protected readonly timestampStyle: "pascal" | "camel" = "pascal";
+  protected readonly createdAtKey: CK;
+  protected readonly updatedAtKey: UK;
 
-  private get ck(): string {
-    return this.timestampStyle === "camel" ? "createdAt" : "CreatedAt";
-  }
-
-  private get uk(): string {
-    return this.timestampStyle === "camel" ? "updatedAt" : "UpdatedAt";
+  constructor({
+    createdAtKey,
+    updatedAtKey,
+  }: { createdAtKey?: CK; updatedAtKey?: UK } = {}) {
+    this.createdAtKey = createdAtKey ?? ("CreatedAt" as CK);
+    this.updatedAtKey = updatedAtKey ?? ("UpdatedAt" as UK);
   }
 
   /**
@@ -168,8 +167,8 @@ export abstract class AbstractFoldProjection<
     const now = Date.now();
     return {
       ...this.initState(),
-      [this.ck]: now,
-      [this.uk]: now,
+      [this.createdAtKey]: now,
+      [this.updatedAtKey]: now,
     } as State;
   }
 
@@ -189,8 +188,8 @@ export abstract class AbstractFoldProjection<
       s: State,
     ) => State;
     const newState = handler.call(this, event, state);
-    const prevUpdatedAt = (state as Record<string, number>)[this.uk] ?? 0;
+    const prevUpdatedAt: number = state[this.updatedAtKey];
     const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);
-    return { ...newState, [this.uk]: nextUpdatedAt } as State;
+    return { ...newState, [this.updatedAtKey]: nextUpdatedAt } as State;
   }
 }

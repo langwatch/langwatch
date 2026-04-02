@@ -124,17 +124,15 @@ describe("evaluationRun foldProjection", () => {
     });
 
     describe("when EvaluationCompletedEvent arrives with empty evaluationId in state", () => {
-      it("throws an error to trigger retry", () => {
+      it("falls back to evaluationId from the event", () => {
         const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const emptyState = createInitState();
 
-        expect(() =>
-          projection.apply(emptyState, createCompletedEvent()),
-        ).toThrow(
-          /Received EvaluationCompletedEvent for evaluation eval-1 but state has no evaluationId/,
-        );
+        const result = projection.apply(emptyState, createCompletedEvent());
+
+        expect(result.evaluationId).toBe("eval-1");
       });
     });
 

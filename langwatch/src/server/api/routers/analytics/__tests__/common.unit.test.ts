@@ -109,11 +109,19 @@ describe("generateFilterConditions()", () => {
     });
 
     it("returns a match_none condition so the trigger never fires", () => {
-      const conditions = generateFilterConditions({
+      const { filterConditions } = generateFilterConditions({
         ["service.name" as FilterField]: ["chat"],
       });
 
-      expect(conditions).toEqual([{ match_none: {} }]);
+      expect(filterConditions).toEqual([{ match_none: {} }]);
+    });
+
+    it("sets hasUnknownFilter to true", () => {
+      const { hasUnknownFilter } = generateFilterConditions({
+        ["service.name" as FilterField]: ["chat"],
+      });
+
+      expect(hasUnknownFilter).toBe(true);
     });
 
     it("logs a warning with the unknown field name", () => {
@@ -131,25 +139,104 @@ describe("generateFilterConditions()", () => {
 
   describe("when filter field is known", () => {
     it("returns real query conditions", () => {
-      const conditions = generateFilterConditions({
+      const { filterConditions } = generateFilterConditions({
         "spans.model": ["gpt-5-mini"],
       });
 
-      expect(conditions).toHaveLength(1);
-      expect(conditions[0]).toEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
+      expect(filterConditions).toHaveLength(1);
+      expect(filterConditions[0]).toEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
+    });
+
+    it("sets hasUnknownFilter to false", () => {
+      const { hasUnknownFilter } = generateFilterConditions({
+        "spans.model": ["gpt-5-mini"],
+      });
+
+      expect(hasUnknownFilter).toBe(false);
     });
   });
 
   describe("when mixing known and unknown fields", () => {
     it("includes match_none for the unknown field", () => {
-      const conditions = generateFilterConditions({
+      const { filterConditions } = generateFilterConditions({
         "spans.model": ["gpt-5-mini"],
         ["service.name" as FilterField]: ["chat"],
       });
 
-      expect(conditions).toHaveLength(2);
-      expect(conditions).toContainEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
-      expect(conditions).toContainEqual({ match_none: {} });
+      expect(filterConditions).toHaveLength(2);
+      expect(filterConditions).toContainEqual({ terms: { "spans.model": ["gpt-5-mini"] } });
+      expect(filterConditions).toContainEqual({ match_none: {} });
+    });
+
+    it("sets hasUnknownFilter to true", () => {
+      const { hasUnknownFilter } = generateFilterConditions({
+        "spans.model": ["gpt-5-mini"],
+        ["service.name" as FilterField]: ["chat"],
+      });
+
+      expect(hasUnknownFilter).toBe(true);
+    });
+  });
+});
+
+describe("generateTracesPivotQueryConditions() with negateFilters", () => {
+  const baseInput = {
+    projectId: "proj_123",
+    startDate: Date.now() - 86400000,
+    endDate: Date.now(),
+    filters: {},
+    negateFilters: true,
+  };
+
+  describe("when negateFilters is true and an unknown filter field is present", () => {
+    it("adds match_none to must so the query fails closed", () => {
+      const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+        ...baseInput,
+        filters: { ["service.name" as FilterField]: ["chat"] },
+      });
+
+      const boolQuery = pivotIndexConditions.bool as QueryDslBoolQuery;
+      const mustClauses = boolQuery.must as Array<Record<string, unknown>>;
+
+      expect(mustClauses).toContainEqual({ match_none: {} });
+    });
+
+    it("does not include must_not when an unknown filter is negated", () => {
+      const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+        ...baseInput,
+        filters: { ["service.name" as FilterField]: ["chat"] },
+      });
+
+      const boolQuery = pivotIndexConditions.bool as QueryDslBoolQuery;
+
+      expect(boolQuery.must_not).toBeUndefined();
+    });
+  });
+
+  describe("when negateFilters is true and all filter fields are known", () => {
+    it("uses must_not for the filter conditions", () => {
+      const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+        ...baseInput,
+        filters: { "spans.model": ["gpt-5-mini"] },
+      });
+
+      const boolQuery = pivotIndexConditions.bool as QueryDslBoolQuery;
+
+      expect(boolQuery.must_not).toEqual([
+        { terms: { "spans.model": ["gpt-5-mini"] } },
+      ]);
+    });
+
+    it("does not add match_none to must", () => {
+      const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+        ...baseInput,
+        filters: { "spans.model": ["gpt-5-mini"] },
+      });
+
+      const boolQuery = pivotIndexConditions.bool as QueryDslBoolQuery;
+      const mustClauses = boolQuery.must as Array<Record<string, unknown>>;
+
+      expect(mustClauses).not.toContainEqual({ match_none: {} });
     });
   });
 });

@@ -12,9 +12,10 @@ import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositorie
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { prisma } from "~/server/db";
-import { NotFoundError } from "~/server/prompt-config/errors";
-import { LabelValidationError } from "~/server/prompt-config/repositories/llm-config-label.repository";
+import { NotFoundError, ShorthandParseError } from "~/server/prompt-config/errors";
+import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { createLogger } from "~/utils/logger/server";
+import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
@@ -92,31 +93,31 @@ app.get(
   },
 );
 
-// Assign label to a prompt version
-const assignLabelResponseSchema = z.object({
+// Assign tag to a prompt version
+const assignTagResponseSchema = z.object({
   configId: z.string(),
   versionId: z.string(),
-  label: z.string(),
+  tag: z.string(),
   updatedAt: z.date(),
 });
 
 app.put(
-  "/:id{.+?}/labels/:label",
+  "/:id{.+?}/tags/:tag",
   describeRoute({
     description:
-      'Assign a label (e.g. "production", "staging") to a specific prompt version',
+      'Assign a tag (e.g. "production", "staging") to a specific prompt version',
     parameters: [
       {
-        name: "label",
+        name: "tag",
         in: "path",
-        description: 'The label to assign (e.g., "production", "staging")',
+        description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
         required: true,
-        schema: { type: "string", enum: ["production", "staging"] },
+        schema: { type: "string" },
       },
     ],
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(assignLabelResponseSchema),
+      200: buildStandardSuccessResponse(assignTagResponseSchema),
       404: {
         description: "Prompt not found",
         content: {
@@ -124,7 +125,7 @@ app.put(
         },
       },
       422: {
-        description: "Invalid label or version",
+        description: "Invalid tag or version",
         content: {
           "application/json": { schema: resolver(badRequestSchema) },
         },
@@ -136,12 +137,12 @@ app.put(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const { id, label } = c.req.param();
+    const { id, tag } = c.req.param();
     const { versionId } = c.req.valid("json");
 
     logger.info(
-      { projectId: project.id, promptId: id, label, versionId },
-      "Assigning label to prompt version",
+      { projectId: project.id, promptId: id, tag, versionId },
+      "Assigning tag to prompt version",
     );
 
     try {
@@ -157,28 +158,29 @@ app.put(
         });
       }
 
-      const result = await service.assignLabel({
+      const result = await service.assignTag({
         configId: config.id,
         versionId,
-        label,
+        tag,
         projectId: config.projectId,
+        organizationId: organization.id,
       });
 
       logger.info(
-        { projectId: project.id, configId: config.id, label, versionId },
-        "Successfully assigned label to prompt version",
+        { projectId: project.id, configId: config.id, tag, versionId },
+        "Successfully assigned tag to prompt version",
       );
 
       return c.json(
-        assignLabelResponseSchema.parse({
+        assignTagResponseSchema.parse({
           configId: result.configId,
           versionId: result.versionId,
-          label: result.label,
+          tag: result.tag,
           updatedAt: result.updatedAt,
         }),
       );
     } catch (error: unknown) {
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });
@@ -239,22 +241,42 @@ app.get(
 app.get(
   "/:id{.+}",
   describeRoute({
-    description: "Get a specific prompt",
+    description:
+      "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
+      'Pass a bare slug like "pizza-prompt" to get the latest version, ' +
+      '"pizza-prompt:production" to resolve a tagged version, or ' +
+      '"pizza-prompt:2" to fetch version 2. ' +
+      "Alternatively, use the tag or version query parameters with a bare slug.",
     parameters: [
+      {
+        name: "id",
+        in: "path",
+        description:
+          "Prompt slug or shorthand. Supports three formats: " +
+          '(1) bare slug — "pizza-prompt" returns the latest version; ' +
+          '(2) slug:tag — "pizza-prompt:production" returns the version pointed to by that tag; ' +
+          '(3) slug:version — "pizza-prompt:2" returns that specific version number. ' +
+          '"slug:latest" is equivalent to the bare slug. ' +
+          "Cannot be combined with the tag or version query parameters.",
+        required: true,
+        schema: { type: "string" },
+      },
       {
         name: "version",
         in: "query",
-        description: "Specific version number to retrieve",
+        description:
+          "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
         schema: { type: "integer", minimum: 0 },
       },
       {
-        name: "label",
+        name: "tag",
         in: "query",
         description:
-          'Fetch the version pointed to by this label (e.g., "production", "staging")',
+          "Fetch the version pointed to by this tag (e.g., \"production\", \"staging\"). " +
+          "Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
-        schema: { type: "string", enum: ["production", "staging"] },
+        schema: { type: "string" },
       },
     ],
     responses: {
@@ -273,23 +295,39 @@ app.get(
     const project = c.get("project");
     const organization = c.get("organization");
     const { id } = c.req.param();
-    const version = c.req.query("version")
-      ? parseInt(c.req.query("version")!)
-      : undefined;
-    const label = c.req.query("label") ?? undefined;
-
-    logger.info(
-      { projectId: project.id, id, version, label },
-      "Getting prompt",
-    );
 
     try {
+      // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
+      const shorthand = parsePromptShorthand(id);
+
+      const queryVersion = c.req.query("version")
+        ? parseInt(c.req.query("version") ?? "")
+        : undefined;
+      const queryTag = c.req.query("tag") ?? undefined;
+
+      // Reject conflicting shorthand + query param.
+      // hadSuffix is true even for "latest" (which normalizes away), so
+      // "foo:latest?tag=production" is correctly rejected.
+      if (shorthand.hadSuffix && (queryTag || queryVersion)) {
+        throw new HTTPException(422, {
+          message: `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
+        });
+      }
+
+      const version = shorthand.version ?? queryVersion;
+      const tag = shorthand.tag ?? queryTag;
+
+      logger.info(
+        { projectId: project.id, id: shorthand.slug, version, tag },
+        "Getting prompt",
+      );
+
       const config = await service.getPromptByIdOrHandle({
-        idOrHandle: id,
+        idOrHandle: shorthand.slug,
         projectId: project.id,
         organizationId: organization.id,
         version,
-        label,
+        tag,
       });
 
       if (!config) {
@@ -300,13 +338,21 @@ app.get(
 
       return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
     } catch (error: unknown) {
-      if (error instanceof LabelValidationError) {
+      if (error instanceof HTTPException) {
+        throw error;
+      }
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });
       }
       if (error instanceof NotFoundError) {
         throw new HTTPException(404, {
+          message: error.message,
+        });
+      }
+      if (error instanceof ShorthandParseError) {
+        throw new HTTPException(422, {
           message: error.message,
         });
       }
@@ -332,7 +378,7 @@ app.post(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const { labels, ...data } = c.req.valid("json");
+    const { tags, ...data } = c.req.valid("json");
 
     logger.info(
       {
@@ -340,7 +386,7 @@ app.post(
         scope: data.scope,
         projectId: project.id,
         organizationId: organization.id,
-        labels,
+        tags,
       },
       "Creating new prompt with initial version",
     );
@@ -357,21 +403,22 @@ app.post(
         "Successfully created prompt with initial version",
       );
 
-      if (labels && labels.length > 0) {
+      if (tags && tags.length > 0) {
         await Promise.all(
-          labels.map((label) =>
-            service.assignLabel({
+          tags.map((tag) =>
+            service.assignTag({
               configId: newConfig.id,
               versionId: newConfig.versionId,
-              label,
+              tag,
               projectId: newConfig.projectId,
+              organizationId: organization.id,
             }),
           ),
         );
 
         logger.info(
-          { promptId: newConfig.id, labels },
-          "Assigned labels to initial version",
+          { promptId: newConfig.id, tags },
+          "Assigned tags to initial version",
         );
       }
 
@@ -383,7 +430,7 @@ app.post(
       return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });
@@ -536,8 +583,9 @@ app.put(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
-    const { labels, ...data } = c.req.valid("json");
+    const { tags, ...data } = c.req.valid("json");
     const projectId = project.id;
 
     if (Object.keys(data).length === 0) {
@@ -551,7 +599,7 @@ app.put(
         projectId: project.id,
         handleOrId: id,
         data,
-        labels,
+        tags,
       },
       "Updating prompt",
     );
@@ -569,21 +617,22 @@ app.put(
         });
       }
 
-      if (labels && labels.length > 0) {
+      if (tags && tags.length > 0) {
         await Promise.all(
-          labels.map((label) =>
-            service.assignLabel({
+          tags.map((tag) =>
+            service.assignTag({
               configId: updatedConfig.id,
               versionId: updatedConfig.versionId,
-              label,
+              tag,
               projectId: updatedConfig.projectId,
+              organizationId: organization.id,
             }),
           ),
         );
 
         logger.info(
-          { projectId, promptId: id, labels, versionId: updatedConfig.versionId },
-          "Assigned labels to updated version",
+          { projectId, promptId: id, tags, versionId: updatedConfig.versionId },
+          "Assigned tags to updated version",
         );
       }
 
@@ -602,7 +651,7 @@ app.put(
       );
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
-      if (error instanceof LabelValidationError) {
+      if (error instanceof TagValidationError) {
         throw new HTTPException(422, {
           message: error.message,
         });

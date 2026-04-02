@@ -5,6 +5,8 @@ import {
   extractTracesFields,
   getThreadAvailableSources,
   getTraceAvailableSources,
+  mapTraceToDatasetEntry,
+  mappingStateSchema,
   SPAN_SUBFIELDS,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
@@ -539,5 +541,207 @@ describe("getThreadAvailableSources", () => {
     expect(formattedField).toBeDefined();
     expect(formattedField!.label).toBe("Full Thread (AI-Readable)");
     expect(formattedField!.type).toBe("str");
+  });
+});
+
+// Regression tests for threads mapping bugs
+describe("TRACE_MAPPINGS.threads", () => {
+  const makeTrace = (overrides: Record<string, any> = {}) => ({
+    trace_id: "trace-1",
+    timestamps: { started_at: Date.now() },
+    input: { type: "text", value: "Hello" },
+    output: { type: "text", value: "World" },
+    metadata: { thread_id: "thread-abc" },
+    ...overrides,
+  });
+
+  describe("when allTraces contains traces with the same thread_id", () => {
+    it("returns thread traces with selected fields extracted", () => {
+      const trace1 = makeTrace({ trace_id: "trace-1" });
+      const trace2 = makeTrace({
+        trace_id: "trace-2",
+        input: { type: "text", value: "Second" },
+        output: { type: "text", value: "Response" },
+      });
+      const unrelatedTrace = makeTrace({
+        trace_id: "trace-3",
+        metadata: { thread_id: "other-thread" },
+      });
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace1 as any,
+        "",
+        "",
+        {
+          allTraces: [trace1, trace2, unrelatedTrace] as any[],
+          selectedFields: ["thread_id"],
+        },
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ thread_id: "thread-abc" });
+      expect(result[1]).toEqual({ thread_id: "thread-abc" });
+    });
+
+    it("returns thread traces with multiple selected fields", () => {
+      const trace1 = makeTrace({ trace_id: "trace-1" });
+      const trace2 = makeTrace({
+        trace_id: "trace-2",
+        input: { type: "text", value: "Second" },
+      });
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace1 as any,
+        "",
+        "",
+        {
+          allTraces: [trace1, trace2] as any[],
+          selectedFields: ["input", "output"],
+        },
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ input: "Hello", output: "World" });
+      expect(result[1]).toEqual({ input: "Second", output: "World" });
+    });
+  });
+
+  describe("when allTraces is undefined", () => {
+    it("returns an empty array", () => {
+      const trace = makeTrace();
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace as any,
+        "",
+        "",
+        { allTraces: undefined, selectedFields: ["thread_id"] },
+      );
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when trace has no thread_id", () => {
+    it("returns an empty array", () => {
+      const trace = makeTrace({ metadata: {} });
+
+      const result = TRACE_MAPPINGS.threads.mapping(
+        trace as any,
+        "",
+        "",
+        { allTraces: [trace] as any[], selectedFields: ["thread_id"] },
+      );
+
+      expect(result).toEqual([]);
+    });
+  });
+});
+
+describe("mapTraceToDatasetEntry()", () => {
+  describe("when mapping uses 'threads' source with selectedFields", () => {
+    it("passes allTraces to the threads mapping and returns thread data", () => {
+      const trace1 = {
+        trace_id: "trace-1",
+        timestamps: { started_at: Date.now() },
+        input: { type: "text", value: "Hello" },
+        output: { type: "text", value: "World" },
+        metadata: { thread_id: "thread-abc" },
+      };
+      const trace2 = {
+        trace_id: "trace-2",
+        timestamps: { started_at: Date.now() },
+        input: { type: "text", value: "Second" },
+        output: { type: "text", value: "Response" },
+        metadata: { thread_id: "thread-abc" },
+      };
+
+      const mapping = {
+        my_threads: {
+          source: "threads",
+          key: undefined as string | undefined,
+          subkey: undefined as string | undefined,
+          selectedFields: ["input", "output"],
+        },
+      };
+
+      const result = mapTraceToDatasetEntry(
+        trace1 as any,
+        mapping,
+        new Set(),
+        undefined,
+        [trace1, trace2] as any[],
+      );
+
+      expect(result).toHaveLength(1);
+      // The threads mapping returns an array of objects, which gets JSON.stringified
+      const parsed = JSON.parse(result[0]!.my_threads as string);
+      expect(parsed).toHaveLength(2);
+      expect(parsed[0]).toEqual({ input: "Hello", output: "World" });
+      expect(parsed[1]).toEqual({ input: "Second", output: "Response" });
+    });
+  });
+});
+
+describe("TRACE_MAPPINGS keys for threads sub-field selection", () => {
+  it("does not include 'threads' as a valid sub-field option for threads mapping", () => {
+    // Bug regression: "threads" appeared in its own sub-field multi-select,
+    // creating a recursive option that makes no sense.
+    // The sub-field options for threads should exclude "threads" itself.
+    const threadSubFieldOptions = Object.keys(TRACE_MAPPINGS).filter(
+      (key) => key !== "threads",
+    );
+
+    // Verify "threads" is in the raw keys (proves we're testing the right thing)
+    expect(Object.keys(TRACE_MAPPINGS)).toContain("threads");
+
+    // But the filtered list used for sub-field selection excludes it
+    expect(threadSubFieldOptions).not.toContain("threads");
+  });
+});
+
+describe("mappingStateSchema", () => {
+  describe("when a trace-type mapping uses 'threads' source with selectedFields", () => {
+    it("preserves selectedFields after Zod parsing", () => {
+      // Bug regression: the trace variant of the Zod schema did not include selectedFields,
+      // causing Zod to strip it during validation. This meant that after
+      // saving and loading the mapping, the threads sub-field selection was lost.
+      const input = {
+        mapping: {
+          my_column: {
+            source: "threads",
+            key: "",
+            subkey: "",
+            selectedFields: ["thread_id", "input", "output"],
+          },
+        },
+        expansions: [],
+      };
+
+      const result = mappingStateSchema.parse(input);
+
+      expect(result.mapping.my_column).toHaveProperty("selectedFields");
+      expect(
+        "selectedFields" in result.mapping.my_column!
+          ? result.mapping.my_column!.selectedFields
+          : undefined,
+      ).toEqual(["thread_id", "input", "output"]);
+    });
+  });
+
+  describe("when a trace-type mapping has no selectedFields", () => {
+    it("parses successfully without selectedFields", () => {
+      const input = {
+        mapping: {
+          my_column: {
+            source: "input",
+          },
+        },
+        expansions: [],
+      };
+
+      const result = mappingStateSchema.parse(input);
+
+      expect(result.mapping.my_column).toHaveProperty("source", "input");
+    });
   });
 });

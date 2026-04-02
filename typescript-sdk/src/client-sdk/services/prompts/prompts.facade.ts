@@ -1,4 +1,4 @@
-import { PromptsApiService } from "./prompts-api.service";
+import { PromptsApiService, type AssignLabelResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
 import { FetchPolicy } from "./types";
@@ -12,6 +12,8 @@ import { PromptsError } from "./errors";
 export interface GetPromptOptions {
   /** Specific version to fetch */
   version?: string;
+  /** Label to fetch (e.g., "production", "staging") */
+  label?: "production" | "staging";
   /** Fetch policy to use */
   fetchPolicy?: FetchPolicy;
   /** Cache TTL in minutes (only used with CACHE_TTL policy) */
@@ -36,10 +38,17 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
+  readonly labels: {
+    assign(id: string, params: { label: "production" | "staging"; versionId: string }): Promise<AssignLabelResult>;
+  };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
+    this.labels = {
+      assign: (id, { label, versionId }) =>
+        this.promptsApiService.assignLabel({ id, label, versionId }),
+    };
   }
 
   /**
@@ -118,11 +127,9 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     throw new PromptsError(`Prompt "${handleOrId}" not found in materialized files`);
   }
 
-  /**
-   * Builds a cache key that includes both handle and version to prevent collisions.
-   */
   private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    return `${handleOrId}::version:${options?.version ?? ''}`;
+    const labelSegment = options?.label != null ? `::label:${options.label}` : '';
+    return `${handleOrId}::version:${options?.version ?? ''}${labelSegment}`;
   }
 
   private async getCacheTtl(

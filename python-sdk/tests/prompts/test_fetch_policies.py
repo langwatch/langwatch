@@ -510,7 +510,7 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
     )
 
     # Mock the API service to return different responses based on version
-    def mock_get(prompt_id, version_number=None):
+    def mock_get(prompt_id, version_number=None, label=None):
         if version_number == 1:
             return version_1_response
         elif version_number == 2:
@@ -526,7 +526,7 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
         )
 
     # Verify it called the API for version 1
-    facade._api_service.get.assert_called_with("my-prompt", 1)
+    facade._api_service.get.assert_called_with("my-prompt", 1, label=None)
     assert result1.version == 1
 
     # Second request for version 2 - should be a cache miss and hit API again
@@ -537,11 +537,11 @@ def test_cache_ttl_caches_versions_independently(clean_langwatch):
         )
 
     # Verify it called the API again for version 2
-    facade._api_service.get.assert_called_with("my-prompt", 2)
+    facade._api_service.get.assert_called_with("my-prompt", 2, label=None)
     assert result2.version == 2
 
     # Verify different versions are cached separately
-    assert "my-prompt::version:1" in facade._cache
-    assert "my-prompt::version:2" in facade._cache
-    assert facade._cache["my-prompt::version:1"]["data"].version == 1
-    assert facade._cache["my-prompt::version:2"]["data"].version == 2
+    assert "my-prompt::version:1::label:" in facade._cache
+    assert "my-prompt::version:2::label:" in facade._cache
+    assert facade._cache["my-prompt::version:1::label:"]["data"].version == 1
+    assert facade._cache["my-prompt::version:2::label:"]["data"].version == 2
