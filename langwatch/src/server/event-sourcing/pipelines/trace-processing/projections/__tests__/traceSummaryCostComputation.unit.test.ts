@@ -690,3 +690,72 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
     });
   });
 });
+
+describe("applySpanToSummary token timing from OTel instrumentation events (@regression)", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("when span has ai.stream.firstChunk/ai.stream.finish events (Vercel AI SDK)", () => {
+    it("computes timeToFirstToken from ai.stream.firstChunk", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [
+          { name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} },
+          { name: "ai.stream.finish", timeUnixMs: 3800, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(250);
+    });
+
+    it("computes timeToLastToken from ai.stream.finish", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [
+          { name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} },
+          { name: "ai.stream.finish", timeUnixMs: 3800, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToLastTokenMs).toBe(2800);
+    });
+  });
+
+  describe("when span has gen_ai.content.chunk events (already supported)", () => {
+    it("computes timeToFirstToken as before", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 3000,
+        durationMs: 2000,
+        events: [
+          { name: "gen_ai.content.chunk", timeUnixMs: 1100, attributes: {} },
+          { name: "gen_ai.content.chunk", timeUnixMs: 2900, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(100);
+      expect(result.timeToLastTokenMs).toBe(1900);
+    });
+  });
+});
