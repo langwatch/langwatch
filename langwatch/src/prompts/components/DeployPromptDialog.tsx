@@ -46,12 +46,11 @@ export function DeployPromptDialog({
   handle,
   projectId,
 }: DeployPromptDialogProps) {
-  const { project, organization } = useOrganizationTeamProject();
-  const organizationId = organization?.id ?? "";
+  const { project } = useOrganizationTeamProject();
 
   const { data: allTags, refetch: refetchTags } = usePromptTags({
-    organizationId,
-    enabled: isOpen && !!organizationId,
+    projectId,
+    enabled: isOpen && !!projectId,
   });
 
   const versionsQuery = api.prompts.getAllVersionsForPrompt.useQuery(
@@ -65,6 +64,8 @@ export function DeployPromptDialog({
   );
 
   const assignTag = api.prompts.assignTag.useMutation();
+  const createTag = api.promptTags.create.useMutation();
+  const deleteTag = api.promptTags.delete.useMutation();
   const utils = api.useContext();
 
   const versions = versionsQuery.data ?? [];
@@ -188,7 +189,6 @@ export function DeployPromptDialog({
   const [addTagError, setAddTagError] = useState("");
   const [isSubmittingTag, setIsSubmittingTag] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<{
-    id: string;
     name: string;
   } | null>(null);
 
@@ -198,49 +198,28 @@ export function DeployPromptDialog({
     setIsSubmittingTag(true);
     setAddTagError("");
     try {
-      const response = await fetch(`/api/orgs/${organizationId}/prompt-tags`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (response.status === 409) {
-        setAddTagError(`${name} already exists`);
-        return;
-      }
-      if (response.status === 422) {
-        const body = (await response.json()) as { message?: string };
-        setAddTagError(body.message ?? "Invalid tag name");
-        return;
-      }
-      if (!response.ok) {
-        setAddTagError("Failed to create tag");
-        return;
-      }
+      await createTag.mutateAsync({ projectId, name });
       await refetchTags();
       setIsAddingTag(false);
       setNewTagName("");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to create tag";
+      if (message.toLowerCase().includes("already exists")) {
+        setAddTagError(`${name} already exists`);
+      } else {
+        setAddTagError(message);
+      }
     } finally {
       setIsSubmittingTag(false);
     }
-  }, [newTagName, organizationId, refetchTags]);
+  }, [newTagName, projectId, createTag, refetchTags]);
 
   const confirmDeleteTag = useCallback(
-    async (tagId: string) => {
+    async (tagName: string) => {
       setTagToDelete(null);
       try {
-        const response = await fetch(
-          `/api/orgs/${organizationId}/prompt-tags/${tagId}`,
-          { method: "DELETE" },
-        );
-        if (!response.ok) {
-          toaster.create({
-            title: "Failed to delete tag",
-            type: "error",
-            duration: 3000,
-            meta: { closable: true },
-          });
-          return;
-        }
+        await deleteTag.mutateAsync({ projectId, name: tagName });
         await refetchTags();
       } catch {
         toaster.create({
@@ -251,7 +230,7 @@ export function DeployPromptDialog({
         });
       }
     },
-    [organizationId, refetchTags],
+    [projectId, deleteTag, refetchTags],
   );
 
   const nonLatestTags = allTags.filter((t) => t.name !== "latest");
@@ -418,7 +397,7 @@ export function DeployPromptDialog({
                             </IconButton>
                           </GeneratePromptApiSnippetDialog.Trigger>
                         </GeneratePromptApiSnippetDialog>
-                        {tagDef.name !== "latest" && tagDef.id && (
+                        {tagDef.name !== "latest" && (
                           <IconButton
                             variant="ghost"
                             size="xs"
@@ -426,7 +405,6 @@ export function DeployPromptDialog({
                             css={{ boxShadow: "none !important" }}
                             onClick={() =>
                               setTagToDelete({
-                                id: tagDef.id ?? "",
                                 name: tagDef.name,
                               })
                             }
@@ -524,7 +502,7 @@ export function DeployPromptDialog({
         onClose={() => setTagToDelete(null)}
         onConfirm={() => {
           if (tagToDelete) {
-            void confirmDeleteTag(tagToDelete.id);
+            void confirmDeleteTag(tagToDelete.name);
           }
         }}
       />

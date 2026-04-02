@@ -10,6 +10,9 @@ import { DeployPromptDialog } from "../DeployPromptDialog";
 const mockUseQuery = vi.fn();
 const mockMutateAsync = vi.fn().mockResolvedValue({});
 const mockInvalidate = vi.fn().mockResolvedValue(undefined);
+const mockPromptTagsQuery = vi.fn();
+const mockCreateTagMutateAsync = vi.fn().mockResolvedValue({});
+const mockDeleteTagMutateAsync = vi.fn().mockResolvedValue({});
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -27,10 +30,30 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    promptTags: {
+      getAll: {
+        useQuery: (...args: unknown[]) => mockPromptTagsQuery(...args),
+      },
+      create: {
+        useMutation: () => ({
+          mutateAsync: mockCreateTagMutateAsync,
+        }),
+      },
+      delete: {
+        useMutation: () => ({
+          mutateAsync: mockDeleteTagMutateAsync,
+        }),
+      },
+    },
     useContext: () => ({
       prompts: {
         getTagsForConfig: {
           invalidate: mockInvalidate,
+        },
+      },
+      promptTags: {
+        getAll: {
+          invalidate: vi.fn().mockResolvedValue(undefined),
         },
       },
     }),
@@ -144,46 +167,17 @@ function setupQueries({
   });
 }
 
-function setupFetch(
-  extraTags: Array<{ name: string; id?: string }> = [],
-) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-      const method = options?.method ?? "GET";
-
-      if (method === "GET" && String(url).includes("/prompt-tags")) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: () =>
-            Promise.resolve([
-              { name: "production", id: "production-id" },
-              { name: "staging", id: "staging-id" },
-              ...extraTags,
-            ]),
-        });
-      }
-
-      if (method === "POST" && String(url).includes("/prompt-tags")) {
-        const body = JSON.parse((options?.body as string) ?? "{}") as { name?: string };
-        const name = body.name ?? "";
-
-        // Simulate duplicate check
-        if (extraTags.some((l) => l.name === name)) {
-          return Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({}) });
-        }
-
-        return Promise.resolve({ ok: true, status: 201, json: () => Promise.resolve({ name, id: `id-${name}` }) });
-      }
-
-      if (method === "DELETE" && String(url).includes("/prompt-tags/")) {
-        return Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) });
-      }
-
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
-    }),
-  );
+function setupPromptTags(extraTags: Array<{ name: string; id?: string }> = []) {
+  const defaultTags = [
+    { name: "production", id: "production-id" },
+    { name: "staging", id: "staging-id" },
+  ];
+  const allTags = [...defaultTags, ...extraTags];
+  mockPromptTagsQuery.mockReturnValue({
+    data: allTags,
+    isLoading: false,
+    refetch: vi.fn().mockResolvedValue({ data: allTags }),
+  });
 }
 
 function renderDialog(props = {}) {
@@ -196,12 +190,11 @@ function renderDialog(props = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  setupFetch();
+  setupPromptTags();
 });
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("Feature: Deploy Prompt Dialog", () => {
@@ -467,7 +460,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Deploy dialog renders built-in and custom tag rows", () => {
       it("renders rows for latest, production, staging, and the custom tag", async () => {
-        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupPromptTags([{ name: "canary", id: "canary-id" }]);
         setupQueries({
           tags: [
             { tagId: "production-id", promptTag: { name: "production" }, versionId: "v1-id" },
@@ -486,7 +479,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
 
       it("renders a version selector for each non-latest tag row", async () => {
-        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupPromptTags([{ name: "canary", id: "canary-id" }]);
         setupQueries();
 
         renderDialog();
@@ -501,7 +494,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Built-in tags have no delete button", () => {
       it("does not render a delete button for the latest row", async () => {
-        setupFetch();
+        setupPromptTags();
         setupQueries();
 
         renderDialog();
@@ -516,7 +509,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
 
       it("renders a delete button for the production row", async () => {
-        setupFetch();
+        setupPromptTags();
         setupQueries();
 
         renderDialog();
@@ -531,7 +524,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
 
       it("renders a delete button for the staging row", async () => {
-        setupFetch();
+        setupPromptTags();
         setupQueries();
 
         renderDialog();
@@ -548,7 +541,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Deploy dialog shows empty state when no custom tags exist", () => {
       it("shows only built-in rows and the '+ Add tag' button", async () => {
-        setupFetch();
+        setupPromptTags();
         setupQueries();
 
         renderDialog();
@@ -564,48 +557,31 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Deploy dialog adds a custom tag row when user confirms input", () => {
       it("adds a new custom tag row when user types and confirms", async () => {
-        // First fetch returns no custom tags; after POST+refetch, returns canary
-        let fetchCallCount = 0;
-        vi.stubGlobal(
-          "fetch",
-          vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-            const method = options?.method ?? "GET";
+        // Initial state: no custom tags
+        setupPromptTags();
 
-            if (method === "GET" && String(url).includes("/prompt-tags")) {
-              fetchCallCount++;
-              if (fetchCallCount === 1) {
-                return Promise.resolve({
-                  ok: true,
-                  status: 200,
-                  json: () => Promise.resolve([
-                    { name: "production", id: "production-id" },
-                    { name: "staging", id: "staging-id" },
-                  ]),
-                });
-              }
-              // After POST, return with canary
-              return Promise.resolve({
-                ok: true,
-                status: 200,
-                json: () => Promise.resolve([
-                  { name: "production", id: "production-id" },
-                  { name: "staging", id: "staging-id" },
-                  { name: "canary", id: "canary-id" },
-                ]),
-              });
-            }
-
-            if (method === "POST" && String(url).includes("/prompt-tags")) {
-              return Promise.resolve({
-                ok: true,
-                status: 201,
-                json: () => Promise.resolve({ name: "canary", id: "canary-id" }),
-              });
-            }
-
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+        // After create succeeds and refetch is called, return with canary
+        const tagsWithCanary = [
+          { name: "production", id: "production-id" },
+          { name: "staging", id: "staging-id" },
+          { name: "canary", id: "canary-id" },
+        ];
+        mockCreateTagMutateAsync.mockResolvedValue({ name: "canary", id: "canary-id" });
+        mockPromptTagsQuery.mockReturnValueOnce({
+          data: [
+            { name: "production", id: "production-id" },
+            { name: "staging", id: "staging-id" },
+          ],
+          isLoading: false,
+          refetch: vi.fn().mockImplementation(() => {
+            mockPromptTagsQuery.mockReturnValue({
+              data: tagsWithCanary,
+              isLoading: false,
+              refetch: vi.fn().mockResolvedValue({ data: tagsWithCanary }),
+            });
+            return Promise.resolve({ data: tagsWithCanary });
           }),
-        );
+        });
 
         setupQueries();
         renderDialog();
@@ -629,7 +605,8 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Deploy dialog rejects duplicate custom tag name", () => {
       it("shows an error when trying to add an existing tag name", async () => {
-        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupPromptTags([{ name: "canary", id: "canary-id" }]);
+        mockCreateTagMutateAsync.mockRejectedValue(new Error("canary already exists"));
         setupQueries();
 
         renderDialog();
@@ -652,43 +629,28 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Deploy dialog removes custom tag row after delete confirmation", () => {
       it("removes the custom tag row when user confirms deletion", async () => {
-        let fetchCallCount = 0;
-        vi.stubGlobal(
-          "fetch",
-          vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-            const method = options?.method ?? "GET";
-
-            if (method === "GET" && String(url).includes("/prompt-tags")) {
-              fetchCallCount++;
-              if (fetchCallCount === 1) {
-                return Promise.resolve({
-                  ok: true,
-                  status: 200,
-                  json: () => Promise.resolve([
-                    { name: "production", id: "production-id" },
-                    { name: "staging", id: "staging-id" },
-                    { name: "canary", id: "canary-id" },
-                  ]),
-                });
-              }
-              // After DELETE, return without canary
-              return Promise.resolve({
-                ok: true,
-                status: 200,
-                json: () => Promise.resolve([
-                  { name: "production", id: "production-id" },
-                  { name: "staging", id: "staging-id" },
-                ]),
-              });
-            }
-
-            if (method === "DELETE" && String(url).includes("/prompt-tags/")) {
-              return Promise.resolve({ ok: true, status: 204, json: () => Promise.resolve({}) });
-            }
-
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+        // Initial state: includes canary
+        const tagsWithoutCanary = [
+          { name: "production", id: "production-id" },
+          { name: "staging", id: "staging-id" },
+        ];
+        mockDeleteTagMutateAsync.mockResolvedValue({});
+        mockPromptTagsQuery.mockReturnValueOnce({
+          data: [
+            { name: "production", id: "production-id" },
+            { name: "staging", id: "staging-id" },
+            { name: "canary", id: "canary-id" },
+          ],
+          isLoading: false,
+          refetch: vi.fn().mockImplementation(() => {
+            mockPromptTagsQuery.mockReturnValue({
+              data: tagsWithoutCanary,
+              isLoading: false,
+              refetch: vi.fn().mockResolvedValue({ data: tagsWithoutCanary }),
+            });
+            return Promise.resolve({ data: tagsWithoutCanary });
           }),
-        );
+        });
 
         setupQueries();
         renderDialog();
@@ -714,7 +676,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
 
       it("shows a confirmation dialog warning that SDK callers may be affected", async () => {
-        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupPromptTags([{ name: "canary", id: "canary-id" }]);
         setupQueries();
 
         renderDialog();
@@ -735,7 +697,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
 
     describe("Scenario: Custom tag delete button is visible only for custom tags", () => {
       it("renders a delete button for the custom tag row", async () => {
-        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupPromptTags([{ name: "canary", id: "canary-id" }]);
         setupQueries();
 
         renderDialog();
@@ -748,7 +710,7 @@ describe("Feature: Deploy Prompt Dialog", () => {
       });
 
       it("renders a delete button for the production row", async () => {
-        setupFetch([{ name: "canary", id: "canary-id" }]);
+        setupPromptTags([{ name: "canary", id: "canary-id" }]);
         setupQueries();
 
         renderDialog();

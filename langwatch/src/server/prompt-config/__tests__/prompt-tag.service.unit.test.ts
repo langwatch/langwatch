@@ -26,8 +26,11 @@ function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagReposi
   return {
     findAll: vi.fn().mockResolvedValue([]),
     findById: vi.fn().mockResolvedValue(null),
+    findByName: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(makeTag()),
     delete: vi.fn().mockResolvedValue(undefined),
+    deleteByName: vi.fn().mockResolvedValue(undefined),
+    rename: vi.fn().mockResolvedValue(makeTag()),
     seedForOrg: vi.fn().mockResolvedValue(undefined),
     existsForOrg: vi.fn().mockResolvedValue(true),
     ...overrides,
@@ -236,6 +239,118 @@ describe("PromptTagService", () => {
           const result = await service.delete({ id: tag.id, organizationId });
           expect(result).toEqual(tag);
         }
+      });
+    });
+  });
+
+  describe("deleteByName()", () => {
+    describe("when tag does not exist", () => {
+      it("returns null without calling repo.deleteByName", async () => {
+        const repo = makeRepo({ findByName: vi.fn().mockResolvedValue(null) });
+        const service = new PromptTagService(repo);
+
+        const result = await service.deleteByName({ organizationId, name: "nonexistent" });
+
+        expect(result).toBeNull();
+        expect(repo.deleteByName).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when tag is a protected system tag", () => {
+      it("throws PromptTagProtectedError for 'latest'", async () => {
+        const repo = makeRepo();
+        const service = new PromptTagService(repo);
+
+        await expect(
+          service.deleteByName({ organizationId, name: "latest" }),
+        ).rejects.toThrow(PromptTagProtectedError);
+      });
+
+      it("does not call repo.deleteByName when tag is protected", async () => {
+        const repo = makeRepo();
+        const service = new PromptTagService(repo);
+
+        await expect(service.deleteByName({ organizationId, name: "latest" })).rejects.toThrow();
+        expect(repo.deleteByName).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when tag is a non-protected custom tag", () => {
+      it("deletes the tag and returns it", async () => {
+        const tag = makeTag({ name: "canary" });
+        const repo = makeRepo({
+          findByName: vi.fn().mockResolvedValue(tag),
+          deleteByName: vi.fn().mockResolvedValue(undefined),
+        });
+        const service = new PromptTagService(repo);
+
+        const result = await service.deleteByName({ organizationId, name: "canary" });
+
+        expect(repo.deleteByName).toHaveBeenCalledWith({ organizationId, name: "canary" });
+        expect(result).toEqual(tag);
+      });
+    });
+  });
+
+  describe("rename()", () => {
+    describe("when renaming a valid tag", () => {
+      it("delegates to repo.rename with correct parameters", async () => {
+        const renamedTag = makeTag({ name: "beta" });
+        const repo = makeRepo({
+          rename: vi.fn().mockResolvedValue(renamedTag),
+        });
+        const service = new PromptTagService(repo);
+
+        const result = await service.rename({
+          organizationId,
+          oldName: "canary",
+          newName: "beta",
+        });
+
+        expect(repo.rename).toHaveBeenCalledWith({
+          organizationId,
+          oldName: "canary",
+          newName: "beta",
+        });
+        expect(result).toEqual(renamedTag);
+      });
+    });
+
+    describe("when old name is a protected tag", () => {
+      it("throws PromptTagProtectedError for 'latest'", async () => {
+        const repo = makeRepo();
+        const service = new PromptTagService(repo);
+
+        await expect(
+          service.rename({ organizationId, oldName: "latest", newName: "beta" }),
+        ).rejects.toThrow(PromptTagProtectedError);
+        expect(repo.rename).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when new name fails validation", () => {
+      it("throws PromptTagValidationError without calling repo.rename", async () => {
+        const repo = makeRepo();
+        const service = new PromptTagService(repo);
+
+        await expect(
+          service.rename({ organizationId, oldName: "canary", newName: "INVALID" }),
+        ).rejects.toThrow(PromptTagValidationError);
+        expect(repo.rename).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when repo signals a unique constraint violation", () => {
+      it("throws PromptTagConflictError", async () => {
+        const prismaError = { code: "P2002" };
+        const repo = makeRepo({
+          rename: vi.fn().mockRejectedValue(prismaError),
+        });
+        const service = new PromptTagService(repo);
+
+        await expect(
+          service.rename({ organizationId, oldName: "canary", newName: "staging" }),
+        ).rejects.toThrow(PromptTagConflictError);
       });
     });
   });

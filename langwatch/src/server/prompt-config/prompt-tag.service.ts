@@ -141,6 +141,69 @@ export class PromptTagService {
 
     return tag;
   }
+
+  /**
+   * Deletes a custom tag definition by name and cascades to PromptTagAssignment rows.
+   *
+   * Returns the deleted tag, or null if it was not found.
+   *
+   * @throws {PromptTagProtectedError} if the tag is a protected system tag
+   */
+  async deleteByName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<PromptTag | null> {
+    if (PROTECTED_TAGS.includes(name as ProtectedTag)) {
+      throw new PromptTagProtectedError(name);
+    }
+
+    const tag = await this.repo.findByName({ organizationId, name });
+
+    if (!tag) {
+      return null;
+    }
+
+    await this.repo.deleteByName({ organizationId, name });
+
+    return tag;
+  }
+
+  /**
+   * Renames a tag definition and updates all corresponding PromptTagAssignment rows.
+   *
+   * @throws {PromptTagValidationError} if the new name is invalid
+   * @throws {PromptTagProtectedError} if the old tag name is a protected system tag
+   * @throws {PromptTagConflictError} if a tag with the new name already exists
+   */
+  async rename({
+    organizationId,
+    oldName,
+    newName,
+  }: {
+    organizationId: string;
+    oldName: string;
+    newName: string;
+  }): Promise<PromptTag> {
+    if (PROTECTED_TAGS.includes(oldName as ProtectedTag)) {
+      throw new PromptTagProtectedError(oldName);
+    }
+
+    validateTagName(newName);
+
+    try {
+      return await this.repo.rename({ organizationId, oldName, newName });
+    } catch (error: unknown) {
+      if (isUniqueConstraintError(error)) {
+        throw new PromptTagConflictError(
+          `A tag with name "${newName}" already exists in this org.`,
+        );
+      }
+      throw error;
+    }
+  }
 }
 
 function isUniqueConstraintError(error: unknown): boolean {
