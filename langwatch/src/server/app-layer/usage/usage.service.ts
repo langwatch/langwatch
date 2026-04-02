@@ -103,7 +103,9 @@ export class UsageService {
     scenarioSetId: string;
   }): Promise<void> {
     // Fast path: set is already known from a recent check
-    const cachedArr = await this.scenarioSetCache.get(organizationId);
+    const rawCached = await this.scenarioSetCache.get(organizationId);
+    // Defensive: discard corrupt cache entries left by the old shared-prefix bug
+    const cachedArr = Array.isArray(rawCached) ? rawCached : undefined;
     if (cachedArr?.includes(scenarioSetId)) {
       return;
     }
