@@ -83,19 +83,13 @@ export class PromptTagRepository {
     id: string;
     organizationId: string;
   }): Promise<void> {
-    const tag = await this.prisma.promptTag.findFirst({
+    const deleted = await this.prisma.promptTag.deleteMany({
       where: { id, organizationId },
     });
 
-    if (!tag) {
-      return;
-    }
+    if (deleted.count === 0) return;
 
-    await this.prisma.promptTag.delete({
-      where: { id },
-    });
-
-    logger.info({ organizationId, id, name: tag.name }, "Custom prompt tag deleted");
+    logger.info({ organizationId, id }, "Custom prompt tag deleted");
   }
 
   /**
