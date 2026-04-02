@@ -90,22 +90,6 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Check if ClickHouse is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.isClickHouseEnabled",
-      {
-        attributes: { "tenant.id": projectId },
-      },
-      async (span) => {
-        span.setAttribute("project.feature.clickhouse", true);
-        return true;
-      },
-    );
-  }
-
-  /**
    * Get traces with spans for the given trace IDs.
    *
    * Returns null if:
@@ -128,11 +112,6 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId },
       },
       async () => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(projectId);
         if (!clickHouseClient) {
           return null;
@@ -213,11 +192,6 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId, "thread.id": threadId },
       },
       async () => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(projectId);
         if (!clickHouseClient) {
           return null;
@@ -313,11 +287,6 @@ export class ClickHouseTraceService {
         },
       },
       async () => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(projectId);
         if (!clickHouseClient) {
           return null;
@@ -645,10 +614,6 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(input.projectId);
         if (!clickHouseClient) {
           return null;
@@ -754,10 +719,6 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(input.projectId);
         if (!clickHouseClient) {
           return null;
@@ -880,10 +841,6 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(projectId);
         if (!clickHouseClient) {
           return null;
@@ -1178,10 +1135,6 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
         const clickHouseClient = await this.resolveClient(projectId);
         if (!clickHouseClient) {
           return null;

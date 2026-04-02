@@ -73,13 +73,6 @@ export class AnalyticsService {
   }
 
   /**
-   * Check if ClickHouse is enabled for the given project
-   */
-  async isClickHouseEnabled(_projectId: string): Promise<boolean> {
-    return true;
-  }
-
-  /**
    * Check if comparison mode is enabled
    * Comparison mode runs both ES and CH queries and logs discrepancies
    */
@@ -109,7 +102,7 @@ export class AnalyticsService {
       `AnalyticsService.${operationName}`,
       { attributes: { "tenant.id": projectId } },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(projectId);
+        const useClickHouse = true;
         const comparisonMode = this.isComparisonModeEnabled();
 
         span.setAttribute(

@@ -85,91 +85,15 @@ function createFakeBackend(options?: {
 /**
  * Create a fake Prisma client for testing
  */
-function createFakePrisma(options?: { clickhouseEnabled?: boolean }) {
+function createFakePrisma() {
   return {
     project: {
-      findUnique: vi.fn().mockResolvedValue({
-        featureClickHouseDataSourceTraces: options?.clickhouseEnabled ?? false,
-      }),
+      findUnique: vi.fn().mockResolvedValue({}),
     },
   } as any;
 }
 
 describe("AnalyticsService", () => {
-  describe("isClickHouseEnabled", () => {
-    it("returns false when project does not have feature flag enabled", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: false });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.isClickHouseEnabled("test-project");
-
-      expect(result).toBe(false);
-      expect(fakePrisma.project.findUnique).toHaveBeenCalledWith({
-        where: { id: "test-project" },
-        select: { featureClickHouseDataSourceTraces: true },
-      });
-    });
-
-    it("returns true when project has feature flag enabled", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: true });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.isClickHouseEnabled("test-project");
-
-      expect(result).toBe(true);
-    });
-
-    it("returns false when CH client is not available", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: false });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: true });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.isClickHouseEnabled("test-project");
-
-      expect(result).toBe(false);
-    });
-
-    it("returns false when Prisma throws an error", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = {
-        project: {
-          findUnique: vi.fn().mockRejectedValue(new Error("DB error")),
-        },
-      } as any;
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.isClickHouseEnabled("test-project");
-
-      expect(result).toBe(false);
-    });
-  });
-
   describe("isComparisonModeEnabled", () => {
     it("returns false when config does not enable comparison mode", () => {
       const service = new AnalyticsService({
@@ -212,28 +136,10 @@ describe("AnalyticsService", () => {
       timeZone: "UTC",
     };
 
-    it("routes to ES service when ClickHouse is not enabled", async () => {
+    it("routes to CH service", async () => {
       const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: false });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.getTimeseries(input);
-
-      expect(result.currentPeriod).toHaveLength(1);
-      expect(fakeES.getTimeseriesCalled).toBe(true);
-      expect(fakeCH.getTimeseriesCalled).toBe(false);
-    });
-
-    it("routes to CH service when ClickHouse is enabled", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: true });
+      const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
         esService: fakeES,
@@ -250,34 +156,10 @@ describe("AnalyticsService", () => {
   });
 
   describe("getDataForFilter", () => {
-    it("routes to ES service when ClickHouse is not enabled", async () => {
+    it("routes to CH service", async () => {
       const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: false });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.getDataForFilter(
-        "test-project",
-        "topics.topics",
-        Date.now() - 86400000,
-        Date.now(),
-        {}
-      );
-
-      expect(result.options).toHaveLength(1);
-      expect(fakeES.getDataForFilterCalled).toBe(true);
-      expect(fakeCH.getDataForFilterCalled).toBe(false);
-    });
-
-    it("routes to CH service when ClickHouse is enabled", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: true });
+      const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
         esService: fakeES,
@@ -300,33 +182,10 @@ describe("AnalyticsService", () => {
   });
 
   describe("getTopUsedDocuments", () => {
-    it("routes to ES service when ClickHouse is not enabled", async () => {
+    it("routes to CH service", async () => {
       const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: false });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.getTopUsedDocuments(
-        "test-project",
-        Date.now() - 86400000,
-        Date.now(),
-        {}
-      );
-
-      expect(result.topDocuments).toHaveLength(1);
-      expect(fakeES.getTopUsedDocumentsCalled).toBe(true);
-      expect(fakeCH.getTopUsedDocumentsCalled).toBe(false);
-    });
-
-    it("routes to CH service when ClickHouse is enabled", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: true });
+      const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
         esService: fakeES,
@@ -348,33 +207,10 @@ describe("AnalyticsService", () => {
   });
 
   describe("getFeedbacks", () => {
-    it("routes to ES service when ClickHouse is not enabled", async () => {
+    it("routes to CH service", async () => {
       const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: false });
-
-      const service = new AnalyticsService({
-        esService: fakeES,
-        chService: fakeCH,
-        prisma: fakePrisma,
-      });
-
-      const result = await service.getFeedbacks(
-        "test-project",
-        Date.now() - 86400000,
-        Date.now(),
-        {}
-      );
-
-      expect(result.events).toHaveLength(1);
-      expect(fakeES.getFeedbacksCalled).toBe(true);
-      expect(fakeCH.getFeedbacksCalled).toBe(false);
-    });
-
-    it("routes to CH service when ClickHouse is enabled", async () => {
-      const fakeES = createFakeBackend();
-      const fakeCH = createFakeBackend({ available: true });
-      const fakePrisma = createFakePrisma({ clickhouseEnabled: true });
+      const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
         esService: fakeES,

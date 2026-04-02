@@ -38,20 +38,6 @@ export class ClickHouseEvaluationService {
   }
 
   /**
-   * Check if ClickHouse evaluations data source is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseEvaluationService.isClickHouseEnabled",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        span.setAttribute("project.feature.clickhouse.evaluations", true);
-        return true;
-      },
-    );
-  }
-
-  /**
    * Get evaluations for a single trace.
    *
    * Returns null if ClickHouse is not enabled for the project.
@@ -73,11 +59,6 @@ export class ClickHouseEvaluationService {
       "ClickHouseEvaluationService.getEvaluationsForTrace",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;
@@ -156,11 +137,6 @@ export class ClickHouseEvaluationService {
         },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;

@@ -1,6 +1,4 @@
 import type { Annotation, PrismaClient } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
-import { isElasticSearchWriteDisabled } from "~/server/elasticsearch/isElasticSearchWriteDisabled";
 import { createLogger } from "~/utils/logger/server";
 import {
   AnnotationRepository,
@@ -28,33 +26,19 @@ export class AnnotationService {
   /**
    * Static factory method for creating an AnnotationService with proper DI.
    *
-   * When ES writes are disabled for the project, `esSync` is set to `null`
-   * so the service never attempts ES operations.
+   * ES writes are globally disabled (ClickHouse is the primary store),
+   * so `esSync` is always `null`.
    */
   static async create({
     prisma,
-    projectId,
+    projectId: _projectId,
   }: {
     prisma: PrismaClient;
     projectId: string;
   }): Promise<AnnotationService> {
     const repository = new AnnotationRepository(prisma);
     const logger = createLogger("langwatch:annotations:service");
-
-    let esSync: AnnotationEsSync | null = null;
-    try {
-      const esDisabled = await isElasticSearchWriteDisabled(
-        prisma,
-        projectId,
-        "traces",
-      );
-      esSync = esDisabled ? null : new AnnotationEsSync();
-    } catch (error) {
-      logger.error(
-        { error, projectId },
-        "Failed to check ES write-disabled flag; skipping ES sync",
-      );
-    }
+    const esSync: AnnotationEsSync | null = null;
 
     return new AnnotationService(repository, esSync, logger);
   }

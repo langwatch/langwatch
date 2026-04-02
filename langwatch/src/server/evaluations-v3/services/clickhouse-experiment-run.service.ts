@@ -45,20 +45,6 @@ export class ClickHouseExperimentRunService {
   }
 
   /**
-   * Check if ClickHouse evaluations data source is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return this.tracer.withActiveSpan(
-      "ClickHouseExperimentRunService.isClickHouseEnabled",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        span.setAttribute("project.feature.clickhouse", true);
-        return true;
-      },
-    );
-  }
-
-  /**
    * List experiment runs for one or more experiments.
    *
    * Returns runs grouped by experiment ID, with per-evaluator breakdown
@@ -82,11 +68,6 @@ export class ClickHouseExperimentRunService {
         },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;
@@ -298,11 +279,6 @@ export class ClickHouseExperimentRunService {
         attributes: { "tenant.id": projectId, "run.id": runId },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;

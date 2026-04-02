@@ -58,22 +58,6 @@ export class ClickHouseFilterService {
   }
 
   /**
-   * Check if ClickHouse is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseFilterService.isClickHouseEnabled",
-      {
-        attributes: { "tenant.id": projectId },
-      },
-      async (span) => {
-        span.setAttribute("project.feature.clickhouse", true);
-        return true;
-      },
-    );
-  }
-
-  /**
    * Get filter options for a specific filter field.
    *
    * Returns null if:
