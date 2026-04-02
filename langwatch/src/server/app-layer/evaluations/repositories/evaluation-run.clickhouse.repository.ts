@@ -139,7 +139,6 @@ export class EvaluationRunClickHouseRepository
         `,
         query_params: { tenantId, evaluationId },
         format: "JSONEachRow",
-        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseEvaluationRunRecord>();
