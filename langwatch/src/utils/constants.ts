@@ -38,4 +38,5 @@ export const KSUID_RESOURCES = {
   TRACKED_EVENT: "trackedevent",
   USER: "user",
   PROMPT_PLAYGROUND_THREAD: "promptthread",
+  DATASET_RECORD: "dsrecord",
 } as const;

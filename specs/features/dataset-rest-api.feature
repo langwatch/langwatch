@@ -159,6 +159,53 @@ Feature: Dataset REST API
     When I call GET /api/dataset/ghost/records
     Then the request fails with 404 Not Found
 
+  # ── Batch Create Records ──────────────────────────────────────
+
+  @integration
+  Scenario: Batch create records via POST /:slugOrId/records
+    Given a dataset "my-dataset" with columns [input, output]
+    When I call POST /api/dataset/my-dataset/records with entries [{"input": "hello", "output": "world"}]
+    Then the records are created with unique IDs
+    And the response includes the created records with their IDs
+
+  @integration
+  Scenario: Batch create records accepts dataset ID as well as slug
+    Given a dataset with slug "my-data" and id "dataset_xyz" with columns [input]
+    When I call POST /api/dataset/dataset_xyz/records with entries [{"input": "test"}]
+    Then the records are created for the matching dataset
+
+  @integration
+  Scenario: Batch create records validates column names against dataset schema
+    Given a dataset "my-dataset" with columns [input, output]
+    When I call POST /api/dataset/my-dataset/records with entries [{"input": "hi", "foo": "bar"}]
+    Then the request fails with 400 Bad Request
+    And the error identifies "foo" as an invalid column
+
+  @integration
+  Scenario: Batch create records allows entries with subset of columns
+    Given a dataset "my-dataset" with columns [input, output]
+    When I call POST /api/dataset/my-dataset/records with entries [{"input": "hi"}]
+    Then the records are created successfully
+    And the missing column "output" defaults to null
+
+  @integration
+  Scenario: Batch create records returns 404 for non-existent dataset
+    When I call POST /api/dataset/ghost/records with entries [{"input": "hello"}]
+    Then the request fails with 404 Not Found
+
+  @integration
+  Scenario: Batch create records requires entries in body
+    Given a dataset "my-dataset" exists
+    When I call POST /api/dataset/my-dataset/records with an empty body
+    Then the request fails with 422 Unprocessable Entity
+
+  @integration
+  Scenario: Batch create records enforces maximum batch size
+    Given a dataset "my-dataset" with columns [input]
+    When I call POST /api/dataset/my-dataset/records with more than 1000 entries
+    Then the request fails with 422 Unprocessable Entity
+    And the error indicates the batch size limit
+
   # ── Update Record ──────────────────────────────────────────────
 
   @integration

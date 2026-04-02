@@ -156,6 +156,38 @@ export class DatasetRecordRepository {
   }
 
   /**
+   * Creates multiple records in a single batch operation.
+   * Returns the created records with their generated timestamps.
+   */
+  async createMany(input: {
+    records: Array<{
+      id: string;
+      entry: Prisma.InputJsonValue;
+    }>;
+    datasetId: string;
+    projectId: string;
+  }): Promise<DatasetRecord[]> {
+    const data = input.records.map((record) => ({
+      id: record.id,
+      entry: record.entry,
+      datasetId: input.datasetId,
+      projectId: input.projectId,
+    }));
+
+    await this.prisma.datasetRecord.createMany({ data });
+
+    // Fetch the created records to return full entities with timestamps
+    return await this.prisma.datasetRecord.findMany({
+      where: {
+        id: { in: input.records.map((r) => r.id) },
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
    * Deletes records by IDs within a dataset and project.
    * Returns the count of deleted records.
    */
