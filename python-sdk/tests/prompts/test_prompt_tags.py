@@ -8,7 +8,7 @@ Covers:
 - MATERIALIZED_FIRST + tag skips local files
 - create/update with tags list
 - PromptApiService.get() passes tag as query parameter
-- Backward-compatible labels alias
+- Global interface attributes
 """
 import json
 from unittest.mock import Mock, patch
@@ -205,13 +205,13 @@ class TestPromptApiServiceAssignTag:
         """
         Given a prompt API service
         When assign_tag() is called for "pizza-prompt" version "v3_id" tag "production"
-        Then put_api_prompts_by_id_labels_by_label.sync_detailed is called correctly
+        Then put_api_prompts_by_id_tags_by_tag.sync_detailed is called correctly
         """
-        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_response_200 import (
-            PutApiPromptsByIdLabelsByLabelResponse200,
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_response_200 import (
+            PutApiPromptsByIdTagsByTagResponse200,
         )
 
-        parsed = PutApiPromptsByIdLabelsByLabelResponse200(
+        parsed = PutApiPromptsByIdTagsByTagResponse200(
             config_id="config_abc",
             version_id="v3_id",
             updated_at="2026-01-01T00:00:00.000Z",
@@ -220,7 +220,7 @@ class TestPromptApiServiceAssignTag:
         mock_resp = _mock_sync_detailed_response(parsed)
 
         with patch(
-            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_labels_by_label"
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_tags_by_tag"
         ) as mock_module:
             mock_module.sync_detailed.return_value = mock_resp
             client = Mock()
@@ -243,11 +243,11 @@ class TestPromptApiServiceAssignTag:
         When assign_tag() is called with tag="canary"
         Then the generated client is called with tag="canary"
         """
-        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_response_200 import (
-            PutApiPromptsByIdLabelsByLabelResponse200,
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_response_200 import (
+            PutApiPromptsByIdTagsByTagResponse200,
         )
 
-        parsed = PutApiPromptsByIdLabelsByLabelResponse200(
+        parsed = PutApiPromptsByIdTagsByTagResponse200(
             config_id="config_abc",
             version_id="v3_id",
             updated_at="2026-01-01T00:00:00.000Z",
@@ -256,7 +256,7 @@ class TestPromptApiServiceAssignTag:
         mock_resp = _mock_sync_detailed_response(parsed)
 
         with patch(
-            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_labels_by_label"
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_tags_by_tag"
         ) as mock_module:
             mock_module.sync_detailed.return_value = mock_resp
             client = Mock()
@@ -276,11 +276,11 @@ class TestPromptApiServiceAssignTag:
         When the API returns configId, versionId, tag, updatedAt
         Then the result dict contains all four fields
         """
-        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_response_200 import (
-            PutApiPromptsByIdLabelsByLabelResponse200,
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_response_200 import (
+            PutApiPromptsByIdTagsByTagResponse200,
         )
 
-        parsed = PutApiPromptsByIdLabelsByLabelResponse200(
+        parsed = PutApiPromptsByIdTagsByTagResponse200(
             config_id="config_abc",
             version_id="v3_id",
             updated_at="2026-01-01T00:00:00.000Z",
@@ -289,7 +289,7 @@ class TestPromptApiServiceAssignTag:
         mock_resp = _mock_sync_detailed_response(parsed)
 
         with patch(
-            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_labels_by_label"
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_tags_by_tag"
         ) as mock_module:
             mock_module.sync_detailed.return_value = mock_resp
             client = Mock()
@@ -313,11 +313,11 @@ class TestPromptApiServiceAssignTag:
         """
         from http import HTTPStatus
         from langwatch.generated.langwatch_rest_api_client.types import Response
-        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_response_404 import (
-            PutApiPromptsByIdLabelsByLabelResponse404,
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_response_404 import (
+            PutApiPromptsByIdTagsByTagResponse404,
         )
 
-        parsed_404 = PutApiPromptsByIdLabelsByLabelResponse404.from_dict(
+        parsed_404 = PutApiPromptsByIdTagsByTagResponse404.from_dict(
             {"error": "Prompt not found"}
         )
         mock_resp = Response(
@@ -328,7 +328,7 @@ class TestPromptApiServiceAssignTag:
         )
 
         with patch(
-            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_labels_by_label"
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id_tags_by_tag"
         ) as mock_module:
             mock_module.sync_detailed.return_value = mock_resp
             client = Mock()
@@ -738,110 +738,14 @@ class TestPromptsFacadeTagsAssign:
 
 
 # ---------------------------------------------------------------------------
-# Backward compatibility: labels alias
-# ---------------------------------------------------------------------------
-
-
-class TestBackwardCompatLabelsAlias:
-    """Tests that the labels property and label= parameter still work."""
-
-    def test_labels_property_returns_tags_namespace(self):
-        """
-        When prompts.labels is accessed
-        Then it returns the same PromptTagsNamespace as prompts.tags
-        """
-        mock_client = Mock()
-        facade = PromptsFacade(mock_client)
-
-        assert type(facade.labels) == type(facade.tags)
-
-    def test_labels_assign_works_with_deprecated_label_param(self):
-        """
-        When labels.assign() is called with label="production" (deprecated)
-        Then it calls the API service assign_tag
-        """
-        mock_client = Mock()
-        facade = PromptsFacade(mock_client)
-        facade._api_service.assign_tag = Mock(return_value={
-            "configId": "config_abc",
-            "versionId": "v3_id",
-            "tag": "production",
-            "updatedAt": "2026-01-01T00:00:00.000Z",
-        })
-
-        with pytest.warns(DeprecationWarning, match="label.*deprecated"):
-            facade.labels.assign(
-                "pizza-prompt", label="production", version_id="v3_id"
-            )
-
-        facade._api_service.assign_tag.assert_called_once_with(
-            "pizza-prompt", "production", "v3_id"
-        )
-
-    def test_create_with_deprecated_labels_param(self):
-        """
-        When create() is called with labels=["production"] (deprecated)
-        Then it passes tags=["production"] to the API service
-        """
-        from langwatch.prompts.types import PromptData, Message
-
-        mock_client = Mock()
-        facade = PromptsFacade(mock_client)
-        mock_data = PromptData(
-            id="pizza-prompt", handle="pizza-prompt", scope="PROJECT",
-            version=1, version_id="v1", model="openai/gpt-4",
-            messages=[Message(role="system", content="v1")], prompt="v1",
-        )
-        facade._api_service.create = Mock(return_value=mock_data)
-
-        with pytest.warns(DeprecationWarning, match="labels.*deprecated"):
-            facade.create(handle="pizza-prompt", labels=["production"])
-
-        call_kwargs = facade._api_service.create.call_args[1]
-        assert call_kwargs["tags"] == ["production"]
-
-    def test_update_with_deprecated_labels_param(self):
-        """
-        When update() is called with labels=["staging"] (deprecated)
-        Then it passes tags=["staging"] to the API service
-        """
-        from langwatch.prompts.types import PromptData, Message
-
-        mock_client = Mock()
-        facade = PromptsFacade(mock_client)
-        mock_data = PromptData(
-            id="pizza-prompt", handle="pizza-prompt", scope="PROJECT",
-            version=2, version_id="v2", model="openai/gpt-4",
-            messages=[Message(role="system", content="v2")], prompt="v2",
-        )
-        facade._api_service.update = Mock(return_value=mock_data)
-
-        with pytest.warns(DeprecationWarning, match="labels.*deprecated"):
-            facade.update(
-                prompt_id_or_handle="pizza-prompt",
-                scope="PROJECT",
-                commit_message="update",
-                labels=["staging"],
-            )
-
-        call_kwargs = facade._api_service.update.call_args[1]
-        assert call_kwargs["tags"] == ["staging"]
-
-
-# ---------------------------------------------------------------------------
 # Integration with langwatch.prompts (global interface)
 # ---------------------------------------------------------------------------
 
 
 class TestLangwatchPromptsGlobalInterface:
-    """Tests that langwatch.prompts exposes the tags and labels sub-resources."""
+    """Tests that langwatch.prompts exposes the tags sub-resource."""
 
     def test_langwatch_prompts_has_tags_attribute(self, clean_langwatch):
         """langwatch.prompts.tags exists and has an assign method."""
         assert hasattr(langwatch.prompts, "tags")
         assert callable(getattr(langwatch.prompts.tags, "assign", None))
-
-    def test_langwatch_prompts_has_labels_attribute(self, clean_langwatch):
-        """langwatch.prompts.labels exists and has an assign method (backward compat)."""
-        assert hasattr(langwatch.prompts, "labels")
-        assert callable(getattr(langwatch.prompts.labels, "assign", None))

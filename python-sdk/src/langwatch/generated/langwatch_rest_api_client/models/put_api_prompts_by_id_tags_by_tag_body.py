@@ -4,42 +4,27 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse200")
+T = TypeVar("T", bound="PutApiPromptsByIdTagsByTagBody")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse200:
+class PutApiPromptsByIdTagsByTagBody:
     """
     Attributes:
-        config_id (str):
         version_id (str):
-        label (str):
-        updated_at (str):
     """
 
-    config_id: str
     version_id: str
-    label: str
-    updated_at: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        config_id = self.config_id
-
         version_id = self.version_id
-
-        label = self.label
-
-        updated_at = self.updated_at
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "configId": config_id,
                 "versionId": version_id,
-                "label": label,
-                "updatedAt": updated_at,
             }
         )
 
@@ -48,23 +33,14 @@ class PutApiPromptsByIdLabelsByLabelResponse200:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        config_id = d.pop("configId")
-
         version_id = d.pop("versionId")
 
-        label = d.pop("label")
-
-        updated_at = d.pop("updatedAt")
-
-        put_api_prompts_by_id_labels_by_label_response_200 = cls(
-            config_id=config_id,
+        put_api_prompts_by_id_tags_by_tag_body = cls(
             version_id=version_id,
-            label=label,
-            updated_at=updated_at,
         )
 
-        put_api_prompts_by_id_labels_by_label_response_200.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_200
+        put_api_prompts_by_id_tags_by_tag_body.additional_properties = d
+        return put_api_prompts_by_id_tags_by_tag_body
 
     @property
     def additional_keys(self) -> list[str]:

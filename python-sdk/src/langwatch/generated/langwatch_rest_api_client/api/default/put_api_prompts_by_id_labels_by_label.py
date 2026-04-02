@@ -6,6 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.put_api_prompts_by_id_labels_by_label_body import PutApiPromptsByIdLabelsByLabelBody
+from ...models.put_api_prompts_by_id_labels_by_label_label import PutApiPromptsByIdLabelsByLabelLabel
 from ...models.put_api_prompts_by_id_labels_by_label_response_200 import PutApiPromptsByIdLabelsByLabelResponse200
 from ...models.put_api_prompts_by_id_labels_by_label_response_400 import PutApiPromptsByIdLabelsByLabelResponse400
 from ...models.put_api_prompts_by_id_labels_by_label_response_401 import PutApiPromptsByIdLabelsByLabelResponse401
@@ -17,7 +18,7 @@ from ...types import Response
 
 def _get_kwargs(
     id: str,
-    tag: str,
+    label: PutApiPromptsByIdLabelsByLabelLabel,
     *,
     body: PutApiPromptsByIdLabelsByLabelBody,
 ) -> dict[str, Any]:
@@ -25,7 +26,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": f"/api/prompts/{id}/tags/{tag}",
+        "url": f"/api/prompts/{id}/labels/{label}",
     }
 
     _body = body.to_dict()
@@ -101,7 +102,7 @@ def _build_response(
 
 def sync_detailed(
     id: str,
-    tag: str,
+    label: PutApiPromptsByIdLabelsByLabelLabel,
     *,
     client: Union[AuthenticatedClient, Client],
     body: PutApiPromptsByIdLabelsByLabelBody,
@@ -119,7 +120,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        tag (str):
+        label (PutApiPromptsByIdLabelsByLabelLabel):
         body (PutApiPromptsByIdLabelsByLabelBody):
 
     Raises:
@@ -132,7 +133,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         id=id,
-        tag=tag,
+        label=label,
         body=body,
     )
 
@@ -145,7 +146,7 @@ def sync_detailed(
 
 def sync(
     id: str,
-    tag: str,
+    label: PutApiPromptsByIdLabelsByLabelLabel,
     *,
     client: Union[AuthenticatedClient, Client],
     body: PutApiPromptsByIdLabelsByLabelBody,
@@ -163,7 +164,7 @@ def sync(
 
     Args:
         id (str):
-        tag (str):
+        label (PutApiPromptsByIdLabelsByLabelLabel):
         body (PutApiPromptsByIdLabelsByLabelBody):
 
     Raises:
@@ -176,7 +177,7 @@ def sync(
 
     return sync_detailed(
         id=id,
-        tag=tag,
+        label=label,
         client=client,
         body=body,
     ).parsed
@@ -184,7 +185,7 @@ def sync(
 
 async def asyncio_detailed(
     id: str,
-    tag: str,
+    label: PutApiPromptsByIdLabelsByLabelLabel,
     *,
     client: Union[AuthenticatedClient, Client],
     body: PutApiPromptsByIdLabelsByLabelBody,
@@ -202,7 +203,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        tag (str):
+        label (PutApiPromptsByIdLabelsByLabelLabel):
         body (PutApiPromptsByIdLabelsByLabelBody):
 
     Raises:
@@ -215,7 +216,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         id=id,
-        tag=tag,
+        label=label,
         body=body,
     )
 
@@ -226,7 +227,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     id: str,
-    tag: str,
+    label: PutApiPromptsByIdLabelsByLabelLabel,
     *,
     client: Union[AuthenticatedClient, Client],
     body: PutApiPromptsByIdLabelsByLabelBody,
@@ -244,7 +245,7 @@ async def asyncio(
 
     Args:
         id (str):
-        tag (str):
+        label (PutApiPromptsByIdLabelsByLabelLabel):
         body (PutApiPromptsByIdLabelsByLabelBody):
 
     Raises:
@@ -258,7 +259,7 @@ async def asyncio(
     return (
         await asyncio_detailed(
             id=id,
-            tag=tag,
+            label=label,
             client=client,
             body=body,
         )

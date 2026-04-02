@@ -192,7 +192,8 @@ class TestTagWithMaterializedFirst:
                     mock_request.return_value = _api_response(3)
 
                     result = prompts.get(
-                        "my-prompt", tag="production",
+                        "my-prompt",
+                        tag="production",
                         fetch_policy=FetchPolicy.MATERIALIZED_FIRST,
                     )
 
@@ -262,10 +263,11 @@ class TestTagAssignment:
 
                     # Verify PUT was sent
                     call_kwargs = mock_request.call_args
-                    method = call_kwargs.kwargs.get("method") or call_kwargs[1].get("method")
-                    assert method == "put"
+                    assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
                     assert "/api/prompts/pizza-prompt/tags/production" in url
+                    json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
+                    assert json_body.get("versionId") == "prompt_version_abc123"
 
                     # Verify response
                     assert result["versionId"] == "prompt_version_abc123"
