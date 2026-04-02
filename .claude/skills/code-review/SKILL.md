@@ -1,13 +1,13 @@
 ---
 name: code-review
 description: "Project-level code review: check changed files against LangWatch codebase rules (IDs, multitenancy, layering, naming, SRP)."
-context: fork
-model: sonnet
 user-invocable: true
-argument-hint: "[branch or commit range, default: diff against origin/main]"
+argument-hint: "[diff, branch, or commit range]"
 ---
 
-Review code changes against origin/main (or the provided range) and sign off on each rule below.
+Review code changes and sign off on each rule below.
+
+**What to diff:** Use the provided argument if given (a diff, branch, or commit range). Otherwise diff against `origin/main`, or the PR base branch if on a PR branch. If ambiguous, ask.
 
 For each rule: **PASS** if no violations, or **FAIL** with every violation listed — one per line with `file:line`.
 
