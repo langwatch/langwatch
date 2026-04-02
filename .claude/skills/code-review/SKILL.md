@@ -119,22 +119,23 @@ For each **new file** (not just modified) in the diff, check:
 
 ## Step 3: Summary
 
-Output a table:
+Output results per check. Use `PASS` or `FAIL` with every violation listed — one per line with file:line. No commentary on passing checks.
+
+Format:
 
 ```
-| # | Check                          | Result |
-|---|--------------------------------|--------|
-| 1 | KSUID only (no uuid/nanoid)    | PASS/FAIL |
-| 2 | No FK in migrations            | PASS/FAIL |
-| 3 | projectId in Prisma queries    | PASS/FAIL |
-| 4 | TenantId in ClickHouse queries | PASS/FAIL |
-| 5 | No TypeScript `any`            | PASS/FAIL |
-| 6 | No hardcoded schema names      | PASS/FAIL |
-| 7 | Hooks don't return JSX         | PASS/FAIL |
-| 8 | No backwards-compat re-exports | PASS/FAIL |
-| 9 | Layer violations               | PASS/FAIL |
-| 10| Repo/service method naming     | PASS/FAIL |
-| 11| Single Responsibility          | PASS/FAIL |
+### 1. KSUID only (no uuid/nanoid) — PASS
+
+### 2. No FK in migrations — FAIL
+- FOREIGN KEY in `migrations/001_init.sql:45`
+- ADD CONSTRAINT FOREIGN in `migrations/002_add.sql:12`
+
+### 3. projectId in Prisma queries — FAIL
+- `findMany` without projectId in `src/api.ts:33`
+
+### 4. TenantId in ClickHouse queries — PASS
+
+...
 ```
 
-List violations grouped by check. No commentary on passing checks.
+List ALL violations for each failing check. Use `file:line` format for every entry.
