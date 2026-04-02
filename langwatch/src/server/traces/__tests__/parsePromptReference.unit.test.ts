@@ -8,7 +8,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -18,7 +18,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "my-org/deep/nested-prompt",
         promptVersionNumber: 12,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -28,37 +28,37 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "simple-prompt",
         promptVersionNumber: 1,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
 
-    it("resolves non-integer suffix as a label", () => {
+    it("resolves non-integer suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:abc" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "abc",
+        promptTag: "abc",
         promptVariables: null,
       });
     });
 
-    it("resolves zero suffix as a label", () => {
+    it("resolves zero suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:0" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "0",
+        promptTag: "0",
         promptVariables: null,
       });
     });
 
-    it("resolves negative suffix as a label", () => {
+    it("resolves negative suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:-1" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "-1",
+        promptTag: "-1",
         promptVariables: null,
       });
     });
@@ -68,29 +68,29 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
 
-    it("resolves float suffix as a label", () => {
+    it("resolves float suffix as a tag", () => {
       const attrs = { "langwatch.prompt.id": "team/prompt:1.5" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/prompt",
         promptVersionNumber: null,
-        promptLabel: "1.5",
+        promptTag: "1.5",
         promptVariables: null,
       });
     });
   });
 
-  describe("when slug:label shorthand is present", () => {
-    it("resolves to handle and label", () => {
+  describe("when slug:tag shorthand is present", () => {
+    it("resolves to handle and tag", () => {
       const attrs = { "langwatch.prompt.id": "pizza-prompt:production" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: null,
-        promptLabel: "production",
+        promptTag: "production",
         promptVariables: null,
       });
     });
@@ -100,17 +100,17 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: 3,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
 
-    it("treats 'latest' suffix as no label or version", () => {
+    it("treats 'latest' suffix as no tag or version", () => {
       const attrs = { "langwatch.prompt.id": "pizza-prompt:latest" };
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "pizza-prompt",
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -125,7 +125,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 2,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -138,7 +138,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 5,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -148,7 +148,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -158,7 +158,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -169,7 +169,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference({})).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -182,7 +182,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -198,7 +198,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/new-prompt",
         promptVersionNumber: 5,
-        promptLabel: null,
+        promptTag: null,
         promptVariables: null,
       });
     });
@@ -293,7 +293,7 @@ describe("parsePromptReference()", () => {
       const result = parsePromptReference(attrs);
       expect(result.promptHandle).toBeNull();
       expect(result.promptVersionNumber).toBeNull();
-      expect(result.promptLabel).toBeNull();
+      expect(result.promptTag).toBeNull();
       expect(result.promptVariables).toEqual({ name: "Alice" });
     });
   });
