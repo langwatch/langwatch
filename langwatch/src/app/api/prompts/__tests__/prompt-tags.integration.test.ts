@@ -308,7 +308,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
             id: `vtag_${nanoid()}`,
             configId: promptConfig.id,
             versionId: promptVersion.id,
-            tag: "canary",
+            tagId: "canary",
             projectId: testProject.id,
           },
         });
@@ -318,7 +318,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
         expect(res.status).toBe(204);
 
         const assignment = await prisma.promptTagAssignment.findFirst({
-          where: { configId: promptConfig.id, tag: "canary", projectId: testProject.id },
+          where: { configId: promptConfig.id, tagId: "canary", projectId: testProject.id },
         });
         expect(assignment).toBeNull();
       });

@@ -139,7 +139,7 @@ export class PromptTagRepository {
       if (projectIds.length > 0) {
         await tx.promptTagAssignment.deleteMany({
           where: {
-            tag: tag.name,
+            tagId: tag.name,
             projectId: { in: projectIds },
           },
         });
@@ -187,10 +187,10 @@ export class PromptTagRepository {
       if (projectIds.length > 0) {
         await tx.promptTagAssignment.updateMany({
           where: {
-            tag: oldName,
+            tagId: oldName,
             projectId: { in: projectIds },
           },
-          data: { tag: newName },
+          data: { tagId: newName },
         });
       }
 
