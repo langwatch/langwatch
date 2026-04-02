@@ -21,7 +21,7 @@ const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const; // Thresholds i
 const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 // NOTE: In-memory cooldown does not survive restarts and does not coordinate across replicas. Accepted tradeoff: worst case is a duplicate Slack alert.
-const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000);
+const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000, "billing:limitcd:");
 export { resourceLimitCooldown };
 
 export interface UsageLimitData {

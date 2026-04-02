@@ -4,7 +4,7 @@ import { prisma } from "~/server/db";
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 /** Cache: projectId -> organizationId. Avoids repeated DB lookups. */
-const orgCache = new TtlCache<string>(TEN_MINUTES_MS);
+const orgCache = new TtlCache<string>(TEN_MINUTES_MS, "org:proj2org:");
 
 /**
  * Resolves the organizationId for a given projectId.

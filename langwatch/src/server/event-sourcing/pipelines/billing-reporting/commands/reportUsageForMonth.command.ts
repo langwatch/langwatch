@@ -33,7 +33,7 @@ type CachedOrgData = {
   subscriptions: { id: string }[];
 };
 
-const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS);
+const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS, "billing:org:");
 
 
 export interface ReportUsageForMonthCommandDeps {

@@ -48,9 +48,9 @@ export class UsageService {
     private readonly simulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds">,
     private readonly clickhouseAvailable: boolean,
   ) {
-    this.countCache = new TtlCache<number>(CACHE_TTL_MS);
-    this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
-    this.scenarioSetCache = new TtlCache<string[]>(CACHE_TTL_MS);
+    this.countCache = new TtlCache<number>(CACHE_TTL_MS, "usage:count:");
+    this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS, "usage:decision:");
+    this.scenarioSetCache = new TtlCache<string[]>(CACHE_TTL_MS, "usage:scenariosets:");
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
