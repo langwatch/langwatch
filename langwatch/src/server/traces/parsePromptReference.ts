@@ -26,7 +26,7 @@ export interface PromptReference {
  * "latest" suffix is treated as a no-op (no tag, no version).
  *
  * @param attrs - Span attributes record
- * @returns Parsed prompt reference with handle, version, tag, and variables, or nulls if not found
+ * @returns Parsed prompt reference with any available handle/version/tag data, plus parsed prompt variables when present
  */
 export function parsePromptReference(
   attrs: Record<string, unknown>,

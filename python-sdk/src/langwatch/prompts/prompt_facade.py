@@ -297,7 +297,7 @@ class PromptTagsNamespace:
 
         Args:
             prompt_id: The prompt ID or handle
-            tag: The tag to assign ("production" or "staging")
+            tag: The tag to assign (e.g., "production", "staging", or a custom tag)
             version_id: The version ID to assign the tag to
 
         Returns:
