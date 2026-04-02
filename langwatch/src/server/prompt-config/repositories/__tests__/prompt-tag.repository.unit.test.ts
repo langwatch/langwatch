@@ -85,7 +85,7 @@ describe("PromptTagRepository", () => {
           where: { organizationId, name: "canary" },
         });
         expect(mockTx.promptTagAssignment.deleteMany).toHaveBeenCalledWith({
-          where: { tag: "canary", projectId: { in: ["proj_1"] } },
+          where: { tagId: "canary", projectId: { in: ["proj_1"] } },
         });
         expect(mockTx.promptTag.delete).toHaveBeenCalledWith({
           where: { id: "ptag_1" },
@@ -141,8 +141,8 @@ describe("PromptTagRepository", () => {
 
         expect(result).toEqual(updatedTag);
         expect(mockTx.promptTagAssignment.updateMany).toHaveBeenCalledWith({
-          where: { tag: "canary", projectId: { in: ["proj_1", "proj_2"] } },
-          data: { tag: "beta" },
+          where: { tagId: "canary", projectId: { in: ["proj_1", "proj_2"] } },
+          data: { tagId: "beta" },
         });
         expect(mockTx.promptTag.update).toHaveBeenCalledWith({
           where: { id: "ptag_1" },
