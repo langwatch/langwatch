@@ -35,6 +35,20 @@ export class EvaluationRunStore
     );
   }
 
+  async bulkStore(
+    entries: Array<{ state: EvaluationRunData; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+    await this.repo.bulkUpsert(
+      entries.map(({ state, context }) => ({
+        data: state.evaluationId
+          ? state
+          : { ...state, evaluationId: String(context.aggregateId) },
+        tenantId: String(context.tenantId),
+      })),
+    );
+  }
+
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,
