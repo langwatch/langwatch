@@ -404,6 +404,83 @@ export const clickHouseFilters: Record<
     extractResults: extractStandardResults,
   },
 
+  "evaluations.evaluator_id.has_passed": {
+    tableName: "evaluation_runs",
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          EvaluatorId as field,
+          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+          count() as count
+        FROM evaluation_runs
+        WHERE ${buildEvaluationRunsConditions(params)}
+          AND Passed IS NOT NULL
+          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
+  "evaluations.evaluator_id.has_score": {
+    tableName: "evaluation_runs",
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          EvaluatorId as field,
+          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+          count() as count
+        FROM evaluation_runs
+        WHERE ${buildEvaluationRunsConditions(params)}
+          AND Score IS NOT NULL
+          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
+  "evaluations.evaluator_id.has_label": {
+    tableName: "evaluation_runs",
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          EvaluatorId as field,
+          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+          count() as count
+        FROM evaluation_runs
+        WHERE ${buildEvaluationRunsConditions(params)}
+          AND Label IS NOT NULL
+          AND Label != ''
+          AND Label NOT IN ('succeeded', 'failed')
+          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
   "evaluations.passed": {
     tableName: "evaluation_runs",
     buildQuery: (params) => {

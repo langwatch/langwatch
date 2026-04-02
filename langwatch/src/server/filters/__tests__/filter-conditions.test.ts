@@ -197,6 +197,44 @@ describe("clickHouseFilterConditions", () => {
     });
   });
 
+  describe("evaluations.evaluator_id.has_passed", () => {
+    it("generates EXISTS subquery filtering on Passed IS NOT NULL", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["eval-1", "eval-2"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain("es.Passed IS NOT NULL");
+      expect(result.params).toEqual({ f0_values: ["eval-1", "eval-2"] });
+    });
+  });
+
+  describe("evaluations.evaluator_id.has_score", () => {
+    it("generates EXISTS subquery filtering on Score IS NOT NULL", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain("es.Score IS NOT NULL");
+      expect(result.params).toEqual({ f0_values: ["eval-1"] });
+    });
+  });
+
+  describe("evaluations.evaluator_id.has_label", () => {
+    it("generates EXISTS subquery filtering on Label IS NOT NULL and excludes succeeded/failed", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain("es.Label IS NOT NULL");
+      expect(result.sql).toContain("es.Label != ''");
+      expect(result.sql).toContain("es.Label NOT IN ('succeeded', 'failed')");
+      expect(result.params).toEqual({ f0_values: ["eval-1"] });
+    });
+  });
+
   describe("evaluations.passed", () => {
     it("returns 1=0 when key is missing", () => {
       const builder = clickHouseFilterConditions["evaluations.passed"];

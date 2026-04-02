@@ -810,12 +810,278 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "evaluations.evaluator_id.has_passed": {
+    name: "Evaluators with Passed results",
+    urlKey: "evaluator_id_has_passed",
+    query: (values) => ({
+      nested: {
+        path: "evaluations",
+        query: {
+          terms: { "evaluations.evaluator_id": values },
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query) => ({
+        unique_evaluator_ids: {
+          nested: { path: "evaluations" },
+          aggs: {
+            has_passed: {
+              filter: {
+                exists: { field: "evaluations.passed" },
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "evaluations.evaluator_id",
+                    size: 10_000,
+                    order: { _key: "asc" },
+                  },
+                  aggs: {
+                    labels: {
+                      filter: query
+                        ? {
+                            prefix: {
+                              "evaluations.name": {
+                                value: query,
+                                case_insensitive: true,
+                              },
+                            },
+                          }
+                        : {
+                            match_all: {},
+                          },
+                      aggs: {
+                        name: {
+                          terms: {
+                            field: "evaluations.name",
+                            size: 1,
+                          },
+                        },
+                        type: {
+                          terms: {
+                            field: "evaluations.type",
+                            size: 1,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_evaluator_ids?.has_passed?.child?.buckets?.map(
+            (bucket: any) => {
+              const type: string = bucket.labels.type.buckets?.[0]?.key;
+              const name: string = bucket.labels.name.buckets?.[0]?.key;
+              const checkDefinition =
+                AVAILABLE_EVALUATORS[type as EvaluatorTypes];
+
+              return {
+                field: bucket.key,
+                label: `[${
+                  name ?? checkDefinition?.name ?? type ?? "custom"
+                }] ${name}`,
+                count: bucket.doc_count,
+              };
+            },
+          ) ?? []
+        );
+      },
+    },
+  },
+  "evaluations.evaluator_id.has_score": {
+    name: "Evaluators with Score results",
+    urlKey: "evaluator_id_has_score",
+    query: (values) => ({
+      nested: {
+        path: "evaluations",
+        query: {
+          terms: { "evaluations.evaluator_id": values },
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query) => ({
+        unique_evaluator_ids: {
+          nested: { path: "evaluations" },
+          aggs: {
+            has_score: {
+              filter: {
+                exists: { field: "evaluations.score" },
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "evaluations.evaluator_id",
+                    size: 10_000,
+                    order: { _key: "asc" },
+                  },
+                  aggs: {
+                    labels: {
+                      filter: query
+                        ? {
+                            prefix: {
+                              "evaluations.name": {
+                                value: query,
+                                case_insensitive: true,
+                              },
+                            },
+                          }
+                        : {
+                            match_all: {},
+                          },
+                      aggs: {
+                        name: {
+                          terms: {
+                            field: "evaluations.name",
+                            size: 1,
+                          },
+                        },
+                        type: {
+                          terms: {
+                            field: "evaluations.type",
+                            size: 1,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_evaluator_ids?.has_score?.child?.buckets?.map(
+            (bucket: any) => {
+              const type: string = bucket.labels.type.buckets?.[0]?.key;
+              const name: string = bucket.labels.name.buckets?.[0]?.key;
+              const checkDefinition =
+                AVAILABLE_EVALUATORS[type as EvaluatorTypes];
+
+              return {
+                field: bucket.key,
+                label: `[${
+                  name ?? checkDefinition?.name ?? type ?? "custom"
+                }] ${name}`,
+                count: bucket.doc_count,
+              };
+            },
+          ) ?? []
+        );
+      },
+    },
+  },
+  "evaluations.evaluator_id.has_label": {
+    name: "Evaluators with Label results",
+    urlKey: "evaluator_id_has_label",
+    query: (values) => ({
+      nested: {
+        path: "evaluations",
+        query: {
+          terms: { "evaluations.evaluator_id": values },
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query) => ({
+        unique_evaluator_ids: {
+          nested: { path: "evaluations" },
+          aggs: {
+            has_label: {
+              filter: {
+                bool: {
+                  must: [
+                    { exists: { field: "evaluations.label" } },
+                  ],
+                  must_not: [
+                    {
+                      terms: {
+                        "evaluations.label": ["succeeded", "failed"],
+                      },
+                    },
+                  ],
+                } as QueryDslBoolQuery,
+              },
+              aggs: {
+                child: {
+                  terms: {
+                    field: "evaluations.evaluator_id",
+                    size: 10_000,
+                    order: { _key: "asc" },
+                  },
+                  aggs: {
+                    labels: {
+                      filter: query
+                        ? {
+                            prefix: {
+                              "evaluations.name": {
+                                value: query,
+                                case_insensitive: true,
+                              },
+                            },
+                          }
+                        : {
+                            match_all: {},
+                          },
+                      aggs: {
+                        name: {
+                          terms: {
+                            field: "evaluations.name",
+                            size: 1,
+                          },
+                        },
+                        type: {
+                          terms: {
+                            field: "evaluations.type",
+                            size: 1,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_evaluator_ids?.has_label?.child?.buckets?.map(
+            (bucket: any) => {
+              const type: string = bucket.labels.type.buckets?.[0]?.key;
+              const name: string = bucket.labels.name.buckets?.[0]?.key;
+              const checkDefinition =
+                AVAILABLE_EVALUATORS[type as EvaluatorTypes];
+
+              return {
+                field: bucket.key,
+                label: `[${
+                  name ?? checkDefinition?.name ?? type ?? "custom"
+                }] ${name}`,
+                count: bucket.doc_count,
+              };
+            },
+          ) ?? []
+        );
+      },
+    },
+  },
   "evaluations.passed": {
     name: "Evaluation Passed",
     urlKey: "evaluation_passed",
     single: true,
     requiresKey: {
-      filter: "evaluations.evaluator_id.guardrails_only",
+      filter: "evaluations.evaluator_id.has_passed",
     },
     query: (values, key) => ({
       nested: {
@@ -890,7 +1156,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     type: "numeric",
     single: true,
     requiresKey: {
-      filter: "evaluations.evaluator_id",
+      filter: "evaluations.evaluator_id.has_score",
     },
     query: (values, key) => ({
       nested: {
@@ -956,7 +1222,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Evaluation Label",
     urlKey: "evaluation_label",
     requiresKey: {
-      filter: "evaluations.evaluator_id",
+      filter: "evaluations.evaluator_id.has_label",
     },
     query: (values, key) => ({
       nested: {

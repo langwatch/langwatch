@@ -155,6 +155,41 @@ export const clickHouseFilterConditions: Record<
     params: { [`${paramId}_values`]: values },
   }),
 
+  "evaluations.evaluator_id.has_passed": (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM evaluation_runs es
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
+        AND es.Passed IS NOT NULL
+    )`,
+    params: { [`${paramId}_values`]: values },
+  }),
+
+  "evaluations.evaluator_id.has_score": (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM evaluation_runs es
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
+        AND es.Score IS NOT NULL
+    )`,
+    params: { [`${paramId}_values`]: values },
+  }),
+
+  "evaluations.evaluator_id.has_label": (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM evaluation_runs es
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
+        AND es.Label IS NOT NULL
+        AND es.Label != ''
+        AND es.Label NOT IN ('succeeded', 'failed')
+    )`,
+    params: { [`${paramId}_values`]: values },
+  }),
+
   "evaluations.passed": (values, paramId, key) => {
     if (!key) return { sql: "1=0", params: {} };
     const passedValues = values.map((v) => (v === "true" || v === "1" ? 1 : 0));

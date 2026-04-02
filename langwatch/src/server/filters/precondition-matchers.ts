@@ -106,6 +106,9 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   // Evaluation fields — not available at trace arrival time
   "evaluations.evaluator_id": null,
   "evaluations.evaluator_id.guardrails_only": null,
+  "evaluations.evaluator_id.has_passed": null,
+  "evaluations.evaluator_id.has_score": null,
+  "evaluations.evaluator_id.has_label": null,
   "evaluations.passed": null,
   "evaluations.score": null,
   "evaluations.state": null,
@@ -187,6 +190,9 @@ export const PRECONDITION_ALLOWED_RULES: Record<
   // Evaluation fields — not usable as preconditions
   "evaluations.evaluator_id": EMPTY_RULES,
   "evaluations.evaluator_id.guardrails_only": EMPTY_RULES,
+  "evaluations.evaluator_id.has_passed": EMPTY_RULES,
+  "evaluations.evaluator_id.has_score": EMPTY_RULES,
+  "evaluations.evaluator_id.has_label": EMPTY_RULES,
   "evaluations.passed": EMPTY_RULES,
   "evaluations.score": EMPTY_RULES, // numeric
   "evaluations.state": EMPTY_RULES,

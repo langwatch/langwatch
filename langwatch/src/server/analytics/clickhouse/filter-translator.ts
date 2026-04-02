@@ -95,6 +95,12 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
   "evaluations.evaluator_id.guardrails_only": (values) =>
     translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.has_passed": (values) =>
+    translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.has_score": (values) =>
+    translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.has_label": (values) =>
+    translateEvaluatorIdFilter(values),
   "evaluations.passed": (values, key) =>
     translateEvaluationPassedFilter(values, key),
   "evaluations.score": (values, key) =>
