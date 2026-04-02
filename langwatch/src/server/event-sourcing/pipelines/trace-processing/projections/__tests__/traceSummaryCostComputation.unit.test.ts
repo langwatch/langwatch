@@ -690,3 +690,107 @@ describe("applySpanToSummary per-role cost/latency accumulation", () => {
     });
   });
 });
+
+describe("applySpanToSummary token timing from OTel instrumentation events (@regression)", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("when span has llm.content.completion.chunk events (opentelemetry-instrumentation-openai)", () => {
+    it("computes timeToFirstToken from the earliest chunk event", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 3000,
+        durationMs: 2000,
+        events: [
+          { name: "llm.content.completion.chunk", timeUnixMs: 1200, attributes: {} },
+          { name: "llm.content.completion.chunk", timeUnixMs: 1500, attributes: {} },
+          { name: "llm.content.completion.chunk", timeUnixMs: 2800, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(200);
+    });
+
+    it("computes timeToLastToken from the latest chunk event", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 3000,
+        durationMs: 2000,
+        events: [
+          { name: "llm.content.completion.chunk", timeUnixMs: 1200, attributes: {} },
+          { name: "llm.content.completion.chunk", timeUnixMs: 1500, attributes: {} },
+          { name: "llm.content.completion.chunk", timeUnixMs: 2800, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToLastTokenMs).toBe(1800);
+    });
+  });
+
+  describe("when span has First Token Stream Event events (openinference-instrumentation-openai)", () => {
+    it("computes timeToFirstToken from the earliest stream event", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 5000,
+        endTimeUnixMs: 8000,
+        durationMs: 3000,
+        events: [
+          { name: "First Token Stream Event", timeUnixMs: 5350, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(350);
+    });
+
+    it("computes timeToLastToken from the latest stream event", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 5000,
+        endTimeUnixMs: 8000,
+        durationMs: 3000,
+        events: [
+          { name: "First Token Stream Event", timeUnixMs: 5350, attributes: {} },
+          { name: "First Token Stream Event", timeUnixMs: 7900, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToLastTokenMs).toBe(2900);
+    });
+  });
+
+  describe("when span has gen_ai.content.chunk events (already supported)", () => {
+    it("computes timeToFirstToken as before", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 3000,
+        durationMs: 2000,
+        events: [
+          { name: "gen_ai.content.chunk", timeUnixMs: 1100, attributes: {} },
+          { name: "gen_ai.content.chunk", timeUnixMs: 2900, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(100);
+      expect(result.timeToLastTokenMs).toBe(1900);
+    });
+  });
+});
