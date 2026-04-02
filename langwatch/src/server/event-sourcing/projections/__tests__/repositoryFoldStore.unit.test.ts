@@ -80,6 +80,78 @@ describe("RepositoryFoldStore", () => {
     });
   });
 
+  describe("storeBatch()", () => {
+    describe("when repository supports storeProjectionBatch", () => {
+      it("delegates to native batch insert with all entries", async () => {
+        const repo = makeMockRepo();
+        const batchSpy = vi.fn().mockResolvedValue(undefined);
+        (repo as any).storeProjectionBatch = batchSpy;
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+
+        await store.storeBatch([
+          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1" }) },
+          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2" }) },
+        ]);
+
+        expect(batchSpy).toHaveBeenCalledOnce();
+        const projections = batchSpy.mock.calls[0]![0];
+        expect(projections).toHaveLength(2);
+        expect(projections[0].aggregateId).toBe("agg-1");
+        expect(projections[0].data.total).toBe(1);
+        expect(projections[1].aggregateId).toBe("agg-2");
+        expect(projections[1].data.total).toBe(2);
+        // Individual store should NOT be called
+        expect(repo.storeProjection).not.toHaveBeenCalled();
+      });
+
+      it("passes tenantId from first entry as write context", async () => {
+        const repo = makeMockRepo();
+        const batchSpy = vi.fn().mockResolvedValue(undefined);
+        (repo as any).storeProjectionBatch = batchSpy;
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+
+        await store.storeBatch([
+          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ tenantId: "proj_xyz" as TenantId }) },
+        ]);
+
+        expect(batchSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ tenantId: "proj_xyz" }),
+        );
+      });
+    });
+
+    describe("when repository does not support storeProjectionBatch", () => {
+      it("falls back to sequential store calls", async () => {
+        const repo = makeMockRepo();
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+
+        await store.storeBatch([
+          { state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 }, context: makeContext({ aggregateId: "agg-1" }) },
+          { state: { total: 2, status: "b", CreatedAt: 300, UpdatedAt: 400 }, context: makeContext({ aggregateId: "agg-2" }) },
+        ]);
+
+        expect(repo.storeProjection).toHaveBeenCalledTimes(2);
+        expect(repo.storedProjections[0]!.aggregateId).toBe("agg-1");
+        expect(repo.storedProjections[1]!.aggregateId).toBe("agg-2");
+      });
+    });
+
+    describe("when entries list is empty", () => {
+      it("skips store entirely", async () => {
+        const repo = makeMockRepo();
+        const batchSpy = vi.fn().mockResolvedValue(undefined);
+        (repo as any).storeProjectionBatch = batchSpy;
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+
+        await store.storeBatch([]);
+
+        expect(batchSpy).not.toHaveBeenCalled();
+        expect(repo.storeProjection).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("get()", () => {
     it("returns data from projection when found", async () => {
       const repo = makeMockRepo();

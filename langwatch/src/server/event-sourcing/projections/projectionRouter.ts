@@ -33,6 +33,7 @@ import { FoldProjectionExecutor } from "./foldProjectionExecutor";
 import type { MapProjectionDefinition } from "./mapProjection.types";
 import { MapProjectionExecutor } from "./mapProjectionExecutor";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
+import type { ReplayMarkerChecker } from "./replayMarkerCheck";
 
 /**
  * Central router that registers fold and map projections and dispatches events.
@@ -64,6 +65,7 @@ export class ProjectionRouter<
     private readonly queueManager: QueueManager<EventType>,
     private readonly featureFlagService?: FeatureFlagServiceInterface,
     private readonly processRole?: ProcessRole,
+    private readonly replayMarkerChecker?: ReplayMarkerChecker,
   ) {}
 
   registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
@@ -584,6 +586,12 @@ export class ProjectionRouter<
           logger: this.logger,
         });
         if (disabled) return;
+
+        // Defer or skip if projection-replay is active for this aggregate
+        if (this.replayMarkerChecker) {
+          const decision = await this.replayMarkerChecker.check(projectionName, event);
+          if (decision === "skip") return;
+        }
 
         const key = fold.key ? fold.key(event) : undefined;
         const storeContext: ProjectionStoreContext = {

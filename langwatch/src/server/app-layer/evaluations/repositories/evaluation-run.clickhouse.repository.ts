@@ -92,6 +92,60 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
+  async upsertBatch(
+    entries: Array<{ data: EvaluationRunData; tenantId: string }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    const tenantId = entries[0]!.tenantId;
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.upsertBatch",
+    );
+
+    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
+    if (mixedTenant) {
+      throw new Error(
+        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
+        `Each batch must contain a single tenant to ensure correct DB routing.`,
+      );
+    }
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const records = entries.map(({ data, tenantId: tid }) => {
+        const projectionId = data.scheduledAt
+          ? IdUtils.generateDeterministicEvaluationRunId(
+              tid,
+              data.evaluationId,
+              data.scheduledAt,
+            )
+          : data.evaluationId;
+        return this.toClickHouseRecord(
+          data,
+          tid,
+          projectionId,
+          EVALUATION_PROJECTION_VERSIONS.STATE,
+        );
+      });
+
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, count: entries.length, error: errorMessage },
+        "Failed to batch store evaluation runs in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getByEvaluationId(
     tenantId: string,
     evaluationId: string,

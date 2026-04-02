@@ -44,6 +44,32 @@ export class RepositoryFoldStore<TData>
     await this.repo.storeProjection(projection, { tenantId: context.tenantId });
   }
 
+  async storeBatch(
+    entries: Array<{ state: TData; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    // Use native batch insert if the repository supports it
+    if (this.repo.storeProjectionBatch) {
+      const projections = entries.map((entry) => ({
+        id: entry.context.aggregateId,
+        aggregateId: entry.context.aggregateId,
+        tenantId: entry.context.tenantId,
+        version: this.version,
+        data: entry.state,
+      }));
+      await this.repo.storeProjectionBatch(projections, {
+        tenantId: entries[0]!.context.tenantId,
+      });
+      return;
+    }
+
+    // Fallback: sequential store calls
+    for (const entry of entries) {
+      await this.store(entry.state, entry.context);
+    }
+  }
+
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,
