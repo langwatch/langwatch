@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildMetricAlias,
   isPercentileAggregation,
@@ -238,10 +238,112 @@ describe("metric-translator", () => {
     });
 
     describe("sentiment metrics", () => {
-      it("translates sentiment.thumbs_up_down", () => {
-        const result = translateMetric("sentiment.thumbs_up_down", "sum", 0);
-        expect(result.selectExpression).toContain("thumbs_up_down");
-        expect(result.requiredJoins).toContain("stored_spans");
+      describe("when aggregation is cardinality", () => {
+        it("counts traces with thumbs_up_down events using countIf", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "cardinality",
+            0
+          );
+          expect(result.selectExpression).toContain("countIf");
+          expect(result.selectExpression).toMatch(
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+          );
+          const eventTypeParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentEventType_")
+          );
+          expect(eventTypeParam).toBeDefined();
+          expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is sum", () => {
+        let result: ReturnType<typeof translateMetric>;
+
+        beforeEach(() => {
+          result = translateMetric("sentiment.thumbs_up_down", "sum", 0);
+        });
+
+        it("extracts vote values and applies sumArray", () => {
+          expect(result.selectExpression).toContain("sumArray");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+
+        it("filters to thumbs_up_down events using parameterized query", () => {
+          expect(result.selectExpression).toMatch(
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+          );
+          const eventTypeParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentEventType_")
+          );
+          expect(eventTypeParam).toBeDefined();
+          expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
+        });
+
+        it("extracts event.metrics.vote using parameterized query", () => {
+          const voteKeyParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentVoteKey_")
+          );
+          expect(voteKeyParam).toBeDefined();
+          expect(result.params[voteKeyParam!]).toBe("event.metrics.vote");
+        });
+
+        it("excludes zero values from the extraction", () => {
+          expect(result.selectExpression).toContain("x != 0");
+        });
+      });
+
+      describe("when aggregation is avg", () => {
+        it("extracts vote values and applies avgArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "avg",
+            0
+          );
+          expect(result.selectExpression).toContain("avgArray");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is min", () => {
+        it("extracts vote values and applies minArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "min",
+            0
+          );
+          expect(result.selectExpression).toContain("minArray");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is max", () => {
+        it("extracts vote values and applies maxArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "max",
+            0
+          );
+          expect(result.selectExpression).toContain("maxArray");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is a percentile", () => {
+        it("extracts vote values and applies quantileExactArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "p95",
+            0
+          );
+          expect(result.selectExpression).toContain("quantileExactArray(0.95)");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
       });
     });
 
