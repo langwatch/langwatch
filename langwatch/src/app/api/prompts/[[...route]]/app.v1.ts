@@ -17,6 +17,13 @@ import { TagValidationError } from "~/server/prompt-config/repositories/llm-conf
 import { createLogger } from "~/utils/logger/server";
 import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
+  PromptTagConflictError,
+  PromptTagNotFoundError,
+  PromptTagProtectedError,
+  PromptTagService,
+  PromptTagValidationError,
+} from "~/server/prompt-config/prompt-tag.service";
+import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
@@ -184,6 +191,204 @@ app.put(
         throw new HTTPException(422, {
           message: error.message,
         });
+      }
+      throw error;
+    }
+  },
+);
+
+// --- Tag definition CRUD (org-level) ---
+
+// List all tag definitions for the org
+app.get(
+  "/tags",
+  describeRoute({
+    description: "List all prompt tag definitions for the organization",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.array(
+                z.object({
+                  id: z.string(),
+                  name: z.string(),
+                  createdAt: z.coerce.date(),
+                }),
+              ),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const organization = c.get("organization");
+    const tagService = PromptTagService.create(prisma);
+    const tags = await tagService.getAll({ organizationId: organization.id });
+
+    return c.json(
+      tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        createdAt: tag.createdAt,
+      })),
+    );
+  },
+);
+
+// Create a tag definition
+app.post(
+  "/tags",
+  describeRoute({
+    description: "Create a custom prompt tag definition for the organization",
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Tag created",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                createdAt: z.coerce.date(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ name: z.string() })),
+  async (c) => {
+    const organization = c.get("organization");
+    const { name } = c.req.valid("json");
+    const tagService = PromptTagService.create(prisma);
+
+    try {
+      const tag = await tagService.create({
+        organizationId: organization.id,
+        name,
+      });
+
+      logger.info({ organizationId: organization.id, name }, "Custom prompt tag created via REST");
+
+      return c.json(
+        { id: tag.id, name: tag.name, createdAt: tag.createdAt },
+        201,
+      );
+    } catch (error) {
+      if (error instanceof PromptTagValidationError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      if (error instanceof PromptTagConflictError) {
+        throw new HTTPException(409, { message: error.message });
+      }
+      throw error;
+    }
+  },
+);
+
+// Rename a tag definition
+app.put(
+  "/tags/:tag",
+  describeRoute({
+    description: "Rename a prompt tag definition",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Tag renamed",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                createdAt: z.coerce.date(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ name: z.string() })),
+  async (c) => {
+    const organization = c.get("organization");
+    const { tag: oldName } = c.req.param();
+    const { name: newName } = c.req.valid("json");
+    const tagService = PromptTagService.create(prisma);
+
+    try {
+      const tag = await tagService.rename({
+        organizationId: organization.id,
+        oldName,
+        newName,
+      });
+
+      logger.info(
+        { organizationId: organization.id, oldName, newName },
+        "Custom prompt tag renamed via REST",
+      );
+
+      return c.json({ id: tag.id, name: tag.name, createdAt: tag.createdAt });
+    } catch (error) {
+      if (error instanceof PromptTagValidationError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      if (error instanceof PromptTagConflictError) {
+        throw new HTTPException(409, { message: error.message });
+      }
+      if (error instanceof PromptTagProtectedError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      if (error instanceof PromptTagNotFoundError) {
+        throw new HTTPException(404, { message: error.message });
+      }
+      throw error;
+    }
+  },
+);
+
+// Delete a tag definition
+app.delete(
+  "/tags/:tag",
+  describeRoute({
+    description: "Delete a prompt tag definition and cascade to assignments",
+    responses: {
+      ...baseResponses,
+      204: { description: "Tag deleted" },
+    },
+  }),
+  async (c) => {
+    const organization = c.get("organization");
+    const { tag: tagName } = c.req.param();
+    const tagService = PromptTagService.create(prisma);
+
+    try {
+      const tag = await tagService.deleteByName({
+        organizationId: organization.id,
+        name: tagName,
+      });
+
+      if (!tag) {
+        throw new HTTPException(404, {
+          message: `Tag not found: ${tagName}`,
+        });
+      }
+
+      logger.info(
+        { organizationId: organization.id, tagName },
+        "Custom prompt tag deleted via REST",
+      );
+
+      return new Response(null, { status: 204 });
+    } catch (error) {
+      if (error instanceof PromptTagProtectedError) {
+        throw new HTTPException(422, { message: error.message });
       }
       throw error;
     }
