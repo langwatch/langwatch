@@ -22,10 +22,11 @@ GROUP BY t."organizationId", a."tag";
 -- Step 3: Backfill tagId from matching PromptTag rows
 UPDATE "PromptTagAssignment" a
 SET "tagId" = pt.id
-FROM "Project" p
-JOIN "Team" t ON t.id = p."teamId"
-JOIN "PromptTag" pt ON pt."organizationId" = t."organizationId" AND pt.name = a.tag
-WHERE a."projectId" = p.id;
+FROM "Project" p, "Team" t, "PromptTag" pt
+WHERE a."projectId" = p.id
+  AND p."teamId" = t.id
+  AND pt."organizationId" = t."organizationId"
+  AND pt.name = a.tag;
 
 -- Step 4: Set tagId NOT NULL
 ALTER TABLE "PromptTagAssignment" ALTER COLUMN "tagId" SET NOT NULL;
