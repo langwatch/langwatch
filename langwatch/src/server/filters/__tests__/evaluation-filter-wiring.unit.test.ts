@@ -28,21 +28,18 @@ describe("evaluation filter requiresKey wiring", () => {
 
   describe("when new filter variants are defined", () => {
     it("defines evaluations.evaluator_id.has_passed", () => {
-      expect(availableFilters["evaluations.evaluator_id.has_passed"]).toBeDefined();
       expect(availableFilters["evaluations.evaluator_id.has_passed"].name).toBe(
         "Evaluators with Passed results",
       );
     });
 
     it("defines evaluations.evaluator_id.has_score", () => {
-      expect(availableFilters["evaluations.evaluator_id.has_score"]).toBeDefined();
       expect(availableFilters["evaluations.evaluator_id.has_score"].name).toBe(
         "Evaluators with Score results",
       );
     });
 
     it("defines evaluations.evaluator_id.has_label", () => {
-      expect(availableFilters["evaluations.evaluator_id.has_label"]).toBeDefined();
       expect(availableFilters["evaluations.evaluator_id.has_label"].name).toBe(
         "Evaluators with Label results",
       );
@@ -51,16 +48,12 @@ describe("evaluation filter requiresKey wiring", () => {
 
   describe("when existing filters are checked", () => {
     it("preserves evaluations.evaluator_id unchanged", () => {
-      expect(availableFilters["evaluations.evaluator_id"]).toBeDefined();
       expect(availableFilters["evaluations.evaluator_id"].name).toBe(
         "Contains Evaluation",
       );
     });
 
     it("preserves evaluations.evaluator_id.guardrails_only unchanged", () => {
-      expect(
-        availableFilters["evaluations.evaluator_id.guardrails_only"],
-      ).toBeDefined();
       expect(
         availableFilters["evaluations.evaluator_id.guardrails_only"].name,
       ).toBe("Contains Evaluation (guardrails only)");
