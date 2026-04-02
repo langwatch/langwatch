@@ -701,21 +701,22 @@ function translateSentimentMetric(
     case "sentiment.thumbs_up_down": {
       requiredJoins.push("stored_spans");
 
+      const params: Record<string, unknown> = {};
+      const eventTypeParam = genMetricParamName("sentimentEventType");
+      params[eventTypeParam] = "thumbs_up_down";
+
       // For cardinality, count traces that have thumbs_up_down events
       if (aggregation === "cardinality") {
         return {
-          selectExpression: `countIf(has(${ss}."Events.Name", 'thumbs_up_down')) AS ${alias}`,
+          selectExpression: `countIf(has(${ss}."Events.Name", {${eventTypeParam}:String})) AS ${alias}`,
           alias,
           requiredJoins,
-          params: {},
+          params,
         };
       }
 
       // For all other aggregations, extract vote values and aggregate
-      const params: Record<string, unknown> = {};
-      const eventTypeParam = genMetricParamName("sentimentEventType");
       const voteKeyParam = genMetricParamName("sentimentVoteKey");
-      params[eventTypeParam] = "thumbs_up_down";
       params[voteKeyParam] = "event.metrics.vote";
 
       // Extract vote values from Events.Attributes for thumbs_up_down events,

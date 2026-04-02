@@ -228,7 +228,14 @@ describe("metric-translator", () => {
             0
           );
           expect(result.selectExpression).toContain("countIf");
-          expect(result.selectExpression).toContain("thumbs_up_down");
+          expect(result.selectExpression).toMatch(
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+          );
+          const eventTypeParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentEventType_")
+          );
+          expect(eventTypeParam).toBeDefined();
+          expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
           expect(result.requiredJoins).toContain("stored_spans");
         });
       });
@@ -277,6 +284,7 @@ describe("metric-translator", () => {
             0
           );
           expect(result.selectExpression).toContain("avgArray");
+          expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
         });
       });
@@ -289,6 +297,7 @@ describe("metric-translator", () => {
             0
           );
           expect(result.selectExpression).toContain("minArray");
+          expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
         });
       });
@@ -301,6 +310,7 @@ describe("metric-translator", () => {
             0
           );
           expect(result.selectExpression).toContain("maxArray");
+          expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
         });
       });
@@ -313,6 +323,7 @@ describe("metric-translator", () => {
             0
           );
           expect(result.selectExpression).toContain("quantileExactArray(0.95)");
+          expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
         });
       });
