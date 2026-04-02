@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient, PromptTag, PromptTagAssignment } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
-import { PromptTagRepository } from "./prompt-tag.repository";
 
 const logger = createLogger("langwatch:prompt-version-tags");
 
@@ -13,47 +12,12 @@ export class TagValidationError extends Error {
 }
 
 /**
- * Repository for managing prompt version tags.
- * Tags are named pointers (production, staging, or custom) to specific prompt versions.
- * Built-in tags "production" and "staging" are always valid.
- * Custom tags are valid when a PromptTag definition exists for the org.
- * "latest" is resolved at query time (highest version number), never stored.
+ * Repository for managing prompt version tag assignments.
+ * Assignments link a prompt config to a PromptTag definition via FK.
+ * Tag validation is the service layer's responsibility.
  */
 export class PromptTagAssignmentRepository {
-  private readonly tagDefinitionRepo: PromptTagRepository;
-
-  constructor(private readonly prisma: PrismaClient) {
-    this.tagDefinitionRepo = new PromptTagRepository(prisma);
-  }
-
-  /**
-   * Validates that a tag is acceptable for assignment without org context.
-   * For checking custom tag existence, use tagExistsForOrg() with organizationId.
-   */
-  validateTag(tag: string): void {
-    if (!tag) {
-      logger.warn({ tag }, "Invalid tag name rejected");
-      throw new TagValidationError(
-        `Invalid tag "${tag}". Must be a custom tag defined for this org.`,
-      );
-    }
-  }
-
-  /**
-   * Returns true if the tag definition exists for the given org.
-   */
-  async tagExistsForOrg({
-    tag,
-    organizationId,
-  }: {
-    tag: string;
-    organizationId: string;
-  }): Promise<boolean> {
-    return this.tagDefinitionRepo.existsForOrg({
-      tag,
-      organizationId,
-    });
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   /**
    * Validates that a version belongs to the specified prompt config.

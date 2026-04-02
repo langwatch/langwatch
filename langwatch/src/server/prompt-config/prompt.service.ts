@@ -1123,9 +1123,9 @@ export class PromptService {
     tagName: string;
     organizationId: string;
   }): Promise<string | null> {
-    const promptTag = await this.prisma.promptTag.findFirst({
-      where: { organizationId, name: tagName },
-      select: { id: true },
+    const promptTag = await this.promptTagRepository.findByOrgAndName({
+      organizationId,
+      name: tagName,
     });
     return promptTag?.id ?? null;
   }

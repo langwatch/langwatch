@@ -20,40 +20,6 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 }
 
 describe("PromptTagAssignmentRepository", () => {
-  describe("validateTag()", () => {
-    describe("when tag is 'production'", () => {
-      it("does not throw", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("production")).not.toThrow();
-      });
-    });
-
-    describe("when tag is 'staging'", () => {
-      it("does not throw", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("staging")).not.toThrow();
-      });
-    });
-
-    describe("when tag is a custom tag name", () => {
-      it("does not throw", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("canary")).not.toThrow();
-      });
-    });
-
-    describe("when tag is empty", () => {
-      it("throws a validation error", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("")).toThrow(TagValidationError);
-      });
-    });
-  });
-
   describe("assignTag()", () => {
     describe("when version does not belong to the prompt", () => {
       it("throws a validation error", async () => {

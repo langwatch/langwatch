@@ -115,6 +115,21 @@ export class PromptTagRepository {
   }
 
   /**
+   * Finds a tag definition by org and name. Returns null if not found.
+   */
+  async findByOrgAndName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<PromptTag | null> {
+    return this.prisma.promptTag.findFirst({
+      where: { organizationId, name },
+    });
+  }
+
+  /**
    * Seeds default tags (production, staging) for a new org.
    */
   async seedForOrg({ organizationId }: { organizationId: string }): Promise<void> {
