@@ -33,6 +33,7 @@ const {
         teamId: string | null;
         teamName: string | null;
         projectName: string | null;
+        projectNames: string[] | null;
         role: string | null;
         customRoleId: string | null;
         customRoleName: string | null;
@@ -232,6 +233,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: null,
           teamName: null,
           projectName: null,
+          projectNames: null,
           role: null,
           customRoleId: null,
           customRoleName: null,
@@ -247,6 +249,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: "team-1",
           teamName: "team-dev",
           projectName: "Project A",
+          projectNames: ["Project A"],
           role: "MEMBER",
           customRoleId: null,
           customRoleName: null,
@@ -288,6 +291,59 @@ describe("SCIM Group Mapping UI", () => {
       const dashes = screen.getAllByText("-");
       expect(dashes.length).toBeGreaterThanOrEqual(3);
     });
+
+    it("shows multiple projects summary when team has multiple projects", async () => {
+      mockMappingsData.current = [
+        {
+          id: "mapping-1",
+          externalGroupId: "ext-1",
+          externalGroupName: "clienta-dev-ro",
+          teamId: null,
+          teamName: null,
+          projectName: null,
+          projectNames: null,
+          role: null,
+          customRoleId: null,
+          customRoleName: null,
+          memberCount: 0,
+          mapped: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "mapping-2",
+          externalGroupId: "ext-2",
+          externalGroupName: "clienta-dev-rw",
+          teamId: "team-1",
+          teamName: "team-dev",
+          projectName: "Project A",
+          projectNames: ["Project A", "Project B"],
+          role: "MEMBER",
+          customRoleId: null,
+          customRoleName: null,
+          memberCount: 5,
+          mapped: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      const user = userEvent.setup();
+      renderPage();
+
+      const multipleIndicator = screen.getByText("Multiple projects (2)");
+      expect(multipleIndicator).toBeTruthy();
+
+      // We use the native `title` attribute for hover; ensure it includes all projects.
+      expect(multipleIndicator).toHaveAttribute(
+        "title",
+        expect.stringContaining("Project A"),
+      );
+      expect(multipleIndicator).toHaveAttribute(
+        "title",
+        expect.stringContaining("Project B"),
+      );
+    });
   });
 
   describe("when Edit button is clicked on an unmapped group", () => {
@@ -300,6 +356,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: null,
           teamName: null,
           projectName: null,
+          projectNames: null,
           role: null,
           customRoleId: null,
           customRoleName: null,
@@ -368,6 +425,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: null,
           teamName: null,
           projectName: null,
+          projectNames: null,
           role: null,
           customRoleId: null,
           customRoleName: null,
@@ -425,6 +483,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: null,
           teamName: null,
           projectName: null,
+          projectNames: null,
           role: null,
           customRoleId: null,
           customRoleName: null,
@@ -459,7 +518,7 @@ describe("SCIM Group Mapping UI", () => {
       expect(createTeamItems.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("shows teams grouped by project in team dropdown", async () => {
+    it("shows teams without project suffix in team dropdown", async () => {
       const user = userEvent.setup();
       renderPage();
 
@@ -467,7 +526,7 @@ describe("SCIM Group Mapping UI", () => {
       await user.click(editButtons[0]!);
 
       // Chakra Select renders items both as hidden <option> and visible <div>
-      const teamItems = screen.getAllByText("team-dev (Project A)");
+      const teamItems = screen.getAllByText("team-dev");
       expect(teamItems.length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -482,6 +541,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: null,
           teamName: null,
           projectName: null,
+          projectNames: null,
           role: null,
           customRoleId: null,
           customRoleName: null,
@@ -533,6 +593,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: "team-1",
           teamName: "team-dev",
           projectName: "Project A",
+          projectNames: ["Project A"],
           role: "MEMBER",
           customRoleId: null,
           customRoleName: null,
@@ -606,6 +667,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: "team-1",
           teamName: "team-dev",
           projectName: "Project A",
+          projectNames: ["Project A"],
           role: "MEMBER",
           customRoleId: null,
           customRoleName: null,
@@ -634,6 +696,7 @@ describe("SCIM Group Mapping UI", () => {
           teamId: "team-1",
           teamName: "team-dev",
           projectName: "Project A",
+          projectNames: ["Project A"],
           role: "CUSTOM",
           customRoleId: "cr-1",
           customRoleName: "Auditor",

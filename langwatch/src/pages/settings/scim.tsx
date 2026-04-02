@@ -332,6 +332,7 @@ type MappingRow = {
   teamId: string | null;
   teamName: string | null;
   projectName: string | null;
+  projectNames: string[] | null;
   role: TeamUserRole | null;
   customRoleId: string | null;
   customRoleName: string | null;
@@ -340,6 +341,60 @@ type MappingRow = {
 };
 
 const CREATE_NEW_TEAM_VALUE = "__create_new_team__";
+
+function getTeamDisplayName({
+  teamName,
+  projectName,
+  projectNames,
+}: {
+  teamName: string | null;
+  projectName?: string | null;
+  projectNames?: string[];
+}) {
+  if (!teamName) return null;
+
+  const candidates = projectNames ?? (projectName ? [projectName] : []);
+  for (const candidate of candidates) {
+    const suffix = ` (${candidate})`;
+    if (teamName.endsWith(suffix)) {
+      return teamName.slice(0, -suffix.length);
+    }
+  }
+
+  // Fallback: if the name is stored with a trailing "(...)" segment, strip it.
+  // This handles historical naming like "Team Foo (Project Bar)".
+  const match = teamName.match(/\s*\(([^()]*)\)\s*$/);
+  if (match) {
+    return teamName.replace(match[0], "").trimEnd();
+  }
+
+  return teamName;
+}
+
+function getProjectDisplay({
+  projectName,
+  projectNames,
+}: {
+  projectName: string | null;
+  projectNames: string[] | null;
+}) {
+  const names =
+    projectNames && projectNames.length > 0
+      ? projectNames
+      : projectName
+        ? [projectName]
+        : [];
+
+  if (names.length === 0) return "-";
+  if (names.length === 1) return names[0] ?? "-";
+
+  return (
+    <Text
+      as="span"
+      title={names.join(", ")}
+    >{`Multiple projects (${names.length})`}</Text>
+  );
+}
 
 function GroupMappingsSection({
   organizationId,
@@ -402,7 +457,7 @@ function GroupMappingsSection({
                   </Table.Cell>
                 </Table.Row>
               )}
-              {mappings.data?.map((mapping) => (
+              {mappings.data?.map((mapping: MappingRow) => (
                 <MappingTableRow
                   key={mapping.id}
                   mapping={mapping}
@@ -477,8 +532,19 @@ function MappingTableRow({
           <Badge colorPalette="yellow" size="sm">Unmapped</Badge>
         )}
       </Table.Cell>
-      <Table.Cell>{mapping.teamName ?? "-"}</Table.Cell>
-      <Table.Cell>{mapping.projectName ?? "-"}</Table.Cell>
+      <Table.Cell>
+        {getTeamDisplayName({
+          teamName: mapping.teamName,
+          projectName: mapping.projectName,
+          projectNames: mapping.projectNames ?? undefined,
+        }) ?? "-"}
+      </Table.Cell>
+      <Table.Cell>
+        {getProjectDisplay({
+          projectName: mapping.projectName,
+          projectNames: mapping.projectNames,
+        })}
+      </Table.Cell>
       <Table.Cell>{roleName}</Table.Cell>
       <Table.Cell>{mapping.memberCount}</Table.Cell>
       <Table.Cell>
@@ -572,18 +638,23 @@ function MappingInlineForm({
   }, [teams.data]);
 
   const teamItems = useMemo(() => {
+    // In the "Team" selector we only want the team name.
+    // Using `teamsByProject` would produce duplicates when teams span multiple projects.
+    if (!teams.data) return [];
     const items: { label: string; value: string }[] = [];
-    for (const group of teamsByProject) {
-      for (const team of group.teams) {
-        items.push({
-          label: `${team.name} (${group.projectName})`,
-          value: team.id,
-        });
-      }
+    const seen = new Set<string>();
+    for (const team of teams.data) {
+      if (seen.has(team.id)) continue;
+      seen.add(team.id);
+      const label = getTeamDisplayName({
+        teamName: team.name,
+        projectNames: team.projects.map((p) => p.name),
+      });
+      items.push({ label: label ?? team.name, value: team.id });
     }
     items.push({ label: "Create new team...", value: CREATE_NEW_TEAM_VALUE });
     return items;
-  }, [teamsByProject]);
+  }, [teams.data]);
 
   const teamCollection = useMemo(
     () => createListCollection({ items: teamItems }),

@@ -41,7 +41,6 @@ export const scimGroupMappingRouter = createTRPCRouter({
             include: {
               projects: {
                 where: { archivedAt: null },
-                take: 1,
                 select: { name: true },
               },
             },
@@ -57,7 +56,14 @@ export const scimGroupMappingRouter = createTRPCRouter({
         externalGroupName: m.externalGroupName,
         teamId: m.teamId,
         teamName: m.team?.name ?? null,
-        projectName: m.team?.projects[0]?.name ?? null,
+        projectNames:
+          m.team?.projects?.length && m.team.projects.length > 0
+            ? m.team.projects.map((p) => p.name)
+            : null,
+        projectName:
+          m.team?.projects?.length && m.team.projects.length > 0
+            ? m.team.projects[0]?.name ?? null
+            : null,
         role: m.role,
         customRoleId: m.customRoleId,
         customRoleName: m.customRole?.name ?? null,
