@@ -720,7 +720,7 @@ function translateSentimentMetric(
 
       // Extract vote values from Events.Attributes for thumbs_up_down events,
       // convert to float, and filter out NULLs and zeros.
-      // Pattern mirrors events.event_score (lines 618-658) with an additional
+      // Pattern mirrors scoreExtraction in translateEventMetric with an additional
       // zero-exclusion filter matching the ES registry's must_not: { term: { value: 0 } }.
       const voteExtraction = `arrayFilter(
           x -> x IS NOT NULL AND x != 0,

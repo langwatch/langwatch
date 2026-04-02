@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildMetricAlias,
   isPercentileAggregation,
@@ -234,23 +234,18 @@ describe("metric-translator", () => {
       });
 
       describe("when aggregation is sum", () => {
+        let result: ReturnType<typeof translateMetric>;
+
+        beforeEach(() => {
+          result = translateMetric("sentiment.thumbs_up_down", "sum", 0);
+        });
+
         it("extracts vote values and applies sumArray", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "sum",
-            0
-          );
           expect(result.selectExpression).toContain("sumArray");
           expect(result.requiredJoins).toContain("stored_spans");
         });
 
         it("filters to thumbs_up_down events using parameterized query", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "sum",
-            0
-          );
-          // Should use parameterized event type
           expect(result.selectExpression).toMatch(
             /\{m_sentimentEventType_[a-f0-9]+:String\}/
           );
@@ -262,11 +257,6 @@ describe("metric-translator", () => {
         });
 
         it("extracts event.metrics.vote using parameterized query", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "sum",
-            0
-          );
           const voteKeyParam = Object.keys(result.params).find((k) =>
             k.startsWith("m_sentimentVoteKey_")
           );
@@ -275,11 +265,6 @@ describe("metric-translator", () => {
         });
 
         it("excludes zero values from the extraction", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "sum",
-            0
-          );
           expect(result.selectExpression).toContain("x != 0");
         });
       });
