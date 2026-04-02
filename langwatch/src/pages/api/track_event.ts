@@ -114,114 +114,87 @@ export default async function handler(
   const eventId =
     body.event_id ?? generate(KSUID_RESOURCES.TRACKED_EVENT).toString();
 
-  if (project.featureEventSourcingTraceIngestion) {
-    try {
-      const timestampMs = body.timestamp ?? Date.now();
-      const timestampNano = String(timestampMs * 1_000_000);
-      const spanId = generateOtelSpanId();
+  try {
+    const timestampMs = body.timestamp ?? Date.now();
+    const timestampNano = String(timestampMs * 1_000_000);
+    const spanId = generateOtelSpanId();
 
-      // Build attributes array for the span
-      const attributes: {
-        key: string;
-        value: { stringValue?: string; doubleValue?: number };
-      }[] = [
-        { key: "event.type", value: { stringValue: body.event_type } },
-        { key: "event.id", value: { stringValue: eventId } },
-      ];
+    // Build attributes array for the span
+    const attributes: {
+      key: string;
+      value: { stringValue?: string; doubleValue?: number };
+    }[] = [
+      { key: "event.type", value: { stringValue: body.event_type } },
+      { key: "event.id", value: { stringValue: eventId } },
+    ];
 
-      // Add metrics as attributes
-      for (const [key, value] of Object.entries(body.metrics)) {
-        attributes.push({
-          key: `event.metrics.${key}`,
-          value: { doubleValue: value },
-        });
-      }
+    // Add metrics as attributes
+    for (const [key, value] of Object.entries(body.metrics)) {
+      attributes.push({
+        key: `event.metrics.${key}`,
+        value: { doubleValue: value },
+      });
+    }
 
-      // Add event_details as attributes
-      if (body.event_details) {
-        for (const [key, value] of Object.entries(body.event_details)) {
-          if (typeof value === "string") {
-            attributes.push({
-              key: `event.details.${key}`,
-              value: { stringValue: value },
-            });
-          } else if (typeof value === "number") {
-            attributes.push({
-              key: `event.details.${key}`,
-              value: { doubleValue: value },
-            });
-          } else if (value != null) {
-            attributes.push({
-              key: `event.details.${key}`,
-              value: { stringValue: String(value) },
-            });
-          }
+    // Add event_details as attributes
+    if (body.event_details) {
+      for (const [key, value] of Object.entries(body.event_details)) {
+        if (typeof value === "string") {
+          attributes.push({
+            key: `event.details.${key}`,
+            value: { stringValue: value },
+          });
+        } else if (typeof value === "number") {
+          attributes.push({
+            key: `event.details.${key}`,
+            value: { doubleValue: value },
+          });
+        } else if (value != null) {
+          attributes.push({
+            key: `event.details.${key}`,
+            value: { stringValue: String(value) },
+          });
         }
       }
-
-      await getApp().traces.recordSpan({
-        tenantId: project.id,
-        span: {
-          traceId: body.trace_id,
-          spanId: spanId,
-          traceState: null,
-          parentSpanId: null,
-          name: "langwatch.track_event",
-          kind: ESpanKind.SPAN_KIND_INTERNAL,
-          startTimeUnixNano: timestampNano,
-          endTimeUnixNano: timestampNano,
-          attributes: attributes,
-          events: [
-            {
-              name: body.event_type,
-              timeUnixNano: timestampNano,
-              attributes: attributes,
-            },
-          ],
-          links: [],
-          status: {
-            code: SpanStatusCode.OK as 1,
-          },
-          droppedAttributesCount: null,
-          droppedEventsCount: null,
-          droppedLinksCount: null,
-        },
-        resource: {
-          attributes: [],
-        },
-        instrumentationScope: {
-          name: "langwatch.track_event",
-        },
-        piiRedactionLevel: project.piiRedactionLevel,
-        occurredAt: Date.now(),
-      });
-    } catch (error) {
-      logger.error(
-        {
-          error,
-        },
-        "unable to dispatch tracked event span",
-      );
     }
-  }
 
-  await trackEventsQueue.add(
-    TRACK_EVENTS_QUEUE.JOB,
-    {
-      project_id: project.id,
-      postpone_count: 0,
-      event: {
-        ...body,
-        event_id: eventId,
-        timestamp: body.timestamp ?? Date.now(),
+    await getApp().traces.recordSpan({
+      tenantId: project.id,
+      span: {
+        traceId: body.trace_id,
+        spanId: spanId,
+        traceState: null,
+        parentSpanId: null,
+        name: "langwatch.track_event",
+        kind: ESpanKind.SPAN_KIND_INTERNAL,
+        startTimeUnixNano: timestampNano,
+        endTimeUnixNano: timestampNano,
+        attributes: attributes,
+        events: [
+          {
+            name: body.event_type,
+            timeUnixNano: timestampNano,
+            attributes: attributes,
+          },
+        ],
+        links: [],
+        status: {
+          code: SpanStatusCode.OK as 1,
+        },
+        droppedAttributesCount: null,
+        droppedEventsCount: null,
+        droppedLinksCount: null,
       },
-    },
-    {
-      jobId: `${project.id}_track_event_${eventId}`,
-      // Add a delay to track events to possibly wait for trace data to be available for the grouping keys
-      delay: process.env.VITEST_MODE ? 0 : 5000,
-    },
-  );
+      resource: {
+        attributes: [],
+      },
+      instrumentationScope: {
+        name: "langwatch.track_event",
+      },
+      piiRedactionLevel: project.piiRedactionLevel,
+      occurredAt: Date.now(),
+    });
+  }
 
   return res.status(200).json({ message: "Event tracked" });
 }
