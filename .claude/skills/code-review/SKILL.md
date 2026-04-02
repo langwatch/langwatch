@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Project-level code review: grep changed files for KSUID violations, foreign keys, missing projectId/TenantId, TypeScript `any`, and other LangWatch codebase rules."
+description: "Project-level code review: grep changed files for KSUID violations, foreign keys, missing projectId/TenantId, layer violations, SRP, and other LangWatch codebase rules."
 context: fork
 model: sonnet
 user-invocable: true
@@ -86,12 +86,19 @@ Grep added lines for patterns like `export { X } from "./old-location"` or `expo
 - **Pass**: No re-export shims
 - **Fail**: List each suspicious re-export (use judgment — new public API re-exports are fine)
 
-### Check 9: Hono routes go through services
+### Check 9: Layer violations (route → service → repository)
 
-Grep added Hono route files for direct repository imports or instantiation. Routes must call services, never repositories directly.
+The layering rule: routes/controllers → services → repositories. Never skip layers.
 
-- **Pass**: No direct repository usage in route files
-- **Fail**: List each violation
+Grep added files for these violations:
+- **Route/controller files** importing from `repositories/` or instantiating repositories directly. Routes must only call services.
+- **Service files** importing from another domain's `repositories/` directly (cross-domain access goes through that domain's service).
+- **Repository files** importing from `services/` (repositories never call up).
+
+Look at import paths in changed files within `src/server/app-layer/`. File naming convention: `*.route.ts` or Hono route files, `*.service.ts`, `repositories/*.repository.ts`.
+
+- **Pass**: All imports respect route → service → repository
+- **Fail**: List each layer-skipping import
 
 ### Check 10: Repository/service method naming
 
@@ -99,6 +106,16 @@ Grep added repository files for methods named `list*` or `get*` (should be `find
 
 - **Pass**: Correct naming conventions
 - **Fail**: List each violation
+
+### Check 11: Single Responsibility — files doing too much
+
+For each **new file** (not just modified) in the diff, check:
+- Does the file mix concerns? E.g. a service that also does HTTP handling, a repository that contains business logic, a component that fetches data and renders UI.
+- Does a single file export more than one class/service/repository? Each file should have one primary responsibility.
+- Are there functions over ~100 lines in added code? Flag as potential SRP smell.
+
+- **Pass**: New files have clear single responsibilities
+- **Fail**: List each file with the concern mix identified
 
 ## Step 3: Summary
 
@@ -115,8 +132,9 @@ Output a table:
 | 6 | No hardcoded schema names      | PASS/FAIL |
 | 7 | Hooks don't return JSX         | PASS/FAIL |
 | 8 | No backwards-compat re-exports | PASS/FAIL |
-| 9 | Hono routes use services       | PASS/FAIL |
+| 9 | Layer violations               | PASS/FAIL |
 | 10| Repo/service method naming     | PASS/FAIL |
+| 11| Single Responsibility          | PASS/FAIL |
 ```
 
 List violations grouped by check. No commentary on passing checks.
