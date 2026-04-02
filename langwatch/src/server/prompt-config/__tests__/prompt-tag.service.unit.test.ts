@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   PromptTagConflictError,
+  PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagService,
   PromptTagValidationError,
@@ -351,6 +352,19 @@ describe("PromptTagService", () => {
         await expect(
           service.rename({ organizationId, oldName: "canary", newName: "staging" }),
         ).rejects.toThrow(PromptTagConflictError);
+      });
+    });
+
+    describe("when repo throws not-found error", () => {
+      it("throws PromptTagNotFoundError", async () => {
+        const repo = makeRepo({
+          rename: vi.fn().mockRejectedValue(new Error('Tag "canary" not found')),
+        });
+        const service = new PromptTagService(repo);
+
+        await expect(
+          service.rename({ organizationId, oldName: "canary", newName: "beta" }),
+        ).rejects.toThrow(PromptTagNotFoundError);
       });
     });
   });

@@ -18,6 +18,7 @@ import { createLogger } from "~/utils/logger/server";
 import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
   PromptTagConflictError,
+  PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagService,
   PromptTagValidationError,
@@ -344,7 +345,7 @@ app.put(
       if (error instanceof PromptTagProtectedError) {
         throw new HTTPException(422, { message: error.message });
       }
-      if (error instanceof Error && error.message.includes("not found")) {
+      if (error instanceof PromptTagNotFoundError) {
         throw new HTTPException(404, { message: error.message });
       }
       throw error;

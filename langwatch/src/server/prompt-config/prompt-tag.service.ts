@@ -22,9 +22,19 @@ export class PromptTagConflictError extends Error {
   }
 }
 
-export class PromptTagProtectedError extends Error {
+export class PromptTagNotFoundError extends Error {
   constructor(public readonly tagName: string) {
-    super(`"${tagName}" is a protected tag and cannot be deleted.`);
+    super(`Tag "${tagName}" not found.`);
+    this.name = "PromptTagNotFoundError";
+  }
+}
+
+export class PromptTagProtectedError extends Error {
+  constructor(
+    public readonly tagName: string,
+    action: "deleted" | "renamed" = "deleted",
+  ) {
+    super(`"${tagName}" is a protected tag and cannot be ${action}.`);
     this.name = "PromptTagProtectedError";
   }
 }
@@ -188,7 +198,7 @@ export class PromptTagService {
     newName: string;
   }): Promise<PromptTag> {
     if (PROTECTED_TAGS.includes(oldName as ProtectedTag)) {
-      throw new PromptTagProtectedError(oldName);
+      throw new PromptTagProtectedError(oldName, "renamed");
     }
 
     validateTagName(newName);
@@ -200,6 +210,12 @@ export class PromptTagService {
         throw new PromptTagConflictError(
           `A tag with name "${newName}" already exists in this org.`,
         );
+      }
+      if (
+        error instanceof Error &&
+        error.message.includes("not found")
+      ) {
+        throw new PromptTagNotFoundError(oldName);
       }
       throw error;
     }

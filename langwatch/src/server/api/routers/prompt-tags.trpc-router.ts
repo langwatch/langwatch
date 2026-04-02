@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   PromptTagConflictError,
+  PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagService,
   PromptTagValidationError,
@@ -46,6 +47,9 @@ function mapServiceError(error: unknown): never {
   }
   if (error instanceof PromptTagProtectedError) {
     throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+  }
+  if (error instanceof PromptTagNotFoundError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
   throw error;
 }
