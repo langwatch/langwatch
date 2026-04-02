@@ -37,7 +37,7 @@ For each rule: **PASS** if no violations, or **FAIL** with every violation liste
 
 ## Output format
 
-```
+```text
 ### 1. KSUID only (no uuid/nanoid) — PASS
 
 ### 2. No FK in migrations — FAIL
