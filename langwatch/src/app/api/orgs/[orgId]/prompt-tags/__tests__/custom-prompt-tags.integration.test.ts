@@ -500,13 +500,13 @@ describe("Custom Prompt Tags API", () => {
           },
         });
 
-        // Create an assignment
+        // Create an assignment pointing to the tag via FK
         await prisma.promptTagAssignment.create({
           data: {
             id: `vtag_${nanoid()}`,
             configId: promptConfig.id,
             versionId: promptVersion.id,
-            tag: "canary",
+            tagId: tag.id,
             projectId: project.id,
           },
         });
@@ -519,7 +519,7 @@ describe("Custom Prompt Tags API", () => {
         expect(res.status).toBe(204);
 
         const assignment = await prisma.promptTagAssignment.findFirst({
-          where: { configId: promptConfig.id, tag: "canary", projectId: project.id },
+          where: { configId: promptConfig.id, tagId: tag.id, projectId: project.id },
         });
         expect(assignment).toBeNull();
       });

@@ -73,8 +73,8 @@ export class PromptTagRepository {
   }
 
   /**
-   * Deletes a custom tag definition and cascades to PromptTagAssignment rows
-   * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
+   * Deletes a custom tag definition.
+   * PromptTagAssignment rows are removed automatically via Prisma's app-level onDelete: Cascade.
    */
   async delete({
     id,
@@ -83,39 +83,13 @@ export class PromptTagRepository {
     id: string;
     organizationId: string;
   }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const tag = await tx.promptTag.findFirst({
-        where: { id, organizationId },
-      });
-
-      if (!tag) {
-        return;
-      }
-
-      const projects = await tx.project.findMany({
-        where: {
-          team: { organizationId },
-        },
-        select: { id: true },
-      });
-
-      const projectIds = projects.map((p) => p.id);
-
-      if (projectIds.length > 0) {
-        await tx.promptTagAssignment.deleteMany({
-          where: {
-            tag: tag.name,
-            projectId: { in: projectIds },
-          },
-        });
-      }
-
-      await tx.promptTag.delete({
-        where: { id },
-      });
-
-      logger.info({ organizationId, id, name: tag.name }, "Custom prompt tag deleted");
+    const deleted = await this.prisma.promptTag.deleteMany({
+      where: { id, organizationId },
     });
+
+    if (deleted.count === 0) return;
+
+    logger.info({ organizationId, id }, "Custom prompt tag deleted");
   }
 
   /**
@@ -132,6 +106,21 @@ export class PromptTagRepository {
       where: { organizationId, name: tag },
     });
     return found !== null;
+  }
+
+  /**
+   * Finds a tag definition by org and name. Returns null if not found.
+   */
+  async findByOrgAndName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<PromptTag | null> {
+    return this.prisma.promptTag.findFirst({
+      where: { organizationId, name },
+    });
   }
 
   /**
