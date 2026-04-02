@@ -13,8 +13,9 @@ describe("Prompt labels and versions (real API)", () => {
 
   describe("when fetching by tag", () => {
     describe("when using explicit label option", () => {
-      it("fetches the labeled version via explicit option", async () => {
-        const handle = HandleUtil.unique("label-explicit");
+      it("fetches the tagged version via explicit option", async () => {
+        const handle = HandleUtil.unique("tag-explicit");
+        const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
         try {
           const v1 = await langwatch.prompts.create({
             handle,
@@ -29,25 +30,27 @@ describe("Prompt labels and versions (real API)", () => {
           expect(v1VersionId).not.toBe("");
 
           await langwatch.prompts.tags.assign(handle, {
-            label: "production",
+            label: tag.name,
             versionId: v1VersionId,
           });
 
           const fetched = await langwatch.prompts.get(handle, {
-            label: "production",
+            label: tag.name,
             fetchPolicy: "ALWAYS_FETCH",
           });
 
           expect(fetched.prompt).toBe("Version 1 content");
         } finally {
           await langwatch.prompts.delete(handle);
+          await langwatch.prompts.tags.delete(tag.id);
         }
       }, 60_000);
     });
 
     describe("when using shorthand syntax", () => {
-      it("fetches the labeled version via shorthand", async () => {
-        const handle = HandleUtil.unique("label-shorthand");
+      it("fetches the tagged version via shorthand", async () => {
+        const handle = HandleUtil.unique("tag-shorthand");
+        const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
         try {
           const v1 = await langwatch.prompts.create({
             handle,
@@ -62,18 +65,19 @@ describe("Prompt labels and versions (real API)", () => {
           expect(v1VersionId).not.toBe("");
 
           await langwatch.prompts.tags.assign(handle, {
-            label: "production",
+            label: tag.name,
             versionId: v1VersionId,
           });
 
           const fetched = await langwatch.prompts.get(
-            `${handle}:production`,
+            `${handle}:${tag.name}`,
             { fetchPolicy: "ALWAYS_FETCH" },
           );
 
           expect(fetched.prompt).toBe("Version 1 content");
         } finally {
           await langwatch.prompts.delete(handle);
+          await langwatch.prompts.tags.delete(tag.id);
         }
       }, 60_000);
     });
@@ -133,7 +137,8 @@ describe("Prompt labels and versions (real API)", () => {
 
   describe("when fetching without label or version", () => {
     it("returns the latest version", async () => {
-      const handle = HandleUtil.unique("label-latest");
+      const handle = HandleUtil.unique("tag-latest");
+      const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
       try {
         const v1 = await langwatch.prompts.create({
           handle,
@@ -148,7 +153,7 @@ describe("Prompt labels and versions (real API)", () => {
         expect(v1VersionId).not.toBe("");
 
         await langwatch.prompts.tags.assign(handle, {
-          label: "production",
+          label: tag.name,
           versionId: v1VersionId,
         });
 
@@ -159,45 +164,50 @@ describe("Prompt labels and versions (real API)", () => {
         expect(fetched.prompt).toBe("Version 2 content");
       } finally {
         await langwatch.prompts.delete(handle);
+        await langwatch.prompts.tags.delete(tag.id);
       }
     }, 60_000);
   });
 
-  describe("when fetching with unassigned label", () => {
+  describe("when fetching with unassigned tag", () => {
     it("rejects with an error via shorthand", async () => {
-      const handle = HandleUtil.unique("label-unassigned-shorthand");
+      const handle = HandleUtil.unique("tag-unassigned-shorthand");
+      const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
       try {
         await langwatch.prompts.create({
           handle,
-          prompt: "A prompt with no labels",
+          prompt: "A prompt with no tags assigned",
         });
 
         await expect(
-          langwatch.prompts.get(`${handle}:production`, {
+          langwatch.prompts.get(`${handle}:${tag.name}`, {
             fetchPolicy: "ALWAYS_FETCH",
           }),
         ).rejects.toThrow();
       } finally {
         await langwatch.prompts.delete(handle);
+        await langwatch.prompts.tags.delete(tag.id);
       }
     }, 60_000);
 
     it("rejects with an error via explicit option", async () => {
-      const handle = HandleUtil.unique("label-unassigned-explicit");
+      const handle = HandleUtil.unique("tag-unassigned-explicit");
+      const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
       try {
         await langwatch.prompts.create({
           handle,
-          prompt: "A prompt with no labels",
+          prompt: "A prompt with no tags assigned",
         });
 
         await expect(
           langwatch.prompts.get(handle, {
-            label: "production",
+            label: tag.name,
             fetchPolicy: "ALWAYS_FETCH",
           }),
         ).rejects.toThrow();
       } finally {
         await langwatch.prompts.delete(handle);
+        await langwatch.prompts.tags.delete(tag.id);
       }
     }, 60_000);
   });
