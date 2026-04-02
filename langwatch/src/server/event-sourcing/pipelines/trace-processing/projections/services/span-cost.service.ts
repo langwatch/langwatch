@@ -10,6 +10,7 @@ export const FIRST_TOKEN_EVENTS = new Set([
   "llm.first_token",
   "llm.content.completion.chunk",
   "First Token Stream Event",
+  "ai.stream.firstChunk",
 ]);
 
 export const LAST_TOKEN_EVENTS = new Set([
@@ -18,6 +19,7 @@ export const LAST_TOKEN_EVENTS = new Set([
   "llm.last_token",
   "llm.content.completion.chunk",
   "First Token Stream Event",
+  "ai.stream.finish",
 ]);
 
 /**

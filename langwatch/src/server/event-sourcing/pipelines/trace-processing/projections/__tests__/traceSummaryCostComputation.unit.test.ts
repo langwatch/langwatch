@@ -775,6 +775,40 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
     });
   });
 
+  describe("when span has ai.stream.firstChunk/ai.stream.finish events (Vercel AI SDK)", () => {
+    it("computes timeToFirstToken from ai.stream.firstChunk", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [
+          { name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} },
+          { name: "ai.stream.finish", timeUnixMs: 3800, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(250);
+    });
+
+    it("computes timeToLastToken from ai.stream.finish", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [
+          { name: "ai.stream.firstChunk", timeUnixMs: 1250, attributes: {} },
+          { name: "ai.stream.finish", timeUnixMs: 3800, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToLastTokenMs).toBe(2800);
+    });
+  });
+
   describe("when span has gen_ai.content.chunk events (already supported)", () => {
     it("computes timeToFirstToken as before", () => {
       const span = createTestSpan({
