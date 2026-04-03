@@ -342,6 +342,16 @@ describe("MCP dataset tools integration", () => {
         expect(result).toContain("platform_create_dataset");
       });
     });
+
+    describe("when format is json", () => {
+      it("returns parseable JSON matching the API response", async () => {
+        const { handleListDatasets } = await import(
+          "../tools/list-datasets.js"
+        );
+        const result = await handleListDatasets({ format: "json" });
+        expect(JSON.parse(result)).toEqual(CANNED_DATASETS_LIST);
+      });
+    });
   });
 
   // ── Get Dataset ────────────────────────────────────────────────
@@ -366,6 +376,16 @@ describe("MCP dataset tools integration", () => {
         const result = await handleGetDataset({ slugOrId: "my-dataset" });
         expect(result).toContain("hello");
         expect(result).toContain("world");
+      });
+    });
+
+    describe("when format is json", () => {
+      it("returns parseable JSON matching the API response", async () => {
+        const { handleGetDataset } = await import(
+          "../tools/get-dataset.js"
+        );
+        const result = await handleGetDataset({ slugOrId: "my-dataset", format: "json" });
+        expect(JSON.parse(result)).toEqual(CANNED_DATASET_DETAIL);
       });
     });
 

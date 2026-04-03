@@ -4,10 +4,17 @@ import { listDatasets as apiListDatasets } from "../langwatch-api-datasets.js";
  * Handles the platform_list_datasets MCP tool invocation.
  *
  * Lists all datasets in the LangWatch project, formatted as an
- * AI-readable markdown summary.
+ * AI-readable digest or raw JSON.
  */
-export async function handleListDatasets(): Promise<string> {
+export async function handleListDatasets(params: {
+  format?: "digest" | "json";
+} = {}): Promise<string> {
   const response = await apiListDatasets();
+
+  if (params.format === "json") {
+    return JSON.stringify(response, null, 2);
+  }
+
   const datasets = response.data;
 
   if (!Array.isArray(datasets) || datasets.length === 0) {

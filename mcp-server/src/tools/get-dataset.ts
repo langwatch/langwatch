@@ -46,11 +46,17 @@ export function formatDatasetResponse(
  * Handles the platform_get_dataset MCP tool invocation.
  *
  * Retrieves a specific dataset by slug or ID and formats it as
- * AI-readable markdown.
+ * AI-readable markdown or raw JSON.
  */
 export async function handleGetDataset(params: {
   slugOrId: string;
+  format?: "digest" | "json";
 }): Promise<string> {
   const dataset = await apiGetDataset(params.slugOrId);
+
+  if (params.format === "json") {
+    return JSON.stringify(dataset, null, 2);
+  }
+
   return formatDatasetResponse(dataset);
 }
