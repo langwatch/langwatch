@@ -344,12 +344,14 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when format is json", () => {
-      it("returns parseable JSON matching the API response", async () => {
+      it("returns parseable JSON containing all datasets and total", async () => {
         const { handleListDatasets } = await import(
           "../tools/list-datasets.js"
         );
         const result = await handleListDatasets({ format: "json" });
-        expect(JSON.parse(result)).toEqual(CANNED_DATASETS_LIST);
+        const parsed = JSON.parse(result);
+        expect(parsed.data).toEqual(CANNED_DATASETS_LIST.data);
+        expect(parsed.total).toBe(CANNED_DATASETS_LIST.total);
       });
     });
   });

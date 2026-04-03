@@ -2,6 +2,7 @@ import {
   getDataset as apiGetDataset,
   type DatasetDetailResponse,
 } from "../langwatch-api-datasets.js";
+import { escapeMarkdown } from "../utils/escape-markdown.js";
 
 /**
  * Formats a dataset detail response into AI-readable markdown.
@@ -12,9 +13,9 @@ export function formatDatasetResponse(
   dataset: DatasetDetailResponse,
 ): string {
   const lines: string[] = [];
-  lines.push(`# Dataset: ${dataset.name}\n`);
-  lines.push(`**Slug**: ${dataset.slug}`);
-  lines.push(`**ID**: ${dataset.id}`);
+  lines.push(`# Dataset: ${escapeMarkdown(dataset.name)}\n`);
+  lines.push(`**Slug**: ${escapeMarkdown(dataset.slug)}`);
+  lines.push(`**ID**: ${escapeMarkdown(dataset.id)}`);
 
   // Column table
   if (
@@ -25,7 +26,7 @@ export function formatDatasetResponse(
     lines.push("| Name | Type |");
     lines.push("|------|------|");
     for (const col of dataset.columnTypes) {
-      lines.push(`| ${col.name} | ${col.type} |`);
+      lines.push(`| ${escapeMarkdown(col.name)} | ${escapeMarkdown(col.type)} |`);
     }
   }
 
@@ -33,7 +34,7 @@ export function formatDatasetResponse(
   if (Array.isArray(dataset.data) && dataset.data.length > 0) {
     lines.push(`\n## Records (${dataset.data.length} shown)\n`);
     for (const record of dataset.data) {
-      lines.push(`**${record.id}**: ${JSON.stringify(record.entry)}`);
+      lines.push(`**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`);
     }
   } else {
     lines.push("\nNo records in this dataset.");
