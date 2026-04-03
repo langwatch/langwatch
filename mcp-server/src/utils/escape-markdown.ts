@@ -5,5 +5,8 @@
  * so that values can be safely embedded in markdown tables and headers.
  */
 export function escapeMarkdown(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/\|/g, "\\|")
+    .replace(/\n/g, " ");
 }

@@ -223,13 +223,13 @@ describe("dataset tools API key requirement", () => {
   describe("when no API key is configured", () => {
     it("throws an error indicating an API key is required when calling handleListDatasets", async () => {
       const { initConfig, requireApiKey } = await import("../config.js");
-      initConfig({ apiKey: undefined, endpoint: "http://localhost:0" });
+      initConfig({ apiKey: "", endpoint: "http://localhost:0" });
 
       // Make the mock call requireApiKey so the handler exercises the
       // real API-key validation path (the mock normally bypasses it).
-      mockListDatasets.mockImplementationOnce(() => {
+      mockListDatasets.mockImplementationOnce(async () => {
         requireApiKey();
-        throw new Error("unreachable");
+        return { data: [], total: 0, page: 1, limit: 50 };
       });
 
       await expect(handleListDatasets()).rejects.toThrow(
