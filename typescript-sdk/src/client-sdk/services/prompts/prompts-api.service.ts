@@ -211,16 +211,16 @@ export class PromptsApiService {
   }
 
   /**
-   * Deletes a custom prompt tag by ID.
-   * @param tagId The tag ID to delete.
+   * Deletes a custom prompt tag by name.
+   * @param tagName The tag name to delete.
    * @throws {PromptsApiError} If the API call fails.
    */
-  async deleteTag(tagId: string): Promise<void> {
+  async deleteTag(tagName: string): Promise<void> {
     const { error } = await this.apiClient.DELETE(
-      "/api/prompts/tags/{tagId}",
-      { params: { path: { tagId } } },
+      "/api/prompts/tags/{tag}" as any,
+      { params: { path: { tag: tagName } } } as any,
     );
-    if (error) this.handleApiError(`delete tag "${tagId}"`, error);
+    if (error) this.handleApiError(`delete tag "${tagName}"`, error);
   }
 
   async assignLabel({

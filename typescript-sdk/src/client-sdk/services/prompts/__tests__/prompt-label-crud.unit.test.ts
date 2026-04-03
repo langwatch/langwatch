@@ -114,14 +114,14 @@ describe("Tag CRUD", () => {
 
     describe("deleteTag()", () => {
       describe("when deleting a tag succeeds", () => {
-        it("calls DELETE /api/prompts/tags/:tagId", async () => {
+        it("calls DELETE /api/prompts/tags/:tag", async () => {
           mockDelete.mockResolvedValue({ data: undefined, error: undefined });
 
-          await service.deleteTag("ptag_abc");
+          await service.deleteTag("my-tag");
 
           expect(mockDelete).toHaveBeenCalledWith(
-            "/api/prompts/tags/{tagId}",
-            expect.objectContaining({ params: { path: { tagId: "ptag_abc" } } }),
+            "/api/prompts/tags/{tag}",
+            expect.objectContaining({ params: { path: { tag: "my-tag" } } }),
           );
         });
       });
@@ -133,7 +133,7 @@ describe("Tag CRUD", () => {
             error: { error: "Tag not found" },
           });
 
-          await expect(service.deleteTag("ptag_abc")).rejects.toThrow(PromptsApiError);
+          await expect(service.deleteTag("my-tag")).rejects.toThrow(PromptsApiError);
         });
       });
     });
@@ -184,13 +184,13 @@ describe("Tag CRUD", () => {
     });
 
     describe("tags.delete()", () => {
-      it("delegates to PromptsApiService.deleteTag with tagId", async () => {
+      it("delegates to PromptsApiService.deleteTag with tag name", async () => {
         promptsApiService.deleteTag.mockResolvedValue(undefined);
 
-        await facade.tags.delete("ptag_abc");
+        await facade.tags.delete("my-tag");
 
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.deleteTag).toHaveBeenCalledWith("ptag_abc");
+        expect(promptsApiService.deleteTag).toHaveBeenCalledWith("my-tag");
       });
     });
   });

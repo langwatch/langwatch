@@ -42,7 +42,7 @@ describe("Prompt labels and versions (real API)", () => {
           expect(fetched.prompt).toBe("Version 1 content");
         } finally {
           await langwatch.prompts.delete(handle);
-          await langwatch.prompts.tags.delete(tag.id);
+          await langwatch.prompts.tags.delete(tag.name);
         }
       }, 60_000);
     });
@@ -77,7 +77,7 @@ describe("Prompt labels and versions (real API)", () => {
           expect(fetched.prompt).toBe("Version 1 content");
         } finally {
           await langwatch.prompts.delete(handle);
-          await langwatch.prompts.tags.delete(tag.id);
+          await langwatch.prompts.tags.delete(tag.name);
         }
       }, 60_000);
     });
@@ -164,7 +164,7 @@ describe("Prompt labels and versions (real API)", () => {
         expect(fetched.prompt).toBe("Version 2 content");
       } finally {
         await langwatch.prompts.delete(handle);
-        await langwatch.prompts.tags.delete(tag.id);
+        await langwatch.prompts.tags.delete(tag.name);
       }
     }, 60_000);
   });
@@ -186,7 +186,7 @@ describe("Prompt labels and versions (real API)", () => {
         ).rejects.toThrow();
       } finally {
         await langwatch.prompts.delete(handle);
-        await langwatch.prompts.tags.delete(tag.id);
+        await langwatch.prompts.tags.delete(tag.name);
       }
     }, 60_000);
 
@@ -207,7 +207,7 @@ describe("Prompt labels and versions (real API)", () => {
         ).rejects.toThrow();
       } finally {
         await langwatch.prompts.delete(handle);
-        await langwatch.prompts.tags.delete(tag.id);
+        await langwatch.prompts.tags.delete(tag.name);
       }
     }, 60_000);
   });

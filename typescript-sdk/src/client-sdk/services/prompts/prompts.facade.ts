@@ -42,7 +42,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     assign(id: string, params: { label: string; versionId: string }): Promise<AssignLabelResult>;
     list(): Promise<TagDefinition[]>;
     create(params: { name: string }): Promise<CreatedTag>;
-    delete(tagId: string): Promise<void>;
+    delete(tagName: string): Promise<void>;
   };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
@@ -53,7 +53,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
         this.promptsApiService.assignLabel({ id, label, versionId }),
       list: () => this.promptsApiService.listTags(),
       create: ({ name }) => this.promptsApiService.createTag({ name }),
-      delete: (tagId) => this.promptsApiService.deleteTag(tagId),
+      delete: (tagName) => this.promptsApiService.deleteTag(tagName),
     };
   }
 
