@@ -151,6 +151,29 @@ Feature: Scenario tests for skills quality assurance
     And the agent updates application code to use langwatch.prompts.get()
     And the agent does NOT duplicate prompt text as a fallback
 
+  @prompts @tags @integration
+  Scenario: Prompts skill guides tag-based deployment workflow
+    Given the fixture "python-openai" is copied to a temp directory
+    And the skill "prompts" is loaded
+    And the LangWatch MCP is configured with an API key
+    When Claude Code receives "set up tag-based deployment for my prompts"
+    Then the agent updates application code to fetch by tag
+    And the code uses langwatch.prompts.get() with a tag parameter
+    And the agent mentions the Deploy dialog for assigning production/staging tags
+    And the agent does NOT hardcode version numbers in application code
+
+  @prompts @tags @platform @integration
+  Scenario: MCP tools support prompt tag operations
+    Given an empty temporary directory (no codebase)
+    And the LangWatch MCP is configured with an API key
+    When the agent uses platform_create_prompt to create a prompt
+    And the agent uses platform_assign_prompt_tag to assign "staging" to a version
+    Then the assign response confirms the tag and version
+    When the agent uses platform_get_prompt with the tag "staging"
+    Then the response returns the tagged version
+    When the agent uses platform_get_prompt with both version and tag
+    Then the response returns an error about mutual exclusion
+
   # ──────────────────────────────────────────────────
   # Level-up meta-skill tests
   # ──────────────────────────────────────────────────
