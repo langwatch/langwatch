@@ -88,33 +88,37 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:5560"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://127.0.0.1:9200"
-      IS_OPENSEARCH: "true"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
+      REDIS_URL: "redis://localhost:6379"
       NODE_ENV: "test"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
-      CLICKHOUSE_URL: "http://localhost:8123/langwatch_test"
-      SKIP_CLICKHOUSE_MIGRATE: "true"
-      SKIP_REDIS: "true"
       LANGWATCH_LICENSE_PUBLIC_KEY: ${{ secrets.TEST_LICENSE_PUBLIC_KEY }}
 
     services:
-      opensearch:
-        image: langwatch/opensearch-lite:latest
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
         ports:
-          - 9200:9200
+          - 8123:8123
         env:
-          discovery.type: single-node
-          DISABLE_SECURITY_PLUGIN: "true"
-          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
-          cluster.routing.allocation.disk.threshold_enabled: "false"
-          bootstrap.memory_lock: "false"
-          node.store.allow_mmap: "false"
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
         options: >-
-          --health-cmd "curl -s http://localhost:9200 || exit 1"
-          --health-interval 30s
-          --health-timeout 30s
-          --health-retries 3
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
       postgres:
         image: postgres:16
@@ -176,9 +180,9 @@ jobs:
         working-directory: langwatch
         run: pnpm prisma:seed
 
-      - name: Setup OpenSearch
+      - name: Setup ClickHouse
         working-directory: langwatch
-        run: pnpm elastic:migrate
+        run: pnpm clickhouse:migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under
