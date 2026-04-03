@@ -309,8 +309,12 @@ class TestDatasetApiService:
         def test_adds_records_to_dataset(self):
             """@integration Scenario: Add records to an existing dataset"""
             mock_httpx = MagicMock()
+            created_records = [
+                {"id": "rec_1", "entry": {"input": "hello", "output": "hi"}, "createdAt": "2026-01-01"},
+                {"id": "rec_2", "entry": {"input": "bye", "output": "goodbye"}, "createdAt": "2026-01-01"},
+            ]
             mock_httpx.post.return_value = _json_response(
-                {"success": True}
+                {"data": created_records}, status_code=201
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             result = svc.create_records(
@@ -320,7 +324,13 @@ class TestDatasetApiService:
                     {"input": "bye", "output": "goodbye"},
                 ],
             )
-            assert result is None
+            assert len(result) == 2
+            assert result[0]["id"] == "rec_1"
+            assert result[1]["id"] == "rec_2"
+            mock_httpx.post.assert_called_once()
+            call_url = mock_httpx.post.call_args[0][0]
+            assert "/records" in call_url
+            assert "/entries" not in call_url
 
         def test_raises_value_error_on_not_found(self):
             """@integration Scenario: Add records to a non-existent dataset"""
