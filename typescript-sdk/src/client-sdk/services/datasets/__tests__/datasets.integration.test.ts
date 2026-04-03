@@ -76,19 +76,22 @@ describe("Feature: Dataset TypeScript SDK", () => {
           http.get(`${TEST_ENDPOINT}/api/dataset`, () => {
             return HttpResponse.json({
               data: [
-                datasetMetadata({ id: "d1", name: "ds-1", slug: "ds-1" }),
-                datasetMetadata({ id: "d2", name: "ds-2", slug: "ds-2" }),
-                datasetMetadata({ id: "d3", name: "ds-3", slug: "ds-3" }),
+                datasetMetadata({ id: "d1", name: "ds-1", slug: "ds-1", recordCount: 10 }),
+                datasetMetadata({ id: "d2", name: "ds-2", slug: "ds-2", recordCount: 5 }),
+                datasetMetadata({ id: "d3", name: "ds-3", slug: "ds-3", recordCount: 0 }),
               ],
-              total: 3,
-              page: 1,
-              limit: 50,
+              pagination: {
+                page: 1,
+                limit: 50,
+                total: 3,
+                totalPages: 1,
+              },
             });
           }),
         );
       });
 
-      it("receives a response containing 3 datasets with id, name, slug, and columnTypes", async () => {
+      it("receives a response containing 3 datasets with id, name, slug, columnTypes, and recordCount", async () => {
         const result = await langwatch.datasets.list();
 
         expect(result.data).toHaveLength(3);
@@ -97,7 +100,14 @@ describe("Feature: Dataset TypeScript SDK", () => {
           expect(dataset).toHaveProperty("name");
           expect(dataset).toHaveProperty("slug");
           expect(dataset).toHaveProperty("columnTypes");
+          expect(dataset).toHaveProperty("recordCount");
         }
+        expect(result.pagination).toEqual({
+          page: 1,
+          limit: 50,
+          total: 3,
+          totalPages: 1,
+        });
       });
     });
   });
@@ -476,6 +486,109 @@ describe("Feature: Dataset TypeScript SDK", () => {
         await expect(
           langwatch.datasets.deleteRecords("ghost", ["rec-1"]),
         ).rejects.toThrow(DatasetNotFoundError);
+      });
+    });
+  });
+
+  // ── List Records ────────────────────────────────────────────────
+
+  describe("listRecords()", () => {
+    describe("when the API returns paginated records", () => {
+      beforeEach(() => {
+        server.use(
+          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+            return HttpResponse.json({
+              data: [
+                recordFixture({ id: "rec-0" }),
+                recordFixture({ id: "rec-1" }),
+              ],
+              pagination: {
+                page: 1,
+                limit: 50,
+                total: 2,
+                totalPages: 1,
+              },
+            });
+          }),
+        );
+      });
+
+      it("returns records with pagination metadata", async () => {
+        const result = await langwatch.datasets.listRecords("my-data");
+
+        expect(result.data).toHaveLength(2);
+        expect(result.data[0]).toHaveProperty("id");
+        expect(result.data[0]).toHaveProperty("entry");
+        expect(result.pagination).toEqual({
+          page: 1,
+          limit: 50,
+          total: 2,
+          totalPages: 1,
+        });
+      });
+    });
+
+    describe("when the API responds with 404", () => {
+      beforeEach(() => {
+        server.use(
+          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+            return HttpResponse.json(
+              { error: "Not Found", message: "Dataset not found" },
+              { status: 404 },
+            );
+          }),
+        );
+      });
+
+      it("throws a DatasetNotFoundError", async () => {
+        await expect(
+          langwatch.datasets.listRecords("does-not-exist"),
+        ).rejects.toThrow(DatasetNotFoundError);
+      });
+    });
+  });
+
+  // ── Create Dataset From Upload ─────────────────────────────────
+
+  describe("createFromUpload()", () => {
+    describe("when the API accepts the upload and creates a dataset", () => {
+      let capturedFormData: FormData | null = null;
+
+      beforeEach(() => {
+        capturedFormData = null;
+        server.use(
+          http.post(`${TEST_ENDPOINT}/api/dataset/upload`, async ({ request }) => {
+            capturedFormData = await request.formData();
+            return HttpResponse.json({
+              id: "dataset_new",
+              name: "uploaded-data",
+              slug: "uploaded-data",
+              columnTypes: [{ name: "input", type: "string" }],
+              createdAt: "2025-01-01T00:00:00Z",
+              updatedAt: "2025-01-01T00:00:00Z",
+              recordsCreated: 5,
+            });
+          }),
+        );
+      });
+
+      it("sends POST /api/dataset/upload with name and file as multipart form data", async () => {
+        const file = new File(["input,output\nhello,world"], "data.csv", {
+          type: "text/csv",
+        });
+
+        const result = await langwatch.datasets.createFromUpload({
+          name: "uploaded-data",
+          file,
+        });
+
+        expect(capturedFormData).not.toBeNull();
+        expect(capturedFormData!.get("name")).toBe("uploaded-data");
+        expect(capturedFormData!.get("file")).toBeTruthy();
+        expect(result.id).toBe("dataset_new");
+        expect(result.name).toBe("uploaded-data");
+        expect(result.slug).toBe("uploaded-data");
+        expect(result.recordsCreated).toBe(5);
       });
     });
   });

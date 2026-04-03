@@ -7,8 +7,12 @@ import {
   type GetDatasetOptions,
   type ListDatasetsOptions,
   type ListDatasetsApiResponse,
+  type ListRecordsOptions,
+  type ListRecordsApiResponse,
   type CreateDatasetOptions,
   type UpdateDatasetOptions,
+  type CreateFromUploadOptions,
+  type CreateFromUploadResponse,
   type BatchCreateRecordsResponse,
   type DeleteRecordsResponse,
   type UploadResponse,
@@ -182,6 +186,49 @@ export class DatasetsFacade {
     recordIds: string[],
   ): Promise<DeleteRecordsResponse> => {
     return this.#datasetService.deleteRecords(slugOrId, recordIds);
+  };
+
+  /**
+   * Lists records in a dataset with optional pagination.
+   *
+   * @param slugOrId - The slug or ID of the dataset
+   * @param options - Pagination options (page, limit)
+   * @returns Paginated list of records
+   *
+   * @example
+   * ```typescript
+   * // List first page of records
+   * const result = await langwatch.datasets.listRecords("my-dataset");
+   *
+   * // With pagination
+   * const page2 = await langwatch.datasets.listRecords("my-dataset", { page: 2, limit: 25 });
+   * ```
+   */
+  listRecords = (
+    slugOrId: string,
+    options?: ListRecordsOptions,
+  ): Promise<ListRecordsApiResponse> => {
+    return this.#datasetService.listRecords(slugOrId, options);
+  };
+
+  /**
+   * Creates a new dataset from a file upload.
+   * Accepts CSV, JSON, or JSONL files.
+   *
+   * @param options - The dataset name and file to upload
+   * @returns The created dataset metadata with record count
+   *
+   * @example
+   * ```typescript
+   * const file = new File(["input,output\nhello,world"], "data.csv", { type: "text/csv" });
+   * const dataset = await langwatch.datasets.createFromUpload({ name: "my-dataset", file });
+   * console.log(`Created ${dataset.recordsCreated} records`);
+   * ```
+   */
+  createFromUpload = (
+    options: CreateFromUploadOptions,
+  ): Promise<CreateFromUploadResponse> => {
+    return this.#datasetService.createDatasetFromUpload(options);
   };
 
   /**
