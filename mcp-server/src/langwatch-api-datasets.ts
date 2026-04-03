@@ -69,8 +69,8 @@ export async function listDatasets(params?: {
   limit?: number;
 }): Promise<DatasetListResponse> {
   const query = new URLSearchParams();
-  if (params?.page) query.set("page", String(params.page));
-  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.page != null) query.set("page", String(params.page));
+  if (params?.limit != null) query.set("limit", String(params.limit));
   const qs = query.toString();
   const path = qs ? `/api/dataset?${qs}` : "/api/dataset";
   return makeRequest("GET", path) as Promise<DatasetListResponse>;

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import packageJson from "../package.json" assert { type: "json" };
 import { requireApiKey } from "./config.js";
+import { createDatasetSchema } from "./schemas/create-dataset.js";
 
 const modelSchema = z
   .string()
@@ -790,18 +791,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   server.tool(
     "platform_create_dataset",
     "Create a new dataset on the LangWatch platform.",
-    {
-      name: z.string().min(1).describe("Dataset name"),
-      columnTypes: z
-        .array(
-          z.object({
-            name: z.string().describe("Column name"),
-            type: z.string().describe("Column type (e.g. 'string', 'number', 'boolean', 'json', 'list', 'chat_messages', 'rag_contexts', 'annotations')"),
-          })
-        )
-        .optional()
-        .describe("Column definitions for the dataset"),
-    },
+    createDatasetSchema.shape,
     async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();

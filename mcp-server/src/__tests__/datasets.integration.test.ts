@@ -1,5 +1,5 @@
 import { createServer, type Server } from "http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { initConfig } from "../config.js";
 
 // --- Canned responses for dataset API endpoints ---
@@ -282,6 +282,10 @@ describe("MCP dataset tools integration", () => {
   let server: Server;
   let port: number;
 
+  beforeEach(() => {
+    emptyListMode = false;
+  });
+
   beforeAll(async () => {
     server = createMockServer();
     await new Promise<void>((resolve) => {
@@ -306,7 +310,6 @@ describe("MCP dataset tools integration", () => {
   describe("platform_list_datasets", () => {
     describe("when the project has datasets", () => {
       it("returns a formatted list showing both datasets with their names, slugs, and record counts", async () => {
-        emptyListMode = false;
         const { handleListDatasets } = await import(
           "../tools/list-datasets.js"
         );
@@ -328,7 +331,6 @@ describe("MCP dataset tools integration", () => {
         );
         const result = await handleListDatasets();
         expect(result).toContain("No datasets found");
-        emptyListMode = false;
       });
 
       it("suggests using platform_create_dataset", async () => {
@@ -338,7 +340,6 @@ describe("MCP dataset tools integration", () => {
         );
         const result = await handleListDatasets();
         expect(result).toContain("platform_create_dataset");
-        emptyListMode = false;
       });
     });
   });
