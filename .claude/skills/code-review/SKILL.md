@@ -35,6 +35,8 @@ For each rule: **PASS** if no violations, or **FAIL** with every violation liste
 
 11. **Single Responsibility.** New files should not mix concerns (e.g. HTTP + business logic, data fetching + rendering). One primary export per file. Flag functions over ~100 lines.
 
+12. **Skills must have scenario tests.** Any PR that adds or modifies a skill (`skills/*/SKILL.md`) or MCP tools (`mcp-server/src/tools/`) must include corresponding scenario tests in `specs/skills/skills-testing.feature`. New tool handlers need at least one `@integration` scenario covering the happy path.
+
 ## Output format
 
 ```text

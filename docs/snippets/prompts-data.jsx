@@ -1296,7 +1296,48 @@ langwatch prompt sync
 
 This pushes your local prompt definitions to the LangWatch platform.
 
-## Step 8: Verify
+## Step 8: Set Up Tags for Deployment Workflows
+
+Tags let you label specific prompt versions for deployment stages. Three built-in tags exist:
+
+- **latest** — auto-assigned to the newest version on every save
+- **production** — for the version your production app should use
+- **staging** — for the version your staging environment should use
+
+### Fetching by Tag
+
+Update application code to fetch by tag instead of bare slug:
+
+**Python:**
+\`\`\`python
+prompt = langwatch.prompts.get("my-agent", tag="production")
+\`\`\`
+
+**TypeScript:**
+\`\`\`typescript
+const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
+\`\`\`
+
+### Assigning Tags
+
+Use the Deploy dialog in the LangWatch UI to assign \`production\` or \`staging\` tags to a version. For programmatic assignment, use the \`platform_assign_prompt_tag\` MCP tool or the REST API:
+
+\`\`\`bash
+curl -X PUT -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"versionId": "version-id-here"}' \
+  "https://app.langwatch.ai/api/prompts/my-agent/tags/production"
+\`\`\`
+
+### Shorthand Syntax
+
+In config files or anywhere a prompt identifier is accepted, you can use shorthand: \`my-agent:production\` instead of passing a separate tag parameter.
+
+### Custom Tags
+
+Create custom tags via \`platform_create_prompt_tag\` MCP tool or \`POST /api/prompts/tags\` for workflows like canary releases or blue-green deployments.
+
+## Step 9: Verify
 
 Check that your prompts appear on https://app.langwatch.ai in the Prompts section.
 
@@ -1699,7 +1740,48 @@ langwatch prompt sync
 
 This pushes your local prompt definitions to the LangWatch platform.
 
-## Step 8: Verify
+## Step 8: Set Up Tags for Deployment Workflows
+
+Tags let you label specific prompt versions for deployment stages. Three built-in tags exist:
+
+- **latest** — auto-assigned to the newest version on every save
+- **production** — for the version your production app should use
+- **staging** — for the version your staging environment should use
+
+### Fetching by Tag
+
+Update application code to fetch by tag instead of bare slug:
+
+**Python:**
+\`\`\`python
+prompt = langwatch.prompts.get("my-agent", tag="production")
+\`\`\`
+
+**TypeScript:**
+\`\`\`typescript
+const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
+\`\`\`
+
+### Assigning Tags
+
+Use the Deploy dialog in the LangWatch UI to assign \`production\` or \`staging\` tags to a version. For programmatic assignment, use the \`platform_assign_prompt_tag\` MCP tool or the REST API:
+
+\`\`\`bash
+curl -X PUT -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"versionId": "version-id-here"}' \
+  "https://app.langwatch.ai/api/prompts/my-agent/tags/production"
+\`\`\`
+
+### Shorthand Syntax
+
+In config files or anywhere a prompt identifier is accepted, you can use shorthand: \`my-agent:production\` instead of passing a separate tag parameter.
+
+### Custom Tags
+
+Create custom tags via \`platform_create_prompt_tag\` MCP tool or \`POST /api/prompts/tags\` for workflows like canary releases or blue-green deployments.
+
+## Step 9: Verify
 
 Check that your prompts appear on https://app.langwatch.ai in the Prompts section.
 
