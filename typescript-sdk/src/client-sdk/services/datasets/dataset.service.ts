@@ -20,8 +20,8 @@ import { DatasetApiError, DatasetNotFoundError } from "./errors";
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
   logger: Logger;
-  endpoint?: string;
-  apiKey?: string;
+  endpoint: string;
+  apiKey: string;
 };
 
 /**
@@ -85,6 +85,33 @@ export class DatasetService {
   }
 
   /**
+   * Wrapper for API calls to endpoints not yet in the generated OpenAPI types.
+   * Quarantines `as any` casts to a single location.
+   */
+  private untypedRequest<M extends 'GET' | 'POST' | 'PATCH' | 'DELETE'>(
+    method: M,
+    path: string,
+    options?: Record<string, unknown>,
+  ) {
+    return (this.#config.langwatchApiClient[method] as any)(path, options);
+  }
+
+  /**
+   * Unwraps an API response, throwing a mapped error if the response contains an error.
+   * Centralizes the repeated `if (error) handleApiError; return data` pattern.
+   */
+  private unwrapResponse<T>(
+    response: { data?: unknown; error?: unknown; response: { status: number } },
+    operation: string,
+    slugOrId: string,
+  ): T {
+    if (response.error) {
+      this.handleApiError(operation, slugOrId, response.error, response.response.status);
+    }
+    return response.data as unknown as T;
+  }
+
+  /**
    * Fetches a dataset by its slug or ID, returning metadata and entries.
    *
    * @param slugOrId - The slug or ID of the dataset
@@ -108,16 +135,11 @@ export class DatasetService {
       }
     );
 
-    if (response.error) {
-      this.handleApiError(
-        `fetch dataset "${slugOrId}"`,
-        slugOrId,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    const data = response.data as GetDatasetApiResponse;
+    const data = this.unwrapResponse<GetDatasetApiResponse>(
+      response,
+      `fetch dataset "${slugOrId}"`,
+      slugOrId,
+    );
 
     const entries: DatasetEntry<T>[] = data.data.map((item) => ({
       id: item.id,
@@ -149,28 +171,20 @@ export class DatasetService {
   async listDatasets(options?: ListDatasetsOptions): Promise<ListDatasetsApiResponse> {
     this.#config.logger.debug("Listing datasets");
 
-    const response = await this.#config.langwatchApiClient.GET(
-      "/api/dataset" as any,
-      {
-        params: {
-          query: {
-            page: options?.page,
-            limit: options?.limit,
-          },
+    const response = await this.untypedRequest('GET', '/api/dataset', {
+      params: {
+        query: {
+          page: options?.page,
+          limit: options?.limit,
         },
-      } as any,
+      },
+    });
+
+    return this.unwrapResponse<ListDatasetsApiResponse>(
+      response,
+      "list datasets",
+      "",
     );
-
-    if (response.error) {
-      this.handleApiError(
-        "list datasets",
-        "",
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as ListDatasetsApiResponse;
   }
 
   /**
@@ -179,26 +193,18 @@ export class DatasetService {
   async createDataset(options: CreateDatasetOptions): Promise<DatasetMetadata> {
     this.#config.logger.debug(`Creating dataset: ${options.name}`);
 
-    const response = await this.#config.langwatchApiClient.POST(
-      "/api/dataset" as any,
-      {
-        body: {
-          name: options.name,
-          columnTypes: options.columnTypes ?? [],
-        },
-      } as any,
+    const response = await this.untypedRequest('POST', '/api/dataset', {
+      body: {
+        name: options.name,
+        columnTypes: options.columnTypes ?? [],
+      },
+    });
+
+    return this.unwrapResponse<DatasetMetadata>(
+      response,
+      `create dataset "${options.name}"`,
+      options.name,
     );
-
-    if (response.error) {
-      this.handleApiError(
-        `create dataset "${options.name}"`,
-        options.name,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as DatasetMetadata;
   }
 
   /**
@@ -207,26 +213,18 @@ export class DatasetService {
   async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
     this.#config.logger.debug(`Updating dataset: ${slugOrId}`);
 
-    const response = await this.#config.langwatchApiClient.PATCH(
-      "/api/dataset/{slugOrId}" as any,
-      {
-        params: {
-          path: { slugOrId },
-        },
-        body: options,
-      } as any,
+    const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}', {
+      params: {
+        path: { slugOrId },
+      },
+      body: options,
+    });
+
+    return this.unwrapResponse<DatasetMetadata>(
+      response,
+      `update dataset "${slugOrId}"`,
+      slugOrId,
     );
-
-    if (response.error) {
-      this.handleApiError(
-        `update dataset "${slugOrId}"`,
-        slugOrId,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as DatasetMetadata;
   }
 
   /**
@@ -235,25 +233,17 @@ export class DatasetService {
   async deleteDataset(slugOrId: string): Promise<DatasetMetadata> {
     this.#config.logger.debug(`Deleting dataset: ${slugOrId}`);
 
-    const response = await this.#config.langwatchApiClient.DELETE(
-      "/api/dataset/{slugOrId}" as any,
-      {
-        params: {
-          path: { slugOrId },
-        },
-      } as any,
+    const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}', {
+      params: {
+        path: { slugOrId },
+      },
+    });
+
+    return this.unwrapResponse<DatasetMetadata>(
+      response,
+      `delete dataset "${slugOrId}"`,
+      slugOrId,
     );
-
-    if (response.error) {
-      this.handleApiError(
-        `delete dataset "${slugOrId}"`,
-        slugOrId,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as DatasetMetadata;
   }
 
   /**
@@ -265,26 +255,18 @@ export class DatasetService {
   ): Promise<BatchCreateRecordsResponse> {
     this.#config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
 
-    const response = await this.#config.langwatchApiClient.POST(
-      "/api/dataset/{slugOrId}/records" as any,
-      {
-        params: {
-          path: { slugOrId },
-        },
-        body: { entries },
-      } as any,
+    const response = await this.untypedRequest('POST', '/api/dataset/{slugOrId}/records', {
+      params: {
+        path: { slugOrId },
+      },
+      body: { entries },
+    });
+
+    return this.unwrapResponse<BatchCreateRecordsResponse>(
+      response,
+      `create records in dataset "${slugOrId}"`,
+      slugOrId,
     );
-
-    if (response.error) {
-      this.handleApiError(
-        `create records in dataset "${slugOrId}"`,
-        slugOrId,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as BatchCreateRecordsResponse;
   }
 
   /**
@@ -297,26 +279,18 @@ export class DatasetService {
   ): Promise<DatasetRecordResponse> {
     this.#config.logger.debug(`Updating record ${recordId} in dataset: ${slugOrId}`);
 
-    const response = await this.#config.langwatchApiClient.PATCH(
-      "/api/dataset/{slugOrId}/records/{recordId}" as any,
-      {
-        params: {
-          path: { slugOrId, recordId },
-        },
-        body: { entry },
-      } as any,
+    const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}/records/{recordId}', {
+      params: {
+        path: { slugOrId, recordId },
+      },
+      body: { entry },
+    });
+
+    return this.unwrapResponse<DatasetRecordResponse>(
+      response,
+      `update record "${recordId}" in dataset "${slugOrId}"`,
+      slugOrId,
     );
-
-    if (response.error) {
-      this.handleApiError(
-        `update record "${recordId}" in dataset "${slugOrId}"`,
-        slugOrId,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as DatasetRecordResponse;
   }
 
   /**
@@ -328,26 +302,18 @@ export class DatasetService {
   ): Promise<DeleteRecordsResponse> {
     this.#config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
 
-    const response = await this.#config.langwatchApiClient.DELETE(
-      "/api/dataset/{slugOrId}/records" as any,
-      {
-        params: {
-          path: { slugOrId },
-        },
-        body: { recordIds },
-      } as any,
+    const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}/records', {
+      params: {
+        path: { slugOrId },
+      },
+      body: { recordIds },
+    });
+
+    return this.unwrapResponse<DeleteRecordsResponse>(
+      response,
+      `delete records from dataset "${slugOrId}"`,
+      slugOrId,
     );
-
-    if (response.error) {
-      this.handleApiError(
-        `delete records from dataset "${slugOrId}"`,
-        slugOrId,
-        response.error,
-        response.response.status,
-      );
-    }
-
-    return response.data as unknown as DeleteRecordsResponse;
   }
 
   /**
@@ -360,16 +326,7 @@ export class DatasetService {
   ): Promise<UploadResponse> {
     this.#config.logger.debug(`Uploading file to dataset: ${slugOrId}`);
 
-    const endpoint = this.#config.endpoint;
-    const apiKey = this.#config.apiKey;
-
-    if (!endpoint || !apiKey) {
-      throw new DatasetApiError(
-        "Endpoint and API key are required for file upload",
-        500,
-        `upload file to dataset "${slugOrId}"`,
-      );
-    }
+    const { endpoint, apiKey } = this.#config;
 
     const url = `${endpoint.replace(/\/$/, "")}/api/dataset/${encodeURIComponent(slugOrId)}/upload`;
 

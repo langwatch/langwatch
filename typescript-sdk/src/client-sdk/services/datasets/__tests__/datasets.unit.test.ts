@@ -65,6 +65,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
           const service = new DatasetService({
             langwatchApiClient: mockClient,
             logger: new NoOpLogger(),
+            endpoint: "http://localhost:5560",
+            apiKey: "test-key",
           });
 
           await service.listDatasets({ page: 2, limit: 10 });
@@ -101,6 +103,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
           const service = new DatasetService({
             langwatchApiClient: mockClient,
             logger: new NoOpLogger(),
+            endpoint: "http://localhost:5560",
+            apiKey: "test-key",
           });
 
           await service.createDataset({ name: "bare-dataset" });
@@ -138,6 +142,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
           const service = new DatasetService({
             langwatchApiClient: mockClient,
             logger: new NoOpLogger(),
+            endpoint: "http://localhost:5560",
+            apiKey: "test-key",
           });
 
           await service.updateDataset("my-data", {
@@ -167,6 +173,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
         service = new DatasetService({
           langwatchApiClient: mockClient,
           logger: new NoOpLogger(),
+          endpoint: "http://localhost:5560",
+          apiKey: "test-key",
         });
       });
 
@@ -204,15 +212,16 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 409 },
           });
 
-          try {
-            await service.createDataset({ name: "duplicate" });
-          } catch (error) {
-            expect(error).toBeInstanceOf(DatasetApiError);
-            expect((error as DatasetApiError).status).toBe(409);
-            expect((error as DatasetApiError).message).toContain(
-              "A dataset with this slug already exists",
-            );
-          }
+          await expect(
+            service.createDataset({ name: "duplicate" }),
+          ).rejects.toThrow(DatasetApiError);
+
+          await expect(
+            service.createDataset({ name: "duplicate" }),
+          ).rejects.toMatchObject({
+            status: 409,
+            message: expect.stringContaining("A dataset with this slug already exists"),
+          });
         });
       });
 
@@ -224,12 +233,15 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 403 },
           });
 
-          try {
-            await service.getDataset("restricted-dataset");
-          } catch (error) {
-            expect(error).toBeInstanceOf(DatasetApiError);
-            expect((error as DatasetApiError).status).toBe(403);
-          }
+          await expect(
+            service.getDataset("restricted-dataset"),
+          ).rejects.toThrow(DatasetApiError);
+
+          await expect(
+            service.getDataset("restricted-dataset"),
+          ).rejects.toMatchObject({
+            status: 403,
+          });
         });
       });
 
@@ -241,12 +253,15 @@ describe("Feature: Dataset TypeScript SDK", () => {
             response: { status: 500 },
           });
 
-          try {
-            await service.getDataset("broken-dataset");
-          } catch (error) {
-            expect(error).toBeInstanceOf(DatasetApiError);
-            expect((error as DatasetApiError).status).toBe(500);
-          }
+          await expect(
+            service.getDataset("broken-dataset"),
+          ).rejects.toThrow(DatasetApiError);
+
+          await expect(
+            service.getDataset("broken-dataset"),
+          ).rejects.toMatchObject({
+            status: 500,
+          });
         });
       });
     });

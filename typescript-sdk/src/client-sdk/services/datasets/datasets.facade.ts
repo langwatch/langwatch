@@ -18,8 +18,8 @@ import {
 type DatasetsFacadeConfig = {
   langwatchApiClient: LangwatchApiClient;
   logger: Logger;
-  endpoint?: string;
-  apiKey?: string;
+  endpoint: string;
+  apiKey: string;
 };
 
 /**
