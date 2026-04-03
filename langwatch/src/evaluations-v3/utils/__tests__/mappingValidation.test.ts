@@ -19,13 +19,16 @@ describe("mappingValidation", () => {
       httpConfig: {
         url: "https://api.example.com/chat",
         method: "POST",
-        bodyTemplate: '{"messages": {{messages}}}',
+        bodyTemplate:
+          '{"messages": {{messages}}, "input": "{{input}}", "threadId": "{{threadId}}"}',
         outputPath: "$.result",
       },
       ...overrides,
     });
 
-    it("returns valid when a fixed HTTP variable is mapped even if target inputs are stale", () => {
+    it("returns valid when a template variable is mapped even if target.inputs is stale", () => {
+      // target.inputs only has "messages", but the body template also uses "input" and "threadId".
+      // Mapping "input" (from the template) should count as valid.
       const target = createHttpAgentTargetConfig({
         mappings: {
           "dataset-1": {
@@ -44,14 +47,68 @@ describe("mappingValidation", () => {
       expect(result.isValid).toBe(true);
     });
 
-    it("returns invalid when no HTTP variable is mapped even if target inputs are empty", () => {
-      const target = createHttpAgentTargetConfig({
-        inputs: [],
-      });
+    it("returns invalid when no variable is mapped", () => {
+      const target = createHttpAgentTargetConfig();
 
       const result = getTargetMissingMappings(target, "dataset-1");
 
       expect(result.isValid).toBe(false);
+    });
+
+    it("derives valid fields from a custom body template", () => {
+      // A user-defined template with custom variable names — not the default three
+      const target = createHttpAgentTargetConfig({
+        inputs: [],
+        httpConfig: {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          bodyTemplate: '{"query": "{{user_query}}", "context": "{{context}}"}',
+        },
+      });
+
+      // No mapping yet → invalid
+      expect(getTargetMissingMappings(target, "dataset-1").isValid).toBe(false);
+
+      // Map one of the custom variables → valid
+      const targetWithMapping = createHttpAgentTargetConfig({
+        inputs: [],
+        httpConfig: {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          bodyTemplate: '{"query": "{{user_query}}", "context": "{{context}}"}',
+        },
+        mappings: {
+          "dataset-1": {
+            user_query: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "question",
+            },
+          },
+        },
+      });
+
+      const result = getTargetMissingMappings(targetWithMapping, "dataset-1");
+      expect(result.isValid).toBe(true);
+      // "context" should appear as an optional missing mapping
+      expect(result.missingMappings).toHaveLength(1);
+      expect(result.missingMappings[0]?.fieldId).toBe("context");
+      expect(result.missingMappings[0]?.isRequired).toBe(false);
+    });
+
+    it("returns valid with zero fields when body template is empty", () => {
+      const target = createHttpAgentTargetConfig({
+        inputs: [],
+        httpConfig: {
+          url: "https://api.example.com/chat",
+          method: "POST",
+          bodyTemplate: '{"static": "payload"}',
+        },
+      });
+
+      // No variables at all → valid (nothing to map)
+      expect(getTargetMissingMappings(target, "dataset-1").isValid).toBe(true);
     });
   });
 

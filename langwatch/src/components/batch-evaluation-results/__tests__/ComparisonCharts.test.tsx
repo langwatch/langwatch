@@ -417,6 +417,56 @@ describe("ComparisonCharts", () => {
       expect(screen.getByTestId("xaxis-option-target")).toBeInTheDocument();
     });
 
+    it("defaults to runs when all targets are evaluators (simple evaluations)", () => {
+      const evaluatorOnlyRun: ComparisonRunData = {
+        runId: "run-1",
+        runName: "Run 1",
+        color: "#3182ce",
+        isLoading: false,
+        data: {
+          runId: "run-1",
+          experimentId: "exp-1",
+          projectId: "project-1",
+          createdAt: Date.now(),
+          datasetColumns: [{ name: "input", hasImages: false }],
+          targetColumns: [
+            {
+              id: "eval-target-1",
+              name: "field_precision",
+              type: "evaluator",
+              outputFields: ["output"],
+            },
+            {
+              id: "eval-target-2",
+              name: "field_recall",
+              type: "evaluator",
+              outputFields: ["output"],
+            },
+          ],
+          evaluatorIds: ["field_precision", "field_recall"],
+          evaluatorNames: {
+            field_precision: "field_precision",
+            field_recall: "field_recall",
+          },
+          rows: [],
+        },
+      };
+
+      render(
+        <ComparisonCharts
+          comparisonData={[evaluatorOnlyRun]}
+          isVisible={true}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Should default to "Runs" even though there are 2+ target columns,
+      // because all of them are evaluator-type (simple evaluations without a real target)
+      expect(screen.getByTestId("group-by-button")).toHaveTextContent(
+        "Group by: Runs",
+      );
+    });
+
     it("shows Model option when targets have model in metadata", async () => {
       const user = userEvent.setup();
       const comparisonData = [

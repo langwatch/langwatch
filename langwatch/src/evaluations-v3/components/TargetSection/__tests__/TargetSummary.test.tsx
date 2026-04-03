@@ -9,18 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TargetAggregate } from "../../../utils/computeAggregates";
 import { TargetSummary } from "../TargetSummary";
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: vi.fn(),
+vi.mock("../../../hooks/useEvaluatorName", () => ({
+  useEvaluatorNames: vi.fn(),
 }));
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    useQueries: vi.fn(),
-  },
-}));
-
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { useEvaluatorNames } from "../../../hooks/useEvaluatorName";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -47,19 +40,7 @@ const createAggregate = (
 
 describe("TargetSummary", () => {
   beforeEach(() => {
-    vi.mocked(useOrganizationTeamProject).mockReturnValue({
-      project: { id: "project-123", slug: "test-project" },
-    } as ReturnType<typeof useOrganizationTeamProject>);
-
-    vi.mocked(api.useQueries).mockImplementation(((queryBuilder: any) =>
-      queryBuilder({
-        evaluators: {
-          getById: (input: { id: string }) => ({
-            data: input.id ? { name: `Evaluator ${input.id}` } : undefined,
-            isLoading: false,
-          }),
-        },
-      })) as typeof api.useQueries);
+    vi.mocked(useEvaluatorNames).mockReturnValue(new Map());
   });
 
   afterEach(() => {
@@ -190,6 +171,11 @@ describe("TargetSummary", () => {
 
   it("shows evaluator display names in the tooltip instead of evaluator ids", async () => {
     const user = userEvent.setup();
+
+    vi.mocked(useEvaluatorNames).mockReturnValue(
+      new Map([["eval-1", "Exact Match"]]),
+    );
+
     const aggregates = createAggregate({
       completedRows: 3,
       totalRows: 3,
@@ -226,7 +212,7 @@ describe("TargetSummary", () => {
     await user.hover(screen.getByTestId("target-summary"));
 
     await waitFor(() => {
-      expect(screen.getByText("Evaluator db-eval-1")).toBeInTheDocument();
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
     });
     expect(screen.queryByText("eval-1")).not.toBeInTheDocument();
   });

@@ -1,5 +1,5 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import {
   LuChevronRight,
   LuClock,
@@ -15,9 +15,8 @@ import {
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
-import { api } from "~/utils/api";
+import { useEvaluatorNames } from "../../hooks/useEvaluatorName";
 import type { EvaluatorConfig } from "../../types";
 import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
@@ -55,33 +54,9 @@ export const TargetSummary = memo(function TargetSummary({
   evaluators,
   isRunning = false,
 }: TargetSummaryProps) {
-  const { project } = useOrganizationTeamProject();
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
-  const evaluatorNameQueries = api.useQueries((t) =>
-    evaluators.map((evaluator) =>
-      t.evaluators.getById(
-        {
-          id: evaluator.dbEvaluatorId ?? "",
-          projectId: project?.id ?? "",
-        },
-        {
-          enabled: !!evaluator.dbEvaluatorId && !!project?.id,
-          staleTime: 60_000,
-        },
-      ),
-    ),
-  );
-  const evaluatorNames = useMemo(() => {
-    return new Map(
-      evaluators.map((evaluator, index) => [
-        evaluator.id,
-        evaluator.localEvaluatorConfig?.name ??
-          evaluatorNameQueries[index]?.data?.name ??
-          evaluator.id,
-      ]),
-    );
-  }, [evaluatorNameQueries, evaluators]);
+  const evaluatorNames = useEvaluatorNames(evaluators);
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =
