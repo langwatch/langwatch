@@ -7,22 +7,25 @@ import {
   type DatasetColumnType,
 } from "./datasets-cli.service";
 
-function parseColumns(columnsStr: string): DatasetColumnType[] {
+export function parseColumns(columnsStr: string): DatasetColumnType[] {
   return columnsStr.split(",").map((col) => {
-    const [name, type] = col.trim().split(":");
-    if (!name || !type) {
+    const parts = col.trim().split(":");
+    if (parts.length !== 2 || !parts[0]!.trim() || !parts[1]!.trim()) {
       throw new Error(
         `Invalid column format: "${col.trim()}". Expected "name:type" (e.g., input:string)`,
       );
     }
-    return { name: name.trim(), type: type.trim() };
+    return { name: parts[0]!.trim(), type: parts[1]!.trim() };
   });
 }
 
-export const datasetCreateCommand = async (
-  name: string,
-  options: { columns?: string },
-): Promise<void> => {
+export const datasetCreateCommand = async ({
+  name,
+  options,
+}: {
+  name: string;
+  options: { columns?: string };
+}): Promise<void> => {
   checkApiKey();
 
   let columnTypes: DatasetColumnType[] = [];

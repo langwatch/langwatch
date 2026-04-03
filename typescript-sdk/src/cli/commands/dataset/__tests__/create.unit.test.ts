@@ -1,19 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-// Test the parseColumns logic (module-private, re-implemented for testing)
-function parseColumns(
-  columnsStr: string,
-): Array<{ name: string; type: string }> {
-  return columnsStr.split(",").map((col) => {
-    const [name, type] = col.trim().split(":");
-    if (!name || !type) {
-      throw new Error(
-        `Invalid column format: "${col.trim()}". Expected "name:type" (e.g., input:string)`,
-      );
-    }
-    return { name: name.trim(), type: type.trim() };
-  });
-}
+import { parseColumns } from "../create";
 
 describe("parseColumns", () => {
   describe("when given valid column definitions", () => {
@@ -58,6 +44,12 @@ describe("parseColumns", () => {
     it("throws on empty string segment", () => {
       expect(() => parseColumns("input:string,")).toThrow(
         'Invalid column format: ""',
+      );
+    });
+
+    it("throws on extra colon segments", () => {
+      expect(() => parseColumns("input:string:extra")).toThrow(
+        'Invalid column format: "input:string:extra"',
       );
     });
   });

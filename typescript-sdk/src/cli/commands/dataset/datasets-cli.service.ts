@@ -56,6 +56,8 @@ export class DatasetsCliServiceError extends Error {
   }
 }
 
+const DEFAULT_TIMEOUT_MS = 30_000;
+
 export class DatasetsCliService {
   private readonly apiKey: string;
   private readonly endpoint: string;
@@ -72,6 +74,27 @@ export class DatasetsCliService {
       "x-auth-token": this.apiKey,
       authorization: `Bearer ${this.apiKey}`,
     };
+  }
+
+  private async request(
+    url: string,
+    init?: RequestInit,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new DatasetsCliServiceError(
+          `Request timed out after ${timeoutMs}ms`,
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -94,7 +117,7 @@ export class DatasetsCliService {
     limit = 50,
   }: { page?: number; limit?: number } = {}): Promise<ListDatasetsResponse> {
     const url = `${this.endpoint}/api/dataset?page=${page}&limit=${limit}`;
-    const response = await fetch(url, { headers: this.headers });
+    const response = await this.request(url, { headers: this.headers });
     return this.handleResponse<ListDatasetsResponse>(response);
   }
 
@@ -106,7 +129,7 @@ export class DatasetsCliService {
     columnTypes?: DatasetColumnType[];
   }): Promise<DatasetDetail> {
     const url = `${this.endpoint}/api/dataset`;
-    const response = await fetch(url, {
+    const response = await this.request(url, {
       method: "POST",
       headers: { ...this.headers, "content-type": "application/json" },
       body: JSON.stringify({ name, columnTypes }),
@@ -116,13 +139,13 @@ export class DatasetsCliService {
 
   async get(slugOrId: string): Promise<DatasetDetail> {
     const url = `${this.endpoint}/api/dataset/${encodeURIComponent(slugOrId)}`;
-    const response = await fetch(url, { headers: this.headers });
+    const response = await this.request(url, { headers: this.headers });
     return this.handleResponse<DatasetDetail>(response);
   }
 
   async delete(slugOrId: string): Promise<{ success: boolean }> {
     const url = `${this.endpoint}/api/dataset/${encodeURIComponent(slugOrId)}`;
-    const response = await fetch(url, {
+    const response = await this.request(url, {
       method: "DELETE",
       headers: this.headers,
     });
@@ -139,7 +162,7 @@ export class DatasetsCliService {
     limit?: number;
   }): Promise<PaginatedResponse<DatasetRecord>> {
     const url = `${this.endpoint}/api/dataset/${encodeURIComponent(slugOrId)}/records?page=${page}&limit=${limit}`;
-    const response = await fetch(url, { headers: this.headers });
+    const response = await this.request(url, { headers: this.headers });
     return this.handleResponse<PaginatedResponse<DatasetRecord>>(response);
   }
 
@@ -171,7 +194,7 @@ export class DatasetsCliService {
     formData.append("file", new Blob([content], { type: "text/plain" }), filename);
 
     const url = `${this.endpoint}/api/dataset/${encodeURIComponent(slugOrId)}/upload`;
-    const response = await fetch(url, {
+    const response = await this.request(url, {
       method: "POST",
       headers: this.headers,
       body: formData,
@@ -193,7 +216,7 @@ export class DatasetsCliService {
     formData.append("file", new Blob([content], { type: "text/plain" }), filename);
 
     const url = `${this.endpoint}/api/dataset/upload`;
-    const response = await fetch(url, {
+    const response = await this.request(url, {
       method: "POST",
       headers: this.headers,
       body: formData,

@@ -56,8 +56,10 @@ export const formatTable = (
 
 export const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "N/A";
+
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
 
   const seconds = Math.floor(diffMs / 1000);
   const minutes = Math.floor(seconds / 60);

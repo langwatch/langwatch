@@ -1,44 +1,40 @@
 import { describe, it, expect } from "vitest";
+import { toCsv, toJsonl, escapeCsvField } from "../download";
 
-// Extract pure functions for testing by re-implementing them here
-// (they're module-private in download.ts, so we test the logic directly)
+describe("escapeCsvField", () => {
+  it("returns plain string as-is", () => {
+    expect(escapeCsvField("hello")).toBe("hello");
+  });
 
-function toCsv(records: Array<{ entry: Record<string, unknown> }>): string {
-  if (records.length === 0) return "";
+  it("wraps value with commas in quotes", () => {
+    expect(escapeCsvField("hello, world")).toBe('"hello, world"');
+  });
 
-  const columns = Object.keys(records[0]!.entry);
+  it("escapes double quotes by doubling them", () => {
+    expect(escapeCsvField('say "hi"')).toBe('"say ""hi"""');
+  });
 
-  const escapeCsvField = (value: unknown): string => {
-    const str =
-      value === null || value === undefined
-        ? ""
-        : typeof value === "string"
-          ? value
-          : JSON.stringify(value);
-    if (
-      str.includes(",") ||
-      str.includes('"') ||
-      str.includes("\n") ||
-      str.includes("\r")
-    ) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
+  it("wraps value with newlines in quotes", () => {
+    expect(escapeCsvField("line1\nline2")).toBe('"line1\nline2"');
+  });
 
-  const header = columns.join(",");
-  const rows = records.map((record) =>
-    columns.map((col) => escapeCsvField(record.entry[col])).join(","),
-  );
+  it("wraps value with carriage returns in quotes", () => {
+    expect(escapeCsvField("line1\rline2")).toBe('"line1\rline2"');
+  });
 
-  return [header, ...rows].join("\n");
-}
+  it("returns empty string for null", () => {
+    expect(escapeCsvField(null)).toBe("");
+  });
 
-function toJsonl(
-  records: Array<{ entry: Record<string, unknown> }>,
-): string {
-  return records.map((record) => JSON.stringify(record.entry)).join("\n");
-}
+  it("returns empty string for undefined", () => {
+    expect(escapeCsvField(undefined)).toBe("");
+  });
+
+  it("JSON-stringifies non-string types", () => {
+    expect(escapeCsvField(42)).toBe("42");
+    expect(escapeCsvField([1, 2])).toBe('"[1,2]"');
+  });
+});
 
 describe("toCsv", () => {
   describe("when records are empty", () => {
@@ -59,31 +55,25 @@ describe("toCsv", () => {
     });
   });
 
-  describe("when values contain commas", () => {
-    it("wraps in quotes", () => {
-      const records = [{ entry: { text: "hello, world" } }];
-      expect(toCsv(records)).toBe('text\n"hello, world"');
+  describe("when records have different keys", () => {
+    it("includes union of all keys as columns", () => {
+      const records = [
+        { entry: { input: "hello" } },
+        { entry: { input: "foo", extra: "bar" } },
+      ];
+      const result = toCsv(records);
+      const lines = result.split("\n");
+      expect(lines[0]).toBe("input,extra");
+      expect(lines[1]).toBe("hello,");
+      expect(lines[2]).toBe("foo,bar");
     });
   });
 
-  describe("when values contain double quotes", () => {
-    it("escapes with doubled quotes", () => {
-      const records = [{ entry: { text: 'say "hi"' } }];
-      expect(toCsv(records)).toBe('text\n"say ""hi"""');
-    });
-  });
-
-  describe("when values contain newlines", () => {
-    it("wraps in quotes", () => {
-      const records = [{ entry: { text: "line1\nline2" } }];
-      expect(toCsv(records)).toBe('text\n"line1\nline2"');
-    });
-  });
-
-  describe("when values contain carriage returns", () => {
-    it("wraps in quotes", () => {
-      const records = [{ entry: { text: "line1\rline2" } }];
-      expect(toCsv(records)).toBe('text\n"line1\rline2"');
+  describe("when header names need escaping", () => {
+    it("escapes header fields with commas", () => {
+      const records = [{ entry: { "col,a": "value" } }];
+      const result = toCsv(records);
+      expect(result.split("\n")[0]).toBe('"col,a"');
     });
   });
 

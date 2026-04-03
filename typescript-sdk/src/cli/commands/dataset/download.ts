@@ -3,25 +3,35 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { DatasetsCliService, DatasetsCliServiceError } from "./datasets-cli.service";
 
-function toCsv(records: Array<{ entry: Record<string, unknown> }>): string {
+const SUPPORTED_FORMATS = ["csv", "jsonl"] as const;
+type DownloadFormat = (typeof SUPPORTED_FORMATS)[number];
+
+export function escapeCsvField(value: unknown): string {
+  const str =
+    value === null || value === undefined
+      ? ""
+      : typeof value === "string"
+        ? value
+        : JSON.stringify(value);
+  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function toCsv(records: Array<{ entry: Record<string, unknown> }>): string {
   if (records.length === 0) return "";
 
-  const columns = Object.keys(records[0]!.entry);
-
-  const escapeCsvField = (value: unknown): string => {
-    const str =
-      value === null || value === undefined
-        ? ""
-        : typeof value === "string"
-          ? value
-          : JSON.stringify(value);
-    if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
-      return `"${str.replace(/"/g, '""')}"`;
+  // Build column list from union of all record keys to avoid dropping columns
+  const columnSet = new Set<string>();
+  for (const record of records) {
+    for (const key of Object.keys(record.entry)) {
+      columnSet.add(key);
     }
-    return str;
-  };
+  }
+  const columns = [...columnSet];
 
-  const header = columns.join(",");
+  const header = columns.map((col) => escapeCsvField(col)).join(",");
   const rows = records.map((record) =>
     columns.map((col) => escapeCsvField(record.entry[col])).join(","),
   );
@@ -29,18 +39,21 @@ function toCsv(records: Array<{ entry: Record<string, unknown> }>): string {
   return [header, ...rows].join("\n");
 }
 
-function toJsonl(records: Array<{ entry: Record<string, unknown> }>): string {
+export function toJsonl(records: Array<{ entry: Record<string, unknown> }>): string {
   return records.map((record) => JSON.stringify(record.entry)).join("\n");
 }
 
-export const datasetDownloadCommand = async (
-  slugOrId: string,
-  options: { format?: string },
-): Promise<void> => {
+export const datasetDownloadCommand = async ({
+  slugOrId,
+  options,
+}: {
+  slugOrId: string;
+  options: { format?: string };
+}): Promise<void> => {
   checkApiKey();
 
   const format = options.format ?? "csv";
-  if (format !== "csv" && format !== "jsonl") {
+  if (!SUPPORTED_FORMATS.includes(format as DownloadFormat)) {
     console.error(
       chalk.red(`Unsupported format "${format}". Use "csv" or "jsonl".`),
     );

@@ -5,11 +5,15 @@ import { basename } from "path";
 import { checkApiKey } from "../../utils/apiKey";
 import { DatasetsCliService, DatasetsCliServiceError } from "./datasets-cli.service";
 
-export const datasetUploadCommand = async (
-  slugOrIdOrFile: string,
-  filePathOrUndefined: string | undefined,
-  options: { create?: string },
-): Promise<void> => {
+export const datasetUploadCommand = async ({
+  slugOrIdOrFile,
+  filePath: filePathOrUndefined,
+  options,
+}: {
+  slugOrIdOrFile: string;
+  filePath: string | undefined;
+  options: { create?: string };
+}): Promise<void> => {
   checkApiKey();
 
   const service = new DatasetsCliService();

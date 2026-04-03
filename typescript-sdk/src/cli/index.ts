@@ -61,9 +61,9 @@ const datasetList = async (): Promise<void> => {
   return datasetListCommand();
 };
 
-const datasetCreate = async (name: string, options: { columns?: string }): Promise<void> => {
+const datasetCreate = async ({ name, options }: { name: string; options: { columns?: string } }): Promise<void> => {
   const { datasetCreateCommand } = await import("./commands/dataset/create.js");
-  return datasetCreateCommand(name, options);
+  return datasetCreateCommand({ name, options });
 };
 
 const datasetGet = async (slugOrId: string): Promise<void> => {
@@ -76,14 +76,14 @@ const datasetDelete = async (slugOrId: string): Promise<void> => {
   return datasetDeleteCommand(slugOrId);
 };
 
-const datasetUpload = async (slugOrIdOrFile: string, filePath: string | undefined, options: { create?: string }): Promise<void> => {
+const datasetUpload = async ({ slugOrIdOrFile, filePath, options }: { slugOrIdOrFile: string; filePath: string | undefined; options: { create?: string } }): Promise<void> => {
   const { datasetUploadCommand } = await import("./commands/dataset/upload.js");
-  return datasetUploadCommand(slugOrIdOrFile, filePath, options);
+  return datasetUploadCommand({ slugOrIdOrFile, filePath, options });
 };
 
-const datasetDownload = async (slugOrId: string, options: { format?: string }): Promise<void> => {
+const datasetDownload = async ({ slugOrId, options }: { slugOrId: string; options: { format?: string } }): Promise<void> => {
   const { datasetDownloadCommand } = await import("./commands/dataset/download.js");
-  return datasetDownloadCommand(slugOrId, options);
+  return datasetDownloadCommand({ slugOrId, options });
 };
 
 const program = new Command();
@@ -242,7 +242,7 @@ datasetCmd
   .option("--columns <columns>", "Column definitions (e.g., input:string,output:string)")
   .action(async (name: string, options: { columns?: string }) => {
     try {
-      await datasetCreate(name, options);
+      await datasetCreate({ name, options });
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -285,13 +285,17 @@ datasetCmd
           console.error("Error: file path is required");
           process.exit(1);
         }
-        await datasetUpload(slug, undefined, options);
+        if (file) {
+          console.error("Error: when using --create, only a single <file> argument is allowed");
+          process.exit(1);
+        }
+        await datasetUpload({ slugOrIdOrFile: slug, filePath: undefined, options });
       } else {
         if (!slug || !file) {
           console.error("Error: both <slug> and <file> are required");
           process.exit(1);
         }
-        await datasetUpload(slug, file, options);
+        await datasetUpload({ slugOrIdOrFile: slug, filePath: file, options });
       }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -305,7 +309,7 @@ datasetCmd
   .option("--format <format>", "Output format: csv or jsonl", "csv")
   .action(async (slug: string, options: { format?: string }) => {
     try {
-      await datasetDownload(slug, options);
+      await datasetDownload({ slugOrId: slug, options });
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
