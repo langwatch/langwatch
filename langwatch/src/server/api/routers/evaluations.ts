@@ -84,14 +84,8 @@ export const evaluationsRouter = createTRPCRouter({
         });
       }
 
-      // Dispatch to evaluation processing pipeline when flag is ON
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: {
-          featureEventSourcingEvaluationIngestion: true,
-        },
-      });
-      if (project?.featureEventSourcingEvaluationIngestion && result) {
+      // Dispatch to evaluation processing pipeline
+      if (result) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         void (async () => {
           try {
