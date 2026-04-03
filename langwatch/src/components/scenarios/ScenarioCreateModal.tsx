@@ -6,6 +6,7 @@ import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { isModelDisabledForProvider } from "~/utils/modelProviderHelpers";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
@@ -72,10 +73,11 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     defaultModel,
     "chat"
   );
-  const providerKey = defaultModel.split("/")[0];
-  const isModelDisabled = modelOption
-    ? modelOption.isDisabled
-    : !(providers?.[providerKey as keyof typeof providers]?.enabled ?? false);
+  const isModelDisabled = isModelDisabledForProvider({
+    modelOption,
+    providers,
+    model: defaultModel,
+  });
 
   const openEditorWithData = useCallback(
     (formData: Partial<ScenarioFormData>) => {

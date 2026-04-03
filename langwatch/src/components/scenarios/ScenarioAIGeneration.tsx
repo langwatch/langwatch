@@ -17,6 +17,7 @@ import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { DEFAULT_MODEL } from "../../utils/constants";
+import { isModelDisabledForProvider } from "../../utils/modelProviderHelpers";
 import { createLogger } from "../../utils/logger";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { toaster } from "../ui/toaster";
@@ -141,10 +142,11 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     defaultModel,
     "chat",
   );
-  const providerKey = defaultModel.split("/")[0];
-  const isDefaultModelDisabled = modelOption
-    ? modelOption.isDisabled
-    : !(providers?.[providerKey as keyof typeof providers]?.enabled ?? false);
+  const isDefaultModelDisabled = isModelDisabledForProvider({
+    modelOption,
+    providers,
+    model: defaultModel,
+  });
   const providerName = extractProviderFromModel(defaultModel);
 
   const hasExistingContent = form !== null && formHasContent(form);

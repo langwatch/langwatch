@@ -87,13 +87,15 @@ vi.mock("../../ModelSelector", () => ({
   useModelSelectionOptions: (..._args: unknown[]) => mockUseModelSelectionOptions(),
 }));
 
-// Create a variable for mock that can be modified per test
+// Create variables for mock that can be modified per test
 let mockHasEnabledProviders = true;
+let mockProviders: Record<string, { enabled: boolean }> = {};
 
 // Mock useModelProvidersSettings
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
     hasEnabledProviders: mockHasEnabledProviders,
+    providers: mockProviders,
     isLoading: false,
   }),
 }));
@@ -136,6 +138,7 @@ describe("<ScenarioCreateModal/>", () => {
     mockToasterCreate.mockClear();
     // Reset to having providers by default
     mockHasEnabledProviders = true;
+    mockProviders = { openai: { enabled: true } };
     // Reset project to default (no Azure)
     mockProject = { id: "project-123", slug: "my-project" };
     // Reset model selection to enabled (default OpenAI model in registry)
@@ -355,6 +358,7 @@ describe("<ScenarioCreateModal/>", () => {
       mockToasterCreate.mockClear();
       // Set to no providers
       mockHasEnabledProviders = false;
+      mockProviders = {};
     });
 
     it("shows warning message instead of form", () => {
@@ -397,6 +401,7 @@ describe("when default model is Azure deployment not in registry", () => {
       mockUseModelSelectionOptions.mockReturnValue({ modelOption: undefined });
       // Azure provider IS enabled
       mockHasEnabledProviders = true;
+      mockProviders = { azure: { enabled: true } };
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -439,6 +444,7 @@ describe("when default model is Azure deployment not in registry", () => {
       // hasEnabledProviders=true simulates: OpenAI is configured, but Azure is NOT configured
       // yet the project's default model is azure/my-gpt4-deployment
       mockHasEnabledProviders = true;
+      mockProviders = { openai: { enabled: true } };
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -446,12 +452,6 @@ describe("when default model is Azure deployment not in registry", () => {
       });
     });
 
-    // This test documents the bug: when modelOption is undefined (Azure deployment not in registry)
-    // and the azure provider is not configured (even though another provider like OpenAI is),
-    // clicking Generate should trigger the isModelDisabled error path.
-    // Current code: `isModelDisabled = modelOption?.isDisabled ?? false` evaluates to false
-    // so generation proceeds and no error is shown.
-    // After the fix, isModelDisabled should be true → error message appears.
     it("shows API key error when generating because azure provider is not configured", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
@@ -463,8 +463,6 @@ describe("when default model is Azure deployment not in registry", () => {
       fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
       fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
-      // BUG: current code proceeds with fetch instead of showing error.
-      // After fix: error state should appear with the API keys message.
       await waitFor(() => {
         expect(within(dialog).getByText(/api keys not configured/i)).toBeInTheDocument();
       });
@@ -472,11 +470,13 @@ describe("when default model is Azure deployment not in registry", () => {
   });
 });
 
+
 describe("when default model is Azure and provider is NOT configured at all", () => {
   beforeEach(() => {
     mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
     mockUseModelSelectionOptions.mockReturnValue({ modelOption: undefined });
     mockHasEnabledProviders = false;
+    mockProviders = {};
   });
 
   it("shows No model provider configured warning", () => {

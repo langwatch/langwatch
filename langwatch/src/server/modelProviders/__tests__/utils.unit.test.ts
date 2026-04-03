@@ -48,7 +48,7 @@ describe("getVercelAIModel", () => {
       await expect(
         getVercelAIModel("project-123", "azure/my-gpt4-deployment"),
       ).rejects.toThrow(
-        "Model provider azure not configured or disabled for project",
+        'Model provider "azure" is not configured for this project.',
       );
     });
 
@@ -60,7 +60,7 @@ describe("getVercelAIModel", () => {
       await expect(
         getVercelAIModel("project-123", "azure/my-gpt4-deployment"),
       ).rejects.toThrow(
-        "Model provider azure not configured or disabled for project",
+        'Model provider "azure" is configured but disabled.',
       );
     });
   });
