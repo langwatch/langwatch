@@ -190,14 +190,11 @@ describe("Feature: Dataset TypeScript SDK", () => {
             service.getDataset("my-missing-dataset"),
           ).rejects.toThrow(DatasetNotFoundError);
 
-          try {
-            await service.getDataset("my-missing-dataset");
-          } catch (error) {
-            expect(error).toBeInstanceOf(DatasetNotFoundError);
-            expect((error as DatasetNotFoundError).message).toContain(
-              "my-missing-dataset",
-            );
-          }
+          await expect(
+            service.getDataset("my-missing-dataset"),
+          ).rejects.toMatchObject({
+            message: expect.stringContaining("my-missing-dataset"),
+          });
         });
       });
 
