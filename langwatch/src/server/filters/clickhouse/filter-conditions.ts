@@ -6,6 +6,28 @@ import type {
   GenerateFilterConditionsResult,
 } from "./types";
 
+/** Label values that represent pass/fail status rather than classification labels. */
+const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
+
+/**
+ * Factory for evaluator_id EXISTS condition builders.
+ * All 5 variants share the same EXISTS subquery template, differing only in the additional WHERE clause.
+ */
+function buildEvaluatorExistsCondition(
+  additionalWhere: string,
+): FilterConditionBuilder {
+  return (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM evaluation_runs es
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId = ts.TraceId
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
+        ${additionalWhere}
+    )`,
+    params: { [`${paramId}_values`]: values },
+  });
+}
+
 /**
  * ClickHouse WHERE clause builders for filtering traces.
  * Returns null if the filter is not supported in ClickHouse.
@@ -134,26 +156,23 @@ export const clickHouseFilterConditions: Record<
   },
 
   // Evaluations - using evaluation_runs table with EXISTS subquery
-  "evaluations.evaluator_id": (values, paramId) => ({
-    sql: `EXISTS (
-      SELECT 1 FROM evaluation_runs es
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
-    )`,
-    params: { [`${paramId}_values`]: values },
-  }),
+  "evaluations.evaluator_id": buildEvaluatorExistsCondition(""),
 
-  "evaluations.evaluator_id.guardrails_only": (values, paramId) => ({
-    sql: `EXISTS (
-      SELECT 1 FROM evaluation_runs es
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
-        AND es.IsGuardrail = 1
-    )`,
-    params: { [`${paramId}_values`]: values },
-  }),
+  "evaluations.evaluator_id.guardrails_only": buildEvaluatorExistsCondition(
+    "AND es.IsGuardrail = 1",
+  ),
+
+  "evaluations.evaluator_id.has_passed": buildEvaluatorExistsCondition(
+    "AND es.Passed IS NOT NULL",
+  ),
+
+  "evaluations.evaluator_id.has_score": buildEvaluatorExistsCondition(
+    "AND es.Score IS NOT NULL",
+  ),
+
+  "evaluations.evaluator_id.has_label": buildEvaluatorExistsCondition(
+    `AND es.Label IS NOT NULL AND es.Label != '' AND es.Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
+  ),
 
   "evaluations.passed": (values, paramId, key) => {
     if (!key) return { sql: "1=0", params: {} };

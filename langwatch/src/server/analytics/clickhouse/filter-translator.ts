@@ -95,6 +95,15 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
   "evaluations.evaluator_id.guardrails_only": (values) =>
     translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.has_passed": (values) =>
+    translateEvaluatorIdFilter(values, "AND Passed IS NOT NULL"),
+  "evaluations.evaluator_id.has_score": (values) =>
+    translateEvaluatorIdFilter(values, "AND Score IS NOT NULL"),
+  "evaluations.evaluator_id.has_label": (values) =>
+    translateEvaluatorIdFilter(
+      values,
+      "AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('succeeded', 'failed')",
+    ),
   "evaluations.passed": (values, key) =>
     translateEvaluationPassedFilter(values, key),
   "evaluations.score": (values, key) =>
@@ -376,9 +385,16 @@ function translateSpanModelFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate evaluator ID filter (requires JOIN)
+ * Translate evaluator ID filter (requires JOIN).
+ *
+ * @param additionalWhere - Optional extra WHERE predicates appended inside the
+ *   subquery (e.g. "AND Passed IS NOT NULL"). Used by the has_passed / has_score /
+ *   has_label variants so the subquery filters by result-type, not just EvaluatorId.
  */
-function translateEvaluatorIdFilter(values: string[]): FilterTranslation {
+function translateEvaluatorIdFilter(
+  values: string[],
+  additionalWhere = "",
+): FilterTranslation {
   const ts = tableAliases.trace_summaries;
   const paramName = genParamName("evaluatorIds");
 
@@ -387,6 +403,7 @@ function translateEvaluatorIdFilter(values: string[]): FilterTranslation {
       SELECT TraceId FROM evaluation_runs
       WHERE TenantId = {tenantId:String}
         AND EvaluatorId IN ({${paramName}:Array(String)})
+        ${additionalWhere}
     )`,
     requiredJoins: [],
     params: { [paramName]: values },
