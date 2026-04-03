@@ -73,7 +73,7 @@ class Dataset(BaseModel):
             raise ImportError(
                 "pandas is required for to_pandas(). "
                 "Install it with: pip install pandas"
-            )
+            ) from None
         return pd.DataFrame([entry.entry for entry in self.entries])
 
 
