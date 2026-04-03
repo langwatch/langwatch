@@ -113,7 +113,7 @@ Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_p
 | Assign tag to version | `PUT /api/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
 
 <Note>
-  Custom tag names must be non-numeric and cannot be "latest". Built-in tags (latest, production, staging) cannot be renamed or deleted.
+  Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected and cannot be renamed or deleted. `production` and `staging` are default seeded tags that can be renamed or deleted like any custom tag.
 </Note>
 
 ## Common Workflows

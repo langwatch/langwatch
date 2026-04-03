@@ -332,6 +332,12 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       ),
     },
     async (params) => {
+      if (params.version != null && params.tag) {
+        return {
+          content: [{ type: "text", text: "Error: Provide either 'version' or 'tag', not both." }],
+          isError: true,
+        };
+      }
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
       const { handleGetPrompt } = await import("./tools/get-prompt.js");
@@ -426,7 +432,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_rename_prompt_tag",
-    "Rename an existing custom prompt tag. Built-in tags (latest, production, staging) cannot be renamed.",
+    'Rename an existing prompt tag. The "latest" tag cannot be renamed.',
     {
       tag: z.string().describe("Current tag name to rename"),
       name: z.string().describe("New tag name"),
@@ -443,7 +449,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_delete_prompt_tag",
-    "Delete a custom prompt tag and all its assignments. Built-in tags cannot be deleted.",
+    'Delete a prompt tag and all its assignments. The "latest" tag cannot be deleted.',
     {
       tag: z.string().describe("Tag name to delete"),
     },

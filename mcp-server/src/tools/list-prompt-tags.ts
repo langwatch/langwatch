@@ -8,7 +8,7 @@ export async function handleListPromptTags(): Promise<string> {
   }>;
 
   if (!tags || tags.length === 0) {
-    return "No prompt tags found. Built-in tags (latest, production, staging) are always available.";
+    return "No prompt tags found. The `latest` tag is always available.";
   }
 
   const lines: string[] = [];

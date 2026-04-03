@@ -140,6 +140,9 @@ export async function makeRequest(
     );
   }
 
+  if (response.status === 204 || response.headers.get("content-length") === "0") {
+    return null;
+  }
   return response.json();
 }
 
@@ -246,11 +249,15 @@ export async function updatePrompt(
 }
 
 /** Assigns a tag to a specific prompt version. */
-export async function assignPromptTag(
-  idOrHandle: string,
-  tag: string,
-  versionId: string
-): Promise<unknown> {
+export async function assignPromptTag({
+  idOrHandle,
+  tag,
+  versionId,
+}: {
+  idOrHandle: string;
+  tag: string;
+  versionId: string;
+}): Promise<unknown> {
   return makeRequest(
     "PUT",
     `/api/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
@@ -269,7 +276,13 @@ export async function createPromptTag(name: string): Promise<unknown> {
 }
 
 /** Renames an existing prompt tag. */
-export async function renamePromptTag(tag: string, name: string): Promise<unknown> {
+export async function renamePromptTag({
+  tag,
+  name,
+}: {
+  tag: string;
+  name: string;
+}): Promise<unknown> {
   return makeRequest(
     "PUT",
     `/api/prompts/tags/${encodeURIComponent(tag)}`,

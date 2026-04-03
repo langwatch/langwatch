@@ -4,7 +4,7 @@ export async function handleRenamePromptTag(params: {
   tag: string;
   name: string;
 }): Promise<string> {
-  await apiRenamePromptTag(params.tag, params.name);
+  await apiRenamePromptTag({ tag: params.tag, name: params.name });
 
   const lines: string[] = [];
   lines.push("Tag renamed successfully!\n");
