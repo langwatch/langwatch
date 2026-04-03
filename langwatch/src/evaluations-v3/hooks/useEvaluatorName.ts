@@ -62,5 +62,5 @@ export const useEvaluatorNames = (
  */
 export const useEvaluatorName = (evaluator: EvaluatorConfig): string => {
   const names = useEvaluatorNames([evaluator]);
-  return names.get(evaluator.id) ?? "";
+  return names.get(evaluator.id) ?? evaluator.id;
 };

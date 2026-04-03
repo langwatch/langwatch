@@ -206,19 +206,22 @@ export const getTargetMissingMappings = (
   }
 
   if (isHttpAgent) {
-    // Derive the effective variable set from the body template (source of truth)
-    // and merge with persisted inputs so we never miss variables from either source.
+    // Derive the effective variable set from the body template (source of truth).
+    // Only fall back to persisted inputs when no body template is available.
     const templateVars = extractVariablesFromBodyTemplate(
       target.httpConfig?.bodyTemplate,
     );
-    const httpFieldIds = new Set([
-      ...templateVars,
-      ...inputs.map((input) => input.identifier),
-    ]);
+    const httpFieldIds = new Set(
+      templateVars.length > 0
+        ? templateVars
+        : inputs.map((input) => input.identifier),
+    );
 
-    // HTTP agents: all fields are optional, but at least one must be mapped
-    const hasAtLeastOneMapping = Object.keys(datasetMappings).some((fieldId) =>
-      httpFieldIds.has(fieldId),
+    // HTTP agents: all fields are optional, but at least one must be mapped.
+    // Check the value too — Object.keys includes keys with undefined values.
+    const hasAtLeastOneMapping = Object.entries(datasetMappings).some(
+      ([fieldId, mapping]) =>
+        mapping !== undefined && httpFieldIds.has(fieldId),
     );
 
     for (const fieldId of httpFieldIds) {

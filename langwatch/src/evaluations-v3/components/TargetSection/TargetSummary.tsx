@@ -42,10 +42,13 @@ type TargetSummaryProps = {
  * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
 // Helper to get evaluator name from the evaluators array
-const getEvaluatorName = (
-  evaluatorId: string,
-  evaluatorNames: Map<string, string>,
-): string => {
+const getEvaluatorName = ({
+  evaluatorId,
+  evaluatorNames,
+}: {
+  evaluatorId: string;
+  evaluatorNames: Map<string, string>;
+}): string => {
   return evaluatorNames.get(evaluatorId) ?? evaluatorId;
 };
 
@@ -193,7 +196,10 @@ export const TargetSummary = memo(function TargetSummary({
             {aggregates.evaluators.map((evaluator) => (
               <HStack key={evaluator.evaluatorId} justify="space-between">
                 <Text color="white/75" truncate maxWidth="150px">
-                  {getEvaluatorName(evaluator.evaluatorId, evaluatorNames)}
+                  {getEvaluatorName({
+                    evaluatorId: evaluator.evaluatorId,
+                    evaluatorNames,
+                  })}
                 </Text>
                 <HStack gap={2}>
                   {evaluator.passRate !== null && (
