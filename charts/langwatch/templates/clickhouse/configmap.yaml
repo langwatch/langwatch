@@ -1,0 +1,104 @@
+{{- if .Values.clickhouse.chartManaged }}
+{{- $replicas := .Values.clickhouse.managed.replicas | int }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-clickhouse-init
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+data:
+  # Generates keeper.xml for ClickHouse data nodes (zookeeper client config + macros + remote_servers).
+  # For single-replica deployments this is a no-op.
+  init-clickhouse-keeper.sh: |
+    #!/bin/sh
+    set -eu
+
+    REPLICAS={{ $replicas }}
+    if [ "${REPLICAS}" -le 1 ]; then
+      echo "Single-replica mode — skipping keeper config"
+      exit 0
+    fi
+
+    # Read password from mounted secret
+    CH_PASSWORD=""
+    if [ -f /mnt/secrets/password ]; then
+      CH_PASSWORD=$(cat /mnt/secrets/password)
+    fi
+
+    cat > /etc/clickhouse-server/config.d/keeper.xml << 'XMLEOF'
+    <clickhouse>
+        <zookeeper>
+    {{- range $i := until $replicas }}
+            <node><host>{{ $.Release.Name }}-clickhouse-keeper-{{ $i }}.{{ $.Release.Name }}-clickhouse-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host><port>9181</port></node>
+    {{- end }}
+            <session_timeout_ms>30000</session_timeout_ms>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+        </zookeeper>
+        <macros>
+            <shard>shard_01</shard>
+            <replica>__REPLICA_NAME__</replica>
+            <cluster>langwatch</cluster>
+        </macros>
+        <remote_servers>
+            <langwatch>
+                <secret>__CLUSTER_SECRET__</secret>
+                <shard>
+                    <internal_replication>true</internal_replication>
+    {{- range $i := until $replicas }}
+                    <replica><host>{{ $.Release.Name }}-clickhouse-{{ $i }}.{{ $.Release.Name }}-clickhouse-headless.{{ $.Release.Namespace }}.svc.cluster.local</host><port>9000</port></replica>
+    {{- end }}
+                </shard>
+            </langwatch>
+        </remote_servers>
+    </clickhouse>
+    XMLEOF
+
+    # Substitute pod-specific values
+    POD_NAME="${POD_NAME:-$(hostname)}"
+    sed -i "s|__REPLICA_NAME__|${POD_NAME}|g" /etc/clickhouse-server/config.d/keeper.xml
+    sed -i "s|__CLUSTER_SECRET__|${CH_PASSWORD}|g" /etc/clickhouse-server/config.d/keeper.xml
+    echo "Keeper client config generated for ${POD_NAME}"
+
+  # Generates keeper_config.xml for dedicated Keeper nodes (raft configuration).
+  init-keeper.sh: |
+    #!/bin/sh
+    set -eu
+
+    POD_NAME="${POD_NAME:-$(hostname)}"
+    # Extract pod ordinal index from name (e.g., "release-clickhouse-keeper-2" → "2")
+    POD_INDEX=$(echo "${POD_NAME}" | sed 's/.*-\([0-9]*\)$/\1/')
+    KEEPER_SERVER_ID=$((POD_INDEX + 1))
+
+    cat > /etc/clickhouse-keeper/keeper_config.xml << XMLEOF
+    <clickhouse>
+        <logger>
+            <level>warning</level>
+            <console>1</console>
+        </logger>
+        <listen_host>0.0.0.0</listen_host>
+        <keeper_server>
+            <tcp_port>9181</tcp_port>
+            <server_id>${KEEPER_SERVER_ID}</server_id>
+            <log_storage_path>/var/lib/clickhouse-keeper/log</log_storage_path>
+            <snapshot_storage_path>/var/lib/clickhouse-keeper/snapshots</snapshot_storage_path>
+            <coordination_settings>
+                <operation_timeout_ms>10000</operation_timeout_ms>
+                <session_timeout_ms>30000</session_timeout_ms>
+                <startup_timeout>60000</startup_timeout>
+                <raft_logs_level>warning</raft_logs_level>
+                <snapshot_distance>100000</snapshot_distance>
+                <reserved_log_items>100000</reserved_log_items>
+            </coordination_settings>
+            <raft_configuration>
+    {{- range $i := until $replicas }}
+                <server><id>{{ add1 $i }}</id><hostname>{{ $.Release.Name }}-clickhouse-keeper-{{ $i }}.{{ $.Release.Name }}-clickhouse-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname><port>9234</port></server>
+    {{- end }}
+            </raft_configuration>
+        </keeper_server>
+    </clickhouse>
+    XMLEOF
+
+    echo "Keeper raft config generated: server_id=${KEEPER_SERVER_ID} pod=${POD_NAME}"
+{{- end }}

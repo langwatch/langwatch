@@ -1,0 +1,36 @@
+{{- if and .Values.clickhouse.chartManaged (gt (int .Values.clickhouse.managed.replicas) 1) }}
+{{- $replicas := .Values.clickhouse.managed.replicas | int }}
+{{- $minAvailable := add1 (div $replicas 2) }}
+# ClickHouse PodDisruptionBudget — maintain quorum
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-clickhouse-pdb
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ $minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+      app.kubernetes.io/instance: {{ .Release.Name }}
+---
+# Keeper PodDisruptionBudget — maintain raft quorum
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-clickhouse-keeper-pdb
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse-keeper
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: keeper
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ $minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-clickhouse-keeper
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

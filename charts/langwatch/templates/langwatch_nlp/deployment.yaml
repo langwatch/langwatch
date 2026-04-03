@@ -102,6 +102,20 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
           volumeMounts:
             {{- with .Values.langwatch_nlp.extraNlpVolumeMounts}}
             {{- toYaml . | nindent 12 }}

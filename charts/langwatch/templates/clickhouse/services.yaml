@@ -1,0 +1,51 @@
+{{- if .Values.clickhouse.chartManaged }}
+# ClusterIP service for app connections
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-clickhouse
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      protocol: TCP
+    - name: native
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+# Headless service for StatefulSet pod identity and DNS discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-clickhouse-headless
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      protocol: TCP
+    - name: native
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

@@ -88,19 +88,22 @@ spec:
           securityContext:
             runAsUser: 1000
             runAsNonRoot: true
-        {{- if .Values.opensearch.chartManaged }}
-        - name: wait-for-opensearch
-          image: curlimages/curl:latest
+        {{- if .Values.clickhouse.chartManaged }}
+        - name: wait-for-clickhouse
+          image: curlimages/curl:8.12.1
           command: ['sh', '-c']
           args:
             - |
-              url="http://{{ .Release.Name }}-opensearch:9200/_cluster/health"
-              echo "Waiting for OpenSearch service at $url..."
-              until curl -s -f $url | grep -q '"status":"green"\|"status":"yellow"'; do
-                echo "OpenSearch not ready yet, waiting..."
+              url="http://{{ .Release.Name }}-clickhouse:8123/ping"
+              echo "Waiting for ClickHouse at $url..."
+              until curl -s -f "$url" >/dev/null 2>&1; do
+                echo "ClickHouse not ready yet, waiting..."
                 sleep 5
               done
-              echo "OpenSearch is ready!"
+              echo "ClickHouse is ready!"
+          securityContext:
+            runAsUser: 100
+            runAsNonRoot: true
         {{- end }}
       containers:
         {{- with .Values.app.extraContainers}}
@@ -201,38 +204,39 @@ spec:
             {{- end }}
             {{- end }}
 
-            # ElasticSearch/OpenSearch/Quickwit connection string
-            {{- if .Values.opensearch.chartManaged }}
-            - name: ELASTICSEARCH_NODE_URL
-              value: "http://{{ .Release.Name }}-opensearch:9200"
-            - name: IS_OPENSEARCH
-              value: "true"
-            {{- else}}
-            - name: ELASTICSEARCH_NODE_URL
-              {{- if .Values.opensearch.external.nodeUrl.value }}
-              value: {{ .Values.opensearch.external.nodeUrl.value | quote }}
-              {{- else }}
+            # ClickHouse connection
+            {{- if .Values.clickhouse.chartManaged }}
+            - name: CLICKHOUSE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.name }}
-                  key: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.key }}
-              {{- end }}
-            - name: ELASTICSEARCH_API_KEY
-              {{- if .Values.opensearch.external.apiKey.value }}
-              value: {{ .Values.opensearch.external.apiKey.value | quote }}
-              {{- else }}
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.opensearch.external.apiKey.secretKeyRef.name }}
-                  key: {{ .Values.opensearch.external.apiKey.secretKeyRef.key }}
-              {{- end }}
-            {{- if eq .Values.opensearch.external.engine "opensearch" }}
-            - name: IS_OPENSEARCH
-              value: "true"
-            {{- else if eq .Values.opensearch.external.engine "quickwit" }}
-            - name: IS_QUICKWIT
-              value: "true"
+                  name: {{ include "langwatch.clickhouse.secretName" . }}
+                  key: {{ include "langwatch.clickhouse.secretKey" . }}
+            - name: CLICKHOUSE_URL
+              value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ .Release.Name }}-clickhouse:8123/langwatch"
+            {{- if gt (int .Values.clickhouse.managed.replicas) 1 }}
+            - name: CLICKHOUSE_CLUSTER
+              value: "langwatch"
             {{- end }}
+            {{- else }}
+            - name: CLICKHOUSE_URL
+              {{- if .Values.clickhouse.external.url.value }}
+              value: {{ .Values.clickhouse.external.url.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.clickhouse.external.url.secretKeyRef.name }}
+                  key: {{ .Values.clickhouse.external.url.secretKeyRef.key }}
+              {{- end }}
+            {{- if .Values.clickhouse.external.cluster }}
+            - name: CLICKHOUSE_CLUSTER
+              value: {{ .Values.clickhouse.external.cluster | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.clickhouse.coldStorageEnabled }}
+            - name: CLICKHOUSE_COLD_STORAGE_ENABLED
+              value: "true"
+            - name: CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS
+              value: {{ .Values.clickhouse.coldStorageDefaultTtlDays | quote }}
             {{- end }}
 
             # Credentials encryption key
@@ -631,6 +635,20 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
           volumeMounts:
             {{- with .Values.app.extraAppVolumeMounts}}
             {{- toYaml . | nindent 12 }}

@@ -1,0 +1,304 @@
+{{- if .Values.clickhouse.chartManaged }}
+{{- $replicas := .Values.clickhouse.managed.replicas | int }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-clickhouse
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}-clickhouse-headless
+  replicas: {{ $replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-clickhouse
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: clickhouse
+    spec:
+      # ClickHouse entrypoint runs as root and uses gosu to drop to clickhouse user.
+      # This overrides the global pod security context.
+      securityContext:
+        fsGroup: 101  # clickhouse group
+      terminationGracePeriodSeconds: 60
+
+      {{- with (coalesce .Values.clickhouse.scheduling.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.clickhouse.scheduling.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if gt $replicas 1 }}
+      affinity:
+        {{- if .Values.clickhouse.scheduling.affinity }}
+        {{- toYaml .Values.clickhouse.scheduling.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}-clickhouse
+                topologyKey: topology.kubernetes.io/zone
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}-clickhouse
+                topologyKey: kubernetes.io/hostname
+        {{- end }}
+      {{- else if .Values.clickhouse.scheduling.affinity }}
+      affinity:
+        {{- toYaml .Values.clickhouse.scheduling.affinity | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- if gt $replicas 1 }}
+        # Wait for all ClickHouse pod DNS entries to be resolvable
+        - name: dns-wait
+          image: busybox:1.37.0
+          command: ['sh', '-c']
+          args:
+            - |
+              REPLICAS={{ $replicas }}
+              NAMESPACE={{ .Release.Namespace }}
+              for i in $(seq 0 $((REPLICAS - 1))); do
+                HOST="{{ .Release.Name }}-clickhouse-${i}.{{ .Release.Name }}-clickhouse-headless.${NAMESPACE}.svc.cluster.local"
+                echo "Waiting for DNS: ${HOST}"
+                until nslookup "${HOST}" >/dev/null 2>&1; do
+                  echo "  ${HOST} not resolvable yet..."
+                  sleep 2
+                done
+                echo "  ${HOST} resolved"
+              done
+              echo "All DNS entries resolvable"
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+        # Generate keeper.xml (zookeeper client config + macros + cluster def)
+        - name: keeper-init
+          image: busybox:1.37.0
+          command: ['sh', '/scripts/init-clickhouse-keeper.sh']
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: clickhouse-config
+              mountPath: /etc/clickhouse-server/config.d
+            - name: init-scripts
+              mountPath: /scripts
+            - name: secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+        {{- end }}
+
+      containers:
+        - name: clickhouse
+          image: "{{ .Values.images.clickhouse.repository }}:{{ .Values.images.clickhouse.tag }}"
+          imagePullPolicy: {{ .Values.images.clickhouse.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8123
+              protocol: TCP
+            - name: native
+              containerPort: 9000
+              protocol: TCP
+          # ClickHouse entrypoint needs root for chown, then drops to clickhouse via gosu
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            readOnlyRootFilesystem: false
+          env:
+            # Core configuration
+            - name: KEEPER_ENABLED
+              value: {{ if gt $replicas 1 }}"true"{{ else }}"false"{{ end }}
+            - name: CLICKHOUSE_PASSWORD_FILE
+              value: "/mnt/secrets/password"
+
+            {{- if gt $replicas 1 }}
+            - name: REPLICA_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SHARD_NAME
+              value: "shard_01"
+            {{- end }}
+
+            # Derived memory settings (from managed.memory: {{ .Values.clickhouse.managed.memory }})
+            - name: MAX_SERVER_MEMORY_USAGE
+              value: {{ include "langwatch.clickhouse.maxServerMemoryUsage" . | quote }}
+            - name: MAX_SERVER_MEMORY_USAGE_TO_RAM_RATIO
+              value: "0.85"
+            - name: MAX_MEMORY_USAGE_PER_QUERY
+              value: {{ include "langwatch.clickhouse.maxMemoryUsagePerQuery" . | quote }}
+            - name: MAX_BYTES_BEFORE_EXTERNAL_GROUP_BY
+              value: {{ include "langwatch.clickhouse.maxBytesBeforeExternalGroupBy" . | quote }}
+            - name: MAX_BYTES_BEFORE_EXTERNAL_SORT
+              value: {{ include "langwatch.clickhouse.maxBytesBeforeExternalSort" . | quote }}
+            - name: UNCOMPRESSED_CACHE_SIZE
+              value: {{ include "langwatch.clickhouse.uncompressedCacheSize" . | quote }}
+
+            # Derived CPU settings (from managed.cpu: {{ .Values.clickhouse.managed.cpu }})
+            - name: BACKGROUND_POOL_SIZE
+              value: {{ include "langwatch.clickhouse.backgroundPoolSize" . | quote }}
+            - name: MAX_INSERT_THREADS
+              value: {{ include "langwatch.clickhouse.maxInsertThreads" . | quote }}
+            - name: MAX_CONCURRENT_QUERIES
+              value: {{ include "langwatch.clickhouse.maxConcurrentQueries" . | quote }}
+
+            # Async inserts (server-side batching)
+            - name: ASYNC_INSERT_ENABLED
+              value: "1"
+            - name: ASYNC_INSERT_WAIT
+              value: "1"
+
+            # Vertical merge (always enabled — reduces peak memory)
+            - name: VERTICAL_MERGE_ALGORITHM_MIN_ROWS_TO_ACTIVATE
+              value: "1"
+            - name: VERTICAL_MERGE_ALGORITHM_MIN_COLUMNS_TO_ACTIVATE
+              value: "1"
+
+            {{- if .Values.clickhouse.managed.cold.enabled }}
+            # Cold storage configuration
+            - name: STORAGE_TYPE
+              value: {{ .Values.clickhouse.managed.cold.provider | quote }}
+            {{- if has .Values.clickhouse.managed.cold.provider (list "s3" "gcs") }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.clickhouse.managed.cold.endpoint | default (printf "https://s3.%s.amazonaws.com/%s/" .Values.clickhouse.managed.cold.region .Values.clickhouse.managed.cold.bucket) | quote }}
+            - name: S3_BUCKET
+              value: {{ .Values.clickhouse.managed.cold.bucket | quote }}
+            - name: S3_REGION
+              value: {{ .Values.clickhouse.managed.cold.region | quote }}
+            - name: USE_ENVIRONMENT_CREDENTIALS
+              value: {{ .Values.clickhouse.managed.cold.useEnvironmentCredentials | quote }}
+            {{- if and .Values.clickhouse.managed.cold.credentials.secretKeyRef.name (not .Values.clickhouse.managed.cold.useEnvironmentCredentials) }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.clickhouse.managed.cold.credentials.secretKeyRef.name }}
+                  key: {{ .Values.clickhouse.managed.cold.credentials.secretKeyRef.accessKeyKey }}
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.clickhouse.managed.cold.credentials.secretKeyRef.name }}
+                  key: {{ .Values.clickhouse.managed.cold.credentials.secretKeyRef.secretKeyKey }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
+            # Advanced overrides (applied last — override any derived value above)
+            {{- range $key, $value := .Values.clickhouse.advanced.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.clickhouse.managed.cpu }}
+              memory: {{ .Values.clickhouse.managed.memory }}
+            limits:
+              cpu: {{ .Values.clickhouse.managed.cpu }}
+              memory: {{ .Values.clickhouse.managed.memory }}
+
+          {{- if gt $replicas 1 }}
+          # Multi-replica: check Keeper connectivity
+          livenessProbe:
+            exec:
+              command:
+                - clickhouse-client
+                - --query
+                - "SELECT 1 FROM system.zookeeper WHERE path='/'"
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - clickhouse-client
+                - --query
+                - "SELECT 1 FROM system.zookeeper WHERE path='/'"
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          {{- else }}
+          # Single-replica: simple HTTP ping
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          {{- end }}
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            {{- if gt $replicas 1 }}
+            - name: clickhouse-config
+              mountPath: /etc/clickhouse-server/config.d
+            {{- end }}
+            - name: secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+
+      volumes:
+        {{- if gt $replicas 1 }}
+        - name: clickhouse-config
+          emptyDir: {}
+        - name: init-scripts
+          configMap:
+            name: {{ .Release.Name }}-clickhouse-init
+            defaultMode: 0755
+        {{- end }}
+        - name: secrets
+          secret:
+            secretName: {{ include "langwatch.clickhouse.secretName" . }}
+            items:
+              - key: {{ include "langwatch.clickhouse.secretKey" . }}
+                path: password
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.clickhouse.managed.storage.storageClass }}
+        storageClassName: {{ .Values.clickhouse.managed.storage.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.clickhouse.managed.storage.size }}
+{{- end }}

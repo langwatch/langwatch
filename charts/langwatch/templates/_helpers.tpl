@@ -195,22 +195,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{/* Validate external service secrets */}}
-{{- if not .Values.opensearch.chartManaged }}
-  {{- if .Values.opensearch.external.nodeUrl.secretKeyRef.name }}
-    {{- if empty .Values.opensearch.external.nodeUrl.secretKeyRef.key }}
-      {{- $errors = append $errors "opensearch.external.nodeUrl.secretKeyRef.name is set but key is empty" }}
+{{/* Validate ClickHouse configuration */}}
+{{- if not .Values.clickhouse.chartManaged }}
+  {{- if .Values.clickhouse.external.url.secretKeyRef.name }}
+    {{- if empty .Values.clickhouse.external.url.secretKeyRef.key }}
+      {{- $errors = append $errors "clickhouse.external.url.secretKeyRef.name is set but key is empty" }}
     {{- end }}
-  {{- else if empty .Values.opensearch.external.nodeUrl.value }}
-    {{- $errors = append $errors "opensearch.chartManaged is false but nodeUrl is not configured" }}
+  {{- else if empty .Values.clickhouse.external.url.value }}
+    {{- $errors = append $errors "clickhouse.chartManaged is false but external.url is not configured" }}
   {{- end }}
-  
-  {{- if .Values.opensearch.external.apiKey.secretKeyRef.name }}
-    {{- if empty .Values.opensearch.external.apiKey.secretKeyRef.key }}
-      {{- $errors = append $errors "opensearch.external.apiKey.secretKeyRef.name is set but key is empty" }}
+{{- else }}
+  {{- $replicas := .Values.clickhouse.managed.replicas | int }}
+  {{- if and (gt $replicas 1) (eq (mod $replicas 2) 0) }}
+    {{- $errors = append $errors "clickhouse.managed.replicas must be odd (1, 3, 5, 7) for Keeper quorum" }}
+  {{- end }}
+  {{- if and (empty .Values.clickhouse.auth.password) (empty .Values.clickhouse.auth.existingSecret) (not .Values.autogen.enabled) }}
+    {{- $errors = append $errors "clickhouse.auth.password, clickhouse.auth.existingSecret, or autogen must be configured" }}
+  {{- end }}
+  {{- if .Values.clickhouse.managed.cold.enabled }}
+    {{- if empty .Values.clickhouse.managed.cold.bucket }}
+      {{- $errors = append $errors "clickhouse.managed.cold.enabled is true but cold.bucket is not configured" }}
     {{- end }}
-  {{- else if empty .Values.opensearch.external.apiKey.value }}
-    {{- $errors = append $errors "opensearch.chartManaged is false but apiKey is not configured" }}
   {{- end }}
 {{- end }}
 
@@ -233,8 +238,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     {{- $errors = append $errors "postgresql.chartManaged is false but connectionString is not configured" }}
   {{- end }}
 {{- else}}
-  {{- if and (empty .Values.postgresql.auth.password) (empty .Values.postgresql.auth.existingSecret) }}
-    {{- $errors = append $errors "neither postgresql.auth.password nor postgresql.auth.existingSecret is configured" }}
+  {{- if and (empty .Values.postgresql.auth.password) (empty .Values.postgresql.auth.existingSecret) (not .Values.autogen.enabled) }}
+    {{- $errors = append $errors "neither postgresql.auth.password nor postgresql.auth.existingSecret is configured (enable autogen or provide one)" }}
   {{- end }}
 {{- end }}
 
@@ -263,3 +268,112 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- end }}
+
+{{/* ============================================================ */}}
+{{/* Metrics API Key Helper                                        */}}
+{{/* ============================================================ */}}
+
+{{/* Resolve the metrics/telemetry API key from value or secretKeyRef */}}
+{{- define "langwatch.metricsApiKey" -}}
+  {{- if .Values.app.telemetry.metrics.apiKey.value -}}
+    {{- .Values.app.telemetry.metrics.apiKey.value -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* ============================================================ */}}
+{{/* ClickHouse Derivation Helpers                                 */}}
+{{/* ============================================================ */}}
+
+{{/* ClickHouse: Convert memory string (e.g. "4Gi", "512Mi") to bytes */}}
+{{- define "langwatch.clickhouse.memoryBytes" -}}
+  {{- $mem := .Values.clickhouse.managed.memory | toString -}}
+  {{- if hasSuffix "Gi" $mem -}}
+    {{- $val := trimSuffix "Gi" $mem | float64 -}}
+    {{- printf "%.0f" (mulf $val 1073741824.0) -}}
+  {{- else if hasSuffix "Mi" $mem -}}
+    {{- $val := trimSuffix "Mi" $mem | float64 -}}
+    {{- printf "%.0f" (mulf $val 1048576.0) -}}
+  {{- else -}}
+    {{- $mem -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* ClickHouse: MAX_SERVER_MEMORY_USAGE = 85% of pod memory */}}
+{{- define "langwatch.clickhouse.maxServerMemoryUsage" -}}
+  {{- $bytes := include "langwatch.clickhouse.memoryBytes" . | float64 -}}
+  {{- printf "%.0f" (mulf $bytes 0.85) -}}
+{{- end -}}
+
+{{/* ClickHouse: MAX_MEMORY_USAGE_PER_QUERY = 20% of pod memory */}}
+{{- define "langwatch.clickhouse.maxMemoryUsagePerQuery" -}}
+  {{- $bytes := include "langwatch.clickhouse.memoryBytes" . | float64 -}}
+  {{- printf "%.0f" (mulf $bytes 0.20) -}}
+{{- end -}}
+
+{{/* ClickHouse: MAX_BYTES_BEFORE_EXTERNAL_GROUP_BY = 10% of pod memory */}}
+{{- define "langwatch.clickhouse.maxBytesBeforeExternalGroupBy" -}}
+  {{- $bytes := include "langwatch.clickhouse.memoryBytes" . | float64 -}}
+  {{- printf "%.0f" (mulf $bytes 0.10) -}}
+{{- end -}}
+
+{{/* ClickHouse: MAX_BYTES_BEFORE_EXTERNAL_SORT = 10% of pod memory */}}
+{{- define "langwatch.clickhouse.maxBytesBeforeExternalSort" -}}
+  {{- $bytes := include "langwatch.clickhouse.memoryBytes" . | float64 -}}
+  {{- printf "%.0f" (mulf $bytes 0.10) -}}
+{{- end -}}
+
+{{/* ClickHouse: UNCOMPRESSED_CACHE_SIZE = 12% of pod memory */}}
+{{- define "langwatch.clickhouse.uncompressedCacheSize" -}}
+  {{- $bytes := include "langwatch.clickhouse.memoryBytes" . | float64 -}}
+  {{- printf "%.0f" (mulf $bytes 0.12) -}}
+{{- end -}}
+
+{{/* ClickHouse: BACKGROUND_POOL_SIZE = max(1, floor(cpu / 2)) */}}
+{{- define "langwatch.clickhouse.backgroundPoolSize" -}}
+  {{- $cpu := .Values.clickhouse.managed.cpu | int -}}
+  {{- $val := div $cpu 2 -}}
+  {{- if lt $val 1 }}1{{- else }}{{ $val }}{{- end -}}
+{{- end -}}
+
+{{/* ClickHouse: MAX_INSERT_THREADS = max(1, floor(cpu / 4)) */}}
+{{- define "langwatch.clickhouse.maxInsertThreads" -}}
+  {{- $cpu := .Values.clickhouse.managed.cpu | int -}}
+  {{- $val := div $cpu 4 -}}
+  {{- if lt $val 1 }}1{{- else }}{{ $val }}{{- end -}}
+{{- end -}}
+
+{{/* ClickHouse: MAX_CONCURRENT_QUERIES = min(100, cpu * 25) */}}
+{{- define "langwatch.clickhouse.maxConcurrentQueries" -}}
+  {{- $cpu := .Values.clickhouse.managed.cpu | int -}}
+  {{- $val := mul $cpu 25 -}}
+  {{- if gt $val 100 }}100{{- else }}{{ $val }}{{- end -}}
+{{- end -}}
+
+{{/* ClickHouse: Password secret name */}}
+{{- define "langwatch.clickhouse.secretName" -}}
+  {{- if .Values.clickhouse.auth.existingSecret -}}
+    {{- .Values.clickhouse.auth.existingSecret -}}
+  {{- else -}}
+    {{- printf "%s-clickhouse" .Release.Name -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* ClickHouse: Password secret key */}}
+{{- define "langwatch.clickhouse.secretKey" -}}
+  {{- if .Values.clickhouse.auth.existingSecret -}}
+    {{- .Values.clickhouse.auth.secretKeys.passwordKey -}}
+  {{- else -}}
+    {{- "password" -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}
+{{- define "langwatch.clickhouse.clusterName" -}}
+  {{- if .Values.clickhouse.chartManaged -}}
+    {{- if gt (int .Values.clickhouse.managed.replicas) 1 -}}
+      langwatch
+    {{- end -}}
+  {{- else -}}
+    {{- .Values.clickhouse.external.cluster -}}
+  {{- end -}}
+{{- end -}}

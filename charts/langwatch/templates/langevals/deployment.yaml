@@ -11,17 +11,17 @@ metadata:
     {{- toYaml .Values.langevals.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- if .Values.langwatch_nlp.deployment.annotations }}
-    {{- toYaml .Values.langwatch_nlp.deployment.annotations | nindent 4 }}
+    {{- if .Values.langevals.deployment.annotations }}
+    {{- toYaml .Values.langevals.deployment.annotations | nindent 4 }}
     {{- end }}
 spec:
   replicas: {{ .Values.langevals.replicaCount }}
   {{- if .Values.langevals.deployment.strategy }}
   strategy: 
-    {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
+    {{- toYaml .Values.langevals.deployment.strategy | nindent 8 }}
   {{- end }}
   {{- if .Values.langevals.deployment.revisionHistoryLimit }}
-  revisionHistoryLimit: {{ .Values.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.langevals.deployment.revisionHistoryLimit }}
   {{- end }}
   selector:
     matchLabels:
@@ -33,7 +33,7 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-langevals
         app.kubernetes.io/instance: {{ .Release.Name }}
         {{- if .Values.langevals.pod.labels }}
-        {{- toYaml .Values.langevals.labels | nindent 8 }}
+        {{- toYaml .Values.langevals.pod.labels | nindent 8 }}
         {{- end }}
       annotations:
         {{- if .Values.langevals.podAnnotations }}
@@ -99,6 +99,20 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.langevals.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 5
           volumeMounts:
             {{- with .Values.langevals.extraLangevalsVolumeMounts}}
             {{- toYaml . | nindent 12 }}

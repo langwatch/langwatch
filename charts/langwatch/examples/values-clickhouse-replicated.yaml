@@ -1,0 +1,10 @@
+# values-clickhouse-replicated.yaml — Overlay: 3-node replicated ClickHouse.
+# Stack with any base: ./helm-safe.sh install lw . -f examples/values-dev.yaml -f examples/values-clickhouse-replicated.yaml
+clickhouse:
+  chartManaged: true
+  managed:
+    replicas: 3
+    memory: 4Gi
+    cpu: 2
+    storage:
+      size: 20Gi
