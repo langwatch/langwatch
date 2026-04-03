@@ -43,12 +43,12 @@ export class DatasetService {
   /**
    * Handles API errors by mapping status codes to appropriate error types.
    * @param operation - Description of the operation being performed
-   * @param slugOrId - The dataset identifier (used for 404 messages)
    * @param error - The error object from the API response
    * @param status - The HTTP status code
+   * @param slugOrId - The dataset identifier (only passed for operations targeting an existing resource)
    */
-  private handleApiError(operation: string, slugOrId: string, error: unknown, status: number): never {
-    if (status === 404) {
+  private handleApiError(operation: string, error: unknown, status: number, slugOrId?: string): never {
+    if (status === 404 && slugOrId) {
       throw new DatasetNotFoundError(slugOrId);
     }
 
@@ -103,12 +103,12 @@ export class DatasetService {
   private unwrapResponse<T>(
     response: { data?: unknown; error?: unknown; response: { status: number } },
     operation: string,
-    slugOrId: string,
+    slugOrId?: string,
   ): T {
     if (response.error) {
-      this.handleApiError(operation, slugOrId, response.error, response.response.status);
+      this.handleApiError(operation, response.error, response.response.status, slugOrId);
     }
-    return response.data as unknown as T;
+    return response.data as T;
   }
 
   /**
@@ -183,7 +183,6 @@ export class DatasetService {
     return this.unwrapResponse<ListDatasetsApiResponse>(
       response,
       "list datasets",
-      "",
     );
   }
 
@@ -203,7 +202,6 @@ export class DatasetService {
     return this.unwrapResponse<DatasetMetadata>(
       response,
       `create dataset "${options.name}"`,
-      options.name,
     );
   }
 
@@ -343,18 +341,21 @@ export class DatasetService {
     });
 
     if (!response.ok) {
-      let errorBody: unknown;
-      try {
-        errorBody = await response.json();
-      } catch {
-        errorBody = await response.text();
+      const rawBody = await response.text();
+      let errorBody: unknown = rawBody;
+      if (rawBody) {
+        try {
+          errorBody = JSON.parse(rawBody);
+        } catch {
+          // Keep the plain-text body.
+        }
       }
 
       this.handleApiError(
         `upload file to dataset "${slugOrId}"`,
-        slugOrId,
         errorBody,
         response.status,
+        slugOrId,
       );
     }
 
