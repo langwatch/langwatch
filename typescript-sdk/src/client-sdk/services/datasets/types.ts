@@ -156,5 +156,4 @@ export type DeleteRecordsResponse = {
 export type UploadResponse = {
   dataset?: DatasetMetadata;
   records?: DatasetRecordResponse[];
-  [key: string]: unknown;
 };

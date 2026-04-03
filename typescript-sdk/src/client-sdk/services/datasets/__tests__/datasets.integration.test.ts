@@ -157,12 +157,11 @@ describe("Feature: Dataset TypeScript SDK", () => {
           langwatch.datasets.create({ name: "existing-name" }),
         ).rejects.toThrow(DatasetApiError);
 
-        try {
-          await langwatch.datasets.create({ name: "existing-name" });
-        } catch (error) {
-          expect(error).toBeInstanceOf(DatasetApiError);
-          expect((error as DatasetApiError).status).toBe(409);
-        }
+        await expect(
+          langwatch.datasets.create({ name: "existing-name" }),
+        ).rejects.toMatchObject({
+          status: 409,
+        });
       });
     });
   });
