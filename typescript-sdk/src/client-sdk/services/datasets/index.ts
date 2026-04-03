@@ -4,6 +4,16 @@ export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./errors";
 export type {
   Dataset,
   DatasetEntry,
+  DatasetMetadata,
+  DatasetColumnType,
   GetDatasetOptions,
   GetDatasetApiResponse,
+  ListDatasetsOptions,
+  ListDatasetsApiResponse,
+  CreateDatasetOptions,
+  UpdateDatasetOptions,
+  BatchCreateRecordsResponse,
+  DeleteRecordsResponse,
+  UploadResponse,
+  DatasetRecordResponse,
 } from "./types";
