@@ -99,15 +99,7 @@ function createSignalCancel(): CancellationServiceDeps["signalCancel"] {
  * an SSE event, so the UI updates without a page refresh.
  */
 function createSaveScenarioEvent(): CancellationServiceDeps["saveScenarioEvent"] {
-  const facade = SimulationFacade.create();
-
   return async (event) => {
-    // Write to ES for backwards compatibility (skip when ES writes are disabled)
-    const project = await getApp().projects.repo.getById(event.projectId);
-    if (!project?.disableElasticSearchSimulationWriting) {
-      await facade.saveScenarioEvent(event);
-    }
-
     // Dispatch to event-sourcing so ClickHouse gets the CANCELLED status
     // and the reactor broadcasts an SSE update to connected clients.
     try {

@@ -55,14 +55,8 @@ interface ClickHouseScrollCursor {
 /**
  * Service for fetching traces from ClickHouse.
  *
- * This service provides a ClickHouse-based alternative to the Elasticsearch
- * trace fetching logic. It:
- * 1. Checks if ClickHouse Traces Data Source is enabled for the project (via project.featureClickHouseDataSourceTraces flag)
- * 2. Fetches trace summaries and spans using a JOIN query
- * 3. Maps the ClickHouse types to the legacy Trace/Span types
- *
- * Returns null when ClickHouse is not enabled for the project, allowing
- * the caller to fall back to Elasticsearch.
+ * Fetches trace summaries and spans using a JOIN query and maps the
+ * ClickHouse types to the legacy Trace/Span types.
  */
 export class ClickHouseTraceService {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");

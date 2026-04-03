@@ -26,11 +26,6 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
-import type {
-  DatasetEntry,
-  EvaluationEntry,
-} from "../repositories/batchEvaluation.repository";
-import { getDefaultBatchEvaluationRepository } from "../repositories/elasticsearchBatchEvaluation.repository";
 import { abortManager } from "./abortManager";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
@@ -76,10 +71,6 @@ export type OrchestratorInput = {
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
-  /** When ON, ES writes are handled by event sourcing reactors instead of direct writes */
-  featureEventSourcingEvaluationIngestion?: boolean;
-  /** When ON, all direct ES writes for evaluations are skipped entirely */
-  disableElasticSearchEvaluationWriting?: boolean;
 };
 
 /**
@@ -548,8 +539,6 @@ export async function* runOrchestrator(
     saveToEs = false,
     runId: providedRunId,
     concurrency: requestedConcurrency,
-    featureEventSourcingEvaluationIngestion = false,
-    disableElasticSearchEvaluationWriting = false,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -570,31 +559,12 @@ export async function* runOrchestrator(
   // Get commands for ClickHouse dual-write (unconditional)
   const commands = getApp().experimentRuns;
 
-  // Get repository and initialize storage if enabled
-  // Skip direct ES writes when:
-  // - featureEventSourcingEvaluationIngestion is ON (reactor handles it)
-  // - disableElasticSearchEvaluationWriting is ON (ES writes fully disabled)
-  const repository =
-    saveToEs &&
-    experimentId &&
-    !featureEventSourcingEvaluationIngestion &&
-    !disableElasticSearchEvaluationWriting
-      ? getDefaultBatchEvaluationRepository()
-      : null;
-
   // Track CH dispatch failures for observability
   let chDispatchFailures = 0;
   let chDispatchTotal = 0;
 
-  // Accumulate results for batch saving
-  const pendingDataset: DatasetEntry[] = [];
-  const pendingEvaluations: EvaluationEntry[] = [];
-  let pendingProgress = 0;
   // Track traceId per cell so evaluator_result events can reference it
   const cellTraceIds = new Map<string, string>();
-  let lastSaveTime = Date.now();
-  const SAVE_INTERVAL = 5000; // Save every 5 seconds
-  const SAVE_THRESHOLD = 10; // Or every 10 events
 
   // Build target metadata for storage
   // For model: first check localPromptConfig, then fall back to loadedPrompts
@@ -641,20 +611,7 @@ export async function* runOrchestrator(
     stripScoreEvaluatorIds: buildStripScoreEvaluatorIds(state.evaluators),
   };
 
-  // Create initial record in storage
-  if (repository && experimentId) {
-    await repository.create({
-      projectId,
-      experimentId,
-      runId,
-      workflowVersionId,
-      total: totalCells,
-      targets: targetMetadata,
-    });
-  }
-
-  // Dispatch event to ClickHouse — must fire regardless of repository (which is
-  // null when featureEventSourcingEvaluationIngestion is ON).
+  // Dispatch event to ClickHouse.
   if (experimentId) {
     chDispatchTotal++;
     await commands.startExperimentRun({
@@ -671,47 +628,15 @@ export async function* runOrchestrator(
     });
   }
 
-  // Helper to save pending results
-  const savePendingResults = async (force = false) => {
-    if (!repository || !experimentId) return;
-
-    const now = Date.now();
-    const shouldSave =
-      force ||
-      pendingDataset.length + pendingEvaluations.length >= SAVE_THRESHOLD ||
-      now - lastSaveTime >= SAVE_INTERVAL;
-
-    if (
-      shouldSave &&
-      (pendingDataset.length > 0 || pendingEvaluations.length > 0)
-    ) {
-      await repository.upsertResults({
-        projectId,
-        experimentId,
-        runId,
-        dataset: [...pendingDataset],
-        evaluations: [...pendingEvaluations],
-        progress: pendingProgress,
-      });
-      pendingDataset.length = 0;
-      pendingEvaluations.length = 0;
-      lastSaveTime = Date.now();
-    }
-  };
-
-  // Helper to process event for storage
+  // Helper to process event for ClickHouse dispatch
   const processEventForStorage = async (event: EvaluationV3Event) => {
     // Track traceId from target_result so evaluator_result events can reference it.
-    // Must happen before the repository guard since repository is null when
-    // featureEventSourcingEvaluationIngestion is on.
     if (event.type === "target_result" && event.traceId) {
       cellTraceIds.set(`${event.rowIndex}:${event.targetId}`, event.traceId);
     }
 
     // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
-    // Lives before the repository guard because repository is intentionally null
-    // when featureEventSourcingEvaluationIngestion is on.
-    if (event.type === "evaluator_result" && featureEventSourcingEvaluationIngestion) {
+    if (event.type === "evaluator_result") {
       const evalResult = event.result as SingleEvaluationResult;
       const evaluatorConfig = state.evaluators.find(
         (e) => e.id === event.evaluatorId,
@@ -746,8 +671,7 @@ export async function* runOrchestrator(
       }
     }
 
-    // Dispatch events to ClickHouse — must fire regardless of repository (which
-    // is null when featureEventSourcingEvaluationIngestion is ON).
+    // Dispatch events to ClickHouse.
     if (experimentId) {
       if (event.type === "target_result") {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
@@ -831,69 +755,6 @@ export async function* runOrchestrator(
       }
     }
 
-    // ES storage — requires repository
-    if (!repository || !experimentId) return;
-
-    if (event.type === "target_result") {
-      const datasetEntry = datasetRows[event.rowIndex] ?? {};
-      pendingDataset.push({
-        index: event.rowIndex,
-        target_id: event.targetId,
-        entry: datasetEntry,
-        predicted:
-          event.output !== undefined ? { output: event.output } : undefined,
-        cost: event.cost ?? null,
-        duration: event.duration ?? null,
-        error: event.error ?? null,
-        trace_id: event.traceId ?? null,
-      });
-    } else if (event.type === "error") {
-      if (event.rowIndex !== undefined && event.targetId) {
-        const datasetEntry = datasetRows[event.rowIndex] ?? {};
-        pendingDataset.push({
-          index: event.rowIndex,
-          target_id: event.targetId,
-          entry: datasetEntry,
-          predicted: undefined,
-          cost: null,
-          duration: null,
-          error: event.message,
-          trace_id: null,
-        });
-      }
-    } else if (event.type === "evaluator_result") {
-      const result = event.result as SingleEvaluationResult;
-      const evaluatorConfig = state.evaluators.find(
-        (e) => e.id === event.evaluatorId,
-      );
-      const dbEvaluator = evaluatorConfig?.dbEvaluatorId
-        ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-        : null;
-      pendingEvaluations.push({
-        evaluator: event.evaluatorId,
-        name: dbEvaluator?.name ?? null,
-        target_id: event.targetId,
-        index: event.rowIndex,
-        status: result.status,
-        score: result.status === "processed" ? result.score : null,
-        label: result.status === "processed" ? result.label : null,
-        passed: result.status === "processed" ? result.passed : null,
-        details:
-          result.status === "error"
-            ? result.details
-            : result.status === "processed"
-              ? result.details
-              : null,
-        cost:
-          result.status === "processed" && result.cost
-            ? result.cost.amount
-            : null,
-      });
-    } else if (event.type === "progress") {
-      pendingProgress = event.completed;
-    }
-
-    await savePendingResults();
   };
 
   // Emit execution_started
@@ -1100,31 +961,9 @@ export async function* runOrchestrator(
     await abortManager.clearRunning(runId);
     await abortManager.clearAbort(runId);
 
-    // Save any remaining results and mark complete
     const finishedAt = Date.now();
-    if (repository && experimentId) {
-      try {
-        // Save any pending results
-        await savePendingResults(true);
 
-        // Mark as complete or stopped
-        await repository.markComplete({
-          projectId,
-          experimentId,
-          runId,
-          finishedAt: aborted ? undefined : finishedAt,
-          stoppedAt: aborted ? finishedAt : undefined,
-        });
-      } catch (error) {
-        logger.error(
-          { error, runId },
-          "Failed to save final results to storage",
-        );
-      }
-    }
-
-    // Dispatch completion event to ClickHouse — must fire regardless of
-    // repository (which is null when featureEventSourcingEvaluationIngestion is ON).
+    // Dispatch completion event to ClickHouse.
     if (experimentId) {
       chDispatchTotal++;
       await commands.completeExperimentRun({

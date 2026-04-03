@@ -145,27 +145,7 @@ export class TraceUsageService {
       return { chProjectIds: [], esProjectIds: projectIds };
     }
 
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, featureClickHouseDataSourceTraces: true },
-    });
-
-    const flagMap = new Map(
-      projects.map((p) => [p.id, p.featureClickHouseDataSourceTraces]),
-    );
-
-    const chProjectIds: string[] = [];
-    const esProjectIds: string[] = [];
-
-    for (const id of projectIds) {
-      if (flagMap.get(id)) {
-        chProjectIds.push(id);
-      } else {
-        esProjectIds.push(id);
-      }
-    }
-
-    return { chProjectIds, esProjectIds };
+    return { chProjectIds: projectIds, esProjectIds: [] };
   }
 
   private async getCountsFromClickHouse(

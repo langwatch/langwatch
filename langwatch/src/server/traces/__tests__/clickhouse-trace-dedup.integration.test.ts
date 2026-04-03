@@ -163,9 +163,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 vi.mock("~/server/db", () => ({
   prisma: {
     project: {
-      findUnique: vi.fn().mockResolvedValue({
-        featureClickHouseDataSourceTraces: true,
-      }),
+      findUnique: vi.fn().mockResolvedValue({}),
     },
   },
 }));
