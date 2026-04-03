@@ -26,28 +26,33 @@ export async function migrateTeamUsersToRoleBindings({
   organizationId?: string;
 }): Promise<{ created: number; skipped: number }> {
   const teamUsers = await prisma.teamUser.findMany({
-    where: organizationId
-      ? { team: { organizationId } }
-      : undefined,
+    where: organizationId ? { team: { organizationId } } : undefined,
     select: {
       userId: true,
       teamId: true,
       role: true,
       assignedRoleId: true,
-      team: { select: { organizationId: true } },
     },
   });
+
+  // Fetch org IDs for all referenced teams (skips orphaned TeamUser rows)
+  const teamIds = [...new Set(teamUsers.map((tu) => tu.teamId))];
+  const teams = await prisma.team.findMany({
+    where: { id: { in: teamIds } },
+    select: { id: true, organizationId: true },
+  });
+  const teamOrgMap = new Map(teams.map((t) => [t.id, t.organizationId]));
 
   let created = 0;
   let skipped = 0;
 
   for (const tu of teamUsers) {
-    const organizationId = tu.team.organizationId;
+    const orgId = teamOrgMap.get(tu.teamId);
+    if (!orgId) continue; // orphaned TeamUser — team was deleted
 
-    // Check if a RoleBinding already exists for this user+team combination
     const existing = await prisma.roleBinding.findFirst({
       where: {
-        organizationId,
+        organizationId: orgId,
         userId: tu.userId,
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: tu.teamId,
@@ -61,7 +66,7 @@ export async function migrateTeamUsersToRoleBindings({
 
     await prisma.roleBinding.create({
       data: {
-        organizationId,
+        organizationId: orgId,
         userId: tu.userId,
         role: tu.role,
         customRoleId: tu.role === TeamUserRole.CUSTOM ? (tu.assignedRoleId ?? null) : null,
