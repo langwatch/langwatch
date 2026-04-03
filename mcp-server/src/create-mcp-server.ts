@@ -758,16 +758,23 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_list_datasets",
-    "List all datasets on the LangWatch platform with their names, slugs, columns, and record counts.",
-    {},
-    async () => {
+    "List all datasets on the LangWatch platform with their names, slugs, columns, and record counts. Returns AI-readable digest by default.",
+    {
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe(
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+        ),
+    },
+    async (params) => {
       const { requireApiKey } = await import("./config.js");
       requireApiKey();
       const { handleListDatasets } = await import(
         "./tools/list-datasets.js"
       );
       return {
-        content: [{ type: "text", text: await handleListDatasets() }],
+        content: [{ type: "text", text: await handleListDatasets(params) }],
       };
     }
   );
@@ -777,6 +784,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     "Get full details of a dataset on the LangWatch platform by slug or ID, including column definitions and a preview of records.",
     {
       slugOrId: z.string().describe("The dataset slug or ID to retrieve"),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe(
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+        ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");

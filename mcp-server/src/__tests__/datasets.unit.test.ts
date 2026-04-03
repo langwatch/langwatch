@@ -83,6 +83,90 @@ describe("formatDatasetResponse()", () => {
   });
 });
 
+// ── handleListDatasets ──────────────────────────────────────────
+
+describe("handleListDatasets()", () => {
+  const sampleListResponse = {
+    data: [
+      {
+        id: "ds_abc123",
+        name: "User Feedback",
+        slug: "user-feedback",
+        columnTypes: [
+          { name: "input", type: "string" },
+          { name: "output", type: "string" },
+        ],
+        recordCount: 25,
+        createdAt: "2025-01-01T00:00:00.000Z",
+        updatedAt: "2025-01-02T00:00:00.000Z",
+      },
+    ],
+    total: 1,
+    page: 1,
+    limit: 50,
+  };
+
+  describe("when format is digest (default)", () => {
+    it("returns markdown containing dataset names", async () => {
+      mockListDatasets.mockResolvedValue(sampleListResponse);
+      const result = await handleListDatasets();
+      expect(result).toContain("User Feedback");
+      expect(result).toContain("user-feedback");
+    });
+  });
+
+  describe("when format is json", () => {
+    it("returns valid parseable JSON matching the full API response", async () => {
+      mockListDatasets.mockResolvedValue(sampleListResponse);
+      const result = await handleListDatasets({ format: "json" });
+      expect(JSON.parse(result)).toEqual(sampleListResponse);
+    });
+  });
+
+  describe("when no datasets exist", () => {
+    it("returns a no-datasets message in digest mode", async () => {
+      mockListDatasets.mockResolvedValue({ data: [], total: 0, page: 1, limit: 50 });
+      const result = await handleListDatasets();
+      expect(result).toContain("No datasets found");
+    });
+  });
+});
+
+// ── handleGetDataset ────────────────────────────────────────────
+
+describe("handleGetDataset()", () => {
+  const sampleDataset = {
+    id: "ds_abc123",
+    name: "My Dataset",
+    slug: "my-dataset",
+    columnTypes: [
+      { name: "input", type: "string" },
+      { name: "output", type: "string" },
+    ],
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-02T00:00:00.000Z",
+    data: [
+      { id: "rec-1", entry: { input: "hello", output: "world" } },
+    ],
+  };
+
+  describe("when format is digest (default)", () => {
+    it("returns markdown containing dataset name", async () => {
+      mockGetDataset.mockResolvedValue(sampleDataset);
+      const result = await handleGetDataset({ slugOrId: "my-dataset" });
+      expect(result).toContain("# Dataset: My Dataset");
+    });
+  });
+
+  describe("when format is json", () => {
+    it("returns valid parseable JSON matching the dataset structure", async () => {
+      mockGetDataset.mockResolvedValue(sampleDataset);
+      const result = await handleGetDataset({ slugOrId: "my-dataset", format: "json" });
+      expect(JSON.parse(result)).toEqual(sampleDataset);
+    });
+  });
+});
+
 // ── platform_create_dataset schema validation ────────────────────
 
 describe("platform_create_dataset schema", () => {
