@@ -27,6 +27,7 @@ const baseAzureProvider = {
     AZURE_API_BASE: "https://my-resource.openai.azure.com",
   },
   extraHeaders: null,
+  deploymentMapping: null,
 };
 
 describe("prepareLitellmParams", () => {
