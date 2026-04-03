@@ -11,7 +11,6 @@ import { evaluationNameAutoslug } from "../../server/background/workers/collecto
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
-  scheduleTraceCollectionWithFallback,
 } from "../../server/background/workers/collectorWorker";
 import { prisma } from "../../server/db";
 import type {
@@ -482,59 +481,56 @@ async function handleCollectorRequest(
 
   let rejectedSpans = 0;
   let rejectionErrors: string[] = [];
-  if (project.featureEventSourcingTraceIngestion) {
-    try {
-      const resource = CollectorSpanUtils.buildResource({
-        reservedTraceMetadata,
-        customMetadata,
-        expectedOutput,
-      });
+  try {
+    const resource = CollectorSpanUtils.buildResource({
+      reservedTraceMetadata,
+      customMetadata,
+      expectedOutput,
+    });
 
-      const results = await Promise.allSettled(
-        spans.map((span) =>
-          getApp().traces.recordSpan({
-            tenantId: project.id,
-            span: CollectorSpanUtils.convertSpanToOtlp(span),
-            resource,
-            instrumentationScope: { name: "langwatch.rest.collector" },
-            piiRedactionLevel: project.piiRedactionLevel,
-            occurredAt: Date.now(),
-          }),
-        ),
-      );
+    const results = await Promise.allSettled(
+      spans.map((span) =>
+        getApp().traces.recordSpan({
+          tenantId: project.id,
+          span: CollectorSpanUtils.convertSpanToOtlp(span),
+          resource,
+          instrumentationScope: { name: "langwatch.rest.collector" },
+          piiRedactionLevel: project.piiRedactionLevel,
+          occurredAt: Date.now(),
+        }),
+      ),
+    );
 
-      const failures = results.filter(
-        (r): r is PromiseRejectedResult => r.status === "rejected",
-      );
-      rejectedSpans = failures.length;
-      rejectionErrors = failures.map((f) =>
-        f.reason instanceof Error ? f.reason.message : String(f.reason),
-      );
-      if (failures.length > 0) {
-        logger.error(
-          {
-            projectId: project.id,
-            traceId,
-            failureCount: failures.length,
-            errors: failures.map((f) => f.reason),
-          },
-          "Error dispatching collector spans to event sourcing",
-        );
-      }
-    } catch (error) {
-      // Catch synchronous errors (e.g., from buildResource)
+    const failures = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
+    rejectedSpans = failures.length;
+    rejectionErrors = failures.map((f) =>
+      f.reason instanceof Error ? f.reason.message : String(f.reason),
+    );
+    if (failures.length > 0) {
       logger.error(
-        { error, projectId: project.id, traceId },
-        "Error initializing event sourcing dispatch",
+        {
+          projectId: project.id,
+          traceId,
+          failureCount: failures.length,
+          errors: failures.map((f) => f.reason),
+        },
+        "Error dispatching collector spans to event sourcing",
       );
     }
+  } catch (error) {
+    // Catch synchronous errors (e.g., from buildResource)
+    logger.error(
+      { error, projectId: project.id, traceId },
+      "Error initializing event sourcing dispatch",
+    );
   }
 
   // Dispatch custom SDK evaluations to the event-sourcing evaluation pipeline.
   // The REST collector receives evaluations as a separate field (not as span events),
   // so they must be dispatched independently from the spans above.
   if (
-    project.featureEventSourcingEvaluationIngestion &&
     params.evaluations &&
     params.evaluations.length > 0 &&
     traceId
@@ -581,29 +577,6 @@ async function handleCollectorRequest(
       );
     }
   }
-
-  if (project.disableElasticSearchTraceWriting) {
-    return res.status(200).json({ message: "Trace received successfully." });
-  }
-
-  const forceSync = req.query.force_sync === "true";
-  const contentLength = req.headers["content-length"];
-  await scheduleTraceCollectionWithFallback(
-    {
-      projectId: project.id,
-      traceId,
-      spans,
-      evaluations: params.evaluations,
-      reservedTraceMetadata,
-      customMetadata,
-      expectedOutput,
-      existingTrace,
-      paramsMD5,
-      collectedAt: Date.now(),
-    },
-    forceSync,
-    contentLength ? parseInt(contentLength as string, 10) : undefined,
-  );
 
   return res.status(200).json({
     message: "Trace received successfully.",

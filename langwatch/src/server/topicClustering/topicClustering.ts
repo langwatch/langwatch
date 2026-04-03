@@ -49,14 +49,14 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  const clickhouse = project.featureClickHouseDataSourceTraces
-    ? await getClickHouseClientForProject(projectId)
-    : null;
+  const clickhouse = await getClickHouseClientForProject(projectId);
+
+  if (!clickhouse) {
+    throw new Error(`ClickHouse client not available for project ${projectId}`);
+  }
 
   const { totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount } =
-    clickhouse
-      ? await fetchCountsFromClickHouse(clickhouse, projectId)
-      : await fetchCountsFromElasticsearch(projectId);
+    await fetchCountsFromClickHouse(clickhouse, projectId);
 
   logger.info(
     {
@@ -64,7 +64,7 @@ export const clusterTopicsForProject = async (
       totalTraces: totalTracesCount,
       tracesWithInput: tracesWithInputCount,
       recentTraces: recentTracesCount,
-      backend: clickhouse ? "clickhouse" : "elasticsearch",
+      backend: "clickhouse",
     },
     "Debug: Project trace counts",
   );
@@ -119,22 +119,14 @@ export const clusterTopicsForProject = async (
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = clickhouse
-    ? await fetchTracesFromClickHouse(
-        clickhouse,
-        projectId,
-        isIncrementalProcessing,
-        topicIds,
-        subtopicIds,
-        searchAfter,
-      )
-    : await fetchTracesFromElasticsearch(
-        projectId,
-        isIncrementalProcessing,
-        topicIds,
-        subtopicIds,
-        searchAfter,
-      );
+  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse(
+    clickhouse,
+    projectId,
+    isIncrementalProcessing,
+    topicIds,
+    subtopicIds,
+    searchAfter,
+  );
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -765,52 +757,39 @@ export const storeResults = async (
     });
   }
 
-  // Emit TopicAssignedEvents via command queue (only for ES-enabled projects)
+  // Emit TopicAssignedEvents via command queue
   if (tracesToAssign.length > 0) {
     try {
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { featureEventSourcingTraceIngestion: true },
-      });
+      const app = getApp();
 
-      if (!project?.featureEventSourcingTraceIngestion) {
-        logger.debug(
-          { projectId },
-          "Skipping AssignTopic commands - event sourcing not enabled for project",
-        );
-      } else {
-        const app = getApp();
+      // Build topic name lookup maps
+      const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
+      const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
 
-        // Build topic name lookup maps
-        const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
-        const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
+      // Send commands in parallel (queue handles batching internally)
+      await Promise.all(
+        tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
+          app.traces.assignTopic({
+            tenantId: projectId,
+            traceId: trace_id,
+            topicId: topic_id,
+            topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
+            subtopicId: subtopic_id,
+            subtopicName: subtopic_id
+              ? (subtopicNameMap.get(subtopic_id) ?? null)
+              : null,
+            isIncremental,
+            occurredAt: Date.now(),
+          }),
+        ),
+      );
 
-        // Send commands in parallel (queue handles batching internally)
-        await Promise.all(
-          tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-            app.traces.assignTopic({
-              tenantId: projectId,
-              traceId: trace_id,
-              topicId: topic_id,
-              topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
-              subtopicId: subtopic_id,
-              subtopicName: subtopic_id
-                ? (subtopicNameMap.get(subtopic_id) ?? null)
-                : null,
-              isIncremental,
-              occurredAt: Date.now(),
-            }),
-          ),
-        );
-
-        logger.info(
-          { projectId, commandsSent: tracesToAssign.length },
-          "Sent AssignTopic commands to queue",
-        );
-      }
+      logger.info(
+        { projectId, commandsSent: tracesToAssign.length },
+        "Sent AssignTopic commands to queue",
+      );
     } catch (error) {
       logger.error({ projectId, error }, "Failed to send AssignTopic commands");
-      // Don't fail the job - ES update already succeeded
     }
   }
 

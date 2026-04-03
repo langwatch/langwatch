@@ -1,10 +1,7 @@
 /**
  * Analytics Service Facade
  *
- * Routes analytics queries to either Elasticsearch or ClickHouse based on
- * the project's featureClickHouseDataSourceTraces flag.
- *
- * Supports comparison mode for verifying CH results against ES results.
+ * Routes analytics queries to ClickHouse.
  */
 
 import type { PrismaClient } from "@prisma/client";
@@ -51,9 +48,7 @@ export interface AnalyticsServiceDependencies {
  * This facade routes analytics requests to either Elasticsearch or ClickHouse
  * based on the project's configuration. It supports:
  *
- * - Feature flag based routing (featureClickHouseDataSourceTraces)
- * - Comparison mode for verifying ClickHouse results against Elasticsearch
- * - Logging of discrepancies for debugging
+ * - ClickHouse-based analytics queries
  */
 export class AnalyticsService {
   private readonly prisma: PrismaClient;
