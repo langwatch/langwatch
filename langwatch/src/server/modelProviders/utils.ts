@@ -6,6 +6,7 @@ import {
   prepareLitellmParams,
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
+import type { MaybeStoredModelProvider } from "./registry";
 
 export const getVercelAIModel = async (projectId: string, model?: string) => {
   const project = await prisma.project.findUnique({
@@ -16,10 +17,16 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
     throw new Error("Project not found");
   }
 
-  const model_ = model ?? project.defaultModel ?? DEFAULT_MODEL;
+  const modelProviders = await getProjectModelProviders(projectId);
+
+  const model_ = resolveModel({
+    explicit: model,
+    projectDefault: project.defaultModel,
+    fallback: DEFAULT_MODEL,
+    modelProviders,
+  });
 
   const providerKey = model_.split("/")[0] as keyof typeof modelProviders;
-  const modelProviders = await getProjectModelProviders(projectId);
   const modelProvider = modelProviders[providerKey];
 
   if (!modelProvider) {
@@ -54,3 +61,40 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
 
   return vercelProvider(model_);
 };
+
+function resolveModel({
+  explicit,
+  projectDefault,
+  fallback,
+  modelProviders,
+}: {
+  explicit: string | undefined;
+  projectDefault: string | null | undefined;
+  fallback: string;
+  modelProviders: Record<string, MaybeStoredModelProvider>;
+}): string {
+  // 1. Explicit model always wins
+  if (explicit) return explicit;
+
+  // 2. Project default — only if its provider is configured
+  if (projectDefault) {
+    const providerKey = projectDefault.split("/")[0] ?? "";
+    if (modelProviders[providerKey]?.enabled) return projectDefault;
+  }
+
+  // 3. Hardcoded fallback — only if its provider is configured
+  const fallbackProvider = fallback.split("/")[0] ?? "";
+  if (modelProviders[fallbackProvider]?.enabled) return fallback;
+
+  // 4. Find any enabled provider with a custom model
+  for (const [key, provider] of Object.entries(modelProviders)) {
+    if (provider.enabled && provider.customModels?.length) {
+      return `${key}/${provider.customModels[0]?.modelId ?? ""}`;
+    }
+  }
+
+  // 5. Nothing available
+  throw new Error(
+    "No model providers configured for this project. Go to Settings → Model Providers to add one.",
+  );
+}
