@@ -93,7 +93,13 @@ function resolveModel({
     }
   }
 
-  // 5. Nothing available
+  // 5. Nothing available — distinguish "none configured" from "all disabled"
+  if (Object.keys(modelProviders).length > 0) {
+    throw new Error(
+      "All configured model providers are disabled or have no usable models. Go to Settings → Model Providers to enable one or add a model.",
+    );
+  }
+
   throw new Error(
     "No model providers configured for this project. Go to Settings → Model Providers to add one.",
   );
