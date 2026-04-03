@@ -334,11 +334,10 @@ export const DashboardLayout = ({
     team?.members.some((member) => member.userId === user?.id);
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
-  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
   const isTracesOrAnalyticsPage =
     router.pathname.startsWith("/[project]/messages") ||
     router.pathname.startsWith("/[project]/analytics");
-  const showSavedViews = hasClickHouse && isTracesOrAnalyticsPage;
+  const showSavedViews = isTracesOrAnalyticsPage;
 
   return (
     <Box

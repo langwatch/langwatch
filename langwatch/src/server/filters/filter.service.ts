@@ -12,13 +12,9 @@ import type { FilterField } from "./types";
 export type { FilterOption };
 
 /**
- * Unified service for fetching filter options from either ClickHouse or Elasticsearch.
+ * Unified service for fetching filter options from ClickHouse.
  *
- * This service acts as a facade that:
- * 1. Checks if ClickHouse is enabled for the project (via featureClickHouseDataSourceTraces flag)
- * 2. Routes requests to the appropriate backend based on the feature flag
- *
- * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
+ * This service acts as a facade that routes all requests to the ClickHouse backend.
  *
  * @example
  * ```ts
@@ -50,16 +46,7 @@ export class FilterServiceFacade {
   }
 
   /**
-   * Check if ClickHouse is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return this.clickHouseService.isClickHouseEnabled(projectId);
-  }
-
-  /**
    * Get filter options for a specific filter field.
-   *
-   * Routes to ClickHouse when enabled, Elasticsearch otherwise.
    *
    * @param input - Query parameters including project ID, field, and filters
    * @returns Array of filter options with field, label, and count
@@ -76,28 +63,20 @@ export class FilterServiceFacade {
         },
       },
       async (span) => {
-        const useClickHouse = await this.isClickHouseEnabled(input.projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
+        span.setAttribute("backend", "clickhouse");
+
+        return this.clickHouseService.getFilterOptions(
+          input.projectId,
+          input.field,
+          {
+            query: input.query,
+            key: input.key,
+            subkey: input.subkey,
+            startDate: input.startDate,
+            endDate: input.endDate,
+            scopeFilters: input.scopeFilters,
+          },
         );
-
-        if (useClickHouse) {
-          return this.clickHouseService.getFilterOptions(
-            input.projectId,
-            input.field,
-            {
-              query: input.query,
-              key: input.key,
-              subkey: input.subkey,
-              startDate: input.startDate,
-              endDate: input.endDate,
-              scopeFilters: input.scopeFilters,
-            },
-          );
-        }
-
-        return this.elasticsearchService.getFilterOptions(input);
       },
     );
   }

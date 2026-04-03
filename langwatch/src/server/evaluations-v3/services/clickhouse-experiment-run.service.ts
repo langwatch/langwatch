@@ -4,7 +4,7 @@ import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseCli
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import { getVersionMap } from "./getVersionMap";
-import { isClickHouseReadEnabled } from "./isClickHouseReadEnabled";
+
 import type {
   ClickHouseCostSummaryRow,
   ClickHouseEvaluatorBreakdownRow,
@@ -45,28 +45,6 @@ export class ClickHouseExperimentRunService {
   }
 
   /**
-   * Check if ClickHouse evaluations data source is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return this.tracer.withActiveSpan(
-      "ClickHouseExperimentRunService.isClickHouseEnabled",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
-        if (!clickHouseClient) {
-          return false;
-        }
-
-        const enabled = await isClickHouseReadEnabled(this.prisma, projectId);
-
-        span.setAttribute("project.feature.clickhouse", enabled);
-
-        return enabled;
-      },
-    );
-  }
-
-  /**
    * List experiment runs for one or more experiments.
    *
    * Returns runs grouped by experiment ID, with per-evaluator breakdown
@@ -90,11 +68,6 @@ export class ClickHouseExperimentRunService {
         },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;
@@ -306,11 +279,6 @@ export class ClickHouseExperimentRunService {
         attributes: { "tenant.id": projectId, "run.id": runId },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;

@@ -98,6 +98,59 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     }
   }
 
+  async upsertBatch(
+    entries: Array<{ data: TraceSummaryData; tenantId: string }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    const tenantId = entries[0]!.tenantId;
+    EventUtils.validateTenantId(
+      { tenantId },
+      "TraceSummaryClickHouseRepository.upsertBatch",
+    );
+
+    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
+    if (mixedTenant) {
+      throw new Error(
+        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
+        `Each batch must contain a single tenant to ensure correct DB routing.`,
+      );
+    }
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const records = entries.map(({ data, tenantId: tid }) => {
+        const projectionId =
+          IdUtils.generateDeterministicTraceSummaryIdFromData(
+            tid,
+            data.traceId,
+            data.occurredAt,
+          );
+        return this.toClickHouseRecord(
+          data,
+          tid,
+          projectionId,
+          TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        );
+      });
+
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, count: entries.length, error: errorMessage },
+        "Failed to batch store trace summaries in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getByTraceId(
     tenantId: string,
     traceId: string,

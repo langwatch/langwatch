@@ -67,6 +67,7 @@ export class EventSourcingService<
     commandRegistrations,
     globalRegistry,
     processRole,
+    replayMarkerChecker,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
@@ -106,6 +107,7 @@ export class EventSourcingService<
       this.queueManager,
       featureFlagService,
       processRole,
+      replayMarkerChecker,
     );
 
     // Register fold projections

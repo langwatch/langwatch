@@ -100,8 +100,8 @@ export interface PromptStudioSpanResult {
   promptHandle: string | null;
   /** Prompt version number from span attributes (new combined or old format) */
   promptVersionNumber: number | null;
-  /** Prompt label from span attributes (e.g., "production", "staging") */
-  promptLabel: string | null;
+  /** Prompt tag from span attributes (e.g., "production", "staging") */
+  promptTag: string | null;
   /** Prompt variables extracted from span attributes */
   promptVariables: Record<string, string> | null;
 }

@@ -8,12 +8,14 @@ export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "first_token",
   "llm.first_token",
+  "ai.stream.firstChunk",
 ]);
 
 export const LAST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "last_token",
   "llm.last_token",
+  "ai.stream.finish",
 ]);
 
 /**

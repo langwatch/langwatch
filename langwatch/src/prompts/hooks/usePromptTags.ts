@@ -1,50 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { api } from "~/utils/api";
 
 export type TagDefinition = {
   name: string;
   id?: string;
 };
 
-type ApiTagResponse = {
-  name: string;
-  id?: string;
-  createdAt?: string;
-};
-
 export function usePromptTags({
-  organizationId,
+  projectId,
   enabled,
 }: {
-  organizationId: string;
+  projectId: string;
   enabled: boolean;
 }) {
-  const [data, setData] = useState<TagDefinition[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const query = api.promptTags.getAll.useQuery(
+    { projectId },
+    { enabled: enabled && !!projectId },
+  );
 
-  const fetchTags = useCallback(async () => {
-    if (!organizationId) return;
-    setIsLoading(true);
-    try {
-      const response = await fetch(
-        `/api/orgs/${organizationId}/prompt-tags`,
-      );
-      if (!response.ok) {
-        setData([]);
-        return;
-      }
-      const json = (await response.json()) as ApiTagResponse[];
-      setData(json.map((t) => ({ name: t.name, id: t.id })));
-    } catch {
-      setData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [organizationId]);
+  const data: TagDefinition[] = (query.data ?? []).map((t) => ({
+    name: t.name,
+    id: t.id,
+  }));
 
-  useEffect(() => {
-    if (!enabled) return;
-    void fetchTags();
-  }, [enabled, fetchTags]);
-
-  return { data, isLoading, refetch: fetchTags };
+  return {
+    data,
+    isLoading: query.isLoading,
+    refetch: query.refetch,
+  };
 }

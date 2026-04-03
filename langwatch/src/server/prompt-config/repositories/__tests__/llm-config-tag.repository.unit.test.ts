@@ -20,40 +20,6 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 }
 
 describe("PromptTagAssignmentRepository", () => {
-  describe("validateTag()", () => {
-    describe("when tag is 'production'", () => {
-      it("does not throw", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("production")).not.toThrow();
-      });
-    });
-
-    describe("when tag is 'staging'", () => {
-      it("does not throw", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("staging")).not.toThrow();
-      });
-    });
-
-    describe("when tag is a custom tag name", () => {
-      it("does not throw", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("canary")).not.toThrow();
-      });
-    });
-
-    describe("when tag is empty", () => {
-      it("throws a validation error", () => {
-        const repo = new PromptTagAssignmentRepository(makeMockPrisma());
-
-        expect(() => repo.validateTag("")).toThrow(TagValidationError);
-      });
-    });
-  });
-
   describe("assignTag()", () => {
     describe("when version does not belong to the prompt", () => {
       it("throws a validation error", async () => {
@@ -67,7 +33,7 @@ describe("PromptTagAssignmentRepository", () => {
           repo.assignTag({
             configId: "config-1",
             versionId: "version-from-other-prompt",
-            tag: "production",
+            tagId: "ptag_production",
             projectId: "project-1",
           }),
         ).rejects.toThrow(
@@ -81,7 +47,7 @@ describe("PromptTagAssignmentRepository", () => {
       });
     });
 
-    describe("when tag and version are valid", () => {
+    describe("when tagId and version are valid", () => {
       it("assigns the tag to the version", async () => {
         const prisma = makeMockPrisma();
         (
@@ -91,8 +57,9 @@ describe("PromptTagAssignmentRepository", () => {
           id: "vtag_abc",
           configId: "config-1",
           versionId: "v1",
-          tag: "production",
+          tagId: "ptag_production",
           projectId: "project-1",
+          promptTag: { id: "ptag_production", name: "production" },
         };
         (
           prisma.promptTagAssignment.upsert as ReturnType<typeof vi.fn>
@@ -102,7 +69,7 @@ describe("PromptTagAssignmentRepository", () => {
         const result = await repo.assignTag({
           configId: "config-1",
           versionId: "v1",
-          tag: "production",
+          tagId: "ptag_production",
           projectId: "project-1",
           userId: "user-1",
         });
@@ -111,12 +78,12 @@ describe("PromptTagAssignmentRepository", () => {
         expect(prisma.promptTagAssignment.upsert).toHaveBeenCalledWith({
           where: {
             projectId: "project-1",
-            configId_tag: { configId: "config-1", tag: "production" },
+            configId_tagId: { configId: "config-1", tagId: "ptag_production" },
           },
           create: expect.objectContaining({
             configId: "config-1",
             versionId: "v1",
-            tag: "production",
+            tagId: "ptag_production",
             projectId: "project-1",
             createdById: "user-1",
             updatedById: "user-1",
@@ -125,6 +92,7 @@ describe("PromptTagAssignmentRepository", () => {
             versionId: "v1",
             updatedById: "user-1",
           },
+          include: { promptTag: true },
         });
       });
     });
@@ -147,27 +115,30 @@ describe("PromptTagAssignmentRepository", () => {
         expect(result).toEqual([]);
         expect(prisma.promptTagAssignment.findMany).toHaveBeenCalledWith({
           where: { configId: "config-1", projectId: "project-1" },
+          include: { promptTag: true },
         });
       });
     });
 
     describe("when tags are assigned", () => {
-      it("returns all tags for the config", async () => {
+      it("returns all tags for the config with their tag definitions", async () => {
         const prisma = makeMockPrisma();
         const mockTags = [
           {
             id: "vtag_1",
             configId: "config-1",
             versionId: "v2",
-            tag: "production",
+            tagId: "ptag_production",
             projectId: "project-1",
+            promptTag: { id: "ptag_production", name: "production" },
           },
           {
             id: "vtag_2",
             configId: "config-1",
             versionId: "v3",
-            tag: "staging",
+            tagId: "ptag_staging",
             projectId: "project-1",
+            promptTag: { id: "ptag_staging", name: "staging" },
           },
         ];
         (

@@ -21,6 +21,7 @@ import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
 import {
   BadRequestError,
+  InternalServerError,
   NotFoundError,
   UnprocessableEntityError,
 } from "../../shared/errors";
@@ -62,6 +63,13 @@ const updateRecordSchema = z.object({
 
 const deleteRecordsSchema = z.object({
   recordIds: z.array(z.string()).min(1, "recordIds is required").max(1000, "Maximum 1000 records per batch delete"),
+});
+
+const batchCreateRecordsSchema = z.object({
+  entries: z
+    .array(z.record(z.string(), z.any()))
+    .min(1, "entries is required")
+    .max(1000, "Maximum batch size is 1000 entries"),
 });
 
 /**
@@ -283,6 +291,42 @@ export const app = new Hono<{ Variables: Variables }>()
           throw new UnprocessableEntityError(error.message);
         }
         throw error;
+      }
+    },
+  )
+
+  // ── Batch Create Records ──────────────────────────────────────
+  .post(
+    "/:slugOrId/records",
+    describeRoute({
+      description: "Create records in a dataset in batch",
+    }),
+    zValidator("json", batchCreateRecordsSchema, validationHook),
+    async (c) => {
+      const { slugOrId } = c.req.param();
+      const project = c.get("project");
+      const { entries } = c.req.valid("json");
+      const service = c.get("datasetService");
+
+      try {
+        const records = await service.batchCreateRecords({
+          slugOrId,
+          projectId: project.id,
+          entries,
+        });
+
+        return c.json({ data: records }, 201);
+      } catch (error) {
+        if (error instanceof Error && error.name === "InvalidColumnError") {
+          throw new BadRequestError(error.message);
+        }
+        if (
+          error instanceof Error &&
+          error.name === "MalformedColumnTypesError"
+        ) {
+          throw new InternalServerError(error.message);
+        }
+        return mapDatasetNotFoundError(error);
       }
     },
   )

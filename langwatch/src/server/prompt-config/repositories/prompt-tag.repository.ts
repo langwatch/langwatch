@@ -73,8 +73,8 @@ export class PromptTagRepository {
   }
 
   /**
-   * Deletes a custom tag definition and cascades to PromptTagAssignment rows
-   * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
+   * Deletes a custom tag definition.
+   * PromptTagAssignment rows are removed automatically via Prisma's app-level onDelete: Cascade.
    */
   async delete({
     id,
@@ -83,9 +83,44 @@ export class PromptTagRepository {
     id: string;
     organizationId: string;
   }): Promise<void> {
+    const deleted = await this.prisma.promptTag.deleteMany({
+      where: { id, organizationId },
+    });
+
+    if (deleted.count === 0) return;
+
+    logger.info({ organizationId, id }, "Custom prompt tag deleted");
+  }
+
+  /**
+   * Fetches a single custom tag by name and org (for name-based lookups).
+   */
+  async findByName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<PromptTag | null> {
+    return this.prisma.promptTag.findFirst({
+      where: { organizationId, name },
+    });
+  }
+
+  /**
+   * Deletes a custom tag definition by name and cascades to PromptTagAssignment rows
+   * for prompts belonging to the same org. Wrapped in a transaction for atomicity.
+   */
+  async deleteByName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const tag = await tx.promptTag.findFirst({
-        where: { id, organizationId },
+        where: { organizationId, name },
       });
 
       if (!tag) {
@@ -104,17 +139,69 @@ export class PromptTagRepository {
       if (projectIds.length > 0) {
         await tx.promptTagAssignment.deleteMany({
           where: {
-            tag: tag.name,
+            tagId: tag.name,
             projectId: { in: projectIds },
           },
         });
       }
 
       await tx.promptTag.delete({
-        where: { id },
+        where: { id: tag.id },
       });
 
-      logger.info({ organizationId, id, name: tag.name }, "Custom prompt tag deleted");
+      logger.info({ organizationId, name }, "Custom prompt tag deleted by name");
+    });
+  }
+
+  /**
+   * Renames a tag definition and updates all corresponding PromptTagAssignment rows.
+   * Wrapped in a transaction for atomicity.
+   */
+  async rename({
+    organizationId,
+    oldName,
+    newName,
+  }: {
+    organizationId: string;
+    oldName: string;
+    newName: string;
+  }): Promise<PromptTag> {
+    return this.prisma.$transaction(async (tx) => {
+      const tag = await tx.promptTag.findFirst({
+        where: { organizationId, name: oldName },
+      });
+
+      if (!tag) {
+        throw new Error(`Tag "${oldName}" not found`);
+      }
+
+      const projects = await tx.project.findMany({
+        where: {
+          team: { organizationId },
+        },
+        select: { id: true },
+      });
+
+      const projectIds = projects.map((p) => p.id);
+
+      if (projectIds.length > 0) {
+        await tx.promptTagAssignment.updateMany({
+          where: {
+            tagId: oldName,
+            projectId: { in: projectIds },
+          },
+          data: { tagId: newName },
+        });
+      }
+
+      const updated = await tx.promptTag.update({
+        where: { id: tag.id },
+        data: { name: newName },
+      });
+
+      logger.info({ organizationId, oldName, newName }, "Custom prompt tag renamed");
+
+      return updated;
     });
   }
 
@@ -132,6 +219,21 @@ export class PromptTagRepository {
       where: { organizationId, name: tag },
     });
     return found !== null;
+  }
+
+  /**
+   * Finds a tag definition by org and name. Returns null if not found.
+   */
+  async findByOrgAndName({
+    organizationId,
+    name,
+  }: {
+    organizationId: string;
+    name: string;
+  }): Promise<PromptTag | null> {
+    return this.prisma.promptTag.findFirst({
+      where: { organizationId, name },
+    });
   }
 
   /**

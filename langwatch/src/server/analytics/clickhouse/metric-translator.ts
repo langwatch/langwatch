@@ -682,7 +682,18 @@ function translateEventMetric(
 }
 
 /**
- * Translate sentiment metrics
+ * Translate sentiment metrics.
+ *
+ * For thumbs_up_down:
+ * - cardinality: counts traces that have a thumbs_up_down event (countIf)
+ * - all other aggregations (sum, avg, min, max, percentiles): extracts vote
+ *   values from Events.Attributes where event name = 'thumbs_up_down' and
+ *   attribute key = 'event.metrics.vote', filters out zeros, then delegates
+ *   to translateArrayAggregation for proper array-level aggregation.
+ *
+ * WHY zero filtering: The ES registry (registry.ts) uses must_not: { term:
+ * { "events.metrics.value": 0 } } to exclude zero votes. Zeros represent
+ * neutral/missing values that would skew aggregation results.
  */
 function translateSentimentMetric(
   metric: string,
@@ -693,15 +704,52 @@ function translateSentimentMetric(
   const ss = tableAliases.stored_spans;
 
   switch (metric) {
-    case "sentiment.thumbs_up_down":
-      // Thumbs up/down from events
+    case "sentiment.thumbs_up_down": {
       requiredJoins.push("stored_spans");
+
+      const params: Record<string, unknown> = {};
+      const eventTypeParam = genMetricParamName("sentimentEventType");
+      params[eventTypeParam] = "thumbs_up_down";
+
+      // For cardinality, count traces that have thumbs_up_down events
+      if (aggregation === "cardinality") {
+        return {
+          selectExpression: `countIf(has(${ss}."Events.Name", {${eventTypeParam}:String})) AS ${alias}`,
+          alias,
+          requiredJoins,
+          params,
+        };
+      }
+
+      // For all other aggregations, extract vote values and aggregate
+      const voteKeyParam = genMetricParamName("sentimentVoteKey");
+      params[voteKeyParam] = "event.metrics.vote";
+
+      // Extract vote values from Events.Attributes for thumbs_up_down events,
+      // convert to float, and filter out NULLs and zeros.
+      // Pattern mirrors scoreExtraction in translateEventMetric with an additional
+      // zero-exclusion filter matching the ES registry's must_not: { term: { value: 0 } }.
+      const voteExtraction = `arrayFilter(
+          x -> x IS NOT NULL AND x != 0,
+          arrayMap(
+            (n, a) -> if(n = {${eventTypeParam}:String}, toFloat64OrNull(a[{${voteKeyParam}:String}]), NULL),
+            ${ss}."Events.Name",
+            ${ss}."Events.Attributes"
+          )
+        )`;
+
+      const aggExpr = translateArrayAggregation(
+        voteExtraction,
+        aggregation,
+        alias,
+      );
       return {
-        selectExpression: `countIf(has(${ss}."Events.Name", 'thumbs_up_down')) AS ${alias}`,
+        selectExpression: aggExpr,
         alias,
         requiredJoins,
-        params: {},
+        params,
       };
+    }
 
     default:
       return {

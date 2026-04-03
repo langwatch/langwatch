@@ -18,7 +18,7 @@ from langwatch.generated.langwatch_rest_api_client.api.default import (
     post_api_prompts,
     put_api_prompts_by_id,
     delete_api_prompts_by_id,
-    put_api_prompts_by_id_labels_by_label,
+    put_api_prompts_by_id_tags_by_tag,
 )
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
@@ -60,23 +60,11 @@ from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_
 from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_by_id_response_200 import (
     DeleteApiPromptsByIdResponse200,
 )
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_label import (
-    GetApiPromptsByIdLabel,
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_body import (
+    PutApiPromptsByIdTagsByTagBody,
 )
-from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_body import (
-    PutApiPromptsByIdLabelsByLabelBody,
-)
-from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_label import (
-    PutApiPromptsByIdLabelsByLabelLabel,
-)
-from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_labels_by_label_response_200 import (
-    PutApiPromptsByIdLabelsByLabelResponse200,
-)
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_body_labels_item import (
-    PostApiPromptsBodyLabelsItem,
-)
-from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_body_labels_item import (
-    PutApiPromptsByIdBodyLabelsItem,
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_response_200 import (
+    PutApiPromptsByIdTagsByTagResponse200,
 )
 
 from langwatch.utils.initialization import ensure_setup
@@ -116,18 +104,14 @@ class PromptApiService:
         self,
         prompt_id: str,
         version_number: Optional[int] = None,
-        label: Optional[str] = None,
+        tag: Optional[str] = None,
     ) -> PromptData:
-        """Retrieve a prompt by its ID from the API. You can optionally specify a version number or label to get a specific version of the prompt."""
-        api_label = UNSET
-        if label is not None:
-            api_label = GetApiPromptsByIdLabel(label)
-
+        """Retrieve a prompt by its ID from the API. You can optionally specify a version number or tag to get a specific version of the prompt."""
         resp = get_api_prompts_by_id.sync_detailed(
             id=prompt_id,
             client=self._client,
             version=version_number if version_number is not None else UNSET,
-            label=api_label,
+            tag=tag if tag is not None else UNSET,
         )
         ok = unwrap_response(
             resp,
@@ -141,41 +125,40 @@ class PromptApiService:
             )
         return PromptData.from_api_response(ok)
 
-    def assign_label(
+    def assign_tag(
         self,
         prompt_id: str,
-        label: str,
+        tag: str,
         version_id: str,
     ) -> Dict[str, str]:
         """
-        Assign a label to a specific prompt version.
+        Assign a tag to a specific prompt version.
 
         Args:
             prompt_id: The prompt ID or handle
-            label: The label to assign ("production" or "staging")
-            version_id: The version ID to assign the label to
+            tag: The tag to assign ("production" or "staging")
+            version_id: The version ID to assign the tag to
 
         Returns:
-            Dictionary with assignment details (configId, versionId, label, updatedAt)
+            Dictionary with assignment details (configId, versionId, tag, updatedAt)
         """
-        api_label = PutApiPromptsByIdLabelsByLabelLabel(label)
-        body = PutApiPromptsByIdLabelsByLabelBody(version_id=version_id)
+        body = PutApiPromptsByIdTagsByTagBody(version_id=version_id)
 
-        resp = put_api_prompts_by_id_labels_by_label.sync_detailed(
+        resp = put_api_prompts_by_id_tags_by_tag.sync_detailed(
             id=prompt_id,
-            label=api_label,
+            tag=tag,
             client=self._client,
             body=body,
         )
         ok = unwrap_response(
             resp,
-            ok_type=PutApiPromptsByIdLabelsByLabelResponse200,
-            subject=f'id="{prompt_id}" label="{label}"',
-            op="assign_label",
+            ok_type=PutApiPromptsByIdTagsByTagResponse200,
+            subject=f'id="{prompt_id}" tag="{tag}"',
+            op="assign_tag",
         )
         if ok is None:
             raise RuntimeError(
-                f"Failed to assign label '{label}' to prompt '{prompt_id}'"
+                f"Failed to assign tag '{tag}' to prompt '{prompt_id}'"
             )
         return ok.to_dict()
 
@@ -188,7 +171,7 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
     ) -> PromptData:
         """
         Create a new prompt with clean dictionary interfaces.
@@ -226,10 +209,6 @@ class PromptApiService:
                 for out in outputs
             ]
 
-        api_labels = UNSET
-        if labels:
-            api_labels = [PostApiPromptsBodyLabelsItem(label) for label in labels]
-
         resp = post_api_prompts.sync_detailed(
             client=self._client,
             body=PostApiPromptsBody(
@@ -240,7 +219,7 @@ class PromptApiService:
                 messages=api_messages,
                 inputs=api_inputs,
                 outputs=api_outputs,
-                labels=api_labels,
+                tags=tags if tags is not None else UNSET,
             ),
         )
         ok = unwrap_response(
@@ -264,7 +243,7 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-        labels: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
     ) -> PromptData:
         """
         Update an existing prompt with clean dictionary interfaces.
@@ -303,10 +282,6 @@ class PromptApiService:
                 for out in outputs
             ]
 
-        api_labels = UNSET
-        if labels:
-            api_labels = [PutApiPromptsByIdBodyLabelsItem(label) for label in labels]
-
         resp = put_api_prompts_by_id.sync_detailed(
             id=prompt_id_or_handle,
             client=self._client,
@@ -318,7 +293,7 @@ class PromptApiService:
                 messages=api_messages,
                 inputs=api_inputs,
                 outputs=api_outputs,
-                labels=api_labels,
+                tags=tags if tags is not None else UNSET,
             ),
         )
 

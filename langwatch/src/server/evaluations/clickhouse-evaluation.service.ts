@@ -7,7 +7,7 @@ import { createLogger } from "~/utils/logger/server";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
-import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClickHouseReadEnabled";
+
 
 /**
  * Service for fetching per-trace evaluation runs from ClickHouse.
@@ -38,31 +38,6 @@ export class ClickHouseEvaluationService {
   }
 
   /**
-   * Check if ClickHouse evaluations data source is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseEvaluationService.isClickHouseEnabled",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
-        if (!clickHouseClient) {
-          return false;
-        }
-
-        const enabled = await isClickHouseReadEnabled(this.prisma, projectId);
-
-        span.setAttribute(
-          "project.feature.clickhouse.evaluations",
-          enabled,
-        );
-
-        return enabled;
-      },
-    );
-  }
-
-  /**
    * Get evaluations for a single trace.
    *
    * Returns null if ClickHouse is not enabled for the project.
@@ -84,11 +59,6 @@ export class ClickHouseEvaluationService {
       "ClickHouseEvaluationService.getEvaluationsForTrace",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;
@@ -167,11 +137,6 @@ export class ClickHouseEvaluationService {
         },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled) {
-          return null;
-        }
-
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
           return null;
