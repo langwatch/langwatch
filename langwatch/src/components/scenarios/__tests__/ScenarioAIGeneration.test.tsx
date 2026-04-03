@@ -139,11 +139,6 @@ describe("when default model is Azure deployment not in registry", () => {
       });
     });
 
-    // This test documents the bug: when modelOption is undefined (Azure deployment not in registry)
-    // and the azure provider is not configured, the model should be treated as disabled.
-    // Current code: `isDefaultModelDisabled = modelOption?.isDisabled ?? false` evaluates to false
-    // because modelOption is undefined, so the textarea is NOT disabled.
-    // After the fix, the textarea SHOULD be disabled.
     it("treats model as disabled by disabling the textarea in input view", () => {
       render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
@@ -151,7 +146,6 @@ describe("when default model is Azure deployment not in registry", () => {
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
       const textarea = screen.getByRole("textbox");
-      // BUG: current code leaves textarea enabled; after fix it should be disabled
       expect(textarea).toBeDisabled();
     });
   });
