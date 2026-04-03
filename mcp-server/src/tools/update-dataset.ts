@@ -1,5 +1,6 @@
 import { updateDataset as apiUpdateDataset } from "../langwatch-api-datasets.js";
 import type { DatasetColumnType } from "../langwatch-api-datasets.js";
+import { formatDatasetMutationDetails } from "./format-dataset-mutation.js";
 
 /**
  * Handles the platform_update_dataset MCP tool invocation.
@@ -16,13 +17,7 @@ export async function handleUpdateDataset(params: {
 
   const lines: string[] = [];
   lines.push("Dataset updated successfully!\n");
-  lines.push(`**Name**: ${result.name}`);
-  lines.push(`**Slug**: ${result.slug}`);
-  lines.push(`**ID**: ${result.id}`);
-  if (Array.isArray(result.columnTypes) && result.columnTypes.length > 0) {
-    const colNames = result.columnTypes.map((c) => `${c.name} (${c.type})`).join(", ");
-    lines.push(`**Columns**: ${colNames}`);
-  }
+  lines.push(...formatDatasetMutationDetails(result));
 
   return lines.join("\n");
 }

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { z } from "zod";
 
 vi.mock("../langwatch-api-datasets.js", () => ({
   listDatasets: vi.fn(),
@@ -11,6 +10,7 @@ import { listDatasets, getDataset } from "../langwatch-api-datasets.js";
 import { handleListDatasets } from "../tools/list-datasets.js";
 import { handleGetDataset } from "../tools/get-dataset.js";
 import { formatDatasetResponse } from "../tools/get-dataset.js";
+import { createDatasetSchema } from "../schemas/create-dataset.js";
 
 const mockListDatasets = vi.mocked(listDatasets);
 const mockGetDataset = vi.mocked(getDataset);
@@ -86,18 +86,6 @@ describe("formatDatasetResponse()", () => {
 // ── platform_create_dataset schema validation ────────────────────
 
 describe("platform_create_dataset schema", () => {
-  const createDatasetSchema = z.object({
-    name: z.string().min(1, "name is required"),
-    columnTypes: z
-      .array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-        }),
-      )
-      .optional(),
-  });
-
   describe("when input has no name", () => {
     it("rejects the input with a validation error", () => {
       const result = createDatasetSchema.safeParse({});
@@ -147,12 +135,20 @@ describe("MCP server dataset tool registration", () => {
 
 describe("dataset tools API key requirement", () => {
   describe("when no API key is configured", () => {
-    it("returns an error indicating an API key is required", async () => {
-      // Reset config to have no API key
+    it("throws an error indicating an API key is required when calling handleListDatasets", async () => {
       const { initConfig, requireApiKey } = await import("../config.js");
       initConfig({ apiKey: undefined, endpoint: "http://localhost:0" });
 
-      expect(() => requireApiKey()).toThrow("LANGWATCH_API_KEY is required");
+      // Make the mock call requireApiKey so the handler exercises the
+      // real API-key validation path (the mock normally bypasses it).
+      mockListDatasets.mockImplementationOnce(() => {
+        requireApiKey();
+        throw new Error("unreachable");
+      });
+
+      await expect(handleListDatasets()).rejects.toThrow(
+        "LANGWATCH_API_KEY is required",
+      );
     });
   });
 });
