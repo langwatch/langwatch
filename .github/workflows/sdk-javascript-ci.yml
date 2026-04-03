@@ -93,6 +93,7 @@ jobs:
       NODE_ENV: "test"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
+      CLICKHOUSE_URL: "http://localhost:8123/langwatch_test"
       SKIP_CLICKHOUSE_MIGRATE: "true"
       SKIP_REDIS: "true"
       LANGWATCH_LICENSE_PUBLIC_KEY: ${{ secrets.TEST_LICENSE_PUBLIC_KEY }}
