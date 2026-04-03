@@ -22,9 +22,14 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
   const modelProviders = await getProjectModelProviders(projectId);
   const modelProvider = modelProviders[providerKey];
 
-  if (!modelProvider || !modelProvider.enabled) {
+  if (!modelProvider) {
     throw new Error(
-      `Model provider ${providerKey} not configured or disabled for project, go to settings to enable it.`,
+      `Model provider "${providerKey}" is not configured for this project. Go to Settings → Model Providers to add it.`,
+    );
+  }
+  if (!modelProvider.enabled) {
+    throw new Error(
+      `Model provider "${providerKey}" is configured but disabled. Go to Settings → Model Providers to enable it.`,
     );
   }
 

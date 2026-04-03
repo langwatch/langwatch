@@ -61,7 +61,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
   const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   // Check if any model providers are configured
-  const { hasEnabledProviders } = useModelProvidersSettings({
+  const { hasEnabledProviders, providers } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
@@ -72,7 +72,10 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
     defaultModel,
     "chat"
   );
-  const isModelDisabled = modelOption?.isDisabled ?? false;
+  const providerKey = defaultModel.split("/")[0];
+  const isModelDisabled = modelOption
+    ? modelOption.isDisabled
+    : !(providers?.[providerKey as keyof typeof providers]?.enabled ?? false);
 
   const openEditorWithData = useCallback(
     (formData: Partial<ScenarioFormData>) => {
