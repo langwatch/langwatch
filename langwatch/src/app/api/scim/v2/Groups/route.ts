@@ -5,24 +5,20 @@ import {
   isAuthError,
 } from "~/server/scim/scim-auth.middleware";
 import { ScimGroupService } from "~/server/scim/scim-group.service";
-import { scimCreateGroupRequestSchema, isScimError } from "~/server/scim/scim.types";
+import { isScimError, scimCreateGroupRequestSchema } from "~/server/scim/scim.types";
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
   if (isAuthError(auth)) return auth;
 
   const service = ScimGroupService.create(prisma);
-
-  const searchParams = request.nextUrl.searchParams;
-  const filter = searchParams.get("filter") ?? undefined;
-  const startIndex = parseInt(searchParams.get("startIndex") ?? "1", 10) || 1;
-  const count = parseInt(searchParams.get("count") ?? "100", 10) || 100;
+  const params = request.nextUrl.searchParams;
 
   const result = await service.listGroups({
     organizationId: auth.organizationId,
-    filter,
-    startIndex,
-    count,
+    filter: params.get("filter") ?? undefined,
+    startIndex: parseInt(params.get("startIndex") ?? "1", 10) || 1,
+    count: parseInt(params.get("count") ?? "100", 10) || 100,
   });
 
   return NextResponse.json(result);
@@ -39,31 +35,20 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch {
     return NextResponse.json(
-      {
-        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-        status: "400",
-        detail: "Invalid JSON in request body",
-      },
-      { status: 400 }
+      { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: "400", detail: "Invalid JSON" },
+      { status: 400 },
     );
   }
 
   const parsed = scimCreateGroupRequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      {
-        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-        status: "400",
-        detail: parsed.error.message,
-      },
-      { status: 400 }
+      { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: "400", detail: parsed.error.message },
+      { status: 400 },
     );
   }
 
-  const result = await service.createGroup({
-    request: parsed.data,
-    organizationId: auth.organizationId,
-  });
+  const result = await service.createGroup({ request: parsed.data, organizationId: auth.organizationId });
 
   if (isScimError(result)) {
     return NextResponse.json(result, { status: parseInt(result.status, 10) });
@@ -71,4 +56,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(result, { status: 201 });
 }
-

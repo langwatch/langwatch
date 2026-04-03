@@ -48,7 +48,10 @@ export class ScimService {
         });
 
       if (existingMembership) {
-        return this.scimError({ status: "409", detail: "User already exists in this organization" });
+        // User already in org — return their record so the IdP learns our internal ID.
+        // This is "find-or-create" semantics: avoids the IdP storing its own opaque ID
+        // and then failing to match group member references later.
+        return this.toScimUser(existingUser);
       }
 
       try {
@@ -61,7 +64,7 @@ export class ScimService {
         });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
-          return this.scimError({ status: "409", detail: "User already exists in this organization" });
+          return this.toScimUser(existingUser);
         }
         throw e;
       }

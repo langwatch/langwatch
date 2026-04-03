@@ -50,11 +50,13 @@ const EXEMPT_MODELS = [
    */
   "PromptTag",
   /**
-   * SCIM group mappings and memberships are organization-level,
-   * linking IdP groups to LangWatch teams.
+   * Scoped RBAC models are organization-level.
+   * Groups and RoleBindings are scoped by organizationId, not projectId.
+   * GroupMembership is scoped indirectly via groupId.
    */
-  "ScimGroupMapping",
-  "ScimGroupMembership",
+  "Group",
+  "GroupMembership",
+  "RoleBinding",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

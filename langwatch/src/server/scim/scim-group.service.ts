@@ -1,20 +1,19 @@
-import { TeamUserRole, type PrismaClient, type ScimGroupMapping } from "@prisma/client";
+import { type Group, type PrismaClient } from "@prisma/client";
+import { slugify } from "~/utils/slugify";
 import type {
+  ScimCreateGroupRequest,
+  ScimError,
   ScimGroup,
   ScimListResponse,
-  ScimError,
-  ScimCreateGroupRequest,
-  ScimReplaceGroupRequest,
-  ScimPatchRequest,
   ScimPatchOperation,
+  ScimPatchRequest,
+  ScimReplaceGroupRequest,
 } from "./scim.types";
-import { resolveHighestRole } from "./scim-role-resolver";
 
 /**
- * Maps between SCIM 2.0 Group resources and LangWatch ScimGroupMapping records.
- * Groups are stored as mappings that can optionally link to a Team + Role.
- * Member operations track provenance via ScimGroupMembership and only create
- * TeamUser records when the mapping has been linked to a team.
+ * Handles SCIM 2.0 Group resources backed by the Group / GroupMembership tables.
+ * Groups pushed from an IdP arrive here unmapped — admins assign role bindings
+ * via the Groups settings page.
  */
 export class ScimGroupService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -36,26 +35,25 @@ export class ScimGroupService {
   }): Promise<ScimListResponse<ScimGroup>> {
     const displayNameFilter = this.parseDisplayNameFilter(filter);
 
-    const where: Record<string, unknown> = {
+    const where = {
       organizationId,
+      scimSource: { not: null as string | null },
+      ...(displayNameFilter ? { name: displayNameFilter } : {}),
     };
 
-    if (displayNameFilter) {
-      where.externalGroupName = displayNameFilter;
-    }
-
-    const [mappings, totalCount] = await Promise.all([
-      this.prisma.scimGroupMapping.findMany({
+    const [groups, totalCount] = await Promise.all([
+      this.prisma.group.findMany({
         where,
         include: {
-          memberships: {
-            include: { user: true },
+          members: {
+            include: { user: { select: { id: true, email: true, name: true } } },
           },
         },
         skip: startIndex - 1,
         take: count,
+        orderBy: { createdAt: "asc" },
       }),
-      this.prisma.scimGroupMapping.count({ where }),
+      this.prisma.group.count({ where }),
     ]);
 
     return {
@@ -63,7 +61,7 @@ export class ScimGroupService {
       totalResults: totalCount,
       startIndex,
       itemsPerPage: count,
-      Resources: mappings.map((m) => this.toScimGroup(m, m.memberships)),
+      Resources: groups.map((g) => this.toScimGroup(g, g.members)),
     };
   }
 
@@ -74,18 +72,15 @@ export class ScimGroupService {
     externalScimId: string;
     organizationId: string;
   }): Promise<ScimGroup | ScimError> {
-    const mapping = await this.findMappingByScimId({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
-    if (!mapping) {
-      return this.scimError({ status: "404", detail: "Group not found" });
-    }
-
-    const memberships = await this.prisma.scimGroupMembership.findMany({
-      where: { scimGroupMappingId: mapping.id },
-      include: { user: true },
+    const members = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      include: { user: { select: { id: true, email: true, name: true } } },
     });
 
-    return this.toScimGroup(mapping, memberships);
+    return this.toScimGroup(group, members);
   }
 
   async createGroup({
@@ -95,37 +90,38 @@ export class ScimGroupService {
     request: ScimCreateGroupRequest;
     organizationId: string;
   }): Promise<ScimGroup | ScimError> {
-    // Check if a mapping with this displayName already exists
-    const existing = await this.prisma.scimGroupMapping.findFirst({
-      where: {
-        organizationId,
-        externalGroupName: request.displayName,
-      },
+    const existing = await this.prisma.group.findFirst({
+      where: { organizationId, name: request.displayName, scimSource: { not: null } },
     });
-
     if (existing) {
-      return this.scimError({ status: "409", detail: "A group with this name is already mapped" });
+      return this.scimError({ status: "409", detail: "A group with this name already exists" });
     }
 
-    // Create the ScimGroupMapping record (unmapped — no team or role)
-    const mapping = await this.prisma.scimGroupMapping.create({
+    const slug = await this.uniqueSlug(organizationId, request.displayName);
+    const group = await this.prisma.group.create({
       data: {
         organizationId,
-        externalGroupId: request.displayName,
-        externalGroupName: request.displayName,
+        name: request.displayName,
+        slug,
+        scimSource: "scim",
+        externalId: (request as { externalId?: string }).externalId ?? null,
       },
     });
 
-    // If members are in the request, process them (will be no-op for unmapped)
     if (request.members?.length) {
-      await this.addMembersToMapping({
-        mapping,
+      await this.addMembers({
+        groupId: group.id,
         organizationId,
         memberIds: request.members.map((m) => m.value),
       });
     }
 
-    return this.toScimGroup(mapping, []);
+    const members = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      include: { user: { select: { id: true, email: true, name: true } } },
+    });
+
+    return this.toScimGroup(group, members);
   }
 
   async replaceGroup({
@@ -137,58 +133,33 @@ export class ScimGroupService {
     organizationId: string;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
-    const mapping = await this.findMappingByScimId({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
-    if (!mapping) {
-      return this.scimError({ status: "404", detail: "Group not found" });
-    }
-
-    // Update displayName if changed
-    if (request.displayName !== mapping.externalGroupName) {
-      await this.prisma.scimGroupMapping.update({
-        where: { id: mapping.id },
-        data: { externalGroupName: request.displayName },
+    if (request.displayName !== group.name) {
+      await this.prisma.group.update({
+        where: { id: group.id },
+        data: { name: request.displayName },
       });
     }
 
-    // If unmapped, just return success with mapping data
-    if (!mapping.teamId || !mapping.role) {
-      return this.toScimGroup(mapping, []);
-    }
+    const requestedIds = new Set((request.members ?? []).map((m) => m.value));
+    const current = await this.prisma.groupMembership.findMany({ where: { groupId: group.id } });
+    const currentIds = new Set(current.map((m) => m.userId));
 
-    // Replace membership: get current memberships, compute diff
-    const currentMemberships = await this.prisma.scimGroupMembership.findMany({
-      where: { scimGroupMappingId: mapping.id },
+    const toAdd = [...requestedIds].filter((id) => !currentIds.has(id));
+    const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
+
+    if (toAdd.length) await this.addMembers({ groupId: group.id, organizationId, memberIds: toAdd });
+    if (toRemove.length) await this.removeMembers({ groupId: group.id, userIds: toRemove });
+
+    const updatedGroup = await this.prisma.group.findUniqueOrThrow({ where: { id: group.id } });
+    const members = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      include: { user: { select: { id: true, email: true, name: true } } },
     });
 
-    const requestedUserIds = new Set((request.members ?? []).map((m) => m.value));
-    const currentUserIds = new Set(currentMemberships.map((m) => m.userId));
-
-    // Add new members
-    const toAdd = [...requestedUserIds].filter((id) => !currentUserIds.has(id));
-    if (toAdd.length > 0) {
-      await this.addMembersToMapping({
-        mapping,
-        organizationId,
-        memberIds: toAdd,
-      });
-    }
-
-    // Remove members no longer in the group
-    const toRemove = [...currentUserIds].filter((id) => !requestedUserIds.has(id));
-    if (toRemove.length > 0) {
-      await this.removeMembersFromMapping({
-        mapping,
-        userIds: toRemove,
-      });
-    }
-
-    const updatedMemberships = await this.prisma.scimGroupMembership.findMany({
-      where: { scimGroupMappingId: mapping.id },
-      include: { user: true },
-    });
-
-    return this.toScimGroup(mapping, updatedMemberships);
+    return this.toScimGroup(updatedGroup, members);
   }
 
   async updateGroup({
@@ -200,41 +171,20 @@ export class ScimGroupService {
     organizationId: string;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
-    const mapping = await this.findMappingByScimId({ externalScimId, organizationId });
-
-    if (!mapping) {
-      return this.scimError({ status: "404", detail: "Group not found" });
-    }
+    const group = await this.findGroup({ externalScimId, organizationId });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
     for (const operation of patchRequest.Operations) {
-      if (operation.op === "add" && operation.path === "members") {
-        const members = this.extractMemberIds(operation.value);
-        if (members.length > 0) {
-          await this.addMembersToMapping({
-            mapping,
-            organizationId,
-            memberIds: members,
-          });
-        }
-      } else if (operation.op === "remove" && operation.path?.startsWith("members")) {
-        const memberIds = this.extractMemberIdsFromPath(operation.path, operation.value);
-        if (memberIds.length > 0) {
-          await this.removeMembersFromMapping({
-            mapping,
-            userIds: memberIds,
-          });
-        }
-      } else if (operation.op === "replace") {
-        await this.handleReplaceOperation({ mapping, operation, organizationId });
-      }
+      await this.applyPatch({ group, operation, organizationId });
     }
 
-    const updatedMemberships = await this.prisma.scimGroupMembership.findMany({
-      where: { scimGroupMappingId: mapping.id },
-      include: { user: true },
+    const updatedGroup = await this.prisma.group.findUniqueOrThrow({ where: { id: group.id } });
+    const members = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      include: { user: { select: { id: true, email: true, name: true } } },
     });
 
-    return this.toScimGroup(mapping, updatedMemberships);
+    return this.toScimGroup(updatedGroup, members);
   }
 
   async deleteGroup({
@@ -244,355 +194,138 @@ export class ScimGroupService {
     externalScimId: string;
     organizationId: string;
   }): Promise<ScimError | null> {
-    const mapping = await this.findMappingByScimId({ externalScimId, organizationId });
+    const group = await this.findGroup({ externalScimId, organizationId });
+    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
 
-    if (!mapping) {
-      return this.scimError({ status: "404", detail: "Group not found" });
-    }
+    await this.prisma.groupMembership.deleteMany({ where: { groupId: group.id } });
+    await this.prisma.roleBinding.deleteMany({ where: { groupId: group.id } });
+    await this.prisma.group.delete({ where: { id: group.id } });
 
-    await this.deleteMapping({ mappingId: mapping.id, organizationId });
     return null;
   }
 
-  /**
-   * Deletes a ScimGroupMapping by ID, cleaning up member team assignments.
-   * Members with other active mappings to the same team get their role recalculated.
-   * Members with no other mappings to the team are removed from the team.
-   *
-   * Used by both the SCIM DELETE endpoint and the tRPC delete procedure.
-   */
-  async deleteMapping({
-    mappingId,
-    organizationId,
-  }: {
-    mappingId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const mapping = await this.prisma.scimGroupMapping.findFirst({
-      where: { id: mappingId, organizationId },
-    });
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
-    if (!mapping) {
-      return;
-    }
-
-    // Get all memberships for this mapping
-    const memberships = await this.prisma.scimGroupMembership.findMany({
-      where: { scimGroupMappingId: mapping.id },
-    });
-
-    // For each user, handle team membership cleanup
-    if (mapping.teamId) {
-      for (const membership of memberships) {
-        // Check if user has memberships from OTHER mappings to the same team
-        const otherMemberships = await this.prisma.scimGroupMembership.findMany({
-          where: {
-            userId: membership.userId,
-            scimGroupMappingId: { not: mapping.id },
-            scimGroupMapping: { teamId: mapping.teamId },
-          },
-          include: { scimGroupMapping: true },
-        });
-
-        if (otherMemberships.length > 0) {
-          // Recalculate role from remaining mappings
-          const roles = otherMemberships
-            .map((m) => m.scimGroupMapping.role)
-            .filter((r): r is TeamUserRole => r !== null);
-
-          if (roles.length > 0) {
-            const effectiveRole = resolveHighestRole(roles);
-            await this.prisma.teamUser.update({
-              where: {
-                userId_teamId: {
-                  userId: membership.userId,
-                  teamId: mapping.teamId,
-                },
-              },
-              data: { role: effectiveRole },
-            });
-          }
-        } else {
-          // No other mappings — remove TeamUser
-          await this.prisma.teamUser.deleteMany({
-            where: {
-              userId: membership.userId,
-              teamId: mapping.teamId,
-            },
-          });
-        }
-      }
-    }
-
-    // Delete memberships then mapping
-    await this.prisma.scimGroupMembership.deleteMany({
-      where: { scimGroupMappingId: mapping.id },
-    });
-
-    await this.prisma.scimGroupMapping.delete({
-      where: { id: mapping.id },
-    });
-  }
-
-  /**
-   * Finds a ScimGroupMapping by its id (used as the SCIM resource ID).
-   */
-  private async findMappingByScimId({
+  private async findGroup({
     externalScimId,
     organizationId,
   }: {
     externalScimId: string;
     organizationId: string;
-  }): Promise<ScimGroupMapping | null> {
-    return this.prisma.scimGroupMapping.findFirst({
-      where: {
-        id: externalScimId,
-        organizationId,
-      },
+  }): Promise<Group | null> {
+    return this.prisma.group.findFirst({
+      where: { id: externalScimId, organizationId },
     });
   }
 
-  /**
-   * Adds members to a mapping. If the mapping has a teamId+role, also creates
-   * TeamUser records. If the user already exists in the team via another mapping,
-   * recalculates the effective role.
-   */
-  private async addMembersToMapping({
-    mapping,
+  private async addMembers({
+    groupId,
     organizationId,
     memberIds,
   }: {
-    mapping: ScimGroupMapping;
+    groupId: string;
     organizationId: string;
     memberIds: string[];
   }): Promise<void> {
-    // If unmapped, do nothing
-    if (!mapping.teamId || !mapping.role) return;
-
-    // Only add users who are members of the organization
     const orgMembers = await this.prisma.organizationUser.findMany({
-      where: {
-        organizationId,
-        userId: { in: memberIds },
-      },
+      where: { organizationId, userId: { in: memberIds } },
+      select: { userId: true },
     });
-    const validUserIds = new Set(orgMembers.map((m) => m.userId));
+    const validIds = new Set(orgMembers.map((m) => m.userId));
 
     for (const userId of memberIds) {
-      if (!validUserIds.has(userId)) continue;
-
-      // Create ScimGroupMembership
-      await this.prisma.scimGroupMembership.upsert({
-        where: {
-          scimGroupMappingId_userId: {
-            scimGroupMappingId: mapping.id,
-            userId,
-          },
-        },
+      if (!validIds.has(userId)) continue;
+      await this.prisma.groupMembership.upsert({
+        where: { userId_groupId: { userId, groupId } },
         update: {},
-        create: {
-          scimGroupMappingId: mapping.id,
-          userId,
-        },
+        create: { userId, groupId },
       });
-
-      // Check if user already has a TeamUser record
-      const existingTeamUser = await this.prisma.teamUser.findUnique({
-        where: { userId_teamId: { userId, teamId: mapping.teamId } },
-      });
-
-      if (existingTeamUser) {
-        // Recalculate effective role across all mappings for this user+team
-        await this.recalculateUserTeamRole({ userId, teamId: mapping.teamId });
-      } else {
-        // Create TeamUser with the mapping's role
-        await this.prisma.teamUser.create({
-          data: {
-            userId,
-            teamId: mapping.teamId,
-            role: mapping.role,
-          },
-        });
-      }
     }
   }
 
-  /**
-   * Removes members from a mapping. If the user has no other ScimGroupMembership
-   * records for the same team, also removes the TeamUser record. Otherwise
-   * recalculates the effective role.
-   */
-  private async removeMembersFromMapping({
-    mapping,
+  private async removeMembers({
+    groupId,
     userIds,
   }: {
-    mapping: ScimGroupMapping;
+    groupId: string;
     userIds: string[];
   }): Promise<void> {
-    if (!mapping.teamId) return;
-
-    for (const userId of userIds) {
-      // Delete the ScimGroupMembership
-      await this.prisma.scimGroupMembership.deleteMany({
-        where: {
-          scimGroupMappingId: mapping.id,
-          userId,
-        },
-      });
-
-      // Check if user has memberships from OTHER mappings to the same team
-      const otherMemberships = await this.prisma.scimGroupMembership.findMany({
-        where: {
-          userId,
-          scimGroupMappingId: { not: mapping.id },
-          scimGroupMapping: { teamId: mapping.teamId },
-        },
-        include: { scimGroupMapping: true },
-      });
-
-      if (otherMemberships.length > 0) {
-        // Recalculate role from remaining mappings
-        await this.recalculateUserTeamRole({ userId, teamId: mapping.teamId });
-      } else {
-        // No other mappings — remove TeamUser
-        await this.prisma.teamUser.deleteMany({
-          where: {
-            userId,
-            teamId: mapping.teamId,
-          },
-        });
-      }
-    }
-  }
-
-  /**
-   * Recalculates a user's effective team role based on all ScimGroupMappings
-   * that target the team and have a ScimGroupMembership for the user.
-   * Uses resolveHighestRole to pick the most permissive role.
-   */
-  private async recalculateUserTeamRole({
-    userId,
-    teamId,
-  }: {
-    userId: string;
-    teamId: string;
-  }): Promise<void> {
-    const mappingsForUserAndTeam = await this.prisma.scimGroupMembership.findMany({
-      where: {
-        userId,
-        scimGroupMapping: { teamId },
-      },
-      include: { scimGroupMapping: true },
-    });
-
-    const roles = mappingsForUserAndTeam
-      .map((m) => m.scimGroupMapping.role)
-      .filter((r): r is TeamUserRole => r !== null);
-
-    if (roles.length === 0) return;
-
-    const effectiveRole = resolveHighestRole(roles);
-
-    await this.prisma.teamUser.update({
-      where: { userId_teamId: { userId, teamId } },
-      data: { role: effectiveRole },
+    await this.prisma.groupMembership.deleteMany({
+      where: { groupId, userId: { in: userIds } },
     });
   }
 
-  /**
-   * Handles a SCIM PATCH "replace" operation on a group mapping.
-   * Supports replacing displayName and full member replacement.
-   */
-  private async handleReplaceOperation({
-    mapping,
+  private async applyPatch({
+    group,
     operation,
     organizationId,
   }: {
-    mapping: ScimGroupMapping;
+    group: Group;
     operation: ScimPatchOperation;
     organizationId: string;
   }): Promise<void> {
-    if (operation.path === "displayName" && typeof operation.value === "string") {
-      await this.prisma.scimGroupMapping.update({
-        where: { id: mapping.id },
-        data: { externalGroupName: operation.value },
-      });
+    if (operation.op === "add" && operation.path === "members") {
+      const ids = this.extractMemberIds(operation.value);
+      if (ids.length) await this.addMembers({ groupId: group.id, organizationId, memberIds: ids });
       return;
     }
 
-    if (operation.path === "members" || !operation.path) {
-      // Full member replace — only if mapped
-      if (!mapping.teamId || !mapping.role) return;
+    if (operation.op === "remove" && operation.path?.startsWith("members")) {
+      const ids = this.extractMemberIdsFromPath(operation.path, operation.value);
+      if (ids.length) await this.removeMembers({ groupId: group.id, userIds: ids });
+      return;
+    }
 
+    if (operation.op === "replace") {
+      if (operation.path === "displayName" && typeof operation.value === "string") {
+        await this.prisma.group.update({ where: { id: group.id }, data: { name: operation.value } });
+        return;
+      }
+
+      // Full member replace (path="members" or no path with members in value)
       const members = this.extractMemberIds(
-        operation.path === "members" ? operation.value : (operation.value as Record<string, unknown> | undefined)?.members
+        operation.path === "members"
+          ? operation.value
+          : (operation.value as Record<string, unknown> | undefined)?.members,
       );
-      const currentMemberships = await this.prisma.scimGroupMembership.findMany({
-        where: { scimGroupMappingId: mapping.id },
-      });
+      const current = await this.prisma.groupMembership.findMany({ where: { groupId: group.id } });
       const requestedIds = new Set(members);
-      const currentIds = new Set(currentMemberships.map((m) => m.userId));
+      const currentIds = new Set(current.map((m) => m.userId));
 
       const toAdd = members.filter((id) => !currentIds.has(id));
       const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
 
-      if (toAdd.length > 0) {
-        await this.addMembersToMapping({
-          mapping,
-          organizationId,
-          memberIds: toAdd,
-        });
-      }
-      if (toRemove.length > 0) {
-        await this.removeMembersFromMapping({
-          mapping,
-          userIds: toRemove,
-        });
-      }
+      if (toAdd.length) await this.addMembers({ groupId: group.id, organizationId, memberIds: toAdd });
+      if (toRemove.length) await this.removeMembers({ groupId: group.id, userIds: toRemove });
     }
   }
 
-  private extractMemberIds(value: unknown): string[] {
-    if (Array.isArray(value)) {
-      return value
-        .filter((m): m is { value: string } => typeof m === "object" && m !== null && typeof m.value === "string")
-        .map((m) => m.value);
+  private async uniqueSlug(organizationId: string, name: string): Promise<string> {
+    const base = slugify(name, { lower: true, strict: true }) || "group";
+    let slug = base;
+    let i = 1;
+    while (await this.prisma.group.findFirst({ where: { organizationId, slug } })) {
+      slug = `${base}-${i++}`;
     }
-    return [];
+    return slug;
   }
 
-  private extractMemberIdsFromPath(path: string, value: unknown): string[] {
-    // Okta format: members[value eq "userId"]
-    const match = path.match(/members\[value\s+eq\s+"([^"]+)"\]/);
-    if (match?.[1]) {
-      return [match[1]];
-    }
-
-    // Azure AD format: uses value array
-    return this.extractMemberIds(value);
-  }
-
-  /**
-   * Converts a ScimGroupMapping to a SCIM Group response.
-   * For mapped groups, includes member data from ScimGroupMembership.
-   * For unmapped groups, returns empty members.
-   */
   private toScimGroup(
-    mapping: ScimGroupMapping,
-    memberships: Array<{ userId: string; user: { id: string; email: string | null; name: string | null } }>,
+    group: Group,
+    members: Array<{ userId: string; user: { id: string; email: string | null; name: string | null } }>,
   ): ScimGroup {
     return {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-      id: mapping.id,
-      displayName: mapping.externalGroupName,
-      members: memberships.map((m) => ({
+      id: group.id,
+      displayName: group.name,
+      members: members.map((m) => ({
         value: m.userId,
         display: m.user.email ?? m.user.name ?? undefined,
       })),
       meta: {
         resourceType: "Group",
-        created: mapping.createdAt.toISOString(),
-        lastModified: mapping.updatedAt.toISOString(),
+        created: group.createdAt.toISOString(),
+        lastModified: group.updatedAt.toISOString(),
       },
     };
   }
@@ -601,6 +334,20 @@ export class ScimGroupService {
     if (!filter) return null;
     const match = filter.match(/^displayName\s+eq\s+"([^"]+)"$/);
     return match?.[1] ?? null;
+  }
+
+  private extractMemberIds(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter((m): m is { value: string } => typeof m === "object" && m !== null && "value" in m && typeof (m as { value: unknown }).value === "string")
+      .map((m) => (m as { value: string }).value);
+  }
+
+  private extractMemberIdsFromPath(path: string, value: unknown): string[] {
+    // Okta: members[value eq "userId"]
+    const match = path.match(/members\[value\s+eq\s+"([^"]+)"\]/);
+    if (match?.[1]) return [match[1]];
+    return this.extractMemberIds(value);
   }
 
   private scimError({ status, detail }: { status: string; detail: string }): ScimError {

@@ -1,0 +1,314 @@
+import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "../enterprise";
+import { checkOrganizationPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { slugify } from "~/utils/slugify";
+
+async function resolveScopeNames(
+  prisma: PrismaClient,
+  bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+): Promise<Map<string, string>> {
+  const teamIds = bindings
+    .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
+    .map((b) => b.scopeId);
+  const projectIds = bindings
+    .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
+    .map((b) => b.scopeId);
+
+  const [teams, projects] = await Promise.all([
+    teamIds.length > 0
+      ? prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } })
+      : [],
+    projectIds.length > 0
+      ? prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } })
+      : [],
+  ]);
+
+  const map = new Map<string, string>();
+  for (const t of teams) map.set(t.id, t.name);
+  for (const p of projects) map.set(p.id, p.name);
+  return map;
+}
+
+export const groupRouter = createTRPCRouter({
+  /**
+   * List all groups in an org with their bindings and member count.
+   */
+  listAll: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      await assertEnterprisePlan({
+        organizationId: input.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
+      });
+
+      const groups = await ctx.prisma.group.findMany({
+        where: { organizationId: input.organizationId },
+        include: {
+          roleBindings: {
+            include: { customRole: { select: { id: true, name: true } } },
+          },
+          _count: { select: { members: true } },
+        },
+        orderBy: { name: "asc" },
+      });
+
+      const allBindings = groups.flatMap((g) => g.roleBindings);
+      const scopeNames = await resolveScopeNames(ctx.prisma, allBindings);
+
+      return groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        slug: g.slug,
+        externalId: g.externalId,
+        scimSource: g.scimSource,
+        memberCount: g._count.members,
+        bindings: g.roleBindings.map((b) => ({
+          id: b.id,
+          role: b.role,
+          customRoleId: b.customRoleId,
+          customRoleName: b.customRole?.name ?? null,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+          scopeName: scopeNames.get(b.scopeId) ?? null,
+        })),
+        createdAt: g.createdAt,
+      }));
+    }),
+
+  /**
+   * Get a single group with full member list and bindings.
+   */
+  getById: protectedProcedure
+    .input(z.object({ organizationId: z.string(), groupId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const group = await ctx.prisma.group.findFirst({
+        where: { id: input.groupId, organizationId: input.organizationId },
+        include: {
+          roleBindings: {
+            include: { customRole: { select: { id: true, name: true } } },
+          },
+          members: {
+            include: { user: { select: { id: true, name: true, email: true } } },
+          },
+        },
+      });
+
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+
+      const scopeNames = await resolveScopeNames(ctx.prisma, group.roleBindings);
+
+      return {
+        id: group.id,
+        name: group.name,
+        slug: group.slug,
+        externalId: group.externalId,
+        scimSource: group.scimSource,
+        bindings: group.roleBindings.map((b) => ({
+          id: b.id,
+          role: b.role,
+          customRoleId: b.customRoleId,
+          customRoleName: b.customRole?.name ?? null,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+          scopeName: scopeNames.get(b.scopeId) ?? null,
+        })),
+        members: group.members.map((m) => ({
+          userId: m.userId,
+          name: m.user.name,
+          email: m.user.email,
+        })),
+      };
+    }),
+
+  /**
+   * Create a manual (non-SCIM) group.
+   */
+  create: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        name: z.string().min(1).max(100),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      await assertEnterprisePlan({
+        organizationId: input.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
+      });
+
+      const baseSlug = slugify(input.name, { lower: true, strict: true });
+      // Ensure slug uniqueness within org
+      const existing = await ctx.prisma.group.count({
+        where: {
+          organizationId: input.organizationId,
+          slug: { startsWith: baseSlug },
+        },
+      });
+      const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
+
+      return ctx.prisma.group.create({
+        data: {
+          organizationId: input.organizationId,
+          name: input.name,
+          slug,
+        },
+      });
+    }),
+
+  /**
+   * Add a role binding to a group.
+   */
+  addBinding: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        groupId: z.string(),
+        role: z.nativeEnum(TeamUserRole),
+        customRoleId: z.string().optional(),
+        scopeType: z.nativeEnum(RoleBindingScopeType),
+        scopeId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const group = await ctx.prisma.group.findFirst({
+        where: { id: input.groupId, organizationId: input.organizationId },
+      });
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+
+      return ctx.prisma.roleBinding.create({
+        data: {
+          organizationId: input.organizationId,
+          groupId: input.groupId,
+          role: input.role,
+          customRoleId:
+            input.role === TeamUserRole.CUSTOM
+              ? (input.customRoleId ?? null)
+              : null,
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+        },
+      });
+    }),
+
+  /**
+   * Remove a role binding from a group.
+   */
+  removeBinding: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        bindingId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const binding = await ctx.prisma.roleBinding.findFirst({
+        where: { id: input.bindingId, organizationId: input.organizationId },
+      });
+      if (!binding) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
+      }
+      await ctx.prisma.roleBinding.delete({ where: { id: input.bindingId } });
+      return { success: true };
+    }),
+
+  /**
+   * Add a user to a manual group.
+   */
+  addMember: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        groupId: z.string(),
+        userId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const group = await ctx.prisma.group.findFirst({
+        where: { id: input.groupId, organizationId: input.organizationId },
+      });
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+      if (group.scimSource) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot manually add members to a SCIM-managed group",
+        });
+      }
+
+      return ctx.prisma.groupMembership.create({
+        data: { groupId: input.groupId, userId: input.userId },
+      });
+    }),
+
+  /**
+   * Delete a group and all its memberships and role bindings.
+   */
+  delete: protectedProcedure
+    .input(z.object({ organizationId: z.string(), groupId: z.string() }))
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const group = await ctx.prisma.group.findFirst({
+        where: { id: input.groupId, organizationId: input.organizationId },
+      });
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+
+      await ctx.prisma.groupMembership.deleteMany({ where: { groupId: input.groupId } });
+      await ctx.prisma.roleBinding.deleteMany({ where: { groupId: input.groupId } });
+      await ctx.prisma.group.delete({ where: { id: input.groupId } });
+
+      return { success: true };
+    }),
+
+  /**
+   * Remove a user from a manual group.
+   */
+  removeMember: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        groupId: z.string(),
+        userId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const group = await ctx.prisma.group.findFirst({
+        where: { id: input.groupId, organizationId: input.organizationId },
+      });
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+      if (group.scimSource) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot manually remove members from a SCIM-managed group",
+        });
+      }
+
+      await ctx.prisma.groupMembership.delete({
+        where: { userId_groupId: { userId: input.userId, groupId: input.groupId } },
+      });
+      return { success: true };
+    }),
+});

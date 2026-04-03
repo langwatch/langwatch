@@ -1,4 +1,4 @@
-import { TeamUserRole } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -105,6 +105,230 @@ export const teamRouter = createTRPCRouter({
 
       return teams;
     }),
+  /**
+   * Returns teams enriched with role-binding data for the new Teams & Projects page.
+   *
+   * For each team:
+   * - directMembers: users/groups with a TEAM-scoped RoleBinding
+   * - projectOnlyAccess: users with PROJECT-scoped bindings inside this team (no team binding)
+   * - projectAccess: per-project computed access (inherited + project-level overrides)
+   *
+   * Falls back to TeamUser when no RoleBindings exist (migration period).
+   */
+  getTeamsWithRoleBindings: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const { organizationId } = input;
+
+      const teams = await prisma.team.findMany({
+        where: { organizationId, archivedAt: null },
+        include: {
+          projects: { where: { archivedAt: null }, orderBy: { name: "asc" } },
+        },
+        orderBy: { name: "asc" },
+      });
+
+      const results = await Promise.all(
+        teams.map(async (team) => {
+          const projectIds = team.projects.map((p) => p.id);
+
+          // ── Fetch all RoleBindings touching this team (team-level + project-level) ──
+          const [teamBindings, projectBindings] = await Promise.all([
+            prisma.roleBinding.findMany({
+              where: {
+                organizationId,
+                scopeType: RoleBindingScopeType.TEAM,
+                scopeId: team.id,
+              },
+              include: {
+                user: { select: { id: true, name: true, email: true } },
+                group: { select: { id: true, name: true, scimSource: true } },
+                customRole: { select: { id: true, name: true } },
+              },
+            }),
+            projectIds.length > 0
+              ? prisma.roleBinding.findMany({
+                  where: {
+                    organizationId,
+                    scopeType: RoleBindingScopeType.PROJECT,
+                    scopeId: { in: projectIds },
+                  },
+                  include: {
+                    user: { select: { id: true, name: true, email: true } },
+                    group: { select: { id: true, name: true, scimSource: true } },
+                    customRole: { select: { id: true, name: true } },
+                  },
+                })
+              : [],
+          ]);
+
+          const hasAnyBindings = teamBindings.length > 0 || projectBindings.length > 0;
+
+          // ── Fallback: use TeamUser if no RoleBindings exist yet ──
+          if (!hasAnyBindings) {
+            const teamUsers = await prisma.teamUser.findMany({
+              where: { teamId: team.id },
+              include: {
+                user: true,
+                assignedRole: true,
+              },
+            });
+
+            const directMembers = teamUsers.map((tu) => ({
+              bindingId: null as string | null,
+              userId: tu.userId,
+              groupId: null as string | null,
+              name: tu.user.name ?? tu.user.email ?? tu.userId,
+              email: tu.user.email ?? "",
+              role: tu.role,
+              customRoleId: tu.assignedRoleId ?? null,
+              fromFallback: true,
+            }));
+
+            const projectAccess: Record<string, Array<typeof directMembers[number] & { source: "team" }>> = {};
+            for (const proj of team.projects) {
+              projectAccess[proj.id] = directMembers.map((m) => ({
+                ...m,
+                source: "team" as const,
+              }));
+            }
+
+            return {
+              id: team.id,
+              name: team.name,
+              slug: team.slug,
+              projects: team.projects,
+              directMembers,
+              projectOnlyAccess: [] as Array<typeof directMembers[number] & { projectId: string; projectName: string }>,
+              projectAccess,
+              fromFallback: true,
+            };
+          }
+
+          // ── Build directMembers from team-level bindings ──
+          const directMembers = teamBindings.map((b) => ({
+            bindingId: b.id,
+            userId: b.userId,
+            groupId: b.groupId,
+            name: b.user?.name ?? b.group?.name ?? "Unknown",
+            email: b.user?.email ?? null,
+            role: b.role,
+            customRoleId: b.customRoleId,
+            fromFallback: false,
+          }));
+
+          // ── Collect userIds that have a team-level binding ──
+          const teamBoundUserIds = new Set(
+            teamBindings.filter((b) => b.userId).map((b) => b.userId!),
+          );
+
+          // ── Build projectOnlyAccess: users with project bindings but NO team binding ──
+          const projectOnlyMap = new Map<string, {
+            bindingId: string;
+            userId: string;
+            name: string;
+            email: string | null;
+            role: TeamUserRole;
+            customRoleId: string | null;
+            projectId: string;
+            projectName: string;
+          }>();
+
+          for (const b of projectBindings) {
+            if (!b.userId) continue;
+            if (teamBoundUserIds.has(b.userId)) continue;
+            const project = team.projects.find((p) => p.id === b.scopeId);
+            if (!project) continue;
+            const key = `${b.userId}:${b.scopeId}`;
+            if (!projectOnlyMap.has(key)) {
+              projectOnlyMap.set(key, {
+                bindingId: b.id,
+                userId: b.userId,
+                name: b.user?.name ?? b.userId,
+                email: b.user?.email ?? null,
+                role: b.role,
+                customRoleId: b.customRoleId,
+                projectId: project.id,
+                projectName: project.name,
+              });
+            }
+          }
+
+          // ── Build per-project access list ──
+          const projectAccess: Record<string, Array<{
+            bindingId: string | null;
+            userId: string | null;
+            groupId: string | null;
+            name: string;
+            email: string | null;
+            role: TeamUserRole;
+            customRoleId: string | null;
+            source: "team" | "direct" | "override";
+            teamRole?: TeamUserRole;
+          }>> = {};
+
+          for (const proj of team.projects) {
+            const inherited = directMembers.map((m) => ({
+              bindingId: m.bindingId,
+              userId: m.userId,
+              groupId: m.groupId,
+              name: m.name,
+              email: m.email,
+              role: m.role,
+              customRoleId: m.customRoleId,
+              source: "team" as const,
+            }));
+
+            const projBindings = projectBindings.filter(
+              (b) => b.scopeId === proj.id,
+            );
+
+            const projectLevel = projBindings.map((b) => {
+              const teamBinding = teamBindings.find(
+                (tb) => tb.userId && tb.userId === b.userId,
+              );
+              return {
+                bindingId: b.id,
+                userId: b.userId,
+                groupId: b.groupId,
+                name: b.user?.name ?? b.group?.name ?? "Unknown",
+                email: b.user?.email ?? null,
+                role: b.role,
+                customRoleId: b.customRoleId,
+                source: teamBinding ? ("override" as const) : ("direct" as const),
+                teamRole: teamBinding?.role,
+              };
+            });
+
+            // Remove "inherited" entries that have a project-level override
+            const overriddenUserIds = new Set(
+              projBindings.filter((b) => b.userId).map((b) => b.userId!),
+            );
+            const filteredInherited = inherited.filter(
+              (m) => !m.userId || !overriddenUserIds.has(m.userId),
+            );
+
+            projectAccess[proj.id] = [...filteredInherited, ...projectLevel];
+          }
+
+          return {
+            id: team.id,
+            name: team.name,
+            slug: team.slug,
+            projects: team.projects,
+            directMembers,
+            projectOnlyAccess: [...projectOnlyMap.values()],
+            projectAccess,
+            fromFallback: false,
+          };
+        }),
+      );
+
+      return results;
+    }),
+
   getTeamWithMembers: protectedProcedure
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
@@ -166,200 +390,124 @@ export const teamRouter = createTRPCRouter({
 
       const prisma = ctx.prisma;
 
-      return await prisma.$transaction(async (tx) => {
-        const updateData: any = {
-          name: input.name,
-        };
+      // Always fetch team to get organizationId (needed for RoleBinding writes)
+      const teamRecord = await prisma.team.findUnique({
+        where: { id: input.teamId },
+        select: { organizationId: true },
+      });
+      if (!teamRecord) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      }
+      const { organizationId } = teamRecord;
 
-        await tx.team.update({
-          where: {
-            id: input.teamId,
-          },
-          data: updateData,
-        });
-
-        if (input.members.length > 0) {
-          const currentMembers = await tx.teamUser.findMany({
-            where: {
-              teamId: input.teamId,
-            },
-            select: {
-              userId: true,
-              role: true,
-            },
-          });
-
-          const currentMembersMap = new Map(
-            currentMembers.map((member) => [member.userId, member.role]),
-          );
-
-          const newMembersMap = new Map(
-            input.members.map((member) => [member.userId, member.role]),
-          );
-
-          const membersToRemove = currentMembers
-            .filter((member) => !newMembersMap.has(member.userId))
-            .map((member) => member.userId);
-
-          const membersToAdd = input.members.filter(
-            (member) => !currentMembersMap.has(member.userId),
-          );
-
-          const membersToUpdate = input.members.filter(
-            (member) =>
-              currentMembersMap.has(member.userId) &&
-              currentMembersMap.get(member.userId) !== member.role,
-          );
-
-          if (membersToRemove.length > 0) {
-            await tx.teamUser.deleteMany({
-              where: {
-                teamId: input.teamId,
-                userId: {
-                  in: membersToRemove,
-                },
-              },
+      // Validate custom roles belong to this org
+      if (input.members.some((m) => isCustomRole(m.role))) {
+        for (const member of input.members.filter((m) => isCustomRole(m.role))) {
+          if (!member.customRoleId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `customRoleId is required when role is a custom role for user ${member.userId}`,
             });
           }
-
-          if (membersToAdd.length > 0) {
-            for (const member of membersToAdd) {
-              if (isCustomRole(member.role)) {
-                // Validate custom role requirements
-                if (!member.customRoleId) {
-                  throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: `customRoleId is required when role is a custom role for user ${member.userId}`,
-                  });
-                }
-
-                // Validate custom role belongs to team's organization
-                const [team, customRole] = await Promise.all([
-                  tx.team.findUnique({
-                    where: { id: input.teamId },
-                    select: { organizationId: true },
-                  }),
-                  tx.customRole.findUnique({
-                    where: { id: member.customRoleId },
-                    select: { organizationId: true },
-                  }),
-                ]);
-
-                if (!team) {
-                  throw new TRPCError({
-                    code: "NOT_FOUND",
-                    message: "Team not found",
-                  });
-                }
-
-                if (!customRole) {
-                  throw new TRPCError({
-                    code: "NOT_FOUND",
-                    message: `Custom role ${member.customRoleId} not found`,
-                  });
-                }
-
-                if (customRole.organizationId !== team.organizationId) {
-                  throw new TRPCError({
-                    code: "FORBIDDEN",
-                    message: `Custom role ${member.customRoleId} does not belong to team's organization`,
-                  });
-                }
-
-                // Create teamUser with CUSTOM role and custom role assignment
-                await tx.teamUser.create({
-                  data: {
-                    userId: member.userId,
-                    teamId: input.teamId,
-                    role: TeamUserRole.CUSTOM,
-                    assignedRoleId: member.customRoleId,
-                  },
-                });
-              } else {
-                // Built-in role - create teamUser with the specified role
-                await tx.teamUser.create({
-                  data: {
-                    userId: member.userId,
-                    teamId: input.teamId,
-                    role: member.role as TeamUserRole,
-                  },
-                });
-              }
-            }
+          const customRole = await prisma.customRole.findUnique({
+            where: { id: member.customRoleId },
+            select: { organizationId: true },
+          });
+          if (!customRole) {
+            throw new TRPCError({ code: "NOT_FOUND", message: `Custom role ${member.customRoleId} not found` });
           }
-
-          for (const member of membersToUpdate) {
-            if (isCustomRole(member.role)) {
-              // Validate custom role requirements
-              if (!member.customRoleId) {
-                throw new TRPCError({
-                  code: "BAD_REQUEST",
-                  message: `customRoleId is required when role is a custom role for user ${member.userId}`,
-                });
-              }
-
-              // Validate custom role belongs to team's organization
-              const [team, customRole] = await Promise.all([
-                tx.team.findUnique({
-                  where: { id: input.teamId },
-                  select: { organizationId: true },
-                }),
-                tx.customRole.findUnique({
-                  where: { id: member.customRoleId },
-                  select: { organizationId: true },
-                }),
-              ]);
-
-              if (!team) {
-                throw new TRPCError({
-                  code: "NOT_FOUND",
-                  message: "Team not found",
-                });
-              }
-
-              if (!customRole) {
-                throw new TRPCError({
-                  code: "NOT_FOUND",
-                  message: `Custom role ${member.customRoleId} not found`,
-                });
-              }
-
-              if (customRole.organizationId !== team.organizationId) {
-                throw new TRPCError({
-                  code: "FORBIDDEN",
-                  message: `Custom role ${member.customRoleId} does not belong to team's organization`,
-                });
-              }
-
-              // Update teamUser with CUSTOM role and assign custom role
-              await tx.teamUser.update({
-                where: {
-                  userId_teamId: {
-                    teamId: input.teamId,
-                    userId: member.userId,
-                  },
-                },
-                data: {
-                  role: TeamUserRole.CUSTOM,
-                  assignedRoleId: member.customRoleId,
-                },
-              });
-            } else {
-              // Built-in role - update teamUser with the specified role
-              await tx.teamUser.update({
-                where: {
-                  userId_teamId: {
-                    teamId: input.teamId,
-                    userId: member.userId,
-                  },
-                },
-                data: {
-                  role: member.role as TeamUserRole,
-                  assignedRoleId: null, // Clear custom role assignment
-                },
-              });
-            }
+          if (customRole.organizationId !== organizationId) {
+            throw new TRPCError({ code: "FORBIDDEN", message: `Custom role ${member.customRoleId} does not belong to team's organization` });
           }
+        }
+      }
+
+      return await prisma.$transaction(async (tx) => {
+        // ── Rename team ──
+        await tx.team.update({ where: { id: input.teamId }, data: { name: input.name } });
+
+        if (input.members.length === 0) return { success: true };
+
+        const newMembersMap = new Map(
+          input.members.map((m) => [m.userId, m]),
+        );
+
+        // ── TeamUser (legacy, keep in sync for fallback) ──
+        const currentTeamUsers = await tx.teamUser.findMany({
+          where: { teamId: input.teamId },
+          select: { userId: true, role: true },
+        });
+        const currentTeamUserMap = new Map(currentTeamUsers.map((m) => [m.userId, m.role]));
+
+        const tuToRemove = currentTeamUsers.filter((m) => !newMembersMap.has(m.userId)).map((m) => m.userId);
+        const tuToAdd = input.members.filter((m) => !currentTeamUserMap.has(m.userId));
+        const tuToUpdate = input.members.filter(
+          (m) => currentTeamUserMap.has(m.userId) && currentTeamUserMap.get(m.userId) !== m.role,
+        );
+
+        if (tuToRemove.length > 0) {
+          await tx.teamUser.deleteMany({ where: { teamId: input.teamId, userId: { in: tuToRemove } } });
+        }
+        for (const member of tuToAdd) {
+          await tx.teamUser.create({
+            data: {
+              userId: member.userId,
+              teamId: input.teamId,
+              role: isCustomRole(member.role) ? TeamUserRole.CUSTOM : (member.role as TeamUserRole),
+              assignedRoleId: isCustomRole(member.role) ? (member.customRoleId ?? null) : null,
+            },
+          });
+        }
+        for (const member of tuToUpdate) {
+          await tx.teamUser.update({
+            where: { userId_teamId: { teamId: input.teamId, userId: member.userId } },
+            data: {
+              role: isCustomRole(member.role) ? TeamUserRole.CUSTOM : (member.role as TeamUserRole),
+              assignedRoleId: isCustomRole(member.role) ? (member.customRoleId ?? null) : null,
+            },
+          });
+        }
+
+        // ── RoleBinding (new, authoritative once migration runs) ──
+        const currentBindings = await tx.roleBinding.findMany({
+          where: { organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: input.teamId, userId: { not: null } },
+          select: { id: true, userId: true, role: true, customRoleId: true },
+        });
+        const currentBindingMap = new Map(currentBindings.map((b) => [b.userId!, b]));
+
+        const rbToRemove = currentBindings.filter((b) => !newMembersMap.has(b.userId!)).map((b) => b.id);
+        const rbToAdd = input.members.filter((m) => !currentBindingMap.has(m.userId));
+        const rbToUpdate = input.members.filter((m) => {
+          const existing = currentBindingMap.get(m.userId);
+          if (!existing) return false;
+          const newRole = isCustomRole(m.role) ? TeamUserRole.CUSTOM : (m.role as TeamUserRole);
+          return existing.role !== newRole || existing.customRoleId !== (m.customRoleId ?? null);
+        });
+
+        if (rbToRemove.length > 0) {
+          await tx.roleBinding.deleteMany({ where: { id: { in: rbToRemove } } });
+        }
+        for (const member of rbToAdd) {
+          await tx.roleBinding.create({
+            data: {
+              organizationId,
+              userId: member.userId,
+              role: isCustomRole(member.role) ? TeamUserRole.CUSTOM : (member.role as TeamUserRole),
+              customRoleId: isCustomRole(member.role) ? (member.customRoleId ?? null) : null,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: input.teamId,
+            },
+          });
+        }
+        for (const member of rbToUpdate) {
+          const existing = currentBindingMap.get(member.userId)!;
+          await tx.roleBinding.update({
+            where: { id: existing.id },
+            data: {
+              role: isCustomRole(member.role) ? TeamUserRole.CUSTOM : (member.role as TeamUserRole),
+              customRoleId: isCustomRole(member.role) ? (member.customRoleId ?? null) : null,
+            },
+          });
         }
 
         return { success: true };
@@ -586,13 +734,18 @@ export const teamRouter = createTRPCRouter({
           });
         }
 
-        // Remove the membership by unique constraint (atomic operation)
+        // Remove TeamUser (legacy)
         await tx.teamUser.delete({
+          where: { userId_teamId: { userId: input.userId, teamId: input.teamId } },
+        });
+
+        // Remove RoleBinding (new)
+        await tx.roleBinding.deleteMany({
           where: {
-            userId_teamId: {
-              userId: input.userId,
-              teamId: input.teamId,
-            },
+            organizationId: team.organizationId,
+            userId: input.userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: input.teamId,
           },
         });
 
