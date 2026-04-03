@@ -113,12 +113,31 @@ describe("getVercelAIModel", () => {
       });
     });
 
-    describe("when no providers are enabled", () => {
-      it("throws clear error about no providers", async () => {
+    describe("when no providers are configured", () => {
+      it("throws error about no providers configured", async () => {
         mockGetProjectModelProviders.mockResolvedValue({});
 
         await expect(getVercelAIModel("project-123")).rejects.toThrow(
           "No model providers configured",
+        );
+      });
+    });
+
+    describe("when providers exist but all are disabled", () => {
+      it("throws error about disabled providers", async () => {
+        mockGetProjectModelProviders.mockResolvedValue({
+          azure: {
+            provider: "azure",
+            enabled: false,
+            customKeys: null,
+            customModels: [
+              { modelId: "my-deployment", displayName: "My Deploy", mode: "chat" },
+            ],
+          },
+        });
+
+        await expect(getVercelAIModel("project-123")).rejects.toThrow(
+          "All configured model providers are disabled",
         );
       });
     });
