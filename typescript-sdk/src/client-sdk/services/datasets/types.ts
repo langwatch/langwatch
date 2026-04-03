@@ -95,13 +95,33 @@ export type GetDatasetApiResponse = {
 };
 
 /**
+ * Pagination metadata returned by paginated API endpoints.
+ */
+export type Pagination = {
+  /** Current page number (1-based) */
+  page: number;
+  /** Number of items per page */
+  limit: number;
+  /** Total number of items across all pages */
+  total: number;
+  /** Total number of pages */
+  totalPages: number;
+};
+
+/**
+ * A dataset in a list response, including record count.
+ */
+export type DatasetListItem = DatasetMetadata & {
+  /** Number of records in the dataset */
+  recordCount: number;
+};
+
+/**
  * API response for listing datasets.
  */
 export type ListDatasetsApiResponse = {
-  data: DatasetMetadata[];
-  total: number;
-  page: number;
-  limit: number;
+  data: DatasetListItem[];
+  pagination: Pagination;
 };
 
 /**
@@ -156,4 +176,40 @@ export type DeleteRecordsResponse = {
 export type UploadResponse = {
   dataset?: DatasetMetadata;
   records?: DatasetRecordResponse[];
+};
+
+/**
+ * Options for listing records in a dataset.
+ */
+export type ListRecordsOptions = {
+  /** Page number (1-based) */
+  page?: number;
+  /** Number of items per page */
+  limit?: number;
+};
+
+/**
+ * API response for listing records in a dataset.
+ */
+export type ListRecordsApiResponse = {
+  data: DatasetRecordResponse[];
+  pagination: Pagination;
+};
+
+/**
+ * Options for creating a dataset from a file upload.
+ */
+export type CreateFromUploadOptions = {
+  /** Name for the new dataset */
+  name: string;
+  /** The file to upload (CSV, JSON, or JSONL) */
+  file: File | Blob;
+};
+
+/**
+ * API response for creating a dataset from a file upload.
+ */
+export type CreateFromUploadResponse = DatasetMetadata & {
+  /** Number of records created from the uploaded file */
+  recordsCreated: number;
 };

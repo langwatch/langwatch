@@ -30,7 +30,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
   describe("DatasetsFacade", () => {
     describe("when inspecting langwatch.datasets", () => {
-      it("exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, and upload methods", () => {
+      it("exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, listRecords, and createFromUpload methods", () => {
         const langwatch = new LangWatch({
           apiKey: "test-key",
           endpoint: "http://localhost:5560",
@@ -45,6 +45,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
         expect(typeof langwatch.datasets.updateRecord).toBe("function");
         expect(typeof langwatch.datasets.deleteRecords).toBe("function");
         expect(typeof langwatch.datasets.upload).toBe("function");
+        expect(typeof langwatch.datasets.listRecords).toBe("function");
+        expect(typeof langwatch.datasets.createFromUpload).toBe("function");
       });
     });
   });
@@ -57,7 +59,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         it("forwards pagination parameters to the API client", async () => {
           const mockClient = createMockApiClient();
           mockClient.GET.mockResolvedValue({
-            data: { data: [], total: 0, page: 2, limit: 10 },
+            data: { data: [], pagination: { page: 2, limit: 10, total: 0, totalPages: 0 } },
             error: null,
             response: { status: 200 },
           });

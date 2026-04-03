@@ -374,6 +374,34 @@ console.log(`Deleted ${result.deletedCount} records`);
   </Tab>
 </Tabs>
 
+### Listing Records
+
+You can list records in a dataset with pagination support.
+
+<Tabs>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// List first page of records
+const result = await langwatch.datasets.listRecords("my-dataset");
+
+for (const record of result.data) {
+  console.log(record.id, record.entry);
+}
+
+// With pagination
+const page2 = await langwatch.datasets.listRecords("my-dataset", {
+  page: 2,
+  limit: 25,
+});
+console.log(`Page ${page2.pagination.page} of ${page2.pagination.totalPages}`);
+```
+  </Tab>
+</Tabs>
+
 ## Uploading a File
 
 You can upload CSV, JSON, or JSONL files to populate a dataset.
@@ -391,6 +419,32 @@ const fileBuffer = readFileSync("data.csv");
 const file = new File([fileBuffer], "data.csv", { type: "text/csv" });
 
 const result = await langwatch.datasets.upload("my-dataset", file);
+```
+  </Tab>
+</Tabs>
+
+## Creating a Dataset from File Upload
+
+You can create a new dataset and populate it from a file in a single step.
+
+<Tabs>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+import { readFileSync } from "fs";
+
+const langwatch = new LangWatch();
+
+// Create a new dataset from a CSV file
+const fileBuffer = readFileSync("data.csv");
+const file = new File([fileBuffer], "data.csv", { type: "text/csv" });
+
+const dataset = await langwatch.datasets.createFromUpload({
+  name: "my-new-dataset",
+  file,
+});
+
+console.log(`Created dataset "${dataset.name}" with ${dataset.recordsCreated} records`);
 ```
   </Tab>
 </Tabs>

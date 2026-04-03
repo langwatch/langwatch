@@ -8,8 +8,12 @@ import {
   type GetDatasetOptions,
   type ListDatasetsOptions,
   type ListDatasetsApiResponse,
+  type ListRecordsOptions,
+  type ListRecordsApiResponse,
   type CreateDatasetOptions,
   type UpdateDatasetOptions,
+  type CreateFromUploadOptions,
+  type CreateFromUploadResponse,
   type BatchCreateRecordsResponse,
   type DeleteRecordsResponse,
   type UploadResponse,
@@ -312,6 +316,86 @@ export class DatasetService {
       `delete records from dataset "${slugOrId}"`,
       slugOrId,
     );
+  }
+
+  /**
+   * Lists records in a dataset with optional pagination.
+   *
+   * @param slugOrId - The slug or ID of the dataset
+   * @param options - Pagination options (page, limit)
+   * @returns Paginated list of records
+   */
+  async listRecords(
+    slugOrId: string,
+    options?: ListRecordsOptions,
+  ): Promise<ListRecordsApiResponse> {
+    this.#config.logger.debug(`Listing records for dataset: ${slugOrId}`);
+
+    const response = await this.untypedRequest('GET', '/api/dataset/{slugOrId}/records', {
+      params: {
+        path: { slugOrId },
+        query: {
+          page: options?.page,
+          limit: options?.limit,
+        },
+      },
+    });
+
+    return this.unwrapResponse<ListRecordsApiResponse>(
+      response,
+      `list records in dataset "${slugOrId}"`,
+      slugOrId,
+    );
+  }
+
+  /**
+   * Creates a new dataset from a file upload.
+   * Uses raw fetch with FormData since openapi-fetch hardcodes content-type: application/json.
+   *
+   * @param options - The dataset name and file to upload
+   * @returns The created dataset metadata with record count
+   */
+  async createDatasetFromUpload(
+    options: CreateFromUploadOptions,
+  ): Promise<CreateFromUploadResponse> {
+    this.#config.logger.debug(`Creating dataset from upload: ${options.name}`);
+
+    const { endpoint, apiKey } = this.#config;
+
+    const url = `${endpoint.replace(/\/$/, "")}/api/dataset/upload`;
+
+    const formData = new FormData();
+    formData.append("name", options.name);
+    formData.append("file", options.file);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": apiKey,
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const rawBody = await response.text();
+      let errorBody: unknown = rawBody;
+      if (rawBody) {
+        try {
+          errorBody = JSON.parse(rawBody);
+        } catch {
+          // Keep the plain-text body.
+        }
+      }
+
+      this.handleApiError(
+        `create dataset from upload "${options.name}"`,
+        errorBody,
+        response.status,
+      );
+    }
+
+    return (await response.json()) as CreateFromUploadResponse;
   }
 
   /**
