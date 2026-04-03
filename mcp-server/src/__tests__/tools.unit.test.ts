@@ -8,6 +8,11 @@ vi.mock("../langwatch-api.js", () => ({
   getPrompt: vi.fn(),
   createPrompt: vi.fn(),
   updatePrompt: vi.fn(),
+  assignPromptTag: vi.fn(),
+  listPromptTags: vi.fn(),
+  createPromptTag: vi.fn(),
+  renamePromptTag: vi.fn(),
+  deletePromptTag: vi.fn(),
 }));
 
 import {
@@ -18,6 +23,11 @@ import {
   getPrompt,
   createPrompt,
   updatePrompt,
+  assignPromptTag,
+  listPromptTags,
+  createPromptTag,
+  renamePromptTag,
+  deletePromptTag,
   type PromptSummary,
 } from "../langwatch-api.js";
 
@@ -28,6 +38,11 @@ import { handleListPrompts } from "../tools/list-prompts.js";
 import { handleGetPrompt } from "../tools/get-prompt.js";
 import { handleCreatePrompt } from "../tools/create-prompt.js";
 import { handleUpdatePrompt } from "../tools/update-prompt.js";
+import { handleAssignPromptTag } from "../tools/assign-prompt-tag.js";
+import { handleListPromptTags } from "../tools/list-prompt-tags.js";
+import { handleCreatePromptTag } from "../tools/create-prompt-tag.js";
+import { handleRenamePromptTag } from "../tools/rename-prompt-tag.js";
+import { handleDeletePromptTag } from "../tools/delete-prompt-tag.js";
 
 const mockSearchTraces = vi.mocked(searchTraces);
 const mockGetTraceById = vi.mocked(getTraceById);
@@ -36,6 +51,11 @@ const mockListPrompts = vi.mocked(listPrompts);
 const mockGetPrompt = vi.mocked(getPrompt);
 const mockCreatePrompt = vi.mocked(createPrompt);
 const mockUpdatePrompt = vi.mocked(updatePrompt);
+const mockAssignPromptTag = vi.mocked(assignPromptTag);
+const mockListPromptTags = vi.mocked(listPromptTags);
+const mockCreatePromptTag = vi.mocked(createPromptTag);
+const mockRenamePromptTag = vi.mocked(renamePromptTag);
+const mockDeletePromptTag = vi.mocked(deletePromptTag);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -718,6 +738,138 @@ describe("handleUpdatePrompt()", () => {
         model: "openai/gpt-4o",
         commitMessage: "Switch model",
       });
+    });
+  });
+});
+
+describe("handleGetPrompt() with tag options", () => {
+  describe("when called with a tag", () => {
+    it("passes tag option to the API", async () => {
+      mockGetPrompt.mockResolvedValue({ name: "Test" });
+
+      await handleGetPrompt({ idOrHandle: "pizza-prompt", tag: "production" });
+
+      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", { version: undefined, tag: "production" });
+    });
+  });
+});
+
+describe("handleCreatePrompt() with tags", () => {
+  describe("when called with tags", () => {
+    it("includes tags in the output", async () => {
+      mockCreatePrompt.mockResolvedValue({ id: "p1", handle: "test" });
+
+      const result = await handleCreatePrompt({
+        name: "Test",
+        messages: [{ role: "system", content: "hi" }],
+        model: "openai/gpt-5-mini",
+        tags: ["production"],
+      });
+
+      expect(result).toContain("**Tags**: production");
+    });
+  });
+});
+
+describe("handleUpdatePrompt() with tags", () => {
+  describe("when called with tags", () => {
+    it("includes tags in the output", async () => {
+      mockUpdatePrompt.mockResolvedValue({ id: "p1", handle: "test", latestVersionNumber: 2 });
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "test",
+        commitMessage: "add tags",
+        tags: ["staging"],
+      });
+
+      expect(result).toContain("**Tags**: staging");
+    });
+  });
+});
+
+describe("handleAssignPromptTag()", () => {
+  describe("when tag is assigned successfully", () => {
+    it("returns a confirmation with prompt, tag, and version", async () => {
+      mockAssignPromptTag.mockResolvedValue({ success: true });
+
+      const result = await handleAssignPromptTag({
+        idOrHandle: "pizza-prompt",
+        tag: "production",
+        versionId: "v123",
+      });
+
+      expect(result).toContain("Tag assigned successfully!");
+      expect(result).toContain("**Prompt**: pizza-prompt");
+      expect(result).toContain("**Tag**: production");
+      expect(result).toContain("**Version ID**: v123");
+    });
+  });
+});
+
+describe("handleListPromptTags()", () => {
+  describe("when tags exist", () => {
+    it("formats tags as a markdown list", async () => {
+      mockListPromptTags.mockResolvedValue([
+        { id: "1", name: "production", createdAt: "2024-01-01" },
+        { id: "2", name: "staging" },
+      ]);
+
+      const result = await handleListPromptTags();
+
+      expect(result).toContain("# Prompt Tags");
+      expect(result).toContain("**production**");
+      expect(result).toContain("**staging**");
+    });
+  });
+
+  describe("when no tags exist", () => {
+    it("returns an empty-state message mentioning latest", async () => {
+      mockListPromptTags.mockResolvedValue([]);
+
+      const result = await handleListPromptTags();
+
+      expect(result).toContain("No prompt tags found");
+      expect(result).toContain("`latest`");
+    });
+  });
+});
+
+describe("handleCreatePromptTag()", () => {
+  describe("when tag is created successfully", () => {
+    it("returns a confirmation with the tag name", async () => {
+      mockCreatePromptTag.mockResolvedValue({ id: "t1", name: "canary" });
+
+      const result = await handleCreatePromptTag({ name: "canary" });
+
+      expect(result).toContain("Tag created successfully!");
+      expect(result).toContain("**Name**: canary");
+    });
+  });
+});
+
+describe("handleRenamePromptTag()", () => {
+  describe("when tag is renamed successfully", () => {
+    it("returns a confirmation with old and new names", async () => {
+      mockRenamePromptTag.mockResolvedValue({ id: "t1", name: "preview" });
+
+      const result = await handleRenamePromptTag({ tag: "canary", name: "preview" });
+
+      expect(result).toContain("Tag renamed successfully!");
+      expect(result).toContain("**Old name**: canary");
+      expect(result).toContain("**New name**: preview");
+    });
+  });
+});
+
+describe("handleDeletePromptTag()", () => {
+  describe("when tag is deleted successfully", () => {
+    it("returns a confirmation with the tag name", async () => {
+      mockDeletePromptTag.mockResolvedValue(null);
+
+      const result = await handleDeletePromptTag({ tag: "canary" });
+
+      expect(result).toContain("Tag deleted successfully!");
+      expect(result).toContain("**Tag**: canary");
     });
   });
 });
