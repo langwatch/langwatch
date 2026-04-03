@@ -17,6 +17,8 @@ import type {
   TargetConfig,
 } from "../types";
 
+const HTTP_AGENT_BASE_VARIABLE_IDS = ["threadId", "input", "messages"] as const;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -205,16 +207,22 @@ export const getTargetMissingMappings = (
   }
 
   if (isHttpAgent) {
+    const httpValidationFieldIds = new Set([
+      ...HTTP_AGENT_BASE_VARIABLE_IDS,
+      ...inputs.map((input) => input.identifier),
+    ]);
+    const httpDisplayFieldIds =
+      inputs.length > 0
+        ? new Set(inputs.map((input) => input.identifier))
+        : new Set<string>(HTTP_AGENT_BASE_VARIABLE_IDS);
+
     // HTTP agents: all fields are optional, but at least one must be mapped
-    let hasAtLeastOneMapping = false;
+    const hasAtLeastOneMapping = Object.keys(datasetMappings).some((fieldId) =>
+      httpValidationFieldIds.has(fieldId),
+    );
 
-    for (const fieldId of usedFields) {
-      if (!inputIds.has(fieldId)) continue;
-
-      const hasMapping = datasetMappings[fieldId] !== undefined;
-      if (hasMapping) {
-        hasAtLeastOneMapping = true;
-      } else {
+    for (const fieldId of httpDisplayFieldIds) {
+      if (datasetMappings[fieldId] === undefined) {
         // Add to missing but mark as NOT required (optional)
         missingMappings.push({
           fieldId,
@@ -225,9 +233,7 @@ export const getTargetMissingMappings = (
     }
 
     // Valid if at least one field has a mapping (or there are no fields)
-    const totalFields = Array.from(usedFields).filter((f) =>
-      inputIds.has(f),
-    ).length;
+    const totalFields = httpValidationFieldIds.size;
     const isValid = totalFields === 0 || hasAtLeastOneMapping;
 
     return {

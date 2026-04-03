@@ -6,6 +6,55 @@ import {
 } from "../mappingValidation";
 
 describe("mappingValidation", () => {
+  describe("HTTP agent validation", () => {
+    const createHttpAgentTargetConfig = (
+      overrides: Partial<TargetConfig> = {},
+    ): TargetConfig => ({
+      id: "target-http-1",
+      type: "agent",
+      agentType: "http",
+      inputs: [{ identifier: "messages", type: "chat_messages" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+      httpConfig: {
+        url: "https://api.example.com/chat",
+        method: "POST",
+        bodyTemplate: '{"messages": {{messages}}}',
+        outputPath: "$.result",
+      },
+      ...overrides,
+    });
+
+    it("returns valid when a fixed HTTP variable is mapped even if target inputs are stale", () => {
+      const target = createHttpAgentTargetConfig({
+        mappings: {
+          "dataset-1": {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "question",
+            },
+          },
+        },
+      });
+
+      const result = getTargetMissingMappings(target, "dataset-1");
+
+      expect(result.isValid).toBe(true);
+    });
+
+    it("returns invalid when no HTTP variable is mapped even if target inputs are empty", () => {
+      const target = createHttpAgentTargetConfig({
+        inputs: [],
+      });
+
+      const result = getTargetMissingMappings(target, "dataset-1");
+
+      expect(result.isValid).toBe(false);
+    });
+  });
+
   describe("evaluator target validation", () => {
     // Evaluator with:
     //   required fields: ["output", "expected_output"]

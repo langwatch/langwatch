@@ -1,5 +1,5 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import {
   LuChevronRight,
   LuClock,
@@ -15,7 +15,9 @@ import {
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
+import { api } from "~/utils/api";
 import type { EvaluatorConfig } from "../../types";
 import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
@@ -43,12 +45,9 @@ type TargetSummaryProps = {
 // Helper to get evaluator name from the evaluators array
 const getEvaluatorName = (
   evaluatorId: string,
-  evaluators: EvaluatorConfig[]
+  evaluatorNames: Map<string, string>,
 ): string => {
-  // For now, just use the evaluator ID as the display name
-  // The proper solution would be to fetch names via tRPC, but that requires
-  // hooks which can't be used in a map iteration
-  return evaluators.find((e) => e.id === evaluatorId)?.id ?? evaluatorId;
+  return evaluatorNames.get(evaluatorId) ?? evaluatorId;
 };
 
 export const TargetSummary = memo(function TargetSummary({
@@ -56,8 +55,33 @@ export const TargetSummary = memo(function TargetSummary({
   evaluators,
   isRunning = false,
 }: TargetSummaryProps) {
+  const { project } = useOrganizationTeamProject();
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
+  const evaluatorNameQueries = api.useQueries((t) =>
+    evaluators.map((evaluator) =>
+      t.evaluators.getById(
+        {
+          id: evaluator.dbEvaluatorId ?? "",
+          projectId: project?.id ?? "",
+        },
+        {
+          enabled: !!evaluator.dbEvaluatorId && !!project?.id,
+          staleTime: 60_000,
+        },
+      ),
+    ),
+  );
+  const evaluatorNames = useMemo(() => {
+    return new Map(
+      evaluators.map((evaluator, index) => [
+        evaluator.id,
+        evaluator.localEvaluatorConfig?.name ??
+          evaluatorNameQueries[index]?.data?.name ??
+          evaluator.id,
+      ]),
+    );
+  }, [evaluatorNameQueries, evaluators]);
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =
@@ -194,7 +218,7 @@ export const TargetSummary = memo(function TargetSummary({
             {aggregates.evaluators.map((evaluator) => (
               <HStack key={evaluator.evaluatorId} justify="space-between">
                 <Text color="white/75" truncate maxWidth="150px">
-                  {getEvaluatorName(evaluator.evaluatorId, evaluators)}
+                  {getEvaluatorName(evaluator.evaluatorId, evaluatorNames)}
                 </Text>
                 <HStack gap={2}>
                   {evaluator.passRate !== null && (
