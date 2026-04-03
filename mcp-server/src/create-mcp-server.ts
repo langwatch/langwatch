@@ -288,6 +288,10 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         )
         .describe("Prompt messages"),
       model: modelSchema,
+      tags: z.array(z.string()).optional().describe(
+        'Tags to assign to the initial version (e.g., ["production", "staging"]). ' +
+        'Built-in tags: "latest" (auto-assigned), "production", "staging". Custom tags must be created first.'
+      ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");
@@ -322,6 +326,10 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         .number()
         .optional()
         .describe("Specific version number (default: latest)"),
+      tag: z.string().optional().describe(
+        'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
+        'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"'
+      ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");
@@ -351,6 +359,9 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       commitMessage: z
         .string()
         .describe("Commit message describing the change"),
+      tags: z.array(z.string()).optional().describe(
+        'Tags to assign to the new version created by this update.'
+      ),
     },
     async (params) => {
       const { requireApiKey } = await import("./config.js");
@@ -358,6 +369,90 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       const { handleUpdatePrompt } = await import("./tools/update-prompt.js");
       return {
         content: [{ type: "text", text: await handleUpdatePrompt(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_assign_prompt_tag",
+    'Assign a tag (e.g. "production") to a specific version of a prompt. ' +
+    'Use this to "deploy" a version by promoting it to the production tag.',
+    {
+      idOrHandle: z.string().describe("Prompt ID or handle"),
+      tag: z.string().describe('Tag name (e.g., "production", "staging")'),
+      versionId: z.string().describe("The version ID to assign the tag to"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleAssignPromptTag } = await import("./tools/assign-prompt-tag.js");
+      return {
+        content: [{ type: "text", text: await handleAssignPromptTag(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_list_prompt_tags",
+    "List all prompt tag definitions for the organization. " +
+    "Shows built-in tags (latest, production, staging) and any custom tags.",
+    {},
+    async () => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleListPromptTags } = await import("./tools/list-prompt-tags.js");
+      return {
+        content: [{ type: "text", text: await handleListPromptTags() }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_create_prompt_tag",
+    "Create a custom prompt tag definition for the organization. " +
+    'Tag names must be non-numeric and not "latest".',
+    {
+      name: z.string().describe("Tag name to create"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleCreatePromptTag } = await import("./tools/create-prompt-tag.js");
+      return {
+        content: [{ type: "text", text: await handleCreatePromptTag(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_rename_prompt_tag",
+    "Rename an existing custom prompt tag. Built-in tags (latest, production, staging) cannot be renamed.",
+    {
+      tag: z.string().describe("Current tag name to rename"),
+      name: z.string().describe("New tag name"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleRenamePromptTag } = await import("./tools/rename-prompt-tag.js");
+      return {
+        content: [{ type: "text", text: await handleRenamePromptTag(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_delete_prompt_tag",
+    "Delete a custom prompt tag and all its assignments. Built-in tags cannot be deleted.",
+    {
+      tag: z.string().describe("Tag name to delete"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleDeletePromptTag } = await import("./tools/delete-prompt-tag.js");
+      return {
+        content: [{ type: "text", text: await handleDeletePromptTag(params) }],
       };
     }
   );
