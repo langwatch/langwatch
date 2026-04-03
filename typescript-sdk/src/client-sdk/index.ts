@@ -1,6 +1,20 @@
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
-export type { Dataset, DatasetEntry, GetDatasetOptions } from "./services/datasets";
+export type {
+  Dataset,
+  DatasetEntry,
+  DatasetMetadata,
+  DatasetColumnType,
+  GetDatasetOptions,
+  ListDatasetsOptions,
+  ListDatasetsApiResponse,
+  CreateDatasetOptions,
+  UpdateDatasetOptions,
+  BatchCreateRecordsResponse,
+  DeleteRecordsResponse,
+  UploadResponse,
+  DatasetRecordResponse,
+} from "./services/datasets";
 export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./services/datasets";
 export type { ExperimentRunResult, RunExperimentOptions } from "./services/experiments";
 export {
@@ -105,6 +119,8 @@ export class LangWatch {
     this.datasets = new DatasetsFacade({
       langwatchApiClient: this.config.langwatchApiClient,
       logger: this.config.logger,
+      endpoint: this.config.endpoint,
+      apiKey: this.config.apiKey,
     });
 
     this.evaluations = new EvaluationsFacade({

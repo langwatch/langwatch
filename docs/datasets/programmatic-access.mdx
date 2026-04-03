@@ -1,10 +1,10 @@
 ---
 title: Programmatic Access
 sidebarTitle: Programmatic Access
-description: Fetch datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+description: Manage datasets programmatically using the SDK for offline evaluations and automated workflows.
 ---
 
-You can fetch datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
+You can manage datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
 
 ## Fetching a Dataset
 
@@ -34,10 +34,272 @@ const langwatch = new LangWatch();
 // Fetch dataset by slug or ID
 const dataset = await langwatch.datasets.get("your-dataset-slug");
 
+// Access metadata
+console.log(dataset.id, dataset.name, dataset.slug);
+
 // Access entries
 for (const entry of dataset.entries) {
   console.log(entry.entry);
 }
+```
+  </Tab>
+</Tabs>
+
+## Listing Datasets
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# List all datasets
+datasets = langwatch.dataset.list()
+for ds in datasets:
+    print(ds.name, ds.slug)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// List all datasets (paginated)
+const result = await langwatch.datasets.list();
+for (const ds of result.data) {
+  console.log(ds.name, ds.slug);
+}
+
+// With pagination
+const page2 = await langwatch.datasets.list({ page: 2, limit: 10 });
+```
+  </Tab>
+</Tabs>
+
+## Creating a Dataset
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Create a dataset with column types
+dataset = langwatch.dataset.create(
+    name="my-dataset",
+    column_types=[
+        {"name": "input", "type": "string"},
+        {"name": "expected_output", "type": "string"},
+    ],
+)
+print(dataset.id, dataset.slug)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Create a dataset with column types
+const dataset = await langwatch.datasets.create({
+  name: "my-dataset",
+  columnTypes: [
+    { name: "input", type: "string" },
+    { name: "expected_output", type: "string" },
+  ],
+});
+
+console.log(dataset.id, dataset.slug);
+```
+  </Tab>
+</Tabs>
+
+## Updating a Dataset
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Update dataset name
+dataset = langwatch.dataset.update("my-dataset", name="new-name")
+
+# Update column types
+dataset = langwatch.dataset.update("my-dataset", column_types=[
+    {"name": "question", "type": "string"},
+    {"name": "answer", "type": "string"},
+])
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Update dataset name
+const updated = await langwatch.datasets.update("my-dataset", {
+  name: "new-name",
+});
+
+// Update column types
+const updated2 = await langwatch.datasets.update("my-dataset", {
+  columnTypes: [
+    { name: "question", type: "string" },
+    { name: "answer", type: "string" },
+  ],
+});
+```
+  </Tab>
+</Tabs>
+
+## Deleting a Dataset
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Delete (archive) a dataset
+result = langwatch.dataset.delete("my-dataset")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Delete (archive) a dataset
+const archived = await langwatch.datasets.delete("my-dataset");
+```
+  </Tab>
+</Tabs>
+
+## Managing Records
+
+### Creating Records
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Add records to a dataset
+langwatch.dataset.create_records("my-dataset", [
+    {"input": "What is AI?", "expected_output": "Artificial Intelligence"},
+    {"input": "What is ML?", "expected_output": "Machine Learning"},
+])
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Add records to a dataset
+const result = await langwatch.datasets.createRecords("my-dataset", [
+  { input: "What is AI?", expected_output: "Artificial Intelligence" },
+  { input: "What is ML?", expected_output: "Machine Learning" },
+]);
+
+// Access created record IDs
+for (const record of result.data) {
+  console.log(record.id);
+}
+```
+  </Tab>
+</Tabs>
+
+### Updating a Record
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Update a single record
+langwatch.dataset.update_record("my-dataset", "record-id", {
+    "input": "Updated question",
+    "expected_output": "Updated answer",
+})
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Update a single record
+const record = await langwatch.datasets.updateRecord(
+  "my-dataset",
+  "record-id",
+  { input: "Updated question", expected_output: "Updated answer" },
+);
+```
+  </Tab>
+</Tabs>
+
+### Deleting Records
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+# Delete records by IDs
+langwatch.dataset.delete_records("my-dataset", ["record-id-1", "record-id-2"])
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Delete records by IDs
+const result = await langwatch.datasets.deleteRecords("my-dataset", [
+  "record-id-1",
+  "record-id-2",
+]);
+console.log(`Deleted ${result.deletedCount} records`);
+```
+  </Tab>
+</Tabs>
+
+## Uploading a File
+
+You can upload CSV, JSON, or JSONL files to populate a dataset.
+
+<Tabs>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+import { readFileSync } from "fs";
+
+const langwatch = new LangWatch();
+
+// Upload a file to an existing dataset
+const fileBuffer = readFileSync("data.csv");
+const file = new File([fileBuffer], "data.csv", { type: "text/csv" });
+
+const result = await langwatch.datasets.upload("my-dataset", file);
 ```
   </Tab>
 </Tabs>
@@ -62,7 +324,7 @@ evaluation = langwatch.experiment.init("my-evaluation")
 for index, row in evaluation.loop(df.iterrows()):
     # Run your LLM/agent
     output = my_llm(row["input"])
-    
+
     # Log evaluation metrics
     evaluation.log("response_quality", index=index, score=0.9)
 ```
@@ -84,7 +346,7 @@ await evaluation.run(
   async ({ item, index }) => {
     // Run your LLM/agent
     const output = await myLLM(item.input);
-    
+
     // Log evaluation metrics
     evaluation.log("response_quality", { index, score: 0.9 });
   },
@@ -124,6 +386,26 @@ const dataset = await langwatch.datasets.get<MyDatasetEntry>("my-dataset");
 for (const entry of dataset.entries) {
   console.log(entry.entry.input);  // Typed as string
   console.log(entry.entry.expected_output);  // Typed as string
+}
+```
+
+## Error Handling
+
+The SDK throws specific error types for common scenarios:
+
+```typescript
+import { LangWatch, DatasetNotFoundError, DatasetApiError } from "langwatch";
+
+const langwatch = new LangWatch();
+
+try {
+  const dataset = await langwatch.datasets.get("my-dataset");
+} catch (error) {
+  if (error instanceof DatasetNotFoundError) {
+    console.log("Dataset not found");
+  } else if (error instanceof DatasetApiError) {
+    console.log(`API error (${error.status}): ${error.message}`);
+  }
 }
 ```
 
