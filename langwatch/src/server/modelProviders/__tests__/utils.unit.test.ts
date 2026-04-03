@@ -64,4 +64,90 @@ describe("getVercelAIModel", () => {
       );
     });
   });
+
+  describe("when project defaultModel is null", () => {
+    beforeEach(() => {
+      mockPrismaFindUnique.mockResolvedValue({
+        id: "project-123",
+        defaultModel: null,
+      });
+    });
+
+    describe("when azure provider is enabled with custom models", () => {
+      it("resolves model from azure custom models", async () => {
+        mockGetProjectModelProviders.mockResolvedValue({
+          azure: {
+            provider: "azure",
+            enabled: true,
+            customKeys: null,
+            customModels: [
+              {
+                modelId: "my-gpt4-deployment",
+                displayName: "My GPT-4",
+                mode: "chat",
+              },
+            ],
+          },
+        });
+
+        const result = await getVercelAIModel("project-123");
+
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe("when openai provider is enabled", () => {
+      it("falls back to DEFAULT_MODEL", async () => {
+        mockGetProjectModelProviders.mockResolvedValue({
+          openai: {
+            provider: "openai",
+            enabled: true,
+            customKeys: null,
+            customModels: null,
+          },
+        });
+
+        const result = await getVercelAIModel("project-123");
+
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe("when no providers are enabled", () => {
+      it("throws clear error about no providers", async () => {
+        mockGetProjectModelProviders.mockResolvedValue({});
+
+        await expect(getVercelAIModel("project-123")).rejects.toThrow(
+          "No model providers configured",
+        );
+      });
+    });
+
+    describe("when defaultModel provider is not configured but another is", () => {
+      it("resolves from the available provider", async () => {
+        mockPrismaFindUnique.mockResolvedValue({
+          id: "project-123",
+          defaultModel: "openai/gpt-4",
+        });
+        mockGetProjectModelProviders.mockResolvedValue({
+          azure: {
+            provider: "azure",
+            enabled: true,
+            customKeys: null,
+            customModels: [
+              {
+                modelId: "my-gpt4-deployment",
+                displayName: "My GPT-4",
+                mode: "chat",
+              },
+            ],
+          },
+        });
+
+        const result = await getVercelAIModel("project-123");
+
+        expect(result).toBeDefined();
+      });
+    });
+  });
 });
