@@ -176,16 +176,22 @@ class DatasetApiService:
         slug_or_id: str,
         *,
         entries: List[Dict[str, Any]],
-    ) -> None:
-        """POST /api/dataset/{slug}/entries -- add records to a dataset."""
+    ) -> List[Dict[str, Any]]:
+        """POST /api/dataset/{slugOrId}/records -- batch-create records.
+
+        Returns:
+            List of created record dicts, each containing id, entry, and createdAt.
+        """
         with _tracer.start_as_current_span("dataset.create_records"):
             body: Dict[str, Any] = {"entries": entries}
 
             quoted = self._quote(slug_or_id)
             response = self._http().post(
-                f"/api/dataset/{quoted}/entries", json=body
+                f"/api/dataset/{quoted}/records", json=body
             )
             _raise_for_api_status(response)
+            data = response.json()
+            return data.get("data", [])
 
     def update_record(
         self,

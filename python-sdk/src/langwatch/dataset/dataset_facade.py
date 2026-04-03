@@ -174,13 +174,19 @@ class DatasetsFacade:
         slug_or_id: str,
         *,
         entries: List[Dict[str, Any]],
-    ) -> None:
+    ) -> List[DatasetRecord]:
         """
-        Add records to an existing dataset.
+        Batch-create records in an existing dataset.
+
+        Uses the new POST /:slugOrId/records endpoint which generates proper
+        KSUIDs and returns the created records.
 
         Args:
             slug_or_id: Dataset slug or ID.
             entries: Non-empty list of record entry dicts.
+
+        Returns:
+            List of created DatasetRecord objects with their generated IDs.
 
         Raises:
             ValueError: If entries is empty or the dataset is not found.
@@ -188,7 +194,8 @@ class DatasetsFacade:
         if not entries:
             raise ValueError("Entries must not be empty.")
 
-        self._api.create_records(slug_or_id, entries=entries)
+        raw_records = self._api.create_records(slug_or_id, entries=entries)
+        return [DatasetRecord(**record) for record in raw_records]
 
     def update_record(
         self,

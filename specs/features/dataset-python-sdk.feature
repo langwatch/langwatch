@@ -154,7 +154,7 @@ Feature: Dataset Python SDK
   Scenario: Add records to an existing dataset
     Given a dataset "my-dataset" exists with columns [{"name": "input", "type": "string"}, {"name": "output", "type": "string"}]
     When I call langwatch.dataset.create_records("my-dataset", entries=[{"input": "hello", "output": "hi"}, {"input": "bye", "output": "goodbye"}])
-    Then 2 records are added to the dataset
+    Then a list of 2 DatasetRecord objects is returned with generated IDs
 
   @integration
   Scenario: Add records to a non-existent dataset raises an error

@@ -50,13 +50,19 @@ class TestDatasetsFacade:
             with pytest.raises(ValueError, match="Entries must not be empty"):
                 facade.create_records("my-dataset", entries=[])
 
-        def test_returns_none(self, facade):
-            """create_records() returns None"""
-            facade._api.create_records = MagicMock(return_value=None)
+        def test_returns_list_of_dataset_records(self, facade):
+            """create_records() returns created DatasetRecord objects"""
+            facade._api.create_records = MagicMock(return_value=[
+                {"id": "rec_1", "entry": {"input": "hello"}, "createdAt": "2026-01-01"},
+                {"id": "rec_2", "entry": {"input": "world"}, "createdAt": "2026-01-01"},
+            ])
             result = facade.create_records(
-                "my-dataset", entries=[{"input": "hello"}]
+                "my-dataset", entries=[{"input": "hello"}, {"input": "world"}]
             )
-            assert result is None
+            assert len(result) == 2
+            assert result[0].id == "rec_1"
+            assert result[1].id == "rec_2"
+            assert result[0].entry == {"input": "hello"}
 
     class TestDeleteRecords:
         """delete_records()"""
