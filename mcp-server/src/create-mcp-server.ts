@@ -3,7 +3,10 @@ import { z } from "zod";
 
 import packageJson from "../package.json" assert { type: "json" };
 import { requireApiKey } from "./config.js";
-import { createDatasetSchema } from "./schemas/create-dataset.js";
+import {
+  createDatasetSchema,
+  datasetColumnDefinitionSchema,
+} from "./schemas/create-dataset.js";
 
 const modelSchema = z
   .string()
@@ -824,12 +827,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       slugOrId: z.string().describe("The dataset slug or ID to update"),
       name: z.string().optional().describe("Updated dataset name"),
       columnTypes: z
-        .array(
-          z.object({
-            name: z.string().describe("Column name"),
-            type: z.string().describe("Column type"),
-          })
-        )
+        .array(datasetColumnDefinitionSchema)
         .optional()
         .describe("Updated column definitions"),
     },

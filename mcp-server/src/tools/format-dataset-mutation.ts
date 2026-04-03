@@ -1,4 +1,5 @@
 import type { DatasetMutationResponse } from "../langwatch-api-datasets.js";
+import { escapeMarkdown } from "../utils/escape-markdown.js";
 
 /**
  * Formats the common detail lines for a dataset mutation response
@@ -11,12 +12,12 @@ export function formatDatasetMutationDetails(
   result: DatasetMutationResponse,
 ): string[] {
   const lines: string[] = [];
-  lines.push(`**Name**: ${result.name}`);
-  lines.push(`**Slug**: ${result.slug}`);
-  lines.push(`**ID**: ${result.id}`);
+  lines.push(`**Name**: ${escapeMarkdown(result.name)}`);
+  lines.push(`**Slug**: ${escapeMarkdown(result.slug)}`);
+  lines.push(`**ID**: ${escapeMarkdown(result.id)}`);
   if (Array.isArray(result.columnTypes) && result.columnTypes.length > 0) {
     const colNames = result.columnTypes
-      .map((c) => `${c.name} (${c.type})`)
+      .map((c) => `${escapeMarkdown(c.name)} (${escapeMarkdown(c.type)})`)
       .join(", ");
     lines.push(`**Columns**: ${colNames}`);
   }

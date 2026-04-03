@@ -116,10 +116,12 @@ describe("handleListDatasets()", () => {
   });
 
   describe("when format is json", () => {
-    it("returns valid parseable JSON matching the full API response", async () => {
+    it("returns valid parseable JSON containing all datasets and total", async () => {
       mockListDatasets.mockResolvedValue(sampleListResponse);
       const result = await handleListDatasets({ format: "json" });
-      expect(JSON.parse(result)).toEqual(sampleListResponse);
+      const parsed = JSON.parse(result);
+      expect(parsed.data).toEqual(sampleListResponse.data);
+      expect(parsed.total).toBe(sampleListResponse.total);
     });
   });
 
