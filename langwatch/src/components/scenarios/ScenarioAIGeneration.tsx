@@ -130,7 +130,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { generate, status } = useScenarioGeneration(project?.id);
 
   // Check if any model providers are configured
-  const { hasEnabledProviders } = useModelProvidersSettings({
+  const { hasEnabledProviders, providers } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
@@ -141,7 +141,10 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     defaultModel,
     "chat",
   );
-  const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
+  const providerKey = defaultModel.split("/")[0];
+  const isDefaultModelDisabled = modelOption
+    ? modelOption.isDisabled
+    : !(providers?.[providerKey as keyof typeof providers]?.enabled ?? false);
   const providerName = extractProviderFromModel(defaultModel);
 
   const hasExistingContent = form !== null && formHasContent(form);
