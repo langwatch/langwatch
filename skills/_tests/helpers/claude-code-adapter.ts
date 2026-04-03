@@ -83,12 +83,12 @@ export function createClaudeCodeAgent({
         const mcpConfig = {
           mcpServers: {
             LangWatch: {
+              type: "stdio",
               command: "node",
-              args: [
-                mcpServerDistPath,
-                "--apiKey",
-                process.env.LANGWATCH_API_KEY!,
-              ],
+              args: [mcpServerDistPath],
+              env: {
+                LANGWATCH_API_KEY: process.env.LANGWATCH_API_KEY!,
+              },
             },
           },
         };
