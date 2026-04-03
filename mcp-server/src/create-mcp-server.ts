@@ -751,4 +751,192 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       };
     })
   );
+
+  // --- Platform Dataset Tools (require API key) ---
+  // These tools manage datasets on the LangWatch platform via API.
+
+  server.tool(
+    "platform_list_datasets",
+    "List all datasets on the LangWatch platform with their names, slugs, columns, and record counts.",
+    {},
+    async () => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleListDatasets } = await import(
+        "./tools/list-datasets.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleListDatasets() }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_get_dataset",
+    "Get full details of a dataset on the LangWatch platform by slug or ID, including column definitions and a preview of records.",
+    {
+      slugOrId: z.string().describe("The dataset slug or ID to retrieve"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleGetDataset } = await import("./tools/get-dataset.js");
+      return {
+        content: [{ type: "text", text: await handleGetDataset(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_create_dataset",
+    "Create a new dataset on the LangWatch platform.",
+    {
+      name: z.string().min(1).describe("Dataset name"),
+      columnTypes: z
+        .array(
+          z.object({
+            name: z.string().describe("Column name"),
+            type: z.string().describe("Column type (e.g. 'string', 'number', 'boolean', 'json', 'list', 'chat_messages', 'rag_contexts', 'annotations')"),
+          })
+        )
+        .optional()
+        .describe("Column definitions for the dataset"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleCreateDataset } = await import(
+        "./tools/create-dataset.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleCreateDataset(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_update_dataset",
+    "Update an existing dataset on the LangWatch platform (name and/or column types).",
+    {
+      slugOrId: z.string().describe("The dataset slug or ID to update"),
+      name: z.string().optional().describe("Updated dataset name"),
+      columnTypes: z
+        .array(
+          z.object({
+            name: z.string().describe("Column name"),
+            type: z.string().describe("Column type"),
+          })
+        )
+        .optional()
+        .describe("Updated column definitions"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleUpdateDataset } = await import(
+        "./tools/update-dataset.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleUpdateDataset(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_delete_dataset",
+    "Delete (archive) a dataset on the LangWatch platform.",
+    {
+      slugOrId: z.string().describe("The dataset slug or ID to delete"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleDeleteDataset } = await import(
+        "./tools/delete-dataset.js"
+      );
+      return {
+        content: [{ type: "text", text: await handleDeleteDataset(params) }],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_create_dataset_records",
+    "Add records to a dataset on the LangWatch platform in batch (max 1000 per call).",
+    {
+      slugOrId: z
+        .string()
+        .describe("The dataset slug or ID to add records to"),
+      entries: z
+        .array(z.record(z.string(), z.unknown()))
+        .min(1)
+        .max(1000)
+        .describe("Array of record entries to create (key-value objects matching dataset columns)"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleCreateDatasetRecords } = await import(
+        "./tools/create-dataset-records.js"
+      );
+      return {
+        content: [
+          { type: "text", text: await handleCreateDatasetRecords(params) },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_update_dataset_record",
+    "Update a single record in a dataset on the LangWatch platform.",
+    {
+      slugOrId: z
+        .string()
+        .describe("The dataset slug or ID containing the record"),
+      recordId: z.string().describe("The record ID to update"),
+      entry: z
+        .record(z.string(), z.unknown())
+        .describe("Updated record entry (key-value object)"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleUpdateDatasetRecord } = await import(
+        "./tools/update-dataset-record.js"
+      );
+      return {
+        content: [
+          { type: "text", text: await handleUpdateDatasetRecord(params) },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "platform_delete_dataset_records",
+    "Delete records from a dataset on the LangWatch platform by their IDs.",
+    {
+      slugOrId: z
+        .string()
+        .describe("The dataset slug or ID containing the records"),
+      recordIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe("Array of record IDs to delete"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleDeleteDatasetRecords } = await import(
+        "./tools/delete-dataset-records.js"
+      );
+      return {
+        content: [
+          { type: "text", text: await handleDeleteDatasetRecords(params) },
+        ],
+      };
+    }
+  );
 }
