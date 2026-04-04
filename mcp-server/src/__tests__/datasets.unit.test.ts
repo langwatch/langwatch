@@ -223,9 +223,9 @@ describe("dataset tools API key requirement", () => {
       const { initConfig, requireApiKey } = await import("../config.js");
       initConfig({ apiKey: "", endpoint: "http://localhost:0" });
 
-      // Make the mock call requireApiKey so the handler exercises the
-      // real API-key validation path (the mock normally bypasses it).
-      mockListDatasets.mockImplementationOnce(async () => {
+      // requireApiKey() throws synchronously before the mock can return,
+      // so the handler never reaches the API call.
+      mockListDatasets.mockImplementation(async () => {
         requireApiKey();
         return { data: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } };
       });
@@ -233,6 +233,9 @@ describe("dataset tools API key requirement", () => {
       await expect(handleListDatasets()).rejects.toThrow(
         "LANGWATCH_API_KEY is required",
       );
+
+      // Restore default mock behavior for subsequent tests.
+      mockListDatasets.mockReset();
     });
   });
 });
