@@ -19,9 +19,12 @@ export interface DatasetSummary {
 
 export interface DatasetListResponse {
   data: DatasetSummary[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface DatasetRecord {

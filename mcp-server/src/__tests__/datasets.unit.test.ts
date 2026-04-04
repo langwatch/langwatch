@@ -101,9 +101,7 @@ describe("handleListDatasets()", () => {
         updatedAt: "2025-01-02T00:00:00.000Z",
       },
     ],
-    total: 1,
-    page: 1,
-    limit: 50,
+    pagination: { total: 1, page: 1, limit: 50, totalPages: 1 },
   };
 
   describe("when format is digest (default)", () => {
@@ -121,13 +119,13 @@ describe("handleListDatasets()", () => {
       const result = await handleListDatasets({ format: "json" });
       const parsed = JSON.parse(result);
       expect(parsed.data).toEqual(sampleListResponse.data);
-      expect(parsed.total).toBe(sampleListResponse.total);
+      expect(parsed.total).toBe(sampleListResponse.pagination.total);
     });
   });
 
   describe("when no datasets exist", () => {
     it("returns a no-datasets message in digest mode", async () => {
-      mockListDatasets.mockResolvedValue({ data: [], total: 0, page: 1, limit: 50 });
+      mockListDatasets.mockResolvedValue({ data: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } });
       const result = await handleListDatasets();
       expect(result).toContain("No datasets found");
     });
@@ -229,7 +227,7 @@ describe("dataset tools API key requirement", () => {
       // real API-key validation path (the mock normally bypasses it).
       mockListDatasets.mockImplementationOnce(async () => {
         requireApiKey();
-        return { data: [], total: 0, page: 1, limit: 50 };
+        return { data: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } };
       });
 
       await expect(handleListDatasets()).rejects.toThrow(

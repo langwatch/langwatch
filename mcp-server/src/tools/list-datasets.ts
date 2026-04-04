@@ -23,7 +23,7 @@ async function fetchAllDatasets(): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- loop until break
   while (true) {
     const response = await apiListDatasets({ page, limit: PAGE_SIZE });
-    total = response.total;
+    total = response.pagination.total;
     datasets.push(...response.data);
 
     if (datasets.length >= total || response.data.length === 0) {
