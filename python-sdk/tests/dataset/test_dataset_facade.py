@@ -114,6 +114,16 @@ class TestDatasetsFacade:
             finally:
                 os.unlink(tmp_path)
 
+        def test_accepts_json_extension(self, facade, tmp_path):
+            """JSON files are accepted by validation."""
+            json_file = tmp_path / "data.json"
+            json_file.write_text('[{"input": "hello"}]')
+            facade._api.upload = MagicMock(
+                return_value={"datasetId": "ds_1", "recordsCreated": 1}
+            )
+            result = facade.upload("my-dataset", file_path=str(json_file))
+            assert result.recordsCreated == 1
+
         def test_accepts_jsonl_extension(self, facade):
             """JSONL files are accepted by validation."""
             with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
@@ -280,6 +290,33 @@ class TestDatasetsFacade:
             # Should not raise
             facade.delete_dataset("to-delete")
             facade._api.delete_dataset.assert_called_once_with("to-delete")
+
+    class TestListRecords:
+        """list_records()"""
+
+        def test_returns_paginated_result_of_dataset_records(self, facade):
+            """list_records() returns PaginatedResult[DatasetRecord]"""
+            facade._api.list_records = MagicMock(
+                return_value={
+                    "data": [
+                        {"id": "rec_1", "entry": {"input": "hello"}, "createdAt": "2026-01-01"},
+                        {"id": "rec_2", "entry": {"input": "world"}, "createdAt": "2026-01-01"},
+                    ],
+                    "pagination": {
+                        "page": 1,
+                        "limit": 10,
+                        "total": 2,
+                        "totalPages": 1,
+                    },
+                }
+            )
+            result = facade.list_records("my-dataset")
+            assert len(result.data) == 2
+            assert result.data[0].id == "rec_1"
+            assert result.data[0].entry == {"input": "hello"}
+            assert result.data[1].id == "rec_2"
+            assert result.pagination.total == 2
+            assert result.pagination.page == 1
 
     class TestUpdateRecord:
         """update_record()"""

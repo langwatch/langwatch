@@ -303,6 +303,67 @@ class TestDatasetApiService:
             with pytest.raises(ValueError, match="Not found"):
                 svc.delete_dataset("nope")
 
+    class TestListRecords:
+        """list_records()"""
+
+        def test_returns_paginated_records(self):
+            """@integration Scenario: List records returns paginated records for a dataset"""
+            mock_httpx = MagicMock()
+            records = [
+                {"id": f"rec_{i}", "entry": {"input": f"val{i}"}, "createdAt": "2026-01-01"}
+                for i in range(10)
+            ]
+            mock_httpx.get.return_value = _json_response(
+                {
+                    "data": records,
+                    "pagination": {
+                        "page": 1,
+                        "limit": 10,
+                        "total": 10,
+                        "totalPages": 1,
+                    },
+                }
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            result = svc.list_records("my-dataset")
+            assert len(result["data"]) == 10
+            assert result["pagination"]["total"] == 10
+            mock_httpx.get.assert_called_once_with(
+                "/api/dataset/my-dataset/records", params={}
+            )
+
+        def test_passes_pagination_params(self):
+            """@integration Scenario: List records with explicit pagination"""
+            mock_httpx = MagicMock()
+            records = [
+                {"id": f"rec_{i}", "entry": {"input": f"val{i}"}, "createdAt": "2026-01-01"}
+                for i in range(20)
+            ]
+            mock_httpx.get.return_value = _json_response(
+                {
+                    "data": records,
+                    "pagination": {
+                        "page": 2,
+                        "limit": 20,
+                        "total": 100,
+                        "totalPages": 5,
+                    },
+                }
+            )
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            svc.list_records("my-dataset", page=2, limit=20)
+            mock_httpx.get.assert_called_once_with(
+                "/api/dataset/my-dataset/records", params={"page": 2, "limit": 20}
+            )
+
+        def test_raises_value_error_on_not_found(self):
+            """@integration Scenario: List records for non-existent dataset raises an error"""
+            mock_httpx = MagicMock()
+            mock_httpx.get.return_value = _error_response(404, "dataset not found")
+            svc = DatasetApiService(_make_mock_client(mock_httpx))
+            with pytest.raises(ValueError, match="Not found"):
+                svc.list_records("ghost")
+
     class TestCreateRecords:
         """create_records()"""
 
