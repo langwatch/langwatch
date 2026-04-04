@@ -51,10 +51,10 @@ Feature: Dataset TypeScript SDK
   # ── Get Dataset (existing) ──────────────────────────────────────
 
   @integration
-  Scenario: Get dataset by slug returns entries
+  Scenario: Get dataset by slug returns metadata and entries
     Given the API returns a dataset with 5 records
     When I call langwatch.datasets.get("my-dataset")
-    Then I receive a dataset with 5 entries
+    Then I receive a dataset with id, name, slug, columnTypes, and 5 entries
 
   @integration
   Scenario: Get non-existent dataset throws DatasetNotFoundError
