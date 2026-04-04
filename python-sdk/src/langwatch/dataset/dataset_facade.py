@@ -33,7 +33,7 @@ from .types import (
     UploadResult,
 )
 
-_SUPPORTED_EXTENSIONS = {".csv", ".jsonl"}
+_SUPPORTED_EXTENSIONS = {".csv", ".json", ".jsonl"}
 
 
 class DatasetsFacade:
@@ -168,6 +168,32 @@ class DatasetsFacade:
         self._api.delete_dataset(slug_or_id)
 
     # ── records ─────────────────────────────────────────────────────
+
+    def list_records(
+        self,
+        slug_or_id: str,
+        *,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> PaginatedResult[DatasetRecord]:
+        """
+        List records for a dataset with pagination.
+
+        Args:
+            slug_or_id: Dataset slug or ID.
+            page: 1-based page number (optional).
+            limit: Maximum items per page (optional).
+
+        Returns:
+            PaginatedResult containing DatasetRecord items and pagination metadata.
+
+        Raises:
+            ValueError: If the dataset is not found (404).
+        """
+        raw = self._api.list_records(slug_or_id, page=page, limit=limit)
+        records = [DatasetRecord(**item) for item in raw.get("data", [])]
+        pagination = Pagination(**raw.get("pagination", {}))
+        return PaginatedResult[DatasetRecord](data=records, pagination=pagination)
 
     def create_records(
         self,

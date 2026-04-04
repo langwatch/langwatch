@@ -1,28 +1,20 @@
 ---
 title: Programmatic Access
 sidebarTitle: Programmatic Access
-description: Fetch datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+description: Manage datasets from LangWatch using the SDK for offline evaluations and automated workflows.
 ---
 
-You can fetch datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
+You can manage datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
 
-## Fetching a Dataset
+## Setup
 
 <Tabs>
   <Tab title="Python">
 ```python
 import langwatch
 
-# Initialize the SDK
+# Initialize the SDK (or set LANGWATCH_API_KEY environment variable)
 langwatch.setup()
-
-# Fetch dataset by slug or ID
-dataset = langwatch.dataset.get_dataset("your-dataset-slug")
-
-# Convert to pandas DataFrame for easy manipulation
-df = dataset.to_pandas()
-
-print(df.head())
 ```
   </Tab>
   <Tab title="TypeScript">
@@ -30,7 +22,106 @@ print(df.head())
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
+```
+  </Tab>
+</Tabs>
 
+## List Datasets
+
+Retrieve all datasets for your project with pagination support.
+
+<Tabs>
+  <Tab title="Python">
+```python
+# List all datasets (first page, default limit)
+result = langwatch.dataset.list_datasets()
+
+for ds in result.data:
+    print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
+
+print(f"Page {result.pagination.page} of {result.pagination.totalPages}")
+
+# List with explicit pagination
+result = langwatch.dataset.list_datasets(page=2, limit=10)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// List all datasets (first page, default limit)
+const result = await langwatch.datasets.list();
+
+for (const ds of result.data) {
+  console.log(`${ds.name} (${ds.slug}) - ${ds.columnTypes.length} columns`);
+}
+
+console.log(`Page ${result.pagination.page} of ${result.pagination.totalPages}`);
+
+// List with explicit pagination
+const page2 = await langwatch.datasets.list({ page: 2, limit: 10 });
+```
+  </Tab>
+</Tabs>
+
+## Create a Dataset
+
+Create a new dataset with an optional column schema.
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Create with name and column types
+info = langwatch.dataset.create_dataset(
+    "User Feedback",
+    columns=[
+        {"name": "input", "type": "string"},
+        {"name": "output", "type": "string"},
+    ],
+)
+print(f"Created: {info.name} (slug: {info.slug})")
+
+# Create with just a name (columns can be added later)
+info = langwatch.dataset.create_dataset("Simple Dataset")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// Create with name and column types
+const info = await langwatch.datasets.create({
+  name: "User Feedback",
+  columnTypes: [
+    { name: "input", type: "string" },
+    { name: "output", type: "string" },
+  ],
+});
+console.log(`Created: ${info.name} (slug: ${info.slug})`);
+
+// Create with just a name
+const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
+```
+  </Tab>
+</Tabs>
+
+## Get a Dataset
+
+Fetch a dataset by slug or ID, including all its entries.
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Fetch dataset by slug or ID
+dataset = langwatch.dataset.get_dataset("your-dataset-slug")
+
+# Access entries
+for entry in dataset.entries:
+    print(entry.id, entry.entry)
+
+# Convert to pandas DataFrame for easy manipulation
+df = dataset.to_pandas()
+print(df.head())
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
 // Fetch dataset by slug or ID
 const dataset = await langwatch.datasets.get("your-dataset-slug");
 
@@ -38,6 +129,229 @@ const dataset = await langwatch.datasets.get("your-dataset-slug");
 for (const entry of dataset.entries) {
   console.log(entry.entry);
 }
+```
+  </Tab>
+</Tabs>
+
+## Update a Dataset
+
+Update a dataset's name or column types.
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Update the name
+updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
+print(f"New slug: {updated.slug}")
+
+# Update column types
+updated = langwatch.dataset.update_dataset(
+    "my-dataset",
+    columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
+)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// Update the name
+const updated = await langwatch.datasets.update("my-dataset", {
+  name: "New Name",
+});
+console.log(`New slug: ${updated.slug}`);
+
+// Update column types
+const withCols = await langwatch.datasets.update("my-dataset", {
+  columnTypes: [
+    { name: "question", type: "string" },
+    { name: "answer", type: "string" },
+  ],
+});
+```
+  </Tab>
+</Tabs>
+
+## Delete a Dataset
+
+Archive a dataset by slug or ID.
+
+<Tabs>
+  <Tab title="Python">
+```python
+langwatch.dataset.delete_dataset("my-dataset")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+await langwatch.datasets.delete("my-dataset");
+```
+  </Tab>
+</Tabs>
+
+## List Records
+
+Retrieve records from a dataset with pagination.
+
+<Tabs>
+  <Tab title="Python">
+```python
+# List records (first page, default limit)
+result = langwatch.dataset.list_records("my-dataset")
+
+for record in result.data:
+    print(record.id, record.entry)
+
+print(f"Total: {result.pagination.total}")
+
+# List with explicit pagination
+result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// List records (first page, default limit)
+const result = await langwatch.datasets.listRecords("my-dataset");
+
+for (const record of result.data) {
+  console.log(record.id, record.entry);
+}
+
+console.log(`Total: ${result.pagination.total}`);
+
+// List with explicit pagination
+const page2 = await langwatch.datasets.listRecords("my-dataset", {
+  page: 2,
+  limit: 20,
+});
+```
+  </Tab>
+</Tabs>
+
+## Create Records
+
+Batch-add records to an existing dataset.
+
+<Tabs>
+  <Tab title="Python">
+```python
+records = langwatch.dataset.create_records(
+    "my-dataset",
+    entries=[
+        {"input": "What is LangWatch?", "output": "An LLM observability platform."},
+        {"input": "How do I get started?", "output": "Install the SDK and call setup()."},
+    ],
+)
+for r in records:
+    print(f"Created record: {r.id}")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const records = await langwatch.datasets.createRecords("my-dataset", {
+  entries: [
+    { input: "What is LangWatch?", output: "An LLM observability platform." },
+    { input: "How do I get started?", output: "Install the SDK and call setup()." },
+  ],
+});
+for (const r of records) {
+  console.log(`Created record: ${r.id}`);
+}
+```
+  </Tab>
+</Tabs>
+
+## Update a Record
+
+Update (or upsert) a single record by ID.
+
+<Tabs>
+  <Tab title="Python">
+```python
+record = langwatch.dataset.update_record(
+    "my-dataset",
+    "rec-1",
+    entry={"input": "updated question", "output": "updated answer"},
+)
+print(f"Updated: {record.id} -> {record.entry}")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const record = await langwatch.datasets.updateRecord("my-dataset", "rec-1", {
+  entry: { input: "updated question", output: "updated answer" },
+});
+console.log(`Updated: ${record.id}`);
+```
+  </Tab>
+</Tabs>
+
+## Delete Records
+
+Batch-delete records by their IDs.
+
+<Tabs>
+  <Tab title="Python">
+```python
+deleted_count = langwatch.dataset.delete_records(
+    "my-dataset",
+    record_ids=["rec-1", "rec-2"],
+)
+print(f"Deleted {deleted_count} records")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const result = await langwatch.datasets.deleteRecords("my-dataset", {
+  recordIds: ["rec-1", "rec-2"],
+});
+console.log(`Deleted ${result.deletedCount} records`);
+```
+  </Tab>
+</Tabs>
+
+## Upload a File
+
+Upload a CSV, JSON, or JSONL file to an existing dataset.
+
+<Tabs>
+  <Tab title="Python">
+```python
+result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
+print(f"Created {result.recordsCreated} records")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const result = await langwatch.datasets.upload("my-dataset", {
+  filePath: "data.csv",
+});
+console.log(`Created ${result.recordsCreated} records`);
+```
+  </Tab>
+</Tabs>
+
+## Create Dataset from File
+
+Create a new dataset and populate it from a file in one call.
+
+<Tabs>
+  <Tab title="Python">
+```python
+result = langwatch.dataset.create_dataset_from_file(
+    "From CSV",
+    file_path="feedback.csv",
+)
+print(f"Dataset: {result.dataset.name} ({result.dataset.slug})")
+print(f"Records created: {result.recordsCreated}")
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const result = await langwatch.datasets.createFromFile({
+  name: "From CSV",
+  filePath: "feedback.csv",
+});
+console.log(`Dataset: ${result.dataset.name} (${result.dataset.slug})`);
+console.log(`Records created: ${result.recordsCreated}`);
 ```
   </Tab>
 </Tabs>
@@ -62,7 +376,7 @@ evaluation = langwatch.experiment.init("my-evaluation")
 for index, row in evaluation.loop(df.iterrows()):
     # Run your LLM/agent
     output = my_llm(row["input"])
-    
+
     # Log evaluation metrics
     evaluation.log("response_quality", index=index, score=0.9)
 ```
@@ -84,7 +398,7 @@ await evaluation.run(
   async ({ item, index }) => {
     // Run your LLM/agent
     const output = await myLLM(item.input);
-    
+
     // Log evaluation metrics
     evaluation.log("response_quality", { index, score: 0.9 });
   },

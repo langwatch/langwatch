@@ -148,6 +148,26 @@ Feature: Dataset Python SDK
     When I call langwatch.dataset.delete_dataset("nope")
     Then a ValueError is raised indicating the dataset was not found
 
+  # ── List Records ──────────────────────────────────────────────
+
+  @integration
+  Scenario: List records returns paginated records for a dataset
+    Given a dataset "my-dataset" exists with 10 records
+    When I call langwatch.dataset.list_records("my-dataset")
+    Then I receive a PaginatedResult with DatasetRecord items in .data
+    And the result includes .pagination with total, page, limit, and totalPages
+
+  @integration
+  Scenario: List records with explicit pagination
+    Given a dataset "my-dataset" exists with 100 records
+    When I call langwatch.dataset.list_records("my-dataset", page=2, limit=20)
+    Then I receive 20 DatasetRecord items from the second page
+
+  @integration
+  Scenario: List records for non-existent dataset raises an error
+    When I call langwatch.dataset.list_records("ghost")
+    Then a ValueError is raised indicating the dataset was not found
+
   # ── Create Records (Batch Add) ─────────────────────────────────
 
   @integration
@@ -211,6 +231,13 @@ Feature: Dataset Python SDK
     And a local CSV file "data.csv" with 3 rows
     When I call langwatch.dataset.upload("my-dataset", file_path="data.csv")
     Then the result indicates records were created from the CSV
+
+  @integration
+  Scenario: Upload a JSON file to an existing dataset
+    Given a dataset "my-dataset" exists
+    And a local JSON file "data.json" with 2 records
+    When I call langwatch.dataset.upload("my-dataset", file_path="data.json")
+    Then the result indicates records were created from the JSON
 
   @integration
   Scenario: Upload a JSONL file to an existing dataset

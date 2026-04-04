@@ -171,6 +171,28 @@ class DatasetApiService:
 
     # ── records ─────────────────────────────────────────────────────
 
+    def list_records(
+        self,
+        slug_or_id: str,
+        *,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """GET /api/dataset/{slugOrId}/records -- list records with pagination."""
+        with _tracer.start_as_current_span("dataset.list_records"):
+            params: Dict[str, Any] = {}
+            if page is not None:
+                params["page"] = page
+            if limit is not None:
+                params["limit"] = limit
+
+            quoted = self._quote(slug_or_id)
+            response = self._http().get(
+                f"/api/dataset/{quoted}/records", params=params
+            )
+            _raise_for_api_status(response)
+            return response.json()
+
     def create_records(
         self,
         slug_or_id: str,
