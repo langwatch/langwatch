@@ -219,23 +219,13 @@ describe("MCP server dataset tool registration", () => {
 
 describe("dataset tools API key requirement", () => {
   describe("when no API key is configured", () => {
-    it("throws an error indicating an API key is required when calling handleListDatasets", async () => {
+    it("requireApiKey throws when apiKey is empty", async () => {
       const { initConfig, requireApiKey } = await import("../config.js");
       initConfig({ apiKey: "", endpoint: "http://localhost:0" });
 
-      // requireApiKey() throws synchronously before the mock can return,
-      // so the handler never reaches the API call.
-      mockListDatasets.mockImplementation(async () => {
-        requireApiKey();
-        return { data: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 0 } };
-      });
-
-      await expect(handleListDatasets()).rejects.toThrow(
+      expect(() => requireApiKey()).toThrow(
         "LANGWATCH_API_KEY is required",
       );
-
-      // Restore default mock behavior for subsequent tests.
-      mockListDatasets.mockReset();
     });
   });
 });
