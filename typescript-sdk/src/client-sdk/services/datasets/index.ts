@@ -8,6 +8,7 @@ export type {
   DatasetColumnType,
   DatasetListItem,
   Pagination,
+  PaginatedResponse,
   GetDatasetOptions,
   GetDatasetApiResponse,
   ListDatasetsOptions,
