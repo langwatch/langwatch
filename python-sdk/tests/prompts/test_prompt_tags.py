@@ -424,6 +424,55 @@ class TestPromptApiServiceCreateUpdateWithTags:
             body_arg = mock_module.sync_detailed.call_args[1]["body"]
             assert body_arg.tags == ["staging"]
 
+    def test_create_includes_multiple_tags_in_request_body(self):
+        """
+        When create() is called with tags=["production", "staging", "canary"]
+        Then the PostApiPromptsBody has all three tags
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.create(handle="pizza-prompt", tags=["production", "staging", "canary"])
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.tags == ["production", "staging", "canary"]
+
+    def test_update_includes_multiple_tags_in_request_body(self):
+        """
+        When update() is called with tags=["staging", "canary"]
+        Then the PutApiPromptsByIdBody has both tags
+        """
+        parsed = _make_api_response_200()
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_by_id"
+        ) as mock_module, patch(
+            "langwatch.prompts.prompt_api_service.unwrap_response",
+            return_value=parsed,
+        ):
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.update(
+                prompt_id_or_handle="pizza-prompt",
+                scope="PROJECT",
+                commit_message="update tags",
+                tags=["staging", "canary"],
+            )
+
+            body_arg = mock_module.sync_detailed.call_args[1]["body"]
+            assert body_arg.tags == ["staging", "canary"]
+
 
 # ---------------------------------------------------------------------------
 # PromptsFacade.get() -- tag parameter
@@ -637,6 +686,26 @@ class TestCacheKeyWithTags:
         assert production_key != staging_key
         assert facade._cache[production_key]["data"].version == 3
         assert facade._cache[staging_key]["data"].version == 4
+
+    def test_custom_tag_name_cached_correctly(self):
+        """
+        When get() is called with tag="v2-beta-release" and CACHE_TTL
+        Then the cache key includes "::tag:v2-beta-release"
+        """
+        from langwatch.prompts.types import PromptData, Message
+
+        facade = self._make_facade_with_mock_api()
+        mock_data = PromptData(
+            id="pizza-prompt", handle="pizza-prompt", scope="PROJECT",
+            version=2, version_id="v2_id", model="openai/gpt-4",
+            messages=[Message(role="system", content="v2")], prompt="v2",
+        )
+        facade._api_service.get = Mock(return_value=mock_data)
+
+        with patch("time.time", return_value=0):
+            facade.get("pizza-prompt", tag="v2-beta-release", fetch_policy=FetchPolicy.CACHE_TTL)
+
+        assert any("::tag:v2-beta-release" in k for k in facade._cache.keys())
 
     def test_tag_cache_hit_does_not_call_api_again(self):
         """

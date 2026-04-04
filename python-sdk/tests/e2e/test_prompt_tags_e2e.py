@@ -257,6 +257,100 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
+    def test_create_prompt_with_multiple_tags(self):
+        """
+        GIVEN a new prompt
+        WHEN I create it with tags=["production", "staging"]
+        THEN fetching by each tag returns the created version
+        """
+        handle = f"e2e-multi-tags-{uuid4().hex[:8]}"
+
+        created = langwatch.prompts.create(
+            handle=handle,
+            prompt="Created with multiple tags",
+            tags=["production", "staging"],
+        )
+
+        try:
+            fetched_prod = langwatch.prompts.get(handle, tag="production")
+            fetched_staging = langwatch.prompts.get(handle, tag="staging")
+
+            assert fetched_prod is not None
+            assert fetched_prod.handle == handle
+            assert fetched_prod.version_id == created.version_id
+
+            assert fetched_staging is not None
+            assert fetched_staging.handle == handle
+            assert fetched_staging.version_id == created.version_id
+        finally:
+            try:
+                langwatch.prompts.delete(created.id)
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+
+    def test_assign_custom_tag_then_fetch_by_tag(self):
+        """
+        GIVEN a prompt with a version on the server
+        WHEN I assign tag="canary" to that version
+        AND I fetch the prompt with tag="canary"
+        THEN I receive the tagged version
+        """
+        handle = f"e2e-custom-tag-{uuid4().hex[:8]}"
+
+        created = langwatch.prompts.create(
+            handle=handle,
+            prompt="Hello from custom tag e2e test",
+        )
+
+        try:
+            langwatch.prompts.tags.assign(
+                handle,
+                tag="canary",
+                version_id=created.version_id,
+            )
+
+            fetched = langwatch.prompts.get(handle, tag="canary")
+
+            assert fetched is not None
+            assert fetched.handle == handle
+            assert fetched.version_id == created.version_id
+        finally:
+            try:
+                langwatch.prompts.delete(created.id)
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+
+    def test_shorthand_syntax_with_custom_tag(self):
+        """
+        GIVEN a prompt with tag="canary" assigned
+        WHEN SDK calls get("handle:canary")
+        THEN the API resolves it server-side and returns the tagged version
+        """
+        handle = f"e2e-shorthand-canary-{uuid4().hex[:8]}"
+
+        created = langwatch.prompts.create(
+            handle=handle,
+            prompt="Shorthand custom tag test",
+        )
+
+        try:
+            langwatch.prompts.tags.assign(
+                handle,
+                tag="canary",
+                version_id=created.version_id,
+            )
+
+            fetched = langwatch.prompts.get(f"{handle}:canary")
+
+            assert fetched is not None
+            assert fetched.handle == handle
+            assert fetched.version_id == created.version_id
+        finally:
+            try:
+                langwatch.prompts.delete(created.id)
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+
     def test_shorthand_syntax_passes_through_as_id(self):
         """
         GIVEN a prompt with a tag assigned via explicit assign
