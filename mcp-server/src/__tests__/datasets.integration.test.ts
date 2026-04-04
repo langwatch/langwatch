@@ -28,16 +28,12 @@ const CANNED_DATASETS_LIST = {
       updatedAt: "2025-01-04T00:00:00.000Z",
     },
   ],
-  total: 2,
-  page: 1,
-  limit: 50,
+  pagination: { total: 2, page: 1, limit: 50, totalPages: 1 },
 };
 
 const CANNED_DATASETS_EMPTY = {
   data: [],
-  total: 0,
-  page: 1,
-  limit: 50,
+  pagination: { total: 0, page: 1, limit: 50, totalPages: 0 },
 };
 
 const CANNED_DATASET_DETAIL = {
@@ -351,7 +347,7 @@ describe("MCP dataset tools integration", () => {
         const result = await handleListDatasets({ format: "json" });
         const parsed = JSON.parse(result);
         expect(parsed.data).toEqual(CANNED_DATASETS_LIST.data);
-        expect(parsed.total).toBe(CANNED_DATASETS_LIST.total);
+        expect(parsed.total).toBe(CANNED_DATASETS_LIST.pagination.total);
       });
     });
   });
