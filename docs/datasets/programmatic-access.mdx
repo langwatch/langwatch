@@ -1,10 +1,10 @@
 ---
 title: Programmatic Access
 sidebarTitle: Programmatic Access
-description: Fetch datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+description: Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
 ---
 
-You can fetch datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
+You can manage datasets from LangWatch using the SDK, MCP tools, or REST API for offline evaluations and automated workflows.
 
 ## Fetching a Dataset
 
@@ -126,6 +126,23 @@ for (const entry of dataset.entries) {
   console.log(entry.entry.expected_output);  // Typed as string
 }
 ```
+
+## MCP Tools (AI Coding Agents)
+
+If you're using an AI coding agent (Claude Code, Cursor, etc.) with the [LangWatch MCP server](/mcp-server), dataset tools are available directly:
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_datasets` | List all datasets with record counts |
+| `platform_get_dataset` | Get dataset metadata, columns, and record preview |
+| `platform_create_dataset` | Create a new dataset with optional column definitions |
+| `platform_update_dataset` | Update dataset name or column types |
+| `platform_delete_dataset` | Archive a dataset |
+| `platform_create_dataset_records` | Add records in batch (max 1000) |
+| `platform_update_dataset_record` | Update a single record |
+| `platform_delete_dataset_records` | Delete records by IDs |
+
+The `platform_list_datasets` and `platform_get_dataset` tools support a `format` parameter — use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
 
 ## Finding Your Dataset Slug
 
