@@ -20,6 +20,8 @@ import {
   type DatasetRecordResponse,
 } from "./types";
 import { DatasetApiError, DatasetNotFoundError } from "./errors";
+import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+import { tracer } from "./tracing";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -42,6 +44,12 @@ export class DatasetService {
 
   constructor(config: DatasetServiceConfig) {
     this.#config = config;
+
+    /**
+     * Wraps the service in a tracing proxy that automatically creates
+     * OpenTelemetry spans for all public methods.
+     */
+    return createTracingProxy(this as DatasetService, tracer);
   }
 
   /**

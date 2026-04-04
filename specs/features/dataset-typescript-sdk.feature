@@ -12,15 +12,16 @@ Feature: Dataset TypeScript SDK
   @unit
   Scenario: Facade exposes all dataset CRUD methods
     When I inspect langwatch.datasets
-    Then it exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, and upload methods
+    Then it exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, listRecords, and createFromUpload methods
 
   # ── List Datasets ───────────────────────────────────────────────
 
   @integration
-  Scenario: List datasets returns paginated results
+  Scenario: List datasets returns paginated results with record counts
     Given the API returns a paginated list of 3 datasets
     When I call langwatch.datasets.list()
-    Then I receive a response containing 3 datasets with id, name, slug, and columnTypes
+    Then I receive a response containing 3 datasets with id, name, slug, columnTypes, and recordCount
+    And the response includes pagination with total, page, limit, and totalPages
 
   @unit
   Scenario: List datasets passes pagination parameters
@@ -41,6 +42,11 @@ Feature: Dataset TypeScript SDK
   Scenario: Create a dataset without column types defaults to empty array
     When I call langwatch.datasets.create({ name: "bare-dataset" })
     Then the request body includes columnTypes as an empty array
+
+  @unit
+  Scenario: Create a dataset with empty name throws validation error
+    When I call langwatch.datasets.create({ name: "" })
+    Then the SDK throws a DatasetApiError indicating name is required
 
   @integration
   Scenario: Create a dataset propagates conflict error
@@ -76,6 +82,11 @@ Feature: Dataset TypeScript SDK
     When I call langwatch.datasets.update("my-data", { columnTypes: [{ name: "question", type: "string" }] })
     Then the request body includes the new columnTypes
 
+  @unit
+  Scenario: Update a dataset with no fields throws validation error
+    When I call langwatch.datasets.update("my-data", {})
+    Then the SDK throws a DatasetApiError indicating at least one field is required
+
   @integration
   Scenario: Update a non-existent dataset throws DatasetNotFoundError
     Given the API responds with 404
@@ -105,6 +116,11 @@ Feature: Dataset TypeScript SDK
     When I call langwatch.datasets.createRecords("my-data", [{ input: "hello", output: "world" }])
     Then the request is sent as POST /api/dataset/my-data/records with the entries array
     And the response includes the created records with IDs
+
+  @unit
+  Scenario: Batch create records with empty entries throws validation error
+    When I call langwatch.datasets.createRecords("my-data", [])
+    Then the SDK throws a DatasetApiError indicating entries must not be empty
 
   @integration
   Scenario: Batch create records for non-existent dataset throws error
@@ -141,6 +157,34 @@ Feature: Dataset TypeScript SDK
     Given the API responds with 404
     When I call langwatch.datasets.deleteRecords("ghost", ["rec-1"])
     Then the SDK throws a DatasetNotFoundError
+
+  # ── List Records ───────────────────────────────────────────────
+
+  @integration
+  Scenario: List records returns paginated results
+    Given the API returns paginated records for a dataset
+    When I call langwatch.datasets.listRecords("my-data")
+    Then I receive records with pagination metadata including total, page, limit, and totalPages
+
+  @integration
+  Scenario: List records with explicit pagination
+    When I call langwatch.datasets.listRecords("my-data", { page: 2, limit: 20 })
+    Then the request includes page=2 and limit=20 query parameters
+
+  @integration
+  Scenario: List records for non-existent dataset throws error
+    Given the API responds with 404
+    When I call langwatch.datasets.listRecords("ghost")
+    Then the SDK throws a DatasetNotFoundError
+
+  # ── Create Dataset from Upload ────────────────────────────────
+
+  @integration
+  Scenario: Create a dataset from file upload
+    Given the API accepts the upload and creates a new dataset
+    When I call langwatch.datasets.createFromUpload({ name: "uploaded-data", file })
+    Then the request is sent as POST /api/dataset/upload with name and file as multipart form data
+    And the response includes dataset metadata and recordsCreated count
 
   # ── Upload File ─────────────────────────────────────────────────
 

@@ -1,6 +1,7 @@
 import { type LangwatchApiClient } from "@/internal/api/client";
 import { type Logger } from "@/logger";
 import { DatasetService } from "./dataset.service";
+import { DatasetApiError } from "./errors";
 import {
   type Dataset,
   type DatasetMetadata,
@@ -91,6 +92,13 @@ export class DatasetsFacade {
    * @returns The created dataset metadata
    */
   create = (options: CreateDatasetOptions): Promise<DatasetMetadata> => {
+    if (!options.name || options.name.trim().length === 0) {
+      throw new DatasetApiError(
+        "Dataset name must not be empty",
+        0,
+        "create",
+      );
+    }
     return this.#datasetService.createDataset(options);
   };
 
@@ -131,6 +139,13 @@ export class DatasetsFacade {
    * @returns The updated dataset metadata
    */
   update = (slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> => {
+    if (options.name == null && options.columnTypes == null) {
+      throw new DatasetApiError(
+        "At least one field (name or columnTypes) must be provided for update",
+        0,
+        "update",
+      );
+    }
     return this.#datasetService.updateDataset(slugOrId, options);
   };
 
@@ -155,6 +170,13 @@ export class DatasetsFacade {
     slugOrId: string,
     entries: Record<string, unknown>[],
   ): Promise<BatchCreateRecordsResponse> => {
+    if (!entries || entries.length === 0) {
+      throw new DatasetApiError(
+        "Entries must not be empty",
+        0,
+        "createRecords",
+      );
+    }
     return this.#datasetService.createRecords(slugOrId, entries);
   };
 
@@ -228,6 +250,13 @@ export class DatasetsFacade {
   createFromUpload = (
     options: CreateFromUploadOptions,
   ): Promise<CreateFromUploadResponse> => {
+    if (!options.file) {
+      throw new DatasetApiError(
+        "File must be provided for upload",
+        0,
+        "createFromUpload",
+      );
+    }
     return this.#datasetService.createDatasetFromUpload(options);
   };
 
@@ -243,6 +272,13 @@ export class DatasetsFacade {
     slugOrId: string,
     file: File | Blob,
   ): Promise<UploadResponse> => {
+    if (!file) {
+      throw new DatasetApiError(
+        "File must be provided for upload",
+        0,
+        "upload",
+      );
+    }
     return this.#datasetService.uploadFile(slugOrId, file);
   };
 }

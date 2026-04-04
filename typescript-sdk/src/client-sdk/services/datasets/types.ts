@@ -117,12 +117,17 @@ export type DatasetListItem = DatasetMetadata & {
 };
 
 /**
- * API response for listing datasets.
+ * Paginated response wrapper for dataset endpoints.
  */
-export type ListDatasetsApiResponse = {
-  data: DatasetListItem[];
+export type PaginatedResponse<T> = {
+  data: T[];
   pagination: Pagination;
 };
+
+/**
+ * API response for listing datasets.
+ */
+export type ListDatasetsApiResponse = PaginatedResponse<DatasetListItem>;
 
 /**
  * Options for creating a dataset.
@@ -191,10 +196,7 @@ export type ListRecordsOptions = {
 /**
  * API response for listing records in a dataset.
  */
-export type ListRecordsApiResponse = {
-  data: DatasetRecordResponse[];
-  pagination: Pagination;
-};
+export type ListRecordsApiResponse = PaginatedResponse<DatasetRecordResponse>;
 
 /**
  * Options for creating a dataset from a file upload.
