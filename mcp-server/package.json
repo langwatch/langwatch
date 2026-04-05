@@ -13,11 +13,15 @@
     },
     "./create-mcp-server": {
       "types": "./src/create-mcp-server.d.ts",
-      "import": "./src/create-mcp-server.ts"
+      "import": "./src/create-mcp-server.ts",
+      "require": "./src/create-mcp-server.ts",
+      "default": "./src/create-mcp-server.ts"
     },
     "./config": {
       "types": "./src/config.d.ts",
-      "import": "./src/config.ts"
+      "import": "./src/config.ts",
+      "require": "./src/config.ts",
+      "default": "./src/config.ts"
     }
   },
   "repository": {
