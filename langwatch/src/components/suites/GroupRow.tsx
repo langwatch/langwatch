@@ -83,13 +83,13 @@ export function GroupRow({
           <Text fontSize="sm" color="fg.muted" flexShrink={0}>
             &middot;
           </Text>
-          <Box flexShrink={0}>
-            <RunMetricsSummary summary={summary} />
-          </Box>
-          <Box flex={1} />
           <Text fontSize="xs" color="fg.muted" flexShrink={0}>
             {runCount} {runCount === 1 ? "run" : "runs"}
           </Text>
+          <Box flex={1} />
+          <Box flexShrink={0}>
+            <RunMetricsSummary summary={summary} />
+          </Box>
         </HStack>
       </Box>
 

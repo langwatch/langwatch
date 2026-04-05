@@ -55,7 +55,7 @@ export function BatchSection({
         gap={2}
         data-testid="batch-sub-header"
       >
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.subtle">
           {timeAgo}
         </Text>
         <Box flex={1} />
@@ -92,7 +92,7 @@ function BatchStatusCounts({ summary }: { summary: BatchRunSummary }) {
       {items.map((item) => (
         <HStack key={item.label} gap={1}>
           <Box width="6px" height="6px" borderRadius="full" bg={item.color} flexShrink={0} />
-          <Text fontSize="xs" color="fg.muted">
+          <Text fontSize="xs" color="fg.subtle">
             {item.count} {item.label}
           </Text>
         </HStack>
