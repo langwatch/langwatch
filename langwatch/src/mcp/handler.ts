@@ -22,6 +22,7 @@ import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
+import { encrypt, decrypt } from "../utils/encryption";
 import { createLogger } from "../utils/logger/server";
 
 const logger = createLogger("langwatch:mcp");
@@ -31,6 +32,52 @@ const REDIS_TOKEN_PREFIX = "mcp:oauth:token:";
 
 /** OAuth token TTL in seconds. */
 const TOKEN_TTL_SECONDS = 3600;
+
+/** Max concurrent sessions per API key. */
+const MAX_SESSIONS_PER_KEY = 20;
+
+// ---------------------------------------------------------------------------
+// Rate limiter — sliding window per IP
+// ---------------------------------------------------------------------------
+
+interface RateLimitEntry {
+  count: number;
+  windowStart: number;
+}
+
+function createRateLimiter({
+  windowMs,
+  maxRequests,
+}: {
+  windowMs: number;
+  maxRequests: number;
+}) {
+  const entries = new Map<string, RateLimitEntry>();
+
+  return {
+    isAllowed(ip: string): boolean {
+      const now = Date.now();
+      const entry = entries.get(ip);
+
+      if (!entry || now - entry.windowStart > windowMs) {
+        entries.set(ip, { count: 1, windowStart: now });
+        return true;
+      }
+
+      entry.count++;
+      return entry.count <= maxRequests;
+    },
+    /** Remove expired entries (call from reaper). */
+    sweep() {
+      const now = Date.now();
+      for (const [ip, entry] of entries) {
+        if (now - entry.windowStart > windowMs) {
+          entries.delete(ip);
+        }
+      }
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +129,16 @@ export function createMcpHandler(): McpHandler {
   const sessions = new Map<string, SessionState>();
   const oauthTokens = new Map<string, OAuthTokenEntry>();
 
+  // Rate limiters
+  const oauthRateLimiter = createRateLimiter({
+    windowMs: 60_000,
+    maxRequests: 10,
+  });
+  const authFailRateLimiter = createRateLimiter({
+    windowMs: 60_000,
+    maxRequests: 20,
+  });
+
   // -------------------------------------------------------------------------
   // Session & token reaper — prevents unbounded memory from abandoned sessions
   // and never-used OAuth tokens.
@@ -107,6 +164,10 @@ export function createMcpHandler(): McpHandler {
         oauthTokens.delete(token);
       }
     }
+
+    // Sweep expired rate limiter entries
+    oauthRateLimiter.sweep();
+    authFailRateLimiter.sweep();
   }, REAPER_INTERVAL_MS);
 
   // Allow the process to exit naturally even if the reaper is still scheduled
@@ -175,7 +236,6 @@ export function createMcpHandler(): McpHandler {
         if (totalBytes > MAX_BODY_BYTES) {
           rejected = true;
           reject(new Error("Request body too large"));
-          // Resume and discard remaining data so the socket is drained
           req.resume();
           return;
         }
@@ -197,6 +257,12 @@ export function createMcpHandler(): McpHandler {
     return result;
   }
 
+  function getClientIp(req: IncomingMessage): string {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string") return forwarded.split(",")[0]!.trim();
+    return req.socket.remoteAddress ?? "unknown";
+  }
+
   // -------------------------------------------------------------------------
   // Token resolution
   // -------------------------------------------------------------------------
@@ -209,8 +275,8 @@ export function createMcpHandler(): McpHandler {
 
   /**
    * Resolves a Bearer token to an API key.
-   * Checks in-memory OAuth tokens first, then Redis, and falls back to
-   * treating the token as a direct API key.
+   * Checks in-memory OAuth tokens first, then Redis (encrypted), and falls
+   * back to treating the token as a direct API key.
    */
   async function resolveApiKey(token: string): Promise<string | null> {
     // 1. Check in-memory OAuth token cache
@@ -223,18 +289,21 @@ export function createMcpHandler(): McpHandler {
       return null;
     }
 
-    // 2. Check Redis for OAuth token
+    // 2. Check Redis for OAuth token (API key is encrypted at rest)
     if (redis) {
       try {
         const redisData = await redis.get(`${REDIS_TOKEN_PREFIX}${token}`);
         if (redisData) {
-          const entry: OAuthTokenEntry = JSON.parse(redisData);
-          if (Date.now() < entry.expiresAt) {
+          const stored = JSON.parse(redisData) as {
+            encryptedApiKey: string;
+            expiresAt: number;
+          };
+          if (Date.now() < stored.expiresAt) {
+            const apiKey = decrypt(stored.encryptedApiKey);
             // Re-populate in-memory cache
-            oauthTokens.set(token, entry);
-            return entry.apiKey;
+            oauthTokens.set(token, { apiKey, expiresAt: stored.expiresAt });
+            return apiKey;
           }
-          // Expired — clean up Redis
           await redis.del(`${REDIS_TOKEN_PREFIX}${token}`);
           return null;
         }
@@ -279,7 +348,6 @@ export function createMcpHandler(): McpHandler {
   ): Promise<string | null> {
     const token = extractBearerToken(req);
     if (!token) {
-      setCorsHeaders(res);
       sendJson(res, 401, {
         error:
           "Authorization: Bearer <LANGWATCH_API_KEY> header required",
@@ -289,14 +357,14 @@ export function createMcpHandler(): McpHandler {
 
     const apiKey = await resolveApiKey(token);
     if (!apiKey) {
-      setCorsHeaders(res);
+      authFailRateLimiter.isAllowed(getClientIp(req)); // track failure
       sendJson(res, 401, { error: "Invalid or expired token" });
       return null;
     }
 
     const project = await validateApiKey(apiKey);
     if (!project) {
-      setCorsHeaders(res);
+      authFailRateLimiter.isAllowed(getClientIp(req)); // track failure
       sendJson(res, 401, { error: "Invalid API key" });
       return null;
     }
@@ -334,15 +402,19 @@ export function createMcpHandler(): McpHandler {
       expiresAt: Date.now() + expiresIn * 1000,
     };
 
-    // Store in memory
+    // Store in memory (plaintext — process-local, not persisted)
     oauthTokens.set(accessToken, entry);
 
-    // Store in Redis
+    // Store in Redis with encrypted API key
     if (redis) {
       try {
+        const redisEntry = JSON.stringify({
+          encryptedApiKey: encrypt(apiKey),
+          expiresAt: entry.expiresAt,
+        });
         await redis.set(
           `${REDIS_TOKEN_PREFIX}${accessToken}`,
-          JSON.stringify(entry),
+          redisEntry,
           "EX",
           expiresIn,
         );
@@ -353,22 +425,32 @@ export function createMcpHandler(): McpHandler {
   }
 
   // -------------------------------------------------------------------------
+  // Session helpers
+  // -------------------------------------------------------------------------
+
+  function sessionCountForKey(apiKey: string): number {
+    let count = 0;
+    for (const session of sessions.values()) {
+      if (session.apiKey === apiKey) count++;
+    }
+    return count;
+  }
+
+  // -------------------------------------------------------------------------
   // Route handlers
   // -------------------------------------------------------------------------
 
   function handleHealthCheck(_req: IncomingMessage, res: ServerResponse): void {
-    setCorsHeaders(res);
     sendJson(res, 200, { status: "ok" });
   }
 
   function handleOAuthMetadata(
-    req: IncomingMessage,
+    _req: IncomingMessage,
     res: ServerResponse,
   ): void {
-    setCorsHeaders(res);
-    const protocol = req.headers["x-forwarded-proto"] ?? "http";
-    const host = req.headers.host ?? "localhost";
-    const baseUrl = `${protocol}://${host}`;
+    // Use configured endpoint to prevent host header injection
+    const baseUrl =
+      process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 
     sendJson(res, 200, {
       issuer: baseUrl,
@@ -384,7 +466,12 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    setCorsHeaders(res);
+    // Rate limit token endpoint per IP
+    if (!oauthRateLimiter.isAllowed(getClientIp(req))) {
+      sendJson(res, 429, { error: "Too many requests" });
+      return;
+    }
+
     let raw: string;
     try {
       raw = await readBody(req);
@@ -443,8 +530,6 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    setCorsHeaders(res);
-
     let raw: string;
     try {
       raw = await readBody(req);
@@ -465,9 +550,20 @@ export function createMcpHandler(): McpHandler {
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    // Existing session — handle request
+    // Existing session — verify Bearer token matches, then handle request
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
+
+      // Re-authenticate: verify the Bearer token resolves to the same API key
+      const token = extractBearerToken(req);
+      if (token) {
+        const apiKey = await resolveApiKey(token);
+        if (apiKey !== session.apiKey) {
+          sendJson(res, 401, { error: "Bearer token does not match session" });
+          return;
+        }
+      }
+
       session.lastActivityAt = Date.now();
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res, body),
@@ -477,8 +573,23 @@ export function createMcpHandler(): McpHandler {
 
     // New session — must be an initialize request
     if (!sessionId && isInitializeRequest(body)) {
+      // Rate limit failed auth attempts
+      const ip = getClientIp(req);
+      if (!authFailRateLimiter.isAllowed(ip)) {
+        sendJson(res, 429, { error: "Too many requests" });
+        return;
+      }
+
       const apiKey = await authenticateRequest(req, res);
       if (!apiKey) return; // 401 already sent
+
+      // Per-key session limit
+      if (sessionCountForKey(apiKey) >= MAX_SESSIONS_PER_KEY) {
+        sendJson(res, 429, {
+          error: `Too many concurrent sessions (max ${MAX_SESSIONS_PER_KEY})`,
+        });
+        return;
+      }
 
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
@@ -513,7 +624,6 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    setCorsHeaders(res);
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (sessionId && sessions.has(sessionId)) {
@@ -531,11 +641,21 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    setCorsHeaders(res);
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
+
+      // Verify the Bearer token matches the session owner
+      const token = extractBearerToken(req);
+      if (token) {
+        const apiKey = await resolveApiKey(token);
+        if (apiKey !== session.apiKey) {
+          sendJson(res, 401, { error: "Bearer token does not match session" });
+          return;
+        }
+      }
+
       await session.transport.close();
       sessions.delete(sessionId);
       sendJson(res, 200, { status: "session closed" });

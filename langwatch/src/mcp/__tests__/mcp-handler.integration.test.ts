@@ -43,6 +43,13 @@ vi.mock("~/server/redis", () => ({
   connection: mockRedis,
 }));
 
+// Mock encryption — use identity functions so tests can inspect values
+vi.mock("~/utils/encryption", () => ({
+  encrypt: (text: string) => `encrypted:${text}`,
+  decrypt: (text: string) =>
+    text.startsWith("encrypted:") ? text.slice(10) : text,
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -397,10 +404,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // Clear in-memory cache
       handler.clearTokenCache();
 
-      // Mock Redis to return the token data
+      // Mock Redis to return the token data (encrypted format)
       mockRedis.get.mockResolvedValue(
         JSON.stringify({
-          apiKey: VALID_API_KEY,
+          encryptedApiKey: `encrypted:${VALID_API_KEY}`,
           expiresAt: Date.now() + 3600 * 1000,
         }),
       );
@@ -421,10 +428,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
-      // Mock Redis returning an expired token
+      // Mock Redis returning an expired token (encrypted format)
       mockRedis.get.mockResolvedValue(
         JSON.stringify({
-          apiKey: VALID_API_KEY,
+          encryptedApiKey: `encrypted:${VALID_API_KEY}`,
           expiresAt: Date.now() - 1000, // expired
         }),
       );
