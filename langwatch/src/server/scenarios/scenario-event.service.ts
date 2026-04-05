@@ -482,14 +482,14 @@ export class ScenarioEventService {
 
         const batches = batchRunIds.map((batchRunId) => {
           const items = batchMap.get(batchRunId) ?? [];
-          const lastUpdatedAt = items.reduce((max, r) => Math.max(max, r.timestamp), 0);
+          const lastUpdatedAt = items.reduce((max, r) => Math.max(max, r.updatedAt ?? r.timestamp), 0);
           if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
 
           const completedItems = items.filter((r) => completedStatuses.has(r.status));
-          const completedTimestamps = completedItems.map((r) => r.timestamp).filter((t) => t > 0);
+          const completedTimestamps = completedItems.map((r) => r.updatedAt ?? r.timestamp).filter((t) => t > 0);
           const firstCompletedAt = completedTimestamps.length > 0 ? Math.min(...completedTimestamps) : null;
           const nonPendingItems = items.filter((r) => !["STALLED", "IN_PROGRESS", "PENDING"].includes(r.status));
-          const nonPendingTimestamps = nonPendingItems.map((r) => r.timestamp).filter((t) => t > 0);
+          const nonPendingTimestamps = nonPendingItems.map((r) => r.updatedAt ?? r.timestamp).filter((t) => t > 0);
           const allCompletedAt = nonPendingTimestamps.length > 0 ? Math.max(...nonPendingTimestamps) : null;
 
           return {
@@ -590,7 +590,7 @@ export class ScenarioEventService {
           scenarioRunIds,
         });
 
-        const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
+        const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.updatedAt ?? r.timestamp), 0);
         span.setAttribute("result.count", runs.length);
         return { changed: true as const, lastUpdatedAt, runs };
       },
