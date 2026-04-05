@@ -5,11 +5,7 @@ import { ScenarioEventService } from "../scenarios/scenario-event.service";
 import type { BatchHistoryResult, BatchRunDataResult, ExternalSetSummary, ScenarioEvent } from "../scenarios/scenario-event.types";
 
 /**
- * Facade that delegates simulation reads to either ClickHouse or Elasticsearch
- * based on the `featureClickHouseDataSourceSimulations` project flag.
- *
- * Write operations still go through the ScenarioEventService (ES path)
- * because dual-write is handled at the route handler layer.
+ * Facade that delegates simulation reads to ClickHouse.
  *
  * Return types intentionally match ScenarioEventService so tRPC router
  * shapes are unchanged.

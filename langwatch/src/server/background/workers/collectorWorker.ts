@@ -461,23 +461,11 @@ const processCollectorJob_ = async (
     );
   }
 
-  const esWriteDisabled = project.disableElasticSearchTraceWriting;
-
-  if (!esWriteDisabled) {
-    await withSpan("updateTrace", () =>
-      updateTrace(trace, esSpans, evaluations),
-    );
-  } else {
-    logger.debug(
-      { projectId: project.id, traceId },
-      "Skipping ES trace write — disableElasticSearchTraceWriting is enabled",
-    );
-  }
+  // ES writes are disabled — ClickHouse handles all trace persistence via event sourcing.
 
   void markProjectFirstMessage(project, trace.metadata);
 
-  if (env.IS_QUICKWIT || esWriteDisabled) {
-    // Skip check and adjust for quickwit or when ES writes are disabled
+  if (env.IS_QUICKWIT) {
     return;
   }
 
