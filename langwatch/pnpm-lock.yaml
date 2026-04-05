@@ -693,6 +693,9 @@ importers:
       playwright:
         specifier: 1.57.0
         version: 1.57.0
+      prettier:
+        specifier: ^3.5.3
+        version: 3.5.3
       prisma:
         specifier: 5.7.0
         version: 5.7.0
