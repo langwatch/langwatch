@@ -24,6 +24,7 @@ const mockRouter = {
   asPath: "/my-project/simulations" as string,
   push: vi.fn(),
   isReady: true,
+  events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
 };
 
 vi.mock("next/router", () => ({

@@ -100,6 +100,7 @@ vi.mock("next/router", () => ({
     push: vi.fn(),
     replace: vi.fn(),
     isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   }),
 }));
 

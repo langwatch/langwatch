@@ -229,6 +229,7 @@ export function RunHistoryPanel({
 
   // Auto-expansion
   const { expandedIds, toggleExpanded } = useAutoExpansion({
+    panelKey: scenarioSetId ?? "all-runs",
     groupBy,
     batchRuns,
     groups,
