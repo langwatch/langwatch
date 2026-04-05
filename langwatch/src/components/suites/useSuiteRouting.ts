@@ -42,9 +42,12 @@ type SuiteRouting = {
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
 
+  // Derive from asPath (actual URL) rather than query.path, because
+  // shallow routing on catch-all [[...path]] may not update query.path
+  // consistently across Next.js versions.
   const { selectedSuiteSlug, highlightBatchId } = deriveFromPath({
     isReady: router.isReady,
-    path: router.query.path,
+    path: router.query.path ?? extractPathFromAsPath(router.asPath),
   });
 
   const projectSlug = router.query.project as string | undefined;
@@ -126,4 +129,11 @@ export function deriveFromPath({
     selectedSuiteSlug: toExternalSetSelection(segments[0]!),
     highlightBatchId: segments[1] ?? null,
   };
+}
+
+/** Extract path segments from asPath (e.g., "/project/simulations/run-plans/slug" → ["run-plans", "slug"]) */
+function extractPathFromAsPath(asPath: string): string[] | undefined {
+  const match = asPath.match(/\/simulations(?:\/(.+?))?(?:\?|$)/);
+  if (!match?.[1]) return undefined;
+  return match[1].split("/");
 }
