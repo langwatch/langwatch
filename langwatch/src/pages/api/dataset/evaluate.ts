@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
+import { extractErrorMessage } from "~/utils/captureError";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
@@ -189,7 +190,7 @@ export default async function handler(
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
-      details: error instanceof Error ? error.message : "Internal error",
+      details: extractErrorMessage(error) ?? "Internal error",
       traceback: [],
     };
   }

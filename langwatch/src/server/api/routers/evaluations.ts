@@ -6,7 +6,9 @@ import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { trackServerEvent } from "~/server/posthog";
 
+import { extractErrorMessage } from "~/utils/captureError";
 import { createLogger } from "~/utils/logger/server";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
@@ -66,14 +68,33 @@ export const evaluationsRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const result = await runEvaluationForTrace({
-        projectId: input.projectId,
-        traceId: input.traceId,
-        evaluatorType: input.evaluatorType as EvaluatorTypes,
-        settings: input.settings,
-        mappings: input.mappings ?? {},
-        protections,
-      });
+      let result;
+      try {
+        result = await runEvaluationForTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          evaluatorType: input.evaluatorType as EvaluatorTypes,
+          settings: input.settings,
+          mappings: input.mappings ?? {},
+          protections,
+        });
+      } catch (error) {
+        captureException(error, {
+          extra: {
+            projectId: input.projectId,
+          },
+        });
+        logger.error(
+          { err: error, projectId: input.projectId },
+          "error running evaluation from tRPC",
+        );
+        return {
+          status: "error" as const,
+          error_type: "INTERNAL_ERROR",
+          details: extractErrorMessage(error) ?? "Internal error",
+          traceback: [],
+        };
+      }
 
       // Dispatch to evaluation processing pipeline when flag is ON
       if (result) {
