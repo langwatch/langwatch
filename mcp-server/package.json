@@ -12,12 +12,12 @@
       "require": "./dist/index.js"
     },
     "./create-mcp-server": {
-      "import": "./src/create-mcp-server.ts",
-      "types": "./src/create-mcp-server.ts"
+      "types": "./src/create-mcp-server.d.ts",
+      "import": "./src/create-mcp-server.ts"
     },
     "./config": {
-      "import": "./src/config.ts",
-      "types": "./src/config.ts"
+      "types": "./src/config.d.ts",
+      "import": "./src/config.ts"
     }
   },
   "repository": {
