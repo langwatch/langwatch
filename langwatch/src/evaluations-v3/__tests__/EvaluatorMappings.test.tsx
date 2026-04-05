@@ -69,6 +69,7 @@ vi.mock("../hooks/useEvaluatorName", () => ({
     evaluator.evaluatorType === "langevals/llm_answer_match"
       ? "LLM Answer Match"
       : "Exact Match",
+  useEvaluatorNames: () => new Map(),
 }));
 
 // Mock api
