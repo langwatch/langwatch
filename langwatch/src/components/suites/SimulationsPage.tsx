@@ -312,6 +312,7 @@ export default function SimulationsPage() {
         <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
           {/* Sidebar */}
           <SuiteSidebar
+            projectSlug={project?.slug ?? ""}
             suites={suites ?? []}
             selectedSuiteSlug={selectedSuiteSlug}
             runSummaries={runSummaries}

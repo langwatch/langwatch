@@ -16,13 +16,13 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const mockPushState = vi.fn();
+const mockPush = vi.fn();
 
 const mockRouter = {
   query: { project: "my-project" } as Record<string, string | string[] | undefined>,
   pathname: "/[project]/simulations" as string,
   asPath: "/my-project/simulations" as string,
-  push: vi.fn(),
+  push: mockPush,
   isReady: true,
   events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
 };
@@ -35,14 +35,11 @@ import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting, deriveFromPath } fro
 
 describe("useSuiteRouting()", () => {
   beforeEach(() => {
-    mockPushState.mockClear();
+    mockPush.mockClear();
     mockRouter.query = { project: "my-project" };
     mockRouter.pathname = "/[project]/simulations";
     mockRouter.asPath = "/my-project/simulations";
     mockRouter.isReady = true;
-
-    // Mock window.history.pushState for navigation tests
-    vi.spyOn(window.history, "pushState").mockImplementation(mockPushState);
   });
 
   describe("given /simulations base path (no further segments)", () => {
@@ -111,22 +108,22 @@ describe("useSuiteRouting()", () => {
   });
 
   describe("when navigateToSuite is called with a suite slug", () => {
-    it("uses pushState to update URL without full page transition", () => {
+    it("navigates to /simulations/run-plans/:slug via router.push", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
         result.current.navigateToSuite("critical-path");
       });
 
-      expect(mockPushState).toHaveBeenCalledWith(
-        null, "", "/my-project/simulations/run-plans/critical-path",
+      expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "critical-path" } },
+        "/my-project/simulations/run-plans/critical-path",
       );
-      expect(result.current.selectedSuiteSlug).toBe("critical-path");
     });
   });
 
   describe("when navigateToSuite is called with 'all-runs'", () => {
-    it("uses pushState to navigate to /simulations", () => {
+    it("navigates to /simulations via router.push", () => {
       mockRouter.pathname = "/[project]/simulations/run-plans/[suiteSlug]";
       mockRouter.query = { project: "my-project", suiteSlug: "critical-path" };
 
@@ -136,25 +133,25 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(ALL_RUNS_ID);
       });
 
-      expect(mockPushState).toHaveBeenCalledWith(
-        null, "", "/my-project/simulations",
+      expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations", query: { project: "my-project" } },
+        "/my-project/simulations",
       );
-      expect(result.current.selectedSuiteSlug).toBe(ALL_RUNS_ID);
     });
   });
 
   describe("when navigateToSuite is called with an external set", () => {
-    it("uses pushState to navigate to /simulations/:setId", () => {
+    it("navigates to /simulations/:setId via router.push", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
         result.current.navigateToSuite(`${EXTERNAL_SET_PREFIX}python-examples`);
       });
 
-      expect(mockPushState).toHaveBeenCalledWith(
-        null, "", "/my-project/simulations/python-examples",
+      expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations/[scenarioSetId]", query: { project: "my-project", scenarioSetId: "python-examples" } },
+        "/my-project/simulations/python-examples",
       );
-      expect(result.current.selectedSuiteSlug).toBe(`${EXTERNAL_SET_PREFIX}python-examples`);
     });
   });
 
@@ -179,7 +176,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite("some-suite");
       });
 
-      expect(mockPushState).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 });
