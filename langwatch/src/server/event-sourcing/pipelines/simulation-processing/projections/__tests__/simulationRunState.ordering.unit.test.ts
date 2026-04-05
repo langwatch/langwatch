@@ -26,6 +26,7 @@ import type {
   SimulationProcessingEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
+  SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "../../schemas/events";
 import {
@@ -57,6 +58,27 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<SimulationRunState
 }
 
 // --- Event factories ---
+function createQueuedEvent(occurredAt = 500): SimulationRunQueuedEvent {
+  return {
+    id: "evt-queued",
+    aggregateId: "run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: occurredAt + 50,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    data: {
+      scenarioRunId: "run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "python-examples",
+      name: "test scenario",
+      description: "test",
+    },
+  };
+}
+
 function createStartedEvent(occurredAt = 1000): SimulationRunStartedEvent {
   return {
     id: "evt-started",
@@ -118,6 +140,30 @@ function createFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
         unmetCriteria: [],
       },
       status: "SUCCESS",
+    },
+  };
+}
+
+function createErrorFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
+  return {
+    id: "evt-finished",
+    aggregateId: "run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: occurredAt + 200,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
+    data: {
+      scenarioRunId: "run-1",
+      results: {
+        verdict: "failure",
+        reasoning: "Cannot connect to API",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: '{"name":"Error","message":"Cannot connect to API"}',
+      },
+      status: "ERROR",
     },
   };
 }
@@ -302,6 +348,80 @@ describe("simulation run fold — event ordering invariants", () => {
         createMetricsComputedEvent("trace-2", 125100),
       ], store, projection);
       assertCorrectFinalState(state, "duplicate delayed metrics");
+    });
+  });
+
+  // Late-arriving lifecycle events must not regress terminal state
+  describe("when started event arrives after finished (late delivery)", () => {
+    it("preserves ERROR status from finished", async () => {
+      // Reproduces: queued processed → finished processed → started arrives late
+      const state = await processFold([
+        createQueuedEvent(500),
+        createErrorFinishedEvent(5200),
+        createStartedEvent(1000),  // late!
+      ], store, projection);
+
+      expect(state.Status, "Status must remain ERROR").toBe("ERROR");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+      expect(state.Verdict, "Verdict must be failure").toBe("failure");
+      expect(state.StartedAt, "StartedAt must still be set from started event").not.toBeNull();
+    });
+
+    it("preserves SUCCESS status from finished", async () => {
+      const state = await processFold([
+        createQueuedEvent(500),
+        createFinishedEvent(5200),
+        createStartedEvent(1000),  // late!
+      ], store, projection);
+
+      expect(state.Status, "Status must remain SUCCESS").toBe("SUCCESS");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+    });
+
+    it("preserves metadata from started even when status is guarded", async () => {
+      const state = await processFold([
+        createQueuedEvent(500),
+        createErrorFinishedEvent(5200),
+        createStartedEvent(1000),  // late!
+      ], store, projection);
+
+      // Started event should still fill metadata gaps
+      expect(state.Name, "Name from started should be preserved").toBe("test scenario");
+      expect(state.ScenarioSetId).toBe("python-examples");
+    });
+  });
+
+  describe("when queued event arrives after finished (late delivery)", () => {
+    it("preserves terminal status", async () => {
+      const state = await processFold([
+        createStartedEvent(1000),
+        createErrorFinishedEvent(5200),
+        createQueuedEvent(500),  // late!
+      ], store, projection);
+
+      expect(state.Status, "Status must remain ERROR").toBe("ERROR");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+    });
+  });
+
+  // Full lifecycle with all events in every possible order
+  describe("when all lifecycle events (queued, started, finished, metrics) arrive in any order", () => {
+    const events: SimulationProcessingEvent[] = [
+      createQueuedEvent(500),
+      createStartedEvent(1000),
+      createFinishedEvent(5200),
+      createMetricsComputedEvent("trace-1", 65000),
+    ];
+
+    const allPerms = permutations(events);
+
+    it.each(allPerms.map((perm, i) => ({
+      name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+      perm,
+    })))("$name → final status is SUCCESS", async ({ name, perm }) => {
+      const state = await processFold(perm, store, projection);
+      expect(state.Status, `${name}: Status must be SUCCESS`).toBe("SUCCESS");
+      expect(state.FinishedAt, `${name}: FinishedAt must be set`).not.toBeNull();
     });
   });
 });
