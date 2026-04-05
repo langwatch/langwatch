@@ -65,6 +65,20 @@ export default function SimulationsPage() {
       void router.replace({ pathname: router.pathname, query: restQuery }, undefined, { shallow: true });
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Read pending batch from URL query param (set by "Save and Run" redirect)
+  const [urlPendingBatchId, setUrlPendingBatchId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!router.isReady) return;
+    const pendingBatch = router.query.pendingBatch;
+    if (typeof pendingBatch === "string" && pendingBatch) {
+      setUrlPendingBatchId(pendingBatch);
+      // Remove the query param to keep URL clean
+      const { pendingBatch: _, ...restQuery } = router.query;
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, { shallow: true });
+    }
+  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { period, setPeriod } = usePeriodSelector(30);
 
   // State
@@ -211,7 +225,7 @@ export default function SimulationsPage() {
     },
   });
 
-  const { requestRun, isPending: isRunPending, dialogProps: runDialogProps } = useRunSuite({
+  const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
     onRunScheduled: () => {
       void utils.suites.getSummaries.invalidate();
     },
@@ -351,6 +365,7 @@ export default function SimulationsPage() {
                 onEditSuite={handleEditSuite}
                 onRunSuite={handleRunSuite}
                 isRunning={isRunPending}
+                pendingBatchRunId={pendingBatchRunId ?? urlPendingBatchId}
                 period={period}
                 suiteNameMap={suiteNameMap}
                 highlightBatchId={highlightBatchId}
@@ -399,6 +414,7 @@ function MainPanel({
   onEditSuite,
   onRunSuite,
   isRunning,
+  pendingBatchRunId,
   period,
   suiteNameMap,
   highlightBatchId,
@@ -412,6 +428,7 @@ function MainPanel({
   onEditSuite: (id: string) => void;
   onRunSuite: (id: string) => void;
   isRunning: boolean;
+  pendingBatchRunId: string | null;
   period: Period;
   suiteNameMap: Map<string, string>;
   highlightBatchId: string | null;
@@ -436,7 +453,7 @@ function MainPanel({
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {
-    return <RunHistoryPanel period={period} suiteNameMap={suiteNameMap} highlightBatchId={highlightBatchId} />;
+    return <RunHistoryPanel period={period} suiteNameMap={suiteNameMap} pendingBatchRunId={pendingBatchRunId} highlightBatchId={highlightBatchId} />;
   }
 
   if (selectedSuite) {
@@ -446,6 +463,7 @@ function MainPanel({
         onEdit={() => onEditSuite(selectedSuite.id)}
         onRun={() => onRunSuite(selectedSuite.id)}
         isRunning={isRunning}
+        pendingBatchRunId={pendingBatchRunId}
         period={period}
         highlightBatchId={highlightBatchId}
       />

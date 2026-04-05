@@ -39,6 +39,7 @@ type SuiteDetailPanelProps = {
   onEdit: () => void;
   onRun: () => void;
   isRunning?: boolean;
+  pendingBatchRunId?: string | null;
   period: Period;
   highlightBatchId?: string | null;
 };
@@ -48,6 +49,7 @@ export function SuiteDetailPanel({
   onEdit,
   onRun,
   isRunning = false,
+  pendingBatchRunId,
   period,
   highlightBatchId,
 }: SuiteDetailPanelProps) {
@@ -172,7 +174,7 @@ export function SuiteDetailPanel({
         scenarioSetId={getSuiteSetId(suite.id)}
         onStatsReady={setLiveStats}
         period={period}
-        isRunStarting={isRunning}
+        pendingBatchRunId={pendingBatchRunId}
         highlightBatchId={highlightBatchId}
       />
     </VStack>

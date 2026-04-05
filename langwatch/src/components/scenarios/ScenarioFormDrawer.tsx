@@ -1,7 +1,9 @@
 import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { useDrawerRunCallbacks } from "../../hooks/useDrawerRunCallbacks";
@@ -244,12 +246,15 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Persist the target selection for this scenario
           persistTarget(target);
 
-          // Fire the run (don't await — the simulations page will show it via SSE)
-          void runScenario({ scenarioId: savedScenario.id, target });
+          // Generate batchRunId so the simulations page can show a placeholder immediately
+          const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 
-          // Close drawer and navigate to simulations page
+          // Fire the run (don't await — the simulations page will show it via SSE)
+          void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
+
+          // Close drawer and navigate to simulations page with pending batch
           onClose();
-          void router.push(`/${project.slug}/simulations`);
+          void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
         })();
       } catch (error) {
         toaster.create({

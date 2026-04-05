@@ -80,6 +80,7 @@ export class SuiteRunService {
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
     idempotencyKey: string;
+    batchRunId?: string;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -92,7 +93,7 @@ export class SuiteRunService {
       idempotencyKey,
     } = params;
 
-    const batchRunId = generateBatchRunId();
+    const batchRunId = params.batchRunId ?? generateBatchRunId();
     const setId = getSuiteSetId(suiteId);
     const total = activeScenarioIds.length * activeTargets.length * repeatCount;
 
