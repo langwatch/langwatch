@@ -31,6 +31,7 @@ import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
@@ -472,6 +473,7 @@ function SuiteListItem({
   onRun: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const now = useNow();
   return (
     <SidebarListItemWrapper
       className="group"
@@ -494,7 +496,7 @@ function SuiteListItem({
           <Spacer />
           {runSummary?.lastRunTimestamp && (
             <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
-              {formatTimeAgoCompact(runSummary.lastRunTimestamp)}
+              {formatTimeAgoCompact(runSummary.lastRunTimestamp, now)}
             </Text>
           )}
           <HStack gap={0} flexShrink={0}>
@@ -562,6 +564,7 @@ function ExternalSetListItem({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const now = useNow();
   return (
     <SidebarListItemWrapper
       data-testid="external-set-list-item"
@@ -582,7 +585,7 @@ function ExternalSetListItem({
           <Spacer />
           {externalSet.lastRunTimestamp && (
             <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
-              {formatTimeAgoCompact(externalSet.lastRunTimestamp)}
+              {formatTimeAgoCompact(externalSet.lastRunTimestamp, now)}
             </Text>
           )}
         </HStack>

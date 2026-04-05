@@ -12,6 +12,7 @@ import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
@@ -55,7 +56,8 @@ export function RunRow({
   isHighlighted = false,
 }: RunRowProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
-  const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
+  const now = useNow();
+  const timeAgo = formatTimeAgoCompact(batchRun.timestamp, now);
   const scenarioNames = suiteName
     ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
     : "";

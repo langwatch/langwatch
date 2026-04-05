@@ -41,6 +41,7 @@ import {
 import { toaster } from "~/components/ui/toaster";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useDrawer } from "~/hooks/useDrawer";
+import { NowProvider } from "./NowProvider";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -291,6 +292,7 @@ export default function SimulationsPage() {
   );
 
   return (
+    <NowProvider>
     <DashboardLayout>
       <VStack width="full" height="full" gap={0}>
         {/* Top row: heading + buttons */}
@@ -382,6 +384,7 @@ export default function SimulationsPage() {
       <SuiteRunConfirmationDialog {...runDialogProps} />
 
     </DashboardLayout>
+    </NowProvider>
   );
 }
 

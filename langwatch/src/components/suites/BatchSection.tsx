@@ -13,6 +13,7 @@ import {
 } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunSummaryCounts } from "./RunSummaryCounts";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -44,7 +45,8 @@ export function BatchSection({
     [batch.scenarioRuns],
   );
 
-  const timeAgo = formatTimeAgoCompact(batch.timestamp);
+  const now = useNow();
+  const timeAgo = formatTimeAgoCompact(batch.timestamp, now);
 
   return (
     <VStack align="stretch" gap={0}>

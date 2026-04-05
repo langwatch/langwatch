@@ -29,6 +29,7 @@ import {
 import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryPanel, type RunHistoryStats } from "./RunHistoryPanel";
@@ -50,6 +51,7 @@ export function SuiteDetailPanel({
   period,
   highlightBatchId,
 }: SuiteDetailPanelProps) {
+  const now = useNow();
   const targets = (() => {
     try {
       return parseSuiteTargets(suite.targets);
@@ -138,7 +140,7 @@ export function SuiteDetailPanel({
               {liveStats.lastActivityTimestamp && (
                 <StatPill
                   icon={<Clock size={14} />}
-                  value={formatTimeAgoCompact(liveStats.lastActivityTimestamp)}
+                  value={formatTimeAgoCompact(liveStats.lastActivityTimestamp, now)}
                   label=""
                   colorScheme="gray"
                 />
