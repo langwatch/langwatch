@@ -70,7 +70,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           borderRadius="lg"
           boxShadow="xs"
         >
-          <Spinner size="xs" color="fg.muted" css={{ flexShrink: 0 }} />
+          <Spinner size="xs" color="fg.muted" css={{ flexShrink: 0, height: "14px", width: "14px" }} />
           {suiteName && (
             <>
               <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
@@ -85,6 +85,10 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
             Starting...
           </Text>
           <Box flex={1} />
+          {/* Invisible spacer matching RunMetricsSummary pill height */}
+          <Box paddingY={1} paddingX={2} borderRadius="lg" border="1px solid transparent">
+            <Text fontSize="12px" visibility="hidden">&nbsp;</Text>
+          </Box>
         </HStack>
       </Box>
       <Box padding={2} />
