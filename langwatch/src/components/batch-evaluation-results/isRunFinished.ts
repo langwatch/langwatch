@@ -2,17 +2,31 @@
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Check if a run is finished based on timestamps.
+ * Check if a run is finished based on timestamps and optional progress.
  * A run is considered finished if it has finishedAt, stoppedAt,
- * or hasn't been updated in 5 minutes (interrupted).
+ * all work is completed (progress >= total), or hasn't been updated
+ * in 5 minutes (interrupted).
  */
 export const isRunFinished = (timestamps: {
   finishedAt?: number | null;
   stoppedAt?: number | null;
   updatedAt?: number | null;
+  progress?: number | null;
+  total?: number | null;
 }): boolean => {
   // Explicitly finished or stopped
   if (timestamps.finishedAt ?? timestamps.stoppedAt) {
+    return true;
+  }
+
+  // All work completed — the completion event may have failed to persist
+  // FinishedAt, but progress reaching total means the run is done.
+  if (
+    timestamps.progress != null &&
+    timestamps.total != null &&
+    timestamps.total > 0 &&
+    timestamps.progress >= timestamps.total
+  ) {
     return true;
   }
 
