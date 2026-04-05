@@ -15,8 +15,8 @@ export const INTERNAL_SET_PREFIX = "__internal__";
 /** Suffix for on-platform scenario sets */
 export const ON_PLATFORM_SET_SUFFIX = "__on-platform-scenarios";
 
-/** Friendly display name for on-platform sets */
-export const ON_PLATFORM_DISPLAY_NAME = "On-Platform Scenarios";
+/** Friendly display name for on-platform ad-hoc runs (single scenario "Save and Run") */
+export const ON_PLATFORM_DISPLAY_NAME = "Manual Run";
 
 /**
  * Checks if a set ID is an internal set (created by LangWatch platform).

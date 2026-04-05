@@ -26,7 +26,7 @@ import {
   Repeat2,
   Target,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { useNow } from "~/hooks/useNow";
@@ -54,6 +54,7 @@ export function SuiteDetailPanel({
   highlightBatchId,
 }: SuiteDetailPanelProps) {
   const now = useNow();
+  const suiteNameMapSingle = useMemo(() => new Map([[suite.id, suite.name]]), [suite.id, suite.name]);
   const targets = (() => {
     try {
       return parseSuiteTargets(suite.targets);
@@ -174,6 +175,7 @@ export function SuiteDetailPanel({
         period={period}
         pendingBatchRunId={pendingBatchRunId}
         highlightBatchId={highlightBatchId}
+        suiteNameMap={suiteNameMapSingle}
       />
     </VStack>
   );

@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
+import { computeIterationMap } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunMetricsSummary } from "./RunMetricsSummary";
 import { isCancellableStatus } from "./useCancelScenarioRun";
@@ -115,9 +115,7 @@ function RunRowData({
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const now = useNow();
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp, now);
-  const scenarioNames = suiteName
-    ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
-    : "";
+  const scenarioCount = new Set(batchRun.scenarioRuns.map((r) => r.scenarioId)).size;
 
   const iterationMap = useMemo(
     () => computeIterationMap({ scenarioRuns: batchRun.scenarioRuns }),
@@ -176,16 +174,12 @@ function RunRowData({
               </Text>
             </>
           )}
-          {scenarioNames && (
-            <>
-              <Text fontSize="sm" color="fg.muted" truncate minWidth={0} flexShrink={1}>
-                {scenarioNames}
-              </Text>
-              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-                &middot;
-              </Text>
-            </>
-          )}
+          <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+            {scenarioCount} {scenarioCount === 1 ? "scenario" : "scenarios"}
+          </Text>
+          <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+            &middot;
+          </Text>
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
             {timeAgo}
           </Text>

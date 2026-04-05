@@ -290,6 +290,7 @@ export function ExternalSetDetailPanel({
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
                           isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                          suiteName={scenarioSetId}
                         />
                       );
                     })
