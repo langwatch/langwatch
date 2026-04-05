@@ -57,7 +57,7 @@ export function RunRow(props: RunRowProps) {
 function RunRowLoading({ suiteName }: { suiteName?: string }) {
   return (
     <Box>
-      <Box padding={2} paddingBottom={0} width="full">
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
           width="full"
           paddingX={4}
@@ -70,7 +70,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           borderRadius="lg"
           boxShadow="xs"
         >
-          <Spinner size="xs" color="fg.muted" />
+          <Spinner size="xs" color="fg.muted" css={{ flexShrink: 0 }} />
           {suiteName && (
             <>
               <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
@@ -82,11 +82,12 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
             </>
           )}
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
-            Initializing...
+            Starting...
           </Text>
           <Box flex={1} />
         </HStack>
       </Box>
+      <Box padding={2} />
     </Box>
   );
 }
