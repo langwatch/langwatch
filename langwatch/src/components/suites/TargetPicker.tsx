@@ -14,7 +14,7 @@ import { SearchInput } from "../ui/SearchInput";
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt";
+  type: "http" | "prompt" | "code";
   referenceId: string;
 }
 
@@ -98,34 +98,38 @@ export function TargetPicker({
         gap={1}
         align="stretch"
       >
-        {targets.map((target) => (
-          <HStack
-            key={`${target.type}-${target.referenceId}`}
-            gap={2}
-            paddingY={1}
-            cursor="pointer"
-          >
-            <Checkbox
-              checked={isTargetSelected(target.type, target.referenceId)}
-              onCheckedChange={() =>
-                onToggle({
-                  type: target.type,
-                  referenceId: target.referenceId,
-                })
-              }
-              flex={1}
+        {targets.map((target) => {
+          const selected = isTargetSelected(target.type, target.referenceId);
+
+          return (
+            <HStack
+              key={`${target.type}-${target.referenceId}`}
+              gap={2}
+              paddingY={1}
+              cursor="pointer"
             >
-              <HStack gap={2} flex={1}>
-                <Text fontSize="sm" flex={1}>
-                  {target.name}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  ({target.type === "http" ? "HTTP" : "Prompt"})
-                </Text>
-              </HStack>
-            </Checkbox>
-          </HStack>
-        ))}
+              <Checkbox
+                checked={selected}
+                onCheckedChange={() =>
+                  onToggle({
+                    type: target.type,
+                    referenceId: target.referenceId,
+                  })
+                }
+                flex={1}
+              >
+                <HStack gap={2} flex={1}>
+                  <Text fontSize="sm" flex={1}>
+                    {target.name}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted">
+                    ({target.type === "http" ? "HTTP" : target.type === "code" ? "Code" : "Prompt"})
+                  </Text>
+                </HStack>
+              </Checkbox>
+            </HStack>
+          );
+        })}
         {targets.length === 0 && (
           <Text fontSize="sm" color="fg.muted" paddingY={2}>
             No targets available
