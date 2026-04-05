@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/langwatch/langwatch/compare/skills@v0.2.0...skills@v0.3.0) (2026-04-05)
+
+
+### Features
+
+* add prompt tag support to MCP tools, docs, and skills ([#2934](https://github.com/langwatch/langwatch/issues/2934)) ([858e0d7](https://github.com/langwatch/langwatch/commit/858e0d7df3df8c70822e2155a73453bf1a6fd324))
+
+
+### Bug Fixes
+
+* **skills:** update MCP config schema for Claude Code compatibility ([#2927](https://github.com/langwatch/langwatch/issues/2927)) ([f85cf4e](https://github.com/langwatch/langwatch/commit/f85cf4e8ad67c518c1cb0f2ba830a6ad8ed00acc))
+
 ## [0.2.0](https://github.com/langwatch/langwatch/compare/skills@v0.1.0...skills@v0.2.0) (2026-03-29)
 
 
