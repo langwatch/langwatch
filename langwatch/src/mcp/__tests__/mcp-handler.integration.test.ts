@@ -343,7 +343,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an OAuth-issued access token is used", () => {
-    it("authenticates MCP requests", async () => {
+    it("re-validates the API key against the database during MCP init", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       // First, obtain an access token
@@ -357,6 +357,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
 
+      // Clear the mock to prove MCP init does its own DB lookup
+      mockPrisma.project.findUnique.mockClear();
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
       // Use the access token to initialize MCP
       const res = await sendRequest({
         server,
@@ -366,6 +370,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers["mcp-session-id"]).toBeDefined();
+      // Verify a fresh DB lookup happened during MCP init
+      expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
+        where: { apiKey: VALID_API_KEY, archivedAt: null },
+      });
     });
   });
 
