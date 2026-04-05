@@ -102,8 +102,8 @@ describe("UsageService", () => {
       eventUsageService: mockEventUsageService,
       planResolver: mockPlanResolver,
       organizationRepository: mockOrgRepo,
-      countCache: new TtlCache<number>(30_000),
-      decisionCache: new TtlCache<unknown>(30_000),
+      countCache: new TtlCache<number>(30_000, "test:"),
+      decisionCache: new TtlCache<unknown>(30_000, "test:"),
     });
   });
 
@@ -412,8 +412,8 @@ describe("UsageService", () => {
 
         // Clear Redis and replace caches to force re-resolution, switch to paid plan (traces unit)
         mockRedisStore.clear();
-        (service as any).decisionCache = new TtlCache(30_000);
-        (service as any).countCache = new TtlCache(30_000);
+        (service as any).decisionCache = new TtlCache(30_000, "test:");
+        (service as any).countCache = new TtlCache(30_000, "test:");
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...PAID_TIERED_PLAN,
         });
