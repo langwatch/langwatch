@@ -61,25 +61,42 @@ export function useSuiteRouting(): SuiteRouting {
         .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
         .join("&");
 
+      // Use shallow routing to avoid full page transitions — all page files
+      // render the same SimulationsPage component, so we just need the URL
+      // to update and the component to re-derive state from the new path.
+      // We use window.history + router state to achieve this cleanly.
+
       if (slug === ALL_RUNS_ID) {
-        const basePath = `/${projectSlug}/simulations`;
-        const asUrl = dateQueryString ? `${basePath}?${dateQueryString}` : basePath;
-        void router.push(asUrl);
+        const displayUrl = `/${projectSlug}/simulations`;
+        const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
+        void router.push(
+          { pathname: "/[project]/simulations", query: { project: projectSlug, ...dateParams } },
+          asUrl,
+          { shallow: true },
+        );
         return;
       }
 
       if (isExternalSetSelection(slug)) {
         const setId = extractExternalSetId(slug);
-        const basePath = `/${projectSlug}/simulations/${setId}`;
-        const asUrl = dateQueryString ? `${basePath}?${dateQueryString}` : basePath;
-        void router.push(asUrl);
+        const displayUrl = `/${projectSlug}/simulations/${setId}`;
+        const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
+        void router.push(
+          { pathname: "/[project]/simulations/[scenarioSetId]", query: { project: projectSlug, scenarioSetId: setId, ...dateParams } },
+          asUrl,
+          { shallow: true },
+        );
         return;
       }
 
       // Suite slug
-      const basePath = `/${projectSlug}/simulations/run-plans/${slug}`;
-      const asUrl = dateQueryString ? `${basePath}?${dateQueryString}` : basePath;
-      void router.push(asUrl);
+      const displayUrl = `/${projectSlug}/simulations/run-plans/${slug}`;
+      const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
+      void router.push(
+        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: projectSlug, suiteSlug: slug, ...dateParams } },
+        asUrl,
+        { shallow: true },
+      );
     },
     [router, projectSlug],
   );

@@ -101,7 +101,7 @@ describe("useSuiteRouting()", () => {
   });
 
   describe("when navigateToSuite is called with a suite slug", () => {
-    it("pushes to /simulations/run-plans/:slug", () => {
+    it("pushes with shallow routing to /simulations/run-plans/:slug", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
@@ -109,13 +109,15 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "critical-path" } },
         "/my-project/simulations/run-plans/critical-path",
+        { shallow: true },
       );
     });
   });
 
   describe("when navigateToSuite is called with 'all-runs'", () => {
-    it("pushes to /simulations base path", () => {
+    it("pushes with shallow routing to /simulations base path", () => {
       mockRouter.pathname = "/[project]/simulations/run-plans/[suiteSlug]";
       mockRouter.query = { project: "my-project", suiteSlug: "critical-path" };
 
@@ -126,13 +128,15 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations", query: { project: "my-project" } },
         "/my-project/simulations",
+        { shallow: true },
       );
     });
   });
 
   describe("when navigateToSuite is called with an external set", () => {
-    it("pushes to /simulations/:setId", () => {
+    it("pushes with shallow routing to /simulations/:setId", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
@@ -140,7 +144,9 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations/[scenarioSetId]", query: { project: "my-project", scenarioSetId: "python-examples" } },
         "/my-project/simulations/python-examples",
+        { shallow: true },
       );
     });
   });

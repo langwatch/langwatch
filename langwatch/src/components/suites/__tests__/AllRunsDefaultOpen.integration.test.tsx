@@ -212,7 +212,9 @@ describe("All Runs default selection (Issue #1771)", () => {
 
       // Archiving the currently selected suite navigates to all-runs
       expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations", query: { project: "my-project" } },
         "/my-project/simulations",
+        { shallow: true },
       );
     });
   });

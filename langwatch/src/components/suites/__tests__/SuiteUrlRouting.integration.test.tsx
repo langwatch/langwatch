@@ -261,7 +261,9 @@ describe("Simulation Page URL Routing", () => {
       await user.click(screen.getByText("Suite A"));
 
       expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "suite-a" } },
         "/my-project/simulations/run-plans/suite-a",
+        { shallow: true },
       );
     });
   });
@@ -277,7 +279,9 @@ describe("Simulation Page URL Routing", () => {
       await user.click(screen.getByText("All Runs"));
 
       expect(mockPush).toHaveBeenCalledWith(
+        { pathname: "/[project]/simulations", query: { project: "my-project" } },
         "/my-project/simulations",
+        { shallow: true },
       );
     });
   });
