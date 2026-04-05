@@ -29,6 +29,7 @@ import {
 import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { Period } from "~/components/PeriodSelector";
@@ -167,7 +168,7 @@ export function SuiteDetailPanel({
         </HStack>
       </Box>
 
-      <Separator />
+      <ShadowDivider />
 
       {/* Run history list */}
       <RunHistoryPanel
