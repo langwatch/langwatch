@@ -64,6 +64,13 @@ export interface FoldProjectionDefinition<
 
   /** Optional processing behavior configuration. */
   options?: FoldProjectionOptions;
+
+  /**
+   * Loads all events for an aggregate, sorted by occurredAt ASC.
+   * Used by the executor to re-fold from scratch when out-of-order events are detected.
+   * When not provided, out-of-order events are applied incrementally (no re-fold).
+   */
+  eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<E[]>;
 }
 
 /**

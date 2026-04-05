@@ -38,6 +38,7 @@ export interface SuiteRunStateData {
   PassRateBps: number | null;
   CreatedAt: number;
   UpdatedAt: number;
+  LastEventOccurredAt: number;
   StartedAt: number | null;
   FinishedAt: number | null;
 

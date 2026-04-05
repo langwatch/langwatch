@@ -1,6 +1,9 @@
+import { createLogger } from "~/utils/logger/server";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
+
+const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
 /**
  * Executes a fold projection incrementally by applying a single event to existing state.
@@ -8,22 +11,15 @@ import type { ProjectionStoreContext } from "./projectionStoreContext";
  * Flow:
  * 1. Load existing state via `store.get()` (or `init()` if none)
  * 2. `state = projection.apply(state, event)`
- * 3. `projection.store.store(state, context)`
+ * 3. If out-of-order detected and `eventLoader` available → re-fold from scratch
+ * 4. `projection.store.store(state, context)`
  *
- * The executor is stateless — it receives event and context each time.
+ * Out-of-order detection: compares event.occurredAt against the state's
+ * LastEventOccurredAt (tracked by AbstractFoldProjection). If the event
+ * occurred earlier than what we've already seen, all events are re-loaded
+ * in occurredAt order and replayed from init().
  */
 export class FoldProjectionExecutor {
-  /**
-   * Executes an incremental fold projection by applying a single event to existing state.
-   *
-   * Loads the current stored state (or initializes if none exists), applies the
-   * single event, and stores the result.
-   *
-   * @param projection - The fold projection definition
-   * @param event - The single event to apply
-   * @param context - Store context with aggregateId, tenantId, and optional key
-   * @returns The updated state
-   */
   async execute<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     event: E,
@@ -36,15 +32,52 @@ export class FoldProjectionExecutor {
     const key = context.key ?? context.aggregateId;
     let state = await projection.store.get(key, context) ?? projection.init();
 
+    // Capture the highest occurredAt before applying the new event
+    const prevLastOccurred = (state as Record<string, unknown>).LastEventOccurredAt
+      ?? (state as Record<string, unknown>).lastEventOccurredAt
+      ?? 0;
+
     state = projection.apply(state, event);
+
+    // Detect out-of-order: event's occurredAt is STRICTLY LESS than what we've already seen.
+    // Same occurredAt (==) does NOT trigger re-fold — arrival order is the correct
+    // tiebreaker for events at the same logical instant (e.g., SDK sends snapshot and
+    // finished with identical occurredAt). The +1 on UpdatedAt in apply() guarantees
+    // distinct ClickHouse rows regardless.
+    const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
+    if (
+      typeof eventOccurredAt === "number" &&
+      eventOccurredAt > 0 &&
+      typeof prevLastOccurred === "number" &&
+      eventOccurredAt < prevLastOccurred &&
+      projection.eventLoader
+    ) {
+      logger.info(
+        {
+          projection: projection.name,
+          aggregateId: context.aggregateId,
+          eventType: event.type,
+          eventOccurredAt,
+          prevLastOccurred,
+        },
+        "Out-of-order event detected, re-folding from scratch",
+      );
+
+      const allEvents = await projection.eventLoader({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+      });
+
+      state = projection.init();
+      for (const e of allEvents) {
+        state = projection.apply(state, e);
+      }
+    }
+
     await projection.store.store(state, context);
     return state;
   }
 
-  /**
-   * Checks if an event matches the projection's eventTypes filter.
-   * Empty eventTypes array means "all events".
-   */
   private matchesEventTypes<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     event: E,

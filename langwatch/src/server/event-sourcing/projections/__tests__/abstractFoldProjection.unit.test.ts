@@ -29,6 +29,7 @@ interface TestState {
   count: number;
   CreatedAt: number;
   UpdatedAt: number;
+  LastEventOccurredAt: number;
 }
 
 const noopStore: FoldProjectionStore<TestState> = {
@@ -65,6 +66,7 @@ interface CamelState {
   name: string;
   createdAt: number;
   updatedAt: number;
+  lastEventOccurredAt: number;
 }
 
 const CamelEventSchema = z.object({
@@ -79,7 +81,8 @@ class CamelFoldProjection
     CamelState,
     typeof camelEvents,
     "createdAt",
-    "updatedAt"
+    "updatedAt",
+    "lastEventOccurredAt"
   >
   implements FoldEventHandlers<typeof camelEvents, CamelState>
 {
@@ -93,7 +96,7 @@ class CamelFoldProjection
   protected readonly events = camelEvents;
 
   constructor() {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
+    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", lastEventOccurredAtKey: "lastEventOccurredAt" });
   }
 
 

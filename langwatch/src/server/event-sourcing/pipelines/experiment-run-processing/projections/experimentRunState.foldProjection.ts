@@ -41,6 +41,7 @@ export interface ExperimentRunStateData {
   Targets: string;
   CreatedAt: number;
   UpdatedAt: number;
+  LastEventOccurredAt: number;
   StartedAt: number | null;
   FinishedAt: number | null;
   StoppedAt: number | null;
