@@ -32,12 +32,10 @@ vi.mock("~/hooks/useSSESubscription", () => ({
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
-let mockPathname = "/[project]/simulations";
-
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    pathname: mockPathname,
+    pathname: "/[project]/simulations/[[...path]]",
     asPath: "/my-project/simulations",
     push: mockPush,
     replace: mockReplace,
@@ -190,7 +188,6 @@ describe("Simulation Page URL Routing", () => {
     mockPush.mockClear();
     mockReplace.mockClear();
     mockQuery = { project: "my-project" };
-    mockPathname = "/[project]/simulations";
   });
 
   afterEach(() => {
@@ -201,30 +198,24 @@ describe("Simulation Page URL Routing", () => {
   describe("when navigating to /simulations (base path)", () => {
     it("shows the all runs view", async () => {
       await renderSimulationsPage();
-
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
     });
 
-    it("displays 'Simulations' heading", async () => {
+    it("displays Simulations heading", async () => {
       await renderSimulationsPage();
-
       expect(screen.getByText("Simulations")).toBeInTheDocument();
     });
 
-    it("displays '+ New Run Plan' button", async () => {
+    it("displays New Run Plan button", async () => {
       await renderSimulationsPage();
-
       expect(screen.getByText(/New Run Plan/)).toBeInTheDocument();
     });
   });
 
   describe("when navigating to /simulations/run-plans/:suiteSlug", () => {
-    it("shows that suite's details", async () => {
-      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
-      mockQuery = { project: "my-project", suiteSlug: "suite-a" };
-
+    it("shows that suite details", async () => {
+      mockQuery = { project: "my-project", path: ["run-plans", "suite-a"] };
       await renderSimulationsPage();
-
       expect(screen.getByTestId("suite-detail-panel")).toBeInTheDocument();
       expect(screen.getByText("Suite A details")).toBeInTheDocument();
     });
@@ -232,11 +223,8 @@ describe("Simulation Page URL Routing", () => {
 
   describe("when navigating to /simulations/:externalSetSlug", () => {
     it("shows the external set panel", async () => {
-      mockPathname = "/[project]/simulations/[scenarioSetId]";
-      mockQuery = { project: "my-project", scenarioSetId: "python-examples" };
-
+      mockQuery = { project: "my-project", path: ["python-examples"] };
       await renderSimulationsPage();
-
       expect(screen.getByTestId("external-set-panel")).toBeInTheDocument();
       expect(screen.getByText("python-examples details")).toBeInTheDocument();
     });
@@ -244,43 +232,37 @@ describe("Simulation Page URL Routing", () => {
 
   describe("when navigating to a non-existent suite slug", () => {
     it("shows the empty state", async () => {
-      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
-      mockQuery = { project: "my-project", suiteSlug: "non-existent-slug" };
-
+      mockQuery = { project: "my-project", path: ["run-plans", "non-existent-slug"] };
       await renderSimulationsPage();
-
       expect(screen.getByTestId("suite-empty-state")).toBeInTheDocument();
     });
   });
 
   describe("when clicking a suite in the sidebar", () => {
-    it("navigates to /simulations/run-plans/:slug", async () => {
+    it("navigates with shallow routing", async () => {
       const user = userEvent.setup();
-
       await renderSimulationsPage();
-
       await user.click(screen.getByText("Suite A"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "suite-a" } },
+        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project", path: ["run-plans", "suite-a"] } },
         "/my-project/simulations/run-plans/suite-a",
+        { shallow: true },
       );
     });
   });
 
   describe("when clicking All Runs in the sidebar", () => {
-    it("navigates to /simulations", async () => {
-      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
-      mockQuery = { project: "my-project", suiteSlug: "suite-a" };
+    it("navigates with shallow routing", async () => {
+      mockQuery = { project: "my-project", path: ["run-plans", "suite-a"] };
       const user = userEvent.setup();
-
       await renderSimulationsPage();
-
       await user.click(screen.getByText("All Runs"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations", query: { project: "my-project" } },
+        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project" } },
         "/my-project/simulations",
+        { shallow: true },
       );
     });
   });

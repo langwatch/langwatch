@@ -95,7 +95,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    pathname: "/[project]/simulations",
+    pathname: "/[project]/simulations/[[...path]]",
     asPath: "/my-project/simulations",
     push: vi.fn(),
     replace: vi.fn(),

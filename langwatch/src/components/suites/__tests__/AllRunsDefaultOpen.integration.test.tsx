@@ -115,12 +115,10 @@ vi.mock("~/hooks/useDrawer", () => ({
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
 let mockRouterQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
-let mockPathname = "/[project]/simulations";
-
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
-    pathname: mockPathname,
+    pathname: "/[project]/simulations/[[...path]]",
     asPath: "/my-project/simulations",
     push: mockPush,
     replace: mockReplace,
@@ -154,7 +152,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 describe("All Runs default selection (Issue #1771)", () => {
   beforeEach(() => {
     mockRouterQuery = { project: "my-project" };
-    mockPathname = "/[project]/simulations";
     mockPush.mockClear();
     mockReplace.mockClear();
   });
@@ -183,9 +180,8 @@ describe("All Runs default selection (Issue #1771)", () => {
 
   describe("when the user archives the selected suite", () => {
     it("navigates to all-runs after archiving", async () => {
-      // Start with a suite selected in the URL (path-based)
-      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
-      mockRouterQuery = { project: "my-project", suiteSlug: "my-suite" };
+      // Start with a suite selected in the URL (catch-all path)
+      mockRouterQuery = { project: "my-project", path: ["run-plans", "my-suite"] };
 
       const { default: SimulationsPage } = await import(
         "~/components/suites/SimulationsPage"
@@ -213,8 +209,9 @@ describe("All Runs default selection (Issue #1771)", () => {
 
       // Archiving the currently selected suite navigates to all-runs
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations", query: { project: "my-project" } },
+        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project" } },
         "/my-project/simulations",
+        { shallow: true },
       );
     });
   });

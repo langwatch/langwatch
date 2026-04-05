@@ -1,15 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Unit tests for useSuiteRouting hook — path-based routing.
+ * Unit tests for useSuiteRouting hook — catch-all path routing.
  *
- * Verifies URL-based suite selection via path segments:
- *   /simulations                              → All Runs
- *   /simulations/run-plans/:suiteSlug         → Suite detail
- *   /simulations/:externalSetSlug/:batchId    → External set + highlight
- *
- * Sidebar navigation uses window.history.pushState (not router.push)
- * to avoid full Next.js page transitions.
+ * All simulation sub-paths are handled by [[...path]].tsx, so
+ * sidebar navigation uses shallow routing within the same page.
  *
  * @see specs/suites/simulation-runs-page.feature
  */
@@ -20,7 +15,7 @@ const mockPush = vi.fn();
 
 const mockRouter = {
   query: { project: "my-project" } as Record<string, string | string[] | undefined>,
-  pathname: "/[project]/simulations" as string,
+  pathname: "/[project]/simulations/[[...path]]" as string,
   asPath: "/my-project/simulations" as string,
   push: mockPush,
   isReady: true,
@@ -37,13 +32,13 @@ describe("useSuiteRouting()", () => {
   beforeEach(() => {
     mockPush.mockClear();
     mockRouter.query = { project: "my-project" };
-    mockRouter.pathname = "/[project]/simulations";
-    mockRouter.asPath = "/my-project/simulations";
     mockRouter.isReady = true;
   });
 
-  describe("given /simulations base path (no further segments)", () => {
-    it("returns 'all-runs' as selectedSuiteSlug", () => {
+  describe("given /simulations (no path segments)", () => {
+    it("returns all-runs", () => {
+      mockRouter.query = { project: "my-project" };
+
       const { result } = renderHook(() => useSuiteRouting());
 
       expect(result.current.selectedSuiteSlug).toBe(ALL_RUNS_ID);
@@ -51,10 +46,9 @@ describe("useSuiteRouting()", () => {
     });
   });
 
-  describe("given /simulations/run-plans/[suiteSlug]", () => {
+  describe("given /simulations/run-plans/slug", () => {
     it("returns the suite slug", () => {
-      mockRouter.pathname = "/[project]/simulations/run-plans/[suiteSlug]";
-      mockRouter.query = { project: "my-project", suiteSlug: "critical-path" };
+      mockRouter.query = { project: "my-project", path: ["run-plans", "critical-path"] };
 
       const { result } = renderHook(() => useSuiteRouting());
 
@@ -63,26 +57,20 @@ describe("useSuiteRouting()", () => {
     });
   });
 
-  describe("given /simulations/run-plans/[suiteSlug]/[batchId]", () => {
-    it("returns suite slug and highlight batch id", () => {
-      mockRouter.pathname = "/[project]/simulations/run-plans/[suiteSlug]/[batchId]";
-      mockRouter.query = {
-        project: "my-project",
-        suiteSlug: "critical-path",
-        batchId: "scenariobatch_abc",
-      };
+  describe("given /simulations/run-plans/slug/batchId", () => {
+    it("returns suite slug with batch highlight", () => {
+      mockRouter.query = { project: "my-project", path: ["run-plans", "critical-path", "batch_abc"] };
 
       const { result } = renderHook(() => useSuiteRouting());
 
       expect(result.current.selectedSuiteSlug).toBe("critical-path");
-      expect(result.current.highlightBatchId).toBe("scenariobatch_abc");
+      expect(result.current.highlightBatchId).toBe("batch_abc");
     });
   });
 
-  describe("given /simulations/[scenarioSetId] (external set)", () => {
+  describe("given /simulations/setId (external set)", () => {
     it("returns external set selection", () => {
-      mockRouter.pathname = "/[project]/simulations/[scenarioSetId]";
-      mockRouter.query = { project: "my-project", scenarioSetId: "python-examples" };
+      mockRouter.query = { project: "my-project", path: ["python-examples"] };
 
       const { result } = renderHook(() => useSuiteRouting());
 
@@ -91,24 +79,19 @@ describe("useSuiteRouting()", () => {
     });
   });
 
-  describe("given /simulations/[scenarioSetId]/[batchRunId]", () => {
+  describe("given /simulations/setId/batchId (external set + batch)", () => {
     it("returns external set with batch highlight", () => {
-      mockRouter.pathname = "/[project]/simulations/[scenarioSetId]/[batchRunId]";
-      mockRouter.query = {
-        project: "my-project",
-        scenarioSetId: "python-examples",
-        batchRunId: "scenariobatch_xyz",
-      };
+      mockRouter.query = { project: "my-project", path: ["python-examples", "batch_xyz"] };
 
       const { result } = renderHook(() => useSuiteRouting());
 
       expect(result.current.selectedSuiteSlug).toBe(`${EXTERNAL_SET_PREFIX}python-examples`);
-      expect(result.current.highlightBatchId).toBe("scenariobatch_xyz");
+      expect(result.current.highlightBatchId).toBe("batch_xyz");
     });
   });
 
   describe("when navigateToSuite is called with a suite slug", () => {
-    it("navigates to /simulations/run-plans/:slug via router.push", () => {
+    it("uses shallow router.push to same page", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
@@ -116,16 +99,19 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "critical-path" } },
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: { project: "my-project", path: ["run-plans", "critical-path"] },
+        },
         "/my-project/simulations/run-plans/critical-path",
+        { shallow: true },
       );
     });
   });
 
-  describe("when navigateToSuite is called with 'all-runs'", () => {
-    it("navigates to /simulations via router.push", () => {
-      mockRouter.pathname = "/[project]/simulations/run-plans/[suiteSlug]";
-      mockRouter.query = { project: "my-project", suiteSlug: "critical-path" };
+  describe("when navigateToSuite is called with all-runs", () => {
+    it("uses shallow router.push with no path", () => {
+      mockRouter.query = { project: "my-project", path: ["run-plans", "critical-path"] };
 
       const { result } = renderHook(() => useSuiteRouting());
 
@@ -134,14 +120,18 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations", query: { project: "my-project" } },
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: { project: "my-project" },
+        },
         "/my-project/simulations",
+        { shallow: true },
       );
     });
   });
 
   describe("when navigateToSuite is called with an external set", () => {
-    it("navigates to /simulations/:setId via router.push", () => {
+    it("uses shallow router.push with setId path", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
@@ -149,19 +139,20 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/[scenarioSetId]", query: { project: "my-project", scenarioSetId: "python-examples" } },
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: { project: "my-project", path: ["python-examples"] },
+        },
         "/my-project/simulations/python-examples",
+        { shallow: true },
       );
     });
   });
 
   describe("when router is not ready", () => {
-    it("returns null as selectedSuiteSlug", () => {
+    it("returns null", () => {
       mockRouter.isReady = false;
-      mockRouter.query = {};
-
       const { result } = renderHook(() => useSuiteRouting());
-
       expect(result.current.selectedSuiteSlug).toBeNull();
     });
   });
@@ -169,45 +160,35 @@ describe("useSuiteRouting()", () => {
   describe("when projectSlug is undefined", () => {
     it("does not navigate", () => {
       mockRouter.query = {};
-
       const { result } = renderHook(() => useSuiteRouting());
-
-      act(() => {
-        result.current.navigateToSuite("some-suite");
-      });
-
+      act(() => { result.current.navigateToSuite("some-suite"); });
       expect(mockPush).not.toHaveBeenCalled();
     });
   });
 });
 
 describe("deriveFromPath", () => {
-  it("handles the base path as All Runs", () => {
-    const result = deriveFromPath({
-      isReady: true,
-      pathname: "/[project]/simulations",
-      query: { project: "my-project" },
+  it("returns all-runs for empty path", () => {
+    expect(deriveFromPath({ isReady: true, path: undefined })).toEqual({
+      selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null,
     });
-    expect(result.selectedSuiteSlug).toBe(ALL_RUNS_ID);
-    expect(result.highlightBatchId).toBeNull();
   });
 
-  it("handles run-plans path with suite slug", () => {
-    const result = deriveFromPath({
-      isReady: true,
-      pathname: "/[project]/simulations/run-plans/[suiteSlug]",
-      query: { project: "my-project", suiteSlug: "my-suite" },
+  it("returns suite slug from run-plans path", () => {
+    expect(deriveFromPath({ isReady: true, path: ["run-plans", "my-suite"] })).toEqual({
+      selectedSuiteSlug: "my-suite", highlightBatchId: null,
     });
-    expect(result.selectedSuiteSlug).toBe("my-suite");
   });
 
-  it("handles external set with batch id via scenarioSetId", () => {
-    const result = deriveFromPath({
-      isReady: true,
-      pathname: "/[project]/simulations/[scenarioSetId]/[batchRunId]",
-      query: { project: "my-project", scenarioSetId: "default", batchRunId: "batch_123" },
+  it("returns external set with batch from path segments", () => {
+    expect(deriveFromPath({ isReady: true, path: ["default", "batch_123"] })).toEqual({
+      selectedSuiteSlug: `${EXTERNAL_SET_PREFIX}default`, highlightBatchId: "batch_123",
     });
-    expect(result.selectedSuiteSlug).toBe(`${EXTERNAL_SET_PREFIX}default`);
-    expect(result.highlightBatchId).toBe("batch_123");
+  });
+
+  it("returns null when not ready", () => {
+    expect(deriveFromPath({ isReady: false, path: undefined })).toEqual({
+      selectedSuiteSlug: null, highlightBatchId: null,
+    });
   });
 });
