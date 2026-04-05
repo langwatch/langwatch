@@ -75,7 +75,12 @@ export const experimentsRouter = createTRPCRouter({
       let workflowId = input.dsl.workflow_id;
       const name =
         input.workbenchState.name ?? (await findNextDraftName(input.projectId));
-      const slug = slugify(name);
+      const slug = await generateUniqueExperimentSlug({
+        baseSlug: slugify(name),
+        projectId: input.projectId,
+        prisma,
+        excludeExperimentId: input.experimentId,
+      });
 
       if (input.experimentId) {
         const currentExperiment = await prisma.experiment.findUnique({
@@ -230,16 +235,20 @@ export const experimentsRouter = createTRPCRouter({
         await enforceLicenseLimit(ctx, input.projectId, "experiments");
       }
 
-      // For new experiments, use the ID as the slug (guaranteed unique)
+      // For new experiments, deduplicate the slug to avoid constraint violations
       // For existing experiments, keep the same slug to avoid breaking URLs
       const name =
         input.state.name || (await findNextDraftName(input.projectId));
 
       let slug: string;
       if (isNewExperiment) {
-        // New experiment: prefer the slug from state (set by frontend redirect),
-        // otherwise use last 8 chars of the ID for a shorter, cleaner URL
-        slug = input.state.experimentSlug ?? experimentId.slice(-8);
+        // New experiment: deduplicate the slug to avoid P2002 constraint violations
+        const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
+        slug = await generateUniqueExperimentSlug({
+          baseSlug: rawSlug,
+          projectId: input.projectId,
+          prisma,
+        });
       } else {
         // Existing experiment: keep the same slug to avoid breaking URLs
         slug = existing.slug;
@@ -1165,6 +1174,66 @@ const findNextDraftName = async (projectId: string) => {
 };
 
 /**
+ * Generates a unique slug for an experiment within a project.
+ *
+ * If the base slug already exists (belonging to a different experiment),
+ * appends an incrementing numeric suffix (-2, -3, ...) until a unique
+ * slug is found. Falls back to a random nanoid suffix after 100 candidates.
+ *
+ * NOTE: There is a TOCTOU race window between this slug check and the
+ * subsequent insert/upsert. If two concurrent requests generate the same
+ * slug, one will hit a P2002 constraint violation. Callers should catch
+ * P2002 and retry if needed.
+ *
+ * @param baseSlug - The initial slug derived from the experiment name
+ * @param projectId - The project to check for uniqueness within
+ * @param prismaClient - The Prisma client to use for database queries
+ * @param excludeExperimentId - Optional experiment ID to exclude from
+ *   conflict checks (used when updating an existing experiment)
+ */
+export const generateUniqueExperimentSlug = async ({
+  baseSlug,
+  projectId,
+  prisma: prismaClient,
+  excludeExperimentId,
+}: {
+  baseSlug: string;
+  projectId: string;
+  prisma: typeof prisma;
+  excludeExperimentId?: string;
+}): Promise<string> => {
+  const existingSlugs = new Set(
+    (
+      await prismaClient.experiment.findMany({
+        select: { slug: true },
+        where: {
+          projectId,
+          slug: { startsWith: baseSlug },
+          ...(excludeExperimentId
+            ? { id: { not: excludeExperimentId } }
+            : {}),
+        },
+      })
+    ).map((e) => e.slug),
+  );
+
+  if (!existingSlugs.has(baseSlug)) {
+    return baseSlug;
+  }
+
+  let index = 2;
+  while (index <= 102) {
+    const candidate = `${baseSlug}-${index}`;
+    if (!existingSlugs.has(candidate)) {
+      return candidate;
+    }
+    index++;
+  }
+
+  return `${baseSlug}-${nanoid(8)}`;
+};
+
+/**
  * Copies an EVALUATIONS_V3 experiment to another project.
  * V3 experiments store their state in workbenchState (no workflow).
  * Optionally copies saved datasets and updates references.
@@ -1240,34 +1309,11 @@ const copyEvaluationsV3Experiment = async ({
 
   // Generate unique slug for the new experiment
   const experimentName = experiment.name ?? experiment.slug;
-  const baseSlug = slugify(experimentName);
-
-  const MAX_ATTEMPTS = 100;
-  let newSlug = baseSlug;
-  let index = 2;
-  let attempts = 0;
-
-  while (attempts < MAX_ATTEMPTS) {
-    const existingExperiment = await ctx.prisma.experiment.findFirst({
-      where: {
-        projectId: targetProjectId,
-        slug: newSlug,
-      },
-    });
-
-    if (!existingExperiment) {
-      break;
-    }
-
-    newSlug = `${baseSlug}-${index}`;
-    index++;
-    attempts++;
-  }
-
-  // Fallback to random suffix if we hit the limit
-  if (attempts >= MAX_ATTEMPTS) {
-    newSlug = `${baseSlug}-${nanoid(8)}`;
-  }
+  const newSlug = await generateUniqueExperimentSlug({
+    baseSlug: slugify(experimentName),
+    projectId: targetProjectId,
+    prisma: ctx.prisma,
+  });
 
   // Create the new experiment
   const newExperiment = await ctx.prisma.experiment.create({
