@@ -1,17 +1,21 @@
 /**
- * Suites page - Create, manage, and run simulation suites.
+ * Unified simulations page — the primary view for all simulation runs.
  *
- * Uses a query parameter `?suite=<slug>` to select a suite:
- *   /simulations/suites              (all runs view)
- *   /simulations/suites?suite=my-slug (specific suite view)
+ * Rendered by multiple Next.js page files under /simulations/:
+ *   /simulations                              (all runs view)
+ *   /simulations/run-plans/:suiteSlug         (suite detail)
+ *   /simulations/run-plans/:suiteSlug/:batchId (suite detail, scroll to batch)
+ *   /simulations/:externalSetSlug             (external set detail)
+ *   /simulations/:externalSetSlug/:batchId    (external set, scroll to batch)
  *
- * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
+ * Layout: sidebar (search, +New Run Plan, All Runs, suite list) + main panel.
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
@@ -35,17 +39,46 @@ import {
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useDrawer } from "~/hooks/useDrawer";
+import { NowProvider } from "./NowProvider";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-function SuitesPageContent() {
+export default function SimulationsPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
   const utils = api.useContext();
-  const { selectedSuiteSlug, navigateToSuite } = useSuiteRouting();
+  const { selectedSuiteSlug, navigateToSuite, highlightBatchId } = useSuiteRouting();
+
+  // Auto-open run detail drawer when redirected from old individual run URL
+  const router = useRouter();
+  useEffect(() => {
+    if (!router.isReady) return;
+    const openRunId = router.query.openRun;
+    if (typeof openRunId === "string" && openRunId) {
+      openDrawer("scenarioRunDetail", {
+        urlParams: { scenarioRunId: openRunId },
+      });
+      // Remove the query param to avoid re-opening on navigation
+      const { openRun: _, ...restQuery } = router.query;
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, { shallow: true });
+    }
+  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Read pending batch from URL query param (set by "Save and Run" redirect)
+  const [urlPendingBatchId, setUrlPendingBatchId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!router.isReady) return;
+    const pendingBatch = router.query.pendingBatch;
+    if (typeof pendingBatch === "string" && pendingBatch) {
+      setUrlPendingBatchId(pendingBatch);
+      // Remove the query param to keep URL clean
+      const { pendingBatch: _, ...restQuery } = router.query;
+      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, { shallow: true });
+    }
+  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { period, setPeriod } = usePeriodSelector(30);
 
   // State
@@ -192,7 +225,7 @@ function SuitesPageContent() {
     },
   });
 
-  const { requestRun, isPending: isRunPending, dialogProps: runDialogProps } = useRunSuite({
+  const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
     onRunScheduled: () => {
       void utils.suites.getSummaries.invalidate();
     },
@@ -273,12 +306,13 @@ function SuitesPageContent() {
   );
 
   return (
+    <NowProvider>
     <DashboardLayout>
       <VStack width="full" height="full" gap={0}>
         {/* Top row: heading + buttons */}
         <PageLayout.Header withBorder={false}>
           <HStack justify="space-between" align="center" w="full">
-            <PageLayout.Heading>Run Plans</PageLayout.Heading>
+            <PageLayout.Heading>Simulations</PageLayout.Heading>
             <HStack>
               <PeriodSelector period={period} setPeriod={setPeriod} />
               <PageLayout.HeaderButton onClick={handleNewSuite}>
@@ -292,6 +326,7 @@ function SuitesPageContent() {
         <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
           {/* Sidebar */}
           <SuiteSidebar
+            projectSlug={project?.slug ?? ""}
             suites={suites ?? []}
             selectedSuiteSlug={selectedSuiteSlug}
             runSummaries={runSummaries}
@@ -330,8 +365,10 @@ function SuitesPageContent() {
                 onEditSuite={handleEditSuite}
                 onRunSuite={handleRunSuite}
                 isRunning={isRunPending}
+                pendingBatchRunId={pendingBatchRunId ?? urlPendingBatchId}
                 period={period}
                 suiteNameMap={suiteNameMap}
+                highlightBatchId={highlightBatchId}
               />
             </Box>
           </Box>
@@ -363,6 +400,7 @@ function SuitesPageContent() {
       <SuiteRunConfirmationDialog {...runDialogProps} />
 
     </DashboardLayout>
+    </NowProvider>
   );
 }
 
@@ -376,8 +414,10 @@ function MainPanel({
   onEditSuite,
   onRunSuite,
   isRunning,
+  pendingBatchRunId,
   period,
   suiteNameMap,
+  highlightBatchId,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -388,13 +428,15 @@ function MainPanel({
   onEditSuite: (id: string) => void;
   onRunSuite: (id: string) => void;
   isRunning: boolean;
+  pendingBatchRunId: string | null;
   period: Period;
   suiteNameMap: Map<string, string>;
+  highlightBatchId: string | null;
 }) {
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
-        <Text color="red.500">Error loading run plans</Text>
+        <Text color="red.500">Error loading simulations</Text>
         <Text fontSize="sm" color="fg.muted">
           {error.message}
         </Text>
@@ -407,11 +449,11 @@ function MainPanel({
   }
 
   if (selectedExternalSetId) {
-    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} />;
+    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} highlightBatchId={highlightBatchId} />;
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {
-    return <RunHistoryPanel period={period} suiteNameMap={suiteNameMap} />;
+    return <RunHistoryPanel period={period} suiteNameMap={suiteNameMap} pendingBatchRunId={pendingBatchRunId} highlightBatchId={highlightBatchId} />;
   }
 
   if (selectedSuite) {
@@ -421,7 +463,9 @@ function MainPanel({
         onEdit={() => onEditSuite(selectedSuite.id)}
         onRun={() => onRunSuite(selectedSuite.id)}
         isRunning={isRunning}
+        pendingBatchRunId={pendingBatchRunId}
         period={period}
+        highlightBatchId={highlightBatchId}
       />
     );
   }
@@ -433,7 +477,3 @@ function MainPanel({
 
   return <SuiteEmptyState onNewSuite={onNewSuite} />;
 }
-
-export default withPermissionGuard("scenarios:view", {
-  layoutComponent: DashboardLayout,
-})(SuitesPageContent);

@@ -5,7 +5,6 @@ Feature: Suite run validation for organization-scoped prompts
 
   Background:
     Given I am logged into project "my-project" in organization "my-org"
-    And the feature flag "release_ui_suites_enabled" is enabled
 
   # ============================================================================
   # Run Validation — Organization-Scoped Prompts

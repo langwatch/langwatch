@@ -279,7 +279,10 @@ export const DashboardLayout = ({
   compactMenu: compactMenuProp = false,
   ...props
 }: DashboardLayoutProps) => {
-  const isSmallScreen = useBreakpointValue({ base: true, lg: false });
+  // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
+  // so the menu starts expanded and only compacts after hydration on small screens.
+  // This avoids the compact→expanded flicker on desktop page navigations.
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
 

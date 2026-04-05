@@ -12,16 +12,23 @@ import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
+import { computeIterationMap } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunMetricsSummary } from "./RunMetricsSummary";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
-type RunRowProps = {
+type RunRowLoadingProps = {
+  loading: true;
+  suiteName?: string;
+};
+
+type RunRowDataProps = {
+  loading?: false;
   batchRun: BatchRun;
   summary: BatchRunSummary;
   isExpanded: boolean;
@@ -35,9 +42,61 @@ type RunRowProps = {
   onCancelAll?: () => void;
   isCancellingBatch?: boolean;
   cancellingJobId?: string | null;
+  isHighlighted?: boolean;
 };
 
-export function RunRow({
+type RunRowProps = RunRowLoadingProps | RunRowDataProps;
+
+export function RunRow(props: RunRowProps) {
+  if (props.loading) {
+    return <RunRowLoading suiteName={props.suiteName} />;
+  }
+  return <RunRowData {...props} />;
+}
+
+function RunRowLoading({ suiteName }: { suiteName?: string }) {
+  return (
+    <Box>
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
+        <HStack
+          width="full"
+          paddingX={4}
+          paddingY={3}
+          gap={3}
+          flexWrap="nowrap"
+          bg="bg.subtle/50"
+          backdropFilter="blur(4px)"
+          data-testid="run-row-header"
+          borderRadius="lg"
+          boxShadow="xs"
+        >
+          <Spinner size="xs" color="fg.muted" css={{ flexShrink: 0, height: "14px", width: "14px" }} />
+          {suiteName && (
+            <>
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
+                {suiteName}
+              </Text>
+              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                &middot;
+              </Text>
+            </>
+          )}
+          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+            Starting...
+          </Text>
+          <Box flex={1} />
+          {/* Invisible spacer matching RunMetricsSummary pill height */}
+          <Box paddingY={1} paddingX={2} borderRadius="lg" border="1px solid transparent">
+            <Text fontSize="12px" visibility="hidden">&nbsp;</Text>
+          </Box>
+        </HStack>
+      </Box>
+      <Box padding={2} />
+    </Box>
+  );
+}
+
+function RunRowData({
   batchRun,
   summary,
   isExpanded,
@@ -51,12 +110,11 @@ export function RunRow({
   onCancelAll,
   isCancellingBatch = false,
   cancellingJobId,
-}: RunRowProps) {
+  isHighlighted = false,
+}: RunRowDataProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
-  const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
-  const scenarioNames = suiteName
-    ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
-    : "";
+  const now = useNow();
+  const timeAgo = formatTimeAgoCompact(batchRun.timestamp, now);
 
   const iterationMap = useMemo(
     () => computeIterationMap({ scenarioRuns: batchRun.scenarioRuns }),
@@ -70,7 +128,16 @@ export function RunRow({
   const hasCancellableRuns = cancellableCount > 0;
 
   return (
-    <Box>
+    <Box
+      data-batch-id={batchRun.batchRunId}
+      css={isHighlighted ? {
+        "@keyframes yellowFlash": {
+          "0%": { backgroundColor: "rgba(234, 179, 8, 0.3)" },
+          "100%": { backgroundColor: "transparent" },
+        },
+        animation: "yellowFlash 2s ease-out",
+      } : undefined}
+    >
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
       <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack
@@ -100,16 +167,6 @@ export function RunRow({
             <>
               <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
                 {suiteName}
-              </Text>
-              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-                &middot;
-              </Text>
-            </>
-          )}
-          {scenarioNames && (
-            <>
-              <Text fontSize="sm" color="fg.muted" truncate minWidth={0} flexShrink={1}>
-                {scenarioNames}
               </Text>
               <Text fontSize="sm" color="fg.muted" flexShrink={0}>
                 &middot;

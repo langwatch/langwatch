@@ -31,6 +31,7 @@ import {
   getPassRateGradientColor,
   PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
@@ -42,27 +43,11 @@ import { SearchInput } from "../ui/SearchInput";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
-/** 1px border line + soft downward shadow, matching the prompt playground divider. */
-function ShadowDivider() {
-  return (
-    <Box width="full" flexShrink={0} position="relative">
-      <Box
-        width="full"
-        height="1px"
-        bg="border.muted"
-      />
-      <Box
-        width="full"
-        height="4px"
-        background="linear-gradient(to bottom, var(--chakra-colors-border-muted), transparent)"
-        opacity={0.4}
-      />
-    </Box>
-  );
-}
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 
 
 type SuiteSidebarProps = {
+  projectSlug: string;
   suites: SimulationSuite[];
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   runSummaries?: Map<string, SuiteRunSummary>;
@@ -76,6 +61,7 @@ type SuiteSidebarProps = {
 const SKELETON_COUNT = 6;
 
 export function SuiteSidebar({
+  projectSlug,
   suites,
   selectedSuiteSlug,
   runSummaries,
@@ -163,6 +149,7 @@ export function SuiteSidebar({
           <SidebarButton
             icon={<List size={14} />}
             label="All Runs"
+            href={`/${projectSlug}/simulations`}
             isSelected={selectedSuiteSlug === ALL_RUNS_ID}
             onClick={() => onSelectSuite(ALL_RUNS_ID)}
           />
@@ -248,6 +235,7 @@ export function SuiteSidebar({
             <SuiteListItem
               key={suite.id}
               suite={suite}
+              projectSlug={projectSlug}
               isSelected={suite.slug === selectedSuiteSlug}
               runSummary={runSummaries?.get(suite.id)}
               onSelect={() => onSelectSuite(suite.slug)}
@@ -317,6 +305,7 @@ export function SuiteSidebar({
                 <ExternalSetListItem
                   key={extSet.scenarioSetId}
                   externalSet={extSet}
+                  projectSlug={projectSlug}
                   isSelected={
                     selectedSuiteSlug ===
                     toExternalSetSelection(extSet.scenarioSetId)
@@ -353,17 +342,25 @@ export function SuiteSidebar({
 function SidebarButton({
   icon,
   label,
+  href,
   isSelected = false,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  href?: string;
   isSelected?: boolean;
   onClick: () => void;
 }) {
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.button === 1) return;
+    e.preventDefault();
+    onClick();
+  };
+
   return (
     <HStack
-      as="button"
+      asChild
       width="full"
       paddingX={2}
       paddingY={1.5}
@@ -371,11 +368,15 @@ function SidebarButton({
       cursor="pointer"
       bg={isSelected ? "bg.emphasized" : "transparent"}
       _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
-      onClick={onClick}
+      onClick={handleClick}
       gap={2}
+      textDecoration="none"
+      color="inherit"
     >
-      {icon}
-      <Text fontSize="sm">{label}</Text>
+      <a href={href ?? "#"}>
+        {icon}
+        <Text fontSize="sm">{label}</Text>
+      </a>
     </HStack>
   );
 }
@@ -410,6 +411,7 @@ function RunSummaryLine({
 
 function SidebarListItemWrapper({
   isSelected,
+  href,
   onClick,
   onContextMenu,
   className,
@@ -417,14 +419,23 @@ function SidebarListItemWrapper({
   children,
 }: {
   isSelected: boolean;
+  href?: string;
   onClick: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   className?: string;
   "data-testid"?: string;
   children: React.ReactNode;
 }) {
+  const handleClick = (e: React.MouseEvent) => {
+    // Allow cmd+click / ctrl+click / middle-click to open in new tab naturally
+    if (e.metaKey || e.ctrlKey || e.button === 1) return;
+    e.preventDefault();
+    onClick();
+  };
+
   return (
     <HStack
+      asChild
       className={className}
       data-testid={dataTestId}
       data-selected={isSelected || undefined}
@@ -437,9 +448,11 @@ function SidebarListItemWrapper({
       border={isSelected ? "1px solid border.emphasized" : "none"}
       _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
       onContextMenu={onContextMenu}
-      onClick={onClick}
+      onClick={handleClick}
       justify="space-between"
       width="full"
+      textDecoration="none"
+      color="inherit"
       _before={{
         content: '""',
         position: "absolute",
@@ -452,13 +465,16 @@ function SidebarListItemWrapper({
         display: isSelected ? "block" : "none",
       }}
     >
-      {children}
+      <a href={href ?? "#"}>
+        {children}
+      </a>
     </HStack>
   );
 }
 
 function SuiteListItem({
   suite,
+  projectSlug,
   isSelected,
   runSummary,
   onSelect,
@@ -466,16 +482,19 @@ function SuiteListItem({
   onContextMenu,
 }: {
   suite: SimulationSuite;
+  projectSlug: string;
   isSelected: boolean;
   runSummary?: SuiteRunSummary;
   onSelect: () => void;
   onRun: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const now = useNow();
   return (
     <SidebarListItemWrapper
       className="group"
       data-testid="suite-list-item"
+      href={`/${projectSlug}/simulations/run-plans/${suite.slug}`}
       isSelected={isSelected}
       onClick={onSelect}
       onContextMenu={onContextMenu}
@@ -494,7 +513,7 @@ function SuiteListItem({
           <Spacer />
           {runSummary?.lastRunTimestamp && (
             <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
-              {formatTimeAgoCompact(runSummary.lastRunTimestamp)}
+              {formatTimeAgoCompact(runSummary.lastRunTimestamp, now)}
             </Text>
           )}
           <HStack gap={0} flexShrink={0}>
@@ -555,16 +574,20 @@ function SuiteListItem({
 /** Read-only list item for external SDK/CI sets. No Run button or context menu. */
 function ExternalSetListItem({
   externalSet,
+  projectSlug,
   isSelected,
   onSelect,
 }: {
   externalSet: ExternalSetSummary;
+  projectSlug: string;
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const now = useNow();
   return (
     <SidebarListItemWrapper
       data-testid="external-set-list-item"
+      href={`/${projectSlug}/simulations/${externalSet.scenarioSetId}`}
       isSelected={isSelected}
       onClick={onSelect}
     >
@@ -582,7 +605,7 @@ function ExternalSetListItem({
           <Spacer />
           {externalSet.lastRunTimestamp && (
             <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
-              {formatTimeAgoCompact(externalSet.lastRunTimestamp)}
+              {formatTimeAgoCompact(externalSet.lastRunTimestamp, now)}
             </Text>
           )}
         </HStack>
