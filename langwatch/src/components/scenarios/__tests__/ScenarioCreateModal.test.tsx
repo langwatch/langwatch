@@ -6,8 +6,8 @@ import { render, screen, within, fireEvent, waitFor } from "@testing-library/rea
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
 
-// Mock useOrganizationTeamProject
-const mockProject = {
+// Mock useOrganizationTeamProject — use vi.fn so per-test overrides are possible
+let mockProject: { id: string; slug: string; defaultModel?: string } = {
   id: "project-123",
   slug: "my-project",
 };
@@ -63,6 +63,9 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      reportLimitBlocked: {
+        useMutation: () => ({ mutate: vi.fn() }),
+      },
     },
     useContext: () => ({
       scenarios: {
@@ -74,21 +77,25 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-// Mock ModelSelector hooks
+// Mock ModelSelector hooks — use a vi.fn so per-test overrides are possible
+const mockUseModelSelectionOptions = vi.fn().mockReturnValue({
+  modelOption: { isDisabled: false },
+});
+
 vi.mock("../../ModelSelector", () => ({
   allModelOptions: [],
-  useModelSelectionOptions: () => ({
-    modelOption: { isDisabled: false },
-  }),
+  useModelSelectionOptions: (..._args: unknown[]) => mockUseModelSelectionOptions(),
 }));
 
-// Create a variable for mock that can be modified per test
+// Create variables for mock that can be modified per test
 let mockHasEnabledProviders = true;
+let mockProviders: Record<string, { enabled: boolean }> = {};
 
 // Mock useModelProvidersSettings
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
   useModelProvidersSettings: () => ({
     hasEnabledProviders: mockHasEnabledProviders,
+    providers: mockProviders,
     isLoading: false,
   }),
 }));
@@ -131,6 +138,11 @@ describe("<ScenarioCreateModal/>", () => {
     mockToasterCreate.mockClear();
     // Reset to having providers by default
     mockHasEnabledProviders = true;
+    mockProviders = { openai: { enabled: true } };
+    // Reset project to default (no Azure)
+    mockProject = { id: "project-123", slug: "my-project" };
+    // Reset model selection to enabled (default OpenAI model in registry)
+    mockUseModelSelectionOptions.mockReturnValue({ modelOption: { isDisabled: false } });
 
     // Mock fetch for AI generation
     global.fetch = vi.fn().mockResolvedValue({
@@ -346,6 +358,7 @@ describe("<ScenarioCreateModal/>", () => {
       mockToasterCreate.mockClear();
       // Set to no providers
       mockHasEnabledProviders = false;
+      mockProviders = {};
     });
 
     it("shows warning message instead of form", () => {
@@ -377,5 +390,102 @@ describe("<ScenarioCreateModal/>", () => {
       const dialog = getDialogContent();
       expect(within(dialog).queryByRole("button", { name: /generate with ai/i })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("when default model is Azure deployment not in registry", () => {
+  describe("when azure provider IS enabled", () => {
+    beforeEach(() => {
+      mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
+      // modelOption=undefined because azure deployment is not in the static registry
+      mockUseModelSelectionOptions.mockReturnValue({ modelOption: undefined });
+      // Azure provider IS enabled
+      mockHasEnabledProviders = true;
+      mockProviders = { azure: { enabled: true } };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ scenario: mockGeneratedScenario }),
+      });
+    });
+
+    it("does not show No model provider configured warning", () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).queryByText("No model provider configured")).not.toBeInTheDocument();
+    });
+
+    it("proceeds with generation when description is provided", async () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      const textarea = within(dialog).getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when azure provider is NOT enabled but another provider is", () => {
+    beforeEach(() => {
+      mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
+      // modelOption=undefined because azure deployment is not in the static registry
+      mockUseModelSelectionOptions.mockReturnValue({ modelOption: undefined });
+      // hasEnabledProviders=true simulates: OpenAI is configured, but Azure is NOT configured
+      // yet the project's default model is azure/my-gpt4-deployment
+      mockHasEnabledProviders = true;
+      mockProviders = { openai: { enabled: true } };
+
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ scenario: mockGeneratedScenario }),
+      });
+    });
+
+    it("shows API key error when generating because azure provider is not configured", async () => {
+      render(
+        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      const textarea = within(dialog).getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "Test azure scenario" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+
+      await waitFor(() => {
+        expect(within(dialog).getByText(/api keys not configured/i)).toBeInTheDocument();
+      });
+    });
+  });
+});
+
+
+describe("when default model is Azure and provider is NOT configured at all", () => {
+  beforeEach(() => {
+    mockProject = { id: "project-123", slug: "my-project", defaultModel: "azure/my-gpt4-deployment" };
+    mockUseModelSelectionOptions.mockReturnValue({ modelOption: undefined });
+    mockHasEnabledProviders = false;
+    mockProviders = {};
+  });
+
+  it("shows No model provider configured warning", () => {
+    render(
+      <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+      { wrapper: Wrapper }
+    );
+
+    const dialog = getDialogContent();
+    expect(within(dialog).getByText("No model provider configured")).toBeInTheDocument();
   });
 });

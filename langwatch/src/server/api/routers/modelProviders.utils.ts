@@ -294,7 +294,5 @@ export const prepareLitellmParams = async ({
     });
   }
 
-  // TODO: add azure deployment as params.model as azure/<deployment-name>
-
   return params;
 };
