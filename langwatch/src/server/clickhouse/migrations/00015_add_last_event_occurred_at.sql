@@ -25,23 +25,11 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
 -- +goose ENVSUB OFF
 
 -- +goose Down
--- +goose ENVSUB ON
--- +goose StatementBegin
-
-ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
-  DROP COLUMN IF EXISTS LastEventOccurredAt;
-
-ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs
-  DROP COLUMN IF EXISTS LastEventOccurredAt;
-
-ALTER TABLE ${CLICKHOUSE_DATABASE}.suite_runs
-  DROP COLUMN IF EXISTS LastEventOccurredAt;
-
-ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_runs
-  DROP COLUMN IF EXISTS lastEventOccurredAt;
-
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
-  DROP COLUMN IF EXISTS lastEventOccurredAt;
-
--- +goose StatementEnd
--- +goose ENVSUB OFF
+-- Down migrations are intentionally commented out to prevent accidental data loss.
+-- To roll back, uncomment and run manually.
+--
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs DROP COLUMN IF EXISTS LastEventOccurredAt;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs DROP COLUMN IF EXISTS LastEventOccurredAt;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.suite_runs DROP COLUMN IF EXISTS LastEventOccurredAt;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_runs DROP COLUMN IF EXISTS lastEventOccurredAt;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS lastEventOccurredAt;

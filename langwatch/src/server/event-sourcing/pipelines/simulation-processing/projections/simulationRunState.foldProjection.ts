@@ -46,16 +46,6 @@ export interface SimulationMessageRow {
 }
 
 /**
- * Statuses that represent a completed run — the run has a final verdict
- * and must not be regressed by late-arriving lifecycle events (queued, started).
- */
-const TERMINAL_STATUSES = new Set(["SUCCESS", "FAILURE", "ERROR", "CANCELLED"]);
-
-function isTerminalStatus(status: string): boolean {
-  return TERMINAL_STATUSES.has(status);
-}
-
-/**
  * State data for a simulation run.
  * Matches the simulation_runs ClickHouse table schema.
  *
@@ -171,11 +161,10 @@ export class SimulationRunStateFoldProjection
       BatchRunId: event.data.batchRunId,
       ScenarioSetId: event.data.scenarioSetId,
       Name: event.data.name ?? null,
-      // Don't regress from a terminal status if this event arrives late
-      Status: isTerminalStatus(state.Status) ? state.Status : "QUEUED",
+      Status: "QUEUED",
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
-      QueuedAt: state.QueuedAt ?? event.occurredAt,
+      QueuedAt: event.occurredAt,
     };
   }
 
@@ -192,9 +181,8 @@ export class SimulationRunStateFoldProjection
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
-      // Don't regress from a terminal status if this event arrives late
-      Status: isTerminalStatus(state.Status) ? state.Status : "IN_PROGRESS",
-      StartedAt: state.StartedAt ?? event.occurredAt,
+      Status: "IN_PROGRESS",
+      StartedAt: event.occurredAt,
     };
   }
 

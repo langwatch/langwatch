@@ -68,7 +68,10 @@ export interface FoldProjectionDefinition<
   /**
    * Loads all events for an aggregate, sorted by occurredAt ASC.
    * Used by the executor to re-fold from scratch when out-of-order events are detected.
-   * When not provided, out-of-order events are applied incrementally (no re-fold).
+   *
+   * Auto-wired by EventSourcingService at registration time — projections don't
+   * need to provide this themselves. Optional at the type level because it's set
+   * after construction, but always present at runtime.
    */
   eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<E[]>;
 }

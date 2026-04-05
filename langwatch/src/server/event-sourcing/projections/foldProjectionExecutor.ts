@@ -49,9 +49,16 @@ export class FoldProjectionExecutor {
       typeof eventOccurredAt === "number" &&
       eventOccurredAt > 0 &&
       typeof prevLastOccurred === "number" &&
-      eventOccurredAt < prevLastOccurred &&
-      projection.eventLoader
+      eventOccurredAt < prevLastOccurred
     ) {
+      if (!projection.eventLoader) {
+        logger.warn(
+          { projection: projection.name, aggregateId: context.aggregateId },
+          "Out-of-order event detected but no eventLoader available — cannot re-fold",
+        );
+        await projection.store.store(state, context);
+        return state;
+      }
       logger.info(
         {
           projection: projection.name,
