@@ -59,21 +59,23 @@ export class FoldProjectionExecutor {
         await projection.store.store(state, context);
         return state;
       }
-      logger.info(
-        {
-          projection: projection.name,
-          aggregateId: context.aggregateId,
-          eventType: event.type,
-          eventOccurredAt,
-          prevLastOccurred,
-        },
-        "Out-of-order event detected, re-folding from scratch",
-      );
-
       const allEvents = await projection.eventLoader({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
       });
+
+      logger.info(
+        {
+          projection: projection.name,
+          aggregateId: context.aggregateId,
+          tenantId: context.tenantId,
+          eventType: event.type,
+          eventOccurredAt,
+          prevLastOccurred,
+          refoldEventCount: allEvents.length,
+        },
+        "Out-of-order event detected, re-folding from scratch",
+      );
 
       state = projection.init();
       for (const e of allEvents) {
