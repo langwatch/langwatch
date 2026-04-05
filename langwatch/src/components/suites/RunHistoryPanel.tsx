@@ -40,6 +40,7 @@ import {
 } from "./run-history-transforms";
 import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
 import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { useScrollToBatch } from "./useScrollToBatch";
 
 export type RunHistoryStats = {
   runCount: number;
@@ -59,6 +60,8 @@ type RunHistoryPanelProps = {
   suiteNameMap?: Map<string, string>;
   /** When true, shows an initializing placeholder while the run mutation is in flight */
   isRunStarting?: boolean;
+  /** When set, the matching batch row is scrolled into view and highlighted. */
+  highlightBatchId?: string | null;
 };
 
 export function RunHistoryPanel({
@@ -68,6 +71,7 @@ export function RunHistoryPanel({
   expectedJobCount,
   suiteNameMap,
   isRunStarting,
+  highlightBatchId,
 }: RunHistoryPanelProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -253,6 +257,9 @@ export function RunHistoryPanel({
       lastActivityTimestamp,
     });
   }, [totals, lastActivityTimestamp, onStatsReady]);
+
+  // Scroll-to-batch highlighting
+  const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
 
   const isPlatformManaged = (setId: string | undefined) =>
     !!setId && (isOnPlatformSet(setId) || isSuiteSetId(setId));
@@ -446,6 +453,7 @@ export function RunHistoryPanel({
                     onCancelAll={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? () => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
+                    isHighlighted={highlightedBatchId === batchRun.batchRunId}
                   />
                 );
               })

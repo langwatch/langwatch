@@ -1,4 +1,7 @@
-import SimulationSetPage from "./[batchRunId]";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import SimulationsPage from "~/components/suites/SimulationsPage";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-// Main layout for a single Simulation Set page
-export default SimulationSetPage;
+export default withPermissionGuard("scenarios:view", {
+  layoutComponent: DashboardLayout,
+})(SimulationsPage);

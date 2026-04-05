@@ -28,6 +28,7 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
+import { useScrollToBatch } from "./useScrollToBatch";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -39,6 +40,7 @@ import { useRunHistoryStore } from "./useRunHistoryStore";
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
   period: Period;
+  highlightBatchId?: string | null;
 };
 
 /** Group-by options available for external sets (no target). */
@@ -49,11 +51,13 @@ const EXTERNAL_GROUP_BY_OPTIONS = availableGroupByOptions({
 export function ExternalSetDetailPanel({
   scenarioSetId,
   period,
+  highlightBatchId,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const hasAutoExpanded = useRef(false);
+  const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
 
   // Use shared zustand store for groupBy, viewMode, and filters
   const groupBy = useRunHistoryStore((s) => s.groupBy);
@@ -309,6 +313,7 @@ export function ExternalSetDetailPanel({
                           resolveTargetName={resolveTargetName}
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
+                          isHighlighted={highlightedBatchId === batchRun.batchRunId}
                         />
                       );
                     })

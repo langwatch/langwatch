@@ -7,28 +7,17 @@ Feature: Suite Workflow — Create, Run, See Results
 
   Background:
     Given I am logged into project "my-project"
-    And the feature flag "release_ui_suites_enabled" is enabled
 
   # ============================================================================
-  # Navigation & Feature Flag
+  # Navigation
   # ============================================================================
+  # Navigation and URL routing scenarios moved to simulation-runs-page.feature
 
   @integration
-  Scenario: Suites nav link visible when feature flag enabled
-    When I view the main navigation
-    Then I see a "Suites" link under Simulations
-
-  @integration
-  Scenario: Suites nav link hidden when feature flag disabled
-    Given the feature flag "release_ui_suites_enabled" is disabled
-    When I view the main navigation
-    Then I do not see a "Suites" link
-
-  @integration
-  Scenario: Navigate to suites page
-    When I click "Suites" in the main navigation
-    Then I am on the suites page
-    And I see the sidebar with "+ New Suite" button
+  Scenario: Navigate to simulations page
+    When I click "Simulation Runs" in the main navigation
+    Then I am on the simulations page
+    And I see the sidebar with "+ New Run Plan" button
     And I see "All Runs" link in the sidebar
 
   # ============================================================================
@@ -435,18 +424,18 @@ Feature: Suite Workflow — Create, Run, See Results
   # ============================================================================
 
   @integration
-  Scenario: Suite page uses standard PageLayout header
-    When I am on the suites page
-    Then I see a "Suites" heading at the top of the page
-    And the sidebar does not show a duplicate "Suites" label
+  Scenario: Simulations page uses standard PageLayout header
+    When I am on the simulations page
+    Then I see a "Simulations" heading at the top of the page
+    And the sidebar does not show a duplicate "Simulations" label
 
   @integration
-  Scenario: Suite page sidebar fills available height below header
-    When I am on the suites page with many suites
+  Scenario: Simulations page sidebar fills available height below header
+    When I am on the simulations page with many suites
     Then the sidebar scrolls independently within its bounded height
     And the main panel scrolls independently
 
   @integration
   Scenario: DashboardLayout wraps the page exactly once
-    When I am on the suites page
+    When I am on the simulations page
     Then the standard page layout and navigation appear exactly once

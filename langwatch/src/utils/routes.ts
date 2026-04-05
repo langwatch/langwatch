@@ -128,7 +128,7 @@ export const projectRoutes = {
   },
   simulation_runs: {
     path: "/[project]/simulations",
-    title: "Run History",
+    title: "Simulation Runs",
     parent: "simulations",
   },
   scenarios: {
@@ -141,9 +141,24 @@ export const projectRoutes = {
     title: "Run Plans",
     parent: "simulations",
   },
-  simulations_batch: {
-    path: "/[project]/simulations/[scenarioSetId]/[batchRunId]",
-    title: "Runs",
+  simulations_suite_detail: {
+    path: "/[project]/simulations/run-plans/[suiteSlug]",
+    title: "Run Plan",
+    parent: "simulations",
+  },
+  simulations_suite_batch: {
+    path: "/[project]/simulations/run-plans/[suiteSlug]/[batchId]",
+    title: "Run Plan",
+    parent: "simulations",
+  },
+  simulations_external_set: {
+    path: "/[project]/simulations/[externalSetSlug]",
+    title: "Simulation Run",
+    parent: "simulations",
+  },
+  simulations_external_batch: {
+    path: "/[project]/simulations/[externalSetSlug]/[batchId]",
+    title: "Simulation Run",
     parent: "simulations",
   },
   simulations_run: {

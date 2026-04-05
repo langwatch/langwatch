@@ -9,6 +9,5 @@ export * from "./SimulationChatViewer";
 export * from "./SimulationChatWrapper";
 export * from "./SimulationLayout";
 export * from "./SimulationResults";
-export * from "./SimulationZoomGrid";
 export * from "./set-run-history-sidebar";
 export * from "./simulation-console/SimulationConsole";

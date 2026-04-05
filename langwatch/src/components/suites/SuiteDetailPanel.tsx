@@ -39,6 +39,7 @@ type SuiteDetailPanelProps = {
   onRun: () => void;
   isRunning?: boolean;
   period: Period;
+  highlightBatchId?: string | null;
 };
 
 export function SuiteDetailPanel({
@@ -47,6 +48,7 @@ export function SuiteDetailPanel({
   onRun,
   isRunning = false,
   period,
+  highlightBatchId,
 }: SuiteDetailPanelProps) {
   const targets = (() => {
     try {
@@ -169,6 +171,7 @@ export function SuiteDetailPanel({
         onStatsReady={setLiveStats}
         period={period}
         isRunStarting={isRunning}
+        highlightBatchId={highlightBatchId}
       />
     </VStack>
   );

@@ -1,5 +1,6 @@
 import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
@@ -55,6 +56,7 @@ export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
   const { closeDrawer, openDrawer } = useDrawer();
   const rawComplexProps = getComplexProps();
   const complexPropsData =
@@ -223,7 +225,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
       const form = formInstance;
-      if (!form || !project?.id) return;
+      if (!form || !project?.id || !project?.slug) return;
       if (!target) {
         toaster.create({
           title: "Select a target",
@@ -242,7 +244,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Persist the target selection for this scenario
           persistTarget(target);
 
-          await runScenario({ scenarioId: savedScenario.id, target });
+          // Fire the run (don't await — the simulations page will show it via SSE)
+          void runScenario({ scenarioId: savedScenario.id, target });
+
+          // Close drawer and navigate to simulations page
+          onClose();
+          void router.push(`/${project.slug}/simulations`);
         })();
       } catch (error) {
         toaster.create({
@@ -254,7 +261,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, persistTarget, runScenario, formInstance],
+    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;

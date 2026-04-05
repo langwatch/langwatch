@@ -68,6 +68,9 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      reportLimitBlocked: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     useContext: () => ({
       scenarios: {
@@ -98,6 +101,17 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
+  }),
+}));
+
+vi.mock("next/router", () => ({
+  useRouter: () => ({
+    query: { project: "my-project" },
+    pathname: "/[project]/simulations/scenarios",
+    asPath: "/my-project/simulations/scenarios",
+    push: vi.fn(),
+    replace: vi.fn(),
+    isReady: true,
   }),
 }));
 

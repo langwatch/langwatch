@@ -32,6 +32,7 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: vi.fn() },
       },
     }),
     suites: {
@@ -42,6 +43,7 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -93,8 +95,10 @@ vi.mock("~/hooks/useDrawer", () => ({
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    asPath: "/my-project/simulations/suites",
+    pathname: "/[project]/simulations",
+    asPath: "/my-project/simulations",
     push: vi.fn(),
+    replace: vi.fn(),
     isReady: true,
   }),
 }));
@@ -148,25 +152,25 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the suites page", () => {
-    it("renders PageLayout.Header with a 'Run Plans' heading", async () => {
+    it("renders PageLayout.Header with a 'Simulations' heading", async () => {
       // Dynamic import to ensure mocks are applied
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+      const { default: SimulationsPage } = await import(
+        "~/components/suites/SimulationsPage"
       );
 
-      render(<SuitesPage />, { wrapper: Wrapper });
+      render(<SimulationsPage />, { wrapper: Wrapper });
 
-      const heading = screen.getByRole("heading", { name: "Run Plans" });
+      const heading = screen.getByRole("heading", { name: "Simulations" });
       expect(heading).toBeInTheDocument();
     });
 
     it("does not render DashboardLayout twice", async () => {
       dashboardLayoutRenderCount = 0;
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+      const { default: SimulationsPage } = await import(
+        "~/components/suites/SimulationsPage"
       );
 
-      render(<SuitesPage />, { wrapper: Wrapper });
+      render(<SimulationsPage />, { wrapper: Wrapper });
 
       expect(dashboardLayoutRenderCount).toBe(1);
     });
