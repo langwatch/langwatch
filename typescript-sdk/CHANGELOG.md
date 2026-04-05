@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.20.0...typescript-sdk@v0.21.0) (2026-04-05)
+
+
+### Features
+
+* **typescript-sdk:** add custom tag support (fetch, CRUD, list) ([#2841](https://github.com/langwatch/langwatch/issues/2841)) ([f8839ab](https://github.com/langwatch/langwatch/commit/f8839abea053e1fa1e879c27db193ee641add526))
+* **typescript-sdk:** add prompt label support (fetch, assign, CRUD) ([#2781](https://github.com/langwatch/langwatch/issues/2781)) ([0ce4b34](https://github.com/langwatch/langwatch/commit/0ce4b349294bb580fd09b73005252abcf2da3c45))
+
 ## [0.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.19.0...typescript-sdk@v0.20.0) (2026-03-29)
 
 
