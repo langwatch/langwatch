@@ -49,14 +49,21 @@ let _runWithConfig: (<T>(config: McpConfig, fn: () => T) => T) | undefined;
 async function loadMcpServerModules(): Promise<void> {
   if (_createMcpServer) return;
 
-  // Dynamic imports resolve via tsx at runtime — the mcp-server source
-  // is in a sibling directory, not a workspace dependency.
-  const createMod = await import(
-    /* webpackIgnore: true */ "../../../mcp-server/src/create-mcp-server"
-  );
-  const configMod = await import(
-    /* webpackIgnore: true */ "../../../mcp-server/src/config"
-  );
+  // Resolve mcp-server paths at runtime relative to this file's location.
+  // Path is constructed dynamically so tsgo does not follow the import
+  // into the mcp-server source tree (which depends on zod v4 / @modelcontextprotocol/sdk
+  // not available in langwatch's node_modules).
+  const { resolve, dirname } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const here = typeof __dirname !== "undefined"
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url));
+  const mcpBase = resolve(here, "..", "..", "..", "mcp-server", "src");
+  const createPath = resolve(mcpBase, "create-mcp-server");
+  const configPath = resolve(mcpBase, "config");
+
+  const createMod = await import(createPath);
+  const configMod = await import(configPath);
 
   _createMcpServer = createMod.createMcpServer;
   _getConfig = configMod.getConfig;
