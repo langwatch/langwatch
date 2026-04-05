@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -28,6 +28,7 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { useAutoExpansion } from "./useAutoExpansion";
 import { useScrollToBatch } from "./useScrollToBatch";
 import {
@@ -57,6 +58,7 @@ export function ExternalSetDetailPanel({
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
+  const runListRef = useRef<HTMLDivElement>(null);
 
   // Use shared zustand store for groupBy, viewMode, and filters
   const groupBy = useRunHistoryStore((s) => s.groupBy);
@@ -239,8 +241,10 @@ export function ExternalSetDetailPanel({
         </Box>
       )}
 
+      <ShadowDivider scrollRef={runListRef} />
+
       {/* Content — scrollable */}
-      <VStack align="stretch" gap={0} flex={1} overflow="auto">
+      <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
         {isLoading && (
           <VStack paddingY={8}>
             <Spinner />

@@ -24,6 +24,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
@@ -85,6 +86,8 @@ export function RunHistoryPanel({
   const setFilters = useRunHistoryStore((s) => s.setFilters);
   const syncToUrl = useRunHistoryStore((s) => s.syncToUrl);
   const hydrateFromUrl = useRunHistoryStore((s) => s.hydrateFromUrl);
+
+  const runListRef = useRef<HTMLDivElement>(null);
 
   // Hydrate from URL on mount
   const hasHydrated = useRef(false);
@@ -399,6 +402,8 @@ export function RunHistoryPanel({
         />
       </Box>
 
+      <ShadowDivider scrollRef={runListRef} />
+
       {/* Run list — own scroll container so RunRow sticky headers don't clash with filters */}
       {itemCount === 0 && !showInitPlaceholder ? (
         <Box paddingX={6} paddingY={8} textAlign="center">
@@ -411,7 +416,7 @@ export function RunHistoryPanel({
           </Text>
         </Box>
       ) : (
-        <VStack align="stretch" gap={0} flex={1} minH={0} overflow="auto">
+        <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
           {showInitPlaceholder && (
             <RunRow loading />
           )}
