@@ -183,6 +183,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
       const suites = [makeSuite()];
       render(
         <SuiteSidebar
+          projectSlug="my-project"
           suites={suites}
           selectedSuiteSlug={null}
           onSelectSuite={vi.fn()}

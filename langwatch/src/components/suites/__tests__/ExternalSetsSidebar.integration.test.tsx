@@ -52,6 +52,7 @@ function makeExternalSet(
 }
 
 const defaultProps = {
+  projectSlug: "my-project",
   suites: [] as SimulationSuite[],
   selectedSuiteSlug: null,
   onSelectSuite: vi.fn(),
