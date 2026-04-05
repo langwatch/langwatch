@@ -18,6 +18,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
+import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
 import { createLogger } from "../utils/logger/server";
@@ -29,47 +31,6 @@ const REDIS_TOKEN_PREFIX = "mcp:oauth:token:";
 
 /** OAuth token TTL in seconds. */
 const TOKEN_TTL_SECONDS = 3600;
-
-// ---------------------------------------------------------------------------
-// Lazy-loaded mcp-server functions. Loaded at runtime via dynamic import to
-// avoid dragging mcp-server source (and its deps like zod v4) into the main
-// app's TypeScript compilation scope.
-// ---------------------------------------------------------------------------
-
-interface McpConfig {
-  apiKey: string | undefined;
-  endpoint: string;
-}
-
-let _createMcpServer: (() => { connect: (t: StreamableHTTPServerTransport) => Promise<void> }) | undefined;
-let _getConfig: (() => McpConfig) | undefined;
-let _initConfig: ((args: { apiKey?: string; endpoint?: string }) => void) | undefined;
-let _runWithConfig: (<T>(config: McpConfig, fn: () => T) => T) | undefined;
-
-async function loadMcpServerModules(): Promise<void> {
-  if (_createMcpServer) return;
-
-  // Resolve mcp-server paths at runtime relative to this file's location.
-  // Path is constructed dynamically so tsgo does not follow the import
-  // into the mcp-server source tree (which depends on zod v4 / @modelcontextprotocol/sdk
-  // not available in langwatch's node_modules).
-  const { resolve, dirname } = await import("node:path");
-  const { fileURLToPath } = await import("node:url");
-  const here = typeof __dirname !== "undefined"
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url));
-  const mcpBase = resolve(here, "..", "..", "..", "mcp-server", "src");
-  const createPath = resolve(mcpBase, "create-mcp-server");
-  const configPath = resolve(mcpBase, "config");
-
-  const createMod = await import(createPath);
-  const configMod = await import(configPath);
-
-  _createMcpServer = createMod.createMcpServer;
-  _getConfig = configMod.getConfig;
-  _initConfig = configMod.initConfig;
-  _runWithConfig = configMod.runWithConfig;
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -108,10 +69,18 @@ export interface McpHandler {
  * and routes for the Streamable HTTP transport.
  */
 export function createMcpHandler(): McpHandler {
+  // Ensure the MCP config is initialized with the app's endpoint
+  try {
+    getConfig();
+  } catch {
+    initConfig({
+      endpoint: process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai",
+    });
+  }
+
   // Use Map to avoid prototype pollution — sessionId comes from user input
   const sessions = new Map<string, SessionState>();
   const oauthTokens = new Map<string, OAuthTokenEntry>();
-  let mcpModulesLoaded = false;
 
   // -------------------------------------------------------------------------
   // Session & token reaper — prevents unbounded memory from abandoned sessions
@@ -142,23 +111,6 @@ export function createMcpHandler(): McpHandler {
 
   // Allow the process to exit naturally even if the reaper is still scheduled
   reaper.unref();
-
-  // -------------------------------------------------------------------------
-  // Lazy init — load mcp-server modules and initialize config
-  // -------------------------------------------------------------------------
-
-  async function ensureMcpModulesLoaded(): Promise<void> {
-    if (mcpModulesLoaded) return;
-    await loadMcpServerModules();
-    try {
-      _getConfig!();
-    } catch {
-      _initConfig!({
-        endpoint: process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai",
-      });
-    }
-    mcpModulesLoaded = true;
-  }
 
   // -------------------------------------------------------------------------
   // Route matching
@@ -360,8 +312,8 @@ export function createMcpHandler(): McpHandler {
     apiKey: string,
     fn: () => Promise<T>,
   ): Promise<T> {
-    const baseConfig = _getConfig!();
-    return _runWithConfig!({ ...baseConfig, apiKey }, fn);
+    const baseConfig = getConfig();
+    return runWithConfig({ ...baseConfig, apiKey }, fn);
   }
 
   // -------------------------------------------------------------------------
@@ -492,7 +444,6 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     setCorsHeaders(res);
-    await ensureMcpModulesLoaded();
 
     let raw: string;
     try {
@@ -542,7 +493,7 @@ export function createMcpHandler(): McpHandler {
         }
       };
 
-      const sessionServer = _createMcpServer!();
+      const sessionServer = createMcpServer();
       await handleWithSessionConfig(apiKey, () =>
         sessionServer.connect(transport),
       );

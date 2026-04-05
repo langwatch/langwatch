@@ -27,12 +27,15 @@ ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 COPY langwatch/vendor ./langwatch/vendor
+# mcp-server is a file: dependency of langwatch — must be present before pnpm install
+COPY mcp-server/package.json mcp-server/pnpm-lock.yaml mcp-server/pnpm-workspace.yaml ./mcp-server/
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 # SDK package files needed by generate-sdk-versions.sh during build
 COPY typescript-sdk/package.json ./typescript-sdk/package.json
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
+COPY mcp-server ./mcp-server
 COPY langwatch ./langwatch
 RUN cd langwatch && pnpm run build
 EXPOSE 5560
