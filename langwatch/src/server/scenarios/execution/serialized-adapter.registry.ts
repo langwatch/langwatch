@@ -13,11 +13,13 @@ import type {
   LiteLLMParams,
   PromptConfigData,
   TargetAdapterData,
+  WorkflowAgentData,
 } from "./types";
 import {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
+  SerializedWorkflowAdapter,
 } from "./serialized.adapters";
 
 type AdapterFactory = (params: {
@@ -42,6 +44,12 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
   code: ({ data, modelParams, nlpServiceUrl }) =>
     new SerializedCodeAgentAdapter(
       data as CodeAgentData,
+      nlpServiceUrl,
+      modelParams.api_key,
+    ),
+  workflow: ({ data, modelParams, nlpServiceUrl }) =>
+    new SerializedWorkflowAdapter(
+      data as WorkflowAgentData,
       nlpServiceUrl,
       modelParams.api_key,
     ),

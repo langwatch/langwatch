@@ -201,6 +201,10 @@ export class SimulationRunnerService {
         throw new Error(
           "Code agent targets are only supported via the child process execution path",
         );
+      case "workflow":
+        throw new Error(
+          "Workflow agent targets are only supported via the child process execution path",
+        );
       default: {
         const _exhaustive: never = target.type;
         throw new Error(`Unknown target type: ${_exhaustive}`);
