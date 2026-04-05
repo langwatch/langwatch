@@ -29,7 +29,7 @@ interface Filters {
 interface RouterLike {
   query: Record<string, string | string[] | undefined>;
   push: (
-    url: { query: Record<string, string> },
+    url: { query: Record<string, string | string[]> },
     as?: undefined,
     options?: { shallow: boolean },
   ) => void;
@@ -96,10 +96,12 @@ export function createRunHistoryStore() {
       const { groupBy, filters } = get();
 
       // Preserve all existing query params (including dynamic path params
-      // like "project" which Next.js needs to interpolate the pathname).
-      const query: Record<string, string> = {};
+      // like "project" and array params like "path" for catch-all routes).
+      const query: Record<string, string | string[]> = {};
       for (const [key, val] of Object.entries(router.query)) {
         if (typeof val === "string") {
+          query[key] = val;
+        } else if (Array.isArray(val)) {
           query[key] = val;
         }
       }
