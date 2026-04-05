@@ -1,27 +1,35 @@
 -- +goose Up
 -- +goose ENVSUB ON
--- +goose StatementBegin
 
 -- Track the highest occurredAt seen across all events for each aggregate.
 -- Used by the fold projection executor to detect out-of-order events and
 -- trigger a re-fold from scratch in occurredAt order.
 
+-- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
   ADD COLUMN IF NOT EXISTS LastEventOccurredAt DateTime64(3) DEFAULT toDateTime64(0, 3) CODEC(Delta(8), ZSTD(1));
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.experiment_runs
   ADD COLUMN IF NOT EXISTS LastEventOccurredAt DateTime64(3) DEFAULT toDateTime64(0, 3) CODEC(Delta(8), ZSTD(1));
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.suite_runs
   ADD COLUMN IF NOT EXISTS LastEventOccurredAt DateTime64(3) DEFAULT toDateTime64(0, 3) CODEC(Delta(8), ZSTD(1));
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_runs
   ADD COLUMN IF NOT EXISTS lastEventOccurredAt DateTime64(3) DEFAULT toDateTime64(0, 3) CODEC(Delta(8), ZSTD(1));
+-- +goose StatementEnd
 
+-- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries
   ADD COLUMN IF NOT EXISTS lastEventOccurredAt DateTime64(3) DEFAULT toDateTime64(0, 3) CODEC(Delta(8), ZSTD(1));
-
 -- +goose StatementEnd
+
 -- +goose ENVSUB OFF
 
 -- +goose Down
