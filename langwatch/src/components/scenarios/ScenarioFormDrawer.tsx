@@ -249,12 +249,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Generate batchRunId so the simulations page can show a placeholder immediately
           const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 
-          // Fire the run (don't await — the simulations page will show it via SSE)
-          void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
-
-          // Close drawer and navigate to simulations page with pending batch
+          // Close drawer and navigate to simulations page BEFORE firing the run.
+          // This ensures onRunComplete's openDrawer captures /simulations as the
+          // current path, not /simulations/scenarios.
           onClose();
-          void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
+          await router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
+
+          // Now fire the run — onRunComplete will open the drawer on /simulations
+          void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
         })();
       } catch (error) {
         toaster.create({
