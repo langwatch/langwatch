@@ -22,7 +22,7 @@ const BATCH_SIZE = 10;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Module-level cache for getCurrentMonthCount */
-const monthCountCache = new TtlCache<number>(CACHE_TTL_MS);
+const monthCountCache = new TtlCache<number>(CACHE_TTL_MS, "ttlcache:traceUsage:monthCount:");
 
 
 /**
