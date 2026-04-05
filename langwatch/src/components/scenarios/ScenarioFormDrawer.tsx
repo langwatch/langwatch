@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
-import { useDrawerRunCallbacks } from "../../hooks/useDrawerRunCallbacks";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
@@ -68,13 +67,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
-  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
-
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
-    onRunComplete,
-    onRunFailed,
   });
   const scenarioId = props.scenarioId;
 
@@ -249,14 +244,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Generate batchRunId so the simulations page can show a placeholder immediately
           const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 
-          // Close drawer and navigate to simulations page BEFORE firing the run.
-          // This ensures onRunComplete's openDrawer captures /simulations as the
-          // current path, not /simulations/scenarios.
-          onClose();
-          await router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
-
-          // Now fire the run — onRunComplete will open the drawer on /simulations
+          // Fire the run — no callbacks, simulations page picks up via SSE
           void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
+
+          // Close drawer and navigate to simulations page
+          onClose();
+          void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
         })();
       } catch (error) {
         toaster.create({
