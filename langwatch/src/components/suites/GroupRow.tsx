@@ -51,72 +51,71 @@ export function GroupRow({
   );
 
   return (
-    <>
-      {/* Group header - clickable to expand/collapse, sticky within scroll container */}
-      <HStack
-        as="button"
-        width="full"
-        paddingX={4}
-        paddingY={3}
-        gap={3}
-        flexWrap="nowrap"
-        _hover={{ bg: "bg.subtle" }}
-        cursor="pointer"
-        onClick={onToggle}
-        role="button"
-        aria-expanded={isExpanded}
-        aria-label={`${group.groupLabel} group`}
-        position="sticky"
-        top={0}
-        zIndex={20}
-        bg="bg.muted"
-        backdropFilter="blur(12px)"
-        borderBottom="1px solid"
-        borderColor="border"
-        data-testid="group-row-header"
-      >
-        {isExpanded ? (
-          <ChevronDown size={14} style={{ flexShrink: 0 }} />
-        ) : (
-          <ChevronRight size={14} style={{ flexShrink: 0 }} />
-        )}
-        <Text fontSize="sm" fontWeight="bold" color="fg.default" truncate minWidth={0} flexShrink={1}>
-          {group.groupLabel}
-        </Text>
-        <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-          &middot;
-        </Text>
-        <Box flexShrink={0}>
-          <RunMetricsSummary summary={summary} />
-        </Box>
-        <Box flex={1} />
-        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-          {runCount} {runCount === 1 ? "run" : "runs"}
-        </Text>
-      </HStack>
+    <Box>
+      {/* Group header — same card style as RunRow */}
+      <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
+        <HStack
+          as="button"
+          width="full"
+          paddingX={4}
+          paddingY={3}
+          gap={3}
+          flexWrap="nowrap"
+          cursor="pointer"
+          onClick={onToggle}
+          className="group"
+          aria-expanded={isExpanded}
+          aria-label={`${group.groupLabel} group`}
+          bg="bg.subtle/50"
+          backdropFilter="blur(4px)"
+          data-testid="group-row-header"
+          borderRadius="lg"
+          boxShadow="xs"
+        >
+          {isExpanded ? (
+            <ChevronDown size={14} style={{ flexShrink: 0 }} />
+          ) : (
+            <ChevronRight size={14} style={{ flexShrink: 0 }} />
+          )}
+          <Text fontSize="sm" fontWeight="medium" color="fg.default" truncate minWidth={0} flexShrink={1}>
+            {group.groupLabel}
+          </Text>
+          <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+            &middot;
+          </Text>
+          <Box flexShrink={0}>
+            <RunMetricsSummary summary={summary} />
+          </Box>
+          <Box flex={1} />
+          <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+            {runCount} {runCount === 1 ? "run" : "runs"}
+          </Text>
+        </HStack>
+      </Box>
 
       {/* Expanded content - scenario runs sub-grouped by batch */}
-      {isExpanded && (
-        <>
-          {batches.map((batch) => (
-            <BatchSection
-              key={batch.batchRunId}
-              batch={batch}
-              resolveTargetName={resolveTargetName}
-              onScenarioRunClick={onScenarioRunClick}
-              viewMode={viewMode}
-              onCancelRun={onCancelRun}
-              cancellingJobId={cancellingJobId}
-            />
-          ))}
-          {group.scenarioRuns.length === 0 && (
-            <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
-              No scenario runs in this group.
-            </Text>
-          )}
-        </>
-      )}
-
-    </>
+      <Box padding={2}>
+        {isExpanded && (
+          <>
+            {batches.map((batch) => (
+              <BatchSection
+                key={batch.batchRunId}
+                batch={batch}
+                resolveTargetName={resolveTargetName}
+                onScenarioRunClick={onScenarioRunClick}
+                viewMode={viewMode}
+                onCancelRun={onCancelRun}
+                cancellingJobId={cancellingJobId}
+              />
+            ))}
+            {group.scenarioRuns.length === 0 && (
+              <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
+                No scenario runs in this group.
+              </Text>
+            )}
+          </>
+        )}
+      </Box>
+    </Box>
   );
 }
