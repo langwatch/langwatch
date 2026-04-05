@@ -413,7 +413,7 @@ export function RunHistoryPanel({
       ) : (
         <VStack align="stretch" gap={0} flex={1} minH={0} overflow="auto">
           {showInitPlaceholder && (
-            <RunInitializingPlaceholder />
+            <RunRow loading />
           )}
           {groupBy === "none"
             ? batchRuns.map((batchRun) => {
@@ -485,29 +485,3 @@ export function RunHistoryPanel({
   );
 }
 
-function RunInitializingPlaceholder() {
-  return (
-    <HStack
-      paddingX={4}
-      paddingY={3}
-      gap={3}
-      bg="bg.muted"
-      borderBottom="1px solid"
-      borderColor="border"
-      css={{
-        "@keyframes shimmer": {
-          "0%": { opacity: 0.4 },
-          "50%": { opacity: 0.7 },
-          "100%": { opacity: 0.4 },
-        },
-      }}
-    >
-      <Spinner size="xs" color="fg.muted" />
-      <Text fontSize="sm" color="fg.muted">
-        Initializing run...
-      </Text>
-      <Box flex={1} />
-      <Box bg="bg.emphasized" borderRadius="md" h="16px" w="60px" css={{ animation: "shimmer 1.5s ease-in-out infinite" }} />
-    </HStack>
-  );
-}

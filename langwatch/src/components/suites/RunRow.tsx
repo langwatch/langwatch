@@ -22,7 +22,13 @@ import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
-type RunRowProps = {
+type RunRowLoadingProps = {
+  loading: true;
+  suiteName?: string;
+};
+
+type RunRowDataProps = {
+  loading?: false;
   batchRun: BatchRun;
   summary: BatchRunSummary;
   isExpanded: boolean;
@@ -39,7 +45,53 @@ type RunRowProps = {
   isHighlighted?: boolean;
 };
 
-export function RunRow({
+type RunRowProps = RunRowLoadingProps | RunRowDataProps;
+
+export function RunRow(props: RunRowProps) {
+  if (props.loading) {
+    return <RunRowLoading suiteName={props.suiteName} />;
+  }
+  return <RunRowData {...props} />;
+}
+
+function RunRowLoading({ suiteName }: { suiteName?: string }) {
+  return (
+    <Box>
+      <Box padding={2} paddingBottom={0} width="full">
+        <HStack
+          width="full"
+          paddingX={4}
+          paddingY={3}
+          gap={3}
+          flexWrap="nowrap"
+          bg="bg.subtle/50"
+          backdropFilter="blur(4px)"
+          data-testid="run-row-header"
+          borderRadius="lg"
+          boxShadow="xs"
+        >
+          <Spinner size="xs" color="fg.muted" />
+          {suiteName && (
+            <>
+              <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
+                {suiteName}
+              </Text>
+              <Text fontSize="sm" color="fg.muted" flexShrink={0}>
+                &middot;
+              </Text>
+            </>
+          )}
+          <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
+            Initializing...
+          </Text>
+          <Box flex={1} />
+        </HStack>
+      </Box>
+    </Box>
+  );
+}
+
+function RunRowData({
   batchRun,
   summary,
   isExpanded,
@@ -54,7 +106,7 @@ export function RunRow({
   isCancellingBatch = false,
   cancellingJobId,
   isHighlighted = false,
-}: RunRowProps) {
+}: RunRowDataProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const now = useNow();
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp, now);
