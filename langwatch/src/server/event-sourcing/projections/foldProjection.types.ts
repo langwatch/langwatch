@@ -66,6 +66,13 @@ export interface FoldProjectionDefinition<
   options?: FoldProjectionOptions;
 
   /**
+   * Key name for the LastEventOccurredAt field on the state.
+   * Used by the executor to detect out-of-order events.
+   * Defaults to "LastEventOccurredAt" if not provided.
+   */
+  lastEventOccurredAtKey?: string;
+
+  /**
    * Loads all events for an aggregate, sorted by occurredAt ASC.
    * Used by the executor to re-fold from scratch when out-of-order events are detected.
    *

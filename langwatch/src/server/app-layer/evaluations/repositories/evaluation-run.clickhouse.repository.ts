@@ -39,11 +39,12 @@ interface ClickHouseEvaluationRunRecord {
   CompletedAt: number | null;
   CostId: string | null;
   LastProcessedEventId: string;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -233,6 +234,7 @@ export class EvaluationRunClickHouseRepository
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
+      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
@@ -269,6 +271,7 @@ export class EvaluationRunClickHouseRepository
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
+      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,

@@ -261,6 +261,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
+      lastEventOccurredAt: Number((record as Record<string, unknown>).LastEventOccurredAt ?? 0),
     };
   }
 
@@ -279,6 +280,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
+      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,

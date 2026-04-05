@@ -134,6 +134,11 @@ export abstract class AbstractFoldProjection<
   /** Optional processing behavior configuration. */
   options?: FoldProjectionOptions;
 
+  /** Key name for the LastEventOccurredAt field — exposed for the executor. */
+  get lastEventOccurredAtKeyName(): string {
+    return this.lastEventOccurredAtKey;
+  }
+
   /**
    * Loads all events for an aggregate, sorted by occurredAt ASC.
    * When provided, the executor re-folds from scratch if an out-of-order event is detected.

@@ -121,7 +121,7 @@ export class EventSourcingService<
           fold.eventLoader = async (ctx: { tenantId: string; aggregateId: string }) => {
             const events = await capturedEventStore.getEvents(
               ctx.aggregateId,
-              { tenantId: ctx.tenantId as any },
+              { tenantId: ctx.tenantId },
               capturedAggregateType,
             );
             return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
