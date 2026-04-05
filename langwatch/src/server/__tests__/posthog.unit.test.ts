@@ -7,6 +7,7 @@
  * - Captures events with correct distinctId, event name, and properties
  * - Includes projectId in properties when provided
  * - Silently no-ops when POSTHOG_KEY is not set
+ * - Skips capture when session has an impersonator
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -38,7 +39,7 @@ vi.mock("~/env.mjs", () => ({
 
 import { trackServerEvent } from "../posthog";
 
-describe("trackServerEvent", () => {
+describe("trackServerEvent()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -113,5 +114,113 @@ describe("trackServerEvent", () => {
         properties: { inviteCount: 3 },
       });
     });
+  });
+
+  describe("when session has an impersonator", () => {
+    it("skips capture", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "scenario_created",
+        projectId: "proj-456",
+        session: {
+          user: {
+            impersonator: { email: "admin@example.com" },
+          },
+        },
+      });
+
+      expect(mockCapture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when session has no impersonator", () => {
+    it("captures event normally", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "scenario_created",
+        projectId: "proj-456",
+        session: {
+          user: {},
+        },
+      });
+
+      expect(mockCapture).toHaveBeenCalledWith({
+        distinctId: "user-123",
+        event: "scenario_created",
+        properties: { projectId: "proj-456" },
+      });
+    });
+  });
+
+  describe("when no session is provided", () => {
+    it("captures event for backwards compatibility", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "evaluation_ran",
+        projectId: "proj-789",
+      });
+
+      expect(mockCapture).toHaveBeenCalledWith({
+        distinctId: "user-123",
+        event: "evaluation_ran",
+        properties: { projectId: "proj-789" },
+      });
+    });
+  });
+
+  describe("when session is explicitly null", () => {
+    it("captures event for backwards compatibility", () => {
+      trackServerEvent({
+        userId: "user-123",
+        event: "evaluation_ran",
+        projectId: "proj-789",
+        session: null,
+      });
+
+      expect(mockCapture).toHaveBeenCalledWith({
+        distinctId: "user-123",
+        event: "evaluation_ran",
+        properties: { projectId: "proj-789" },
+      });
+    });
+  });
+});
+
+describe("trackServerEvent() when POSTHOG_KEY is not set", () => {
+  it("skips capture silently", async () => {
+    vi.resetModules();
+
+    vi.doMock("~/env.mjs", () => ({
+      env: {
+        POSTHOG_KEY: undefined,
+        POSTHOG_HOST: undefined,
+      },
+    }));
+
+    vi.doMock("posthog-node", () => ({
+      PostHog: function () {
+        return { capture: mockCapture, shutdown: vi.fn() };
+      },
+    }));
+
+    vi.doMock("~/utils/logger/server", () => ({
+      createLogger: () => ({
+        info: vi.fn(),
+        error: vi.fn(),
+        warn: vi.fn(),
+        debug: vi.fn(),
+      }),
+    }));
+
+    mockCapture.mockClear();
+
+    const { trackServerEvent: trackNoKey } = await import("../posthog");
+
+    trackNoKey({
+      userId: "user-123",
+      event: "some_event",
+    });
+
+    expect(mockCapture).not.toHaveBeenCalled();
   });
 });
