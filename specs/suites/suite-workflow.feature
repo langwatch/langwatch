@@ -15,7 +15,7 @@ Feature: Suite Workflow — Create, Run, See Results
 
   @integration
   Scenario: Navigate to simulations page
-    When I click "Simulation Runs" in the main navigation
+    When I click "Runs" in the main navigation
     Then I am on the simulations page
     And I see the sidebar with "+ New Run Plan" button
     And I see "All Runs" link in the sidebar

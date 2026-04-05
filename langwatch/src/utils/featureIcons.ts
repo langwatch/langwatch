@@ -78,7 +78,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   simulation_runs: {
     icon: PlayCircle,
     color: "pink.500",
-    label: "Simulation Runs",
+    label: "Runs",
   },
   suites: {
     icon: FolderOpen,

@@ -1,4 +1,4 @@
-Feature: Simulation Runs Page — Unified Navigation & URL Routing
+Feature: Runs Page — Unified Navigation & URL Routing
   As a LangWatch user
   I want a single unified page for all simulation runs (SDK-driven and platform-created)
   So that I can access run history through clean URLs, navigate directly to specific batch runs,
@@ -12,9 +12,9 @@ Feature: Simulation Runs Page — Unified Navigation & URL Routing
   # ============================================================================
 
   @integration
-  Scenario: Sidebar shows "Simulation Runs" menu item without beta badge
+  Scenario: Sidebar shows "Runs" menu item without beta badge
     When I view the main navigation
-    Then I see a "Simulation Runs" link under Simulations with a play-circle icon
+    Then I see a "Runs" link under Simulations with a play-circle icon
     And the link does not have a beta badge
 
   @integration
