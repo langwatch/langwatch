@@ -8,16 +8,21 @@
  *   /simulations/run-plans/:suiteSlug         → Suite detail
  *   /simulations/:externalSetSlug/:batchId    → External set + highlight
  *
+ * Sidebar navigation uses window.history.pushState (not router.push)
+ * to avoid full Next.js page transitions.
+ *
  * @see specs/suites/simulation-runs-page.feature
  */
 import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const mockPush = vi.fn();
+const mockPushState = vi.fn();
+
 const mockRouter = {
   query: { project: "my-project" } as Record<string, string | string[] | undefined>,
   pathname: "/[project]/simulations" as string,
-  push: mockPush,
+  asPath: "/my-project/simulations" as string,
+  push: vi.fn(),
   isReady: true,
 };
 
@@ -29,10 +34,14 @@ import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting, deriveFromPath } fro
 
 describe("useSuiteRouting()", () => {
   beforeEach(() => {
-    mockPush.mockClear();
+    mockPushState.mockClear();
     mockRouter.query = { project: "my-project" };
     mockRouter.pathname = "/[project]/simulations";
+    mockRouter.asPath = "/my-project/simulations";
     mockRouter.isReady = true;
+
+    // Mock window.history.pushState for navigation tests
+    vi.spyOn(window.history, "pushState").mockImplementation(mockPushState);
   });
 
   describe("given /simulations base path (no further segments)", () => {
@@ -101,23 +110,22 @@ describe("useSuiteRouting()", () => {
   });
 
   describe("when navigateToSuite is called with a suite slug", () => {
-    it("pushes with shallow routing to /simulations/run-plans/:slug", () => {
+    it("uses pushState to update URL without full page transition", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
         result.current.navigateToSuite("critical-path");
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "critical-path" } },
-        "/my-project/simulations/run-plans/critical-path",
-        { shallow: true },
+      expect(mockPushState).toHaveBeenCalledWith(
+        null, "", "/my-project/simulations/run-plans/critical-path",
       );
+      expect(result.current.selectedSuiteSlug).toBe("critical-path");
     });
   });
 
   describe("when navigateToSuite is called with 'all-runs'", () => {
-    it("pushes with shallow routing to /simulations base path", () => {
+    it("uses pushState to navigate to /simulations", () => {
       mockRouter.pathname = "/[project]/simulations/run-plans/[suiteSlug]";
       mockRouter.query = { project: "my-project", suiteSlug: "critical-path" };
 
@@ -127,27 +135,25 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(ALL_RUNS_ID);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations", query: { project: "my-project" } },
-        "/my-project/simulations",
-        { shallow: true },
+      expect(mockPushState).toHaveBeenCalledWith(
+        null, "", "/my-project/simulations",
       );
+      expect(result.current.selectedSuiteSlug).toBe(ALL_RUNS_ID);
     });
   });
 
   describe("when navigateToSuite is called with an external set", () => {
-    it("pushes with shallow routing to /simulations/:setId", () => {
+    it("uses pushState to navigate to /simulations/:setId", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
         result.current.navigateToSuite(`${EXTERNAL_SET_PREFIX}python-examples`);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/[scenarioSetId]", query: { project: "my-project", scenarioSetId: "python-examples" } },
-        "/my-project/simulations/python-examples",
-        { shallow: true },
+      expect(mockPushState).toHaveBeenCalledWith(
+        null, "", "/my-project/simulations/python-examples",
       );
+      expect(result.current.selectedSuiteSlug).toBe(`${EXTERNAL_SET_PREFIX}python-examples`);
     });
   });
 
@@ -172,7 +178,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite("some-suite");
       });
 
-      expect(mockPush).not.toHaveBeenCalled();
+      expect(mockPushState).not.toHaveBeenCalled();
     });
   });
 });

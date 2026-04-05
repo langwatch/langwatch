@@ -156,6 +156,7 @@ describe("All Runs default selection (Issue #1771)", () => {
     mockPathname = "/[project]/simulations";
     mockPush.mockClear();
     mockReplace.mockClear();
+    vi.spyOn(window.history, "pushState").mockImplementation(vi.fn());
   });
 
   afterEach(() => {
@@ -210,11 +211,9 @@ describe("All Runs default selection (Issue #1771)", () => {
         capturedArchiveOnSuccess?.();
       });
 
-      // Archiving the currently selected suite navigates to all-runs
-      expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations", query: { project: "my-project" } },
-        "/my-project/simulations",
-        { shallow: true },
+      // Archiving the currently selected suite navigates to all-runs via pushState
+      expect(window.history.pushState).toHaveBeenCalledWith(
+        null, "", "/my-project/simulations",
       );
     });
   });

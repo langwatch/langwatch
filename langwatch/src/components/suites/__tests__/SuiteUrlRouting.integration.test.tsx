@@ -253,36 +253,36 @@ describe("Simulation Page URL Routing", () => {
   });
 
   describe("when clicking a suite in the sidebar", () => {
-    it("navigates to /simulations/run-plans/:slug", async () => {
+    it("updates URL via pushState without full page transition", async () => {
+      const pushStateSpy = vi.spyOn(window.history, "pushState").mockImplementation(vi.fn());
       const user = userEvent.setup();
 
       await renderSimulationsPage();
 
       await user.click(screen.getByText("Suite A"));
 
-      expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "suite-a" } },
-        "/my-project/simulations/run-plans/suite-a",
-        { shallow: true },
+      expect(pushStateSpy).toHaveBeenCalledWith(
+        null, "", "/my-project/simulations/run-plans/suite-a",
       );
+      pushStateSpy.mockRestore();
     });
   });
 
   describe("when clicking All Runs in the sidebar", () => {
-    it("navigates to /simulations", async () => {
+    it("updates URL via pushState without full page transition", async () => {
       mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
       mockQuery = { project: "my-project", suiteSlug: "suite-a" };
+      const pushStateSpy = vi.spyOn(window.history, "pushState").mockImplementation(vi.fn());
       const user = userEvent.setup();
 
       await renderSimulationsPage();
 
       await user.click(screen.getByText("All Runs"));
 
-      expect(mockPush).toHaveBeenCalledWith(
-        { pathname: "/[project]/simulations", query: { project: "my-project" } },
-        "/my-project/simulations",
-        { shallow: true },
+      expect(pushStateSpy).toHaveBeenCalledWith(
+        null, "", "/my-project/simulations",
       );
+      pushStateSpy.mockRestore();
     });
   });
 });

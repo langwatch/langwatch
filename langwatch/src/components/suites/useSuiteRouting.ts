@@ -8,9 +8,11 @@
  *   /simulations/:externalSetSlug               → External set
  *   /simulations/:externalSetSlug/:batchId      → External set + highlight batch
  *
+ * Sidebar navigation uses window.history.pushState to avoid full Next.js
+ * page transitions (all page files render the same SimulationsPage component).
  * Also exposes `highlightBatchId` for scroll-to-batch + yellow flash.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
 export const ALL_RUNS_ID = "all-runs" as const;
@@ -39,72 +41,90 @@ type SuiteRouting = {
 
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
+  const projectSlug = router.query.project as string | undefined;
 
-  const { selectedSuiteSlug, highlightBatchId } = deriveFromPath({
+  // Derive initial state from the router (covers hard navigations / page loads)
+  const initial = deriveFromPath({
     isReady: router.isReady,
     pathname: router.pathname,
     query: router.query,
   });
 
-  const projectSlug = router.query.project as string | undefined;
+  // Local state for the selection — updated by sidebar clicks via pushState,
+  // avoids full Next.js page transitions between different page files.
+  const [selection, setSelection] = useState(initial);
+
+  // Sync local state when router changes (hard navigation, popstate, initial load)
+  useEffect(() => {
+    const derived = deriveFromPath({
+      isReady: router.isReady,
+      pathname: router.pathname,
+      query: router.query,
+    });
+    setSelection(derived);
+  }, [router.isReady, router.pathname, router.asPath, router.query]);
+
+  // Listen for browser back/forward to re-derive selection
+  useEffect(() => {
+    const handlePopState = () => {
+      // On popstate, Next.js router will update — the effect above handles it.
+      // But for pushState-based URLs that Next.js doesn't know about, we need
+      // to parse from window.location.
+      const parsed = parseFromUrl(window.location.pathname);
+      if (parsed) {
+        setSelection(parsed);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const navigateToSuite = useCallback(
     (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
 
       // Preserve date params so period survives navigation
+      const searchParams = new URLSearchParams(window.location.search);
       const dateParams: Record<string, string> = {};
-      if (typeof router.query.startDate === "string") dateParams.startDate = router.query.startDate;
-      if (typeof router.query.endDate === "string") dateParams.endDate = router.query.endDate;
+      const startDate = searchParams.get("startDate");
+      const endDate = searchParams.get("endDate");
+      if (startDate) dateParams.startDate = startDate;
+      if (endDate) dateParams.endDate = endDate;
 
-      const dateQueryString = Object.entries(dateParams)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join("&");
+      const dateQueryString = new URLSearchParams(dateParams).toString();
 
-      // Use shallow routing to avoid full page transitions — all page files
-      // render the same SimulationsPage component, so we just need the URL
-      // to update and the component to re-derive state from the new path.
-      // We use window.history + router state to achieve this cleanly.
+      let displayUrl: string;
+      let newSelection: { selectedSuiteSlug: string; highlightBatchId: string | null };
 
       if (slug === ALL_RUNS_ID) {
-        const displayUrl = `/${projectSlug}/simulations`;
-        const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
-        void router.push(
-          { pathname: "/[project]/simulations", query: { project: projectSlug, ...dateParams } },
-          asUrl,
-          { shallow: true },
-        );
-        return;
-      }
-
-      if (isExternalSetSelection(slug)) {
+        displayUrl = `/${projectSlug}/simulations`;
+        newSelection = { selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null };
+      } else if (isExternalSetSelection(slug)) {
         const setId = extractExternalSetId(slug);
-        const displayUrl = `/${projectSlug}/simulations/${setId}`;
-        const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
-        void router.push(
-          { pathname: "/[project]/simulations/[scenarioSetId]", query: { project: projectSlug, scenarioSetId: setId, ...dateParams } },
-          asUrl,
-          { shallow: true },
-        );
-        return;
+        displayUrl = `/${projectSlug}/simulations/${setId}`;
+        newSelection = { selectedSuiteSlug: toExternalSetSelection(setId), highlightBatchId: null };
+      } else {
+        displayUrl = `/${projectSlug}/simulations/run-plans/${slug}`;
+        newSelection = { selectedSuiteSlug: slug, highlightBatchId: null };
       }
 
-      // Suite slug
-      const displayUrl = `/${projectSlug}/simulations/run-plans/${slug}`;
-      const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
-      void router.push(
-        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: projectSlug, suiteSlug: slug, ...dateParams } },
-        asUrl,
-        { shallow: true },
-      );
+      const fullUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
+
+      // Use pushState to update URL without Next.js page transition
+      window.history.pushState(null, "", fullUrl);
+      setSelection(newSelection);
     },
-    [router, projectSlug],
+    [projectSlug],
   );
 
-  return { selectedSuiteSlug, navigateToSuite, highlightBatchId };
+  return {
+    selectedSuiteSlug: selection.selectedSuiteSlug,
+    navigateToSuite,
+    highlightBatchId: selection.highlightBatchId,
+  };
 }
 
-/** Determines which selection is active from the current route. */
+/** Determines which selection is active from the current route (Next.js router). */
 export function deriveFromPath({
   isReady,
   pathname,
@@ -139,6 +159,34 @@ export function deriveFromPath({
 
   // /simulations (base path) → All Runs
   return { selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null };
+}
+
+/** Parse selection from a raw URL pathname (for pushState/popstate). */
+function parseFromUrl(pathname: string): { selectedSuiteSlug: string; highlightBatchId: string | null } | null {
+  // /project/simulations/run-plans/slug/batchId
+  const runPlansMatch = pathname.match(/\/simulations\/run-plans\/([^/]+)(?:\/([^/?]+))?/);
+  if (runPlansMatch) {
+    return {
+      selectedSuiteSlug: runPlansMatch[1]!,
+      highlightBatchId: runPlansMatch[2] ?? null,
+    };
+  }
+
+  // /project/simulations/setId/batchId (external set)
+  const externalMatch = pathname.match(/\/simulations\/(?!run-plans|scenarios|suites)([^/]+)(?:\/([^/?]+))?/);
+  if (externalMatch) {
+    return {
+      selectedSuiteSlug: toExternalSetSelection(externalMatch[1]!),
+      highlightBatchId: externalMatch[2] ?? null,
+    };
+  }
+
+  // /project/simulations (base)
+  if (pathname.match(/\/simulations\/?$/)) {
+    return { selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null };
+  }
+
+  return null;
 }
 
 function asString(val: string | string[] | undefined): string | undefined {
