@@ -39,6 +39,8 @@ const runScenarioSchema = projectSchema.extend({
   target: simulationTargetSchema,
   /** Optional set ID - defaults to internal on-platform set ID for ad-hoc runs */
   setId: z.string().optional(),
+  /** Optional client-generated batch run ID for immediate placeholder feedback */
+  batchRunId: z.string().optional(),
 });
 
 /**
@@ -57,7 +59,7 @@ export const simulationRunnerRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
-      const batchRunId = generateBatchRunId();
+      const batchRunId = input.batchRunId ?? generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();

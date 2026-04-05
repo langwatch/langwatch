@@ -12,6 +12,7 @@ import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
@@ -35,6 +36,7 @@ type RunRowProps = {
   onCancelAll?: () => void;
   isCancellingBatch?: boolean;
   cancellingJobId?: string | null;
+  isHighlighted?: boolean;
 };
 
 export function RunRow({
@@ -51,9 +53,11 @@ export function RunRow({
   onCancelAll,
   isCancellingBatch = false,
   cancellingJobId,
+  isHighlighted = false,
 }: RunRowProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
-  const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
+  const now = useNow();
+  const timeAgo = formatTimeAgoCompact(batchRun.timestamp, now);
   const scenarioNames = suiteName
     ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
     : "";
@@ -70,7 +74,16 @@ export function RunRow({
   const hasCancellableRuns = cancellableCount > 0;
 
   return (
-    <Box>
+    <Box
+      data-batch-id={batchRun.batchRunId}
+      css={isHighlighted ? {
+        "@keyframes yellowFlash": {
+          "0%": { backgroundColor: "rgba(234, 179, 8, 0.3)" },
+          "100%": { backgroundColor: "transparent" },
+        },
+        animation: "yellowFlash 2s ease-out",
+      } : undefined}
+    >
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
       <Box padding={2} paddingBottom={0} width="full" position="sticky" top={0} zIndex={20}>
         <HStack

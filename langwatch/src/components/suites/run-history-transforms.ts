@@ -122,9 +122,19 @@ const UNKNOWN_GROUP_KEY = "__unknown__";
 
 /**
  * Computes the maximum timestamp from a list of scenario runs.
+ * Used for scenario/target groups where "most recently active" ordering makes sense.
  */
 function maxTimestamp(runs: ScenarioRunData[]): number {
   return runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
+}
+
+/**
+ * Computes the minimum timestamp from a list of scenario runs.
+ * Used as the batch "creation time" so batches maintain stable ordering
+ * even when individual runs within them get updated.
+ */
+function minTimestamp(runs: ScenarioRunData[]): number {
+  return runs.reduce((min, r) => Math.min(min, r.timestamp), Infinity);
 }
 
 /**
@@ -139,7 +149,8 @@ function sortByTimestampDesc<T extends RunGroup>(groups: T[]): T[] {
  * Groups a flat list of scenario runs by their batchRunId.
  *
  * Returns batch runs sorted by timestamp descending (most recent first).
- * Each batch uses the maximum timestamp from its scenario runs.
+ * Each batch uses the minimum timestamp (creation time) from its scenario runs
+ * so batches maintain stable ordering even when individual runs update.
  * When scenarioSetIds is provided, each batch run includes its scenarioSetId.
  */
 export function groupRunsByBatchId({
@@ -162,7 +173,7 @@ export function groupRunsByBatchId({
 
   const batchRuns: BatchRun[] = [];
   for (const [batchRunId, scenarioRuns] of batchMap) {
-    const timestamp = maxTimestamp(scenarioRuns);
+    const timestamp = minTimestamp(scenarioRuns);
     const scenarioSetId = scenarioSetIds?.[batchRunId];
     batchRuns.push({
       groupKey: batchRunId,

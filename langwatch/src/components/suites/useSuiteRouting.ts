@@ -1,9 +1,16 @@
 /**
- * Hook for URL-based suite routing.
+ * Hook for path-based suite routing.
  *
- * Reads suite slug from the `?suite=` query parameter and provides
- * navigation helpers for shallow client-side transitions.
- * Also supports `?externalSet=<scenarioSetId>` for external SDK/CI sets.
+ * Derives the active selection from the URL pathname:
+ *   /simulations                                → All Runs
+ *   /simulations/run-plans/:suiteSlug           → Suite detail
+ *   /simulations/run-plans/:suiteSlug/:batchId  → Suite detail + highlight batch
+ *   /simulations/:externalSetSlug               → External set
+ *   /simulations/:externalSetSlug/:batchId      → External set + highlight batch
+ *
+ * Sidebar navigation uses router.push with a consistent internal pathname
+ * so Next.js treats all transitions as shallow (same page component).
+ * Also exposes `highlightBatchId` for scroll-to-batch + yellow flash.
  */
 import { useCallback } from "react";
 import { useRouter } from "next/router";
@@ -29,15 +36,16 @@ export function toExternalSetSelection(scenarioSetId: string): string {
 type SuiteRouting = {
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;
+  highlightBatchId: string | null;
 };
 
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
 
-  const selectedSuiteSlug = deriveSelectedSuiteSlug({
+  const { selectedSuiteSlug, highlightBatchId } = deriveFromPath({
     isReady: router.isReady,
-    suiteParam: router.query.suite,
-    externalSetParam: router.query.externalSet,
+    pathname: router.pathname,
+    query: router.query,
   });
 
   const projectSlug = router.query.project as string | undefined;
@@ -45,8 +53,6 @@ export function useSuiteRouting(): SuiteRouting {
   const navigateToSuite = useCallback(
     (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
-
-      const basePath = `/${projectSlug}/simulations/suites`;
 
       // Preserve date params so period survives navigation
       const dateParams: Record<string, string> = {};
@@ -57,62 +63,79 @@ export function useSuiteRouting(): SuiteRouting {
         .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
         .join("&");
 
-      if (isExternalSetSelection(slug)) {
+      let displayUrl: string;
+      let internalPathname: string;
+      let internalQuery: Record<string, string>;
+
+      if (slug === ALL_RUNS_ID) {
+        displayUrl = `/${projectSlug}/simulations`;
+        internalPathname = "/[project]/simulations";
+        internalQuery = { project: projectSlug, ...dateParams };
+      } else if (isExternalSetSelection(slug)) {
         const setId = extractExternalSetId(slug);
-        const qs = `externalSet=${encodeURIComponent(setId)}${dateQueryString ? `&${dateQueryString}` : ""}`;
-        void router.push(
-          {
-            pathname: "/[project]/simulations/suites",
-            query: { project: projectSlug, externalSet: setId, ...dateParams },
-          },
-          `${basePath}?${qs}`,
-          { shallow: true },
-        );
-        return;
+        displayUrl = `/${projectSlug}/simulations/${setId}`;
+        internalPathname = "/[project]/simulations/[scenarioSetId]";
+        internalQuery = { project: projectSlug, scenarioSetId: setId, ...dateParams };
+      } else {
+        displayUrl = `/${projectSlug}/simulations/run-plans/${slug}`;
+        internalPathname = "/[project]/simulations/run-plans/[suiteSlug]";
+        internalQuery = { project: projectSlug, suiteSlug: slug, ...dateParams };
       }
 
-      const selectionQs = slug === ALL_RUNS_ID ? "" : `suite=${slug}`;
-      const qs = [selectionQs, dateQueryString].filter(Boolean).join("&");
-      const asUrl = qs ? `${basePath}?${qs}` : basePath;
+      const asUrl = dateQueryString ? `${displayUrl}?${dateQueryString}` : displayUrl;
 
+      // Use router.push so Next.js knows about the new pathname/query.
+      // Even though the internal pathname differs between routes, Next.js
+      // handles the transition correctly since all page files render the
+      // same SimulationsPage component.
       void router.push(
-        {
-          pathname: "/[project]/simulations/suites",
-          query:
-            slug === ALL_RUNS_ID
-              ? { project: projectSlug, ...dateParams }
-              : { project: projectSlug, suite: slug, ...dateParams },
-        },
+        { pathname: internalPathname, query: internalQuery },
         asUrl,
-        { shallow: true },
       );
     },
     [router, projectSlug],
   );
 
-  return { selectedSuiteSlug, navigateToSuite };
+  return { selectedSuiteSlug, navigateToSuite, highlightBatchId };
 }
 
-function deriveSelectedSuiteSlug({
+/** Determines which selection is active from the current route. */
+export function deriveFromPath({
   isReady,
-  suiteParam,
-  externalSetParam,
+  pathname,
+  query,
 }: {
   isReady: boolean;
-  suiteParam: string | string[] | undefined;
-  externalSetParam: string | string[] | undefined;
-}): string | typeof ALL_RUNS_ID | null {
-  if (!isReady) return null;
+  pathname: string;
+  query: Record<string, string | string[] | undefined>;
+}): { selectedSuiteSlug: string | typeof ALL_RUNS_ID | null; highlightBatchId: string | null } {
+  if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };
 
-  if (externalSetParam) {
-    const setId = Array.isArray(externalSetParam)
-      ? externalSetParam[0]
-      : externalSetParam;
-    if (setId) return toExternalSetSelection(setId);
+  // /simulations/run-plans/[suiteSlug] or /simulations/run-plans/[suiteSlug]/[batchId]
+  if (pathname.includes("/simulations/run-plans/")) {
+    const suiteSlug = asString(query.suiteSlug);
+    const batchId = asString(query.batchId);
+    return {
+      selectedSuiteSlug: suiteSlug ?? ALL_RUNS_ID,
+      highlightBatchId: batchId ?? null,
+    };
   }
 
-  if (!suiteParam) return ALL_RUNS_ID;
+  // /simulations/[externalSetSlug]/[batchId] or /simulations/[scenarioSetId]/[batchRunId]
+  const externalSetSlug = asString(query.externalSetSlug) ?? asString(query.scenarioSetId);
+  if (externalSetSlug) {
+    const batchId = asString(query.batchId) ?? asString(query.batchRunId);
+    return {
+      selectedSuiteSlug: toExternalSetSelection(externalSetSlug),
+      highlightBatchId: batchId ?? null,
+    };
+  }
 
-  const slug = Array.isArray(suiteParam) ? suiteParam[0] : suiteParam;
-  return slug ?? ALL_RUNS_ID;
+  // /simulations (base path) → All Runs
+  return { selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null };
+}
+
+function asString(val: string | string[] | undefined): string | undefined {
+  if (Array.isArray(val)) return val[0];
+  return val;
 }

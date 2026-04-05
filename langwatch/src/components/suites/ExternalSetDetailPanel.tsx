@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -28,6 +28,8 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
+import { useAutoExpansion } from "./useAutoExpansion";
+import { useScrollToBatch } from "./useScrollToBatch";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -39,6 +41,7 @@ import { useRunHistoryStore } from "./useRunHistoryStore";
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
   period: Period;
+  highlightBatchId?: string | null;
 };
 
 /** Group-by options available for external sets (no target). */
@@ -49,11 +52,11 @@ const EXTERNAL_GROUP_BY_OPTIONS = availableGroupByOptions({
 export function ExternalSetDetailPanel({
   scenarioSetId,
   period,
+  highlightBatchId,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const hasAutoExpanded = useRef(false);
+  const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
 
   // Use shared zustand store for groupBy, viewMode, and filters
   const groupBy = useRunHistoryStore((s) => s.groupBy);
@@ -68,15 +71,6 @@ export function ExternalSetDetailPanel({
     ? groupBy
     : "none";
 
-  // Reset expanded state when groupBy changes
-  const prevGroupBy = useRef(effectiveGroupBy);
-  useEffect(() => {
-    if (prevGroupBy.current !== effectiveGroupBy) {
-      setExpandedIds(new Set());
-      hasAutoExpanded.current = false;
-      prevGroupBy.current = effectiveGroupBy;
-    }
-  }, [effectiveGroupBy]);
 
   const {
     data: runDataResult,
@@ -160,30 +154,12 @@ export function ExternalSetDetailPanel({
     return groupRunsByScenarioId({ runs: filteredRuns });
   }, [effectiveGroupBy, filteredRuns]);
 
-  // Auto-expand all rows when data first loads
-  useEffect(() => {
-    if (!hasAutoExpanded.current) {
-      if (effectiveGroupBy === "none" && batchRuns.length > 0) {
-        setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
-        hasAutoExpanded.current = true;
-      } else if (effectiveGroupBy !== "none" && groups.length > 0) {
-        setExpandedIds(new Set(groups.map((g) => g.groupKey)));
-        hasAutoExpanded.current = true;
-      }
-    }
-  }, [batchRuns, groups, effectiveGroupBy]);
-
-  const handleToggle = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
+  const { expandedIds, toggleExpanded: handleToggle } = useAutoExpansion({
+    panelKey: `external:${scenarioSetId}`,
+    groupBy: effectiveGroupBy,
+    batchRuns,
+    groups,
+  });
 
   const handleScenarioRunClick = useCallback(
     (run: ScenarioRunData) => {
@@ -309,6 +285,7 @@ export function ExternalSetDetailPanel({
                           resolveTargetName={resolveTargetName}
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
+                          isHighlighted={highlightedBatchId === batchRun.batchRunId}
                         />
                       );
                     })

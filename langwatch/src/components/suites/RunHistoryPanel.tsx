@@ -40,6 +40,7 @@ import {
 } from "./run-history-transforms";
 import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
 import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { useScrollToBatch } from "./useScrollToBatch";
 
 export type RunHistoryStats = {
   runCount: number;
@@ -57,8 +58,10 @@ type RunHistoryPanelProps = {
   expectedJobCount?: number;
   /** For All Runs view to show suite names on rows */
   suiteNameMap?: Map<string, string>;
-  /** When true, shows an initializing placeholder while the run mutation is in flight */
-  isRunStarting?: boolean;
+  /** When set, shows an initializing placeholder until this batch appears in the data */
+  pendingBatchRunId?: string | null;
+  /** When set, the matching batch row is scrolled into view and highlighted. */
+  highlightBatchId?: string | null;
 };
 
 export function RunHistoryPanel({
@@ -67,7 +70,8 @@ export function RunHistoryPanel({
   onStatsReady,
   expectedJobCount,
   suiteNameMap,
-  isRunStarting,
+  pendingBatchRunId,
+  highlightBatchId,
 }: RunHistoryPanelProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -225,6 +229,7 @@ export function RunHistoryPanel({
 
   // Auto-expansion
   const { expandedIds, toggleExpanded } = useAutoExpansion({
+    panelKey: scenarioSetId ?? "all-runs",
     groupBy,
     batchRuns,
     groups,
@@ -253,6 +258,9 @@ export function RunHistoryPanel({
       lastActivityTimestamp,
     });
   }, [totals, lastActivityTimestamp, onStatsReady]);
+
+  // Scroll-to-batch highlighting
+  const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
 
   const isPlatformManaged = (setId: string | undefined) =>
     !!setId && (isOnPlatformSet(setId) || isSuiteSetId(setId));
@@ -297,21 +305,11 @@ export function RunHistoryPanel({
     [setFilters],
   );
 
-  // Keep initializing placeholder until a NEW batch run appears.
-  // Uses useMemo so the placeholder hides in the same render that
-  // adds the new batch row — no flicker gap.
-  const batchCountAtStartRef = useRef<number | null>(null);
-  if (isRunStarting && batchCountAtStartRef.current === null) {
-    batchCountAtStartRef.current = batchRuns.length;
-  }
+  // Show initializing placeholder until the pending batch appears in the data.
   const showInitPlaceholder = useMemo(() => {
-    if (batchCountAtStartRef.current === null) return false;
-    if (batchRuns.length > batchCountAtStartRef.current) {
-      batchCountAtStartRef.current = null;
-      return false;
-    }
-    return true;
-  }, [batchRuns.length]);
+    if (!pendingBatchRunId) return false;
+    return !batchRuns.some((b) => b.batchRunId === pendingBatchRunId);
+  }, [pendingBatchRunId, batchRuns]);
 
   // --- Render ---
 
@@ -446,6 +444,7 @@ export function RunHistoryPanel({
                     onCancelAll={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? () => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
+                    isHighlighted={highlightedBatchId === batchRun.batchRunId}
                   />
                 );
               })

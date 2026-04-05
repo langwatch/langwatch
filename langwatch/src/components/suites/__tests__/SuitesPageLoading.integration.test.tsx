@@ -18,10 +18,11 @@ let allRunsPanelLoading = false;
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      suites: { getAll: { invalidate: vi.fn() } },
+      suites: { getAll: { invalidate: vi.fn() }, getSummaries: { invalidate: vi.fn() } },
     }),
     suites: {
       getAll: { useQuery: (...args: unknown[]) => mockSuitesQuery(...args) },
+      getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -68,9 +69,12 @@ vi.mock("~/hooks/useDrawer", () => ({
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    asPath: "/my-project/simulations/suites",
+    pathname: "/[project]/simulations",
+    asPath: "/my-project/simulations",
     push: vi.fn(),
+    replace: vi.fn(),
     isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   }),
 }));
 
@@ -102,7 +106,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 async function importSuitesPage(): Promise<React.ComponentType> {
-  const mod = await import("~/pages/[project]/simulations/suites/index");
+  const mod = await import("~/components/suites/SimulationsPage");
   return mod.default;
 }
 
@@ -141,10 +145,11 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
       expect(screen.queryAllByRole("status")).toHaveLength(0);
     });
 
-    it("does not render the main panel", () => {
+    it("renders the All Runs panel while sidebar loads", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      expect(screen.queryByTestId("all-runs-panel")).not.toBeInTheDocument();
+      // The All Runs panel shows immediately — it fetches data independently
+      expect(screen.queryByTestId("all-runs-panel")).toBeInTheDocument();
     });
   });
 

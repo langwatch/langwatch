@@ -10,7 +10,6 @@ Feature: Suite list view status with criteria count
 
   Background:
     Given I am logged into project "my-project"
-    And the feature flag "release_ui_suites_enabled" is enabled
 
   # --- Status label formatting ---
 

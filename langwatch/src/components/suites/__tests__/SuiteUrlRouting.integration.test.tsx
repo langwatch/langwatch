@@ -1,12 +1,15 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for suite URL routing.
+ * Integration tests for simulation page URL routing.
  *
- * Verifies that suite selection is driven by URL query param (?suite=slug),
- * navigation updates the query param, and direct navigation works correctly.
+ * Verifies that selection is driven by URL path segments:
+ *   /simulations                              → All Runs
+ *   /simulations/run-plans/:suiteSlug         → Suite detail
+ *   /simulations/:externalSetSlug             → External set
+ *   /simulations/:externalSetSlug/:batchId    → External set + highlight
  *
- * @see specs/features/suites/suite-url-routing.feature
+ * @see specs/suites/simulation-runs-page.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -27,21 +30,22 @@ vi.mock("~/hooks/useSSESubscription", () => ({
 }));
 
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
+let mockPathname = "/[project]/simulations";
 
-// Mock next/router
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    asPath: mockQuery.suite
-      ? `/my-project/simulations/suites?suite=${mockQuery.suite as string}`
-      : "/my-project/simulations/suites",
+    pathname: mockPathname,
+    asPath: "/my-project/simulations",
     push: mockPush,
+    replace: mockReplace,
     isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   }),
 }));
 
-// Mock tRPC api
 const mockSuites = [
   {
     id: "suite_a",
@@ -78,6 +82,7 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: vi.fn() },
       },
     }),
     suites: {
@@ -87,6 +92,9 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
           error: null,
         }),
+      },
+      getSummaries: {
+        useQuery: () => ({ data: {}, isLoading: false }),
       },
       archive: {
         useMutation: (opts: { onSuccess?: () => void }) => ({
@@ -111,7 +119,7 @@ vi.mock("~/utils/api", () => ({
       },
       getExternalSetSummaries: {
         useQuery: () => ({
-          data: [],
+          data: [{ scenarioSetId: "python-examples", passedCount: 5, failedCount: 1, totalCount: 6, lastRunTimestamp: Date.now() }],
           isLoading: false,
           error: null,
         }),
@@ -161,20 +169,28 @@ vi.mock("~/components/suites/SuiteDetailPanel", () => ({
   SuiteEmptyState: () => <div data-testid="suite-empty-state">No run plan selected</div>,
 }));
 
+vi.mock("~/components/suites/ExternalSetDetailPanel", () => ({
+  ExternalSetDetailPanel: ({ scenarioSetId }: { scenarioSetId: string }) => (
+    <div data-testid="external-set-panel">{scenarioSetId} details</div>
+  ),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-async function renderSuitesPage() {
-  const mod = await import("~/pages/[project]/simulations/suites/index");
-  const SuitesPage = mod.default;
-  return render(<SuitesPage />, { wrapper: Wrapper });
+async function renderSimulationsPage() {
+  const mod = await import("~/components/suites/SimulationsPage");
+  const SimulationsPage = mod.default;
+  return render(<SimulationsPage />, { wrapper: Wrapper });
 }
 
-describe("Suite URL Routing", () => {
+describe("Simulation Page URL Routing", () => {
   beforeEach(() => {
     mockPush.mockClear();
+    mockReplace.mockClear();
     mockQuery = { project: "my-project" };
+    mockPathname = "/[project]/simulations";
   });
 
   afterEach(() => {
@@ -182,73 +198,89 @@ describe("Suite URL Routing", () => {
     vi.restoreAllMocks();
   });
 
-  describe("when navigating to base suites URL (no suite param)", () => {
+  describe("when navigating to /simulations (base path)", () => {
     it("shows the all runs view", async () => {
-      mockQuery = { project: "my-project" };
-
-      await renderSuitesPage();
+      await renderSimulationsPage();
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
     });
+
+    it("displays 'Simulations' heading", async () => {
+      await renderSimulationsPage();
+
+      expect(screen.getByText("Simulations")).toBeInTheDocument();
+    });
+
+    it("displays '+ New Run Plan' button", async () => {
+      await renderSimulationsPage();
+
+      expect(screen.getByText(/New Run Plan/)).toBeInTheDocument();
+    });
   });
 
-  describe("when navigating directly to a suite URL via query param", () => {
+  describe("when navigating to /simulations/run-plans/:suiteSlug", () => {
     it("shows that suite's details", async () => {
-      mockQuery = { project: "my-project", suite: "suite-a" };
+      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
+      mockQuery = { project: "my-project", suiteSlug: "suite-a" };
 
-      await renderSuitesPage();
+      await renderSimulationsPage();
 
       expect(screen.getByTestId("suite-detail-panel")).toBeInTheDocument();
       expect(screen.getByText("Suite A details")).toBeInTheDocument();
     });
   });
 
+  describe("when navigating to /simulations/:externalSetSlug", () => {
+    it("shows the external set panel", async () => {
+      mockPathname = "/[project]/simulations/[scenarioSetId]";
+      mockQuery = { project: "my-project", scenarioSetId: "python-examples" };
+
+      await renderSimulationsPage();
+
+      expect(screen.getByTestId("external-set-panel")).toBeInTheDocument();
+      expect(screen.getByText("python-examples details")).toBeInTheDocument();
+    });
+  });
+
   describe("when navigating to a non-existent suite slug", () => {
     it("shows the empty state", async () => {
-      mockQuery = { project: "my-project", suite: "non-existent-slug" };
+      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
+      mockQuery = { project: "my-project", suiteSlug: "non-existent-slug" };
 
-      await renderSuitesPage();
+      await renderSimulationsPage();
 
       expect(screen.getByTestId("suite-empty-state")).toBeInTheDocument();
     });
   });
 
   describe("when clicking a suite in the sidebar", () => {
-    it("navigates with suite slug as query param", async () => {
-      mockQuery = { project: "my-project" };
+    it("navigates to /simulations/run-plans/:slug", async () => {
       const user = userEvent.setup();
 
-      await renderSuitesPage();
+      await renderSimulationsPage();
 
       await user.click(screen.getByText("Suite A"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/suites",
-          query: { project: "my-project", suite: "suite-a" },
-        },
-        "/my-project/simulations/suites?suite=suite-a",
-        { shallow: true },
+        { pathname: "/[project]/simulations/run-plans/[suiteSlug]", query: { project: "my-project", suiteSlug: "suite-a" } },
+        "/my-project/simulations/run-plans/suite-a",
       );
     });
   });
 
   describe("when clicking All Runs in the sidebar", () => {
-    it("removes the suite query param", async () => {
-      mockQuery = { project: "my-project", suite: "suite-a" };
+    it("navigates to /simulations", async () => {
+      mockPathname = "/[project]/simulations/run-plans/[suiteSlug]";
+      mockQuery = { project: "my-project", suiteSlug: "suite-a" };
       const user = userEvent.setup();
 
-      await renderSuitesPage();
+      await renderSimulationsPage();
 
       await user.click(screen.getByText("All Runs"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/suites",
-          query: { project: "my-project" },
-        },
-        "/my-project/simulations/suites",
-        { shallow: true },
+        { pathname: "/[project]/simulations", query: { project: "my-project" } },
+        "/my-project/simulations",
       );
     });
   });
