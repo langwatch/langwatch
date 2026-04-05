@@ -115,7 +115,6 @@ function RunRowData({
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const now = useNow();
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp, now);
-  const scenarioCount = new Set(batchRun.scenarioRuns.map((r) => r.scenarioId)).size;
 
   const iterationMap = useMemo(
     () => computeIterationMap({ scenarioRuns: batchRun.scenarioRuns }),
@@ -174,12 +173,6 @@ function RunRowData({
               </Text>
             </>
           )}
-          <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-            {scenarioCount} {scenarioCount === 1 ? "scenario" : "scenarios"}
-          </Text>
-          <Text fontSize="sm" color="fg.muted" flexShrink={0}>
-            &middot;
-          </Text>
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
             {timeAgo}
           </Text>
