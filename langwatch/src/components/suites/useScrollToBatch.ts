@@ -27,6 +27,7 @@ export function useScrollToBatch({
 
     let attempts = 0;
     let cancelled = false;
+    let highlightTimer: ReturnType<typeof setTimeout> | null = null;
 
     const poll = () => {
       if (cancelled) return;
@@ -52,7 +53,7 @@ export function useScrollToBatch({
       setHighlightedBatchId(highlightBatchId);
 
       // Clear after duration
-      setTimeout(() => {
+      highlightTimer = setTimeout(() => {
         if (!cancelled) {
           setHighlightedBatchId(null);
         }
@@ -65,6 +66,7 @@ export function useScrollToBatch({
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      if (highlightTimer) clearTimeout(highlightTimer);
     };
   }, [highlightBatchId]);
 

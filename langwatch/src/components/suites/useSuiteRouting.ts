@@ -113,8 +113,11 @@ export function useSuiteRouting(): SuiteRouting {
       // Use pushState to update URL without Next.js page transition
       window.history.pushState(null, "", fullUrl);
       setSelection(newSelection);
+
+      // Emit router event so analytics (PostHog), activity tracker, etc. still fire
+      router.events.emit("routeChangeComplete", fullUrl);
     },
-    [projectSlug],
+    [projectSlug, router.events],
   );
 
   return {
