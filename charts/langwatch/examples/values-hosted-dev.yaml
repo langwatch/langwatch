@@ -1,0 +1,80 @@
+# values-hosted-dev.yaml — Cloud dev environment (EKS/GKE/AKS). Chart-managed deps, small but real.
+# namespace: langwatch-dev
+# Usage: ./examples/helm-safe.sh install lw-dev . -f examples/values-hosted-dev.yaml
+autogen:
+  enabled: true
+
+app:
+  replicaCount: 1
+  http:
+    baseHost: "https://langwatch-dev.example.com"
+    publicUrl: "https://langwatch-dev.example.com"
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits:   { cpu: 1, memory: 2Gi }
+
+workers:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits:   { cpu: 1, memory: 2Gi }
+
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: 1, memory: 2Gi }
+
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 500m, memory: 2Gi }
+    limits:   { cpu: 1, memory: 4Gi }
+
+clickhouse:
+  chartManaged: true
+  managed:
+    replicas: 1
+    memory: 4Gi
+    cpu: 2
+    storage:
+      size: 50Gi
+
+postgresql:
+  chartManaged: true
+  auth:
+    password: ""  # autogen handles it
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 10Gi
+
+redis:
+  chartManaged: true
+  auth:
+    password: ""  # autogen handles it
+  master:
+    persistence:
+      size: 5Gi
+
+prometheus:
+  chartManaged: true
+
+ingress:
+  enabled: true
+  className: "nginx"  # or "alb" for AWS
+  hosts:
+    - host: langwatch-dev.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: langwatch-app
+                port:
+                  number: 5560
+
+cronjobs:
+  enabled: true
