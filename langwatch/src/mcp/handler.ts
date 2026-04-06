@@ -364,30 +364,37 @@ export function createMcpHandler(): McpHandler {
    * Full auth flow: extract Bearer token, resolve to API key, validate
    * against DB. Returns the API key if valid, or sends a 401 and returns null.
    */
+  function send401(res: ServerResponse, error: string): void {
+    const baseUrl =
+      process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    res.setHeader(
+      "WWW-Authenticate",
+      `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+    );
+    sendJson(res, 401, { error });
+  }
+
   async function authenticateRequest(
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<string | null> {
     const token = extractBearerToken(req);
     if (!token) {
-      sendJson(res, 401, {
-        error:
-          "Authorization: Bearer <LANGWATCH_API_KEY> header required",
-      });
+      send401(res, "Authorization required");
       return null;
     }
 
     const apiKey = await resolveApiKey(token);
     if (!apiKey) {
       authFailRateLimiter.track(getClientIp(req));
-      sendJson(res, 401, { error: "Invalid or expired token" });
+      send401(res, "Invalid or expired token");
       return null;
     }
 
     const project = await validateApiKey(apiKey);
     if (!project) {
       authFailRateLimiter.track(getClientIp(req));
-      sendJson(res, 401, { error: "Invalid API key" });
+      send401(res, "Invalid API key");
       return null;
     }
 
@@ -665,12 +672,12 @@ export function createMcpHandler(): McpHandler {
 
       const token = extractBearerToken(req);
       if (!token) {
-        sendJson(res, 401, { error: "Authorization header required" });
+        send401(res, "Authorization header required");
         return;
       }
       const apiKey = await resolveApiKey(token);
       if (apiKey !== session.apiKey) {
-        sendJson(res, 401, { error: "Bearer token does not match session" });
+        send401(res, "Bearer token does not match session");
         return;
       }
 
@@ -741,12 +748,12 @@ export function createMcpHandler(): McpHandler {
 
       const token = extractBearerToken(req);
       if (!token) {
-        sendJson(res, 401, { error: "Authorization header required" });
+        send401(res, "Authorization header required");
         return;
       }
       const apiKey = await resolveApiKey(token);
       if (apiKey !== session.apiKey) {
-        sendJson(res, 401, { error: "Bearer token does not match session" });
+        send401(res, "Bearer token does not match session");
         return;
       }
 
@@ -770,12 +777,12 @@ export function createMcpHandler(): McpHandler {
 
       const token = extractBearerToken(req);
       if (!token) {
-        sendJson(res, 401, { error: "Authorization header required" });
+        send401(res, "Authorization header required");
         return;
       }
       const apiKey = await resolveApiKey(token);
       if (apiKey !== session.apiKey) {
-        sendJson(res, 401, { error: "Bearer token does not match session" });
+        send401(res, "Bearer token does not match session");
         return;
       }
 
