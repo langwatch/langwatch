@@ -6,7 +6,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID, createHash } from "node:crypto";
 import type { Server } from "node:http";
 
-import { getConfig, runWithConfig } from "./config.js";
+import { getConfig, runWithConfig, requireApiKey } from "./config.js";
 import { createMcpServer } from "./create-mcp-server.js";
 
 /**
@@ -218,7 +218,7 @@ export async function startHttpServer({
         }
       };
 
-      const sessionServer = createMcpServer();
+      const sessionServer = createMcpServer(requireApiKey);
       await handleWithSessionConfig(apiKey, () =>
         sessionServer.connect(transport)
       );
@@ -287,7 +287,7 @@ export async function startHttpServer({
     const transport = new SSEServerTransport("/messages", res);
     sseSessions[transport.sessionId] = { transport, apiKey };
 
-    const sessionServer = createMcpServer();
+    const sessionServer = createMcpServer(requireApiKey);
 
     // Clean up when the SSE connection closes
     res.on("close", () => {
