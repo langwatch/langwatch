@@ -55,17 +55,22 @@ function createRateLimiter({
   const entries = new Map<string, RateLimitEntry>();
 
   return {
-    isAllowed(ip: string): boolean {
+    /** Check if the IP is within the rate limit (does NOT increment). */
+    isBlocked(ip: string): boolean {
       const now = Date.now();
       const entry = entries.get(ip);
-
+      if (!entry || now - entry.windowStart > windowMs) return false;
+      return entry.count >= maxRequests;
+    },
+    /** Record a request for this IP (increments the counter). */
+    track(ip: string): void {
+      const now = Date.now();
+      const entry = entries.get(ip);
       if (!entry || now - entry.windowStart > windowMs) {
         entries.set(ip, { count: 1, windowStart: now });
-        return true;
+      } else {
+        entry.count++;
       }
-
-      entry.count++;
-      return entry.count <= maxRequests;
     },
     /** Remove expired entries (call from reaper). */
     sweep() {
@@ -258,8 +263,11 @@ export function createMcpHandler(): McpHandler {
   }
 
   function getClientIp(req: IncomingMessage): string {
-    const forwarded = req.headers["x-forwarded-for"];
-    if (typeof forwarded === "string") return forwarded.split(",")[0]!.trim();
+    // Use socket address only — X-Forwarded-For is client-controlled and
+    // would let attackers bypass rate limits by spoofing different IPs.
+    // Behind a reverse proxy (K8s, Cloudflare), the socket address is the
+    // proxy's IP, which means rate limiting is per-proxy not per-client.
+    // This is acceptable: the proxy itself limits concurrent connections.
     return req.socket.remoteAddress ?? "unknown";
   }
 
@@ -357,14 +365,14 @@ export function createMcpHandler(): McpHandler {
 
     const apiKey = await resolveApiKey(token);
     if (!apiKey) {
-      authFailRateLimiter.isAllowed(getClientIp(req)); // track failure
+      authFailRateLimiter.track(getClientIp(req));
       sendJson(res, 401, { error: "Invalid or expired token" });
       return null;
     }
 
     const project = await validateApiKey(apiKey);
     if (!project) {
-      authFailRateLimiter.isAllowed(getClientIp(req)); // track failure
+      authFailRateLimiter.track(getClientIp(req));
       sendJson(res, 401, { error: "Invalid API key" });
       return null;
     }
@@ -467,10 +475,12 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     // Rate limit token endpoint per IP
-    if (!oauthRateLimiter.isAllowed(getClientIp(req))) {
+    const ip = getClientIp(req);
+    if (oauthRateLimiter.isBlocked(ip)) {
       sendJson(res, 429, { error: "Too many requests" });
       return;
     }
+    oauthRateLimiter.track(ip);
 
     let raw: string;
     try {
@@ -550,18 +560,19 @@ export function createMcpHandler(): McpHandler {
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    // Existing session — verify Bearer token matches, then handle request
+    // Existing session — require Bearer token and verify it matches
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
 
-      // Re-authenticate: verify the Bearer token resolves to the same API key
       const token = extractBearerToken(req);
-      if (token) {
-        const apiKey = await resolveApiKey(token);
-        if (apiKey !== session.apiKey) {
-          sendJson(res, 401, { error: "Bearer token does not match session" });
-          return;
-        }
+      if (!token) {
+        sendJson(res, 401, { error: "Authorization header required" });
+        return;
+      }
+      const apiKey = await resolveApiKey(token);
+      if (apiKey !== session.apiKey) {
+        sendJson(res, 401, { error: "Bearer token does not match session" });
+        return;
       }
 
       session.lastActivityAt = Date.now();
@@ -573,9 +584,9 @@ export function createMcpHandler(): McpHandler {
 
     // New session — must be an initialize request
     if (!sessionId && isInitializeRequest(body)) {
-      // Rate limit failed auth attempts
+      // Rate limit failed auth attempts (check only — track on failure in authenticateRequest)
       const ip = getClientIp(req);
-      if (!authFailRateLimiter.isAllowed(ip)) {
+      if (authFailRateLimiter.isBlocked(ip)) {
         sendJson(res, 429, { error: "Too many requests" });
         return;
       }
@@ -628,6 +639,18 @@ export function createMcpHandler(): McpHandler {
 
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
+
+      const token = extractBearerToken(req);
+      if (!token) {
+        sendJson(res, 401, { error: "Authorization header required" });
+        return;
+      }
+      const apiKey = await resolveApiKey(token);
+      if (apiKey !== session.apiKey) {
+        sendJson(res, 401, { error: "Bearer token does not match session" });
+        return;
+      }
+
       session.lastActivityAt = Date.now();
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res),
@@ -646,14 +669,15 @@ export function createMcpHandler(): McpHandler {
     if (sessionId && sessions.has(sessionId)) {
       const session = sessions.get(sessionId)!;
 
-      // Verify the Bearer token matches the session owner
       const token = extractBearerToken(req);
-      if (token) {
-        const apiKey = await resolveApiKey(token);
-        if (apiKey !== session.apiKey) {
-          sendJson(res, 401, { error: "Bearer token does not match session" });
-          return;
-        }
+      if (!token) {
+        sendJson(res, 401, { error: "Authorization header required" });
+        return;
+      }
+      const apiKey = await resolveApiKey(token);
+      if (apiKey !== session.apiKey) {
+        sendJson(res, 401, { error: "Bearer token does not match session" });
+        return;
       }
 
       await session.transport.close();
