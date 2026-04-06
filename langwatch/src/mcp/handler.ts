@@ -15,6 +15,7 @@
  */
 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -88,11 +89,17 @@ function createRateLimiter({
 // Types
 // ---------------------------------------------------------------------------
 
-/** Per-session state: the transport and the API key provided at session creation. */
+/** Per-session state for Streamable HTTP transport. */
 interface SessionState {
   transport: StreamableHTTPServerTransport;
   apiKey: string;
   lastActivityAt: number;
+}
+
+/** Per-session state for legacy SSE transport. */
+interface SseSessionState {
+  transport: SSEServerTransport;
+  apiKey: string;
 }
 
 /** OAuth token entry stored in memory and Redis. */
@@ -132,6 +139,7 @@ export function createMcpHandler(): McpHandler {
 
   // Use Map to avoid prototype pollution — sessionId comes from user input
   const sessions = new Map<string, SessionState>();
+  const sseSessions = new Map<string, SseSessionState>();
   const oauthTokens = new Map<string, OAuthTokenEntry>();
 
   // Rate limiters
@@ -185,6 +193,8 @@ export function createMcpHandler(): McpHandler {
   const MCP_ROUTES = new Set([
     "/mcp",
     "/mcp/health",
+    "/sse",
+    "/messages",
     "/.well-known/oauth-authorization-server",
     "/oauth/token",
   ]);
@@ -689,6 +699,59 @@ export function createMcpHandler(): McpHandler {
   }
 
   // -------------------------------------------------------------------------
+  // Legacy SSE transport handlers (ChatGPT, etc.)
+  // -------------------------------------------------------------------------
+
+  async function handleSseConnect(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const apiKey = await authenticateRequest(req, res);
+    if (!apiKey) return;
+
+    const transport = new SSEServerTransport("/messages", res);
+    sseSessions.set(transport.sessionId, { transport, apiKey });
+
+    const sessionServer = createMcpServer();
+
+    res.on("close", () => {
+      sseSessions.delete(transport.sessionId);
+    });
+
+    await handleWithSessionConfig(apiKey, () =>
+      sessionServer.connect(transport),
+    );
+  }
+
+  async function handleSseMessage(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const url = new URL(req.url ?? "", "http://localhost");
+    const sessionId = url.searchParams.get("sessionId");
+
+    if (!sessionId || !sseSessions.has(sessionId)) {
+      sendJson(res, 400, { error: "Invalid or missing session ID" });
+      return;
+    }
+
+    const session = sseSessions.get(sessionId)!;
+
+    const raw = await readBody(req);
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    await handleWithSessionConfig(session.apiKey, () =>
+      session.transport.handlePostMessage(req, res, body),
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // Main request dispatcher
   // -------------------------------------------------------------------------
 
@@ -742,6 +805,20 @@ export function createMcpHandler(): McpHandler {
               sendJson(res, 405, { error: "Method not allowed" });
           }
           break;
+        case "/sse":
+          if (method === "GET") {
+            await handleSseConnect(req, res);
+          } else {
+            sendJson(res, 405, { error: "Method not allowed" });
+          }
+          break;
+        case "/messages":
+          if (method === "POST") {
+            await handleSseMessage(req, res);
+          } else {
+            sendJson(res, 405, { error: "Method not allowed" });
+          }
+          break;
         default:
           sendJson(res, 404, { error: "Not found" });
       }
@@ -768,6 +845,10 @@ export function createMcpHandler(): McpHandler {
     for (const [id, session] of sessions) {
       session.transport.close().catch(() => {});
       sessions.delete(id);
+    }
+    for (const [id, session] of sseSessions) {
+      session.transport.close().catch(() => {});
+      sseSessions.delete(id);
     }
   }
 
