@@ -85,6 +85,17 @@ describe("ScenarioExecutionPool", () => {
 
       expect(spawnedJobs).toHaveLength(0);
     });
+
+    it("calls onSkipCancelled so the terminal event is written", () => {
+      const onSkip = vi.fn();
+      pool.setOnSkipCancelled(onSkip);
+
+      pool.markCancelled("run-1");
+      pool.submit(makeJob("run-1"));
+
+      expect(onSkip).toHaveBeenCalledTimes(1);
+      expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunId: "run-1" }));
+    });
   });
 
   describe("when cancel arrives for a pending job", () => {
@@ -103,6 +114,22 @@ describe("ScenarioExecutionPool", () => {
       // run-3 should NOT have been spawned
       expect(spawnedJobs).toHaveLength(2);
       expect(pool.pendingCount).toBe(0);
+    });
+
+    it("calls onSkipCancelled for the skipped pending job", async () => {
+      const onSkip = vi.fn();
+      pool.setOnSkipCancelled(onSkip);
+
+      pool.submit(makeJob("run-1"));
+      pool.submit(makeJob("run-2"));
+      pool.submit(makeJob("run-3")); // pending
+
+      pool.markCancelled("run-3");
+      pool.deregisterChild("run-1");
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(onSkip).toHaveBeenCalledTimes(1);
+      expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunId: "run-3" }));
     });
   });
 

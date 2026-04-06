@@ -30,12 +30,16 @@ export interface ExecutionJobData {
 /** Function that spawns a child process for a scenario job. Returns when child exits. */
 export type SpawnFunction = (jobData: ExecutionJobData) => Promise<void>;
 
+/** Called when the pool skips a cancelled job. Responsible for writing the terminal event. */
+export type OnSkipCancelledFn = (jobData: ExecutionJobData) => void;
+
 export class ScenarioExecutionPool {
   private readonly _running = new Map<string, ChildProcess>();
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
   private _spawnFn: SpawnFunction | null = null;
+  private _onSkipCancelled: OnSkipCancelledFn | null = null;
 
   constructor({ concurrency }: { concurrency: number }) {
     this._concurrency = concurrency;
@@ -44,6 +48,11 @@ export class ScenarioExecutionPool {
   /** Set the spawn function. Called once during wiring (after deps are available). */
   setSpawnFunction(fn: SpawnFunction): void {
     this._spawnFn = fn;
+  }
+
+  /** Set the callback for when a cancelled job is skipped. Writes finished(CANCELLED). */
+  setOnSkipCancelled(fn: OnSkipCancelledFn): void {
+    this._onSkipCancelled = fn;
   }
 
   /** Number of currently running child processes. */
@@ -99,7 +108,8 @@ export class ScenarioExecutionPool {
   submit(jobData: ExecutionJobData): void {
     // Skip if already cancelled before we even start
     if (this._cancelled.has(jobData.scenarioRunId)) {
-      logger.info({ scenarioRunId: jobData.scenarioRunId }, "Skipping cancelled job");
+      logger.info({ scenarioRunId: jobData.scenarioRunId }, "Skipping cancelled job, dispatching finished(CANCELLED)");
+      this._onSkipCancelled?.(jobData);
       return;
     }
     if (this._running.size < this._concurrency) {
@@ -151,7 +161,8 @@ export class ScenarioExecutionPool {
 
       // Skip cancelled jobs in the pending queue
       if (this._cancelled.has(next.scenarioRunId)) {
-        logger.info({ scenarioRunId: next.scenarioRunId }, "Skipping cancelled pending job");
+        logger.info({ scenarioRunId: next.scenarioRunId }, "Skipping cancelled pending job, dispatching finished(CANCELLED)");
+        this._onSkipCancelled?.(next);
         continue;
       }
 

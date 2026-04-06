@@ -450,6 +450,13 @@ export async function startScenarioProcessor(
     await executeScenarioRun(jobData, pool, deps);
   });
 
+  // Wire the callback for when the pool skips a cancelled job —
+  // dispatch finished(CANCELLED) so the run reaches terminal state
+  pool.setOnSkipCancelled((jobData) => {
+    logger.info({ scenarioRunId: jobData.scenarioRunId }, "Dispatching finished(CANCELLED) for skipped cancelled job");
+    void handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
+  });
+
   // Subscribe to cancellation signals from the event-sourcing reactor
   const subscriber = connection.duplicate();
   const unsubscribe = await subscribeToCancellations({
@@ -461,9 +468,9 @@ export async function startScenarioProcessor(
           { scenarioRunId: message.scenarioRunId, pid: child.pid },
           "Killing child process via event-sourcing cancel broadcast",
         );
-        pool.markCancelled(message.scenarioRunId);
         child.kill("SIGTERM");
       }
+      pool.markCancelled(message.scenarioRunId);
     },
   });
 
