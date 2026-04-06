@@ -213,7 +213,7 @@ function RunRowData({
               aria-disabled={isCancellingBatch}
               data-testid="cancel-all-button"
             >
-              {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+              {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} />}
               <Text fontSize="xs">Stop</Text>
             </HStack>
           )}

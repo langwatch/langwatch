@@ -85,7 +85,7 @@ export function ScenarioGridCard({
           aria-disabled={isCancelling}
           data-testid="cancel-run-button"
         >
-          {isCancelling ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+          {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
           <Text fontSize="xs">Stop</Text>
         </HStack>
       )}
