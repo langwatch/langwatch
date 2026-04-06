@@ -282,11 +282,11 @@ const dispatchToClickHouse = async (
       occurredAt: Date.now(),
     });
   } catch (error) {
-    logger.warn(
+    logger.error(
       { error, runId, projectId: project.id },
-      "Failed to dispatch startExperimentRun to CH — aborting CH dual-write for this batch",
+      "Failed to dispatch startExperimentRun to CH — aborting dispatch for this batch",
     );
-    return; // Without start, individual results would be orphaned
+    throw error; // CH is the sole data store — surface the failure
   }
 
   // Dispatch target and evaluator results — best-effort, log failures
@@ -366,31 +366,28 @@ const dispatchToClickHouse = async (
   // Per-evaluation processing pipeline dispatches
   {
     const app = getApp();
-    for (const evaluation of batchEvaluation.evaluations) {
-      // Use a deterministic ID so repeated API calls (e.g. SDK progress
-      // updates) don't create duplicate evaluation aggregates.
+    const evalPromises = batchEvaluation.evaluations.map((evaluation) => {
       const targetId = evaluation.target_id ?? "";
       const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
-      try {
-        await app.evaluations.reportEvaluation({
-          tenantId: project.id,
-          evaluationId,
-          evaluatorId: evaluation.evaluator,
-          evaluatorType: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
-          details: evaluation.details ?? undefined,
-          occurredAt: Date.now(),
-        });
-      } catch (err) {
+      return app.evaluations.reportEvaluation({
+        tenantId: project.id,
+        evaluationId,
+        evaluatorId: evaluation.evaluator,
+        evaluatorType: evaluation.evaluator,
+        evaluatorName: evaluation.name ?? undefined,
+        status: evaluation.status,
+        score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
+        passed: evaluation.passed ?? undefined,
+        label: evaluation.label ?? undefined,
+        details: evaluation.details ?? undefined,
+        occurredAt: Date.now(),
+      }).catch((err) => {
         logger.warn(
           { err, evaluationId, evaluator: evaluation.evaluator },
           "Failed to dispatch evaluation to evaluation processing pipeline",
         );
-      }
-    }
+      });
+    });
+    await Promise.all(evalPromises);
   }
 };

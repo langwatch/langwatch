@@ -548,7 +548,15 @@ export async function* runOrchestrator(
   const cells = generateCells(state, datasetRows, scope);
   const totalCells = cells.length;
 
-  logger.info({ runId, totalCells, scope }, "Starting orchestrator");
+  logger.info(
+    {
+      runId,
+      totalCells,
+      scopeType: scope.type,
+      targetCount: state.targets.length,
+    },
+    "Starting orchestrator",
+  );
 
   // Set running flag
   await abortManager.setRunning(runId);
