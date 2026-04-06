@@ -33,6 +33,10 @@ export default async function handler(
       return res.status(404).json({ message: "User to impersonate not found" });
     }
 
+    if (isAdmin(userToImpersonate)) {
+      return res.status(403).json({ message: "Cannot impersonate another admin" });
+    }
+
     await auditLog({
       userId: user.id,
       action: "admin/impersonate",

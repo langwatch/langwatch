@@ -11,6 +11,19 @@ import { auditLog } from "~/server/auditLog";
 import { PlanTypes, SubscriptionStatus } from "@prisma/client";
 import type { Organization, Prisma, Project, Team, User } from "@prisma/client";
 
+const ALLOWED_RESOURCES = new Set([
+  "user",
+  "organization",
+  "organizations",
+  "team",
+  "teams",
+  "project",
+  "subscription",
+  "subscriptions",
+  "organizationFeature",
+  "organizationFeatures",
+]);
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -19,6 +32,10 @@ export default async function handler(
   const user = (session?.user as any)?.impersonator ?? session?.user;
   if (!session || (session && !isAdmin(user))) {
     return res.status(404).json({ message: "Not Found" });
+  }
+
+  if (!ALLOWED_RESOURCES.has(req.body.resource)) {
+    return res.status(400).json({ message: "Unknown resource" });
   }
 
   if (req.body.resource === "organizations") {
