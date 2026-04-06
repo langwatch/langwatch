@@ -11,6 +11,7 @@ import {
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { useState } from "react";
+import { toaster } from "../../components/ui/toaster";
 import {
   DashboardLayout,
   ProjectSelector,
@@ -74,6 +75,16 @@ export default function McpAuthorize({ oauthParams }: McpAuthorizeProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const showError = (message: string) => {
+    toaster.create({
+      title: "Authorization failed",
+      description: message,
+      type: "error",
+      meta: { closable: true },
+    });
+    setIsSubmitting(false);
+  };
+
   const handleAllow = async () => {
     if (!project) return;
     setIsSubmitting(true);
@@ -92,17 +103,20 @@ export default function McpAuthorize({ oauthParams }: McpAuthorizeProps) {
         }),
       });
 
-      if (response.redirected) {
-        window.location.href = response.url;
+      const data = await response.json();
+
+      if (!response.ok) {
+        showError(data.error ?? "Unknown error");
         return;
       }
 
-      const data = await response.json();
       if (data.redirect) {
         window.location.href = data.redirect;
+      } else {
+        showError("No redirect URL received from server");
       }
-    } catch {
-      setIsSubmitting(false);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Network error");
     }
   };
 
@@ -148,7 +162,7 @@ export default function McpAuthorize({ oauthParams }: McpAuthorizeProps) {
               <Text fontSize="sm" color="fg.muted">
                 Scopes: {scopeDisplay}
               </Text>
-              <HStack width="full" gap={4}>
+              <HStack width="full" gap={2}>
                 <Button
                   colorScheme="blue"
                   onClick={handleAllow}
