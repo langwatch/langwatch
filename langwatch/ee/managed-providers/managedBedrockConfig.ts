@@ -207,11 +207,13 @@ export async function buildManagedBedrockLitellmParams({
   params.aws_secret_access_key = customerCredentials.SecretAccessKey;
   params.aws_session_token = customerCredentials.SessionToken;
   params.aws_region_name = config.region;
+  // Default to http:// for VPC-internal endpoints (NLB/PrivateLink typically don't have TLS).
+  // Full URLs with explicit scheme are passed through as-is.
   params.aws_bedrock_runtime_endpoint =
     config.bedrockProxyEndpoint.startsWith("http://") ||
     config.bedrockProxyEndpoint.startsWith("https://")
       ? config.bedrockProxyEndpoint
-      : `https://${config.bedrockProxyEndpoint}`;
+      : `http://${config.bedrockProxyEndpoint}`;
 
   delete params.api_key;
 
