@@ -201,6 +201,7 @@ export function createMcpHandler(): McpHandler {
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-authorization-server",
     "/oauth/token",
+    "/oauth/register",
   ]);
 
   function isMcpRoute(pathname: string): boolean {
@@ -500,11 +501,67 @@ export function createMcpHandler(): McpHandler {
       issuer: baseUrl,
       authorization_endpoint: `${baseUrl}/mcp/authorize`,
       token_endpoint: `${baseUrl}/oauth/token`,
+      registration_endpoint: `${baseUrl}/oauth/register`,
       token_endpoint_auth_methods_supported: ["none"],
       grant_types_supported: ["authorization_code"],
       response_types_supported: ["code"],
       code_challenge_methods_supported: ["S256"],
       scopes_supported: ["mcp:tools"],
+    });
+  }
+
+  async function handleOAuthRegister(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request body too large") {
+        sendJson(res, 413, { error: "Request body too large" });
+        return;
+      }
+      throw err;
+    }
+
+    let body: {
+      redirect_uris?: string[];
+      client_name?: string;
+      [key: string]: unknown;
+    };
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: "invalid_client_metadata" });
+      return;
+    }
+
+    // RFC 7591: redirect_uris is REQUIRED for authorization_code grant
+    if (
+      !body.redirect_uris ||
+      !Array.isArray(body.redirect_uris) ||
+      body.redirect_uris.length === 0
+    ) {
+      sendJson(res, 400, {
+        error: "invalid_client_metadata",
+        error_description: "redirect_uris is required",
+      });
+      return;
+    }
+
+    // Generate a client_id — we don't restrict which clients can use the
+    // OAuth flow, so any registration succeeds. The real authorization
+    // happens at the consent page where the user picks a project.
+    const clientId = `mcp_${randomUUID().replace(/-/g, "")}`;
+
+    sendJson(res, 201, {
+      client_id: clientId,
+      client_name: body.client_name ?? "MCP Client",
+      redirect_uris: body.redirect_uris,
+      grant_types: ["authorization_code"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
     });
   }
 
@@ -882,6 +939,13 @@ export function createMcpHandler(): McpHandler {
         case "/.well-known/oauth-authorization-server":
           if (method === "GET") {
             handleOAuthMetadata(req, res);
+          } else {
+            sendJson(res, 405, { error: "Method not allowed" });
+          }
+          break;
+        case "/oauth/register":
+          if (method === "POST") {
+            await handleOAuthRegister(req, res);
           } else {
             sendJson(res, 405, { error: "Method not allowed" });
           }
