@@ -348,4 +348,81 @@ datasetCmd
       process.exit(1);
     }
   });
+
+datasetCmd
+  .command("update <slugOrId>")
+  .description("Update a dataset name or columns")
+  .option("--name <name>", "New dataset name")
+  .option("--columns <columns>", "New column definitions (e.g. input:string,output:string)")
+  .action(async (slugOrId: string, options: { name?: string; columns?: string }) => {
+    try {
+      const { updateCommand: updateDatasetImpl } = await import("./commands/dataset/update.js");
+      await updateDatasetImpl(slugOrId, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+// Records subcommand group
+const recordsCmd = datasetCmd
+  .command("records")
+  .description("Manage dataset records");
+
+recordsCmd
+  .command("list <slugOrId>")
+  .description("List records in a dataset")
+  .option("--page <n>", "Page number (default: 1)")
+  .option("--limit <n>", "Records per page (default: 20)")
+  .action(async (slugOrId: string, options: { page?: string; limit?: string }) => {
+    try {
+      const { recordsListCommand } = await import("./commands/dataset/records-list.js");
+      await recordsListCommand(slugOrId, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+recordsCmd
+  .command("add <slugOrId>")
+  .description("Add records to a dataset")
+  .option("--json <json>", "JSON array of records (inline)")
+  .option("--stdin", "Read JSON array from stdin")
+  .action(async (slugOrId: string, options: { json?: string; stdin?: boolean }) => {
+    try {
+      const { recordsAddCommand } = await import("./commands/dataset/records-add.js");
+      await recordsAddCommand(slugOrId, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+recordsCmd
+  .command("update <slugOrId> <recordId>")
+  .description("Update a single record in a dataset")
+  .requiredOption("--json <json>", "JSON object with updated fields")
+  .action(async (slugOrId: string, recordId: string, options: { json: string }) => {
+    try {
+      const { recordsUpdateCommand } = await import("./commands/dataset/records-update.js");
+      await recordsUpdateCommand(slugOrId, recordId, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+recordsCmd
+  .command("delete <slugOrId> <recordIds...>")
+  .description("Delete records from a dataset")
+  .action(async (slugOrId: string, recordIds: string[]) => {
+    try {
+      const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
+      await recordsDeleteCommand(slugOrId, recordIds);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
 program.parse(process.argv);
