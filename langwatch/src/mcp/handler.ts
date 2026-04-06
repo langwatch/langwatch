@@ -420,6 +420,10 @@ export function createMcpHandler(): McpHandler {
     fn: () => Promise<T>,
   ): Promise<T> {
     const baseConfig = getConfig();
+    logger.debug(
+      { hasApiKey: !!apiKey, endpoint: baseConfig.endpoint },
+      "Running with session config",
+    );
     return runWithConfig({ ...baseConfig, apiKey }, fn);
   }
 
