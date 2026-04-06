@@ -84,12 +84,10 @@ import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 
 /**
  * Late-bound handle for the scenario execution reactor.
- * Set during app initialization, accessed by the worker to wire the execution pool.
+ * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-let _scenarioExecutionHandle: ScenarioExecutionReactorHandle | null = null;
-
 export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
-  return _scenarioExecutionHandle;
+  return (globalForApp as any).__scenarioExecutionHandle ?? null;
 }
 
 export function initializeWebApp(): App {
@@ -311,7 +309,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usageReportingService,
   });
   const commands = registry.registerAll();
-  _scenarioExecutionHandle = commands.scenarioExecutionHandle;
+  (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
