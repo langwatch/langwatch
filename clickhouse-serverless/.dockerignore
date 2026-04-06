@@ -1,0 +1,6 @@
+README.md
+*.md
+.git
+.gitignore
+Makefile
+tests/
