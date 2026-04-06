@@ -22,7 +22,7 @@ import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
-import { dependencies } from "../injection/dependencies.server";
+import { handleAdminImpersonationSession } from "../../ee/admin/sessionHandler";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
@@ -59,14 +59,12 @@ export const authOptions = (
   },
   callbacks: {
     session: async ({ session, user }) => {
-      if (dependencies.sessionHandler) {
-        const newSession = await dependencies.sessionHandler({
-          req,
-          session,
-          user,
-        });
-        if (newSession) return newSession;
-      }
+      const impersonatedSession = await handleAdminImpersonationSession({
+        req,
+        session,
+        user,
+      });
+      if (impersonatedSession) return impersonatedSession;
 
       if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({

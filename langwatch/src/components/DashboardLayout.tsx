@@ -28,7 +28,7 @@ import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { dependencies } from "../injection/dependencies.client";
+import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
@@ -473,9 +473,7 @@ export const DashboardLayout = ({
             {session && (
               <Portal>
                 <Menu.Content>
-                  {dependencies.ExtraMenuItems && (
-                    <dependencies.ExtraMenuItems />
-                  )}
+                  <ImpersonationSwitchBackMenuItem />
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >

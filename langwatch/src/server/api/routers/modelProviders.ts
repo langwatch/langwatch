@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import {
+  checkProjectPermission,
+  checkOrganizationPermission,
+  hasProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   validateKeyWithCustomUrl,
@@ -11,6 +15,7 @@ import {
   getProjectModelProviders,
   getProjectModelProvidersForFrontend,
 } from "./modelProviders.utils";
+import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
@@ -118,6 +123,18 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
+    }),
+
+  isManagedProvider: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        provider: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(({ input }) => {
+      return { managed: isManagedProvider(input.organizationId, input.provider) };
     }),
 
   /**

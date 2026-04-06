@@ -57,6 +57,9 @@ export const userRouter = createTRPCRouter({
     .input(z.object({}))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx }) => {
+      // Don't update lastLoginAt for impersonated sessions
+      if ((ctx.session.user as any).impersonator) return;
+
       await ctx.prisma.user.update({
         where: {
           id: ctx.session.user.id,

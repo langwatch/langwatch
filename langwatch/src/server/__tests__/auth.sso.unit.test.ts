@@ -16,8 +16,8 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-vi.mock("../../injection/dependencies.server", () => ({
-  dependencies: {},
+vi.mock("../../../ee/admin/sessionHandler", () => ({
+  handleAdminImpersonationSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../utils/auth", () => ({
