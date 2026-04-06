@@ -121,6 +121,7 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
       - app_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
     command: >
@@ -153,6 +154,7 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
       - app_modules:/app/node_modules
     command: >
       sh -c "
@@ -199,6 +201,7 @@ services:
     profiles: [workers, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
@@ -284,6 +287,7 @@ services:
     profiles: [test, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && pnpm tsx scripts/ai-server.ts"
     ports:
