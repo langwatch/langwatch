@@ -561,7 +561,7 @@ function SuiteListItem({
             </Box>
           </HStack>
         </HStack>
-        {runSummary && runSummary.totalCount > 0 && (
+        {runSummary && (
           <RunSummaryLine
             passedCount={runSummary.passedCount}
             failedCount={runSummary.failedCount}
@@ -611,13 +611,11 @@ function ExternalSetListItem({
             </Text>
           )}
         </HStack>
-        {externalSet.totalCount > 0 && (
-          <RunSummaryLine
-            passedCount={externalSet.passedCount}
-            failedCount={externalSet.failedCount}
-            totalCount={externalSet.totalCount}
-          />
-        )}
+        <RunSummaryLine
+          passedCount={externalSet.passedCount}
+          failedCount={externalSet.failedCount}
+          totalCount={externalSet.totalCount}
+        />
       </VStack>
     </SidebarListItemWrapper>
   );
