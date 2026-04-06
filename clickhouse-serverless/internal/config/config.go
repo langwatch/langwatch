@@ -22,7 +22,8 @@ type Input struct {
 	DataNodePort  int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
-	Password string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
+	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
+	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`

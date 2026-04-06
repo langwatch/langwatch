@@ -40,9 +40,6 @@ func renderKeeper(input *config.Input, configD string) error {
 		replicas[i] = map[string]any{"host": host, "port": input.DataNodePort}
 	}
 
-	// Hash the password for inter-server communication (avoids plaintext in config files)
-	secretHash := fmt.Sprintf("%x", sha256.Sum256([]byte(input.Password)))
-
 	return writeYAML(filepath.Join(configD, "keeper.yaml"), map[string]any{
 		"zookeeper": map[string]any{
 			"node":                 znodes,
@@ -56,7 +53,7 @@ func renderKeeper(input *config.Input, configD string) error {
 		},
 		"remote_servers": map[string]any{
 			input.ClusterName: map[string]any{
-				"secret_hash": secretHash,
+				"secret": map[string]string{"@from_file": input.ClusterSecretFile},
 				"shard": map[string]any{
 					"internal_replication": true,
 					"replica":             replicas,

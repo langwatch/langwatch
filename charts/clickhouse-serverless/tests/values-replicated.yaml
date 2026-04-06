@@ -8,6 +8,7 @@ storage:
 
 auth:
   password: "e2etest"
+  clusterSecret: "e2e-cluster-secret"
 
 keeper:
   resources:

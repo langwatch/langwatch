@@ -73,69 +73,6 @@ spec:
         {{- toYaml .Values.scheduling.affinity | nindent 8 }}
       {{- end }}
 
-      initContainers:
-        {{- if gt $replicas 1 }}
-        # Wait for all ClickHouse pod DNS entries to be resolvable
-        - name: dns-wait
-          image: busybox:1.37.0
-          command: ['sh', '-c']
-          args:
-            - |
-              REPLICAS={{ $replicas }}
-              NAMESPACE={{ .Release.Namespace }}
-              TIMEOUT=300; ELAPSED=0
-              for i in $(seq 0 $((REPLICAS - 1))); do
-                HOST="{{ $fullname }}-${i}.{{ $fullname }}-headless.${NAMESPACE}.svc"
-                echo "Waiting for DNS: ${HOST}"
-                until nslookup "${HOST}" >/dev/null 2>&1; do
-                  echo "  ${HOST} not resolvable yet..."
-                  sleep 2; ELAPSED=$((ELAPSED + 2))
-                  if [ "$ELAPSED" -ge "$TIMEOUT" ]; then echo "TIMEOUT after ${TIMEOUT}s"; exit 1; fi
-                done
-                echo "  ${HOST} resolved"
-              done
-              echo "All DNS entries resolvable"
-          securityContext:
-            runAsUser: 65534
-            runAsNonRoot: true
-          resources:
-            requests: { cpu: 10m, memory: 16Mi }
-            limits: { cpu: 100m, memory: 64Mi }
-        # Wait for Keeper quorum to be ready before starting ClickHouse
-        - name: keeper-wait
-          image: busybox:1.37.0
-          command: ['sh', '-c']
-          args:
-            - |
-              REPLICAS={{ $replicas }}
-              NAMESPACE={{ .Release.Namespace }}
-              QUORUM=$(( REPLICAS / 2 + 1 ))
-              TIMEOUT=300; ELAPSED=0
-              echo "Waiting for Keeper quorum (${QUORUM}/${REPLICAS})..."
-              while true; do
-                READY=0
-                for i in $(seq 0 $((REPLICAS - 1))); do
-                  HOST="{{ $fullname }}-keeper-${i}.{{ $fullname }}-keeper-headless.${NAMESPACE}.svc"
-                  if echo ruok | nc -w 2 "${HOST}" 9181 2>/dev/null | grep -q imok; then
-                    READY=$((READY + 1))
-                  fi
-                done
-                if [ "$READY" -ge "$QUORUM" ]; then
-                  echo "Keeper quorum reached: ${READY}/${REPLICAS} nodes ready"
-                  break
-                fi
-                echo "  ${READY}/${QUORUM} keepers ready, waiting..."
-                sleep 3; ELAPSED=$((ELAPSED + 3))
-                if [ "$ELAPSED" -ge "$TIMEOUT" ]; then echo "TIMEOUT after ${TIMEOUT}s"; exit 1; fi
-              done
-          securityContext:
-            runAsUser: 65534
-            runAsNonRoot: true
-          resources:
-            requests: { cpu: 10m, memory: 16Mi }
-            limits: { cpu: 100m, memory: 64Mi }
-        {{- end }}
-
       containers:
         - name: clickhouse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -161,6 +98,8 @@ spec:
               value: "/mnt/secrets/password"
 
             {{- if gt $replicas 1 }}
+            - name: CLICKHOUSE_CLUSTER_SECRET_FILE
+              value: "/mnt/secrets/cluster-secret"
             - name: CH_CLUSTER
               value: {{ .Values.clusterName | quote }}
             - name: CH_SHARD
@@ -238,7 +177,7 @@ spec:
               command:
                 - sh
                 - -c
-                - clickhouse-client --user default --password-file /mnt/secrets/password --query "SELECT 1"
+                - clickhouse-client --user default --password "$(cat /mnt/secrets/password)" --query "SELECT 1"
             failureThreshold: 30
             periodSeconds: 10
           livenessProbe:
@@ -246,7 +185,7 @@ spec:
               command:
                 - sh
                 - -c
-                - clickhouse-client --user default --password-file /mnt/secrets/password --receive_timeout=3 --query "SELECT 1 FROM system.zookeeper WHERE path='/'"
+                - clickhouse-client --user default --password "$(cat /mnt/secrets/password)" --receive_timeout=3 --query "SELECT 1 FROM system.zookeeper WHERE path='/'"
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
@@ -255,7 +194,7 @@ spec:
               command:
                 - sh
                 - -c
-                - clickhouse-client --user default --password-file /mnt/secrets/password --receive_timeout=3 --query "SELECT 1 FROM system.zookeeper WHERE path='/'"
+                - clickhouse-client --user default --password "$(cat /mnt/secrets/password)" --receive_timeout=3 --query "SELECT 1 FROM system.zookeeper WHERE path='/'"
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
@@ -305,6 +244,10 @@ spec:
             items:
               - key: {{ include "clickhouse-serverless.secretKey" . }}
                 path: password
+              {{- if gt $replicas 1 }}
+              - key: {{ include "clickhouse-serverless.clusterSecretKey" . }}
+                path: cluster-secret
+              {{- end }}
 
   volumeClaimTemplates:
     - metadata:
