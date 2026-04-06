@@ -1,7 +1,301 @@
 {
-  "updatedAt": "2026-03-30T03:08:29.709Z",
-  "modelCount": 341,
+  "updatedAt": "2026-04-06T03:08:49.696Z",
+  "modelCount": 343,
   "models": {
+    "gemini/gemma-4-26b-a4b-it": {
+      "id": "gemini/gemma-4-26b-a4b-it",
+      "name": "Google: Gemma 4 26B A4B ",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 1.3e-7,
+        "outputCostPerToken": 4e-7
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 262144,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 1,
+        "topP": 0.95
+      },
+      "modality": "text+image+video->text",
+      "mode": "chat",
+      "description": "Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference — delivering near-31B quality at a fraction of the compute cost. Supports multimodal input including text, images, and video (up to 60s at 1fps). Features a 256K token context window, native function calling, configurable thinking/reasoning mode, and structured output support. Released under Apache 2.0.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "gemini/gemma-4-31b-it": {
+      "id": "gemini/gemma-4-31b-it",
+      "name": "Google: Gemma 4 31B",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 1.4e-7,
+        "outputCostPerToken": 4e-7
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 131072,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 1,
+        "topP": 0.95,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+video->text",
+      "mode": "chat",
+      "description": "Gemma 4 31B Instruct is Google DeepMind's 30.7B dense multimodal model supporting text and image input with text output. Features a 256K token context window, configurable thinking/reasoning mode, native function calling, and multilingual support across 140+ languages. Strong on coding, reasoning, and document understanding tasks. Apache 2.0 license.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "z-ai/glm-5v-turbo": {
+      "id": "z-ai/glm-5v-turbo",
+      "name": "Z.ai: GLM 5V Turbo",
+      "provider": "z-ai",
+      "pricing": {
+        "inputCostPerToken": 0.0000012,
+        "outputCostPerToken": 0.000004,
+        "inputCacheReadPerToken": 2.4e-7
+      },
+      "contextLength": 202752,
+      "maxCompletionTokens": 131072,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 1,
+        "topP": 0.95,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+video->text",
+      "mode": "chat",
+      "description": "GLM-5V-Turbo is Z.ai’s first native multimodal agent foundation model, built for vision-based coding and agent-driven tasks. It natively handles image, video, and text inputs, excels at long-horizon planning, complex coding, and task execution, and works seamlessly with agents to complete the full loop of “perceive → plan → execute“.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "arcee-ai/trinity-large-thinking": {
+      "id": "arcee-ai/trinity-large-thinking",
+      "name": "Arcee AI: Trinity Large Thinking",
+      "provider": "arcee-ai",
+      "pricing": {
+        "inputCostPerToken": 2.2e-7,
+        "outputCostPerToken": 8.5e-7
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 262144,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 0.3,
+        "topP": 0.8,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Trinity Large Thinking is a powerful open source reasoning model from the team at Arcee AI. It shows strong performance in PinchBench, agentic workloads, and reasoning tasks. It is free in open claw for the first five days. Launch video: https://youtu.be/Gc82AXLa0Rg?si=4RLn6WBz33qT--B7",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "xai/grok-4.20-multi-agent": {
+      "id": "xai/grok-4.20-multi-agent",
+      "name": "xAI: Grok 4.20 Multi-Agent",
+      "provider": "xai",
+      "pricing": {
+        "inputCostPerToken": 0.000002,
+        "outputCostPerToken": 0.000006,
+        "inputCacheReadPerToken": 2e-7,
+        "webSearchCostPerQuery": 0.005
+      },
+      "contextLength": 2000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "Grok 4.20 Multi-Agent is a variant of xAI’s Grok 4.20 designed for collaborative, agent-based workflows. Multiple agents operate in parallel to conduct deep research, coordinate tool use, and synthesize information across complex tasks. Reasoning effort behavior: - low / medium: 4 agents - high / xhigh: 16 agents",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "xai/grok-4.20": {
+      "id": "xai/grok-4.20",
+      "name": "xAI: Grok 4.20",
+      "provider": "xai",
+      "pricing": {
+        "inputCostPerToken": 0.000002,
+        "outputCostPerToken": 0.000006,
+        "inputCacheReadPerToken": 2e-7,
+        "webSearchCostPerQuery": 0.005
+      },
+      "contextLength": 2000000,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "Grok 4.20 is xAI's newest flagship model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering consistently precise and truthful responses. Reasoning can be enabled/disabled using the `reasoning` `enabled` parameter in the API.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "gemini/lyria-3-pro-preview": {
+      "id": "gemini/lyria-3-pro-preview",
+      "name": "Google: Lyria 3 Pro Preview",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "max_tokens",
+        "response_format",
+        "seed",
+        "temperature",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text+audio",
+      "mode": "chat",
+      "description": "Full-length songs are priced at $0.08 per song. Lyria 3 is Google's family of music generation models, available through the Gemini API. With Lyria 3, you can generate high-quality, 48kHz stereo audio from text prompts or from images. These models deliver structural coherence, including vocals, timed lyrics, and full instrumental arrangements. Lyria 3 Pro can generate full-length songs with verses, choruses, bridges.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "gemini/lyria-3-clip-preview": {
+      "id": "gemini/lyria-3-clip-preview",
+      "name": "Google: Lyria 3 Clip Preview",
+      "provider": "gemini",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0
+      },
+      "contextLength": 1048576,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "max_tokens",
+        "response_format",
+        "seed",
+        "temperature",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text+audio",
+      "mode": "chat",
+      "description": "30 second duration clips are priced at $0.04 per clip. Lyria 3 is Google's family of music generation models, available through the Gemini API. With Lyria 3, you can generate high-quality, 48kHz stereo audio from text prompts or from images. These models deliver structural coherence, including vocals, timed lyrics, and full instrumental arrangements. Lyria 3 Clip can generate short clips, loops, previews.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
     "kwaipilot/kat-coder-pro-v2": {
       "id": "kwaipilot/kat-coder-pro-v2",
       "name": "Kwaipilot: KAT-Coder-Pro V2",
@@ -43,10 +337,10 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "reka/reka-edge": {
-      "id": "reka/reka-edge",
+    "rekaai/reka-edge": {
+      "id": "rekaai/reka-edge",
       "name": "Reka Edge",
-      "provider": "reka",
+      "provider": "rekaai",
       "pricing": {
         "inputCostPerToken": 1e-7,
         "outputCostPerToken": 1e-7
@@ -110,7 +404,7 @@
       },
       "modality": "text+image+audio+video->text",
       "mode": "chat",
-      "description": "MiMo-V2-Omni is a frontier omni-modal model that natively processes image, video, and audio inputs within a unified architecture. It combines strong multimodal perception with agentic capability - visual grounding, multi-step planning, tool use, and code execution - making it well-suited for complex real-world tasks that span modalities. 256K context window.",
+      "description": "MiMo-V2-Omni is a frontier omni-modal model that natively processes image, video, and audio inputs within a unified architecture. It combines strong multimodal perception with agentic capability - visual grounding, multi-step planning, tool use, and code execution - making it well-suited for complex real-world tasks that span modalities, 256K context window.",
       "supportsImageInput": true,
       "supportsAudioInput": true,
       "supportsImageOutput": false,
@@ -338,82 +632,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "xai/grok-4.20-multi-agent-beta": {
-      "id": "xai/grok-4.20-multi-agent-beta",
-      "name": "xAI: Grok 4.20 Multi-Agent Beta",
-      "provider": "xai",
-      "pricing": {
-        "inputCostPerToken": 0.000002,
-        "outputCostPerToken": 0.000006,
-        "inputCacheReadPerToken": 2e-7,
-        "webSearchCostPerQuery": 0.005
-      },
-      "contextLength": 2000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "temperature",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Grok 4.20 Multi-Agent Beta is a variant of xAI’s Grok 4.20 designed for collaborative, agent-based workflows. Multiple agents operate in parallel to conduct deep research, coordinate tool use, and synthesize information across complex tasks. Reasoning effort behavior: - low / medium: 4 agents - high / xhigh: 16 agents",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "xai/grok-4.20-beta": {
-      "id": "xai/grok-4.20-beta",
-      "name": "xAI: Grok 4.20 Beta",
-      "provider": "xai",
-      "pricing": {
-        "inputCostPerToken": 0.000002,
-        "outputCostPerToken": 0.000006,
-        "inputCacheReadPerToken": 2e-7,
-        "webSearchCostPerQuery": 0.005
-      },
-      "contextLength": 2000000,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Grok 4.20 Beta is xAI's newest flagship model with industry-leading speed and agentic tool calling capabilities. It combines the lowest hallucination rate on the market with strict prompt adherance, delivering consistently precise and truthful responses. Reasoning can be enabled/disabled using the `reasoning` `enabled` parameter in the API.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "nvidia/nemotron-3-super-120b-a12b": {
       "id": "nvidia/nemotron-3-super-120b-a12b",
       "name": "NVIDIA: Nemotron 3 Super",
@@ -500,7 +718,7 @@
         "outputCostPerToken": 1.5e-7
       },
       "contextLength": 256000,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1322,9 +1540,9 @@
       "name": "MiniMax: MiniMax M2.5",
       "provider": "minimax",
       "pricing": {
-        "inputCostPerToken": 1.9e-7,
-        "outputCostPerToken": 0.00000115,
-        "inputCacheReadPerToken": 9.5e-8
+        "inputCostPerToken": 1.18e-7,
+        "outputCostPerToken": 9.9e-7,
+        "inputCacheReadPerToken": 5.9e-8
       },
       "contextLength": 196608,
       "maxCompletionTokens": 65536,
@@ -1583,11 +1801,10 @@
       "provider": "stepfun",
       "pricing": {
         "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 2e-8
+        "outputCostPerToken": 3e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1600,6 +1817,7 @@
         "seed",
         "stop",
         "temperature",
+        "tool_choice",
         "tools",
         "top_k",
         "top_p"
@@ -1622,12 +1840,12 @@
       "name": "MoonshotAI: Kimi K2.5",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 4.2e-7,
-        "outputCostPerToken": 0.0000022,
-        "inputCacheReadPerToken": 2.1e-7
+        "inputCostPerToken": 3.827e-7,
+        "outputCostPerToken": 0.00000172,
+        "inputCacheReadPerToken": 1.935e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65535,
+      "maxCompletionTokens": 262144,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1778,6 +1996,8 @@
         "stop",
         "structured_outputs",
         "temperature",
+        "tool_choice",
+        "tools",
         "top_logprobs",
         "top_p"
       ],
@@ -1816,6 +2036,8 @@
         "stop",
         "structured_outputs",
         "temperature",
+        "tool_choice",
+        "tools",
         "top_logprobs",
         "top_p"
       ],
@@ -2093,6 +2315,7 @@
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
+        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -2106,6 +2329,7 @@
         "tool_choice",
         "tools",
         "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -2195,45 +2419,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Mistral Small Creative is an experimental small model designed for creative writing, narrative generation, roleplay and character-driven dialogue, general-purpose instruction following, and conversational agents.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "allenai/olmo-3.1-32b-think": {
-      "id": "allenai/olmo-3.1-32b-think",
-      "name": "AllenAI: Olmo 3.1 32B Think",
-      "provider": "allenai",
-      "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 5e-7
-      },
-      "contextLength": 65536,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logit_bias",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.6,
-        "topP": 0.95,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Olmo 3.1 32B Think is a large-scale, 32-billion-parameter model designed for deep reasoning, complex multi-step logic, and advanced instruction following. Building on the Olmo 3 series, version 3.1 delivers refined reasoning behavior and stronger performance across demanding evaluations and nuanced conversational tasks. Developed by Ai2 under the Apache 2.0 license, Olmo 3.1 32B Think continues the Olmo initiative’s commitment to openness, providing full transparency across model weights, code, and training methodology.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -3232,7 +3417,7 @@
         "topP": 0.95,
         "frequencyPenalty": null
       },
-      "modality": "text+image->text",
+      "modality": "text+image+file->text",
       "mode": "chat",
       "description": "Grok 4.1 Fast is xAI's best agentic tool calling model that shines in real-world use cases like customer support and deep research. 2M context window. Reasoning can be enabled/disabled using the `reasoning` `enabled` parameter in the API.",
       "supportsImageInput": true,
@@ -3462,47 +3647,6 @@
         "defaultValue": "none",
         "canDisable": true
       }
-    },
-    "kwaipilot/kat-coder-pro": {
-      "id": "kwaipilot/kat-coder-pro",
-      "name": "Kwaipilot: KAT-Coder-Pro V1",
-      "provider": "kwaipilot",
-      "pricing": {
-        "inputCostPerToken": 2.07e-7,
-        "outputCostPerToken": 8.28e-7,
-        "inputCacheReadPerToken": 4.14e-8
-      },
-      "contextLength": 256000,
-      "maxCompletionTokens": 128000,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "KAT-Coder-Pro V1 is KwaiKAT's most advanced agentic coding model in the KAT-Coder series. Designed specifically for agentic coding tasks, it excels in real-world software engineering scenarios, achieving 73.4% solve rate on the SWE-Bench Verified benchmark. The model has been optimized for tool-use capability, multi-turn interaction, instruction following, generalization, and comprehensive capabilities through a multi-stage training process, including mid-training, supervised fine-tuning (SFT), reinforcement fine-tuning (RFT), and scalable agentic RL.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
     },
     "moonshotai/kimi-k2-thinking": {
       "id": "moonshotai/kimi-k2-thinking",
@@ -3799,76 +3943,6 @@
       "mode": "chat",
       "description": "Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, images, and video. With 32 billion parameters, it combines deep visual perception with advanced text comprehension, enabling fine-grained spatial reasoning, document and scene analysis, and long-horizon video understanding.Robust OCR in 32 languages, and enhanced multimodal fusion through Interleaved-MRoPE and DeepStack architectures. Optimized for agentic interaction and visual tool use, Qwen3-VL-32B delivers state-of-the-art performance for complex real-world multimodal tasks.",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "liquid/lfm2-8b-a1b": {
-      "id": "liquid/lfm2-8b-a1b",
-      "name": "LiquidAI: LFM2-8B-A1B",
-      "provider": "liquid",
-      "pricing": {
-        "inputCostPerToken": 1e-8,
-        "outputCostPerToken": 2e-8
-      },
-      "contextLength": 32768,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "seed",
-        "stop",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "LFM2-8B-A1B is an efficient on-device Mixture-of-Experts (MoE) model from Liquid AI’s LFM2 family, built for fast, high-quality inference on edge hardware. It uses 8.3B total parameters with only ~1.5B active per token, delivering strong performance while keeping compute and memory usage low—making it ideal for phones, tablets, and laptops.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "liquid/lfm-2.2-6b": {
-      "id": "liquid/lfm-2.2-6b",
-      "name": "LiquidAI: LFM2-2.6B",
-      "provider": "liquid",
-      "pricing": {
-        "inputCostPerToken": 1e-8,
-        "outputCostPerToken": 2e-8
-      },
-      "contextLength": 32768,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "seed",
-        "stop",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "LFM2 is a new generation of hybrid models developed by Liquid AI, specifically designed for edge AI and on-device deployment. It sets a new standard in terms of quality, speed, and memory efficiency.",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -4397,6 +4471,7 @@
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
+        "logit_bias",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -4667,7 +4742,7 @@
         "internalReasoningCostPerToken": 4e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 65535,
       "supportedParameters": [
         "include_reasoning",
         "max_tokens",
@@ -4974,7 +5049,7 @@
         "topP": null,
         "frequencyPenalty": null
       },
-      "modality": "text+image->text",
+      "modality": "text+image+file->text",
       "mode": "chat",
       "description": "Grok 4 Fast is xAI's latest multimodal model with SOTA cost-efficiency and a 2M token context window. It comes in two flavors: non-reasoning and reasoning. Read more about the model on xAI's [news post](http://x.ai/news/grok-4-fast). Reasoning can be enabled/disabled using the `reasoning` `enabled` parameter in the API.",
       "supportsImageInput": true,
@@ -5627,10 +5702,8 @@
         "presence_penalty",
         "reasoning",
         "repetition_penalty",
-        "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -5868,6 +5941,7 @@
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
+        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -5882,6 +5956,7 @@
         "tool_choice",
         "tools",
         "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -6401,6 +6476,7 @@
         "tool_choice",
         "tools",
         "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -6453,19 +6529,15 @@
       "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
-        "logprobs",
         "max_tokens",
         "presence_penalty",
         "repetition_penalty",
-        "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -6573,8 +6645,12 @@
         "top_logprobs",
         "top_p"
       ],
-      "defaultParameters": {},
-      "modality": "text+image->text",
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
       "mode": "chat",
       "description": "Grok 4 is xAI's latest reasoning model with a 256k context window. It supports parallel tool calling, structured outputs, and both image and text inputs. Note that reasoning is not exposed, reasoning cannot be disabled, and the reasoning effort cannot be specified. Pricing increases once the total tokens in a given request is greater than 128k tokens. See more details on the [xAI docs](https://docs.x.ai/docs/models/grok-4-0709)",
       "supportsImageInput": true,
@@ -8599,6 +8675,41 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "rekaai/reka-flash-3": {
+      "id": "rekaai/reka-flash-3",
+      "name": "Reka Flash 3",
+      "provider": "rekaai",
+      "pricing": {
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 2e-7
+      },
+      "contextLength": 65536,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "seed",
+        "stop",
+        "temperature",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Reka Flash 3 is a general-purpose, instruction-tuned large language model with 21 billion parameters, developed by Reka. It excels at general chat, coding tasks, instruction-following, and function calling. Featuring a 32K context length and optimized through reinforcement learning (RLOO), it provides competitive performance comparable to proprietary models within a smaller parameter footprint. Ideal for low-latency, local, or on-device deployments, Reka Flash 3 is compact, supports efficient quantization (down to 11GB at 4-bit precision), and employs explicit reasoning tags (\"<reasoning>\") to indicate its internal thought process. Reka Flash 3 is primarily an English model with limited multilingual understanding capabilities. The model weights are released under the Apache 2.0 license.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "gemini/gemma-3-27b-it": {
       "id": "gemini/gemma-3-27b-it",
       "name": "Google: Gemma 3 27B",
@@ -9328,7 +9439,6 @@
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
-        "logit_bias",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -9337,8 +9447,6 @@
         "seed",
         "stop",
         "temperature",
-        "tool_choice",
-        "tools",
         "top_k",
         "top_p"
       ],
@@ -9449,7 +9557,6 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "top_k",
         "top_p"
@@ -10159,36 +10266,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "anthropic/claude-3.5-sonnet": {
-      "id": "anthropic/claude-3.5-sonnet",
-      "name": "Anthropic: Claude 3.5 Sonnet",
-      "provider": "anthropic",
-      "pricing": {
-        "inputCostPerToken": 0.000006,
-        "outputCostPerToken": 0.00003,
-        "inputCacheReadPerToken": 6e-7,
-        "inputCacheWritePerToken": 0.0000075
-      },
-      "contextLength": 200000,
-      "maxCompletionTokens": 8192,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image+file->text",
-      "mode": "chat",
-      "description": "New Claude 3.5 Sonnet delivers better-than-Opus capabilities, faster-than-Sonnet speeds, at the same Sonnet prices. Sonnet is particularly good at: - Coding: Scores ~49% on SWE-Bench Verified, higher than the last best score, and without any fancy prompt scaffolding - Data science: Augments human data science expertise; navigates unstructured data while using multiple tools for insights - Visual processing: excelling at interpreting charts, graphs, and images, accurately transcribing text to derive insights beyond just the text alone - Agentic tasks: exceptional tool use, making it great at agentic tasks (i.e. complex, multi-step problem solving tasks that require engaging with other systems) #multimodal",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen-2.5-7b-instruct": {
       "id": "qwen/qwen-2.5-7b-instruct",
       "name": "Qwen: Qwen2.5 7B Instruct",
@@ -10262,31 +10339,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "inflection/inflection-3-productivity": {
-      "id": "inflection/inflection-3-productivity",
-      "name": "Inflection: Inflection 3 Productivity",
-      "provider": "inflection",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 8000,
-      "maxCompletionTokens": 1024,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Inflection 3 Productivity is optimized for following instructions. It is better for tasks requiring JSON output or precise adherence to provided guidelines. It has access to recent news. For emotional intelligence similar to Pi, see [Inflect 3 Pi](/inflection/inflection-3-pi) See [Inflection's announcement](https://inflection.ai/blog/enterprise) for more details.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "inflection/inflection-3-pi": {
       "id": "inflection/inflection-3-pi",
       "name": "Inflection: Inflection 3 Pi",
@@ -10307,6 +10359,31 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Inflection 3 Pi powers Inflection's [Pi](https://pi.ai) chatbot, including backstory, emotional intelligence, productivity, and safety. It has access to recent news, and excels in scenarios like customer support and roleplay. Pi has been trained to mirror your tone and style, if you use more emojis, so will Pi! Try experimenting with various prompts and conversation styles.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "inflection/inflection-3-productivity": {
+      "id": "inflection/inflection-3-productivity",
+      "name": "Inflection: Inflection 3 Productivity",
+      "provider": "inflection",
+      "pricing": {
+        "inputCostPerToken": 0.0000025,
+        "outputCostPerToken": 0.00001
+      },
+      "contextLength": 8000,
+      "maxCompletionTokens": 1024,
+      "supportedParameters": [
+        "max_tokens",
+        "stop",
+        "temperature",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Inflection 3 Productivity is optimized for following instructions. It is better for tasks requiring JSON output or precise adherence to provided guidelines. It has access to recent news. For emotional intelligence similar to Pi, see [Inflect 3 Pi](/inflection/inflection-3-pi) See [Inflection's announcement](https://inflection.ai/blog/enterprise) for more details.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -10459,7 +10536,6 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -10470,39 +10546,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Qwen2.5 72B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2: - Significantly more knowledge and has greatly improved capabilities in coding and mathematics, thanks to our specialized expert models in these domains. - Significant improvements in instruction following, generating long texts (over 8K tokens), understanding structured data (e.g, tables), and generating structured outputs especially JSON. More resilient to the diversity of system prompts, enhancing role-play implementation and condition-setting for chatbots. - Long-context Support up to 128K tokens and can generate up to 8K tokens. - Multilingual support for over 29 languages, including Chinese, English, French, Spanish, Portuguese, German, Italian, Russian, Japanese, Korean, Vietnamese, Thai, Arabic, and more. Usage of this model is subject to [Tongyi Qianwen LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen1.5-110B-Chat/blob/main/LICENSE).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "cohere/command-r-plus-08-2024": {
-      "id": "cohere/command-r-plus-08-2024",
-      "name": "Cohere: Command R+ (08-2024)",
-      "provider": "cohere",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 4000,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "command-r-plus-08-2024 is an update of the [Command R+](/models/cohere/command-r-plus) with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint the same. Read the launch post [here](https://docs.cohere.com/changelog/command-gets-refreshed). Use of this model is subject to Cohere's [Usage Policy](https://docs.cohere.com/docs/usage-policy) and [SaaS Agreement](https://cohere.com/saas-agreement).",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -10541,6 +10584,39 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "cohere/command-r-plus-08-2024": {
+      "id": "cohere/command-r-plus-08-2024",
+      "name": "Cohere: Command R+ (08-2024)",
+      "provider": "cohere",
+      "pricing": {
+        "inputCostPerToken": 0.0000025,
+        "outputCostPerToken": 0.00001
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": 4000,
+      "supportedParameters": [
+        "frequency_penalty",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "command-r-plus-08-2024 is an update of the [Command R+](/models/cohere/command-r-plus) with roughly 50% higher throughput and 25% lower latencies as compared to the previous Command R+ version, while keeping the hardware footprint the same. Read the launch post [here](https://docs.cohere.com/changelog/command-gets-refreshed). Use of this model is subject to Cohere's [Usage Policy](https://docs.cohere.com/docs/usage-policy) and [SaaS Agreement](https://cohere.com/saas-agreement).",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "sao10k/l3.1-euryale-70b": {
       "id": "sao10k/l3.1-euryale-70b",
       "name": "Sao10K: Llama 3.1 Euryale 70B v2.2",
@@ -10560,7 +10636,6 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -10818,9 +10893,9 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4o-mini": {
-      "id": "openai/gpt-4o-mini",
-      "name": "OpenAI: GPT-4o-mini",
+    "openai/gpt-4o-mini-2024-07-18": {
+      "id": "openai/gpt-4o-mini-2024-07-18",
+      "name": "OpenAI: GPT-4o-mini (2024-07-18)",
       "provider": "openai",
       "pricing": {
         "inputCostPerToken": 1.5e-7,
@@ -10855,9 +10930,9 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4o-mini-2024-07-18": {
-      "id": "openai/gpt-4o-mini-2024-07-18",
-      "name": "OpenAI: GPT-4o-mini (2024-07-18)",
+    "openai/gpt-4o-mini": {
+      "id": "openai/gpt-4o-mini",
+      "name": "OpenAI: GPT-4o-mini",
       "provider": "openai",
       "pricing": {
         "inputCostPerToken": 1.5e-7,
@@ -11136,10 +11211,8 @@
         "max_tokens",
         "presence_penalty",
         "repetition_penalty",
-        "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "top_k",
         "top_p"
@@ -11318,41 +11391,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4-turbo-preview": {
-      "id": "openai/gpt-4-turbo-preview",
-      "name": "OpenAI: GPT-4 Turbo Preview",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00001,
-        "outputCostPerToken": 0.00003
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Training data: up to Dec 2023. **Note:** heavily rate limited by OpenAI while in preview.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-3.5-turbo-0613": {
       "id": "openai/gpt-3.5-turbo-0613",
       "name": "OpenAI: GPT-3.5 Turbo (older v0613)",
@@ -11383,6 +11421,41 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-4-turbo-preview": {
+      "id": "openai/gpt-4-turbo-preview",
+      "name": "OpenAI: GPT-4 Turbo Preview",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.00001,
+        "outputCostPerToken": 0.00003
+      },
+      "contextLength": 128000,
+      "maxCompletionTokens": 4096,
+      "supportedParameters": [
+        "frequency_penalty",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "The preview GPT-4 model with improved instruction following, JSON mode, reproducible outputs, parallel function calling, and more. Training data: up to Dec 2023. **Note:** heavily rate limited by OpenAI while in preview.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -11542,6 +11615,37 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "mistralai/mistral-7b-instruct-v0.1": {
+      "id": "mistralai/mistral-7b-instruct-v0.1",
+      "name": "Mistral: Mistral 7B Instruct v0.1",
+      "provider": "mistralai",
+      "pricing": {
+        "inputCostPerToken": 1.1e-7,
+        "outputCostPerToken": 1.9e-7
+      },
+      "contextLength": 2824,
+      "maxCompletionTokens": null,
+      "supportedParameters": [
+        "frequency_penalty",
+        "max_tokens",
+        "presence_penalty",
+        "repetition_penalty",
+        "seed",
+        "temperature",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 0.3
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "A 7.3B parameter model that outperforms Llama 2 13B on all benchmarks, with optimizations for speed and context length.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "openai/gpt-3.5-turbo-instruct": {
       "id": "openai/gpt-3.5-turbo-instruct",
       "name": "OpenAI: GPT-3.5 Turbo Instruct",
@@ -11570,37 +11674,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "This model is a variant of GPT-3.5 Turbo tuned for instructional prompts and omitting chat-related optimizations. Training data: up to Sep 2021.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "mistralai/mistral-7b-instruct-v0.1": {
-      "id": "mistralai/mistral-7b-instruct-v0.1",
-      "name": "Mistral: Mistral 7B Instruct v0.1",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 1.1e-7,
-        "outputCostPerToken": 1.9e-7
-      },
-      "contextLength": 2824,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "repetition_penalty",
-        "seed",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "A 7.3B parameter model that outperforms Llama 2 13B on all benchmarks, with optimizations for speed and context length.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -11751,41 +11824,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/gpt-4": {
-      "id": "openai/gpt-4",
-      "name": "OpenAI: GPT-4",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.00003,
-        "outputCostPerToken": 0.00006
-      },
-      "contextLength": 8191,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning capabilities. Training data: up to Sep 2021.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/gpt-4-0314": {
       "id": "openai/gpt-4-0314",
       "name": "OpenAI: GPT-4 (older v0314)",
@@ -11851,6 +11889,41 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "GPT-3.5 Turbo is OpenAI's fastest model. It can understand and generate natural language or code, and is optimized for chat and traditional completion tasks. Training data up to Sep 2021.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-4": {
+      "id": "openai/gpt-4",
+      "name": "OpenAI: GPT-4",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.00003,
+        "outputCostPerToken": 0.00006
+      },
+      "contextLength": 8191,
+      "maxCompletionTokens": 4096,
+      "supportedParameters": [
+        "frequency_penalty",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "OpenAI's flagship model, GPT-4 is a large-scale multimodal language model capable of solving difficult problems with greater accuracy than previous models due to its broader general knowledge and advanced reasoning capabilities. Training data: up to Sep 2021.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
