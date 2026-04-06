@@ -18,11 +18,11 @@ Feature: Dataset Python SDK
   # covers 2 of 9 dataset endpoints. DatasetApiService encapsulates all
   # raw HTTP calls using _raise_for_api_status() for error surfacing.
   #
-  # Error handling: Follows existing SDK conventions:
-  #   - ValueError for 400/404/409/422 (client errors)
-  #   - RuntimeError for 401/5xx (auth/server errors)
-  #   - FileNotFoundError / ValueError for client-side file validation
-  # NO new LangWatchError class — matches prompts/evaluators modules.
+  # Error handling: Custom error hierarchy (mirrors TypeScript SDK):
+  #   - DatasetNotFoundError for 404
+  #   - DatasetPlanLimitError for 403 (resourceLimitMiddleware)
+  #   - DatasetApiError for 400/401/403/409/422/5xx (HTTP errors)
+  #   - ValueError / FileNotFoundError for client-side validation
   #
   # Initialization: from_global() classmethod + ensure_setup() pattern
   # (like PromptsFacade.from_global). Module-level __getattr__ exposes
@@ -69,7 +69,7 @@ Feature: Dataset Python SDK
   Scenario: List datasets propagates authentication errors
     Given the SDK is initialized with an invalid API key
     When I call langwatch.dataset.list_datasets()
-    Then a RuntimeError is raised indicating authentication failed
+    Then a DatasetApiError is raised indicating authentication failed
 
   # ── Create Dataset ─────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ Feature: Dataset Python SDK
   Scenario: Create a dataset with a conflicting name raises an error
     Given a dataset named "Existing" already exists
     When I call langwatch.dataset.create_dataset(name="Existing")
-    Then a ValueError is raised indicating a conflict
+    Then a DatasetApiError is raised indicating a conflict
 
   @unit
   Scenario: Create dataset validates that name is not empty
@@ -114,7 +114,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: Get non-existent dataset raises an error
     When I call langwatch.dataset.get_dataset("does-not-exist")
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   # ── Update Dataset ─────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: Update a non-existent dataset raises an error
     When I call langwatch.dataset.update_dataset("ghost", name="Whatever")
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   # ── Delete Dataset ─────────────────────────────────────────────
 
@@ -146,7 +146,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: Delete a non-existent dataset raises an error
     When I call langwatch.dataset.delete_dataset("nope")
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   # ── List Records ──────────────────────────────────────────────
 
@@ -166,7 +166,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: List records for non-existent dataset raises an error
     When I call langwatch.dataset.list_records("ghost")
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   # ── Create Records (Batch Add) ─────────────────────────────────
 
@@ -179,7 +179,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: Add records to a non-existent dataset raises an error
     When I call langwatch.dataset.create_records("ghost", entries=[{"input": "x"}])
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   @unit
   Scenario: Create records validates entries is not empty
@@ -203,7 +203,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: Update a record for non-existent dataset raises an error
     When I call langwatch.dataset.update_record("ghost", "rec-1", entry={"input": "x"})
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   # ── Delete Records (Batch) ─────────────────────────────────────
 
@@ -216,7 +216,7 @@ Feature: Dataset Python SDK
   @integration
   Scenario: Delete records for non-existent dataset raises an error
     When I call langwatch.dataset.delete_records("ghost", record_ids=["rec-1"])
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   @unit
   Scenario: Delete records validates record_ids is not empty
@@ -250,7 +250,7 @@ Feature: Dataset Python SDK
   Scenario: Upload to a non-existent dataset raises an error
     Given a local CSV file "data.csv" with 1 row
     When I call langwatch.dataset.upload("ghost", file_path="data.csv")
-    Then a ValueError is raised indicating the dataset was not found
+    Then a DatasetNotFoundError is raised
 
   @unit
   Scenario: Upload validates that file exists
@@ -277,7 +277,7 @@ Feature: Dataset Python SDK
     Given a dataset named "Existing" already exists
     And a local CSV file "data.csv" with 1 row
     When I call langwatch.dataset.create_dataset_from_file(name="Existing", file_path="data.csv")
-    Then a ValueError is raised indicating a conflict
+    Then a DatasetApiError is raised indicating a conflict
 
   # ── SDK Initialization ──────────────────────────────────────────
 

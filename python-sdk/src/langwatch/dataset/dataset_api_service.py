@@ -18,17 +18,20 @@ from opentelemetry import trace
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
+from .errors import DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError
 
 _tracer = trace.get_tracer(__name__)
 
 
-def _raise_for_api_status(response: httpx.Response) -> None:
+def _raise_for_api_status(
+    response: httpx.Response, *, operation: str = ""
+) -> None:
     """
-    Map HTTP error status codes to the SDK's error conventions.
+    Map HTTP error status codes to the SDK's custom error hierarchy.
 
-    - 400, 404, 409, 422 -> ValueError (client mistakes)
-    - 401                 -> RuntimeError (auth)
-    - 5xx                 -> RuntimeError (server)
+    - 404              -> DatasetNotFoundError
+    - 403 + limitType  -> DatasetPlanLimitError
+    - 400, 401, 403 (without limitType), 409, 422, 5xx -> DatasetApiError
 
     Extracts the ``message`` or ``error`` field from JSON body when available.
     """
@@ -37,35 +40,75 @@ def _raise_for_api_status(response: httpx.Response) -> None:
 
     status = response.status_code
     detail = ""
+    body: dict = {}
     try:
         body = response.json()
         detail = body.get("message") or body.get("error") or ""
     except Exception:
         detail = response.text or ""
 
-    if status == 400:
-        raise ValueError(f"Bad request: {detail}" if detail else "Bad request")
-    if status == 401:
-        raise RuntimeError(
-            f"Authentication failed: {detail}" if detail else "Authentication failed"
-        )
     if status == 404:
-        raise ValueError(f"Not found: {detail}" if detail else "Not found")
+        raise DatasetNotFoundError(
+            f"Not found: {detail}" if detail else "Not found"
+        )
+
+    if status == 403:
+        limit_type = body.get("limitType")
+        if limit_type:
+            raise DatasetPlanLimitError(
+                detail or "Plan limit exceeded",
+                limit_type=limit_type,
+                current=body.get("current"),
+                max=body.get("max"),
+                upgrade_url=body.get("upgradeUrl"),
+            )
+        raise DatasetApiError(
+            f"Forbidden: {detail}" if detail else "Forbidden",
+            status_code=403,
+            operation=operation,
+        )
+
+    if status == 400:
+        raise DatasetApiError(
+            f"Bad request: {detail}" if detail else "Bad request",
+            status_code=400,
+            operation=operation,
+        )
+    if status == 401:
+        raise DatasetApiError(
+            f"Authentication failed: {detail}"
+            if detail
+            else "Authentication failed",
+            status_code=401,
+            operation=operation,
+        )
     if status == 409:
-        raise ValueError(f"Conflict: {detail}" if detail else "Conflict")
+        raise DatasetApiError(
+            f"Conflict: {detail}" if detail else "Conflict",
+            status_code=409,
+            operation=operation,
+        )
     if status == 422:
-        raise ValueError(
-            f"Validation error: {detail}" if detail else "Validation error"
+        raise DatasetApiError(
+            f"Validation error: {detail}" if detail else "Validation error",
+            status_code=422,
+            operation=operation,
         )
     if status >= 500:
-        raise RuntimeError(
+        raise DatasetApiError(
             f"Server error ({status}): {detail}"
             if detail
-            else f"Server error ({status})"
+            else f"Server error ({status})",
+            status_code=status,
+            operation=operation,
         )
 
     # Fallback for any other non-success status
-    raise RuntimeError(f"Unexpected status {status}: {detail}")
+    raise DatasetApiError(
+        f"Unexpected status {status}: {detail}",
+        status_code=status,
+        operation=operation,
+    )
 
 
 class DatasetApiService:
@@ -107,7 +150,7 @@ class DatasetApiService:
                 params["limit"] = limit
 
             response = self._http().get("/api/dataset", params=params)
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="list_datasets")
             return response.json()
 
     def create_dataset(
@@ -123,7 +166,7 @@ class DatasetApiService:
                 body["columnTypes"] = columns
 
             response = self._http().post("/api/dataset", json=body)
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="create_dataset")
             return response.json()
 
     def get_dataset(
@@ -139,7 +182,7 @@ class DatasetApiService:
 
             quoted = self._quote(slug_or_id)
             response = self._http().get(f"/api/dataset/{quoted}")
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="get_dataset")
             return response.json()
 
     def update_dataset(
@@ -159,7 +202,7 @@ class DatasetApiService:
 
             quoted = self._quote(slug_or_id)
             response = self._http().patch(f"/api/dataset/{quoted}", json=body)
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="update_dataset")
             return response.json()
 
     def delete_dataset(self, slug_or_id: str) -> None:
@@ -167,7 +210,7 @@ class DatasetApiService:
         with _tracer.start_as_current_span("dataset.delete_dataset"):
             quoted = self._quote(slug_or_id)
             response = self._http().delete(f"/api/dataset/{quoted}")
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="delete_dataset")
 
     # ── records ─────────────────────────────────────────────────────
 
@@ -190,7 +233,7 @@ class DatasetApiService:
             response = self._http().get(
                 f"/api/dataset/{quoted}/records", params=params
             )
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="list_records")
             return response.json()
 
     def create_records(
@@ -211,7 +254,7 @@ class DatasetApiService:
             response = self._http().post(
                 f"/api/dataset/{quoted}/records", json=body
             )
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="create_records")
             data = response.json()
             return data.get("data", [])
 
@@ -231,7 +274,7 @@ class DatasetApiService:
             response = self._http().patch(
                 f"/api/dataset/{quoted_slug}/records/{quoted_record}", json=body
             )
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="update_record")
             return response.json()
 
     def delete_records(
@@ -254,7 +297,7 @@ class DatasetApiService:
                 f"/api/dataset/{quoted}/records",
                 json=body,
             )
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="delete_records")
             data = response.json()
             return int(data.get("deletedCount", 0))
 
@@ -274,7 +317,7 @@ class DatasetApiService:
                     f"/api/dataset/{quoted}/upload",
                     files={"file": (os.path.basename(file_path), f)},
                 )
-            _raise_for_api_status(response)
+            _raise_for_api_status(response, operation="upload")
             return response.json()
 
     def create_dataset_from_file(
@@ -291,5 +334,7 @@ class DatasetApiService:
                     data={"name": name},
                     files={"file": (os.path.basename(file_path), f)},
                 )
-            _raise_for_api_status(response)
+            _raise_for_api_status(
+                response, operation="create_dataset_from_file"
+            )
             return response.json()

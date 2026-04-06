@@ -96,7 +96,8 @@ class DatasetsFacade:
             columns: Optional column type definitions.
 
         Raises:
-            ValueError: If name is empty or a dataset with the same name already exists (409).
+            ValueError: If name is empty (client-side validation).
+            DatasetApiError: If the API returns a conflict (409) or other HTTP error.
         """
         if not name or not name.strip():
             raise ValueError("Dataset name is required and must not be empty.")
@@ -122,7 +123,7 @@ class DatasetsFacade:
             Dataset object with entries.
 
         Raises:
-            ValueError: If the dataset is not found (404).
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         tracer = NoOpTracer() if ignore_tracing else None
         raw = self._api.get_dataset(slug_or_id, tracer=tracer)
@@ -150,7 +151,7 @@ class DatasetsFacade:
             columns: New column types (optional).
 
         Raises:
-            ValueError: If the dataset is not found (404).
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         raw = self._api.update_dataset(slug_or_id, name=name, columns=columns)
         return DatasetInfo(**raw)
@@ -163,7 +164,7 @@ class DatasetsFacade:
             slug_or_id: Dataset slug or ID.
 
         Raises:
-            ValueError: If the dataset is not found (404).
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         self._api.delete_dataset(slug_or_id)
 
@@ -188,7 +189,7 @@ class DatasetsFacade:
             PaginatedResult containing DatasetRecord items and pagination metadata.
 
         Raises:
-            ValueError: If the dataset is not found (404).
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         raw = self._api.list_records(slug_or_id, page=page, limit=limit)
         records = [DatasetRecord(**item) for item in raw.get("data", [])]
@@ -215,7 +216,8 @@ class DatasetsFacade:
             List of created DatasetRecord objects with their generated IDs.
 
         Raises:
-            ValueError: If entries is empty or the dataset is not found.
+            ValueError: If entries is empty (client-side validation).
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         if not entries:
             raise ValueError("Entries must not be empty.")
@@ -242,7 +244,7 @@ class DatasetsFacade:
             The updated DatasetRecord.
 
         Raises:
-            ValueError: If the dataset is not found.
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         raw = self._api.update_record(slug_or_id, record_id, entry=entry)
         return DatasetRecord(**raw)
@@ -264,7 +266,8 @@ class DatasetsFacade:
             The number of records deleted.
 
         Raises:
-            ValueError: If record_ids is empty or the dataset is not found.
+            ValueError: If record_ids is empty (client-side validation).
+            DatasetNotFoundError: If the dataset is not found (404).
         """
         if not record_ids:
             raise ValueError("record_ids must not be empty.")

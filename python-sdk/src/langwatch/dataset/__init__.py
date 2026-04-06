@@ -43,12 +43,24 @@ from .types import (
     UploadResult,
 )
 
+# Re-export custom error classes for convenient import.
+from .errors import (
+    DatasetApiError,
+    DatasetError,
+    DatasetNotFoundError,
+    DatasetPlanLimitError,
+)
+
 __all__ = [
     "DatasetsFacade",
     "ColumnType",
     "CreateFromFileResult",
     "Dataset",
     "DatasetEntry",
+    "DatasetError",
+    "DatasetApiError",
+    "DatasetNotFoundError",
+    "DatasetPlanLimitError",
     "DatasetInfo",
     "DatasetRecord",
     "PaginatedResult",

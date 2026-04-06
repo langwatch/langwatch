@@ -14,6 +14,11 @@ import httpx
 import pytest
 
 from langwatch.dataset.dataset_api_service import DatasetApiService, _raise_for_api_status
+from langwatch.dataset.errors import (
+    DatasetApiError,
+    DatasetNotFoundError,
+    DatasetPlanLimitError,
+)
 
 
 def _make_mock_client(mock_httpx: MagicMock) -> MagicMock:
@@ -50,29 +55,62 @@ class TestRaiseForApiStatus:
         resp = _json_response({}, 200)
         _raise_for_api_status(resp)  # should not raise
 
-    def test_raises_value_error_on_400(self):
-        with pytest.raises(ValueError, match="Bad request"):
+    def test_raises_dataset_api_error_on_400(self):
+        with pytest.raises(DatasetApiError, match="Bad request"):
             _raise_for_api_status(_error_response(400, "invalid field"))
 
-    def test_raises_runtime_error_on_401(self):
-        with pytest.raises(RuntimeError, match="Authentication failed"):
+    def test_raises_dataset_api_error_on_401(self):
+        with pytest.raises(DatasetApiError, match="Authentication failed"):
             _raise_for_api_status(_error_response(401, "bad token"))
 
-    def test_raises_value_error_on_404(self):
-        with pytest.raises(ValueError, match="Not found"):
+    def test_raises_dataset_not_found_error_on_404(self):
+        with pytest.raises(DatasetNotFoundError, match="Not found"):
             _raise_for_api_status(_error_response(404, "dataset not found"))
 
-    def test_raises_value_error_on_409(self):
-        with pytest.raises(ValueError, match="Conflict"):
+    def test_raises_dataset_api_error_on_403_without_limit_type(self):
+        with pytest.raises(DatasetApiError, match="Forbidden"):
+            _raise_for_api_status(_error_response(403, "access denied"))
+
+    def test_raises_dataset_plan_limit_error_on_403_with_limit_type(self):
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = 403
+        resp.is_success = False
+        resp.json.return_value = {
+            "error": "resource_limit_exceeded",
+            "message": "You have reached the limit of 10 datasets",
+            "limitType": "datasets",
+            "current": 10,
+            "max": 10,
+            "upgradeUrl": "https://app.langwatch.ai/settings/usage",
+        }
+        resp.text = json.dumps(resp.json.return_value)
+        with pytest.raises(DatasetPlanLimitError) as exc_info:
+            _raise_for_api_status(resp)
+        err = exc_info.value
+        assert err.limit_type == "datasets"
+        assert err.current == 10
+        assert err.max == 10
+        assert err.upgrade_url == "https://app.langwatch.ai/settings/usage"
+
+    def test_raises_dataset_api_error_on_409(self):
+        with pytest.raises(DatasetApiError, match="Conflict"):
             _raise_for_api_status(_error_response(409, "already exists"))
 
-    def test_raises_value_error_on_422(self):
-        with pytest.raises(ValueError, match="Validation error"):
+    def test_raises_dataset_api_error_on_422(self):
+        with pytest.raises(DatasetApiError, match="Validation error"):
             _raise_for_api_status(_error_response(422, "bad data"))
 
-    def test_raises_runtime_error_on_500(self):
-        with pytest.raises(RuntimeError, match="Server error"):
+    def test_raises_dataset_api_error_on_500(self):
+        with pytest.raises(DatasetApiError, match="Server error"):
             _raise_for_api_status(_error_response(500, "internal error"))
+
+    def test_passes_operation_to_dataset_api_error(self):
+        with pytest.raises(DatasetApiError) as exc_info:
+            _raise_for_api_status(
+                _error_response(400, "bad"), operation="create_dataset"
+            )
+        assert exc_info.value.operation == "create_dataset"
+        assert exc_info.value.status_code == 400
 
 
 @pytest.mark.integration
@@ -137,12 +175,12 @@ class TestDatasetApiService:
             assert result["data"] == []
             assert result["pagination"]["total"] == 0
 
-        def test_raises_runtime_error_on_auth_failure(self):
+        def test_raises_dataset_api_error_on_auth_failure(self):
             """@integration Scenario: List datasets propagates authentication errors"""
             mock_httpx = MagicMock()
             mock_httpx.get.return_value = _error_response(401, "Invalid API key")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(RuntimeError, match="Authentication failed"):
+            with pytest.raises(DatasetApiError, match="Authentication failed"):
                 svc.list_datasets()
 
     class TestCreateDataset:
@@ -189,12 +227,12 @@ class TestDatasetApiService:
             result = svc.create_dataset(name="Simple Dataset")
             assert result["columnTypes"] == []
 
-        def test_raises_value_error_on_conflict(self):
+        def test_raises_dataset_api_error_on_conflict(self):
             """@integration Scenario: Create a dataset with a conflicting name"""
             mock_httpx = MagicMock()
             mock_httpx.post.return_value = _error_response(409, "Dataset already exists")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Conflict"):
+            with pytest.raises(DatasetApiError, match="Conflict"):
                 svc.create_dataset(name="Existing")
 
     class TestGetDataset:
@@ -229,12 +267,12 @@ class TestDatasetApiService:
             assert result["slug"] == "my-data"
             mock_httpx.get.assert_called_once_with("/api/dataset/dataset_xyz")
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Get non-existent dataset raises an error"""
             mock_httpx = MagicMock()
             mock_httpx.get.return_value = _error_response(404, "dataset not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.get_dataset("does-not-exist")
 
     class TestUpdateDataset:
@@ -274,12 +312,12 @@ class TestDatasetApiService:
                 "columnTypes": [{"name": "question", "type": "string"}]
             }
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Update a non-existent dataset"""
             mock_httpx = MagicMock()
             mock_httpx.patch.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.update_dataset("ghost", name="Whatever")
 
     class TestDeleteDataset:
@@ -295,12 +333,12 @@ class TestDatasetApiService:
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             svc.delete_dataset("to-delete")  # should not raise
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Delete a non-existent dataset"""
             mock_httpx = MagicMock()
             mock_httpx.delete.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.delete_dataset("nope")
 
     class TestListRecords:
@@ -356,12 +394,12 @@ class TestDatasetApiService:
                 "/api/dataset/my-dataset/records", params={"page": 2, "limit": 20}
             )
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: List records for non-existent dataset raises an error"""
             mock_httpx = MagicMock()
             mock_httpx.get.return_value = _error_response(404, "dataset not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.list_records("ghost")
 
     class TestCreateRecords:
@@ -393,12 +431,12 @@ class TestDatasetApiService:
             assert "/records" in call_url
             assert "/entries" not in call_url
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Add records to a non-existent dataset"""
             mock_httpx = MagicMock()
             mock_httpx.post.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.create_records("ghost", entries=[{"input": "x"}])
 
     class TestUpdateRecord:
@@ -433,12 +471,12 @@ class TestDatasetApiService:
                 json={"entry": {"input": "new"}},
             )
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Update a record for non-existent dataset"""
             mock_httpx = MagicMock()
             mock_httpx.patch.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.update_record("ghost", "rec-1", entry={"input": "x"})
 
     class TestDeleteRecords:
@@ -454,12 +492,12 @@ class TestDatasetApiService:
             )
             assert result == 2
 
-        def test_raises_value_error_on_not_found(self):
+        def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Delete records for non-existent dataset"""
             mock_httpx = MagicMock()
             mock_httpx.request.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.delete_records("ghost", record_ids=["rec-1"])
 
     class TestUpload:
@@ -496,7 +534,7 @@ class TestDatasetApiService:
             assert result["recordsCreated"] == 2
             mock_httpx.post.assert_called_once()
 
-        def test_raises_value_error_on_not_found(self, tmp_path):
+        def test_raises_dataset_not_found_error(self, tmp_path):
             """@integration Scenario: Upload to a non-existent dataset"""
             csv_file = tmp_path / "data.csv"
             csv_file.write_text("input\nhello")
@@ -504,7 +542,7 @@ class TestDatasetApiService:
             mock_httpx = MagicMock()
             mock_httpx.post.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Not found"):
+            with pytest.raises(DatasetNotFoundError):
                 svc.upload("ghost", file_path=str(csv_file))
 
     class TestCreateDatasetFromFile:
@@ -534,7 +572,7 @@ class TestDatasetApiService:
             assert result["recordsCreated"] == 5
             assert result["dataset"]["name"] == "From CSV"
 
-        def test_raises_value_error_on_conflict(self, tmp_path):
+        def test_raises_dataset_api_error_on_conflict(self, tmp_path):
             """@integration Scenario: Create dataset from file with conflicting name"""
             csv_file = tmp_path / "data.csv"
             csv_file.write_text("input\nhello")
@@ -542,7 +580,7 @@ class TestDatasetApiService:
             mock_httpx = MagicMock()
             mock_httpx.post.return_value = _error_response(409, "already exists")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            with pytest.raises(ValueError, match="Conflict"):
+            with pytest.raises(DatasetApiError, match="Conflict"):
                 svc.create_dataset_from_file(name="Existing", file_path=str(csv_file))
 
 
