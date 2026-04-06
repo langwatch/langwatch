@@ -48,6 +48,7 @@
 	],
 	"exclude": [
 		"node_modules",
+		"../mcp-server",
 		"saas-src/**/*",
 		".next",
 		".next-saas",
