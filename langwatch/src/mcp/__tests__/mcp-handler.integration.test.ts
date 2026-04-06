@@ -490,6 +490,126 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
+  // --- Security: session re-auth ---
+
+  describe("when an existing session request omits the Authorization header", () => {
+    it("returns 401 on POST", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      // Initialize a session
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      // Send a request WITHOUT Authorization header
+      const res = await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+        headers: { "mcp-session-id": sessionId },
+      });
+
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 on GET", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      const res = await sendRequest({
+        server,
+        method: "GET",
+        path: "/mcp",
+        headers: { "mcp-session-id": sessionId },
+      });
+
+      expect(res.status).toBe(401);
+    });
+
+    it("returns 401 on DELETE", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      const res = await sendRequest({
+        server,
+        method: "DELETE",
+        path: "/mcp",
+        headers: { "mcp-session-id": sessionId },
+      });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe("when an existing session request has a wrong Bearer token", () => {
+    it("returns 401", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      mockPrisma.project.findUnique.mockResolvedValue(null);
+
+      const res = await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", id: 2, method: "tools/list" },
+        headers: {
+          authorization: "Bearer wrong_key",
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // --- Security: rate limiting ---
+
+  describe("when /oauth/token is called more than 10 times per minute", () => {
+    it("returns 429", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+
+      // Send 10 requests (allowed)
+      for (let i = 0; i < 10; i++) {
+        await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+        });
+      }
+
+      // 11th request should be rate limited
+      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+      });
+
+      expect(res.status).toBe(429);
+    });
+  });
+
   // --- Standalone Package Isolation ---
 
   describe("when the standalone mcp-server package is checked for isolation", () => {
