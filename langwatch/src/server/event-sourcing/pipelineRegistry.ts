@@ -27,6 +27,8 @@ import { SimulationRunStateFoldProjection, type SimulationRunStateData } from ".
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
+import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import type { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
@@ -122,6 +124,8 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
+  /** Execution pool for scenario child processes. Provided by the worker bootstrap. */
+  scenarioExecutionPool?: ScenarioExecutionPool;
 }
 
 /**
@@ -380,6 +384,10 @@ export class PipelineRegistry {
       publisher: this.deps.eventSourcing.redisConnection ?? null,
     });
 
+    const scenarioExecutionReactor = this.deps.scenarioExecutionPool
+      ? createScenarioExecutionReactor({ pool: this.deps.scenarioExecutionPool })
+      : undefined;
+
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
     const suiteRunSyncReactor = createSuiteRunSyncReactor({
       recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
@@ -418,6 +426,7 @@ export class PipelineRegistry {
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
         cancellationBroadcastReactor,
+        scenarioExecutionReactor,
         suiteRunSyncReactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,

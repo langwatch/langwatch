@@ -90,6 +90,8 @@ specs/               # BDD feature specs
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements |
+
 ## TypeScript
 
 | Common Mistake | Correct Behavior |

@@ -153,6 +153,7 @@ export class SuiteRunService {
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
           },
+          target: { type: item.target.type, referenceId: item.target.referenceId },
           occurredAt: now,
         }),
       ),

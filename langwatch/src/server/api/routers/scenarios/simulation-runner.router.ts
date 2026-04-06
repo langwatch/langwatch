@@ -110,6 +110,7 @@ export const simulationRunnerRouter = createTRPCRouter({
           scenarioId: input.scenarioId,
           batchRunId,
           scenarioSetId: setId,
+          target: { type: input.target.type, referenceId: input.target.referenceId },
           occurredAt: Date.now(),
         });
       } catch (error) {

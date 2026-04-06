@@ -22,13 +22,13 @@ import {
   CANCELLATION_CHANNEL,
 } from "../cancellation-channel";
 import type { CancellationMessage, CancellationSubscriber } from "../cancellation-channel";
-import type IORedis from "ioredis";
+import type { Redis } from "ioredis";
 
 /**
  * Simulates a worker pod with a set of "running" child processes.
  * Each child tracks whether it received a kill signal.
  */
-function createMockWorker(redis: IORedis.Redis) {
+function createMockWorker(redis: Redis) {
   const killed = new Map<string, boolean>();
   const running = new Map<string, { kill: (signal: string) => void }>();
 
@@ -64,7 +64,7 @@ function createMockWorker(redis: IORedis.Redis) {
 }
 
 describe("Event-sourcing cancellation (real Redis)", () => {
-  let redis: IORedis.Redis;
+  let redis: Redis;
   const cleanupFns: Array<() => Promise<void>> = [];
 
   beforeAll(async () => {
