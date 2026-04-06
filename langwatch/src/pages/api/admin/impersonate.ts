@@ -26,14 +26,15 @@ export default async function handler(
 
     const userToImpersonate = await prisma.user.findUnique({
       where: { id: userIdToImpersonate },
+      select: { id: true, name: true, email: true, image: true },
     });
 
     if (!userToImpersonate) {
       return res.status(404).json({ message: "User to impersonate not found" });
     }
 
-    auditLog({
-      userId: session.user.id,
+    await auditLog({
+      userId: user.id,
       action: "admin/impersonate",
       args: {
         userIdToImpersonate: userToImpersonate.id,
@@ -43,11 +44,10 @@ export default async function handler(
     });
 
     await prisma.session.update({
-      where: { sessionToken, userId: session.user.id },
+      where: { sessionToken, userId: user.id },
       data: {
         impersonating: {
           ...userToImpersonate,
-          password: undefined,
           expires: new Date(Date.now() + 1000 * 60 * 60), // 1 hour
         },
       },

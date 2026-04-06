@@ -1,7 +1,9 @@
 export const isAdmin = (user: { email?: string | null }) => {
   if (!user) return false;
   const adminEmails = process.env.ADMIN_EMAILS;
-  return (
-    adminEmails && user.email && adminEmails.split(",").includes(user.email)
-  );
+  if (!adminEmails || !user.email) return false;
+  const normalizedEmail = user.email.toLowerCase().trim();
+  return adminEmails
+    .split(",")
+    .some((e) => e.trim().toLowerCase() === normalizedEmail);
 };

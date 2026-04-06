@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("~/server/db", () => ({
   prisma: {
     user: { findUnique: vi.fn() },
-    organization: { findFirst: vi.fn() },
+    organization: { findFirst: vi.fn(), findUnique: vi.fn() },
     session: { findUnique: vi.fn() },
     account: { create: vi.fn(), deleteMany: vi.fn() },
     organizationUser: { create: vi.fn() },

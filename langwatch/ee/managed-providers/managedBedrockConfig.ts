@@ -147,9 +147,12 @@ export async function buildManagedBedrockLitellmParams({
   model: string;
   modelProvider: MaybeStoredModelProvider;
 }): Promise<Record<string, string>> {
-  const config = await getManagedBedrockConfigForProject(projectId);
+  if (modelProvider.provider !== "bedrock") {
+    return params;
+  }
 
-  if (!config || modelProvider.provider !== "bedrock") {
+  const config = await getManagedBedrockConfigForProject(projectId);
+  if (!config) {
     return params;
   }
 
@@ -204,7 +207,7 @@ export async function buildManagedBedrockLitellmParams({
   params.aws_secret_access_key = customerCredentials.SecretAccessKey;
   params.aws_session_token = customerCredentials.SessionToken;
   params.aws_region_name = config.region;
-  params.aws_bedrock_runtime_endpoint = `http://${config.bedrockProxyEndpoint}`;
+  params.aws_bedrock_runtime_endpoint = `https://${config.bedrockProxyEndpoint}`;
 
   delete params.api_key;
 

@@ -8,6 +8,13 @@ import posthog from "posthog-js";
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
+  const publicEnv = api.publicEnv.useQuery(undefined, {
+    staleTime: Infinity,
+  });
+
+  if (!publicEnv.data?.IS_SAAS) {
+    return null;
+  }
 
   return (
     <>
@@ -26,6 +33,15 @@ export function ExtraFooterComponents() {
   );
 }
 
+function sanitizeForJs(value: string): string {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '\\"')
+    .replace(/</g, "\\x3c")
+    .replace(/>/g, "\\x3e");
+}
+
 export function SignedInExtraFooterComponents() {
   const updateLastLogin = api.user.updateLastLogin.useMutation();
 
@@ -35,12 +51,16 @@ export function SignedInExtraFooterComponents() {
   });
 
   const hasTracked = useRef(false);
+  const hasUpdatedLastLogin = useRef(false);
 
   useEffect(() => {
     if (!session.data?.user?.email || !organization?.name || hasTracked.current)
       return;
 
-    (window as any).Reo?.identify?.({
+    const reo = (window as any).Reo;
+    if (!reo?.identify) return;
+
+    reo.identify({
       username: session.data.user.email,
       type: "email",
       firstname: session.data.user.name || "",
@@ -49,13 +69,25 @@ export function SignedInExtraFooterComponents() {
     hasTracked.current = true;
   }, [session.data?.user?.email, session.data?.user?.name, organization?.name]);
 
+  // Update last login separately from analytics — don't gate on gtag availability
+  useEffect(() => {
+    if (
+      !session.data?.user ||
+      !organization ||
+      !project ||
+      hasUpdatedLastLogin.current
+    )
+      return;
+    if ((session.data.user as any).impersonator) return;
+
+    hasUpdatedLastLogin.current = true;
+    void updateLastLogin.mutate({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organization?.id, project?.id]);
+
   useEffect(() => {
     const gtag = (window as any).gtag;
     if (!session.data?.user || !organization || !project || !gtag) return;
-
-    if (!(session.data.user as any).impersonator) {
-      void updateLastLogin.mutate({});
-    }
 
     if (!(session.data.user as any).impersonator) {
       gtag("set", "user_properties", {
@@ -95,9 +127,14 @@ export function SignedInExtraFooterComponents() {
     return null;
   }
 
+  const isImpersonating = !!(session.data?.user as any)?.impersonator;
+  const isInStudio =
+    typeof window !== "undefined" &&
+    window.location.pathname.includes("/studio");
+
   return (
     <>
-      {(session.data?.user as any)?.impersonator ? null : (
+      {isImpersonating ? null : (
         <>
           <Script id="pendo">
             {`(function(apiKey){
@@ -109,19 +146,19 @@ export function SignedInExtraFooterComponents() {
 
     pendo.initialize({
         visitor: {
-            id: "${session.data.user?.id || ""}",
-            email: "${session.data.user?.email || ""}",
-            name: "${session.data.user?.name || ""}"
+            id: '${sanitizeForJs(session.data.user?.id || "")}',
+            email: '${sanitizeForJs(session.data.user?.email || "")}',
+            name: '${sanitizeForJs(session.data.user?.name || "")}'
         },
         account: {
-            id: "${organization.id || ""}",
-            projectName: "${project.name || ""}",
-            organizationName: "${organization.name || ""}"
+            id: '${sanitizeForJs(organization.id || "")}',
+            projectName: '${sanitizeForJs(project.name || "")}',
+            organizationName: '${sanitizeForJs(organization.name || "")}'
         }
     });
 })('18f008fe-1a55-4b22-70d9-964d6e98b130');`}
           </Script>
-          {window.location.pathname.includes("/studio") ? null : (
+          {isInStudio ? null : (
             <Script id="crisp">
               {`window.$crisp=[];window.$crisp.push(["do", "chat:hide"]);window.$crisp.push(["on", "chat:closed", () => { window.$crisp.push(["do", "chat:hide"]); }]);window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
             </Script>

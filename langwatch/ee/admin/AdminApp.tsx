@@ -44,20 +44,25 @@ const AdminApp = () => {
     }
 
     setLoadingImpersonation(user.id);
-    const response = await fetch("/api/admin/impersonate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userIdToImpersonate: user.id,
-        reason: reason,
-      }),
-    });
+    try {
+      const response = await fetch("/api/admin/impersonate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userIdToImpersonate: user.id,
+          reason: reason,
+        }),
+      });
 
-    if (response.ok) {
-      window.location.href = "/";
-    } else {
+      if (response.ok) {
+        window.location.href = "/";
+      } else {
+        alert("Error impersonating user");
+        setLoadingImpersonation(undefined);
+      }
+    } catch {
       alert("Error impersonating user");
       setLoadingImpersonation(undefined);
     }

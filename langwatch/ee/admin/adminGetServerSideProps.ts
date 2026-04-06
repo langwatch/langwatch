@@ -7,7 +7,8 @@ export const getServerSideProps = async (
 ) => {
   const session = await getSession(context);
 
-  if (!session || (session.user && !isAdmin(session.user))) {
+  const user = (session?.user as any)?.impersonator ?? session?.user;
+  if (!session || (user && !isAdmin(user))) {
     return {
       notFound: true,
     };

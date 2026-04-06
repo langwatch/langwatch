@@ -16,7 +16,8 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const session = await getServerAuthSession({ req, res });
-  if (!session || (session && !isAdmin(session.user))) {
+  const user = (session?.user as any)?.impersonator ?? session?.user;
+  if (!session || (session && !isAdmin(user))) {
     return res.status(404).json({ message: "Not Found" });
   }
 
@@ -37,8 +38,8 @@ export default async function handler(
   }
 
   if (req.body.resource === "user" && req.body.method === "getList") {
-    const query = req.body.params.filter.query;
-    delete req.body.params.filter.query;
+    const query = req.body.params?.filter?.query;
+    if (req.body.params?.filter?.query) delete req.body.params.filter.query;
 
     const result = await getListHandler<Prisma.UserFindManyArgs>(
       req.body as GetListRequest,
@@ -93,11 +94,10 @@ export default async function handler(
           },
         },
         map: (
-          users: User &
-            {
+          users: (User & {
               orgMemberships: { organization: Organization }[];
               teamMemberships: { team: Team & { projects: Project[] } }[];
-            }[]
+            })[]
         ) => {
           return users.map((user) => ({
             ...user,
@@ -121,8 +121,8 @@ export default async function handler(
   }
 
   if (req.body.resource === "organization" && req.body.method === "getList") {
-    const query = req.body.params.filter.query;
-    delete req.body.params.filter.query;
+    const query = req.body.params?.filter?.query;
+    if (req.body.params?.filter?.query) delete req.body.params.filter.query;
 
     const result = await getListHandler<Prisma.OrganizationFindManyArgs>(
       req.body as GetListRequest,
@@ -145,8 +145,8 @@ export default async function handler(
   }
 
   if (req.body.resource === "project" && req.body.method === "getList") {
-    const query = req.body.params.filter.query;
-    delete req.body.params.filter.query;
+    const query = req.body.params?.filter?.query;
+    if (req.body.params?.filter?.query) delete req.body.params.filter.query;
 
     const result = await getListHandler<Prisma.ProjectFindManyArgs>(
       req.body as GetListRequest,
@@ -169,8 +169,8 @@ export default async function handler(
   }
 
   if (req.body.resource === "subscription" && req.body.method === "getList") {
-    const query = req.body.params.filter.query;
-    delete req.body.params.filter.query;
+    const query = req.body.params?.filter?.query;
+    if (req.body.params?.filter?.query) delete req.body.params.filter.query;
 
     const upperQuery = query?.toUpperCase();
     const matchingPlan = upperQuery
@@ -235,7 +235,7 @@ export default async function handler(
             };
           };
         }) => {
-          auditLog({
+          await auditLog({
             userId: data.author.connect.id,
             action: `admin/${data.action}/${data.resource}`,
             args: data.payload,
@@ -246,8 +246,8 @@ export default async function handler(
       authProvider: {
         getIdentity: async () => {
           return {
-            id: session?.user.id,
-            fullName: session?.user.name,
+            id: user?.id ?? session?.user.id,
+            fullName: user?.name ?? session?.user.name,
           };
         },
       },
