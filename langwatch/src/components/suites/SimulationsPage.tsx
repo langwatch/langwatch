@@ -271,10 +271,12 @@ export default function SimulationsPage() {
     (suiteId: string) => {
       const suite = suites?.find((s) => s.id === suiteId);
       if (!suite) return;
-      navigateToSuite(suite.slug);
+      if (selectedSuiteSlug !== suite.slug) {
+        navigateToSuite(suite.slug);
+      }
       requestRun(suite);
     },
-    [suites, navigateToSuite, requestRun],
+    [suites, selectedSuiteSlug, navigateToSuite, requestRun],
   );
 
   const handleDuplicateSuite = useCallback(
