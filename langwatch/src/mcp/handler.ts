@@ -198,6 +198,7 @@ export function createMcpHandler(): McpHandler {
     "/mcp/health",
     "/sse",
     "/messages",
+    "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-authorization-server",
     "/oauth/token",
   ]);
@@ -465,13 +466,28 @@ export function createMcpHandler(): McpHandler {
     sendJson(res, 200, { status: "ok" });
   }
 
+  function handleProtectedResourceMetadata(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): void {
+    const baseUrl =
+      process.env.BASE_HOST ?? "https://app.langwatch.ai";
+
+    sendJson(res, 200, {
+      resource: baseUrl,
+      authorization_servers: [baseUrl],
+      bearer_methods_supported: ["header"],
+      scopes_supported: ["mcp:tools"],
+    });
+  }
+
   function handleOAuthMetadata(
     _req: IncomingMessage,
     res: ServerResponse,
   ): void {
     // Use configured endpoint to prevent host header injection
     const baseUrl =
-      process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+      process.env.BASE_HOST ?? "https://app.langwatch.ai";
 
     sendJson(res, 200, {
       issuer: baseUrl,
@@ -848,6 +864,13 @@ export function createMcpHandler(): McpHandler {
       switch (pathname) {
         case "/mcp/health":
           handleHealthCheck(req, res);
+          break;
+        case "/.well-known/oauth-protected-resource":
+          if (method === "GET") {
+            handleProtectedResourceMetadata(req, res);
+          } else {
+            sendJson(res, 405, { error: "Method not allowed" });
+          }
           break;
         case "/.well-known/oauth-authorization-server":
           if (method === "GET") {
