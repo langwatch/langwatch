@@ -50,7 +50,11 @@ export default async function handler(
   // but allow custom schemes for native apps (RFC 8252)
   try {
     const redirectUrl = new URL(redirect_uri);
-    if (redirectUrl.protocol === "javascript:") {
+    if (
+      redirectUrl.protocol === "javascript:" ||
+      redirectUrl.protocol === "data:" ||
+      redirectUrl.protocol === "vbscript:"
+    ) {
       return res
         .status(400)
         .json({ error: "redirect_uri uses a disallowed scheme" });
@@ -100,7 +104,7 @@ export default async function handler(
   const authCodeEntry = JSON.stringify({
     projectId: project.id,
     encryptedApiKey: encrypt(project.apiKey),
-    codeChallenge: code_challenge ?? "",
+    codeChallenge: code_challenge,
     codeChallengeMethod: code_challenge_method ?? "S256",
     clientId: client_id ?? "",
     expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
