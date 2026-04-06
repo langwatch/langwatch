@@ -16,6 +16,7 @@ import {
   type ScenarioFetcher,
   type PromptFetcher,
   type AgentFetcher,
+  type WorkflowFetcher,
   type ProjectFetcher,
   type ModelParamsProvider,
 } from "../data-prefetcher";
@@ -75,6 +76,11 @@ describe("prefetchScenarioData", () => {
       findById: vi.fn().mockResolvedValue(null),
     };
 
+    const workflowFetcher: WorkflowFetcher = {
+      findWorkflow: vi.fn().mockResolvedValue(null),
+      findPublishedVersion: vi.fn().mockResolvedValue(null),
+    };
+
     const projectFetcher: ProjectFetcher = {
       findUnique: vi.fn().mockResolvedValue(defaultProject),
     };
@@ -87,6 +93,7 @@ describe("prefetchScenarioData", () => {
       scenarioFetcher,
       promptFetcher,
       agentFetcher,
+      workflowFetcher,
       projectFetcher,
       modelParamsProvider,
       ...overrides,
@@ -445,6 +452,162 @@ describe("prefetchScenarioData", () => {
             "proj_123",
             "anthropic/claude-3-sonnet",
           );
+        });
+      });
+    });
+  });
+
+  describe("workflow agent prefetch", () => {
+    const sampleDsl = {
+      workflow_id: "wf_123",
+      name: "Customer Support Bot",
+      nodes: [
+        {
+          id: "entry",
+          type: "entry",
+          data: {
+            name: "Entry",
+            outputs: [
+              { identifier: "question", type: "str" },
+            ],
+          },
+        },
+        {
+          id: "llm_node",
+          type: "signature",
+          data: { name: "LLM" },
+        },
+        {
+          id: "end",
+          type: "end",
+          data: {
+            name: "End",
+            inputs: [
+              { identifier: "answer", type: "str" },
+            ],
+          },
+        },
+      ],
+      edges: [],
+    };
+
+    const workflowAgent = {
+      id: "agent_wf_123",
+      type: "workflow" as const,
+      name: "My Workflow Bot",
+      projectId: "proj_123",
+      config: {
+        workflow_id: "wf_123",
+        publishedId: "ver_pub_123",
+      },
+      workflowId: "wf_123",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+
+    describe("given a workflow agent exists with a published workflow", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns the workflow DSL and entry/end fields", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(workflowAgent),
+            },
+            workflowFetcher: {
+              findWorkflow: vi.fn().mockResolvedValue({ id: "wf_123", publishedId: "ver_pub_123" }),
+              findPublishedVersion: vi.fn().mockResolvedValue({ dsl: sampleDsl }),
+            },
+          });
+
+          const target: TargetConfig = { type: "workflow", referenceId: "agent_wf_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.adapterData).toMatchObject({
+              type: "workflow",
+              agentId: "agent_wf_123",
+              workflowDsl: sampleDsl,
+              entryInputs: [{ identifier: "question", type: "str" }],
+              endOutputs: [{ identifier: "answer", type: "str" }],
+            });
+          }
+        });
+
+        it("passes projectId to findWorkflow for multitenancy", async () => {
+          const mockFindWorkflow = vi.fn().mockResolvedValue({ id: "wf_123", publishedId: "ver_pub_123" });
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(workflowAgent),
+            },
+            workflowFetcher: {
+              findWorkflow: mockFindWorkflow,
+              findPublishedVersion: vi.fn().mockResolvedValue({ dsl: sampleDsl }),
+            },
+          });
+
+          const target: TargetConfig = { type: "workflow", referenceId: "agent_wf_123" };
+          await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(mockFindWorkflow).toHaveBeenCalledWith({
+            id: "wf_123",
+            projectId: "proj_123",
+          });
+        });
+      });
+    });
+
+    describe("given a workflow agent has no published version", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with agent not found error", async () => {
+          const agentNoPublished = {
+            ...workflowAgent,
+            config: { workflow_id: "wf_123" },
+          };
+
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(agentNoPublished),
+            },
+            workflowFetcher: {
+              findWorkflow: vi.fn().mockResolvedValue({ id: "wf_123", publishedId: null }),
+              findPublishedVersion: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "workflow", referenceId: "agent_wf_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Workflow agent");
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
+    });
+
+    describe("given a workflow agent references a deleted workflow", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with agent not found error", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(workflowAgent),
+            },
+            workflowFetcher: {
+              findWorkflow: vi.fn().mockResolvedValue(null),
+              findPublishedVersion: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "workflow", referenceId: "agent_wf_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Workflow agent");
+            expect(result.error).toContain("not found");
+          }
         });
       });
     });

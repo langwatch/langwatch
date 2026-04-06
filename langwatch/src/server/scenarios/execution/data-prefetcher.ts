@@ -35,6 +35,7 @@ import {
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
+  type WorkflowAgentData,
 } from "./types";
 
 // ============================================================================
@@ -63,6 +64,19 @@ export interface PromptFetcher {
 /** Minimal interface for agent lookup - uses only what prefetcher needs */
 export interface AgentFetcher {
   findById(params: { projectId: string; id: string }): Promise<TypedAgent | null>;
+}
+
+/** Minimal interface for workflow version lookup - uses only what prefetcher needs */
+export interface WorkflowFetcher {
+  findPublishedVersion(params: {
+    workflowId: string;
+    publishedId: string;
+    projectId: string;
+  }): Promise<{ dsl: unknown } | null>;
+  findWorkflow(params: {
+    id: string;
+    projectId: string;
+  }): Promise<{ id: string; publishedId: string | null } | null>;
 }
 
 /** Minimal interface for project lookup */
@@ -96,6 +110,7 @@ export interface DataPrefetcherDependencies {
   scenarioFetcher: ScenarioFetcher;
   promptFetcher: PromptFetcher;
   agentFetcher: AgentFetcher;
+  workflowFetcher: WorkflowFetcher;
   projectFetcher: ProjectFetcher;
   modelParamsProvider: ModelParamsProvider;
 }
@@ -160,7 +175,13 @@ export async function prefetchScenarioData(
       { projectId: context.projectId, targetType: target.type, targetReferenceId: target.referenceId },
       "Target adapter not found",
     );
-    const targetLabel = target.type === "prompt" ? "Prompt" : target.type === "code" ? "Code agent" : "HTTP agent";
+    const targetLabels: Record<string, string> = {
+      prompt: "Prompt",
+      code: "Code agent",
+      http: "HTTP agent",
+      workflow: "Workflow agent",
+    };
+    const targetLabel = targetLabels[target.type] ?? "Target";
     return {
       success: false,
       error: `${targetLabel} ${target.referenceId} not found`,
@@ -262,6 +283,9 @@ async function fetchAgentData(
   }
   if (target.type === "code") {
     return fetchCodeAgentData(projectId, target.referenceId, deps.agentFetcher);
+  }
+  if (target.type === "workflow") {
+    return fetchWorkflowAgentData(projectId, target.referenceId, deps.agentFetcher, deps.workflowFetcher);
   }
   return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
 }
@@ -380,6 +404,91 @@ async function fetchCodeAgentData(
   };
 }
 
+/**
+ * Zod schema for workflow agent config validation.
+ * Workflow agents store their workflow_id in the config and
+ * optionally a publishedId for the version to execute.
+ */
+const WorkflowAgentConfigSchema = z.object({
+  workflow_id: z.string().optional(),
+  publishedId: z.string().optional(),
+});
+
+/**
+ * Zod schema for extracting entry/end node fields from a workflow DSL.
+ * The DSL nodes array contains entry and end nodes with their field definitions.
+ */
+const DslNodeFieldSchema = z.object({
+  identifier: z.string(),
+  type: z.string(),
+});
+
+const DslNodeSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  data: z.object({
+    outputs: z.array(DslNodeFieldSchema).optional(),
+    inputs: z.array(DslNodeFieldSchema).optional(),
+  }).passthrough(),
+}).passthrough();
+
+const DslSchema = z.object({
+  nodes: z.array(DslNodeSchema),
+}).passthrough();
+
+async function fetchWorkflowAgentData(
+  projectId: string,
+  agentId: string,
+  agentFetcher: AgentFetcher,
+  workflowFetcher: WorkflowFetcher,
+): Promise<WorkflowAgentData | null> {
+  const agent = await agentFetcher.findById({ projectId, id: agentId });
+  if (!agent || agent.type !== "workflow") return null;
+
+  const configResult = WorkflowAgentConfigSchema.safeParse(agent.config);
+  if (!configResult.success) return null;
+
+  const workflowId = agent.workflowId ?? configResult.data.workflow_id;
+  if (!workflowId) return null;
+
+  const workflow = await workflowFetcher.findWorkflow({ id: workflowId, projectId });
+  if (!workflow) return null;
+
+  const publishedId = configResult.data.publishedId ?? workflow.publishedId;
+  if (!publishedId) return null;
+
+  const version = await workflowFetcher.findPublishedVersion({
+    workflowId,
+    publishedId,
+    projectId,
+  });
+  if (!version) return null;
+
+  const dslResult = DslSchema.safeParse(version.dsl);
+  if (!dslResult.success) return null;
+
+  const entryNode = dslResult.data.nodes.find((n) => n.type === "entry");
+  const endNode = dslResult.data.nodes.find((n) => n.type === "end");
+  if (!entryNode || !endNode) return null;
+
+  const entryInputs = (entryNode?.data.outputs ?? []).map((f) => ({
+    identifier: f.identifier,
+    type: f.type,
+  }));
+  const endOutputs = (endNode?.data.inputs ?? []).map((f) => ({
+    identifier: f.identifier,
+    type: f.type,
+  }));
+
+  return {
+    type: "workflow",
+    agentId: agent.id,
+    workflowDsl: version.dsl as Record<string, unknown>,
+    entryInputs,
+    endOutputs,
+  };
+}
+
 // ============================================================================
 // Factory Function (wires up production dependencies)
 // ============================================================================
@@ -409,6 +518,22 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
     },
     agentFetcher: {
       findById: (params) => agentRepository.findById(params),
+    },
+    workflowFetcher: {
+      findWorkflow: async ({ id, projectId }) => {
+        const workflow = await prisma.workflow.findFirst({
+          where: { id, projectId },
+          select: { id: true, publishedId: true },
+        });
+        return workflow;
+      },
+      findPublishedVersion: async ({ workflowId, publishedId, projectId }) => {
+        const version = await prisma.workflowVersion.findFirst({
+          where: { id: publishedId, workflowId, projectId },
+          select: { dsl: true },
+        });
+        return version;
+      },
     },
     projectFetcher: {
       findUnique: async (projectId) =>
