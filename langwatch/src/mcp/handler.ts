@@ -137,7 +137,7 @@ export function createMcpHandler(): McpHandler {
     getConfig();
   } catch {
     initConfig({
-      endpoint: process.env.LANGWATCH_ENDPOINT ?? process.env.BASE_HOST ?? "https://app.langwatch.ai",
+      endpoint: process.env.BASE_HOST ?? "https://app.langwatch.ai",
     });
   }
 
