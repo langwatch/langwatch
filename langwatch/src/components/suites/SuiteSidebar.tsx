@@ -381,6 +381,10 @@ function SidebarButton({
   );
 }
 
+/**
+ * ⚠️  KEEP IN SYNC with run-history-transforms.ts → computeGroupSummary()
+ * Pass rate = passed / settled (totalCount here IS settled count from query).
+ */
 function RunSummaryLine({
   passedCount,
   failedCount,
@@ -390,10 +394,8 @@ function RunSummaryLine({
   failedCount: number;
   totalCount: number;
 }) {
-  if (totalCount === 0) return null;
-
-  const completedCount = passedCount + failedCount;
-  const passRate = completedCount > 0 ? (passedCount / totalCount) * 100 : null;
+  // totalCount = settled count from the ClickHouse query (excludes in-progress/queued)
+  const passRate = totalCount > 0 ? (passedCount / totalCount) * 100 : null;
 
   return (
     <HStack gap={1} color="fg.muted">

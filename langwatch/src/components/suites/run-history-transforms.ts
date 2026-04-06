@@ -299,8 +299,8 @@ export function computeBatchRunSummary({
  *
  * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
  * with its own pass rate formula. If you change the formula here, also update:
- *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar external sets)
- *   - suites.router.ts → getSummaries() (sidebar suite summaries)
+ *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar query)
+ *   - SuiteSidebar.tsx → RunSummaryLine() (sidebar display)
  */
 export function computeGroupSummary({
   group,
