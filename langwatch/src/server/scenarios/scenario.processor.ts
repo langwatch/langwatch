@@ -229,6 +229,13 @@ export async function executeScenarioRun(
       prefetchDeps,
     );
 
+    // Check if cancellation was requested while we were prefetching
+    if (pool.wasCancelled(jobData.scenarioRunId)) {
+      jobLogger.info("Scenario cancelled during prefetch");
+      await handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
+      return;
+    }
+
     if (!prefetchResult.success) {
       jobLogger.error(
         { error: prefetchResult.error, phase: "prefetch" },

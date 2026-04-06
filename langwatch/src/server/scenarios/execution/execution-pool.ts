@@ -97,6 +97,11 @@ export class ScenarioExecutionPool {
    * Starts immediately if capacity available, buffers if full.
    */
   submit(jobData: ExecutionJobData): void {
+    // Skip if already cancelled before we even start
+    if (this._cancelled.has(jobData.scenarioRunId)) {
+      logger.info({ scenarioRunId: jobData.scenarioRunId }, "Skipping cancelled job");
+      return;
+    }
     if (this._running.size < this._concurrency) {
       this.startJob(jobData);
     } else {
@@ -141,14 +146,21 @@ export class ScenarioExecutionPool {
   }
 
   private dequeueNext(): void {
-    if (this._pending.length === 0) return;
-    if (this._running.size >= this._concurrency) return;
+    while (this._pending.length > 0 && this._running.size < this._concurrency) {
+      const next = this._pending.shift()!;
 
-    const next = this._pending.shift()!;
-    logger.debug(
-      { scenarioRunId: next.scenarioRunId, remainingPending: this._pending.length },
-      "Dequeuing pending job",
-    );
-    this.startJob(next);
+      // Skip cancelled jobs in the pending queue
+      if (this._cancelled.has(next.scenarioRunId)) {
+        logger.info({ scenarioRunId: next.scenarioRunId }, "Skipping cancelled pending job");
+        continue;
+      }
+
+      logger.debug(
+        { scenarioRunId: next.scenarioRunId, remainingPending: this._pending.length },
+        "Dequeuing pending job",
+      );
+      this.startJob(next);
+      return; // One at a time — next dequeue happens when this job completes
+    }
   }
 }
