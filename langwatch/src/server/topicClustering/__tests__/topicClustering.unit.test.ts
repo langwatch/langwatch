@@ -162,21 +162,16 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
-  describe("when CH flag is on but getClickHouseClientForProject returns null", () => {
-    it("falls back to ES", async () => {
+  describe("when getClickHouseClientForProject returns null", () => {
+    it("throws because ClickHouse is required", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
 
-      mockEsClient.count.mockResolvedValue({ count: 0 });
-      mockEsClient.search.mockResolvedValue({
-        hits: { total: { value: 0 }, hits: [] },
-      });
-
-      await clusterTopicsForProject("proj-1", undefined, false);
-
-      expect(mockEsClient.count).toHaveBeenCalledTimes(4);
+      await expect(
+        clusterTopicsForProject("proj-1", undefined, false),
+      ).rejects.toThrow("ClickHouse client not available for project proj-1");
     });
   });
 

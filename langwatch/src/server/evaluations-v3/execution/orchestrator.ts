@@ -65,8 +65,6 @@ export type OrchestratorInput = {
   loadedAgents: Map<string, TypedAgent>;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
-  /** Enable saving results to Elasticsearch */
-  saveToEs?: boolean;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
@@ -536,7 +534,6 @@ export async function* runOrchestrator(
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,
-    saveToEs = false,
     runId: providedRunId,
     concurrency: requestedConcurrency,
   } = input;
@@ -551,7 +548,7 @@ export async function* runOrchestrator(
   const cells = generateCells(state, datasetRows, scope);
   const totalCells = cells.length;
 
-  logger.info({ runId, totalCells, scope, saveToEs }, "Starting orchestrator");
+  logger.info({ runId, totalCells, scope }, "Starting orchestrator");
 
   // Set running flag
   await abortManager.setRunning(runId);
