@@ -303,31 +303,31 @@ class DatasetApiService:
 
     # ── file upload ─────────────────────────────────────────────────
 
-    def upload(
+    def upload_to_existing(
         self,
         slug_or_id: str,
         *,
         file_path: str,
     ) -> Dict[str, Any]:
         """POST /api/dataset/{slugOrId}/upload -- upload a file to an existing dataset."""
-        with _tracer.start_as_current_span("dataset.upload"):
+        with _tracer.start_as_current_span("dataset.upload_to_existing"):
             quoted = self._quote(slug_or_id)
             with open(file_path, "rb") as f:
                 response = self._http().post(
                     f"/api/dataset/{quoted}/upload",
                     files={"file": (os.path.basename(file_path), f)},
                 )
-            _raise_for_api_status(response, operation="upload")
+            _raise_for_api_status(response, operation="upload_to_existing")
             return response.json()
 
-    def create_dataset_from_file(
+    def create_from_file(
         self,
         *,
         name: str,
         file_path: str,
     ) -> Dict[str, Any]:
         """POST /api/dataset/upload -- create a new dataset from a file."""
-        with _tracer.start_as_current_span("dataset.create_dataset_from_file"):
+        with _tracer.start_as_current_span("dataset.create_from_file"):
             with open(file_path, "rb") as f:
                 response = self._http().post(
                     "/api/dataset/upload",
@@ -335,6 +335,6 @@ class DatasetApiService:
                     files={"file": (os.path.basename(file_path), f)},
                 )
             _raise_for_api_status(
-                response, operation="create_dataset_from_file"
+                response, operation="create_from_file"
             )
             return response.json()

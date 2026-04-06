@@ -21,7 +21,6 @@ from langwatch.dataset.types import (
     PaginatedResult,
     Pagination,
     UploadResult,
-    CreateFromFileResult,
 )
 
 
@@ -158,14 +157,13 @@ class TestUploadResult:
         result = UploadResult(datasetId="ds_1", recordsCreated=5)
         assert result.datasetId == "ds_1"
         assert result.recordsCreated == 5
+        assert result.dataset is None
 
-
-class TestCreateFromFileResult:
-    """CreateFromFileResult"""
-
-    def test_constructs_with_dataset_and_count(self):
+    def test_constructs_with_dataset_info(self):
+        """UploadResult includes optional dataset field for create-from-file responses"""
         info = DatasetInfo(id="ds_1", name="From CSV", slug="from-csv")
-        result = CreateFromFileResult(dataset=info, recordsCreated=10)
+        result = UploadResult(dataset=info, recordsCreated=10)
+        assert result.dataset is not None
         assert result.dataset.name == "From CSV"
         assert result.recordsCreated == 10
 

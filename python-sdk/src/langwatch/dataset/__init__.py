@@ -33,7 +33,6 @@ from .dataset_facade import DatasetsFacade
 # Re-export types that users may import directly.
 from .types import (
     ColumnType,
-    CreateFromFileResult,
     Dataset,
     DatasetEntry,
     DatasetInfo,
@@ -54,7 +53,6 @@ from .errors import (
 __all__ = [
     "DatasetsFacade",
     "ColumnType",
-    "CreateFromFileResult",
     "Dataset",
     "DatasetEntry",
     "DatasetError",

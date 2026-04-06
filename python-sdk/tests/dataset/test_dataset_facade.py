@@ -99,15 +99,23 @@ class TestDatasetsFacade:
             finally:
                 os.unlink(tmp_path)
 
+        def test_validates_if_exists_value(self, facade):
+            """@unit Scenario: Upload validates if_exists parameter"""
+            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                tmp_path = f.name
+            try:
+                with pytest.raises(ValueError, match="Invalid if_exists value"):
+                    facade.upload("my-dataset", file_path=tmp_path, if_exists="invalid")
+            finally:
+                os.unlink(tmp_path)
+
         def test_accepts_csv_extension(self, facade):
             """CSV files are accepted by validation."""
             with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
                 tmp_path = f.name
             try:
-                # Should not raise FileNotFoundError or ValueError for extension
-                # Will raise from the API call since we have a mock, but that's fine
-                facade._api.upload = MagicMock(
-                    return_value={"id": "ds_1", "recordsCreated": 1}
+                facade._api.upload_to_existing = MagicMock(
+                    return_value={"datasetId": "ds_1", "recordsCreated": 1}
                 )
                 result = facade.upload("my-dataset", file_path=tmp_path)
                 assert result.recordsCreated == 1
@@ -118,8 +126,8 @@ class TestDatasetsFacade:
             """JSON files are accepted by validation."""
             json_file = tmp_path / "data.json"
             json_file.write_text('[{"input": "hello"}]')
-            facade._api.upload = MagicMock(
-                return_value={"id": "ds_1", "recordsCreated": 1}
+            facade._api.upload_to_existing = MagicMock(
+                return_value={"datasetId": "ds_1", "recordsCreated": 1}
             )
             result = facade.upload("my-dataset", file_path=str(json_file))
             assert result.recordsCreated == 1
@@ -129,29 +137,156 @@ class TestDatasetsFacade:
             with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as f:
                 tmp_path = f.name
             try:
-                facade._api.upload = MagicMock(
-                    return_value={"id": "ds_1", "recordsCreated": 2}
+                facade._api.upload_to_existing = MagicMock(
+                    return_value={"datasetId": "ds_1", "recordsCreated": 2}
                 )
                 result = facade.upload("my-dataset", file_path=tmp_path)
                 assert result.recordsCreated == 2
             finally:
                 os.unlink(tmp_path)
 
-    class TestCreateDatasetFromFile:
-        """create_dataset_from_file()"""
+        def test_append_creates_when_not_found(self, facade):
+            """@integration Scenario: Upload creates dataset when it does not exist"""
+            from langwatch.dataset.errors import DatasetNotFoundError
 
-        def test_raises_value_error_when_name_is_empty(self, facade):
             with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
                 tmp_path = f.name
             try:
-                with pytest.raises(ValueError, match="name is required"):
-                    facade.create_dataset_from_file("", file_path=tmp_path)
+                facade._api.upload_to_existing = MagicMock(
+                    side_effect=DatasetNotFoundError("Not found")
+                )
+                facade._api.create_from_file = MagicMock(
+                    return_value={
+                        "dataset": {
+                            "id": "ds_new",
+                            "name": "new-data",
+                            "slug": "new-data",
+                            "columnTypes": [],
+                        },
+                        "recordsCreated": 3,
+                    }
+                )
+                result = facade.upload("new-data", file_path=tmp_path)
+                assert result.recordsCreated == 3
+                assert result.dataset is not None
+                assert result.dataset.name == "new-data"
+                facade._api.create_from_file.assert_called_once()
             finally:
                 os.unlink(tmp_path)
 
-        def test_raises_file_not_found_when_file_missing(self, facade):
-            with pytest.raises(FileNotFoundError):
-                facade.create_dataset_from_file("Test", file_path="nonexistent.csv")
+        def test_append_uploads_to_existing(self, facade):
+            """@integration Scenario: Upload appends to existing dataset by default"""
+            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                tmp_path = f.name
+            try:
+                facade._api.upload_to_existing = MagicMock(
+                    return_value={"datasetId": "ds_1", "recordsCreated": 2}
+                )
+                result = facade.upload("my-dataset", file_path=tmp_path)
+                assert result.recordsCreated == 2
+                assert result.datasetId == "ds_1"
+                facade._api.upload_to_existing.assert_called_once()
+            finally:
+                os.unlink(tmp_path)
+
+        def test_replace_deletes_then_uploads(self, facade):
+            """@integration Scenario: Upload with if_exists=replace removes existing records first"""
+            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                tmp_path = f.name
+            try:
+                facade._api.get_dataset = MagicMock(
+                    return_value={"id": "ds_1", "name": "my-dataset", "slug": "my-dataset", "data": []}
+                )
+                # First call returns records, second call returns empty (all deleted)
+                facade._api.list_records = MagicMock(
+                    side_effect=[
+                        {"data": [{"id": "r1"}, {"id": "r2"}, {"id": "r3"}]},
+                        {"data": []},
+                    ]
+                )
+                facade._api.delete_records = MagicMock(return_value=3)
+                facade._api.upload_to_existing = MagicMock(
+                    return_value={"datasetId": "ds_1", "recordsCreated": 3}
+                )
+                result = facade.upload("my-dataset", file_path=tmp_path, if_exists="replace")
+                assert result.recordsCreated == 3
+                facade._api.delete_records.assert_called_once_with(
+                    "my-dataset", record_ids=["r1", "r2", "r3"]
+                )
+                facade._api.upload_to_existing.assert_called_once()
+            finally:
+                os.unlink(tmp_path)
+
+        def test_replace_creates_when_not_found(self, facade):
+            """replace mode creates dataset when it does not exist"""
+            from langwatch.dataset.errors import DatasetNotFoundError
+
+            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                tmp_path = f.name
+            try:
+                facade._api.get_dataset = MagicMock(
+                    side_effect=DatasetNotFoundError("Not found")
+                )
+                facade._api.create_from_file = MagicMock(
+                    return_value={
+                        "dataset": {
+                            "id": "ds_new",
+                            "name": "my-dataset",
+                            "slug": "my-dataset",
+                            "columnTypes": [],
+                        },
+                        "recordsCreated": 3,
+                    }
+                )
+                result = facade.upload("my-dataset", file_path=tmp_path, if_exists="replace")
+                assert result.recordsCreated == 3
+                assert result.dataset is not None
+                facade._api.create_from_file.assert_called_once()
+            finally:
+                os.unlink(tmp_path)
+
+        def test_error_raises_when_exists(self, facade):
+            """@integration Scenario: Upload with if_exists=error raises when dataset exists"""
+            from langwatch.dataset.errors import DatasetApiError
+
+            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                tmp_path = f.name
+            try:
+                facade._api.get_dataset = MagicMock(
+                    return_value={"id": "ds_1", "name": "my-dataset", "slug": "my-dataset", "data": []}
+                )
+                with pytest.raises(DatasetApiError, match="Dataset already exists"):
+                    facade.upload("my-dataset", file_path=tmp_path, if_exists="error")
+            finally:
+                os.unlink(tmp_path)
+
+        def test_error_creates_when_not_found(self, facade):
+            """error mode creates dataset when it does not exist"""
+            from langwatch.dataset.errors import DatasetNotFoundError
+
+            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+                tmp_path = f.name
+            try:
+                facade._api.get_dataset = MagicMock(
+                    side_effect=DatasetNotFoundError("Not found")
+                )
+                facade._api.create_from_file = MagicMock(
+                    return_value={
+                        "dataset": {
+                            "id": "ds_new",
+                            "name": "my-dataset",
+                            "slug": "my-dataset",
+                            "columnTypes": [],
+                        },
+                        "recordsCreated": 1,
+                    }
+                )
+                result = facade.upload("my-dataset", file_path=tmp_path, if_exists="error")
+                assert result.recordsCreated == 1
+                assert result.dataset is not None
+                facade._api.create_from_file.assert_called_once()
+            finally:
+                os.unlink(tmp_path)
 
     class TestListDatasets:
         """list_datasets()"""

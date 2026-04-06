@@ -114,18 +114,15 @@ class PaginatedResult(BaseModel, Generic[T]):
 
 
 class UploadResult(BaseModel):
-    """Result of uploading a file to an existing dataset."""
+    """Result of uploading a file to a dataset.
+
+    Handles both upload-to-existing and create-from-file responses.
+    When a new dataset is created, the ``dataset`` field is populated
+    with the created dataset metadata.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
     datasetId: Optional[str] = None
     recordsCreated: int = 0
-
-
-class CreateFromFileResult(BaseModel):
-    """Result of creating a new dataset from a file upload."""
-
-    model_config = ConfigDict(extra="ignore")
-
-    dataset: DatasetInfo
-    recordsCreated: int = 0
+    dataset: Optional[DatasetInfo] = None

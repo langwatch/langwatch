@@ -223,34 +223,51 @@ Feature: Dataset Python SDK
     When I call langwatch.dataset.delete_records("my-dataset", record_ids=[])
     Then a ValueError is raised indicating record_ids must not be empty
 
-  # ── Upload File to Existing Dataset ──────────────────────────────
+  # ── Upload File ─────────────────────────────────────────────────
 
   @integration
-  Scenario: Upload a CSV file to an existing dataset
-    Given a dataset "my-dataset" exists
+  Scenario: Upload creates dataset when it does not exist
+    Given no dataset "new-data" exists
     And a local CSV file "data.csv" with 3 rows
-    When I call langwatch.dataset.upload("my-dataset", file_path="data.csv")
-    Then the result indicates records were created from the CSV
+    When I call langwatch.dataset.upload("new-data", file_path="data.csv")
+    Then a new dataset "new-data" is created with the file contents
+    And the result indicates 3 records were created
 
   @integration
-  Scenario: Upload a JSON file to an existing dataset
+  Scenario: Upload appends to existing dataset by default
+    Given a dataset "my-dataset" exists with 5 records
+    And a local CSV file "more.csv" with 2 rows
+    When I call langwatch.dataset.upload("my-dataset", file_path="more.csv")
+    Then the 2 rows are appended to the existing 5 records
+
+  @integration
+  Scenario: Upload with if_exists=replace removes existing records first
+    Given a dataset "my-dataset" exists with 5 records
+    And a local CSV file "fresh.csv" with 3 rows
+    When I call langwatch.dataset.upload("my-dataset", file_path="fresh.csv", if_exists="replace")
+    Then all existing records are removed
+    And the dataset now has only the 3 new records
+
+  @integration
+  Scenario: Upload with if_exists=error raises when dataset exists
+    Given a dataset "my-dataset" exists
+    And a local CSV file "data.csv" with 1 row
+    When I call langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
+    Then a DatasetApiError is raised indicating the dataset already exists
+
+  @integration
+  Scenario: Upload supports JSON files
     Given a dataset "my-dataset" exists
     And a local JSON file "data.json" with 2 records
     When I call langwatch.dataset.upload("my-dataset", file_path="data.json")
-    Then the result indicates records were created from the JSON
+    Then the result indicates records were created
 
   @integration
-  Scenario: Upload a JSONL file to an existing dataset
+  Scenario: Upload supports JSONL files
     Given a dataset "my-dataset" exists
     And a local JSONL file "data.jsonl" with 2 records
     When I call langwatch.dataset.upload("my-dataset", file_path="data.jsonl")
-    Then the result indicates records were created from the JSONL
-
-  @integration
-  Scenario: Upload to a non-existent dataset raises an error
-    Given a local CSV file "data.csv" with 1 row
-    When I call langwatch.dataset.upload("ghost", file_path="data.csv")
-    Then a DatasetNotFoundError is raised
+    Then the result indicates records were created
 
   @unit
   Scenario: Upload validates that file exists
@@ -263,21 +280,10 @@ Feature: Dataset Python SDK
     When I call langwatch.dataset.upload("my-dataset", file_path="data.parquet")
     Then a ValueError is raised indicating the file format is not supported
 
-  # ── Create Dataset from File Upload ──────────────────────────────
-
-  @integration
-  Scenario: Create a dataset from a CSV file in one call
-    Given a local CSV file "feedback.csv" with columns "question" and "answer" and 5 rows
-    When I call langwatch.dataset.create_dataset_from_file(name="From CSV", file_path="feedback.csv")
-    Then a DatasetInfo is returned with name "From CSV" and slug "from-csv"
-    And the result indicates 5 records were created
-
-  @integration
-  Scenario: Create dataset from file with conflicting name raises an error
-    Given a dataset named "Existing" already exists
-    And a local CSV file "data.csv" with 1 row
-    When I call langwatch.dataset.create_dataset_from_file(name="Existing", file_path="data.csv")
-    Then a DatasetApiError is raised indicating a conflict
+  @unit
+  Scenario: Upload validates if_exists parameter
+    When I call langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="invalid")
+    Then a ValueError is raised indicating invalid if_exists value
 
   # ── SDK Initialization ──────────────────────────────────────────
 

@@ -310,14 +310,30 @@ console.log(`Deleted ${result.deletedCount} records`);
 
 ## Upload a File
 
-Upload a CSV, JSON, or JSONL file to an existing dataset.
+Upload a CSV, JSON, or JSONL file to a dataset. If the dataset does not exist, it is created automatically.
 
 <Tabs>
   <Tab title="Python">
 ```python
+# Upload to existing or create new (default: append)
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
 print(f"Created {result.recordsCreated} records")
+
+# Replace all records (delete existing, then upload)
+result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="replace")
+
+# Error if dataset already exists (create-only)
+result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
 ```
+
+The `if_exists` parameter controls how conflicts are handled:
+
+| Value | Behavior |
+|-------|----------|
+| `"append"` (default) | Append rows to the existing dataset, or create it if it doesn't exist |
+| `"replace"` | Delete all existing records first, then upload. Creates the dataset if it doesn't exist |
+| `"error"` | Raise an error if the dataset already exists. Creates it otherwise |
+
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -329,22 +345,10 @@ console.log(`Created ${result.recordsCreated} records`);
   </Tab>
 </Tabs>
 
-## Create Dataset from File
+### Create Dataset from File (TypeScript)
 
-Create a new dataset and populate it from a file in one call.
+In the TypeScript SDK, you can also create a new dataset from a file in one call:
 
-<Tabs>
-  <Tab title="Python">
-```python
-result = langwatch.dataset.create_dataset_from_file(
-    "From CSV",
-    file_path="feedback.csv",
-)
-print(f"Dataset: {result.dataset.name} ({result.dataset.slug})")
-print(f"Records created: {result.recordsCreated}")
-```
-  </Tab>
-  <Tab title="TypeScript">
 ```typescript
 const result = await langwatch.datasets.createFromFile({
   name: "From CSV",
@@ -353,8 +357,6 @@ const result = await langwatch.datasets.createFromFile({
 console.log(`Dataset: ${result.dataset.name} (${result.dataset.slug})`);
 console.log(`Records created: ${result.recordsCreated}`);
 ```
-  </Tab>
-</Tabs>
 
 ## Using with Evaluations
 

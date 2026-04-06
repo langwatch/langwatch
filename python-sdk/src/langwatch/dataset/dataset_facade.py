@@ -22,8 +22,8 @@ from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 
 from .dataset_api_service import DatasetApiService
+from .errors import DatasetApiError, DatasetNotFoundError
 from .types import (
-    CreateFromFileResult,
     Dataset,
     DatasetEntry,
     DatasetInfo,
@@ -276,57 +276,121 @@ class DatasetsFacade:
 
     # ── file operations ─────────────────────────────────────────────
 
+    _VALID_IF_EXISTS = {"append", "replace", "error"}
+
     def upload(
         self,
         slug_or_id: str,
         *,
         file_path: str,
+        if_exists: str = "append",
+        columns: Optional[List[Dict[str, str]]] = None,
     ) -> UploadResult:
         """
-        Upload a file (CSV or JSONL) to an existing dataset.
+        Upload a file to a dataset, creating it if it does not exist.
+
+        Follows the pandas ``if_exists`` pattern for conflict resolution:
+
+        - ``"append"`` (default): append rows to the existing dataset,
+          or create a new dataset if it does not exist.
+        - ``"replace"``: delete all existing records first, then upload.
+          Creates the dataset if it does not exist.
+        - ``"error"``: raise ``DatasetApiError`` (409) if the dataset
+          already exists. Creates it otherwise.
 
         Args:
             slug_or_id: Dataset slug or ID.
-            file_path: Local path to the file.
+            file_path: Local path to a CSV, JSON, or JSONL file.
+            if_exists: Conflict strategy -- ``"append"``, ``"replace"``,
+                or ``"error"``.
+            columns: Optional column type definitions (used only when
+                creating a new dataset).
+
+        Returns:
+            UploadResult with record count and optional dataset metadata.
 
         Raises:
             FileNotFoundError: If the file does not exist.
-            ValueError: If the file extension is not supported.
+            ValueError: If the file extension is not supported or
+                ``if_exists`` is invalid.
+            DatasetApiError: If ``if_exists="error"`` and dataset exists.
         """
+        self._validate_if_exists(if_exists)
         self._validate_file(file_path)
 
-        raw = self._api.upload(slug_or_id, file_path=file_path)
+        if if_exists == "append":
+            return self._upload_append(slug_or_id, file_path=file_path)
+        elif if_exists == "replace":
+            return self._upload_replace(slug_or_id, file_path=file_path)
+        else:  # "error"
+            return self._upload_error(slug_or_id, file_path=file_path)
+
+    # ── upload strategy helpers ──────────────────────────────────────
+
+    def _upload_append(self, slug_or_id: str, *, file_path: str) -> UploadResult:
+        """Append to existing dataset, or create if not found."""
+        try:
+            raw = self._api.upload_to_existing(slug_or_id, file_path=file_path)
+            return UploadResult(**raw)
+        except DatasetNotFoundError:
+            return self._create_from_file(slug_or_id, file_path=file_path)
+
+    def _upload_replace(self, slug_or_id: str, *, file_path: str) -> UploadResult:
+        """Delete all records then upload, or create if not found."""
+        try:
+            self._api.get_dataset(slug_or_id)
+        except DatasetNotFoundError:
+            return self._create_from_file(slug_or_id, file_path=file_path)
+
+        self._delete_all_records(slug_or_id)
+        raw = self._api.upload_to_existing(slug_or_id, file_path=file_path)
         return UploadResult(**raw)
 
-    def create_dataset_from_file(
-        self,
-        name: str,
-        *,
-        file_path: str,
-    ) -> CreateFromFileResult:
-        """
-        Create a new dataset and populate it from a file in one call.
+    def _upload_error(self, slug_or_id: str, *, file_path: str) -> UploadResult:
+        """Create only -- raise if dataset already exists."""
+        try:
+            self._api.get_dataset(slug_or_id)
+        except DatasetNotFoundError:
+            return self._create_from_file(slug_or_id, file_path=file_path)
 
-        Args:
-            name: Dataset name.
-            file_path: Local path to a CSV or JSONL file.
+        raise DatasetApiError(
+            "Dataset already exists",
+            status_code=409,
+            operation="upload",
+        )
 
-        Raises:
-            ValueError: If name is empty.
-            FileNotFoundError: If the file does not exist.
-            ValueError: If the file extension is not supported.
-        """
-        if not name or not name.strip():
-            raise ValueError("Dataset name is required and must not be empty.")
-
-        self._validate_file(file_path)
-
-        raw = self._api.create_dataset_from_file(name=name, file_path=file_path)
+    def _create_from_file(
+        self, slug_or_id: str, *, file_path: str
+    ) -> UploadResult:
+        """Create a new dataset from a file and return an UploadResult."""
+        raw = self._api.create_from_file(name=slug_or_id, file_path=file_path)
         dataset_info = DatasetInfo(**raw.get("dataset", raw))
         records_created = raw.get("recordsCreated", 0)
-        return CreateFromFileResult(dataset=dataset_info, recordsCreated=records_created)
+        return UploadResult(
+            dataset=dataset_info,
+            recordsCreated=records_created,
+        )
+
+    def _delete_all_records(self, slug_or_id: str) -> None:
+        """Delete all records from a dataset in batches."""
+        while True:
+            page = self._api.list_records(slug_or_id, page=1, limit=1000)
+            records = page.get("data", [])
+            if not records:
+                break
+            record_ids = [r["id"] for r in records]
+            self._api.delete_records(slug_or_id, record_ids=record_ids)
 
     # ── private helpers ─────────────────────────────────────────────
+
+    @classmethod
+    def _validate_if_exists(cls, if_exists: str) -> None:
+        """Validate the if_exists parameter value."""
+        if if_exists not in cls._VALID_IF_EXISTS:
+            raise ValueError(
+                f"Invalid if_exists value '{if_exists}'. "
+                f"Must be one of: {', '.join(sorted(cls._VALID_IF_EXISTS))}"
+            )
 
     @staticmethod
     def _validate_file(file_path: str) -> None:

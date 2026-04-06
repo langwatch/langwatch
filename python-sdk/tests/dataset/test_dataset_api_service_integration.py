@@ -500,8 +500,8 @@ class TestDatasetApiService:
             with pytest.raises(DatasetNotFoundError):
                 svc.delete_records("ghost", record_ids=["rec-1"])
 
-    class TestUpload:
-        """upload()"""
+    class TestUploadToExisting:
+        """upload_to_existing()"""
 
         def test_uploads_file_to_existing_dataset(self, tmp_path):
             """@integration Scenario: Upload a CSV file to an existing dataset"""
@@ -513,7 +513,7 @@ class TestDatasetApiService:
                 {"datasetId": "ds_1", "recordsCreated": 3}
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            result = svc.upload("my-dataset", file_path=str(csv_file))
+            result = svc.upload_to_existing("my-dataset", file_path=str(csv_file))
             assert result["recordsCreated"] == 3
             mock_httpx.post.assert_called_once()
 
@@ -530,7 +530,7 @@ class TestDatasetApiService:
                 {"datasetId": "ds_1", "recordsCreated": 2}
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            result = svc.upload("my-dataset", file_path=str(jsonl_file))
+            result = svc.upload_to_existing("my-dataset", file_path=str(jsonl_file))
             assert result["recordsCreated"] == 2
             mock_httpx.post.assert_called_once()
 
@@ -543,10 +543,10 @@ class TestDatasetApiService:
             mock_httpx.post.return_value = _error_response(404, "not found")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             with pytest.raises(DatasetNotFoundError):
-                svc.upload("ghost", file_path=str(csv_file))
+                svc.upload_to_existing("ghost", file_path=str(csv_file))
 
-    class TestCreateDatasetFromFile:
-        """create_dataset_from_file()"""
+    class TestCreateFromFile:
+        """create_from_file()"""
 
         def test_creates_dataset_from_csv(self, tmp_path):
             """@integration Scenario: Create a dataset from a CSV file"""
@@ -566,7 +566,7 @@ class TestDatasetApiService:
                 }
             )
             svc = DatasetApiService(_make_mock_client(mock_httpx))
-            result = svc.create_dataset_from_file(
+            result = svc.create_from_file(
                 name="From CSV", file_path=str(csv_file)
             )
             assert result["recordsCreated"] == 5
@@ -581,7 +581,7 @@ class TestDatasetApiService:
             mock_httpx.post.return_value = _error_response(409, "already exists")
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             with pytest.raises(DatasetApiError, match="Conflict"):
-                svc.create_dataset_from_file(name="Existing", file_path=str(csv_file))
+                svc.create_from_file(name="Existing", file_path=str(csv_file))
 
 
 @pytest.mark.integration
