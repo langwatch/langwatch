@@ -12,7 +12,7 @@ Feature: Dataset TypeScript SDK
   @unit
   Scenario: Facade exposes all dataset CRUD methods
     When I inspect langwatch.datasets
-    Then it exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, listRecords, and createFromUpload methods
+    Then it exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, and listRecords methods
 
   # ── List Datasets ───────────────────────────────────────────────
 
@@ -177,29 +177,31 @@ Feature: Dataset TypeScript SDK
     When I call langwatch.datasets.listRecords("ghost")
     Then the SDK throws a DatasetNotFoundError
 
-  # ── Create Dataset from Upload ────────────────────────────────
+  # ── Upload (unified with ifExists strategy) ────────────────────
 
   @integration
-  Scenario: Create a dataset from file upload
-    Given the API accepts the upload and creates a new dataset
-    When I call langwatch.datasets.createFromUpload({ name: "uploaded-data", file })
-    Then the request is sent as POST /api/dataset/upload with name and file as multipart form data
-    And the response includes dataset metadata and recordsCreated count
-
-  # ── Upload File ─────────────────────────────────────────────────
+  Scenario: Upload with append strategy appends to existing dataset
+    Given the API accepts the file upload
+    When I call langwatch.datasets.upload("existing-data", file)
+    Then the file is uploaded to the existing dataset
 
   @integration
-  Scenario: Upload a file to an existing dataset
-    Given the API accepts the file upload and returns created records
-    When I call langwatch.datasets.upload("my-data", file)
-    Then the request is sent as POST /api/dataset/my-data/upload with the file as multipart form data
-    And the response includes the created records
+  Scenario: Upload with append strategy creates dataset if not found
+    Given the API responds with 404 for upload, then accepts create-from-file
+    When I call langwatch.datasets.upload("new-data", file)
+    Then the SDK creates the dataset from the file
 
   @integration
-  Scenario: Upload to a non-existent dataset throws error
-    Given the API responds with 404
-    When I call langwatch.datasets.upload("ghost", file)
-    Then the SDK throws a DatasetNotFoundError
+  Scenario: Upload with replace strategy deletes records then uploads
+    Given the dataset has existing records
+    When I call langwatch.datasets.upload("my-data", file, { ifExists: "replace" })
+    Then all existing records are deleted before uploading
+
+  @integration
+  Scenario: Upload with error strategy throws if dataset exists
+    Given the dataset exists
+    When I call langwatch.datasets.upload("my-data", file, { ifExists: "error" })
+    Then the SDK throws a DatasetApiError with status 409
 
   # ── Error Mapping ───────────────────────────────────────────────
 

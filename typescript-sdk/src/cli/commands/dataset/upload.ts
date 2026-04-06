@@ -10,44 +10,31 @@ import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
 
 /**
- * Uploads a file to an existing dataset or creates a new dataset from a file.
+ * Uploads a file to a dataset with a configurable strategy for handling existing datasets.
  *
- * Modes:
- * - Upload to existing: `langwatch dataset upload <slug> <file>`
- * - Create from file:   `langwatch dataset upload --create <name> <file>`
+ * Usage:
+ * - Append (default):  `langwatch dataset upload <slug> <file>`
+ * - Replace:           `langwatch dataset upload <slug> <file> --if-exists replace`
+ * - Error if exists:   `langwatch dataset upload <slug> <file> --if-exists error`
  */
 export const uploadCommand = async (
-  target: string,
-  filePathOrOptions: string | { create?: string },
-  options?: { create?: string },
+  slugOrId: string,
+  filePath: string,
+  options?: { ifExists?: string },
 ): Promise<void> => {
   checkApiKey();
 
-  // Determine mode: --create or upload to existing
-  const isCreateMode = typeof filePathOrOptions === "object"
-    ? !!filePathOrOptions.create
-    : !!options?.create;
-
-  let filePath: string;
-  let slugOrId: string | undefined;
-  let datasetName: string | undefined;
-
-  if (isCreateMode) {
-    // `langwatch dataset upload --create "Name" <file>`
-    // target is the file path when --create is used with just one positional arg
-    // OR target is the name and filePathOrOptions is the file
-    datasetName = (typeof filePathOrOptions === "object"
-      ? filePathOrOptions.create
-      : options?.create) ?? target;
-    filePath = typeof filePathOrOptions === "string" ? filePathOrOptions : target;
-  } else {
-    // `langwatch dataset upload <slug> <file>`
-    slugOrId = target;
-    filePath = typeof filePathOrOptions === "string" ? filePathOrOptions : "";
-  }
-
   if (!filePath) {
     console.error(chalk.red("Error: File path is required"));
+    process.exit(1);
+  }
+
+  const ifExists = (options?.ifExists ?? "append") as "append" | "replace" | "error";
+  const validStrategies = ["append", "replace", "error"];
+  if (!validStrategies.includes(ifExists)) {
+    console.error(
+      chalk.red(`Error: --if-exists must be one of: ${validStrategies.join(", ")}`),
+    );
     process.exit(1);
   }
 
@@ -64,75 +51,53 @@ export const uploadCommand = async (
 
   const service = createDatasetService();
 
-  if (isCreateMode && datasetName) {
-    const spinner = ora(
-      `Creating dataset "${datasetName}" from ${filename}...`,
-    ).start();
+  const strategyLabel = ifExists === "append"
+    ? "Uploading"
+    : ifExists === "replace"
+      ? "Replacing records and uploading"
+      : "Uploading (error if exists)";
 
-    try {
-      const result = await service.createDatasetFromUpload({
-        name: datasetName,
-        file,
-      });
+  const spinner = ora(
+    `${strategyLabel} ${filename} to dataset "${slugOrId}"...`,
+  ).start();
 
+  try {
+    const result = await service.uploadWithStrategy(slugOrId, file, ifExists);
+
+    const recordCount = result.records?.length ?? result.recordsCreated ?? 0;
+
+    if (result.dataset) {
       spinner.succeed(
-        `Dataset "${chalk.cyan(result.name)}" created from ${filename}`,
+        `Dataset "${chalk.cyan(result.dataset.name)}" ready with ${recordCount} record${recordCount !== 1 ? "s" : ""}`,
       );
       console.log();
-      console.log(`  ${chalk.bold("Slug:")}    ${result.slug}`);
-      console.log(`  ${chalk.bold("ID:")}      ${result.id}`);
-      console.log(`  ${chalk.bold("Records:")} ${result.recordsCreated}`);
-    } catch (error) {
-      spinner.fail("Failed to create dataset from file");
-
-      if (error instanceof DatasetApiError && error.status === 409) {
-        console.error(
-          chalk.red(
-            "A dataset with this name already exists. Choose a different name.",
-          ),
-        );
-      } else if (error instanceof DatasetApiError) {
-        console.error(chalk.red(`API Error: ${error.message}`));
-      } else {
-        console.error(
-          chalk.red(
-            `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-          ),
-        );
-      }
-      process.exit(1);
-    }
-  } else if (slugOrId) {
-    const spinner = ora(
-      `Uploading ${filename} to dataset "${slugOrId}"...`,
-    ).start();
-
-    try {
-      const result = await service.uploadFile(slugOrId, file);
-      const recordCount = result.records?.length ?? 0;
-
+      console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
+      console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
+    } else {
       spinner.succeed(
         `Uploaded ${filename} to "${chalk.cyan(slugOrId)}" (${recordCount} record${recordCount !== 1 ? "s" : ""})`,
       );
-    } catch (error) {
-      spinner.fail("Failed to upload file");
-
-      if (error instanceof DatasetNotFoundError) {
-        console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-      } else if (error instanceof DatasetApiError && error.status === 409) {
-        console.error(
-          chalk.red("Conflict: the upload conflicts with existing data."),
-        );
-      } else if (error instanceof DatasetApiError) {
-        console.error(chalk.red(`API Error: ${error.message}`));
-      } else {
-        console.error(
-          chalk.red(
-            `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-          ),
-        );
-      }
-      process.exit(1);
     }
+  } catch (error) {
+    spinner.fail("Failed to upload file");
+
+    if (error instanceof DatasetNotFoundError) {
+      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
+    } else if (error instanceof DatasetApiError && error.status === 409) {
+      console.error(
+        chalk.red(
+          `Dataset "${slugOrId}" already exists. Use --if-exists append or --if-exists replace.`,
+        ),
+      );
+    } else if (error instanceof DatasetApiError) {
+      console.error(chalk.red(`API Error: ${error.message}`));
+    } else {
+      console.error(
+        chalk.red(
+          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        ),
+      );
+    }
+    process.exit(1);
   }
 };

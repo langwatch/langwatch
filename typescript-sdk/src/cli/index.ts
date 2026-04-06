@@ -322,13 +322,13 @@ datasetCmd
   });
 
 datasetCmd
-  .command("upload <target> [file]")
-  .description("Upload a file to a dataset (or create with --create)")
-  .option("--create <name>", "Create a new dataset from the file")
-  .action(async (target: string, file: string | undefined, options: { create?: string }) => {
+  .command("upload <slug> <file>")
+  .description("Upload a file to a dataset (creates if not found)")
+  .option("--if-exists <strategy>", "Strategy when dataset exists: append (default), replace, error")
+  .action(async (slug: string, file: string, options: { ifExists?: string }) => {
     try {
       const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
-      await uploadDatasetImpl(target, file ?? options, options);
+      await uploadDatasetImpl(slug, file, options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);

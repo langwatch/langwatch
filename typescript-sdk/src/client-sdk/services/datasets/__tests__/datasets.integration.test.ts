@@ -548,107 +548,202 @@ describe("Feature: Dataset TypeScript SDK", () => {
     });
   });
 
-  // ── Create Dataset From Upload ─────────────────────────────────
-
-  describe("createFromUpload()", () => {
-    describe("when the API accepts the upload and creates a dataset", () => {
-      let capturedFormData: FormData | null = null;
-
-      beforeEach(() => {
-        capturedFormData = null;
-        server.use(
-          http.post(`${TEST_ENDPOINT}/api/dataset/upload`, async ({ request }) => {
-            capturedFormData = await request.formData();
-            return HttpResponse.json({
-              id: "dataset_new",
-              name: "uploaded-data",
-              slug: "uploaded-data",
-              columnTypes: [{ name: "input", type: "string" }],
-              createdAt: "2025-01-01T00:00:00Z",
-              updatedAt: "2025-01-01T00:00:00Z",
-              recordsCreated: 5,
-            });
-          }),
-        );
-      });
-
-      it("sends POST /api/dataset/upload with name and file as multipart form data", async () => {
-        const file = new File(["input,output\nhello,world"], "data.csv", {
-          type: "text/csv",
-        });
-
-        const result = await langwatch.datasets.createFromUpload({
-          name: "uploaded-data",
-          file,
-        });
-
-        expect(capturedFormData).not.toBeNull();
-        expect(capturedFormData!.get("name")).toBe("uploaded-data");
-        expect(capturedFormData!.get("file")).toBeTruthy();
-        expect(result.id).toBe("dataset_new");
-        expect(result.name).toBe("uploaded-data");
-        expect(result.slug).toBe("uploaded-data");
-        expect(result.recordsCreated).toBe(5);
-      });
-    });
-  });
-
-  // ── Upload File ─────────────────────────────────────────────────
+  // ── Upload (unified with ifExists strategy) ────────────────────
 
   describe("upload()", () => {
-    describe("when the API accepts the file upload and returns created records", () => {
-      let capturedContentType: string | null = null;
-      let capturedFormData: FormData | null = null;
+    describe("when using append strategy (default)", () => {
+      describe("when the API accepts the file upload", () => {
+        let capturedContentType: string | null = null;
+        let capturedFormData: FormData | null = null;
 
-      beforeEach(() => {
-        capturedContentType = null;
-        capturedFormData = null;
-        server.use(
-          http.post(
-            `${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`,
-            async ({ request }) => {
-              capturedContentType = request.headers.get("content-type");
-              capturedFormData = await request.formData();
-              return HttpResponse.json({
-                records: [recordFixture()],
-              });
-            },
-          ),
-        );
-      });
-
-      it("sends POST /api/dataset/my-data/upload with multipart form data", async () => {
-        const file = new File(["input,output\nhello,world"], "data.csv", {
-          type: "text/csv",
+        beforeEach(() => {
+          capturedContentType = null;
+          capturedFormData = null;
+          server.use(
+            http.post(
+              `${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`,
+              async ({ request }) => {
+                capturedContentType = request.headers.get("content-type");
+                capturedFormData = await request.formData();
+                return HttpResponse.json({
+                  records: [recordFixture()],
+                });
+              },
+            ),
+          );
         });
 
-        const result = await langwatch.datasets.upload("my-data", file);
+        it("uploads the file to the existing dataset", async () => {
+          const file = new File(["input,output\nhello,world"], "data.csv", {
+            type: "text/csv",
+          });
 
-        expect(capturedContentType).toContain("multipart/form-data");
-        expect(capturedFormData).not.toBeNull();
-        expect(capturedFormData!.get("file")).toBeTruthy();
-        expect(result.records).toHaveLength(1);
+          const result = await langwatch.datasets.upload("existing-data", file);
+
+          expect(capturedContentType).toContain("multipart/form-data");
+          expect(capturedFormData).not.toBeNull();
+          expect(capturedFormData!.get("file")).toBeTruthy();
+          expect(result.records).toHaveLength(1);
+        });
+      });
+
+      describe("when the API responds with 404 for upload, then accepts create-from-file", () => {
+        beforeEach(() => {
+          server.use(
+            http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`, () => {
+              return HttpResponse.json(
+                { error: "Not Found", message: "Dataset not found" },
+                { status: 404 },
+              );
+            }),
+            http.post(`${TEST_ENDPOINT}/api/dataset/upload`, async () => {
+              return HttpResponse.json({
+                id: "dataset_new",
+                name: "new-data",
+                slug: "new-data",
+                columnTypes: [{ name: "input", type: "string" }],
+                createdAt: "2025-01-01T00:00:00Z",
+                updatedAt: "2025-01-01T00:00:00Z",
+                recordsCreated: 3,
+              });
+            }),
+          );
+        });
+
+        it("creates the dataset from the file", async () => {
+          const file = new File(["input,output\nhello,world"], "data.csv", {
+            type: "text/csv",
+          });
+
+          const result = await langwatch.datasets.upload("new-data", file);
+
+          expect(result.dataset).toBeDefined();
+          expect(result.dataset!.name).toBe("new-data");
+          expect(result.recordsCreated).toBe(3);
+          expect(result.datasetId).toBe("dataset_new");
+        });
       });
     });
 
-    describe("when the API responds with 404", () => {
-      beforeEach(() => {
-        server.use(
-          http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`, () => {
-            return HttpResponse.json(
-              { error: "Not Found", message: "Dataset not found" },
-              { status: 404 },
-            );
-          }),
-        );
+    describe("when using replace strategy", () => {
+      describe("when the dataset has existing records", () => {
+        let deleteCallCount = 0;
+
+        beforeEach(() => {
+          deleteCallCount = 0;
+
+          server.use(
+            // getDataset returns the dataset
+            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+              return HttpResponse.json({
+                ...datasetMetadata(),
+                data: [],
+              });
+            }),
+            // First listRecords call returns records; second returns empty
+            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+              if (deleteCallCount === 0) {
+                return HttpResponse.json({
+                  data: [
+                    recordFixture({ id: "rec-0" }),
+                    recordFixture({ id: "rec-1" }),
+                  ],
+                  pagination: { page: 1, limit: 1000, total: 2, totalPages: 1 },
+                });
+              }
+              return HttpResponse.json({
+                data: [],
+                pagination: { page: 1, limit: 1000, total: 0, totalPages: 0 },
+              });
+            }),
+            // deleteRecords
+            http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+              deleteCallCount++;
+              return HttpResponse.json({ deletedCount: 2 });
+            }),
+            // uploadFile after deletion
+            http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`, async () => {
+              return HttpResponse.json({
+                records: [recordFixture({ id: "rec-new" })],
+              });
+            }),
+          );
+        });
+
+        it("deletes all existing records before uploading", async () => {
+          const file = new File(["input,output\nhello,world"], "data.csv", {
+            type: "text/csv",
+          });
+
+          const result = await langwatch.datasets.upload("my-data", file, {
+            ifExists: "replace",
+          });
+
+          expect(deleteCallCount).toBe(1);
+          expect(result.records).toHaveLength(1);
+        });
+      });
+    });
+
+    describe("when using error strategy", () => {
+      describe("when the dataset exists", () => {
+        beforeEach(() => {
+          server.use(
+            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+              return HttpResponse.json({
+                ...datasetMetadata(),
+                data: [],
+              });
+            }),
+          );
+        });
+
+        it("throws a DatasetApiError with status 409", async () => {
+          const file = new File(["data"], "data.csv", { type: "text/csv" });
+
+          await expect(
+            langwatch.datasets.upload("my-data", file, { ifExists: "error" }),
+          ).rejects.toThrow(DatasetApiError);
+
+          await expect(
+            langwatch.datasets.upload("my-data", file, { ifExists: "error" }),
+          ).rejects.toMatchObject({ status: 409 });
+        });
       });
 
-      it("throws a DatasetNotFoundError", async () => {
-        const file = new File(["data"], "data.csv", { type: "text/csv" });
+      describe("when the dataset does not exist", () => {
+        beforeEach(() => {
+          server.use(
+            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+              return HttpResponse.json(
+                { error: "Not Found", message: "Dataset not found" },
+                { status: 404 },
+              );
+            }),
+            http.post(`${TEST_ENDPOINT}/api/dataset/upload`, async () => {
+              return HttpResponse.json({
+                id: "dataset_created",
+                name: "new-data",
+                slug: "new-data",
+                columnTypes: [],
+                createdAt: "2025-01-01T00:00:00Z",
+                updatedAt: "2025-01-01T00:00:00Z",
+                recordsCreated: 1,
+              });
+            }),
+          );
+        });
 
-        await expect(
-          langwatch.datasets.upload("ghost", file),
-        ).rejects.toThrow(DatasetNotFoundError);
+        it("creates the dataset from the file", async () => {
+          const file = new File(["data"], "data.csv", { type: "text/csv" });
+
+          const result = await langwatch.datasets.upload("new-data", file, {
+            ifExists: "error",
+          });
+
+          expect(result.dataset).toBeDefined();
+          expect(result.recordsCreated).toBe(1);
+        });
       });
     });
   });

@@ -17,7 +17,6 @@ export type {
   ListRecordsApiResponse,
   CreateDatasetOptions,
   UpdateDatasetOptions,
-  CreateFromUploadOptions,
   CreateFromUploadResponse,
   BatchCreateRecordsResponse,
   DeleteRecordsResponse,

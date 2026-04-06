@@ -12,8 +12,6 @@ import {
   type ListRecordsApiResponse,
   type CreateDatasetOptions,
   type UpdateDatasetOptions,
-  type CreateFromUploadOptions,
-  type CreateFromUploadResponse,
   type BatchCreateRecordsResponse,
   type DeleteRecordsResponse,
   type UploadResponse,
@@ -64,8 +62,11 @@ type DatasetsFacadeConfig = {
  * // Delete records
  * const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
  *
- * // Upload a file
+ * // Upload a file (append to existing or create new)
  * const uploadResult = await langwatch.datasets.upload("my-dataset", file);
+ *
+ * // Upload with replace strategy (delete all records first)
+ * await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
  * ```
  */
 export class DatasetsFacade {
@@ -234,43 +235,38 @@ export class DatasetsFacade {
   };
 
   /**
-   * Creates a new dataset from a file upload.
-   * Accepts CSV, JSON, or JSONL files.
+   * Uploads a file to a dataset with a configurable strategy for handling existing datasets.
    *
-   * @param options - The dataset name and file to upload
-   * @returns The created dataset metadata with record count
+   * Strategies:
+   * - `"append"` (default): Upload to existing dataset; if not found, create a new one.
+   * - `"replace"`: Delete all existing records, then upload; if not found, create a new one.
+   * - `"error"`: Throw a 409 error if the dataset already exists; if not found, create a new one.
+   *
+   * @param slugOrId - The slug or ID of the dataset
+   * @param file - The file to upload (File or Blob)
+   * @param options - Upload options including the ifExists strategy
+   * @returns The upload result
    *
    * @example
    * ```typescript
    * const file = new File(["input,output\nhello,world"], "data.csv", { type: "text/csv" });
-   * const dataset = await langwatch.datasets.createFromUpload({ name: "my-dataset", file });
-   * console.log(`Created ${dataset.recordsCreated} records`);
-   * ```
-   */
-  createFromUpload = (
-    options: CreateFromUploadOptions,
-  ): Promise<CreateFromUploadResponse> => {
-    if (!options.file) {
-      throw new DatasetApiError(
-        "File must be provided for upload",
-        0,
-        "createFromUpload",
-      );
-    }
-    return this.#datasetService.createDatasetFromUpload(options);
-  };
-
-  /**
-   * Uploads a file to an existing dataset.
-   * Accepts File or Blob objects. Uses raw fetch with FormData.
    *
-   * @param slugOrId - The slug or ID of the dataset
-   * @param file - The file to upload (File or Blob)
-   * @returns The upload result with created records
+   * // Append to existing or create new
+   * await langwatch.datasets.upload("my-dataset", file);
+   *
+   * // Replace all records
+   * await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
+   *
+   * // Fail if dataset already exists
+   * await langwatch.datasets.upload("my-dataset", file, { ifExists: "error" });
+   * ```
    */
   upload = (
     slugOrId: string,
     file: File | Blob,
+    options?: {
+      ifExists?: "append" | "replace" | "error";
+    },
   ): Promise<UploadResponse> => {
     if (!file) {
       throw new DatasetApiError(
@@ -279,6 +275,10 @@ export class DatasetsFacade {
         "upload",
       );
     }
-    return this.#datasetService.uploadFile(slugOrId, file);
+    return this.#datasetService.uploadWithStrategy(
+      slugOrId,
+      file,
+      options?.ifExists ?? "append",
+    );
   };
 }

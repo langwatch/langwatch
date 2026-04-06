@@ -30,7 +30,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
   describe("DatasetsFacade", () => {
     describe("when inspecting langwatch.datasets", () => {
-      it("exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, listRecords, and createFromUpload methods", () => {
+      it("exposes get, list, create, update, delete, createRecords, updateRecord, deleteRecords, upload, and listRecords methods", () => {
         const langwatch = new LangWatch({
           apiKey: "test-key",
           endpoint: "http://localhost:5560",
@@ -46,7 +46,6 @@ describe("Feature: Dataset TypeScript SDK", () => {
         expect(typeof langwatch.datasets.deleteRecords).toBe("function");
         expect(typeof langwatch.datasets.upload).toBe("function");
         expect(typeof langwatch.datasets.listRecords).toBe("function");
-        expect(typeof langwatch.datasets.createFromUpload).toBe("function");
       });
     });
   });

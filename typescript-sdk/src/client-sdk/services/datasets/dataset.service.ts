@@ -412,6 +412,138 @@ export class DatasetService {
   }
 
   /**
+   * Uploads a file with a strategy for handling existing datasets.
+   *
+   * @param slugOrId - The slug or ID of the dataset
+   * @param file - The file to upload (File or Blob)
+   * @param ifExists - Strategy when dataset exists: "append" (default), "replace", or "error"
+   * @returns The upload result
+   */
+  async uploadWithStrategy(
+    slugOrId: string,
+    file: File | Blob,
+    ifExists: "append" | "replace" | "error" = "append",
+  ): Promise<UploadResponse> {
+    switch (ifExists) {
+      case "append":
+        return this._uploadAppend(slugOrId, file);
+      case "replace":
+        return this._uploadReplace(slugOrId, file);
+      case "error":
+        return this._uploadError(slugOrId, file);
+    }
+  }
+
+  /**
+   * Append strategy: try uploading to existing dataset; if not found, create from file.
+   */
+  private async _uploadAppend(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+    try {
+      return await this.uploadFile(slugOrId, file);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) {
+        const result = await this.createDatasetFromUpload({ name: slugOrId, file });
+        return {
+          dataset: {
+            id: result.id,
+            name: result.name,
+            slug: result.slug,
+            columnTypes: result.columnTypes,
+            createdAt: result.createdAt,
+            updatedAt: result.updatedAt,
+          },
+          recordsCreated: result.recordsCreated,
+          datasetId: result.id,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Replace strategy: if dataset exists, delete all records then upload; if not found, create from file.
+   */
+  private async _uploadReplace(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+    try {
+      await this.getDataset(slugOrId);
+      await this._deleteAllRecords(slugOrId);
+      return await this.uploadFile(slugOrId, file);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) {
+        const result = await this.createDatasetFromUpload({ name: slugOrId, file });
+        return {
+          dataset: {
+            id: result.id,
+            name: result.name,
+            slug: result.slug,
+            columnTypes: result.columnTypes,
+            createdAt: result.createdAt,
+            updatedAt: result.updatedAt,
+          },
+          recordsCreated: result.recordsCreated,
+          datasetId: result.id,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Error strategy: if dataset exists, throw 409; if not found, create from file.
+   */
+  private async _uploadError(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
+    let datasetExists = false;
+    try {
+      await this.getDataset(slugOrId);
+      datasetExists = true;
+    } catch (error) {
+      if (!(error instanceof DatasetNotFoundError)) {
+        throw error;
+      }
+    }
+
+    if (datasetExists) {
+      throw new DatasetApiError(
+        `Dataset already exists: ${slugOrId}`,
+        409,
+        "upload",
+      );
+    }
+
+    const result = await this.createDatasetFromUpload({ name: slugOrId, file });
+    return {
+      dataset: {
+        id: result.id,
+        name: result.name,
+        slug: result.slug,
+        columnTypes: result.columnTypes,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      },
+      recordsCreated: result.recordsCreated,
+      datasetId: result.id,
+    };
+  }
+
+  /**
+   * Deletes all records from a dataset by iterating through pages.
+   * Always fetches page 1 since records shift after deletion.
+   */
+  private async _deleteAllRecords(slugOrId: string): Promise<void> {
+    const BATCH_SIZE = 1000;
+
+    while (true) {
+      const page = await this.listRecords(slugOrId, { page: 1, limit: BATCH_SIZE });
+      if (page.data.length === 0) {
+        break;
+      }
+
+      const ids = page.data.map((record) => record.id);
+      await this.deleteRecords(slugOrId, ids);
+    }
+  }
+
+  /**
    * Uploads a file to an existing dataset.
    * Uses raw fetch with FormData since openapi-fetch hardcodes content-type: application/json.
    */

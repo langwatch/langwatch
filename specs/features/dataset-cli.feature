@@ -22,17 +22,17 @@ Feature: Dataset CLI Commands
     When I run langwatch dataset delete my-dataset
     Then the dataset is archived and I see confirmation
 
-  Scenario: Upload CSV to dataset
+  Scenario: Upload file to dataset with default append strategy
     When I run langwatch dataset upload my-dataset data.csv
-    Then the CSV is uploaded and I see the record count
+    Then the file is uploaded and I see the record count
 
-  Scenario: Upload JSONL to dataset
-    When I run langwatch dataset upload my-dataset data.jsonl
-    Then the JSONL is uploaded and I see the record count
+  Scenario: Upload with replace strategy
+    When I run langwatch dataset upload my-dataset data.csv --if-exists replace
+    Then existing records are deleted and the file is uploaded
 
-  Scenario: Create and upload in one command
-    When I run langwatch dataset upload --create "New Dataset" data.csv
-    Then a dataset is created from the file and I see confirmation
+  Scenario: Upload with error strategy
+    When I run langwatch dataset upload my-dataset data.csv --if-exists error
+    Then the command fails because the dataset already exists
 
   Scenario: Download dataset as CSV
     When I run langwatch dataset download my-dataset --format csv
