@@ -133,12 +133,13 @@ export interface McpHandler {
  */
 export function createMcpHandler(): McpHandler {
   // Ensure the MCP config is initialized with the app's endpoint
+  const baseHost = process.env.BASE_HOST ?? "https://app.langwatch.ai";
   try {
     getConfig();
+    logger.info("MCP config already initialized");
   } catch {
-    initConfig({
-      endpoint: process.env.BASE_HOST ?? "https://app.langwatch.ai",
-    });
+    initConfig({ endpoint: baseHost });
+    logger.info({ endpoint: baseHost }, "MCP config initialized");
   }
 
   // Use Map to avoid prototype pollution — sessionId comes from user input
@@ -420,6 +421,7 @@ export function createMcpHandler(): McpHandler {
     fn: () => Promise<T>,
   ): Promise<T> {
     const baseConfig = getConfig();
+    logger.debug({ hasApiKey: !!apiKey, endpoint: baseConfig.endpoint }, "Running with session config");
     return runWithConfig({ ...baseConfig, apiKey }, fn);
   }
 

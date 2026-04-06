@@ -822,4 +822,105 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolNames).toContain("fetch_scenario_docs");
     });
   });
+
+  // --- Tool Execution ---
+
+  describe("when fetch_langwatch_docs is called with a specific URL", () => {
+    it("returns the page content", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      // Initialize session
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      // Send initialized notification
+      await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      // Call fetch_langwatch_docs with the index URL
+      const toolRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 3,
+          method: "tools/call",
+          params: {
+            name: "fetch_langwatch_docs",
+            arguments: { url: "https://langwatch.ai/docs/llms.txt" },
+          },
+        },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(toolRes.status).toBe(200);
+      const body = toolRes.json() as Record<string, unknown>;
+      const result = body.result as Record<string, unknown>;
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content).toBeDefined();
+      expect(content[0]?.text).toContain("langwatch");
+    });
+  });
+
+  describe("when search_traces is called with a valid API key session", () => {
+    it("does not throw Config not initialized", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      // Initialize session
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      // Send initialized notification
+      await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      // Call search_traces — it will fail because the API endpoint is fake,
+      // but it should NOT fail with "Config not initialized"
+      const toolRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 4,
+          method: "tools/call",
+          params: {
+            name: "search_traces",
+            arguments: {},
+          },
+        },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(toolRes.status).toBe(200);
+      const body = toolRes.json() as Record<string, unknown>;
+      const result = body.result as Record<string, unknown>;
+      const content = result.content as Array<{ type: string; text: string }>;
+      // Should get an API error (not "Config not initialized")
+      expect(content[0]?.text).not.toContain("Config not initialized");
+    });
+  });
 });
