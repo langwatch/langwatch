@@ -511,6 +511,7 @@ function SuiteListItem({
             <Box
               as="button"
               onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onRun();
               }}
@@ -532,6 +533,7 @@ function SuiteListItem({
               aria-label="Run plan options"
               data-testid="suite-menu-button"
               onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onContextMenu(e);
               }}
