@@ -69,32 +69,6 @@ spec:
         {{- end }}
 
       initContainers:
-        # Wait for all Keeper pod DNS entries to be resolvable
-        - name: dns-wait
-          image: busybox:1.37.0
-          command: ['sh', '-c']
-          args:
-            - |
-              REPLICAS={{ $replicas }}
-              NAMESPACE={{ .Release.Namespace }}
-              TIMEOUT=300; ELAPSED=0
-              for i in $(seq 0 $((REPLICAS - 1))); do
-                HOST="{{ $fullname }}-keeper-${i}.{{ $fullname }}-keeper-headless.${NAMESPACE}.svc"
-                echo "Waiting for DNS: ${HOST}"
-                until nslookup "${HOST}" >/dev/null 2>&1; do
-                  echo "  ${HOST} not resolvable yet..."
-                  sleep 2; ELAPSED=$((ELAPSED + 2))
-                  if [ "$ELAPSED" -ge "$TIMEOUT" ]; then echo "TIMEOUT after ${TIMEOUT}s"; exit 1; fi
-                done
-                echo "  ${HOST} resolved"
-              done
-              echo "All Keeper DNS entries resolvable"
-          securityContext:
-            runAsUser: 65534
-            runAsNonRoot: true
-          resources:
-            requests: { cpu: 10m, memory: 16Mi }
-            limits: { cpu: 100m, memory: 64Mi }
         # Copy keeper raft config from ConfigMap and substitute pod-specific server_id.
         # server_id = pod ordinal + 1 (e.g. keeper-0 → 1, keeper-1 → 2, keeper-2 → 3)
         - name: keeper-init

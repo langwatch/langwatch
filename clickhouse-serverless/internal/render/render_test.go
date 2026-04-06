@@ -128,6 +128,7 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 	input.KeeperPort = 9181
 	input.DataNodes = "ch-0.ch-headless,ch-1.ch-headless,ch-2.ch-headless"
 	input.DataNodePort = 9000
+	input.ClusterSecretFile = "/mnt/secrets/cluster-secret"
 	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
 
 	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
@@ -148,10 +149,11 @@ func TestRenderAll_KeeperWrittenForReplicated(t *testing.T) {
 		"shard_01",
 		"node-0",
 		"internal_replication: true",
-		"secret_hash:",
+		"from_file",
+		"/mnt/secrets/cluster-secret",
 	} {
 		if !strings.Contains(content, want) {
-			t.Errorf("keeper.yaml missing %q", want)
+			t.Errorf("keeper.yaml missing %q\n--- actual content ---\n%s", want, content)
 		}
 	}
 }

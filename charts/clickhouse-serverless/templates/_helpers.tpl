@@ -98,3 +98,12 @@ app.kubernetes.io/component: keeper
   {{- end -}}
 {{- end -}}
 
+{{/* Cluster secret key */}}
+{{- define "clickhouse-serverless.clusterSecretKey" -}}
+  {{- if .Values.auth.existingSecret -}}
+    {{- .Values.auth.secretKeys.clusterSecretKey -}}
+  {{- else -}}
+    {{- "clusterSecret" -}}
+  {{- end -}}
+{{- end -}}
+

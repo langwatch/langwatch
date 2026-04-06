@@ -41,10 +41,12 @@ backup:
 
 # Authentication
 auth:
-  password: ""  # Auto-generated when empty
+  password: ""         # Auto-generated when empty
+  clusterSecret: ""    # Inter-node cluster secret; auto-generated when empty
   existingSecret: ""
   secretKeys:
     passwordKey: "password"
+    clusterSecretKey: "clusterSecret"
 
 # User management: "user1:pass1:readwrite:db1,db2;user2:pass2:readonly:*"
 users: ""
