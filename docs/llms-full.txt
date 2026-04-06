@@ -13489,6 +13489,8 @@ There are a couple ways to add data to a dataset;
 - **From traces**: You can fill the dataset by selecting a group of messages already captured.
 - **CSV Upload**: You can fill the dataset by uploading a CSV file.
 - **Continuously populate**: You can continuously populate the dataset with data traced from production.
+- **Via MCP tools**: AI coding agents can create and manage datasets through the [MCP server](/integration/mcp). See [Programmatic Access](/datasets/programmatic-access) for details.
+- **Via SDK**: Use the Python or TypeScript SDK for programmatic dataset management. See [Programmatic Access](/datasets/programmatic-access).
 
 ### Manually
 
@@ -13547,7 +13549,7 @@ description: Manage datasets from LangWatch using the SDK, MCP, or REST API for 
 
 You can manage datasets from LangWatch using the SDK, MCP tools, or REST API for offline evaluations and automated workflows.
 
-## Fetching a Dataset
+## Setup
 
 
   ### Python
@@ -13555,16 +13557,8 @@ You can manage datasets from LangWatch using the SDK, MCP tools, or REST API for
 ```python
 import langwatch
 
-# Initialize the SDK
+# Initialize the SDK (or set LANGWATCH_API_KEY environment variable)
 langwatch.setup()
-
-# Fetch dataset by slug or ID
-dataset = langwatch.dataset.get_dataset("your-dataset-slug")
-
-# Convert to pandas DataFrame for easy manipulation
-df = dataset.to_pandas()
-
-print(df.head())
 ```
 
   ### TypeScript
@@ -13573,7 +13567,112 @@ print(df.head())
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
+```
 
+
+
+## List Datasets
+
+Retrieve all datasets for your project with pagination support.
+
+
+  ### Python
+
+```python
+# List all datasets (first page, default limit)
+result = langwatch.dataset.list_datasets()
+
+for ds in result.data:
+    print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
+
+print(f"Page {result.pagination.page} of {result.pagination.totalPages}")
+
+# List with explicit pagination
+result = langwatch.dataset.list_datasets(page=2, limit=10)
+```
+
+  ### TypeScript
+
+```typescript
+// List all datasets (first page, default limit)
+const result = await langwatch.datasets.list();
+
+for (const ds of result.data) {
+  console.log(`${ds.name} (${ds.slug}) - ${ds.columnTypes.length} columns`);
+}
+
+console.log(`Page ${result.pagination.page} of ${result.pagination.totalPages}`);
+
+// List with explicit pagination
+const page2 = await langwatch.datasets.list({ page: 2, limit: 10 });
+```
+
+
+
+## Create a Dataset
+
+Create a new dataset with an optional column schema.
+
+
+  ### Python
+
+```python
+# Create with name and column types
+info = langwatch.dataset.create_dataset(
+    "User Feedback",
+    columns=[
+        {"name": "input", "type": "string"},
+        {"name": "output", "type": "string"},
+    ],
+)
+print(f"Created: {info.name} (slug: {info.slug})")
+
+# Create with just a name (columns can be added later)
+info = langwatch.dataset.create_dataset("Simple Dataset")
+```
+
+  ### TypeScript
+
+```typescript
+// Create with name and column types
+const info = await langwatch.datasets.create({
+  name: "User Feedback",
+  columnTypes: [
+    { name: "input", type: "string" },
+    { name: "output", type: "string" },
+  ],
+});
+console.log(`Created: ${info.name} (slug: ${info.slug})`);
+
+// Create with just a name
+const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
+```
+
+
+
+## Get a Dataset
+
+Fetch a dataset by slug or ID, including all its entries.
+
+
+  ### Python
+
+```python
+# Fetch dataset by slug or ID
+dataset = langwatch.dataset.get_dataset("your-dataset-slug")
+
+# Access entries
+for entry in dataset.entries:
+    print(entry.id, entry.entry)
+
+# Convert to pandas DataFrame for easy manipulation
+df = dataset.to_pandas()
+print(df.head())
+```
+
+  ### TypeScript
+
+```typescript
 // Fetch dataset by slug or ID
 const dataset = await langwatch.datasets.get("your-dataset-slug");
 
@@ -13584,6 +13683,245 @@ for (const entry of dataset.entries) {
 ```
 
 
+
+## Update a Dataset
+
+Update a dataset's name or column types.
+
+
+  ### Python
+
+```python
+# Update the name
+updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
+print(f"New slug: {updated.slug}")
+
+# Update column types
+updated = langwatch.dataset.update_dataset(
+    "my-dataset",
+    columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
+)
+```
+
+  ### TypeScript
+
+```typescript
+// Update the name
+const updated = await langwatch.datasets.update("my-dataset", {
+  name: "New Name",
+});
+console.log(`New slug: ${updated.slug}`);
+
+// Update column types
+const withCols = await langwatch.datasets.update("my-dataset", {
+  columnTypes: [
+    { name: "question", type: "string" },
+    { name: "answer", type: "string" },
+  ],
+});
+```
+
+
+
+## Delete a Dataset
+
+Archive a dataset by slug or ID.
+
+
+  ### Python
+
+```python
+langwatch.dataset.delete_dataset("my-dataset")
+```
+
+  ### TypeScript
+
+```typescript
+await langwatch.datasets.delete("my-dataset");
+```
+
+
+
+## List Records
+
+Retrieve records from a dataset with pagination.
+
+
+  ### Python
+
+```python
+# List records (first page, default limit)
+result = langwatch.dataset.list_records("my-dataset")
+
+for record in result.data:
+    print(record.id, record.entry)
+
+print(f"Total: {result.pagination.total}")
+
+# List with explicit pagination
+result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
+```
+
+  ### TypeScript
+
+```typescript
+// List records (first page, default limit)
+const result = await langwatch.datasets.listRecords("my-dataset");
+
+for (const record of result.data) {
+  console.log(record.id, record.entry);
+}
+
+console.log(`Total: ${result.pagination.total}`);
+
+// List with explicit pagination
+const page2 = await langwatch.datasets.listRecords("my-dataset", {
+  page: 2,
+  limit: 20,
+});
+```
+
+
+
+## Create Records
+
+Batch-add records to an existing dataset.
+
+
+  ### Python
+
+```python
+records = langwatch.dataset.create_records(
+    "my-dataset",
+    entries=[
+        {"input": "What is LangWatch?", "output": "An LLM observability platform."},
+        {"input": "How do I get started?", "output": "Install the SDK and call setup()."},
+    ],
+)
+for r in records:
+    print(f"Created record: {r.id}")
+```
+
+  ### TypeScript
+
+```typescript
+const records = await langwatch.datasets.createRecords("my-dataset", {
+  entries: [
+    { input: "What is LangWatch?", output: "An LLM observability platform." },
+    { input: "How do I get started?", output: "Install the SDK and call setup()." },
+  ],
+});
+for (const r of records) {
+  console.log(`Created record: ${r.id}`);
+}
+```
+
+
+
+## Update a Record
+
+Update (or upsert) a single record by ID.
+
+
+  ### Python
+
+```python
+record = langwatch.dataset.update_record(
+    "my-dataset",
+    "rec-1",
+    entry={"input": "updated question", "output": "updated answer"},
+)
+print(f"Updated: {record.id} -> {record.entry}")
+```
+
+  ### TypeScript
+
+```typescript
+const record = await langwatch.datasets.updateRecord("my-dataset", "rec-1", {
+  entry: { input: "updated question", output: "updated answer" },
+});
+console.log(`Updated: ${record.id}`);
+```
+
+
+
+## Delete Records
+
+Batch-delete records by their IDs.
+
+
+  ### Python
+
+```python
+deleted_count = langwatch.dataset.delete_records(
+    "my-dataset",
+    record_ids=["rec-1", "rec-2"],
+)
+print(f"Deleted {deleted_count} records")
+```
+
+  ### TypeScript
+
+```typescript
+const result = await langwatch.datasets.deleteRecords("my-dataset", {
+  recordIds: ["rec-1", "rec-2"],
+});
+console.log(`Deleted ${result.deletedCount} records`);
+```
+
+
+
+## Upload a File
+
+Upload a CSV, JSON, or JSONL file to a dataset. If the dataset does not exist, it is created automatically.
+
+
+  ### Python
+
+```python
+# Upload to existing or create new (default: append)
+result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
+print(f"Created {result.recordsCreated} records")
+
+# Replace all records (delete existing, then upload)
+result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="replace")
+
+# Error if dataset already exists (create-only)
+result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
+```
+
+The `if_exists` parameter controls how conflicts are handled:
+
+| Value | Behavior |
+|-------|----------|
+| `"append"` (default) | Append rows to the existing dataset, or create it if it doesn't exist |
+| `"replace"` | Delete all existing records first, then upload. Creates the dataset if it doesn't exist |
+| `"error"` | Raise an error if the dataset already exists. Creates it otherwise |
+
+
+  ### TypeScript
+
+```typescript
+const result = await langwatch.datasets.upload("my-dataset", {
+  filePath: "data.csv",
+});
+console.log(`Created ${result.recordsCreated} records`);
+```
+
+
+
+### Create Dataset from File (TypeScript)
+
+In the TypeScript SDK, you can also create a new dataset from a file in one call:
+
+```typescript
+const result = await langwatch.datasets.createFromFile({
+  name: "From CSV",
+  filePath: "feedback.csv",
+});
+console.log(`Dataset: ${result.dataset.name} (${result.dataset.slug})`);
+console.log(`Records created: ${result.recordsCreated}`);
+```
 
 ## Using with Evaluations
 
@@ -23410,1277 +23748,3234 @@ curl -X POST "https://app.langwatch.ai/api/track_event" \\
 
 ---
 
-# FILE: ./self-hosting/docker-compose.mdx
+# FILE: ./self-hosting/configuration/backups.mdx
 
 ---
-title: Docker Compose
-description: Deploy LangWatch using Docker Compose for easy local setups supporting observability, evaluations, and AI agent testing.
-keywords: self-hosting, docker, docker-compose, deployment, langwatch
+title: Backups
+description: "Backup and restore strategies for LangWatch data stores"
 ---
 
-<Note>
-While the open-source version is available for local use and experimentation, for commercial use please reach out for a [demo call with our team](https://get.langwatch.ai/request-a-demo).
-</Note>
+LangWatch stores data across three systems. Each requires its own backup strategy:
 
-### Prerequisites
+| Data Store | What It Stores | Backup Priority |
+|------------|---------------|-----------------|
+| **PostgreSQL** | Users, teams, projects, configurations, prompt versions | Critical |
+| **ClickHouse** | Traces, spans, evaluations, experiments, analytics | High |
+| **S3** | Datasets, ClickHouse cold data | Medium |
 
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+## PostgreSQL Backups
 
-## Running with Docker Compose
+PostgreSQL holds your control plane data — losing it means losing user accounts, project configurations, and monitor definitions.
 
-To run the project locally with Docker Compose, fetch the LangWatch repository and start the services:
+### Chart-Managed PostgreSQL
+
+If you're using the chart-managed PostgreSQL (development/small deployments), use `pg_dump`:
 
 ```bash
-git clone https://github.com/langwatch/langwatch.git
-cp langwatch/.env.example langwatch/.env
-docker compose up -d --wait --build
+# Create a backup
+kubectl exec -n langwatch deploy/langwatch-postgresql -- \
+  pg_dump -U postgres langwatch > backup-$(date +%Y%m%d).sql
+
+# Restore from backup
+kubectl exec -i -n langwatch deploy/langwatch-postgresql -- \
+  psql -U postgres langwatch < backup-20260407.sql
 ```
 
-The application will be available at [http://localhost:5560](http://localhost:5560).
+### External PostgreSQL (RDS, Cloud SQL, etc.)
+
+For production, use your cloud provider's built-in backup features:
+
+- **AWS RDS**: Enable automated snapshots (recommended: 30-day retention) and point-in-time recovery
+- **GCP Cloud SQL**: Enable automated backups with point-in-time recovery
+- **Azure Database**: Enable geo-redundant backups
+
+<Tip>
+Always test your restore procedure before you need it. Schedule a quarterly restore drill to validate your backups.
+</Tip>
+
+## ClickHouse Backups
+
+ClickHouse holds all your trace and evaluation data. The `clickhouse-serverless` subchart supports native ClickHouse `BACKUP`/`RESTORE` to S3-compatible storage.
+
+### Enable Backups
+
+Backups require an S3-compatible bucket. Configure in your Helm values:
+
+```yaml
+clickhouse:
+  # S3 bucket for backups (shared with cold storage if both enabled)
+  objectStorage:
+    bucket: "my-langwatch-backups"
+    region: "us-east-1"
+    useEnvironmentCredentials: true  # IRSA / workload identity
+
+  backup:
+    enabled: true
+    database: "langwatch"
+    user: "default"
+    full:
+      schedule: "0 */12 * * *"     # Full backup every 12 hours
+    incremental:
+      schedule: "0 * * * *"        # Incremental every hour
+```
+
+Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and backups:
+
+```bash
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/cold-storage-s3.yaml
+```
+
+### S3 Authentication
+
+**IRSA / Workload Identity (recommended):**
+
+```yaml
+clickhouse:
+  objectStorage:
+    useEnvironmentCredentials: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/clickhouse-s3-role
+```
+
+**Static credentials:**
+
+```yaml
+clickhouse:
+  objectStorage:
+    useEnvironmentCredentials: false
+    credentials:
+      secretKeyRef:
+        name: clickhouse-s3-creds    # K8s secret name
+        accessKeyKey: "accessKey"
+        secretKeyKey: "secretKey"
+```
+
+### Backup Schedule
+
+| Backup Type | Default Schedule | Description |
+|-------------|-----------------|-------------|
+| Full | `0 */12 * * *` (every 12h) | Complete database backup |
+| Incremental | `0 * * * *` (every 1h) | Only changes since last full backup |
+
+Both are implemented as Kubernetes CronJobs that run `clickhouse-client` commands inside the ClickHouse pod.
+
+### Restore from Backup
+
+To restore, you need to identify the backup name and run the restore command:
+
+```bash
+# List available backups
+kubectl exec -n langwatch langwatch-clickhouse-0 -- \
+  clickhouse-client --query "SELECT * FROM system.backups ORDER BY start_time DESC"
+
+# Restore a specific backup
+kubectl exec -n langwatch langwatch-clickhouse-0 -- \
+  clickhouse-client --query "RESTORE DATABASE langwatch FROM S3('https://s3.us-east-1.amazonaws.com/my-langwatch-backups/backup-name', 'access_key', 'secret_key')"
+```
+
+<Warning>
+Restoring a backup will overwrite existing data in the target database. Always verify you're restoring to the correct environment.
+</Warning>
+
+## ClickHouse Cold Storage
+
+Cold storage is separate from backups — it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
+
+### How It Works
+
+1. New data is written to **hot storage** (local SSD on the ClickHouse pod)
+2. After the TTL period, data is moved to **cold storage** (S3)
+3. Queries transparently read from both hot and cold storage
+4. Cold data is cached locally for repeated reads
+
+### Enable Cold Storage
+
+```yaml
+clickhouse:
+  objectStorage:
+    bucket: "my-langwatch-data"
+    region: "us-east-1"
+    useEnvironmentCredentials: true
+
+  cold:
+    enabled: true
+    defaultTtlDays: 49  # Data older than 49 days moves to S3
+```
 
 <Note>
- Curiosity: we decided on 5560 because that's where the letters "LLM" are, on a T9 keyboard.
+The TTL must be divisible by 7 (ClickHouse partitions data weekly). The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
 </Note>
 
-## Helm Chart for LangWatch
+### Cost Savings
 
-LangWatch is available as a Helm chart for easy deployment on Kubernetes. The next section provides instructions for installing the Langwatch Helm chart.
+Cold storage can reduce storage costs significantly:
 
-Check out the [Helm Chart](/self-hosting/kubernetes-helm) page for more details.
+| Storage Type | Approximate Cost | Speed |
+|-------------|-----------------|-------|
+| gp3 SSD (hot) | ~$0.08/GB/month | Fast |
+| S3 Standard (cold) | ~$0.023/GB/month | Slower (cached) |
+| S3 Infrequent Access | ~$0.0125/GB/month | Slower |
 
----
+For a deployment with 150 GB/month of trace data, cold storage can save ~$500/year.
 
-# FILE: ./self-hosting/docker-images.mdx
+## S3 Dataset Backups
 
----
-title: Docker Images
-description: Explore LangWatch Docker images and endpoints for setting up observability, evaluations, and AI agent testing environments.
----
+If you're using S3 for dataset storage (`app.datasetObjectStorage.enabled: true`), protect this data with:
 
-# LangWatch Docker Images
+- **S3 Versioning**: Enable versioning on the bucket to recover from accidental deletes
+- **Cross-region replication**: For disaster recovery, replicate to another region
+- **Lifecycle policies**: Move old versions to Glacier after 30 days
 
-LangWatch is composed of three main Docker images that work together to provide the complete LLM observability platform. Each image serves a specific purpose and exposes different endpoints for various functionalities.
+## Disaster Recovery Checklist
 
-## Image Overview
-
-### 1. `langwatch/langwatch` - Main Application
-
-The primary LangWatch application that provides the web interface and core functionality.
-
-**Purpose:**
-- Web-based user interface for LangWatch
-- API endpoints for trace collection and management
-- User authentication and session management
-- Dashboard and analytics interface
-- Background workers for processing traces and evaluations (deployed as a separate pod in Helm by default)
-
-**Key Features:**
-- Trace collection and storage
-- Real-time monitoring dashboard
-- User management and authentication
-- API endpoints for SDK integration
-- Background job processing
-
-
-### 2. `langwatch/langwatch_nlp` - NLP Backend Service
-
-The NLP backend service that handles advanced language processing tasks and optimization studio workflows.
-
-**Purpose:**
-- Optimization studio workflows
-- Advanced NLP processing
-- Topic clustering and analysis
-
-**Key Features:**
-- Optimization studio backend
-- Topic clustering service
-- Advanced NLP processing
-
-
-### 3. `langwatch/langevals` - Evaluation Service
-
-The dedicated evaluation service that provides built-in evaluators and evaluation processing capabilities.
-
-**Purpose:**
-- Built-in evaluator execution
-- Evaluation result processing
-- Model-based evaluations
-- Safety and quality checks
-- Evaluation API endpoints
-
-**Key Features:**
-- Comprehensive evaluator library
-- LLM-as-a-judge evaluations
-- Safety evaluators (content safety, jailbreak detection)
-- Quality evaluators (relevance, accuracy, etc.)
-- RAG-specific evaluators
-
-
-## Service Communication
-
-The three services communicate with each other through HTTP endpoints:
-
-```mermaid
-graph TD
-    A[langwatch/langwatch<br/>:5560] --> B[langwatch/langwatch_nlp<br/>:5561]
-    A --> C[langwatch/langevals<br/>:5562]
-    B --> C
-    A --> D[PostgreSQL]
-    A --> E[Elasticsearch/OpenSearch]
-    A --> F[Redis]
-```
-
-## Running from a docker image
-
-For detailed instructions on how to deploy LangWatch using Docker or Kubernetes, see our deployment guides:
-
-<CardGroup cols={2}>
-<Card title="Docker Compose" icon="docker" href="/self-hosting/docker-compose">
-  Easily get started with LangWatch using Docker Compose.
-</Card>
-
-<Card title="Helm Chart" icon="dharmachakra" href="/self-hosting/kubernetes-helm">
-  Run LangWatch on Kubernetes with our pre-configured Helm chart.
-</Card>
-</CardGroup>
+- [ ] PostgreSQL automated backups enabled (30-day retention)
+- [ ] ClickHouse backup CronJobs running (check `kubectl get cronjobs`)
+- [ ] S3 bucket versioning enabled
+- [ ] Backup S3 bucket is in a different region or account from primary
+- [ ] Restore procedure documented and tested
+- [ ] Quarterly restore drills scheduled
 
 ---
 
-# FILE: ./self-hosting/env-variables.mdx
+# FILE: ./self-hosting/configuration/environment-variables.mdx
 
 ---
 title: Environment Variables
-description: Review all environment variables available for LangWatch self-hosting to configure observability and AI agent testing pipelines.
+description: "Complete environment variable reference for LangWatch self-hosting"
 ---
 
-# Environment Variables
+LangWatch is configured through environment variables. How you set them depends on your deployment method:
 
-This page provides a comprehensive list of all environment variables that can be configured for LangWatch self-hosting deployments. These variables control various aspects of the application including authentication, database connections, external services, and feature flags.
+- **Docker Compose**: Set in your `.env` file
+- **Helm chart**: Set via `values.yaml` (the chart maps values to env vars automatically)
+- **Raw Kubernetes**: Set directly in your Deployment manifests
 
-## Environment Variables Reference
+<Tip>
+When using the Helm chart, you rarely need to set environment variables directly. The `values.yaml` file provides a structured way to configure everything. See the [Helm chart mapping table](#helm-chart-mapping) below.
+</Tip>
 
-| Variable                         | Description                                                                                              | Required | Default |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------- | -------- | ------- |
-| **Core Configuration**           |
-| `DATABASE_URL`                   | PostgreSQL database connection URL                                                                       | Yes      | -       |
-| `NODE_ENV`                       | Application environment (development, test, production)                                                  | Yes      | -       |
-| `BASE_HOST`                      | Base URL of the application                                                                              | Yes      | -       |
-| `API_TOKEN_JWT_SECRET`           | Secret key for JWT token signing                                                                         | Yes      | -       |
-| `CREDENTIALS_SECRET`             | Secret for credential encryption, Base16 encoded                                                         | Yes      | -       |
-| **Authentication (NextAuth)**    |
-| `NEXTAUTH_PROVIDER`              | Authentication provider (azure-ad, okta, auth0, etc.)                                                    | No       | email   |
-| `NEXTAUTH_SECRET`                | Secret for NextAuth.js session encryption                                                                | Yes      | -       |
-| `NEXTAUTH_URL`                   | URL of the authentication service                                                                        | Yes      | -       |
-| **Search & Storage**             |
-| `ELASTICSEARCH_NODE_URL`         | Elasticsearch/OpenSearch cluster endpoint                                                                | Yes      | -       |
-| `ELASTICSEARCH_API_KEY`          | Elasticsearch/OpenSearch API key for authentication                                                      | Yes      | -       |
-| `IS_OPENSEARCH`                  | Flag to indicate OpenSearch instead of Elasticsearch                                                     | No       | false   |
-| `IS_QUICKWIT`                    | Flag to indicate Quickwit instead of Elasticsearch                                                       | No       | false   |
-| `REDIS_URL`                      | Redis connection URL                                                                                     | No       | -       |
-| `REDIS_CLUSTER_ENDPOINTS`        | If using Redis cluster, specify the endpoints (comma-separated)                                          | No       | -       |
-| **Startup Options**              |
-| `SKIP_PRISMA_MIGRATE`            | Skip Prisma database migrations on startup                                                               | No       | false   |
-| `SKIP_ELASTIC_MIGRATE`           | Skip Elasticsearch migrations on startup                                                                 | No       | false   |
-| **S3 Storage**                   |
-| `USE_S3_STORAGE`                 | Enable S3-compatible storage for datasets                                                                | No       | false   |
-| `S3_ENDPOINT`                    | S3-compatible storage endpoint                                                                           | No       | -       |
-| `S3_ACCESS_KEY_ID`               | S3 access key ID                                                                                         | No       | -       |
-| `S3_SECRET_ACCESS_KEY`           | S3 secret access key                                                                                     | No       | -       |
-| `S3_BUCKET_NAME`                 | S3 bucket name for dataset storage                                                                       | No       | -       |
-| `S3_KEY_SALT`                    | Salt for S3 key encryption                                                                               | No       | -       |
-| **Evaluation Providers**         |
-| `AZURE_OPENAI_ENDPOINT`          | Azure OpenAI endpoint URL for jailbreak and content safety evaluators                                    | No       | -       |
-| `AZURE_OPENAI_KEY`               | Azure OpenAI API key for jailbreak and content safety evaluators                                         | No       | -       |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud service account credentials for PII detection fallback (when internal Presidio check fails) | No       | -       |
-| **NLP Services**                 |
-| `LANGWATCH_NLP_SERVICE`          | Custom NLP service endpoint                                                                              | Yes      | -       |
-| `TOPIC_CLUSTERING_SERVICE`       | Topic clustering service endpoint                                                                        | Yes      | -       |
-| `LANGEVALS_ENDPOINT`             | LangEvals evaluation service endpoint                                                                    | No       | -       |
-| `LANGWATCH_NLP_LAMBDA_CONFIG`    | Lambda configuration for NLP services                                                                    | No       | -       |
-| **Email Services**               |
-| `SENDGRID_API_KEY`               | SendGrid API key for email delivery                                                                      | No       | -       |
-| `EMAIL_DEFAULT_FROM`             | Default sender email address                                                                             | No       | -       |
-| **Analytics & Monitoring**       |
-| `DISABLE_USAGE_STATS`            | Disable usage statistics collection                                                                      | No       | false   |
-| `SENTRY_DSN`                     | Sentry DSN for error tracking                                                                            | No       | -       |
-| **SSO Providers**                |
-| `AUTH0_CLIENT_ID`                | Auth0 client ID                                                                                          | No       | -       |
-| `AUTH0_CLIENT_SECRET`            | Auth0 client secret                                                                                      | No       | -       |
-| `AUTH0_ISSUER`                   | Auth0 issuer URL                                                                                         | No       | -       |
-| `AZURE_AD_CLIENT_ID`             | Azure AD client ID                                                                                       | No       | -       |
-| `AZURE_AD_CLIENT_SECRET`         | Azure AD client secret                                                                                   | No       | -       |
-| `AZURE_AD_TENANT_ID`             | Azure AD tenant ID                                                                                       | No       | -       |
-| `COGNITO_CLIENT_ID`              | AWS Cognito client ID                                                                                    | No       | -       |
-| `COGNITO_ISSUER`                 | AWS Cognito issuer URL                                                                                   | No       | -       |
-| `COGNITO_CLIENT_SECRET`          | AWS Cognito client secret                                                                                | No       | -       |
-| `GITHUB_CLIENT_ID`               | GitHub OAuth client ID                                                                                   | No       | -       |
-| `GITHUB_CLIENT_SECRET`           | GitHub OAuth client secret                                                                               | No       | -       |
-| `GITLAB_CLIENT_ID`               | GitLab OAuth client ID                                                                                   | No       | -       |
-| `GITLAB_CLIENT_SECRET`           | GitLab OAuth client secret                                                                               | No       | -       |
-| `GOOGLE_CLIENT_ID`               | Google OAuth client ID                                                                                   | No       | -       |
-| `GOOGLE_CLIENT_SECRET`           | Google OAuth client secret                                                                               | No       | -       |
-| `OKTA_CLIENT_ID`                 | Okta client ID                                                                                           | No       | -       |
-| `OKTA_CLIENT_SECRET`             | Okta client secret                                                                                       | No       | -       |
-| `OKTA_ISSUER`                    | Okta issuer URL                                                                                          | No       | -       |
+## Core Configuration
 
----
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes | — |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | — |
+| `REDIS_URL` | Redis connection string | Yes | — |
+| `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
+| `BASE_HOST` | Internal base URL for the application | Yes | — |
+| `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
+| `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
 
-# FILE: ./self-hosting/grafana.mdx
+## Secrets
 
----
-title: Infra Monitoring
-description: Set up Grafana and Prometheus for LangWatch infra monitoring to track system health in large-scale agent testing setups.
----
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
+| `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
+| `NEXTAUTH_SECRET` | Session encryption key for NextAuth.js | Yes |
+| `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
 
-## Installation with Monitoring
+<Warning>
+Never commit secrets to version control. In production, use a secrets manager (AWS Secrets Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
+</Warning>
 
-For monitoring setup, you'll need to add the `metricsApiKey` and `prometheus.enabled=true` to the values.yaml file.
+## Authentication
 
-### Access Grafana
-LangWatch includes integrated Prometheus monitoring for observability. The monitoring is built into the main LangWatch chart and can be enabled with a simple configuration.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azureAd`, `cognito`, `okta`, `auth0` | `email` |
 
-### Quick Setup
+### SSO Provider Variables
 
-```bash
-# Generate all required secrets including metrics key
-export NEXTAUTH_SECRET=$(openssl rand -base64 32)
-export API_TOKEN_JWT_SECRET=$(openssl rand -base64 32)
-export CRON_API_KEY=$(openssl rand -base64 32)
-export METRICS_API_KEY=$(openssl rand -base64 32)  # ← Required for monitoring
+Each SSO provider requires specific variables. See [SSO Configuration](/self-hosting/configuration/sso) for detailed setup guides.
 
-# Deploy LangWatch with monitoring enabled
-helm install langwatch ./langwatch \
-  --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
-  --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
-  --set app.env.BASE_HOST="http://localhost:5560" \
-  --set app.env.NEXTAUTH_URL="http://localhost:5560" \
-  --set app.env.CRON_API_KEY=$CRON_API_KEY \
-  --set global.monitoring.enabled=true \
-  --set global.monitoring.metricsApiKey=$METRICS_API_KEY \
-  --set prometheus.enabled=true
+**Auth0:**
+
+| Variable | Description |
+|----------|-------------|
+| `AUTH0_CLIENT_ID` | Auth0 application client ID |
+| `AUTH0_CLIENT_SECRET` | Auth0 application client secret |
+| `AUTH0_ISSUER` | Auth0 issuer URL (e.g. `https://your-tenant.auth0.com`) |
+
+**Azure AD:**
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
+| `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
+| `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
+
+**AWS Cognito:**
+
+| Variable | Description |
+|----------|-------------|
+| `COGNITO_CLIENT_ID` | Cognito user pool client ID |
+| `COGNITO_CLIENT_SECRET` | Cognito user pool client secret |
+| `COGNITO_ISSUER` | Cognito issuer URL |
+
+**GitHub:**
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
+
+**GitLab:**
+
+| Variable | Description |
+|----------|-------------|
+| `GITLAB_CLIENT_ID` | GitLab OAuth app client ID |
+| `GITLAB_CLIENT_SECRET` | GitLab OAuth app client secret |
+
+**Google:**
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+
+**Okta:**
+
+| Variable | Description |
+|----------|-------------|
+| `OKTA_CLIENT_ID` | Okta application client ID |
+| `OKTA_CLIENT_SECRET` | Okta application client secret |
+| `OKTA_ISSUER` | Okta issuer URL |
+
+## Services
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LANGWATCH_NLP_SERVICE` | URL of the NLP service | `http://langwatch-nlp:5561` |
+| `LANGEVALS_ENDPOINT` | URL of the LangEvals service | `http://langevals:5562` |
+
+## Object Storage (S3)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset storage | `false` |
+| `DATASET_OBJECT_STORAGE_PROVIDER` | Storage provider (`awsS3`) | `awsS3` |
+| `DATASET_OBJECT_STORAGE_BUCKET` | S3 bucket name | `langwatch-dataset` |
+| `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | — |
+| `S3_ACCESS_KEY_ID` | S3 access key ID | — |
+| `S3_SECRET_ACCESS_KEY` | S3 secret access key | — |
+| `S3_KEY_SALT` | Optional key salt for S3 object keys | — |
+
+<Note>
+When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access keys. The pod's service account will assume the IAM role automatically.
+</Note>
+
+## Email
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EMAIL_ENABLED` | Enable email notifications | `false` |
+| `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
+| `SENDGRID_API_KEY` | SendGrid API key | — |
+| `EMAIL_DEFAULT_FROM` | Default "from" address | — |
+
+## Evaluator Providers
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | — |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | — |
+| `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | — |
+
+## Feature Flags
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
+| `DISABLE_PII_REDACTION` | Disable automatic PII redaction in traces | `false` |
+| `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup | `false` |
+
+## Telemetry
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
+| `SENTRY_DSN` | Sentry DSN for error tracking | — |
+| `METRICS_API_KEY` | API key for metrics collection | — |
+
+## Helm Chart Mapping {#helm-chart-mapping}
+
+When using the Helm chart, configuration is set in `values.yaml` rather than environment variables directly. Here's how key values map:
+
+| Helm Value | Environment Variable |
+|------------|---------------------|
+| `app.http.baseHost` | `BASE_HOST` |
+| `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
+| `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
+| `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
+| `app.cronApiKey.value` | `CRON_API_KEY` |
+| `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
+| `app.features.disablePiiRedaction` | `DISABLE_PII_REDACTION` |
+| `app.email.enabled` | `EMAIL_ENABLED` |
+| `app.email.provider` | `EMAIL_PROVIDER` |
+| `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
+| `app.evaluators.azureOpenAI.enabled` | `AZURE_OPENAI_EVALUATOR_ENABLED` |
+| `app.evaluators.azureOpenAI.endpoint.value` | `AZURE_OPENAI_EVALUATOR_ENDPOINT` |
+| `app.evaluators.azureOpenAI.apiKey.value` | `AZURE_OPENAI_EVALUATOR_API_KEY` |
+| `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
+| `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
+| `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
+| `app.datasetObjectStorage.enabled` | `DATASET_OBJECT_STORAGE_ENABLED` |
+| `app.datasetObjectStorage.bucket` | `DATASET_OBJECT_STORAGE_BUCKET` |
+| `postgresql.external.connectionString.value` | `DATABASE_URL` |
+| `redis.external.connectionString.value` | `REDIS_URL` |
+| `workers.enabled` | Inverse of `START_WORKERS` |
+
+<Tip>
+For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:
+
+```yaml
+app:
+  credentialsEncryptionKey:
+    secretKeyRef:
+      name: langwatch-secrets
+      key: credentialsEncryptionKey
 ```
+</Tip>
+
+---
+
+# FILE: ./self-hosting/configuration/observability.mdx
+
+---
+title: Observability & Monitoring
+description: "Monitor LangWatch infrastructure with Prometheus, Grafana, and health checks"
+---
+
+LangWatch exposes Prometheus metrics and health check endpoints for monitoring your self-hosted deployment.
+
+## Prometheus
+
+The Helm chart includes an optional Prometheus instance that scrapes metrics from LangWatch components.
+
+### Enable Prometheus
+
+```yaml
+# In your values.yaml
+app:
+  telemetry:
+    metrics:
+      enabled: true
+      apiKey:
+        value: "your-metrics-api-key"  # Authenticates scrape requests
+
+prometheus:
+  chartManaged: true
+  server:
+    retention: 30d
+    persistentVolume:
+      size: 20Gi
+```
+
+### What Gets Scraped
+
+| Component | Port | Endpoint | Metrics |
+|-----------|------|----------|---------|
+| App | 5560 | `/metrics` | HTTP request latency, error rates, active connections |
+| Workers | 2999 | `/metrics` | Queue depth, job processing time, job success/failure rates |
 
 ### Access Prometheus
 
+Port-forward to the Prometheus UI:
+
 ```bash
-# Port forward for development
-kubectl port-forward svc/langwatch-prometheus 9090:9090
+kubectl -n langwatch port-forward svc/langwatch-prometheus-server 9090:9090
+# Open http://localhost:9090
 ```
 
-Access Prometheus at: http://localhost:9090
+### External Prometheus
 
-### What Gets Monitored
-
-- **LangWatch App**: Main application metrics (port 5560)
-- **LangWatch Workers**: Worker metrics (port 2999)
-- **Kubernetes Infrastructure**: Node and container metrics via cAdvisor
-
-### Prometheus Configuration
-
-The Prometheus configuration can be customized through the `prometheus` section in values.yaml:
+To use an existing Prometheus instance instead of the chart-managed one:
 
 ```yaml
 prometheus:
-  enabled: false # Set to true to enable
-  image:
-    repository: quay.io/prometheus/prometheus
-    tag: "v3.0.1"
-  service:
-    type: ClusterIP # Change to LoadBalancer for external access
-    port: 9090
-  storage:
-    enabled: true
-    size: 6Gi
-    storageClass: "" # Use default storage class
-  retention: 60d
-  rbac:
-    enabled: true
+  chartManaged: false
+  external:
+    existingSecret: prometheus-credentials
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username"
+      password: "password"
 ```
 
-### LangWatch Pod Annotations
-
-For Prometheus to discover your LangWatch pods, ensure they have the correct annotations:
+You'll need to configure your external Prometheus to scrape the LangWatch pods. Pods are annotated with:
 
 ```yaml
-metadata:
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "5560" # For main app
-    prometheus.io/path: "/metrics" # For workers with custom paths
+prometheus.io/scrape: "true"
+prometheus.io/port: "5560"    # or 2999 for workers
+prometheus.io/path: "/metrics"
 ```
 
-### LangWatch Dashboard
+## Grafana
 
-You can find the LangWatch dashboard template [here](/langwatch-dashboard.json).
+Connect Grafana to your Prometheus instance to visualize LangWatch metrics.
 
-![Grafana](/images/monitoring.png)
+### Key Dashboards
 
+Set up dashboards for:
+- **Trace throughput** — traces ingested per minute
+- **Worker queue depth** — BullMQ queue backlog (indicates processing bottleneck)
+- **ClickHouse query latency** — p50/p95/p99 query times
+- **Error rates** — HTTP 5xx responses from App and Workers
+- **Resource utilization** — CPU and memory per component
+
+### Example Queries
+
+```promql
+# Trace ingestion rate (per minute)
+rate(langwatch_traces_ingested_total[5m]) * 60
+
+# Worker queue depth
+langwatch_worker_queue_depth
+
+# HTTP error rate
+rate(http_requests_total{status=~"5.."}[5m])
+  / rate(http_requests_total[5m])
+
+# ClickHouse query p95 latency
+histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
+```
+
+## Health & Readiness Checks
+
+### Endpoints
+
+| Component | Endpoint | Method | Healthy Response |
+|-----------|----------|--------|-----------------|
+| App | `/api/health` | GET | 200 OK |
+| Workers | `/healthz` | GET | 200 OK |
+
+### Kubernetes Probes
+
+The Helm chart configures probes automatically. Default configuration:
+
+```yaml
+# Startup probe (allows time for migrations)
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: 5560
+  periodSeconds: 5
+  failureThreshold: 30    # Up to 150s for startup
+
+# Liveness probe (restarts unhealthy pods)
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 5560
+  periodSeconds: 10
+  failureThreshold: 5
+
+# Readiness probe (removes from service if unhealthy)
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 5560
+  periodSeconds: 5
+  failureThreshold: 3
+```
+
+### Manual Health Check
+
+```bash
+# Check app health
+kubectl -n langwatch exec deploy/langwatch-app -- \
+  curl -s http://localhost:5560/api/health
+
+# Check worker health
+kubectl -n langwatch exec deploy/langwatch-workers -- \
+  curl -s http://localhost:2999/healthz
+```
+
+## Alerting Recommendations
+
+Set up alerts for these critical conditions:
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| Worker queue backlog | Queue depth > 10,000 for 5 min | Warning |
+| Worker queue backlog (critical) | Queue depth > 100,000 for 5 min | Critical |
+| ClickHouse memory | Memory usage > 80% of limit | Warning |
+| ClickHouse disk | Hot storage > 85% full | Critical |
+| PostgreSQL connections | Active connections > 80% of max | Warning |
+| App error rate | HTTP 5xx rate > 5% for 5 min | Critical |
+| Pod restarts | Pod restart count > 3 in 15 min | Warning |
+
+### Example Alertmanager Rule
+
+```yaml
+groups:
+  - name: langwatch
+    rules:
+      - alert: WorkerQueueBacklog
+        expr: langwatch_worker_queue_depth > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker queue backlog is high"
+          description: "Queue depth is {{ $value }} — workers may need scaling."
+```
+
+## Prometheus Configuration Reference
+
+Full Prometheus configuration in the Helm chart:
+
+| Value | Description | Default |
+|-------|-------------|---------|
+| `prometheus.chartManaged` | Manage Prometheus via this chart | `true` |
+| `prometheus.server.retention` | Data retention period | `60d` |
+| `prometheus.server.persistentVolume.size` | Storage size | `6Gi` |
+| `prometheus.server.persistentVolume.storageClass` | Storage class | `""` (default) |
+| `prometheus.server.resources.requests.cpu` | CPU request | `200m` |
+| `prometheus.server.resources.requests.memory` | Memory request | `512Mi` |
+| `prometheus.server.resources.limits.cpu` | CPU limit | `500m` |
+| `prometheus.server.resources.limits.memory` | Memory limit | `2Gi` |
+| `prometheus.server.global.scrape_interval` | Scrape interval | `15s` |
 
 ---
 
-# FILE: ./self-hosting/kubernetes-helm.mdx
+# FILE: ./self-hosting/configuration/sizing-and-scaling.mdx
 
 ---
-title: Kubernetes (Helm Chart)
-description: Install LangWatch using a Kubernetes Helm chart for production-grade deployments supporting LLM and agent testing workflows.
-keywords: self-hosting, helm, kubernetes, deployment, langwatch
+title: Sizing & Scaling
+description: "Resource requirements, size profiles, and scaling recommendations for LangWatch"
 ---
 
-This document walks you through deploying LangWatch on Kubernetes using our Helm chart. You will add our Helm repo, choose a values profile, and deploy.
+## Minimum Requirements
+
+### Docker Compose (local development)
+
+- 4 CPU cores, 16 GB RAM, 50 GB disk
+- Suitable for evaluation and small teams (&lt; 5 users)
+
+### Kubernetes (production)
+
+- Minimum 3 nodes with 4 CPU / 16 GB each
+- StorageClass that supports dynamic provisioning
+- See size profiles below for detailed per-component requirements
+
+## Component Resource Defaults
+
+These are the default resource requests and limits from the Helm chart (`values.yaml`):
+
+| Component | CPU Request | CPU Limit | Memory Request | Memory Limit | Storage |
+|-----------|-------------|-----------|----------------|--------------|---------|
+| LangWatch App | 250m | 1000m | 2Gi | 4Gi | --- |
+| LangWatch Workers | 250m | 1000m | 2Gi | 4Gi | --- |
+| LangWatch NLP | 1000m | 2000m | 2Gi | 4Gi | --- |
+| LangEvals | 1000m | 2000m | 6Gi | 8Gi | --- |
+| PostgreSQL | 250m | 1000m | 512Mi | 1Gi | 20Gi |
+| ClickHouse | 2 cores | 2 cores | 4Gi | 4Gi | 50Gi |
+| Redis | 250m | 500m | 256Mi | 512Mi | 10Gi |
+| Prometheus | 200m | 500m | 512Mi | 2Gi | 6Gi |
+
+<Note>ClickHouse auto-tunes internal parameters (memory limits, thread pools, merge settings) based on the CPU and memory you allocate. You only need to set `clickhouse.cpu` and `clickhouse.memory`.</Note>
+
+## Size Profiles
+
+The Helm chart ships with composable overlay files in `examples/overlays/`. Use them with `helm install -f`:
+
+### Development (`values-local.yaml`)
+
+For local development and small teams.
+
+- LangWatch App: 1 replica, 250m/1 CPU, 1Gi/3Gi memory
+- LangWatch Workers: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- LangWatch NLP: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- LangEvals: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- ClickHouse: 1 CPU, 1Gi memory, 5Gi storage
+- PostgreSQL: 100m/500m CPU, 256Mi/512Mi memory, 2Gi storage
+- Redis: 50m/250m CPU, 64Mi/256Mi memory, 1Gi storage
+- Total: ~1 CPU, ~4 Gi RAM requests
+
+```yaml
+# Example: helm install with dev sizing
+helm install langwatch langwatch/langwatch \
+  -f examples/values-local.yaml \
+  --set autogen.enabled=true
+```
+
+### Production (`size-prod.yaml`)
+
+For production with single-node ClickHouse.
+
+- LangWatch App: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory, PDB minAvailable 1
+- LangWatch Workers: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory
+- LangWatch NLP: 1 replica, 1/2 CPU, 2Gi/4Gi memory
+- LangEvals: 1 replica, 1/2 CPU, 4Gi/8Gi memory
+- ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
+- PostgreSQL: 20Gi storage
+- Redis: 5Gi storage
+- Prometheus: 30d retention, 20Gi storage
+- Total: ~12 CPU, ~28 Gi RAM requests
+
+```yaml
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/access-ingress.yaml
+```
+
+### High Availability (`size-ha.yaml`)
+
+For production with replicated ClickHouse.
+
+- LangWatch App: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
+- LangWatch Workers: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
+- LangWatch NLP: 2 replicas, 1/2 CPU, 2Gi/4Gi memory
+- LangEvals: 2 replicas, 1/2 CPU, 4Gi/8Gi memory
+- ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
+- PostgreSQL: 50Gi storage
+- Redis: 10Gi storage
+- Prometheus: 60d retention, 50Gi storage
+- Total: ~25 CPU, ~70 Gi RAM requests (plus 3x ClickHouse)
+
+```yaml
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-ha.yaml \
+  -f examples/overlays/access-ingress.yaml \
+  -f examples/overlays/cold-storage-s3.yaml
+```
+
+## Scaling Guidelines
+
+### What to scale first
+
+| Bottleneck | Component to Scale | How |
+|---|---|---|
+| Trace ingestion is slow / queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
+| UI is slow / many concurrent users | LangWatch App | Increase `app.replicaCount` |
+| ClickHouse queries are slow | ClickHouse | Increase `clickhouse.cpu` and `clickhouse.memory` |
+| Evaluations are slow | LangEvals | Increase `langevals.replicaCount` |
+| Topic clustering is slow | LangWatch NLP | Increase `langwatch_nlp.replicaCount` |
+
+### Horizontal Pod Autoscaler (HPA)
+
+```yaml
+# Example HPA for workers
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langwatch-workers
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: langwatch-workers
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+```
+
+## Storage Sizing
+
+### ClickHouse hot storage
+
+- ~1 KB per span (compressed, varies with payload size)
+- 100K traces/day with avg 5 spans = ~500 MB/day = ~15 GB/month
+- 1M traces/day with avg 5 spans = ~5 GB/day = ~150 GB/month
+- Plan for 3-6 months of hot data before cold storage kicks in
+
+### ClickHouse cold storage (S3)
+
+- Enable with `clickhouse.cold.enabled: true`
+- Default TTL: 49 days (data older than this moves to S3)
+- S3 cost is typically 10-20x cheaper than SSD storage
+
+### PostgreSQL
+
+- Grows slowly --- metadata only (users, projects, configurations)
+- 10-20 GB is sufficient for most deployments
+
+### Redis
+
+- Minimal storage --- job queue and cache only
+- 1-5 GB is sufficient
+
+## Cloud Instance Recommendations
+
+| Cloud | General Nodes | ClickHouse Nodes | Notes |
+|-------|--------------|------------------|-------|
+| AWS | m7g.xlarge (4 vCPU, 16 GB) | r7g.2xlarge (8 vCPU, 64 GB) | Graviton (ARM) for cost efficiency |
+| GCP | e2-standard-4 (4 vCPU, 16 GB) | n2-highmem-8 (8 vCPU, 64 GB) | |
+| Azure | Standard_D4s_v5 (4 vCPU, 16 GB) | Standard_E8s_v5 (8 vCPU, 64 GB) | |
+
+<Tip>For ClickHouse, prioritize memory over CPU. ClickHouse benefits from large memory for caching and merge operations.</Tip>
+
+---
+
+# FILE: ./self-hosting/configuration/sso.mdx
+
+---
+title: SSO Configuration
+description: "Set up Single Sign-On for LangWatch with your identity provider"
+---
+
+LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as described below.
+
+## Supported Providers
+
+| Provider | `NEXTAUTH_PROVIDER` value | Requires |
+|----------|--------------------------|----------|
+| Email/Password | `email` (default) | Nothing extra |
+| Auth0 | `auth0` | Client ID, Client Secret, Issuer |
+| Azure AD | `azureAd` | Client ID, Client Secret, Tenant ID |
+| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
+| GitHub | `github` | Client ID, Client Secret |
+| GitLab | `gitlab` | Client ID, Client Secret |
+| Google | `google` | Client ID, Client Secret |
+| Okta | `okta` | Client ID, Client Secret, Issuer |
+
+## OAuth Redirect URL
+
+When configuring your identity provider, set the redirect/callback URL to:
+
+```
+https://your-langwatch-domain.com/api/auth/callback/{provider}
+```
+
+Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, or `okta`.
+
+## Provider Setup
+
+### Auth0
+
+1. Create an application in the [Auth0 Dashboard](https://manage.auth0.com/)
+2. Set **Allowed Callback URLs** to `https://your-domain.com/api/auth/callback/auth0`
+3. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: auth0
+    providers:
+      auth0:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: auth0ClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: auth0ClientSecret }
+        issuer:
+          value: "https://your-tenant.auth0.com"
+```
+
+Or via environment variables:
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `auth0` |
+| `AUTH0_CLIENT_ID` | Your Auth0 client ID |
+| `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
+| `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
+
+### Azure AD
+
+1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
+2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
+3. Create a client secret under **Certificates & secrets**
+4. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: azureAd
+    providers:
+      azureAd:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: azureClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: azureClientSecret }
+        tenantId:
+          value: "your-tenant-id"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `azureAd` |
+| `AZURE_AD_CLIENT_ID` | Application (client) ID |
+| `AZURE_AD_CLIENT_SECRET` | Client secret value |
+| `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
+
+### AWS Cognito
+
+1. Create a User Pool in [AWS Cognito](https://console.aws.amazon.com/cognito/)
+2. Add an app client with a **Callback URL**: `https://your-domain.com/api/auth/callback/cognito`
+3. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: cognito
+    providers:
+      cognito:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
+        issuer:
+          value: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXX"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `cognito` |
+| `COGNITO_CLIENT_ID` | User pool app client ID |
+| `COGNITO_CLIENT_SECRET` | User pool app client secret |
+| `COGNITO_ISSUER` | `https://cognito-idp.{region}.amazonaws.com/{userPoolId}` |
+
+### GitHub
+
+1. Create an OAuth App in [GitHub Developer Settings](https://github.com/settings/developers)
+2. Set **Authorization callback URL** to `https://your-domain.com/api/auth/callback/github`
+3. Configure:
+
+```yaml
+app:
+  nextAuth:
+    provider: github
+    providers:
+      github:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: githubClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: githubClientSecret }
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `github` |
+| `GITHUB_CLIENT_ID` | OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | OAuth app client secret |
+
+### GitLab
+
+1. Create an application in [GitLab > Applications](https://gitlab.com/-/profile/applications)
+2. Set **Redirect URI** to `https://your-domain.com/api/auth/callback/gitlab`
+3. Select scopes: `read_user`, `openid`, `profile`, `email`
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `gitlab` |
+| `GITLAB_CLIENT_ID` | Application ID |
+| `GITLAB_CLIENT_SECRET` | Application secret |
+
+### Google
+
+1. Create credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Add an **Authorized redirect URI**: `https://your-domain.com/api/auth/callback/google`
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `google` |
+| `GOOGLE_CLIENT_ID` | OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
+
+### Okta
+
+1. Create an application in [Okta Admin Console](https://developer.okta.com/)
+2. Set **Sign-in redirect URI** to `https://your-domain.com/api/auth/callback/okta`
+
+```yaml
+app:
+  nextAuth:
+    provider: okta
+    providers:
+      okta:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oktaClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oktaClientSecret }
+        issuer:
+          value: "https://your-org.okta.com"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `okta` |
+| `OKTA_CLIENT_ID` | Client ID |
+| `OKTA_CLIENT_SECRET` | Client secret |
+| `OKTA_ISSUER` | `https://your-org.okta.com` |
+
+## Domain-to-Organization Mapping
+
+For on-premises deployments with SSO, map email domains to organizations:
+
+```sql
+-- Connect to PostgreSQL and run:
+UPDATE "Organization"
+SET "ssoProvider" = 'okta',
+    "ssoEmailDomain" = 'yourcompany.com'
+WHERE "id" = 'your-org-id';
+```
+
+This ensures users with `@yourcompany.com` emails are automatically associated with the correct organization.
+
+## Migrating from Email/Password to SSO
+
+1. Enable SSO by setting the provider configuration above
+2. Flag existing email/password users for SSO migration:
+
+```sql
+UPDATE "User"
+SET "pendingSsoSetup" = true
+WHERE "email" LIKE '%@yourcompany.com';
+```
+
+3. When flagged users next sign in via SSO, their accounts are automatically linked
 
 <Note>
-  While the open-source version is available for local use and experimentation,
-  for commercial use please reach out for a [demo call with our
-  team](https://get.langwatch.ai/request-a-demo).
+Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.
 </Note>
+
+---
+
+# FILE: ./self-hosting/configuration/third-party-integrations.mdx
+
+---
+title: Third-Party Integrations
+description: "Configure email, error tracking, analytics, and external services for LangWatch"
+---
+
+LangWatch integrates with several third-party services for notifications, error tracking, and evaluation capabilities.
+
+## Email (SendGrid)
+
+Email is used for alerts, team invitations, and system notifications.
+
+### Helm Configuration
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "langwatch@yourcompany.com"
+    provider: sendgrid
+    providers:
+      sendgrid:
+        apiKey:
+          secretKeyRef:
+            name: langwatch-email
+            key: sendgridApiKey
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `EMAIL_ENABLED` | `true` to enable email |
+| `EMAIL_PROVIDER` | `sendgrid` |
+| `SENDGRID_API_KEY` | Your SendGrid API key |
+| `EMAIL_DEFAULT_FROM` | Default sender address |
+
+### Setup Steps
+
+1. Create a [SendGrid account](https://sendgrid.com/) and generate an API key
+2. Verify your sender domain in SendGrid
+3. Configure the API key via the Helm chart or environment variable
+4. Test by inviting a team member in the LangWatch UI
+
+## Error Tracking (Sentry)
+
+Capture application errors and exceptions for debugging.
+
+### Configuration
+
+| Variable | Description |
+|----------|-------------|
+| `SENTRY_DSN` | Sentry DSN for the LangWatch app |
+
+```yaml
+app:
+  extraEnvs:
+    - name: SENTRY_DSN
+      value: "https://examplePublicKey@o0.ingest.sentry.io/0"
+```
+
+## Usage Analytics
+
+LangWatch collects anonymous usage analytics by default to help improve the product. No trace data or PII is collected.
+
+### Disable Telemetry
+
+```yaml
+app:
+  telemetry:
+    usage:
+      enabled: false
+```
+
+Or via environment variable:
+
+| Variable | Description |
+|----------|-------------|
+| `DISABLE_USAGE_STATS` | Set to `true` to disable anonymous usage analytics |
+
+## LLM Providers for Evaluations
+
+LangWatch evaluators use external LLM providers for model-based evaluations (LLM-as-a-Judge, safety checks, etc.). Configure these if you want to use built-in evaluators.
+
+### Azure OpenAI
+
+Used for jailbreak detection and content safety evaluators.
+
+```yaml
+app:
+  evaluators:
+    azureOpenAI:
+      enabled: true
+      endpoint:
+        secretKeyRef: { name: langwatch-evaluators, key: azureEndpoint }
+      apiKey:
+        secretKeyRef: { name: langwatch-evaluators, key: azureApiKey }
+```
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_OPENAI_EVALUATOR_ENABLED` | `true` to enable |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |
+
+### Google AI
+
+Used for PII detection evaluators.
+
+```yaml
+app:
+  evaluators:
+    google:
+      enabled: true
+      credentials:
+        secretKeyRef: { name: langwatch-evaluators, key: googleCredentials }
+```
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_EVALUATOR_ENABLED` | `true` to enable |
+| `GOOGLE_CREDENTIALS_JSON` | Service account credentials JSON |
+
+<Note>
+You don't need to configure evaluator providers to use LangWatch. They're only required if you want to use built-in evaluators that rely on specific LLM providers. You can always configure your own LLM provider API keys in the LangWatch UI for evaluations.
+</Note>
+
+## Slack
+
+LangWatch can send notifications to Slack channels via webhooks for alerts and automations. This is configured in the LangWatch UI under **Automations**, not via environment variables.
+
+## S3 / Object Storage
+
+Used for dataset storage and ClickHouse cold storage/backups. See:
+- [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and backup configuration
+- [Environment Variables](/self-hosting/configuration/environment-variables#object-storage-s3) for S3 configuration reference
+
+---
+
+# FILE: ./self-hosting/deployment/docker-compose.mdx
+
+---
+title: Docker Compose
+description: "Get LangWatch running locally in minutes with Docker Compose"
+---
+
+Docker Compose is the quickest way to try LangWatch locally. It runs the full stack in containers on your machine.
 
 ## Prerequisites
 
-- A Kubernetes cluster (local or managed), kubectl, and Helm 3.12+
-- StorageClass available if you enable chart-managed PostgreSQL, Redis, or OpenSearch
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose v2
+- 4 CPU cores, 8 GB RAM, 20 GB disk
 
-<Warning>
-Chart-managed OpenSearch/PostgreSQL options are intended for testing/evaluation. For production, use managed/external providers for these services.
-</Warning>
-
-## Add Helm repo
+## Quick Start
 
 ```bash
-helm repo add langwatch https://langwatch.github.io/langwatch/
-helm repo update
+# Clone the repository
+git clone https://github.com/langwatch/langwatch.git
+cd langwatch
+
+# Copy the example environment file
+cp langwatch/.env.example langwatch/.env
+
+# Start all services
+docker compose up
 ```
 
-## Choose a values profile
-
-Pick the profile that matches your environment. You can copy these into files like `values.prod.yaml`, `values.dev.yaml`, `values.half-managed.yaml`, or `values.minimal.yaml`.
-
-### Minimal (quickstart dev)
-
-- Smallest set of overrides for a local test
-- Autogen enabled, chart-managed dependencies
-
-```yaml
-# values.minimal.yaml
-# Minimal development values for LangWatch Helm chart
-# Only essential overrides for development environment
-
-autogen:
-  enabled: true
-
-app:
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-
-langwatch_nlp:
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1500m
-      memory: 2Gi
-
-langevals:
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1.5Gi
-    limits:
-      cpu: 2000m
-      memory: 3Gi
-
-postgresql:
-  chartManaged: true
-  auth:
-    password: "rtfyg6j8iu"
-
-redis:
-  chartManaged: true
-
-opensearch:
-  chartManaged: true
-  clusterName: "langwatch-test-opensearch"
-```
-
-### Production (external/managed dependencies, secrets via Secret manager)
-
-- No autogen
-- External PostgreSQL, Redis, OpenSearch
-- Secrets referenced via `secretKeyRef`
-- Ingress enabled
-
-```yaml
-# values.prod.yaml
-global:
-  env: production
-
-autogen:
-  enabled: false
-
-app:
-  http:
-    # Public URL for users (your HTTPS domain)
-    publicUrl: https://langwatch.example.com
-    # Internal base URL (usually same host via Ingress)
-    baseHost: https://langwatch.example.com
-  credentialsEncryptionKey:
-    secretKeyRef:
-      name: langwatch-secrets
-      key: credentialsEncryptionKey
-  cronApiKey:
-    secretKeyRef:
-      name: langwatch-secrets
-      key: cronApiKey
-  nextAuth:
-    secret:
-      secretKeyRef:
-        name: langwatch-secrets
-        key: nextAuthSecret
-  telemetry:
-    metrics:
-      enabled: true
-      apiKey:
-        secretKeyRef:
-          name: langwatch-secrets
-          key: metricsApiKey
-
-workers:
-  replicaCount: 2
-  resources:
-    requests:
-      cpu: 500m
-      memory: 2Gi
-    limits:
-      cpu: 2000m
-      memory: 4Gi
-
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: langwatch.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - hosts:
-        - langwatch.example.com
-      secretName: langwatch-tls
-
-postgresql:
-  chartManaged: false
-  external:
-    connectionString:
-      secretKeyRef:
-        name: pg-conn
-        key: url
-
-redis:
-  chartManaged: false
-  external:
-    connectionString:
-      secretKeyRef:
-        name: redis-conn
-        key: url
-
-opensearch:
-  chartManaged: false
-  external:
-    engine: opensearch
-    nodeUrl:
-      secretKeyRef:
-        name: opensearch-conn
-        key: nodeUrl
-    apiKey:
-      secretKeyRef:
-        name: opensearch-conn
-        key: apiKey
-
-prometheus:
-  chartManaged: false
-```
+LangWatch is available at **http://localhost:5560**.
 
 <Tip>
-Create Kubernetes Secrets (`langwatch-secrets`, `pg-conn`, `redis-conn`, `opensearch-conn`) via your secret manager or IaC. Avoid inlining production secrets.
+Why port 5560? On a T9 keyboard, 5560 spells "LLM".
 </Tip>
 
-### Local development (chart-managed, autogen, explicit Postgres password)
+## Services
 
-- Autogen enabled to generate app secrets
-- Chart-managed PostgreSQL/Redis/OpenSearch/Prometheus
-- Explicit PostgreSQL password for convenience
-- No Ingress; port-forward to access
-- Includes resource requests/limits for app, NLP, and Langevals
+Docker Compose starts the following services:
 
-```yaml
-# values.dev.yaml
-global:
-  env: development
+| Service | Image | Port | Description |
+|---------|-------|------|-------------|
+| `app` | `langwatch/langwatch:latest` | 5560 | Main application |
+| `workers` | `langwatch/langwatch:latest` | — | Background job processing |
+| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
+| `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
+| `postgres` | `postgres:16` | 5432 | Control plane database |
+| `redis` | `redis:alpine` | — | Job queue, caching |
+| `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
 
-autogen:
-  enabled: true
+## Configuration
 
-app:
-  http:
-    publicUrl: http://localhost:5560
-    baseHost: http://localhost:5560
-  features:
-    skipEnvValidation: true
-  telemetry:
-    metrics:
-      enabled: false
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
+Edit `langwatch/.env` to customize your deployment. Key variables:
 
-langwatch_nlp:
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1500m
-      memory: 2Gi
-
-langevals:
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1.5Gi
-    limits:
-      cpu: 2000m
-      memory: 3Gi
-
-postgresql:
-  chartManaged: true
-  auth:
-    username: postgres
-    password: dev-postgres-password
-    database: langwatch
-  primary:
-    persistence:
-      enabled: false
-
-redis:
-  chartManaged: true
-  auth:
-    password: dev-redis-password
-  master:
-    persistence:
-      enabled: false
-
-opensearch:
-  chartManaged: true
-  replicas: 1
-  persistence:
-    enabled: false
-
-prometheus:
-  chartManaged: true
+```bash
+# Required: generate a secret for each
+API_TOKEN_JWT_SECRET=your-jwt-secret
+CREDENTIALS_SECRET=your-encryption-key
+NEXTAUTH_SECRET=your-session-secret
 ```
 
-### Half-managed (external PostgreSQL; chart-managed Redis/OpenSearch/Prometheus)
+See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
-- No autogen
-- External PostgreSQL via connection string
-- Chart-managed Redis/OpenSearch/Prometheus
+## Common Operations
+
+### Start in the background
+
+```bash
+docker compose up -d
+```
+
+### View logs
+
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f app
+```
+
+### Stop services
+
+```bash
+docker compose down
+```
+
+### Update to latest version
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### Reset data
+
+```bash
+docker compose down -v  # Removes volumes (all data)
+docker compose up
+```
+
+## Customization
+
+### Disable optional services
+
+If you don't need NLP or evaluators, comment them out in `compose.yml`:
 
 ```yaml
-# values.half-managed.yaml
-global:
-  env: production
+services:
+  # langwatch_nlp:
+  #   ...
+  # langevals:
+  #   ...
+```
+
+Remove the corresponding upstream URLs from the app environment to avoid connection errors.
+
+### Connect to external databases
+
+Replace the `postgres` and `redis` services with connection strings to your existing instances:
+
+```yaml
+services:
+  app:
+    environment:
+      DATABASE_URL: postgresql://user:password@your-postgres:5432/langwatch
+      REDIS_URL: redis://:password@your-redis:6379
+    depends_on: []  # Remove postgres and redis dependencies
+```
+
+### Connect to external ClickHouse
+
+Replace the `clickhouse` service with a connection string to your existing instance:
+
+```yaml
+services:
+  app:
+    environment:
+      CLICKHOUSE_URL: http://user:password@your-clickhouse:8123/langwatch
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Remove clickhouse from depends_on
+```
+
+## Limitations
+
+Docker Compose is suitable for evaluation and small teams but lacks:
+
+- **High availability** — single instance of each service
+- **Horizontal scaling** — cannot scale workers independently
+- **Automated backups** — no built-in backup scheduling
+- **TLS** — no built-in HTTPS (use a reverse proxy like nginx or Caddy)
+
+For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/kubernetes-helm).
+
+## Next Steps
+
+- [Docker Images](/self-hosting/deployment/docker-images) — Learn about each container image
+- [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) — Production deployment
+- [Environment Variables](/self-hosting/configuration/environment-variables) — Full configuration reference
+
+---
+
+# FILE: ./self-hosting/deployment/docker-images.mdx
+
+---
+title: Docker Images
+description: "LangWatch Docker image reference — what each container does and how they communicate"
+---
+
+LangWatch is distributed as three Docker images, each serving a distinct role in the platform.
+
+## Images
+
+### langwatch/langwatch
+
+The main application image. Used for both LangWatch App and LangWatch Workers. Handles the web UI, REST API, OTel trace ingestion, and authentication.
+
+| | |
+|---|---|
+| **Port** | 5560 |
+| **Base** | `node:24-alpine` |
+| **Entrypoint** | `pnpm start` |
+| **Workers** | In Kubernetes, Workers run as a separate Deployment using the same image with `pnpm start:workers`. |
+
+**What it does:**
+- Serves the LangWatch web UI (Next.js)
+- Exposes REST and OTel APIs for trace ingestion from SDKs
+- Handles authentication (NextAuth.js with email or SSO providers)
+- Queries ClickHouse for analytics, dashboards, and trace search
+- Manages the control plane via PostgreSQL (Prisma ORM)
+- Broadcasts real-time updates via Server-Sent Events (SSE)
+
+### langwatch/langwatch_nlp
+
+Python service for natural language processing tasks.
+
+| | |
+|---|---|
+| **Port** | 5561 |
+| **Base** | Python |
+| **Callbacks** | Calls back to the app at the URL configured via `LANGWATCH_ENDPOINT` |
+
+**What it does:**
+- Runs Optimization Studio workflows
+- Executes topic clustering algorithms
+- Handles custom evaluator execution
+- Processes NLP tasks (embeddings, text analysis)
+
+### langwatch/langevals
+
+Python service providing the built-in evaluator library.
+
+| | |
+|---|---|
+| **Port** | 5562 |
+| **Base** | Python |
+| **Memory** | Higher memory requirements due to model loading (default: 6Gi request, 8Gi limit) |
+
+**What it does:**
+- LLM-as-a-Judge evaluators (boolean, category, score)
+- RAG evaluators (faithfulness, context precision, context recall, answer relevancy)
+- Safety evaluators (content safety, jailbreak detection, PII detection)
+- Quality evaluators (summarization, query resolution, semantic similarity)
+- Custom evaluators (exact match, BLEU/ROUGE scores, format validation)
+
+<Note>
+LangEvals calls external LLM providers (OpenAI, Azure OpenAI, Google) to run model-based evaluations. Ensure your evaluator pods have network access to these providers, or configure your own provider credentials via the Helm chart.
+</Note>
+
+### Additional Images
+
+The Helm chart also deploys:
+
+- `langwatch/clickhouse-serverless` — Performance-tweaked ClickHouse image optimized for LangWatch's event ingestion and analytical query patterns
+
+## Service Communication
+
+```mermaid
+graph LR
+    SDK["Your LLM App<br/>(SDK)"] -->|OTel / REST| App["LangWatch App<br/>:5560"]
+    App -->|enqueue jobs| Redis["Redis<br/>:6379"]
+    Workers["Workers"] -->|consume jobs| Redis
+    Workers -->|write events| CH["ClickHouse<br/>:8123"]
+    Workers -->|SSE broadcast| App
+    Workers -->|evaluation requests| Evals["LangEvals<br/>:5562"]
+    Workers -->|NLP tasks| NLP["NLP<br/>:5561"]
+    Evals -->|LLM calls| LLMs["External LLMs"]
+    NLP -->|LLM calls| LLMs
+    App -->|queries| CH
+    App -->|control plane| PG["PostgreSQL<br/>:5432"]
+    CronJobs["CronJobs"] -->|HTTP trigger| App
+```
+
+## Image Tags
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest stable release |
+| `x.y.z` (e.g. `3.0.0`) | Specific version (recommended for production) |
+| `local` | Built locally via `make images` (development only) |
+
+<Tip>
+Pin to a specific version tag in production to prevent unexpected changes during upgrades. Update deliberately using the [Upgrade Guide](/self-hosting/upgrade).
+</Tip>
+
+## Private Registries
+
+For air-gapped or private environments, mirror the images to your own registry:
+
+```bash
+# Pull from Docker Hub
+docker pull langwatch/langwatch:3.0.0
+docker pull langwatch/langwatch_nlp:3.0.0
+docker pull langwatch/langevals:3.0.0
+
+# Tag for your registry
+docker tag langwatch/langwatch:3.0.0 registry.example.com/langwatch/langwatch:3.0.0
+docker tag langwatch/langwatch_nlp:3.0.0 registry.example.com/langwatch/langwatch_nlp:3.0.0
+docker tag langwatch/langevals:3.0.0 registry.example.com/langwatch/langevals:3.0.0
+
+# Push
+docker push registry.example.com/langwatch/langwatch:3.0.0
+docker push registry.example.com/langwatch/langwatch_nlp:3.0.0
+docker push registry.example.com/langwatch/langevals:3.0.0
+```
+
+Then configure the Helm chart:
+
+```yaml
+images:
+  app:
+    repository: registry.example.com/langwatch/langwatch
+    tag: "3.0.0"
+  langwatch_nlp:
+    repository: registry.example.com/langwatch/langwatch_nlp
+    tag: "3.0.0"
+  langevals:
+    repository: registry.example.com/langwatch/langevals
+    tag: "3.0.0"
+
+imagePullSecrets:
+  - name: registry-credentials
+```
+
+---
+
+# FILE: ./self-hosting/deployment/kubernetes-helm.mdx
+
+---
+title: Kubernetes (Helm)
+description: "Production Kubernetes deployment with the LangWatch Helm chart"
+---
+
+Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The chart supports everything from single-node development to highly-available production with replicated ClickHouse.
+
+## Prerequisites
+
+- Kubernetes 1.28+
+- Helm 3.12+
+- `kubectl` configured for your cluster
+- A StorageClass that supports dynamic provisioning (for persistent volumes)
+- A domain name (for Ingress with TLS)
+- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+
+## Quick Start
+
+Deploy LangWatch with all dependencies managed by the chart:
+
+```bash
+# Add the Helm repository
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+
+# Install with auto-generated secrets (development only)
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch --create-namespace \
+  --set autogen.enabled=true \
+  --wait --timeout 10m
+```
+
+Verify the installation:
+
+```bash
+kubectl -n langwatch get pods
+```
+
+Port-forward to access the UI:
+
+```bash
+kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
+# Open http://localhost:5560
+```
+
+<Warning>
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production — secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+</Warning>
+
+## Low-Resources Deployment
+
+The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
+
+```bash
+curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
+
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch --create-namespace \
+  --set autogen.enabled=true \
+  -f size-dev.yaml \
+  --wait --timeout 10m
+```
+
+This configures smaller resource limits, single replicas, and disables evaluator preloading to reduce memory usage. Suitable for development, demos, and small teams.
+
+## Production Deployment
+
+For production, you should:
+1. Use external managed databases (PostgreSQL, Redis)
+2. Create Kubernetes Secrets manually
+3. Expose via Ingress with TLS
+4. Disable auto-generation
+
+### 1. Create Secrets
+
+Create a Kubernetes Secret with your application secrets:
+
+```bash
+kubectl create namespace langwatch
+
+kubectl create secret generic langwatch-secrets \
+  --namespace langwatch \
+  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+  --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
+  --from-literal=cronApiKey=$(openssl rand -hex 32)
+```
+
+For external databases, create additional secrets:
+
+```bash
+# PostgreSQL (RDS, Cloud SQL, etc.)
+kubectl create secret generic langwatch-db \
+  --namespace langwatch \
+  --from-literal=connectionString="postgresql://user:password@host:5432/langwatch"
+
+# Redis (ElastiCache, Memorystore, etc.)
+kubectl create secret generic langwatch-redis \
+  --namespace langwatch \
+  --from-literal=connectionString="redis://:password@host:6379"
+```
+
+### 2. Create a Values File
+
+Start from the production example and customize. This configuration requests approximately **~8.5 CPU and ~28 Gi RAM** across all pods:
+
+```yaml
+# values-production.yaml
 
 autogen:
   enabled: false
 
+secrets:
+  existingSecret: langwatch-secrets
+
 app:
+  replicaCount: 2
   http:
-    publicUrl: https://langwatch.example.com
-    baseHost: https://langwatch.example.com
-  credentialsEncryptionKey:
-    secretKeyRef:
-      name: langwatch-secrets
-      key: credentialsEncryptionKey
-  cronApiKey:
-    secretKeyRef:
-      name: langwatch-secrets
-      key: cronApiKey
-  nextAuth:
-    secret:
-      secretKeyRef:
-        name: langwatch-secrets
-        key: nextAuthSecret
-  telemetry:
-    metrics:
-      enabled: true
-      apiKey:
-        secretKeyRef:
-          name: langwatch-secrets
-          key: metricsApiKey
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
+  resources:
+    requests: { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 1
 
 workers:
+  enabled: true
   replicaCount: 2
   resources:
-    requests:
-      cpu: 500m
-      memory: 2Gi
-    limits:
-      cpu: 2000m
-      memory: 4Gi
+    requests: { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 1
 
+# External PostgreSQL
+postgresql:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-db
+        key: connectionString
+
+# External Redis
+redis:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-redis
+        key: connectionString
+
+# Chart-managed ClickHouse (production sizing)
+clickhouse:
+  cpu: 4
+  memory: "8Gi"
+  storage:
+    size: 100Gi
+
+# Ingress with TLS
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
   hosts:
     - host: langwatch.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
   tls:
-    - hosts:
+    - secretName: langwatch-tls
+      hosts:
         - langwatch.example.com
-      secretName: langwatch-tls
+
+# Prometheus monitoring
+prometheus:
+  chartManaged: true
+  server:
+    retention: 30d
+    persistentVolume:
+      size: 20Gi
+```
+
+### 3. Install
+
+```bash
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+### 4. Verify
+
+```bash
+# Check all pods are running
+kubectl -n langwatch get pods
+
+# Check ingress
+kubectl -n langwatch get ingress
+
+# Check logs
+kubectl -n langwatch logs deploy/langwatch-app --tail=50
+```
+
+## High-Availability Deployment
+
+For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~36 CPU and ~84 Gi RAM** across all pods:
+
+```yaml
+# values-ha.yaml (extends production values above)
+
+app:
+  replicaCount: 3
+  podDisruptionBudget:
+    minAvailable: 2
+
+workers:
+  replicaCount: 3
+  podDisruptionBudget:
+    minAvailable: 2
+
+langwatch_nlp:
+  replicaCount: 2
+  podDisruptionBudget:
+    minAvailable: 1
+
+langevals:
+  replicaCount: 2
+  podDisruptionBudget:
+    minAvailable: 1
+
+# 3-node replicated ClickHouse with Keeper
+clickhouse:
+  replicas: 3
+  cpu: 8
+  memory: "16Gi"
+  storage:
+    size: 300Gi
+    storageClass: gp3
+
+  # Cold storage and backups
+  objectStorage:
+    bucket: "langwatch-data"
+    region: "us-east-1"
+    useEnvironmentCredentials: true
+  cold:
+    enabled: true
+    defaultTtlDays: 49
+  backup:
+    enabled: true
 
 postgresql:
   chartManaged: false
   external:
     connectionString:
       secretKeyRef:
-        name: pg-conn
-        key: url
+        name: langwatch-db
+        key: connectionString
 
 redis:
-  chartManaged: true
-  auth:
-    password: change-me # or use an existing Secret
-  master:
-    persistence:
-      enabled: true
-      size: 10Gi
-
-opensearch:
-  chartManaged: true
-  replicas: 1
-  persistence:
-    enabled: true
-    size: 20Gi
-
-prometheus:
-  chartManaged: true
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-redis
+        key: connectionString
 ```
-
-## Install
 
 ```bash
-# (Optional) dedicated namespace
-kubectl create namespace langwatch
-
-# Install using your chosen values file
-helm install langwatch langwatch/langwatch-helm \
-  -n langwatch \
-  -f values.prod.yaml # or values.dev.yaml, values.half-managed.yaml, values.minimal.yaml
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-ha.yaml \
+  --wait --timeout 15m
 ```
 
-<Check>
-All pods should become Ready. Use `kubectl get pods -n langwatch`.
-</Check>
+<Note>
+Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. 3 replicas is recommended for most deployments.
+</Note>
 
-## Access the UI (local dev)
+## Overlay System
+
+The chart ships with composable overlay files in `examples/overlays/`. Combine them to build your deployment configuration:
+
+### Size Overlays
+
+| Overlay | Use Case | Approx Resources (requests) |
+|---------|----------|-----------------|
+| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
+| `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
+| `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
+
+### Access Overlays
+
+| Overlay | Description |
+|---------|-------------|
+| `access-nodeport.yaml` | NodePort on 30560 (Kind, bare-metal) |
+| `access-ingress.yaml` | Nginx Ingress with TLS template |
+
+### Infrastructure Overlays
+
+| Overlay | Description |
+|---------|-------------|
+| `postgres-external.yaml` | External PostgreSQL (RDS, Cloud SQL) |
+| `redis-external.yaml` | External Redis (ElastiCache, Memorystore) |
+| `clickhouse-external.yaml` | External ClickHouse instance |
+| `clickhouse-replicated.yaml` | 3-node replicated ClickHouse |
+| `cold-storage-s3.yaml` | S3 cold storage + backups |
+| `local-images.yaml` | Local images with `pullPolicy: Never` |
+
+### Composing Overlays
+
+Overlays are composable — later files override earlier ones:
 
 ```bash
-kubectl port-forward svc/langwatch-app -n langwatch 5560:5560
+# Production with external DBs and S3 cold storage
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/access-ingress.yaml \
+  -f examples/overlays/postgres-external.yaml \
+  -f examples/overlays/redis-external.yaml \
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set autogen.enabled=true
 ```
 
-Open `http://localhost:5560`.
+## ClickHouse Configuration
+
+### Standalone vs Replicated
+
+| Mode | Replicas | Engine | When to Use |
+|------|----------|--------|-------------|
+| Standalone | 1 | MergeTree | Development, small production |
+| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production |
+
+Switch to replicated mode:
+
+```yaml
+clickhouse:
+  replicas: 3  # Automatically uses ReplicatedMergeTree + Keeper
+```
+
+### External ClickHouse
+
+To use an existing ClickHouse instance:
+
+```yaml
+clickhouse:
+  chartManaged: false
+  external:
+    url:
+      value: "http://user:password@clickhouse-host:8123/langwatch"
+    # For replicated instances:
+    clusterName: "my_cluster"
+```
+
+### Auto-Tuning
+
+The `clickhouse-serverless` subchart automatically tunes ClickHouse parameters based on the CPU and memory you allocate:
+
+```yaml
+clickhouse:
+  cpu: 4        # Tunes thread pools, merge concurrency
+  memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
+```
+
+You only need to set these two values — the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
 ## Upgrade
 
 ```bash
 helm repo update
-helm upgrade langwatch langwatch/langwatch-helm \
-  -n langwatch \
-  -f values.prod.yaml # or your chosen values file
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
 ```
 
-### Migration from Pre-1.0.0 Helm Charts
+Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
 
-<Warning>
-If you're upgrading from a LangWatch Helm chart version before 1.0.0, you may need to preserve your existing PostgreSQL data.
-</Warning>
-
-Preserve existing data by setting `postgresql.primary.persistence.existingClaim` in your values file:
-
-```yaml
-postgresql:
-  primary:
-    persistence:
-      existingClaim: "data-langwatch-postgres-0"
-      size: 20Gi
-```
-
-This will prevent data loss during the upgrade process.
+See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 
 ## Uninstall
 
 ```bash
-helm uninstall langwatch -n langwatch
-kubectl delete namespace langwatch
+helm uninstall langwatch --namespace langwatch
 ```
+
+<Warning>
+This does not delete PersistentVolumeClaims. Your data in PostgreSQL, ClickHouse, and Redis PVCs is preserved. Delete them manually if you want a clean removal:
+
+```bash
+kubectl -n langwatch delete pvc --all
+```
+</Warning>
 
 ## FAQ
 
-<AccordionGroup>
-<Accordion title="Istio/service mesh: wait-for-opensearch job fails">
-If your cluster uses Istio sidecar injection, the pre-install job `wait-for-opensearch` can fail because the job may start before the Istio proxy is ready and cannot reach OpenSearch.
+### Istio / Service Mesh
 
-<Warning>
-Workarounds:
-</Warning>
+If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
 
-- Disable sidecar injection for the job/pod:
+Disable sidecar injection for CronJobs:
 
 ```yaml
-metadata:
-  annotations:
-    sidecar.istio.io/inject: "false"
+cronjobs:
+  pod:
+    annotations:
+      sidecar.istio.io/inject: "false"
 ```
 
-- Or allow egress to OpenSearch by excluding port 9200 from Envoy interception:
+### Custom StorageClass
+
+Set a StorageClass for all persistent volumes:
 
 ```yaml
-metadata:
-  annotations:
-    traffic.sidecar.istio.io/excludeOutboundPorts: "9200"
+clickhouse:
+  storage:
+    storageClass: "gp3"
+postgresql:
+  primary:
+    persistence:
+      storageClass: "gp3"
+redis:
+  master:
+    persistence:
+      storageClass: "gp3"
 ```
 
-Alternatively, configure an Istio `ServiceEntry`/egress policy for your OpenSearch endpoint.
-</Accordion>
-</AccordionGroup>
+### Air-Gapped Environments
+
+For clusters without internet access:
+1. Push LangWatch images to your private registry
+2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
+3. Set `imagePullSecrets` if your registry requires authentication
 
 ---
 
-# FILE: ./self-hosting/onprem.mdx
+# FILE: ./self-hosting/deployment/kubernetes-local.mdx
 
 ---
-title: OnPrem
-description: Deploy LangWatch on-premises for full control over data, compliance, and secure AI agent evaluation workflows.
+title: Local Kubernetes (Kind + Helm)
+description: "Run LangWatch locally on Kind for development and testing"
 ---
 
-<img src="/images/onprem-logo.png" alt="LangWatch On Prem" width="400px" style={{marginTop: "50px"}} />
+Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) cluster. This is useful for testing the Helm chart, evaluating LangWatch in a Kubernetes environment, or developing against a production-like setup.
 
+> **Looking for production deployment?** If you want to deploy LangWatch to a real cluster with prebuilt images (no local build required), see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) instead. This page covers the local Kind workflow which builds images from source.
 
-### Key Features
+> **Developing LangWatch itself?** The `make dev` commands in the repo root use docker-compose and are faster for day-to-day development. This Kind workflow is for testing the Helm chart packaging and Kubernetes-specific behavior.
 
-- Self-hosted on your AWS, Google Cloud, Azure or any other instances
-- Full control over your data
-- Feature parity with the SaaS version
-- Scalable to enterprise needs
-- Hosted in preferred region (e.g. eu-central-1 for GDPR compliance)
-- Installation and maintenance service
-- Dedicated support agent to help you optimize your deployment
-- Purchase and billing option through AWS Marketplace to facilitate procurement
+## Prerequisites
 
-## Infrastructure Diagram
+- [Docker](https://docs.docker.com/get-docker/) (running, with at least **16 GB RAM** and **20 GB free disk** allocated)
+- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) v0.20+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/) 3.12+
+- `make` (included on macOS and most Linux distributions)
 
-Check out below a high-level diagram of how the LangWatch on-premises infrastructure is deployed on the cloud provider.
+> **Note:** The first image build (especially the Next.js app) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
 
+## Quick Start
 
-  ### AWS
+```bash
+git clone https://github.com/langwatch/langwatch.git
+cd langwatch/charts/langwatch
+make example-up
+```
 
-    <Frame>
-    <img
-      className="block"
-      src="/images/aws-infra.png"
-      alt="LangWatch"
-    />
-    </Frame>
+This will:
+1. Create a Kind cluster named `lw-local` (if it doesn't exist)
+2. Build all Docker images locally (if not already built — first build takes 15-30 min)
+3. Load images into the Kind cluster
+4. Install the Helm chart with `values-local.yaml` into the `lw-local` namespace
 
-  ### Azure
+Access LangWatch at **http://localhost:30560**.
 
-    <Frame>
-    <img
-      className="block"
-      src="/images/azure-infra.png"
-      alt="LangWatch"
-    />
-    </Frame>
+## Manual Setup
 
+If you prefer to run each step manually:
 
+### 1. Create a Kind Cluster
 
-The diagram above outlines the overall architecture of LangWatch deployed OnPrem and the network boundaries. In short, all LangWatch components live in its own private network, with access control in between each component to make sure only the components that must have access to each other do have access.
+```bash
+kind create cluster --name lw-local \
+  --config charts/lib/kind-config.yaml \
+  --wait 60s
+```
 
-Only the main application frontend port is exposed via a Load Balancer, which can be positioned either on a public subnet or VPN-protected company access for users access.
-To run LangWatch, 4 pods are required: the main LangWatch application, the workers that processes traces and real evaluations, the LangEvals service that holds the evaluators and some eval models, and the LangWatchNLP pod that runs the evals and optimization studio workflows.
+The Kind config maps port 30560 on your host to a NodePort inside the cluster.
 
-The basic user storage database is Postgres, with ElasticSearch being the main storage for all the traces and evaluations for heavy scalability. Redis is used as a queue mechanism for accumulating and processing the traces as they arrive, guaranteeing delivery, retrial, back pressure and so on. Finally, blob storage is used to store datasets created on the platform and Communication Services for Email, specially for alerts and system notifications.
+### 2. Build and Load Images
 
-On AWS, all those components are natively available, and on Google Cloud and Azure, all but ElasticSearch/OpenSearch are natively available, however around 80% of Fortune 500 companies already have an ElasticSearch in-house, so it's likely this setup is already done for you and your customers.
+```bash
+cd charts/langwatch
 
-## Data Flow Diagram
+# Build all images
+make images
 
-To understand how the data flows through the platform, check out the diagram below:
+# Load into Kind
+make images-local
+```
 
-<Frame>
-<img
-  className="block"
-  src="/images/data-flow-diagram.png"
-  alt="LangWatch"
-/>
-</Frame>
+This builds four images:
+- `langwatch/langwatch:local` — App
+- `langwatch/langwatch_nlp:local` — NLP service
+- `langwatch/langevals:local` — Evaluators
+- `langwatch/clickhouse-serverless:next` — ClickHouse
 
-In short, the data is collected from your application in the background, via the LangWatch SDK, from this moment on everything happens inside the platform. The only moment it leaves the platform again, is for running evaluations with your own LLM providers and API keys.
+### 3. Install the Helm Chart
 
-As data comes in, the traces are enqueued in the Redis queue, and then processed by the workers which then stores it in ElasticSearch/OpenSearch, the main application reads from this data to display it in the UI. LangEvals and LangWatchNLP components never talk to the databases directly.
+```bash
+# Update chart dependencies
+make deps
 
-## Proof of Concept Setup
+# Install with local values
+helm upgrade --install lw . \
+  -f examples/values-local.yaml \
+  --wait --timeout 10m
+```
 
-Our permissive license allows you to run a proof of concept of LangWatch on your own infrastructure before getting to production while commercial negotiations are ongoing, please reach out to our team to get started and we can help unblock you as soon as possible.
+### 4. Verify
 
-### Setup
+```bash
+# Check pod status
+make example-status
 
-Schedule a free consultation with our team to get started on the On-Prem setup:
+# Or directly:
+kubectl -n lw-local get pods
+```
 
-<div style={{fontSize: "18px", marginBottom: "56px"}}>
-[Schedule a Call](https://get.langwatch.ai/request-a-demo)
-</div>
+All pods should reach `Running` status within a few minutes.
+
+## Profiles
+
+The Makefile supports multiple profiles via the `PROFILE` variable:
+
+```bash
+make example-up PROFILE=local           # Default: all-in-one local dev
+make example-up PROFILE=hosted-dev      # Simulates cloud dev environment
+make example-up PROFILE=hosted-prod     # Simulates production (requires external DBs)
+make example-up PROFILE=scalable-prod   # Simulates HA production
+make example-up PROFILE=test            # CI integration testing
+```
+
+Each profile uses the corresponding `examples/values-{profile}.yaml` file.
+
+## What's Included
+
+The `values-local.yaml` profile deploys:
+
+| Component | Replicas | Notes |
+|-----------|----------|-------|
+| LangWatch App | 1 | NodePort on 30560 |
+| LangWatch Workers | 1 | Separate pod |
+| LangWatch NLP | 1 | |
+| LangEvals | 1 | |
+| PostgreSQL | 1 | Chart-managed |
+| ClickHouse | 1 | Chart-managed, standalone |
+| Redis | 1 | Chart-managed |
+
+- `autogen.enabled: true` — secrets are auto-generated
+- `pullPolicy: Never` — uses locally-built images
+- Prometheus is disabled to save resources
+
+## Teardown
+
+```bash
+# Remove the Helm release
+make example-down
+
+# Delete the Kind cluster entirely
+make clean
+```
+
+## Troubleshooting
+
+**Pods stuck in `ImagePullBackOff`:**
+Images haven't been loaded into Kind. Run `make images-local`.
+
+**Port 30560 not accessible:**
+Ensure the Kind cluster was created with the port mapping config (`charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
+
+**Pods stuck in `Pending`:**
+Check if your Docker daemon has enough resources. Kind needs at least 4 CPU and 8 GB RAM allocated to Docker (16 GB if building images locally).
+
+**Slow startup:**
+First-time image builds take several minutes. Subsequent `make example-up` runs reuse cached images and are much faster.
+
+## Next Steps
+
+- [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm) — Deploy to a real cluster
+- [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling) — Resource recommendations
+
+---
+
+# FILE: ./self-hosting/infrastructure/architecture.mdx
+
+---
+title: Architecture & Infrastructure
+description: "How LangWatch components fit together — what you're deploying and how data flows through the system"
+---
+
+This page explains what you're deploying when you self-host LangWatch — the components, how they connect, and how data moves through the system. Understanding this will help you size, operate, and debug your deployment.
+
+## System Overview
+
+```mermaid
+---
+config:
+  layout: elk
+---
+architecture-beta
+    service llmApp(internet)[Your LLM App]
+
+    group platform(cloud)[Your Infrastructure]
+
+    service app(server)[LangWatch App] in platform
+    service postgres(database)[PostgreSQL] in platform
+    service redis(database)[Redis BullMQ] in platform
+
+    group eventSourcing(server)[Event Sourcing Pipeline] in platform
+    service spanPipe(disk)[Ingestion and Enrichment] in eventSourcing
+    service evalPipe(disk)[Evaluations and Experiments] in eventSourcing
+    service reactionPipe(disk)[Reactions and Triggers] in eventSourcing
+
+    group dataLayer(database)[Data Layer] in platform
+    service clickhouse(database)[ClickHouse] in dataLayer
+    service s3(disk)[S3 Cold Storage] in dataLayer
+
+    service nlp(server)[LangWatch NLP] in platform
+    service langevals(server)[LangEvals] in platform
+
+    service llmProviders(cloud)[External LLMs]
+    service notify(internet)[Slack Email Webhooks]
+
+    llmApp:B --> T:app
+    app:B --> T:redis
+    app:R --> L:postgres
+    redis:B --> T:spanPipe
+    spanPipe:R --> L:clickhouse
+    evalPipe:B --> T:langevals
+    langevals:R --> L:llmProviders
+    nlp:R --> L:llmProviders
+    reactionPipe:B --> T:notify
+    clickhouse:R --> L:s3
+```
+
+<CardGroup cols={3}>
+<Card title="API Layer" icon="globe">
+**LangWatch App** (:5560)
+
+Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The only externally-exposed component.
+</Card>
+<Card title="Processing" icon="microchip">
+**LangWatch Workers**
+
+Event sourcing pipeline via BullMQ — span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
+</Card>
+<Card title="Services" icon="flask">
+**LangWatch NLP** (:5561) and **LangEvals** (:5562)
+
+NLP workflows, topic clustering, built-in evaluators, guardrails. Call external LLMs for model-based operations.
+</Card>
+<Card title="Control Plane" icon="database">
+**PostgreSQL**
+
+Users, teams, projects, configurations, prompt versions. Managed via Prisma with auto-migrations.
+</Card>
+<Card title="Data Plane" icon="chart-bar">
+**ClickHouse**
+
+All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold storage on S3. Auto-tuned via the clickhouse-serverless subchart.
+</Card>
+<Card title="Queue & Storage" icon="layer-group">
+**Redis** — BullMQ job queue, caching, sessions.
+
+**S3** — ClickHouse cold storage, backups, datasets.
+</Card>
+</CardGroup>
+
+## Components
+
+### LangWatch App (port 5560)
+
+Next.js server — the single external entry point for all traffic:
+
+- **Web UI** — dashboards, trace explorer, prompt management, experiment views
+- **REST API + OTel ingestion** — receives spans from LangWatch SDKs
+- **Authentication** — NextAuth.js (email, Google, GitHub, GitLab, Azure AD, Cognito, Okta)
+- **SSE** — pushes real-time updates to connected browser clients
+- **Analytics queries** — reads from ClickHouse
+- **Control plane** — manages users, teams, projects via PostgreSQL
+
+### LangWatch Workers
+
+Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jobs from a BullMQ queue in Redis and runs the event sourcing pipeline (see below).
+
+- Deployed as a separate Kubernetes Deployment
+- Stateless — scale by adding replicas
+
+### LangWatch NLP (port 5561)
+
+Python service for:
+
+- Optimization Studio workflow execution
+- Topic clustering algorithms
+- Custom evaluator execution
+
+### LangEvals (port 5562)
+
+Built-in evaluator library (Python):
+
+- LLM-as-a-Judge (boolean, categorical, scored)
+- Safety (content safety, jailbreak detection, prompt shield)
+- Quality (faithfulness, relevancy, correctness, summarization)
+- RAG (context precision, context recall, context relevancy)
+- Format (exact match, BLEU, ROUGE, semantic similarity)
+
+Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
+
+### PostgreSQL — Control Plane
+
+Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
+
+### ClickHouse — Data Plane
+
+Stores all high-volume data: traces, spans, evaluations, experiments, analytics, and event sourcing events/projections.
+
+| Mode | Replicas | Engine | Use Case |
+|------|----------|--------|----------|
+| Standalone | 1 | MergeTree | Dev, small production |
+| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production |
+
+The `clickhouse-serverless` subchart auto-tunes internal parameters from two inputs: `cpu` and `memory`.
+
+The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked ClickHouse build optimized for LangWatch's traffic patterns — high-throughput event ingestion with concurrent analytical queries.
+
+**Tiered storage**: hot data on local SSD, cold data on S3 after a configurable TTL (default 49 days). Native `BACKUP`/`RESTORE` to S3.
+
+### Redis
+
+- **BullMQ job queue** — connects the App to Workers with guaranteed delivery, retry, and backpressure
+- **Caching** — frequently accessed config and lookup data
+- **Sessions** — user session storage
+
+### S3 / Object Storage
+
+- ClickHouse cold storage (tiered after TTL)
+- ClickHouse backups (full + incremental)
+- Dataset storage (optional)
+
+## Event Sourcing Pipeline
+
+LangWatch v3 uses an event-sourcing model for data processing. Understanding this helps with debugging and capacity planning.
+
+When a span arrives from your SDK, it enters a pipeline of independent steps running on the Workers:
+
+```mermaid
+graph LR
+    subgraph Ingestion
+        A[Span Ingestion] --> B[Trace Summarisation]
+    end
+
+    subgraph Enrichment
+        B --> C[LLM Cost Enrichment]
+        B --> D[LLM Metric Processing]
+        B --> E[Embedding Extraction]
+        B --> F[PII Redaction]
+    end
+
+    subgraph Evaluation
+        C --> G[Evaluation Execution]
+        D --> G
+        G --> H[Annotation Processing]
+        G --> I[Experiment Processing]
+    end
+
+    subgraph Reactions
+        I --> J[Generate Topics]
+        I --> K[Automation / Triggers]
+        I --> L[UI Update Broadcasting]
+    end
+
+    L --> M[(ClickHouse)]
+    K --> M
+    J --> M
+```
+
+Each step reads from the queue, does its work, and writes results to ClickHouse. Steps are independent — if one is slow (e.g., evaluation waiting on an LLM call), others continue processing.
+
+### How Data is Organized
+
+The pipeline produces three types of output:
+
+**Events** — immutable records of what happened. Stored in ClickHouse and never modified.
+
+| Event | Produced By | What It Contains |
+|-------|------------|------------------|
+| SpanIngested | Span Ingestion | Raw span data from SDK |
+| TraceSummarised | Trace Summarisation | Aggregated trace with input/output |
+| CostEnriched | LLM Cost Enrichment | Token costs per model |
+| MetricsExtracted | LLM Metric Processing | Latency, token counts, model info |
+| EmbeddingsGenerated | Embedding Extraction | Vector embeddings for similarity |
+| PIIRedacted | PII Redaction | Redacted fields and detection metadata |
+| EvaluationCompleted | Evaluation Execution | Evaluator scores and results |
+| ExperimentResultRecorded | Experiment Processing | Run results for A/B tests |
+
+**Projections** — derived tables that dashboards and APIs read from. Built from events.
+
+| Projection | Built From | Used By |
+|-----------|-----------|---------|
+| Traces | SpanIngested + TraceSummarised | Trace explorer, search |
+| Spans | SpanIngested | Span detail views |
+| Evaluations | EvaluationCompleted | Quality scores, monitors |
+| ExperimentRuns | ExperimentResultRecorded | Experiment result tables |
+| Analytics | All events | Dashboard aggregations |
+| Topics | TraceSummarised + clustering | Conversation topic groups |
+
+**Reactions** — side effects triggered during processing.
+
+| Reaction | Triggered By | Effect |
+|----------|-------------|--------|
+| SSE Update | Any event | Real-time UI refresh in browser |
+| Alert / Trigger | EvaluationCompleted | Slack, email, webhook notification |
+| Dataset Append | Automation rules | Auto-add traces to datasets |
+
+<Note>
+If Worker queue depth grows in Redis, it means processing is falling behind ingestion. The fix is to add more Worker replicas — each one is stateless and consumes jobs independently.
+</Note>
+
+## Data Flow
+
+```mermaid
+sequenceDiagram
+    participant App as Your LLM App
+    participant LW as LangWatch App
+    participant Redis as Redis (BullMQ)
+    participant W as Workers
+    participant CH as ClickHouse
+    participant LE as LangEvals
+    participant Browser as Browser (UI)
+
+    App->>LW: Send spans (OTel / REST)
+    LW->>Redis: Enqueue span ingestion job
+    Redis->>W: Worker picks up job
+    W->>W: Pipeline steps (enrich, evaluate, etc.)
+    W->>CH: Write events + projections
+    W->>LE: Request evaluation (if configured)
+    LE-->>W: Evaluation scores
+    W->>CH: Write evaluation results
+    W->>LW: SSE broadcast
+    LW->>Browser: Real-time update
+```
+
+Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
+- **Topic clustering** — daily at midnight, via the NLP service
+- **Alert triggers** — every 3 minutes, evaluates monitor conditions
+- **Retention cleanup** — daily at 01:00, removes data past retention period
+
+## Network Topology
+
+Only the App is exposed externally. Everything else is cluster-internal:
+
+| Component | Service Type | External |
+|-----------|-------------|----------|
+| App | Ingress / LoadBalancer | Yes |
+| Workers | None (no Service needed) | No |
+| NLP | ClusterIP | No |
+| LangEvals | ClusterIP | No |
+| PostgreSQL | ClusterIP | No |
+| ClickHouse | ClusterIP | No |
+| Redis | ClusterIP | No |
+
+<Note>
+LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure these pods have network egress to the relevant endpoints.
+</Note>
+
+## Docker Images
+
+| Image | Port | Purpose |
+|-------|------|---------|
+| `langwatch/langwatch` | 5560 | App + Workers (same image, different entrypoint) |
+| `langwatch/langwatch_nlp` | 5561 | NLP, workflows, topic clustering |
+| `langwatch/langevals` | 5562 | Evaluators, guardrails |
+
+## OpenTelemetry Integration
+
+LangWatch is deeply integrated with OpenTelemetry. The platform both **consumes** and **exports** telemetry data:
+
+**Ingestion**: The LangWatch App accepts spans via the OpenTelemetry protocol (OTLP over HTTP). Any OTel-instrumented application can send traces to LangWatch without a vendor-specific SDK.
+
+**Export**: LangWatch exports its own operational metrics, logs, and traces via OpenTelemetry for infrastructure debugging:
+
+- **Metrics** — Prometheus-compatible metrics from the App and Workers (request latency, queue depth, error rates)
+- **Logs** — Structured application logs from all components
+- **Traces** — Distributed traces of internal request processing
+
+This means you can monitor LangWatch itself using the same observability stack you use for the rest of your infrastructure — Grafana, Datadog, New Relic, or any OTel-compatible backend.
+
+LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup details.
+
+## Deployment Models
+
+### Self-Managed
+
+Everything on your infrastructure. You deploy the Helm chart and manage all components.
+
+### Cloud Enterprise
+
+LangWatch manages the control plane in a dedicated, single-tenant environment. Exclusive data instances in your preferred region.
+
+### Hybrid (Bring Your Own Storage)
+
+LangWatch manages compute (App, Workers, NLP, LangEvals). You bring your own ClickHouse + S3 in your VPC.
+
+For Cloud Enterprise or Hybrid, [contact the LangWatch team](https://langwatch.ai/schedule-demo).
+
 ---
 
 # FILE: ./self-hosting/overview.mdx
 
 ---
-title: Overview
-description: LangWatch offers a fully self-hosted version of the platform for companies that require strict data control and compliance.
+title: Self-Hosting Overview
+description: "Deploy LangWatch on your own infrastructure for full data control"
 ---
 
-## LangWatch High-Level Architecture
+LangWatch is an open-source LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines. You can self-host LangWatch for full data sovereignty, regulatory compliance (GDPR, SOC 2), or air-gapped environments. The self-hosted edition runs the same software that powers LangWatch Cloud -- there is no separate "community" or "enterprise" build.
 
-Below is a high-level overview of the LangWatch architecture.
+<Tip>
+**Get the entire LangWatch platform running with a single Helm install:**
 
-<Frame>
-<img
-  className="block"
-  src="/images/simple-architecture.png"
-  alt="LangWatch"
-/>
-</Frame>
+```bash
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+helm pull langwatch/langwatch --untar
+helm install langwatch ./langwatch \
+  --namespace langwatch --create-namespace \
+  -f langwatch/examples/values-local.yaml
+```
 
-LangWatch is composed of a few core components:
+See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+</Tip>
 
-- **LangWatch App**: The main application and user interface for the platform.
-- **LangEvals**: The evaluation service for LangWatch built-in evaluators.
-- **LangWatch NLP**: The service the runs workflows and custom built evaluators in the platform.
-- **LangWatch Workers**: Background workers that process traces, trigger alerts, run real-time evaluations and so on. By default, workers are deployed as a separate pod for independent scaling.
-- **Redis**: A redis queue that coordinates and add resiliency for the traces to be processed.
-- **Elasticsearch/OpenSearch**: The main database for the platform, storing traces and evaluation results.
-- **PostgreSQL**: The core database for the platform, storing user accounts, teams, and other metadata.
+<Note>
+  Looking for a managed solution? [LangWatch Cloud](https://langwatch.ai) is fully maintained by the LangWatch team and is the fastest way to get started.
+</Note>
 
-Check out the [OnPrem](/self-hosting/onprem) page for more in-depth architecture information, and below you can find the deployment options for self-hosting LangWatch.
+## Architecture at a Glance
 
-## Deployment Options
+```mermaid
+graph LR
+    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
+    App -->|"enqueue"| Redis["Redis"]
+    Redis -->|"consume"| Workers["LangWatch Workers"]
+    Workers -->|"events &<br/>projections"| CH["ClickHouse"]
+    Workers -->|"evals"| Evals["LangEvals"]
+    Workers -->|"NLP"| NLP["LangWatch NLP"]
+    App -->|"queries"| CH
+    App -->|"control plane"| PG["PostgreSQL"]
+    CH -->|"cold storage"| S3["S3"]
+```
 
-<img src="/images/onprem-logo.png" alt="LangWatch On Prem" width="400px" style={{marginTop: "50px"}} />
+See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers.
 
-<img src="/images/onprem-clouds.png" alt="On Prem Clouds" width="200px" />
+## Deployment Models
 
-### Enterprise OnPrem Solution
+<CardGroup cols={2}>
+<Card title="LangWatch Cloud" icon="cloud">
+Fully managed by the LangWatch team. No infrastructure to manage — sign up and start sending traces in minutes.
 
-For organizations that require the data to never leave their own infrastructure, we offer a managed on-premise service.
+[Sign up at langwatch.ai](https://langwatch.ai)
+</Card>
 
-If you need to manage the installation yourself for compliance reasons, you can follow our detailed deployment instructions which we will provide after an [onboarding call](https://meetings-eu1.hubspot.com/manouk-draisma). However, granting our team temporary access to an isolated area of your infrastructure can streamline the process, ensuring a quick and efficient setup of LangWatch on your premises.
+<Card title="Self-Managed" icon="server">
+Deploy the complete LangWatch stack on your own infrastructure — AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
 
-Check out the [OnPrem](/self-hosting/onprem) page for more details.
+[Get started with Kubernetes](/self-hosting/deployment/kubernetes-helm)
+</Card>
 
-### Hybrid Setup
+<Card title="Cloud Enterprise" icon="building">
+LangWatch manages the application. Your data lives on exclusive, dedicated instances deployed in your preferred cloud region. The convenience of managed, with the isolation of self-hosted.
 
-We offer seamless integrations with S3-compatible storage and Elasticsearch, supporting both cloud and on-premise environments.
+[Contact sales](https://langwatch.ai/schedule-demo)
+</Card>
 
-For hybrid deployments, you can choose between a fully managed service on your infrastructure or a self-managed setup. If you need to retain full control for compliance or security reasons, our team will provide detailed deployment instructions after a brief [onboarding call](https://meetings-eu1.hubspot.com/manouk-draisma). To accelerate the setup, you may optionally grant us temporary access to an isolated environment within your infrastructure.
+<Card title="Hybrid" icon="arrows-split-up-and-left">
+LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 
-Check out the [Hybrid Setup](/hybrid-setup/overview) page for more details.
+[Learn more](/hybrid-setup/overview)
+</Card>
+</CardGroup>
+
+### At a Glance
+
+| | **Cloud** | **Self-Managed** | **Cloud Enterprise** | **Hybrid** |
+|---|:---:|:---:|:---:|:---:|
+| You manage infrastructure | | Yes | | |
+| You manage data storage | | Yes | Yes | Yes |
+| LangWatch manages app | Yes | | Yes | Yes |
+| Data stays in your network | | Yes | Yes | Yes |
+| Setup time | Minutes | Hours | Days | Days |
+
+## Quick Start
+
+Choose the deployment method that fits your environment.
+
+<CardGroup cols={3}>
+  <Card
+    title="Docker Compose"
+    icon="docker"
+    href="/self-hosting/deployment/docker-compose"
+  >
+    Quick local setup with Docker. Coming soon for v3 — currently available for v2.
+  </Card>
+  <Card
+    title="Kubernetes (Helm)"
+    icon="dharmachakra"
+    href="/self-hosting/deployment/kubernetes-helm"
+  >
+    Production deployment on any Kubernetes cluster.
+  </Card>
+  <Card
+    title="Local Kubernetes"
+    icon="laptop-code"
+    href="/self-hosting/deployment/kubernetes-local"
+  >
+    Test the Helm chart locally with Kind.
+  </Card>
+</CardGroup>
+
+## What's New in v3
+
+<Tip>
+  LangWatch v3 is a major architecture upgrade. If you are migrating from v2, review the deployment guides for updated requirements.
+</Tip>
+
+- **ClickHouse replaces Elasticsearch** as the primary data store, delivering faster analytical queries and lower operational overhead.
+- **Event-sourcing architecture** ensures reliable, ordered processing of traces, evaluations, and experiment runs.
+- **S3 cold storage tiering** moves older data to object storage automatically, reducing ClickHouse disk costs.
+- **Native ClickHouse backup/restore** simplifies disaster recovery without third-party tooling.
+- **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
+- **Composable Helm chart overlays** let you customize deployments without forking the chart.
+- **Deep OpenTelemetry integration** — ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring
+
+## Enterprise
+
+For Cloud Enterprise or Hybrid deployments, [contact the LangWatch team](https://langwatch.ai/schedule-demo) to discuss your requirements.
+
+Enterprise capabilities include:
+
+- **SSO / SCIM** -- integrate with your identity provider for seamless user provisioning
+- **Role-based access control** -- fine-grained permissions across projects and teams
+- **Audit logs** -- full visibility into who did what and when
+- **Priority support** -- dedicated engineering assistance and SLA-backed response times
+
+---
+
+# FILE: ./self-hosting/security.mdx
+
+---
+title: Security
+description: "Security model, encryption, secrets management, and hardening for LangWatch"
+---
+
+This page covers the security features and best practices for self-hosted LangWatch deployments.
+
+## Authentication & Authorization
+
+**NextAuth.js** handles user authentication with support for:
+- Email/password (default)
+- SSO providers: Azure AD, Okta, Auth0, AWS Cognito, Google, GitHub, GitLab
+
+See [SSO Configuration](/self-hosting/configuration/sso) for setup guides.
+
+**Role-Based Access Control (RBAC)** controls what users can do within a project:
+- Organization-level roles (owner, admin, member)
+- Project-level permissions
+
+**SCIM provisioning** (Enterprise) enables automated user lifecycle management from your identity provider.
+
+**API tokens** are signed with JWT (`API_TOKEN_JWT_SECRET`) for SDK authentication.
+
+## Encryption
+
+### At Rest
+
+| Data Store | Encryption Method |
+|------------|------------------|
+| PostgreSQL | Provider-level encryption (RDS: AES-256, Cloud SQL: AES-256) |
+| ClickHouse | Encrypted volumes (EBS encryption, PD encryption) |
+| S3 | Server-side encryption (SSE-S3 or SSE-KMS) |
+| Stored credentials | Application-level encryption via `CREDENTIALS_SECRET` |
+
+The `CREDENTIALS_SECRET` environment variable is used to encrypt API keys and credentials stored in PostgreSQL (e.g., LLM provider keys configured in the UI). This is application-level encryption on top of database-level encryption.
+
+### In Transit
+
+| Path | Encryption |
+|------|-----------|
+| Client to App | TLS at Ingress / Load Balancer |
+| App to PostgreSQL | TLS (configure via connection string: `?sslmode=require`) |
+| App to ClickHouse | HTTPS (configure ClickHouse with TLS certificates) |
+| App to Redis | TLS (configure via connection string: `rediss://...`) |
+| Inter-service (App, Workers, NLP, LangEvals) | Plain HTTP within cluster (use a service mesh for mTLS) |
+
+<Tip>
+For inter-service encryption, deploy a service mesh like Istio or Linkerd. This adds mTLS between all pods without application changes.
+</Tip>
+
+## Secrets Management
+
+### Development (Auto-Generated)
+
+For development, enable `autogen.enabled: true` in the Helm chart. This generates random secrets automatically. Not suitable for production — secrets change on reinstall.
+
+### Production (Kubernetes Secrets)
+
+Create secrets manually and reference them in the Helm chart:
+
+```bash
+kubectl create secret generic langwatch-secrets \
+  --namespace langwatch \
+  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+  --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
+  --from-literal=cronApiKey=$(openssl rand -hex 32)
+```
+
+Reference in `values.yaml`:
+
+```yaml
+secrets:
+  existingSecret: langwatch-secrets
+```
+
+### Production (External Secret Managers)
+
+For tighter security, use an external secrets operator to sync secrets from your cloud provider:
+
+- **AWS Secrets Manager** — via [External Secrets Operator](https://external-secrets.io/)
+- **HashiCorp Vault** — via [Vault Secrets Operator](https://developer.hashicorp.com/vault/docs/platform/k8s/vso)
+- **Azure Key Vault** — via [Azure Key Vault Provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/)
+
+The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regardless of how it was created.
+
+## Network Security
+
+### Recommended Network Architecture
+
+- **Only the LangWatch App should be exposed externally** via Ingress or Load Balancer
+- All other components (Workers, NLP, LangEvals, PostgreSQL, ClickHouse, Redis) should be on internal networks only (ClusterIP services)
+- Place databases in private subnets with no internet access
+- Use VPC endpoints / PrivateLink for S3 access
+
+### Kubernetes Network Policies
+
+Restrict traffic between pods:
+
+```yaml
+# Example: only allow app and workers to reach ClickHouse
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clickhouse-access
+  namespace: langwatch
+spec:
+  podSelector:
+    matchLabels:
+      app: clickhouse
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: app
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: workers
+      ports:
+        - port: 8123
+```
+
+### Firewall Rules
+
+| Source | Destination | Port | Protocol |
+|--------|-------------|------|----------|
+| Internet / VPN | App (Ingress) | 443 | HTTPS |
+| App | PostgreSQL | 5432 | TCP |
+| App, Workers | ClickHouse | 8123 | HTTP |
+| App, Workers | Redis | 6379 | TCP |
+| Workers | NLP | 5561 | HTTP |
+| Workers | LangEvals | 5562 | HTTP |
+| NLP, LangEvals | External LLMs | 443 | HTTPS |
+| CronJobs | App | 5560 | HTTP |
+
+## Pod Security
+
+The Helm chart applies secure defaults to all pods:
+
+```yaml
+# Pod-level (applied via global.podSecurityContext)
+runAsNonRoot: true
+runAsUser: 1000
+fsGroup: 1000
+
+# Container-level (applied via global.containerSecurityContext)
+allowPrivilegeEscalation: false
+capabilities:
+  drop:
+    - ALL
+readOnlyRootFilesystem: true
+```
+
+These ensure:
+- No containers run as root
+- No privilege escalation is possible
+- Containers cannot modify their own filesystem
+- All Linux capabilities are dropped
+
+## PII Redaction
+
+LangWatch includes a built-in PII redaction pipeline step that automatically detects and masks personally identifiable information in traces before storage.
+
+- **Enabled by default** in the Helm chart
+- Disable with `app.features.disablePiiRedaction: true` (not recommended)
+- Runs as part of the event sourcing pipeline in workers
+
+## Multitenancy
+
+LangWatch enforces tenant isolation at the application level:
+
+- Every ClickHouse query includes `WHERE TenantId = ...` as the first predicate
+- PostgreSQL queries include `projectId` in WHERE clauses
+- API tokens are scoped to a specific project
+- Cross-tenant data access is prevented at the query layer
+
+## Production Hardening Checklist
+
+- [ ] `autogen.enabled: false` — use manually created secrets
+- [ ] All secrets stored in a secrets manager (not inline in values.yaml)
+- [ ] TLS enabled on Ingress (HTTPS only)
+- [ ] Database connections use TLS (`?sslmode=require`)
+- [ ] PostgreSQL, ClickHouse, Redis in private subnets (no public access)
+- [ ] Network policies restrict pod-to-pod traffic
+- [ ] S3 buckets have public access blocked
+- [ ] ClickHouse backups enabled and tested
+- [ ] Monitoring and alerting configured
+- [ ] Secret rotation procedure documented
+- [ ] Pod security contexts verified (non-root, read-only filesystem)
+- [ ] Ingress rate limiting configured
+- [ ] Audit logs enabled (Enterprise)
+
+---
+
+# FILE: ./self-hosting/troubleshooting.mdx
+
+---
+title: Troubleshooting & FAQ
+description: "Common issues and solutions for LangWatch self-hosting"
+---
+
+## Health Checks
+
+Verify your deployment is healthy:
+
+```bash
+# App health
+kubectl -n langwatch exec deploy/langwatch-app -- curl -s http://localhost:5560/api/health
+
+# Worker health
+kubectl -n langwatch exec deploy/langwatch-workers -- curl -s http://localhost:2999/healthz
+
+# Pod status
+kubectl -n langwatch get pods
+
+# Recent events
+kubectl -n langwatch get events --sort-by='.lastTimestamp' | tail -20
+```
+
+## Docker Compose Issues
+
+### Port 5560 already in use
+
+Another process is using port 5560. Find and stop it:
+
+```bash
+lsof -i :5560
+# Then either stop that process or change the port in compose.yml
+```
+
+### Containers keep restarting
+
+Check logs for the failing container:
+
+```bash
+docker compose logs app --tail=50
+docker compose logs postgres --tail=50
+```
+
+Common causes:
+- PostgreSQL not ready before app starts (health checks should handle this)
+- Missing or invalid `.env` file
+- Insufficient Docker memory (increase to 8+ GB in Docker Desktop settings)
+
+### Slow startup
+
+First startup is slower because:
+- Docker pulls all images
+- PostgreSQL runs initial migrations
+- OpenSearch initializes its cluster
+
+Subsequent starts are faster. If it remains slow, check Docker resource allocation.
+
+## Kubernetes / Helm Issues
+
+### Pods stuck in `CrashLoopBackOff`
+
+```bash
+# Check pod logs
+kubectl -n langwatch logs <pod-name> --previous
+
+# Common causes:
+# 1. Database connection failed — check DATABASE_URL secret
+# 2. Missing secrets — check autogen.enabled or secrets.existingSecret
+# 3. ClickHouse not ready — check clickhouse pod status
+```
+
+### Pods stuck in `Pending`
+
+```bash
+# Check events for the pod
+kubectl -n langwatch describe pod <pod-name>
+
+# Common causes:
+# 1. Insufficient cluster resources (CPU/memory)
+# 2. No StorageClass available for PVC provisioning
+# 3. Node selector/affinity mismatch
+```
+
+### PVC stuck in `Pending`
+
+```bash
+kubectl -n langwatch get pvc
+kubectl -n langwatch describe pvc <pvc-name>
+```
+
+Ensure your cluster has a default StorageClass:
+
+```bash
+kubectl get storageclass
+```
+
+If not, set one in your values:
+
+```yaml
+clickhouse:
+  storage:
+    storageClass: "gp3"  # or your available StorageClass
+```
+
+### Ingress not routing traffic
+
+```bash
+# Check ingress resource
+kubectl -n langwatch get ingress
+kubectl -n langwatch describe ingress <ingress-name>
+
+# Verify the ingress controller is running
+kubectl get pods -n ingress-nginx  # or your ingress namespace
+```
+
+Ensure `app.http.baseHost` and `app.http.publicUrl` match the Ingress host.
+
+### Istio / Service Mesh
+
+CronJob pods may hang after completion because the Istio sidecar keeps the pod alive.
+
+Fix: disable sidecar injection for CronJobs:
+
+```yaml
+cronjobs:
+  pod:
+    annotations:
+      sidecar.istio.io/inject: "false"
+```
+
+## ClickHouse Issues
+
+### ClickHouse OOM kills
+
+Increase ClickHouse memory:
+
+```yaml
+clickhouse:
+  memory: "16Gi"  # Up from default 4Gi
+```
+
+The subchart auto-tunes internal memory limits based on this value.
+
+### ClickHouse connection errors
+
+```bash
+# Check ClickHouse pod status
+kubectl -n langwatch get pods -l app.kubernetes.io/component=clickhouse
+
+# Test connectivity from app pod
+kubectl -n langwatch exec deploy/langwatch-app -- \
+  curl -s "http://langwatch-clickhouse:8123/?query=SELECT%201"
+```
+
+### Cold storage not working
+
+Verify S3 credentials and bucket access:
+
+```bash
+# Check ClickHouse logs for S3 errors
+kubectl -n langwatch logs sts/langwatch-clickhouse --tail=50 | grep -i s3
+```
+
+Ensure the service account has S3 access (IRSA) or static credentials are configured correctly.
+
+## PostgreSQL Issues
+
+### Migration failures on startup
+
+If Prisma migrations fail, the app pod will crash. Check logs:
+
+```bash
+kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma
+```
+
+To skip migrations temporarily (for debugging):
+
+```yaml
+app:
+  extraEnvs:
+    - name: SKIP_PRISMA_MIGRATE
+      value: "true"
+```
+
+<Warning>
+Only skip migrations for debugging. Running with pending migrations can cause application errors.
+</Warning>
+
+### Connection refused
+
+Verify the connection string:
+
+```bash
+# For chart-managed PostgreSQL
+kubectl -n langwatch exec deploy/langwatch-postgresql -- \
+  pg_isready -U postgres
+
+# For external PostgreSQL, test from the app pod
+kubectl -n langwatch exec deploy/langwatch-app -- \
+  curl -v telnet://your-rds-host:5432
+```
+
+## Authentication Issues
+
+### SSO callback URL mismatch
+
+The callback URL configured in your identity provider must exactly match:
+
+```
+https://your-langwatch-domain.com/api/auth/callback/{provider}
+```
+
+Check that `app.http.publicUrl` matches your actual domain (including `https://`).
+
+### "Email already exists" during SSO migration
+
+This happens when a user already has an email/password account. Follow the [SSO migration steps](/self-hosting/configuration/sso#migrating-from-emailpassword-to-sso) to link existing accounts.
+
+### Sessions expire too quickly
+
+`NEXTAUTH_SECRET` may have changed between deployments. Ensure it's stored persistently in a Kubernetes Secret, not auto-generated.
+
+## Debugging Tools
+
+### Grafana Dashboards
+
+LangWatch ships with off-the-shelf Grafana dashboards for monitoring the platform — including trace throughput, worker queue depth, ClickHouse performance, and error rates. See [Observability & Monitoring](/self-hosting/configuration/observability) for setup.
+
+### Skynet (Internal Event Debugger)
+
+LangWatch includes Skynet, an internal event debugging tool that lets you inspect the event sourcing pipeline in real-time — view individual events, trace processing steps, and diagnose pipeline issues.
+
+## FAQ
+
+### How much disk space does ClickHouse need?
+
+Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling#storage-sizing) for detailed estimates.
+
+### Can I use an existing PostgreSQL / Redis?
+
+Yes. Use the external database overlays:
+
+```bash
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/postgres-external.yaml \
+  -f examples/overlays/redis-external.yaml
+```
+
+See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm#production-deployment) for full instructions.
+
+### Can I run without LangEvals or NLP?
+
+Yes. These services are optional. If you don't need built-in evaluators or NLP features, you can scale them to zero:
+
+```yaml
+langwatch_nlp:
+  replicaCount: 0
+langevals:
+  replicaCount: 0
+```
+
+### How do I disable telemetry?
+
+```yaml
+app:
+  telemetry:
+    usage:
+      enabled: false
+```
+
+Or set `DISABLE_USAGE_STATS=true`.
+
+### What ports need to be open?
+
+Only port 443 (HTTPS) for the Ingress/Load Balancer. All other communication is internal to the cluster. See [Security](/self-hosting/security#firewall-rules) for the full port matrix.
+
+### Can I run LangWatch in an air-gapped environment?
+
+Yes. Mirror the Docker images to your private registry and configure the Helm chart to pull from there. See [Docker Images](/self-hosting/deployment/docker-images#private-registries).
+
+### How do I check the LangWatch version?
+
+```bash
+# Helm chart version and app version
+helm list -n langwatch
+
+# Image version running in pods
+kubectl -n langwatch get pods -o jsonpath='{.items[*].spec.containers[*].image}'
+```
+
+---
+
+# FILE: ./self-hosting/upgrade.mdx
+
+---
+title: Upgrade Guide
+description: "How to upgrade LangWatch to the latest version"
+---
+
+## Before You Upgrade
+
+1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
+2. **Back up your databases** — see [Backups](/self-hosting/configuration/backups)
+3. **Test in a staging environment** before upgrading production
+
+## Docker Compose
+
+```bash
+# Pull latest images
+docker compose pull
+
+# Restart with new images
+docker compose up -d
+```
+
+Database migrations run automatically on startup.
+
+## Helm Chart
+
+```bash
+# Update the Helm repository
+helm repo update
+
+# Upgrade the release
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+### Pin a Specific Version
+
+```bash
+# List available versions
+helm search repo langwatch/langwatch --versions
+
+# Install a specific chart version
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  --version 3.0.0 \
+  -f values-production.yaml
+```
+
+## Database Migrations
+
+### PostgreSQL
+
+Prisma migrations run automatically when the app pod starts. To disable this (e.g., if you run migrations separately):
+
+```yaml
+app:
+  features:
+    skipEnvValidation: false
+  extraEnvs:
+    - name: SKIP_PRISMA_MIGRATE
+      value: "true"
+```
+
+### ClickHouse
+
+Schema migrations are handled by the application on startup. No manual intervention is required.
+
+## Rollback
+
+### Helm
+
+```bash
+# List release history
+helm history langwatch --namespace langwatch
+
+# Rollback to a previous revision
+helm rollback langwatch <revision> --namespace langwatch
+```
 
 ### Docker Compose
 
-For the open-source version, deploy LangWatch using Docker Compose for easy local setups that support observability, evaluations, and AI agent testing.
+Pin image tags to a specific version instead of `latest`:
 
-Check out the [Docker Compose](/self-hosting/docker-compose) page for more details.
-
-### Helm Chart
-
-LangWatch open-source is also available as a Helm chart for easy deployment on Kubernetes.
-
-Check out the [Helm Chart](/self-hosting/kubernetes-helm) page for more details.
----
-
-# FILE: ./self-hosting/sso-setup-langwatch.mdx
-
----
-title: SSO
-description: Configure SSO for LangWatch to secure access to evaluation dashboards, observability data, and agent testing environments.
-keywords: [sso, hybrid, azure, auth0]
----
-
-# Single Sign-On (SSO)
-
-LangWatch supports sign-in via various SSO providers. There are two ways to set up SSO:
-
-## 1. **Self-Hosted Deployment**:
-
-We’ve set up the following providers for you.
-If you'd prefer a different provider, feel free to reach out to us at [support@langwatch.ai](mailto:support@langwatch.ai).
-
-For a complete list of possible supported providers, please refer to the [NextAuth.js documentation](https://next-auth.js.org/providers).
-
-### Azure AD/Entra ID
-
-📄[NextAuth Azure AD Provider Docs](https://next-auth.js.org/providers/azure-ad)
-
-| Configuration      | Value                                                                      |
-| ------------------ | -------------------------------------------------------------------------- |
-| Required Variables | `AZURE_AD_CLIENT_ID`<br/>`AZURE_AD_CLIENT_SECRET`<br/>`AZURE_AD_TENANT_ID` |
-| OAuth Redirect URL | `/api/auth/callback/azure-ad`                                              |
-
-Set `NEXTAUTH_PROVIDER` to `azure-ad` in your `.env` file.
-
-<Note>
-**Azure AD Configuration**: As of LangWatch version 1.4.0+, Azure AD authentication requires the `User.Read` permission to be granted in your Azure application registration. Make sure this permission is added to avoid authentication errors.
-</Note>
-
-### Okta
-
-📄 [Okta Docs](https://developer.okta.com/docs/reference/api/oidc)
-
-| Configuration      | Value                                                         |
-| ------------------ | ------------------------------------------------------------- |
-| Required Variables | `OKTA_CLIENT_ID`<br />`OKTA_CLIENT_SECRET`<br />`OKTA_ISSUER` |
-| OAuth Redirect URL | `/api/auth/callback/okta`                                     |
-
-Set `NEXTAUTH_PROVIDER` to `okta` in your `.env` file.
-
-### Auth0
-
-📄 [NextAuth Auth0 Provider Docs](https://next-auth.js.org/providers/auth0)
-
-| Configuration      | Value                                                          |
-| ------------------ | -------------------------------------------------------------- |
-| Required Variables | `AUTH0_CLIENT_ID`<br/>`AUTH0_CLIENT_SECRET`<br/>`AUTH0_ISSUER` |
-| OAuth Redirect URL | `/api/auth/callback/auth0`                                     |
-
-Set `NEXTAUTH_PROVIDER` to `auth0` in your `.env` file.
-
-### AWS Cognito
-
-📄 [NextAuth Cognito Provider Docs](https://next-auth.js.org/providers/cognito)
-
-| Configuration          | Value                                                                |
-| ---------------------- | -------------------------------------------------------------------- |
-| Required ENV Variables | `COGNITO_CLIENT_ID`<br/>`COGNITO_CLIENT_SECRET`<br/>`COGNITO_ISSUER` |
-| OAuth Redirect URL     | `/api/auth/callback/cognito`                                         |
-
-Set `NEXTAUTH_PROVIDER` to `cognito` in your `.env` file.
-
-### Google
-
-📄 [NextAuth Google Provider Docs](https://next-auth.js.org/providers/google)
-
-| Configuration      | Value                                         |
-| ------------------ | --------------------------------------------- |
-| Required Variables | `GOOGLE_CLIENT_ID`<br/>`GOOGLE_CLIENT_SECRET` |
-| OAuth Redirect URL | `/api/auth/callback/google`                   |
-
-Set `NEXTAUTH_PROVIDER` to `google` in your `.env` file.
-
-### GitHub
-
-📄 [NextAuth GitHub Provider Docs](https://next-auth.js.org/providers/github)
-
-| Configuration          | Value                                         |
-| ---------------------- | --------------------------------------------- |
-| Required ENV Variables | `GITHUB_CLIENT_ID`<br/>`GITHUB_CLIENT_SECRET` |
-| OAuth Redirect URL     | `/api/auth/callback/github`                   |
-
-Set `NEXTAUTH_PROVIDER` to `github` in your `.env` file.
-
-### GitLab
-
-📄 [NextAuth GitLab Provider Docs](https://next-auth.js.org/providers/gitlab)
-
-| Configuration          | Value                                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------- |
-| Required ENV Variables | `GITLAB_CLIENT_ID`<br/>`GITLAB_CLIENT_SECRET`                                            |
-| OAuth Redirect URL     | `/api/auth/callback/gitlab`                                                              |
-
-Set `NEXTAUTH_PROVIDER` to `gitlab` in your `.env` file.
-
-### On-Premises Domain Configuration
-
-If you want to ensure only a single organization is created for on-premises deployments, you can
-configure the `Organization` table to map email domains to their corresponding organizations and SSO providers:
-
-```sql
-UPDATE "Organization"
-SET "ssoDomain" = 'yourcompany.com',
-    "ssoProvider" = 'azure-ad'
-WHERE id = 'your-organization-id';
+```yaml
+services:
+  app:
+    image: langwatch/langwatch:2.6.0  # Pin to previous version
 ```
 
-**Configuration Parameters:**
+Then restart:
 
-- **`ssoDomain`**: The email domain for your organization (e.g., `yourcompany.com`)
-- **`ssoProvider`**: The SSO provider name matching your `NEXTAUTH_PROVIDER` value (e.g., `azure-ad`, `okta`, `auth0`)
+```bash
+docker compose up -d
+```
 
-This configuration ensures that:
-- New users with matching email domains are automatically assigned to the correct organization
-- Users don't need an explicit invite to join their organization
-- Multi-tenant deployments can support multiple organizations with different domains
+## Breaking Changes
 
-## 2. Managed Service (app.langwatch.ai)
+### v2 to v3: ClickHouse Migration
 
-If you want to use SSO with our Cloud version, contact our team with the required variables in hand for the following providers:
+LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a significant architectural change.
 
-### Azure AD / Entra ID
+**What changes:**
+- Trace, span, and evaluation data is stored in ClickHouse instead of Elasticsearch
+- New event-sourcing architecture for data processing
+- New Helm chart structure with composable overlays
+- `clickhouse-serverless` subchart for auto-tuned ClickHouse
 
-📄 [Azure AD Docs](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
+**Migration path:**
+- New deployments: Use the v3 Helm chart directly
+- Existing v2 deployments: Contact the [LangWatch team](https://langwatch.ai/schedule-demo) for migration assistance
 
-| Configuration      | Value                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| Required Variables | `AZURE_AD_CLIENT_ID`<br />`AZURE_AD_CLIENT_SECRET`<br />`AZURE_AD_TENANT_ID`<br/>`AZURE_AD_DOMAIN` |
-| Redirect URL       | `https://langwatch.eu.auth0.com/login/callback`                                             |
+### Helm Chart Pre-1.0.0 to 1.0.0+
 
-### Google Workspace
+If upgrading from a Helm chart version before 1.0.0, the PostgreSQL PVC naming changed. To preserve your data:
 
-📄 [Google Docs](https://auth0.com/docs/authenticate/identity-providers/enterprise-identity-providers/google-apps)
+```yaml
+postgresql:
+  primary:
+    persistence:
+      existingClaim: "data-langwatch-postgresql-0"  # Your existing PVC name
+```
 
-| Configuration      | Value                                                    |
-| ------------------ | -------------------------------------------------------- |
-| Required Variables | `GOOGLE_CLIENT_ID`<br />`GOOGLE_CLIENT_SECRET` |
-| Redirect URL       | `https://langwatch.eu.auth0.com/login/callback`          |
+Check your existing PVC name:
 
-### Okta
+```bash
+kubectl -n langwatch get pvc
+```
 
-📄 [Okta Docs](https://developer.okta.com/docs/reference/api/oidc)
+## Version Compatibility
 
-| Configuration      | Value                                                                        |
-| ------------------ | ---------------------------------------------------------------------------- |
-| Required Variables | `OKTA_CLIENT_ID`<br />`OKTA_CLIENT_SECRET`<br />`OKTA_ISSUER` |
-| Redirect URL       | `https://langwatch.eu.auth0.com/login/callback`                              |
+| Chart Version | App Version | Kubernetes | Helm | Data Store |
+|--------------|-------------|------------|------|------------|
+| 3.x | 3.x | 1.28+ | 3.12+ | ClickHouse |
+| 2.x | 2.x | 1.25+ | 3.10+ | Elasticsearch / OpenSearch |
+| 1.x | 1.x | 1.25+ | 3.10+ | Elasticsearch / OpenSearch |
 
-## Contact Us
+## Getting Help
 
-Once you have all these details, please contact us so we can set them up from our side.
+If you encounter issues during an upgrade:
 
-If you use a different provider other than the ones listed above, contact us to check availability for a new implementation.
-
----
-
-## Migrating from Email/Password Authentication
-
-For security reasons, users are not automatically linked between email address and SSO provider, they can only link it themselves when already signed in.
-
-If you're then transitioning from a previous LangWatch setup that used email/password authentication to SSO, you'll need to enable automatic account linking to prevent "email already exists" errors and ensure a smooth migration for your existing users.
-
-### Migration Steps
-
-<Steps>
-<Step title="Enable SSO configuration">
-  Configure your chosen SSO provider following the instructions in the sections above, including setting all required environment variables and `NEXTAUTH_PROVIDER`.
-</Step>
-
-<Step title="Update database for existing users">
-  Run the following SQL command on your LangWatch database to enable automatic account linking:
-
-  ```sql
-  UPDATE "User"
-  SET "pendingSsoSetup" = true;
-  ```
-
-  This flags all existing user accounts to automatically link with their SSO provider when they next sign in.
-
-  <Info>
-  This is a **one-time operation** that only affects existing users. New users created after SSO is enabled will not need this flag.
-  </Info>
-</Step>
-
-<Step title="Notify your users">
-  Inform your users about the authentication method change. When they next attempt to sign in:
-
-  - They should use the **SSO sign-in option** instead of email/password
-  - Their existing account will be automatically linked to their SSO identity
-  - All their projects, data, and permissions will remain intact
-
-  <Check>
-  Users will maintain access to all their existing resources after the migration.
-  </Check>
-</Step>
-</Steps>
-
-## Support
-
-For any queries or issues, feel free to reach out to us. We are available via:
-
-- **Email**: [support@langwatch.ai](mailto:support@langwatch.ai)
-- **Slack**: Connect with us directly on Slack for real-time support and assistance.
-
----
-
-We look forward to helping you set up LangWatch seamlessly and efficiently.
-
----
-
-# FILE: ./hybrid-setup/elasticsearch.mdx
-
----
-title: Elasticsearch
-description: Set up Elasticsearch for LangWatch Hybrid deployments to enable scalable search and analysis of traces and agent evaluations.
----
-
-### Introduction
-
-This guide walks you through the process of preparing your environment for LangWatch's hybrid deployment. It uses your own Elasticsearch cluster for search and indexing. The instructions cover setup on Elastic Cloud.
-> A screen-sharing session with LangWatch is strongly recommended to ensure everything is working as expected.
-
----
-
-### Step-by-Step Setup Instructions
-
-#### Elasticsearch Setup (Required)
-
-LangWatch relies on Elasticsearch (or OpenSearch) for core functionality such as log indexing, analytics, and querying.
-
-#### Create an Elasticsearch Cluster
-
-- Go to **Elastic Cloud** on GCP or your preferred Elasticsearch provider.
-- Create a new deployment with the following specs:
-
-  - **Version:** 8.x (recommended)
-  - **Template:** Search optimized
-  - **Storage:** 45GB
-  - **Availability Zones:** 2
-
-#### After the deployment completes:
-
-- Save the **Elasticsearch Endpoint** (e.g., `https://your-elasticsearch-host:9200`)
-- Near **API Keys**, click **(+ New)** to create a new API key:
-  - Name it something like `langwatch-api-key`
-  - Assign **full access permissions**
-  - **Copy the encoded API key**
-
----
-
-#### Required Values for Deployment:
-
-- **Elasticsearch URL**
-- **API Key** with full permissions
-
-> Once you have these, add them to your account on the **LangWatch settings page**, as shown in the image below.
-
-![Elasticsearch Setup](/images/settings-hybrid.png)
-
-> If using OpenSearch instead of Elastic Cloud, the setup steps are similar—just ensure the endpoint and API key/token support write and search operations.
+- Check pod logs: `kubectl -n langwatch logs deploy/langwatch-app --tail=100`
+- Check the [Troubleshooting guide](/self-hosting/troubleshooting)
+- Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
+- Contact [support](https://langwatch.ai/support)
 
 ---
 
 # FILE: ./hybrid-setup/overview.mdx
 
 ---
-title: Overview
-description: Learn how LangWatch's hybrid setup ensures strict data control, compliance needs, and secure AI agent testing infrastructure.
+title: Hybrid Setup
+description: Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
 ---
 
-# Hybrid Setup Overview
+# Hybrid Setup
 
-### Elasticsearch for Trace Data
+The hybrid setup gives you the best of both worlds: LangWatch manages the **control plane** (application, UI, evaluations, prompt management), while your sensitive data stays in **your own infrastructure**.
 
-- Enables high-performance search across all your LLM interactions
-- Supports complex filtering and aggregation for analytics
-- Can be deployed within your own infrastructure while connecting to LangWatch's management plane
+## How It Works
 
-### S3 Storage for Datasets
+```mermaid
+graph LR
+    subgraph cloud["LangWatch Cloud (Control Plane)"]
+        App["LangWatch App<br/>UI · Evaluations · Prompts"]
+        Workers["Workers"]
+        NLP["NLP"]
+        Evals["LangEvals"]
+    end
+    subgraph customer["Your Infrastructure (Data Plane)"]
+        CH["ClickHouse<br/>Traces · Spans · Analytics"]
+        S3["S3 / Object Storage<br/>Datasets · Cold storage · Backups"]
+    end
+    App -->|"queries"| CH
+    Workers -->|"events & projections"| CH
+    CH -->|"cold tiering"| S3
+    Workers -->|"evals"| Evals
+    Workers -->|"NLP"| NLP
+```
 
-S3 storage for datasets provides a secure and scalable solution for your data:
+### What stays in your infrastructure
 
-- Evaluation datasets
-- Custom datasets
+- **ClickHouse** — All trace data, span payloads, evaluation results, and analytics. This is where your LLM inputs/outputs and sensitive content live.
+- **S3-compatible object storage** — Datasets, ClickHouse cold storage tiers, and backups.
 
-This storage can be configured within your compatible cloud provider account while still integrating with LangWatch's observability tools.
+### What LangWatch Cloud manages
 
-## Getting Started with Hybrid Setup
+- Application UI and API
+- Evaluation orchestration
+- Prompt management and versioning
+- Scenario testing and simulations
+- User management and access control
 
-The hybrid setup requires collaboration with our team to properly configure and integrate with your infrastructure.
+## Benefits
 
-**Contact us to set up your hybrid deployment:**
+- **Data ownership** — Sensitive LLM interactions never leave your infrastructure. You can pull the plug at any time.
+- **Compliance** — Meet data residency requirements by deploying the data plane in your preferred region.
+- **No operational overhead** — LangWatch handles application updates, scaling, and maintenance of the control plane.
+- **Full functionality** — All LangWatch features work identically to the fully-hosted version.
 
-1. Reach out to our sales team at [Email Support](mailto:support@langwatch.ai)
-2. Schedule a consultation to discuss your specific requirements
-3. Work with our integration specialists to configure your hybrid deployment
-4. Receive ongoing support for your custom setup
+## Requirements
 
-For more information or to schedule a consultation, please [contact our sales team](https://meetings-eu1.hubspot.com/manouk-draisma).
+The data plane requires:
 
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **ClickHouse** | Single node, 2 vCPU, 4 GiB RAM | 3-node replicated cluster |
+| **S3 storage** | Any S3-compatible provider | Same region as ClickHouse |
 
----
+ClickHouse can be deployed as:
+- A managed service (e.g., ClickHouse Cloud, Aiven, Altinity)
+- Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/charts/clickhouse-serverless)
+- Self-hosted on VMs
 
-# FILE: ./hybrid-setup/s3-storage.mdx
+## Getting Started
 
----
-title: S3 Storage
-description: Configure S3 storage for LangWatch Hybrid deployments to store traces, evaluations, and AI agent testing datasets.
----
+The hybrid setup requires coordination with our team to configure the secure connection between LangWatch Cloud and your data plane.
 
-### S3-Compatible Object Storage Setup
+**To get started:**
 
-LangWatch stores dataset records in an S3-compatible bucket. You may use **AWS S3**, **GCP Storage with interoperability**, or **custom endpoints** (e.g., MinIO, Cloudflare R2).
+1. **Contact us** at [support@langwatch.ai](mailto:support@langwatch.ai) or through your account manager
+2. **Provision your data plane** — We'll help you set up ClickHouse and S3 in your infrastructure
+3. **Configure the connection** — We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
+4. **Verify** — Run traces and confirm data flows correctly while staying in your infrastructure
 
-### Required Configuration
-
-- **S3 Endpoint** (e.g., `https://s3.amazonaws.com` or a custom endpoint)
-- **Access Key ID**
-- **Secret Access Key**
-- **Bucket Name** (e.g., `langwatch-logs-yourcompany`)
-
-Ensure your S3 credentials have the following permissions:
-
-- `s3:PutObject`
-- `s3:GetObject`
-- `s3:ListBucket`
-
----
-
-### 🟦 Using Google Cloud Storage with S3 API (GCP Users)
-
-If you are using **Google Cloud Storage**, you can enable S3-compatible access by turning on interoperability settings:
-
-1. Go to your project in the [Google Cloud Console](https://console.cloud.google.com/).
-2. Navigate to **Cloud Storage > Settings > Interoperability** tab.
-3. **Enable Interoperability access**.
-4. Create an **Access Key** and **Secret Key**.
-5. Use the following endpoint: https://storage.googleapis.com
-
-
-📘 **See the full guide here:**
-👉 [GCP Interoperability Setup](https://cloud.google.com/storage/docs/interoperability)
-
-You can now use these credentials and endpoint just like standard S3 keys.
-
----
-
-### 🔧 Add Credentials to LangWatch
-
-Once you have your credentials and endpoint:
-
-- Go to the **LangWatch settings page**.
-- Add them to your account at either the **project level** or **organization level**.
-
-![S3 Setup](/images/settings-hybrid.png)
+<Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
+  Contact our team to discuss your requirements and get started with a hybrid deployment.
+</Card>
 
 ---
 
