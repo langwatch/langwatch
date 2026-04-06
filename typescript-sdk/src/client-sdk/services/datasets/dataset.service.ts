@@ -435,6 +435,24 @@ export class DatasetService {
   }
 
   /**
+   * Converts a CreateFromUploadResponse to the unified UploadResponse shape.
+   */
+  private toUploadResponse(result: CreateFromUploadResponse): UploadResponse {
+    return {
+      dataset: {
+        id: result.id,
+        name: result.name,
+        slug: result.slug,
+        columnTypes: result.columnTypes,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      },
+      recordsCreated: result.recordsCreated,
+      datasetId: result.id,
+    };
+  }
+
+  /**
    * Append strategy: try uploading to existing dataset; if not found, create from file.
    */
   private async _uploadAppend(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
@@ -442,19 +460,7 @@ export class DatasetService {
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        const result = await this.createDatasetFromUpload({ name: slugOrId, file });
-        return {
-          dataset: {
-            id: result.id,
-            name: result.name,
-            slug: result.slug,
-            columnTypes: result.columnTypes,
-            createdAt: result.createdAt,
-            updatedAt: result.updatedAt,
-          },
-          recordsCreated: result.recordsCreated,
-          datasetId: result.id,
-        };
+        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
       }
       throw error;
     }
@@ -470,19 +476,7 @@ export class DatasetService {
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        const result = await this.createDatasetFromUpload({ name: slugOrId, file });
-        return {
-          dataset: {
-            id: result.id,
-            name: result.name,
-            slug: result.slug,
-            columnTypes: result.columnTypes,
-            createdAt: result.createdAt,
-            updatedAt: result.updatedAt,
-          },
-          recordsCreated: result.recordsCreated,
-          datasetId: result.id,
-        };
+        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
       }
       throw error;
     }
@@ -510,19 +504,7 @@ export class DatasetService {
       );
     }
 
-    const result = await this.createDatasetFromUpload({ name: slugOrId, file });
-    return {
-      dataset: {
-        id: result.id,
-        name: result.name,
-        slug: result.slug,
-        columnTypes: result.columnTypes,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt,
-      },
-      recordsCreated: result.recordsCreated,
-      datasetId: result.id,
-    };
+    return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
   }
 
   /**
