@@ -129,7 +129,7 @@ class DatasetsFacade:
         raw = self._api.get_dataset(slug_or_id, tracer=tracer)
         entries = [DatasetEntry(**item) for item in raw.get("data", [])]
         return Dataset(
-            id=raw.get("datasetId", ""),
+            id=raw.get("id", ""),
             name=raw.get("name", ""),
             slug=raw.get("slug", ""),
             entries=entries,

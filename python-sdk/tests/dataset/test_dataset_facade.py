@@ -107,7 +107,7 @@ class TestDatasetsFacade:
                 # Should not raise FileNotFoundError or ValueError for extension
                 # Will raise from the API call since we have a mock, but that's fine
                 facade._api.upload = MagicMock(
-                    return_value={"datasetId": "ds_1", "recordsCreated": 1}
+                    return_value={"id": "ds_1", "recordsCreated": 1}
                 )
                 result = facade.upload("my-dataset", file_path=tmp_path)
                 assert result.recordsCreated == 1
@@ -119,7 +119,7 @@ class TestDatasetsFacade:
             json_file = tmp_path / "data.json"
             json_file.write_text('[{"input": "hello"}]')
             facade._api.upload = MagicMock(
-                return_value={"datasetId": "ds_1", "recordsCreated": 1}
+                return_value={"id": "ds_1", "recordsCreated": 1}
             )
             result = facade.upload("my-dataset", file_path=str(json_file))
             assert result.recordsCreated == 1
@@ -130,7 +130,7 @@ class TestDatasetsFacade:
                 tmp_path = f.name
             try:
                 facade._api.upload = MagicMock(
-                    return_value={"datasetId": "ds_1", "recordsCreated": 2}
+                    return_value={"id": "ds_1", "recordsCreated": 2}
                 )
                 result = facade.upload("my-dataset", file_path=tmp_path)
                 assert result.recordsCreated == 2
@@ -203,7 +203,7 @@ class TestDatasetsFacade:
         def test_returns_dataset_with_entries(self, facade):
             facade._api.get_dataset = MagicMock(
                 return_value={
-                    "datasetId": "ds_1",
+                    "id": "ds_1",
                     "name": "My Dataset",
                     "slug": "my-dataset",
                     "data": [
@@ -221,7 +221,7 @@ class TestDatasetsFacade:
             """get_dataset() by ID works the same as by slug"""
             facade._api.get_dataset = MagicMock(
                 return_value={
-                    "datasetId": "dataset_xyz",
+                    "id": "dataset_xyz",
                     "name": "my-data",
                     "slug": "my-data",
                     "data": [],
@@ -238,7 +238,7 @@ class TestDatasetsFacade:
 
             facade._api.get_dataset = MagicMock(
                 return_value={
-                    "datasetId": "ds_1",
+                    "id": "ds_1",
                     "name": "test",
                     "slug": "test",
                     "data": [],
