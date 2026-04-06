@@ -64,6 +64,16 @@ export interface DeleteRecordsResponse {
   deletedCount: number;
 }
 
+export interface DatasetRecordListResponse {
+  data: DatasetRecord[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 // --- Dataset API functions ---
 
 /** Lists all datasets in the project (paginated). */
@@ -163,4 +173,19 @@ export async function deleteDatasetRecords(params: {
     `/api/dataset/${encodeURIComponent(slugOrId)}/records`,
     { recordIds },
   ) as Promise<DeleteRecordsResponse>;
+}
+
+/** Lists records in a dataset (paginated). */
+export async function listDatasetRecords(params: {
+  slugOrId: string;
+  page?: number;
+  limit?: number;
+}): Promise<DatasetRecordListResponse> {
+  const { slugOrId } = params;
+  const query = new URLSearchParams();
+  if (params.page != null) query.set("page", String(params.page));
+  if (params.limit != null) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  const path = `/api/dataset/${encodeURIComponent(slugOrId)}/records${qs ? `?${qs}` : ""}`;
+  return makeRequest("GET", path) as Promise<DatasetRecordListResponse>;
 }

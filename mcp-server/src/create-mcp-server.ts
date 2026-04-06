@@ -862,6 +862,45 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   );
 
   server.tool(
+    "platform_list_dataset_records",
+    "List records in a dataset on the LangWatch platform with pagination.",
+    {
+      slugOrId: z
+        .string()
+        .describe("The dataset slug or ID to list records from"),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Page number (default: 1)"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe("Records per page (default: 50, max: 1000)"),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"),
+    },
+    async (params) => {
+      const { requireApiKey } = await import("./config.js");
+      requireApiKey();
+      const { handleListDatasetRecords } = await import(
+        "./tools/list-dataset-records.js"
+      );
+      return {
+        content: [
+          { type: "text", text: await handleListDatasetRecords(params) },
+        ],
+      };
+    }
+  );
+
+  server.tool(
     "platform_create_dataset_records",
     "Add records to a dataset on the LangWatch platform in batch (max 1000 per call).",
     {
