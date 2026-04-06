@@ -292,9 +292,10 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / total (all runs count in denominator).
- * When no runs have an actual verdict (completedCount == 0), passRate is null
- * to distinguish "nothing evaluated yet" from "everything failed" (0%).
+ * Pass rate = passed / settled. "Settled" = passed + failed + stalled + cancelled
+ * (all terminal states). Only in-progress and queued runs are excluded from the
+ * denominator since we don't know their outcome yet.
+ * When no runs have settled yet (settledCount == 0), passRate is null.
  */
 export function computeGroupSummary({
   group,
@@ -332,9 +333,10 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
+  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
-  const passRate = completedCount > 0
-    ? (passedCount / totalCount) * 100
+  const passRate = settledCount > 0
+    ? (passedCount / settledCount) * 100
     : (totalCount > 0 ? null : 0);
 
   let totalCost = 0;

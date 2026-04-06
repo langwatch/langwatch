@@ -124,6 +124,7 @@ export default function SimulationsPage() {
     projectId: project?.id ?? "",
     refetch: () => {
       void utils.suites.getSummaries.invalidate();
+      void utils.scenarios.getExternalSetSummaries.invalidate();
     },
     enabled: !!project?.id,
     debounceMs: 500,

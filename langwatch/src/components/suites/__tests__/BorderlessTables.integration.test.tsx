@@ -164,7 +164,8 @@ describe("<GroupRow/> borderless styling", () => {
       const header = screen.getByRole("button", {
         name: /Angry refund request group/,
       });
-      expect(header).toHaveStyle({ position: "sticky", top: "0px" });
+      // Sticky is on the wrapper Box around the button, not the button itself
+      expect(header.closest("[class]")?.parentElement).toHaveStyle({ position: "sticky", top: "0px" });
     });
   });
 });
