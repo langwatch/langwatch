@@ -216,10 +216,10 @@ Feature: Dataset TypeScript SDK
     Then it throws a DatasetApiError with status 409 and the conflict message
 
   @unit
-  Scenario: SDK maps 403 responses to DatasetApiError
-    Given an API response with status 403
+  Scenario: SDK maps 403 responses to DatasetPlanLimitError with upgrade message
+    Given an API response with status 403 and a plan limit exceeded message
     When the DatasetService processes the response
-    Then it throws a DatasetApiError with status 403
+    Then it throws a DatasetPlanLimitError with the limit details and upgrade URL
 
   @unit
   Scenario: SDK maps unexpected errors to DatasetApiError with status code

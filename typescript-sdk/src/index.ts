@@ -51,6 +51,7 @@ export {
   DatasetError,
   DatasetNotFoundError,
   DatasetApiError,
+  DatasetPlanLimitError,
   type Dataset,
   type DatasetEntry,
   type DatasetMetadata,

@@ -39,3 +39,27 @@ export class DatasetApiError extends DatasetError {
     this.originalError = originalError;
   }
 }
+
+/**
+ * Thrown when a dataset operation exceeds the plan limit (403).
+ * The message includes the upgrade/subscription URL from the server.
+ */
+export class DatasetPlanLimitError extends DatasetError {
+  readonly limitType: string;
+  readonly current?: number;
+  readonly max?: number;
+
+  constructor(message: string, originalError?: unknown) {
+    super(message);
+    this.name = "DatasetPlanLimitError";
+
+    if (originalError != null && typeof originalError === "object") {
+      const err = originalError as Record<string, unknown>;
+      this.limitType = typeof err.limitType === "string" ? err.limitType : "datasets";
+      this.current = typeof err.current === "number" ? err.current : undefined;
+      this.max = typeof err.max === "number" ? err.max : undefined;
+    } else {
+      this.limitType = "datasets";
+    }
+  }
+}

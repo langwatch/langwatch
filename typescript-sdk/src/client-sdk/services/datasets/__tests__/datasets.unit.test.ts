@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import { DatasetService } from "../dataset.service";
-import { DatasetNotFoundError, DatasetApiError } from "../errors";
+import { DatasetNotFoundError, DatasetApiError, DatasetPlanLimitError } from "../errors";
 import { NoOpLogger } from "@/logger";
 
 const createMockApiClient = () => {
@@ -224,22 +224,30 @@ describe("Feature: Dataset TypeScript SDK", () => {
         });
       });
 
-      describe("when the API responds with status 403", () => {
-        it("throws a DatasetApiError with status 403", async () => {
+      describe("when the API responds with status 403 (plan limit)", () => {
+        it("throws a DatasetPlanLimitError with the server message", async () => {
           mockClient.GET.mockResolvedValue({
             data: null,
-            error: { error: "Forbidden", message: "Access denied" },
+            error: {
+              error: "limit_exceeded",
+              message: "Free plan limit of 5 datasets reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
+              limitType: "datasets",
+              current: 5,
+              max: 5,
+            },
             response: { status: 403 },
           });
 
           await expect(
             service.getDataset("restricted-dataset"),
-          ).rejects.toThrow(DatasetApiError);
+          ).rejects.toThrow(DatasetPlanLimitError);
 
           await expect(
             service.getDataset("restricted-dataset"),
           ).rejects.toMatchObject({
-            status: 403,
+            message: expect.stringContaining("upgrade your plan"),
+            limitType: "datasets",
+            max: 5,
           });
         });
       });

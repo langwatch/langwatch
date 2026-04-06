@@ -1,6 +1,6 @@
 export { DatasetsFacade } from "./datasets.facade";
 export { DatasetService } from "./dataset.service";
-export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./errors";
+export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetPlanLimitError } from "./errors";
 export type {
   Dataset,
   DatasetEntry,

@@ -19,7 +19,7 @@ import {
   type UploadResponse,
   type DatasetRecordResponse,
 } from "./types";
-import { DatasetApiError, DatasetNotFoundError } from "./errors";
+import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./errors";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { tracer } from "./tracing";
 
@@ -62,6 +62,11 @@ export class DatasetService {
   private handleApiError(operation: string, error: unknown, status: number, slugOrId?: string): never {
     if (status === 404 && slugOrId) {
       throw new DatasetNotFoundError(slugOrId);
+    }
+
+    if (status === 403) {
+      const errorMessage = this.extractErrorMessage(error, status);
+      throw new DatasetPlanLimitError(errorMessage, error);
     }
 
     const errorMessage = this.extractErrorMessage(error, status);
