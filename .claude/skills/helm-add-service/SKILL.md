@@ -146,7 +146,7 @@ Add a new top-level section following the pattern of `langevals` or `langwatch_n
     annotations: {}
     labels: {}
     strategy: {}
-  revisionHistoryLimit: 10
+    revisionHistoryLimit: 10
   extraEnvs: []
   extraContainers: []
   extraVolumes: []
