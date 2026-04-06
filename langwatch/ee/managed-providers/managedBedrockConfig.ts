@@ -207,7 +207,11 @@ export async function buildManagedBedrockLitellmParams({
   params.aws_secret_access_key = customerCredentials.SecretAccessKey;
   params.aws_session_token = customerCredentials.SessionToken;
   params.aws_region_name = config.region;
-  params.aws_bedrock_runtime_endpoint = `https://${config.bedrockProxyEndpoint}`;
+  params.aws_bedrock_runtime_endpoint =
+    config.bedrockProxyEndpoint.startsWith("http://") ||
+    config.bedrockProxyEndpoint.startsWith("https://")
+      ? config.bedrockProxyEndpoint
+      : `https://${config.bedrockProxyEndpoint}`;
 
   delete params.api_key;
 
