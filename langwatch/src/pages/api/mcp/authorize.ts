@@ -46,6 +46,25 @@ export default async function handler(
       .json({ error: "projectId and redirect_uri are required" });
   }
 
+  // Validate redirect_uri scheme to prevent open redirect / XSS
+  try {
+    const redirectUrl = new URL(redirect_uri);
+    if (!["http:", "https:"].includes(redirectUrl.protocol)) {
+      return res
+        .status(400)
+        .json({ error: "redirect_uri must use http or https" });
+    }
+  } catch {
+    return res.status(400).json({ error: "Invalid redirect_uri" });
+  }
+
+  // PKCE is required — reject without code_challenge
+  if (!code_challenge) {
+    return res
+      .status(400)
+      .json({ error: "code_challenge is required (PKCE S256)" });
+  }
+
   // Validate the project belongs to the user (check team membership)
   const project = await prisma.project.findFirst({
     where: {

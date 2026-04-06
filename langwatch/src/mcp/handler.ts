@@ -103,6 +103,7 @@ interface SessionState {
 interface SseSessionState {
   transport: SSEServerTransport;
   apiKey: string;
+  lastActivityAt: number;
 }
 
 /** OAuth token entry stored in memory and Redis. */
@@ -136,7 +137,7 @@ export function createMcpHandler(): McpHandler {
     getConfig();
   } catch {
     initConfig({
-      endpoint: process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai",
+      endpoint: process.env.LANGWATCH_ENDPOINT ?? process.env.BASE_HOST ?? "https://app.langwatch.ai",
     });
   }
 
@@ -171,6 +172,14 @@ export function createMcpHandler(): McpHandler {
       if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
         session.transport.close().catch(() => {});
         sessions.delete(id);
+      }
+    }
+
+    // Sweep idle SSE sessions
+    for (const [id, session] of sseSessions) {
+      if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
+        session.transport.close().catch(() => {});
+        sseSessions.delete(id);
       }
     }
 
@@ -463,6 +472,9 @@ export function createMcpHandler(): McpHandler {
     for (const session of sessions.values()) {
       if (session.apiKey === apiKey) count++;
     }
+    for (const session of sseSessions.values()) {
+      if (session.apiKey === apiKey) count++;
+    }
     return count;
   }
 
@@ -514,6 +526,13 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    const ip = getClientIp(req);
+    if (oauthRateLimiter.isBlocked(ip)) {
+      sendJson(res, 429, { error: "Too many requests" });
+      return;
+    }
+    oauthRateLimiter.track(ip);
+
     let raw: string;
     try {
       raw = await readBody(req);
@@ -862,8 +881,19 @@ export function createMcpHandler(): McpHandler {
     const apiKey = await authenticateRequest(req, res);
     if (!apiKey) return;
 
+    if (sessionCountForKey(apiKey) >= MAX_SESSIONS_PER_KEY) {
+      sendJson(res, 429, {
+        error: `Too many concurrent sessions (max ${MAX_SESSIONS_PER_KEY})`,
+      });
+      return;
+    }
+
     const transport = new SSEServerTransport("/messages", res);
-    sseSessions.set(transport.sessionId, { transport, apiKey });
+    sseSessions.set(transport.sessionId, {
+      transport,
+      apiKey,
+      lastActivityAt: Date.now(),
+    });
 
     const sessionServer = createMcpServer();
 
@@ -890,7 +920,30 @@ export function createMcpHandler(): McpHandler {
 
     const session = sseSessions.get(sessionId)!;
 
-    const raw = await readBody(req);
+    // Re-authenticate: verify Bearer token matches the session
+    const token = extractBearerToken(req);
+    if (!token) {
+      send401(res, "Authorization header required");
+      return;
+    }
+    const apiKey = await resolveApiKey(token);
+    if (apiKey !== session.apiKey) {
+      send401(res, "Bearer token does not match session");
+      return;
+    }
+
+    session.lastActivityAt = Date.now();
+
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request body too large") {
+        sendJson(res, 413, { error: "Request body too large" });
+        return;
+      }
+      throw err;
+    }
     let body: unknown;
     try {
       body = JSON.parse(raw);

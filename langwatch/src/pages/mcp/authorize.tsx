@@ -123,6 +123,11 @@ export default function McpAuthorize({ oauthParams }: McpAuthorizeProps) {
   const handleDeny = () => {
     if (oauthParams.redirect_uri) {
       const url = new URL(oauthParams.redirect_uri);
+      // Prevent XSS via javascript: or other dangerous schemes
+      if (!["http:", "https:"].includes(url.protocol)) {
+        void router.push("/");
+        return;
+      }
       url.searchParams.set("error", "access_denied");
       if (oauthParams.state) {
         url.searchParams.set("state", oauthParams.state);
