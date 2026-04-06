@@ -1,0 +1,111 @@
+# values-hosted-prod.yaml — Production with managed external services.
+# namespace: langwatch
+# ClickHouse single-node (good for most workloads), external PG/Redis recommended.
+# Usage: helm install langwatch . -f examples/values-hosted-prod.yaml -n langwatch --create-namespace
+#
+# Prerequisites:
+#   kubectl create secret generic langwatch-secrets -n langwatch \
+#     --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+#     --from-literal=cronApiKey=$(openssl rand -hex 16) \
+#     --from-literal=nextAuthSecret=$(openssl rand -hex 16)
+#
+#   # ClickHouse password (if not using auto-generated):
+#   kubectl create secret generic clickhouse-password -n langwatch \
+#     --from-literal=password=$(openssl rand -hex 16)
+
+autogen:
+  enabled: false
+
+secrets:
+  existingSecret: "langwatch-secrets"
+
+app:
+  replicaCount: 2
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
+  resources:
+    requests: { cpu: 500m, memory: 2Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 1
+
+workers:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests: { cpu: 500m, memory: 2Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 1, memory: 2Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 8Gi }
+
+# Single-node ClickHouse — sufficient for most production workloads
+clickhouse:
+  chartManaged: true
+  replicas: 1
+  memory: 8Gi
+  cpu: 4
+  storage:
+    size: 100Gi
+  auth:
+    existingSecret: "clickhouse-password"
+    secretKeys:
+      passwordKey: "password"
+
+# External PostgreSQL (RDS, Cloud SQL, etc.)
+postgresql:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: "langwatch-db"
+        key: "connectionString"
+
+# External Redis (ElastiCache, Memorystore, etc.)
+redis:
+  chartManaged: false
+  external:
+    architecture: standalone
+    connectionString:
+      secretKeyRef:
+        name: "langwatch-redis"
+        key: "connectionString"
+
+prometheus:
+  chartManaged: true
+  server:
+    retention: 30d
+    persistentVolume:
+      size: 20Gi
+
+ingress:
+  enabled: true
+  className: "nginx"
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.example.com
+  hosts:
+    - host: langwatch.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: langwatch-app  # must match release name + "-app"
+                port:
+                  number: 5560
+
+cronjobs:
+  enabled: true

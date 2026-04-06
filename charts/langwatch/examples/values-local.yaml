@@ -1,0 +1,86 @@
+# values-local.yaml — Local Kind cluster, everything chart-managed, minimal resources.
+# namespace: lw-local
+# Usage: make example-up  (or: ./examples/helm-safe.sh install lw . -f examples/values-local.yaml)
+autogen:
+  enabled: true
+
+images:
+  app:
+    tag: local
+    pullPolicy: Never
+  langevals:
+    tag: local
+    pullPolicy: Never
+
+app:
+  replicaCount: 1
+  service: { type: NodePort, port: 5560, nodePort: 30560 }
+  http:
+    baseHost: "http://localhost:30560"
+    publicUrl: "http://localhost:30560"
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits:   { cpu: 1, memory: 3Gi }
+
+workers:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+  extraEnvs:
+    - name: DISABLE_EVALUATORS_PRELOAD
+      value: "true"
+    - name: WEB_CONCURRENCY
+      value: "1"
+
+clickhouse:
+  chartManaged: true
+  image:
+    pullPolicy: Never
+  replicas: 1
+  memory: 1Gi
+  cpu: 1
+  storage:
+    size: 5Gi
+
+postgresql:
+  chartManaged: true
+  auth:
+    password: ""  # autogen handles it
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 2Gi
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+redis:
+  chartManaged: true
+  auth:
+    password: ""  # autogen handles it
+  master:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+
+prometheus:
+  chartManaged: false  # skip for local dev
+
+cronjobs:
+  enabled: false
