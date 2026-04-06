@@ -228,7 +228,7 @@ export function createMcpHandler(): McpHandler {
     res.end(body);
   }
 
-  const MAX_BODY_BYTES = 1_048_576; // 1 MB
+  const MAX_BODY_BYTES = 10_485_760; // 10 MB
 
   function readBody(req: IncomingMessage): Promise<string> {
     return new Promise((resolve, reject) => {
