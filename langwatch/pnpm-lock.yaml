@@ -449,6 +449,9 @@ importers:
       prism-react-renderer:
         specifier: ^2.1.0
         version: 2.1.0(react@19.1.0)
+      prisma:
+        specifier: 5.7.0
+        version: 5.7.0
       prismjs:
         specifier: ^1.29.0
         version: 1.30.0
@@ -708,9 +711,6 @@ importers:
       playwright:
         specifier: 1.57.0
         version: 1.57.0
-      prisma:
-        specifier: 5.7.0
-        version: 5.7.0
       raw-loader:
         specifier: ^4.0.2
         version: 4.0.2(webpack@5.97.1(esbuild@0.27.3))
