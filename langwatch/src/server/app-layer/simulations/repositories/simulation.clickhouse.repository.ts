@@ -777,6 +777,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return this.getSetSummaries({ ...params, filter: "internal-suites" });
   }
 
+  /**
+   * ⚠️  KEEP IN SYNC: The content panel computes pass rate on the frontend
+   * with its own formula (passed / settled, excluding in-progress/queued).
+   * If you change the aggregation here, also update:
+   *   - run-history-transforms.ts → computeGroupSummary() (content panel)
+   *
+   * Known mismatches (TODO):
+   * - This query uses count() for total (includes in-progress in denominator)
+   * - This query uses CreatedAt for lastRunTimestamp (should use StartedAt)
+   * - This query gets the latest batch's counts, not the currently-running batch
+   */
   private async getSetSummaries({
     projectId,
     startDate,

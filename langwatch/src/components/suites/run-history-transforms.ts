@@ -296,6 +296,11 @@ export function computeBatchRunSummary({
  * (all terminal states). Only in-progress and queued runs are excluded from the
  * denominator since we don't know their outcome yet.
  * When no runs have settled yet (settledCount == 0), passRate is null.
+ *
+ * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
+ * with its own pass rate formula. If you change the formula here, also update:
+ *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar external sets)
+ *   - suites.router.ts → getSummaries() (sidebar suite summaries)
  */
 export function computeGroupSummary({
   group,
