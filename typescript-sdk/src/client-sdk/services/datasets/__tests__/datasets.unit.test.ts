@@ -272,4 +272,34 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
     });
   });
+
+  // ── Client-side validation ──────────────────────────────────────
+
+  describe("DatasetsFacade validation", () => {
+    const langwatch = new LangWatch({
+      apiKey: "test-key",
+      endpoint: "http://localhost:5560",
+    });
+
+    describe("when creating a dataset with empty name", () => {
+      it("throws a DatasetApiError indicating name is required", () => {
+        expect(() => langwatch.datasets.create({ name: "" })).toThrow(DatasetApiError);
+        expect(() => langwatch.datasets.create({ name: "   " })).toThrow(
+          expect.objectContaining({ message: expect.stringContaining("name") }),
+        );
+      });
+    });
+
+    describe("when updating a dataset with no fields", () => {
+      it("throws a DatasetApiError indicating at least one field is required", () => {
+        expect(() => langwatch.datasets.update("my-data", {})).toThrow(DatasetApiError);
+      });
+    });
+
+    describe("when creating records with empty entries", () => {
+      it("throws a DatasetApiError indicating entries must not be empty", () => {
+        expect(() => langwatch.datasets.createRecords("my-data", [])).toThrow(DatasetApiError);
+      });
+    });
+  });
 });
