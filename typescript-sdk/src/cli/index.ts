@@ -80,7 +80,7 @@ const program = new Command();
 
 program
   .name("langwatch")
-  .description("LangWatch CLI - The npm of prompts")
+  .description("LangWatch CLI - Manage prompts and datasets")
   .version(__CLI_VERSION__, "-v, --version", "Display the current version")
   .configureHelp({
     showGlobalOptions: true,
@@ -263,4 +263,89 @@ evaluatorCmd
     }
   });
 
+// Add dataset command group
+const datasetCmd = program
+  .command("dataset")
+  .description("Manage datasets");
+
+datasetCmd
+  .command("list")
+  .description("List all datasets")
+  .action(async () => {
+    try {
+      const { listCommand: listDatasetsImpl } = await import("./commands/dataset/list.js");
+      await listDatasetsImpl();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+datasetCmd
+  .command("create <name>")
+  .description("Create a new dataset")
+  .option("-c, --columns <columns>", "Column definitions (e.g. input:string,output:string)")
+  .action(async (name: string, options: { columns?: string }) => {
+    try {
+      const { createCommand: createDatasetImpl } = await import("./commands/dataset/create.js");
+      await createDatasetImpl(name, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+datasetCmd
+  .command("get <slugOrId>")
+  .description("Get dataset details and preview records")
+  .action(async (slugOrId: string) => {
+    try {
+      const { getCommand: getDatasetImpl } = await import("./commands/dataset/get.js");
+      await getDatasetImpl(slugOrId);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+datasetCmd
+  .command("delete <slugOrId>")
+  .description("Delete (archive) a dataset")
+  .action(async (slugOrId: string) => {
+    try {
+      const { deleteCommand: deleteDatasetImpl } = await import("./commands/dataset/delete.js");
+      await deleteDatasetImpl(slugOrId);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+datasetCmd
+  .command("upload <target> [file]")
+  .description("Upload a file to a dataset (or create with --create)")
+  .option("--create <name>", "Create a new dataset from the file")
+  .action(async (target: string, file: string | undefined, options: { create?: string }) => {
+    try {
+      const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
+      await uploadDatasetImpl(target, file ?? options, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+datasetCmd
+  .command("download <slugOrId>")
+  .description("Download dataset records as CSV or JSONL")
+  .option("-f, --format <format>", "Output format: csv or jsonl", "csv")
+  .action(async (slugOrId: string, options: { format?: string }) => {
+    try {
+      const { downloadCommand: downloadDatasetImpl } = await import("./commands/dataset/download.js");
+      await downloadDatasetImpl(slugOrId, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
 program.parse(process.argv);
