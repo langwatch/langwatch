@@ -7,6 +7,7 @@
  * The handler is tested by creating a real HTTP server (no Express) with
  * mocked Prisma and Redis dependencies.
  */
+import { createHash, randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import {
   afterAll,
@@ -98,6 +99,47 @@ function parseSseBody(raw: string): unknown[] {
     }
   }
   return results;
+}
+
+/**
+ * Creates a PKCE code_verifier and code_challenge pair for testing.
+ */
+function createPkceChallenge() {
+  const codeVerifier = randomUUID() + randomUUID();
+  const codeChallenge = createHash("sha256")
+    .update(codeVerifier)
+    .digest("base64url");
+  return { codeVerifier, codeChallenge };
+}
+
+/**
+ * Stores a mock auth code in the Redis mock that the handler can retrieve.
+ */
+function mockAuthCodeInRedis({
+  code,
+  codeChallenge,
+  apiKey = VALID_API_KEY,
+  expiresAt,
+}: {
+  code: string;
+  codeChallenge: string;
+  apiKey?: string;
+  expiresAt?: number;
+}) {
+  const entry = JSON.stringify({
+    projectId: PROJECT_ID,
+    encryptedApiKey: `encrypted:${apiKey}`,
+    codeChallenge,
+    codeChallengeMethod: "S256",
+    expiresAt: expiresAt ?? Date.now() + 600_000,
+  });
+
+  mockRedis.get.mockImplementation((key: string) => {
+    if (key === `mcp:auth_code:${code}`) {
+      return Promise.resolve(entry);
+    }
+    return Promise.resolve(null);
+  });
 }
 
 async function sendRequest({
@@ -196,6 +238,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     vi.clearAllMocks();
     mockRedis.get.mockResolvedValue(null);
     mockRedis.set.mockResolvedValue("OK");
+    mockRedis.del.mockResolvedValue(1);
   });
 
   // --- Route Mounting ---
@@ -264,10 +307,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- OAuth client_credentials ---
+  // --- OAuth authorization_code ---
 
   describe("when OAuth metadata is fetched", () => {
-    it("advertises client_credentials grant", async () => {
+    it("advertises authorization_code grant", async () => {
       const res = await sendRequest({
         server,
         method: "GET",
@@ -276,43 +319,129 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(200);
       const body = JSON.parse(res.body);
-      expect(body.grant_types_supported).toContain("client_credentials");
+      expect(body.grant_types_supported).toContain("authorization_code");
+      expect(body.response_types_supported).toContain("code");
+      expect(body.code_challenge_methods_supported).toContain("S256");
+      expect(body.token_endpoint_auth_methods_supported).toContain("none");
+      expect(body.authorization_endpoint).toContain("/mcp/authorize");
       expect(body.token_endpoint).toContain("/oauth/token");
     });
   });
 
-  describe("when client_credentials grant is used with valid API key", () => {
+  describe("when authorization_code grant is used with a valid auth code and PKCE verifier", () => {
     it("issues an access token", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const code = randomUUID();
+      const { codeVerifier, codeChallenge } = createPkceChallenge();
+
+      mockAuthCodeInRedis({ code, codeChallenge });
 
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
       });
 
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.access_token).toBeDefined();
       expect(body.token_type).toBe("Bearer");
+      expect(body.expires_in).toBe(3600);
+
+      // Verify the auth code was deleted (one-time use)
+      expect(mockRedis.del).toHaveBeenCalledWith(`mcp:auth_code:${code}`);
     });
   });
 
-  describe("when client_credentials grant is missing client_secret", () => {
+  describe("when authorization_code grant is used with an invalid code_verifier", () => {
+    it("returns 400 with invalid_grant error", async () => {
+      const code = randomUUID();
+      const { codeChallenge } = createPkceChallenge();
+
+      mockAuthCodeInRedis({ code, codeChallenge });
+
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `grant_type=authorization_code&code=${code}&code_verifier=wrong-verifier`,
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("invalid_grant");
+      expect(body.error_description).toContain("code_verifier");
+    });
+  });
+
+  describe("when authorization_code grant is missing the code parameter", () => {
     it("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: "grant_type=client_credentials",
+        body: "grant_type=authorization_code&code_verifier=some-verifier",
       });
 
       expect(res.status).toBe(400);
       const body = await res.json();
       expect(body.error).toBe("invalid_request");
+      expect(body.error_description).toContain("code is required");
+    });
+  });
+
+  describe("when authorization_code grant is missing the code_verifier parameter", () => {
+    it("returns 400 with invalid_request error", async () => {
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `grant_type=authorization_code&code=${randomUUID()}`,
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("invalid_request");
+      expect(body.error_description).toContain("code_verifier is required");
+    });
+  });
+
+  describe("when an unsupported grant_type is used", () => {
+    it("returns 400 with unsupported_grant_type error", async () => {
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "grant_type=client_credentials&client_secret=some-key",
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("unsupported_grant_type");
+    });
+  });
+
+  describe("when an invalid authorization code is used", () => {
+    it("returns 400 with invalid_grant error", async () => {
+      // Redis returns null for unknown codes (default mock behavior)
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `grant_type=authorization_code&code=invalid-code&code_verifier=some-verifier`,
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("invalid_grant");
     });
   });
 
@@ -353,13 +482,18 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("re-validates the API key against the database during MCP init", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
-      // First, obtain an access token
+      const code = randomUUID();
+      const { codeVerifier, codeChallenge } = createPkceChallenge();
+
+      mockAuthCodeInRedis({ code, codeChallenge });
+
+      // First, obtain an access token via authorization_code
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -390,13 +524,18 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("accepts the connection via Redis lookup", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
-      // Issue a token (this stores it in both memory and Redis mock)
+      const code = randomUUID();
+      const { codeVerifier, codeChallenge } = createPkceChallenge();
+
+      mockAuthCodeInRedis({ code, codeChallenge });
+
+      // Issue a token
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -595,7 +734,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+          body: `grant_type=authorization_code&code=code-${i}&code_verifier=verifier`,
         });
       }
 
@@ -603,7 +742,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=client_credentials&client_secret=${VALID_API_KEY}`,
+        body: `grant_type=authorization_code&code=code-11&code_verifier=verifier`,
       });
 
       expect(res.status).toBe(429);

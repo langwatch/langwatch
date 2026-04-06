@@ -31,6 +31,9 @@ const logger = createLogger("langwatch:mcp");
 /** Redis key prefix for OAuth tokens. */
 const REDIS_TOKEN_PREFIX = "mcp:oauth:token:";
 
+/** Redis key prefix for MCP authorization codes. */
+const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
+
 /** OAuth token TTL in seconds. */
 const TOKEN_TTL_SECONDS = 3600;
 
@@ -472,10 +475,12 @@ export function createMcpHandler(): McpHandler {
 
     sendJson(res, 200, {
       issuer: baseUrl,
+      authorization_endpoint: `${baseUrl}/mcp/authorize`,
       token_endpoint: `${baseUrl}/oauth/token`,
-      token_endpoint_auth_methods_supported: ["client_secret_post"],
-      grant_types_supported: ["client_credentials"],
-      response_types_supported: [],
+      token_endpoint_auth_methods_supported: ["none"],
+      grant_types_supported: ["authorization_code"],
+      response_types_supported: ["code"],
+      code_challenge_methods_supported: ["S256"],
       scopes_supported: ["mcp:tools"],
     });
   }
@@ -504,45 +509,113 @@ export function createMcpHandler(): McpHandler {
     }
     const params = parseFormBody(raw);
 
-    if (params.grant_type !== "client_credentials") {
+    if (params.grant_type !== "authorization_code") {
       sendJson(res, 400, {
         error: "unsupported_grant_type",
         error_description:
-          "Only client_credentials grant type is supported",
+          "Only authorization_code grant type is supported",
       });
       return;
     }
 
-    const clientSecret = params.client_secret;
-    if (!clientSecret) {
+    const code = params.code;
+    if (!code) {
       sendJson(res, 400, {
         error: "invalid_request",
-        error_description:
-          "client_secret is required (use your LangWatch API key)",
+        error_description: "code is required",
       });
       return;
     }
 
-    // Validate the API key against the database
-    const project = await validateApiKey(clientSecret);
-    if (!project) {
-      sendJson(res, 401, {
-        error: "invalid_client",
-        error_description: "Invalid API key",
+    const codeVerifier = params.code_verifier;
+    if (!codeVerifier) {
+      sendJson(res, 400, {
+        error: "invalid_request",
+        error_description: "code_verifier is required",
       });
       return;
     }
+
+    // Look up auth code from Redis
+    if (!redis) {
+      sendJson(res, 500, { error: "server_error" });
+      return;
+    }
+
+    const redisKey = `${REDIS_AUTH_CODE_PREFIX}${code}`;
+    let authCodeData: string | null;
+    try {
+      authCodeData = await redis.get(redisKey);
+    } catch (err) {
+      logger.error({ error: err }, "Redis auth code lookup failed");
+      sendJson(res, 500, { error: "server_error" });
+      return;
+    }
+
+    if (!authCodeData) {
+      sendJson(res, 400, {
+        error: "invalid_grant",
+        error_description: "Invalid or expired authorization code",
+      });
+      return;
+    }
+
+    // Delete the code immediately (one-time use)
+    await redis.del(redisKey).catch((err: unknown) => {
+      logger.error({ error: err }, "Failed to delete auth code from Redis");
+    });
+
+    let stored: {
+      projectId: string;
+      encryptedApiKey: string;
+      codeChallenge: string;
+      codeChallengeMethod: string;
+      expiresAt: number;
+    };
+    try {
+      stored = JSON.parse(authCodeData);
+    } catch {
+      sendJson(res, 400, {
+        error: "invalid_grant",
+        error_description: "Corrupted authorization code",
+      });
+      return;
+    }
+
+    // Check expiration
+    if (Date.now() >= stored.expiresAt) {
+      sendJson(res, 400, {
+        error: "invalid_grant",
+        error_description: "Authorization code has expired",
+      });
+      return;
+    }
+
+    // PKCE S256 verification: base64url(SHA256(code_verifier)) == code_challenge
+    const computedChallenge = createHash("sha256")
+      .update(codeVerifier)
+      .digest("base64url");
+
+    if (computedChallenge !== stored.codeChallenge) {
+      sendJson(res, 400, {
+        error: "invalid_grant",
+        error_description: "PKCE code_verifier does not match code_challenge",
+      });
+      return;
+    }
+
+    // Decrypt the API key
+    const apiKey = decrypt(stored.encryptedApiKey);
 
     const expiresIn = TOKEN_TTL_SECONDS;
     const accessToken = generateAccessToken();
 
-    await storeOAuthToken(accessToken, clientSecret, expiresIn);
+    await storeOAuthToken(accessToken, apiKey, expiresIn);
 
     sendJson(res, 200, {
       access_token: accessToken,
       token_type: "Bearer",
       expires_in: expiresIn,
-      scope: "mcp:tools",
     });
   }
 
