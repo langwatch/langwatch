@@ -5,7 +5,7 @@ import {
   DatasetNotFoundError,
 } from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatTable, formatRelativeTime } from "../../utils/format";
+import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
 
 /**

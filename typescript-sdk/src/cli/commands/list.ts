@@ -50,15 +50,10 @@ export const listCommand = async (): Promise<void> => {
       }));
 
       // Display table
-      formatTable({
-        data: tableData,
-        headers: ["Name", "Version", "Model", "Updated"],
-        colorMap: {
-          Name: chalk.cyan,
-          Version: chalk.green,
-          Model: chalk.yellow,
-        },
-        emptyMessage: "No prompts found",
+      formatTable(tableData, ["Name", "Version", "Model", "Updated"], {
+        Name: chalk.cyan,
+        Version: chalk.green,
+        Model: chalk.yellow,
       });
 
       console.log();
