@@ -816,10 +816,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }>(
       `SELECT
         NormalizedSetId AS ScenarioSetId,
-        toString(argMax(SettledCount, MaxStartedAtMs)) AS TotalCount,
-        toString(argMax(PassCount, MaxStartedAtMs)) AS PassCount,
-        toString(argMax(FailCount, MaxStartedAtMs)) AS FailCount,
-        toString(max(MaxStartedAtMs)) AS LastRunAt
+        toString(argMax(SettledCount, MinStartedAtMs)) AS TotalCount,
+        toString(argMax(PassCount, MinStartedAtMs)) AS PassCount,
+        toString(argMax(FailCount, MinStartedAtMs)) AS FailCount,
+        toString(max(MinStartedAtMs)) AS LastRunAt
        FROM (
          SELECT
            NormalizedSetId,
@@ -828,7 +828,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            countIf(Status NOT IN ('IN_PROGRESS', 'PENDING', 'QUEUED', 'RUNNING')) AS SettledCount,
            countIf(Status = 'SUCCESS') AS PassCount,
            countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED')) AS FailCount,
-           toUnixTimestamp64Milli(max(if(StartedAt IS NOT NULL, StartedAt, CreatedAt))) AS MaxStartedAtMs
+           -- Use min(StartedAt) to match frontend's minTimestamp (batch creation time)
+           toUnixTimestamp64Milli(min(if(StartedAt IS NOT NULL, StartedAt, CreatedAt))) AS MinStartedAtMs
          FROM (
            SELECT ${selectId}, BatchRunId, Status, CreatedAt, StartedAt, ArchivedAt
            FROM (
