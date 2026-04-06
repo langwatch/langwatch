@@ -99,7 +99,7 @@ interface SessionState {
   lastActivityAt: number;
 }
 
-/** Per-session state for legacy SSE transport. */
+/** Per-session state for SSE transport. */
 interface SseSessionState {
   transport: SSEServerTransport;
   apiKey: string;
@@ -852,7 +852,7 @@ export function createMcpHandler(): McpHandler {
   }
 
   // -------------------------------------------------------------------------
-  // Legacy SSE transport handlers (ChatGPT, etc.)
+  // SSE transport handlers (ChatGPT, etc.)
   // -------------------------------------------------------------------------
 
   async function handleSseConnect(

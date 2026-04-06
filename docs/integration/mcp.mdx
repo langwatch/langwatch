@@ -107,6 +107,17 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 *Requires a Pro or Max plan.*
 </Tab>
 
+<Tab title="BoltAI / Other MCP Clients">
+For any MCP client that supports remote servers with OAuth:
+
+1. Add a new remote MCP server
+2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
+3. Select **OAuth (browser)** authentication
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+
+The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
+</Tab>
+
 <Tab title="Other">
 For other MCP-compatible editors, add the following configuration to your MCP settings file:
 
@@ -147,7 +158,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE — click Connect and sign in via your browser to authorize access to your project.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE — click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
 
 ## Usage Examples
 
