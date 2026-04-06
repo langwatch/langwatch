@@ -37,18 +37,32 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
 export function getConfig(): McpConfig {
   const scoped = configStorage.getStore();
   if (scoped) return scoped;
-  if (!globalConfig) throw new Error("Config not initialized");
+  if (!globalConfig) {
+    console.error(
+      "[MCP config] getConfig() failed: globalConfig is null, no scoped config active. " +
+        "Was initConfig() called? Stack:",
+      new Error().stack,
+    );
+    throw new Error("Config not initialized");
+  }
   return globalConfig;
 }
 
 export function requireApiKey(): string {
-  const { apiKey } = getConfig();
-  if (!apiKey) {
+  const config = getConfig();
+  if (!config.apiKey) {
+    const hasScoped = !!configStorage.getStore();
+    console.error(
+      "[MCP config] requireApiKey() failed: apiKey is undefined. " +
+        `scopedConfig=${hasScoped}, endpoint=${config.endpoint}. ` +
+        "In HTTP mode, the API key should be set per-session via runWithConfig(). Stack:",
+      new Error().stack,
+    );
     throw new Error(
       "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable."
     );
   }
-  return apiKey;
+  return config.apiKey;
 }
 
 /**

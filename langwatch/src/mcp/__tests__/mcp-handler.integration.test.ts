@@ -822,4 +822,329 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolNames).toContain("fetch_scenario_docs");
     });
   });
+
+  // --- Tool Execution: AsyncLocalStorage Propagation ---
+  //
+  // These tests verify that the session's API key is correctly propagated
+  // to tool handlers through AsyncLocalStorage. In production (HTTP mode),
+  // there is NO global LANGWATCH_API_KEY — each client provides their own
+  // via OAuth. If the AsyncLocalStorage context is lost during MCP SDK
+  // tool dispatch, requireApiKey() fails with:
+  //   - "Config not initialized" (globalConfig null)
+  //   - "LANGWATCH_API_KEY is required" (globalConfig has no apiKey)
+
+  describe("when search_traces is called within an authenticated session", () => {
+    it("receives the API key from session config via AsyncLocalStorage", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      // Initialize session
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      // Send initialized notification
+      await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      // Call search_traces — the API endpoint is real but the key is fake,
+      // so this will fail with an API error, NOT a config error
+      const toolRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 3,
+          method: "tools/call",
+          params: {
+            name: "search_traces",
+            arguments: {},
+          },
+        },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(toolRes.status).toBe(200);
+      const body = toolRes.json() as Record<string, unknown>;
+      const result = body.result as Record<string, unknown>;
+      const content = result.content as Array<{ type: string; text: string }>;
+
+      // These config errors indicate AsyncLocalStorage context loss
+      expect(content[0]?.text).not.toContain("Config not initialized");
+      expect(content[0]?.text).not.toContain("LANGWATCH_API_KEY is required");
+    });
+  });
+
+  describe("when search_traces is called via an OAuth-obtained access token", () => {
+    it("propagates the OAuth-resolved API key through to the tool handler", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      // 1. Obtain an access token via OAuth authorization_code + PKCE
+      const code = randomUUID();
+      const { codeVerifier, codeChallenge } = createPkceChallenge();
+      mockAuthCodeInRedis({ code, codeChallenge });
+
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
+      });
+      const tokenBody = (await tokenRes.json()) as { access_token: string };
+      const accessToken = tokenBody.access_token;
+
+      // Reset redis mock (auth code was consumed)
+      mockRedis.get.mockResolvedValue(null);
+
+      // 2. Initialize MCP session with the OAuth token
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+      expect(initRes.status).toBe(200);
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      // 3. Send initialized notification
+      await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      // 4. Call search_traces — should reach the API, not fail on config
+      const toolRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 4,
+          method: "tools/call",
+          params: { name: "search_traces", arguments: {} },
+        },
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(toolRes.status).toBe(200);
+      const body = toolRes.json() as Record<string, unknown>;
+      const result = body.result as Record<string, unknown>;
+      const content = result.content as Array<{ type: string; text: string }>;
+
+      expect(content[0]?.text).not.toContain("Config not initialized");
+      expect(content[0]?.text).not.toContain("LANGWATCH_API_KEY is required");
+    });
+  });
+
+  describe("when fetch_langwatch_docs is called with a specific URL", () => {
+    it("returns page content", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      // Call with the index URL (known to work in production)
+      const toolRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 5,
+          method: "tools/call",
+          params: {
+            name: "fetch_langwatch_docs",
+            arguments: { url: "https://langwatch.ai/docs/llms.txt" },
+          },
+        },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(toolRes.status).toBe(200);
+      const body = toolRes.json() as Record<string, unknown>;
+      const result = body.result as Record<string, unknown>;
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content).toBeDefined();
+      expect(content[0]?.text.length).toBeGreaterThan(0);
+      expect(content[0]?.text.toLowerCase()).toContain("langwatch");
+    });
+  });
+
+  describe("when fetch_langwatch_docs is called with a specific docs page URL", () => {
+    it("fetches the page and returns its content", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      const sessionId = initRes.headers["mcp-session-id"]!;
+
+      await sendRequest({
+        server,
+        body: { jsonrpc: "2.0", method: "notifications/initialized" },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      // This is the exact URL pattern that fails in production
+      const toolRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 6,
+          method: "tools/call",
+          params: {
+            name: "fetch_langwatch_docs",
+            arguments: { url: "https://langwatch.ai/docs/integration/overview.md" },
+          },
+        },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+
+      expect(toolRes.status).toBe(200);
+      const body = toolRes.json() as Record<string, unknown>;
+      const result = body.result as Record<string, unknown>;
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content).toBeDefined();
+      expect(content[0]?.text.length).toBeGreaterThan(100);
+      // The result should NOT be an error — in production this was returning
+      // "Error occurred during tool execution"
+      expect(result.isError).not.toBe(true);
+    });
+  });
+
+  // --- SSE Transport Tool Execution ---
+
+  describe("when a tool is called via the SSE transport", () => {
+    it("propagates the API key to search_traces", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const baseUrl = `http://127.0.0.1:${port}`;
+
+      // 1. Connect via SSE — GET /sse with Bearer token
+      // Use AbortController since SSE is a long-lived stream
+      const abortController = new AbortController();
+      const sseChunks: string[] = [];
+
+      const ssePromise = fetch(`${baseUrl}/sse`, {
+        method: "GET",
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+        signal: abortController.signal,
+      }).then(async (res) => {
+        expect(res.status).toBe(200);
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        // Read chunks until we have the endpoint event
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          sseChunks.push(decoder.decode(value, { stream: true }));
+          const joined = sseChunks.join("");
+          if (joined.includes("event: endpoint")) break;
+        }
+      });
+
+      // Wait for the endpoint event
+      await ssePromise;
+
+      // Parse SSE stream to get the endpoint event with session URL
+      const sseBody = sseChunks.join("");
+      const endpointMatch = sseBody.match(
+        /event:\s*endpoint\ndata:\s*(.+)/,
+      );
+      expect(endpointMatch).toBeTruthy();
+
+      const messagesPath = endpointMatch![1]!.trim();
+      expect(messagesPath).toContain("sessionId=");
+
+      // 2. Send initialize request via POST /messages
+      const initRes = await fetch(`${baseUrl}${messagesPath}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${VALID_API_KEY}`,
+        },
+        body: JSON.stringify(mcpInitializeBody()),
+      });
+      expect(initRes.status).toBe(202);
+
+      // 3. Send initialized notification
+      await fetch(`${baseUrl}${messagesPath}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${VALID_API_KEY}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          method: "notifications/initialized",
+        }),
+      });
+
+      // 4. Call search_traces via SSE transport
+      const toolRes = await fetch(`${baseUrl}${messagesPath}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${VALID_API_KEY}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 7,
+          method: "tools/call",
+          params: { name: "search_traces", arguments: {} },
+        }),
+      });
+      expect(toolRes.status).toBe(202);
+
+      // Wait for the tool to execute (response goes through SSE stream)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Verify the server is still healthy (tool didn't crash it)
+      const healthRes = await fetch(`${baseUrl}/mcp/health`);
+      expect(healthRes.status).toBe(200);
+
+      // Clean up the SSE connection
+      abortController.abort();
+    });
+  });
 });

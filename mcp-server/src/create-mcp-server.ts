@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import packageJson from "../package.json" assert { type: "json" };
+import { requireApiKey } from "./config.js";
 
 const modelSchema = z
   .string()
@@ -25,6 +26,29 @@ export function createMcpServer(): McpServer {
   return server;
 }
 
+/**
+ * Wraps a tool handler with error logging. In HTTP mode (production),
+ * tool errors are caught by the MCP SDK and returned to the client as
+ * error responses — but without server-side logs we can't diagnose them.
+ */
+function withToolLogging<T extends unknown[], R>(
+  toolName: string,
+  fn: (...args: T) => Promise<R>,
+): (...args: T) => Promise<R> {
+  return async (...args: T) => {
+    try {
+      return await fn(...args);
+    } catch (error) {
+      console.error(
+        `[MCP tool] ${toolName} failed:`,
+        error instanceof Error ? error.message : error,
+        error instanceof Error ? error.stack : "",
+      );
+      throw error;
+    }
+  };
+}
+
 function registerTools(server: McpServer): void {
   server.tool(
     "fetch_langwatch_docs",
@@ -37,7 +61,7 @@ function registerTools(server: McpServer): void {
           "The full url of the specific doc page. If not provided, the docs index will be fetched."
         ),
     },
-    async ({ url }) => {
+    withToolLogging("fetch_langwatch_docs", async ({ url }) => {
       let urlToFetch = url || "https://langwatch.ai/docs/llms.txt";
       if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
         urlToFetch += ".md";
@@ -53,7 +77,7 @@ function registerTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await response.text() }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -67,7 +91,7 @@ function registerTools(server: McpServer): void {
           "The full url of the specific doc page. If not provided, the docs index will be fetched."
         ),
     },
-    async ({ url }) => {
+    withToolLogging("fetch_scenario_docs", async ({ url }) => {
       let urlToFetch = url || "https://langwatch.ai/scenario/llms.txt";
       if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
         urlToFetch += ".md";
@@ -83,7 +107,7 @@ function registerTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await response.text() }],
       };
-    }
+    })
   );
 
   // --- Observability Tools (require API key) ---
@@ -181,14 +205,13 @@ function registerTools(server: McpServer): void {
           "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
         ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("search_traces", async (params) => {
       requireApiKey();
       const { handleSearchTraces } = await import("./tools/search-traces.js");
       return {
         content: [{ type: "text", text: await handleSearchTraces(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -203,14 +226,13 @@ function registerTools(server: McpServer): void {
           "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
         ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("get_trace", async (params) => {
       requireApiKey();
       const { handleGetTrace } = await import("./tools/get-trace.js");
       return {
         content: [{ type: "text", text: await handleGetTrace(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -245,14 +267,13 @@ function registerTools(server: McpServer): void {
         .optional()
         .describe("Filters to apply"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("get_analytics", async (params) => {
       requireApiKey();
       const { handleGetAnalytics } = await import("./tools/get-analytics.js");
       return {
         content: [{ type: "text", text: await handleGetAnalytics(params) }],
       };
-    }
+    })
   );
 
   // --- Platform Prompt Tools (require API key) ---
@@ -293,28 +314,26 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         'Built-in tags: "latest" (auto-assigned), "production", "staging". Custom tags must be created first.'
       ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_create_prompt", async (params) => {
       requireApiKey();
       const { handleCreatePrompt } = await import("./tools/create-prompt.js");
       return {
         content: [{ type: "text", text: await handleCreatePrompt(params) }],
       };
-    }
+    })
   );
 
   server.tool(
     "platform_list_prompts",
     "List all prompts configured on the LangWatch platform.",
     {},
-    async () => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_list_prompts", async () => {
       requireApiKey();
       const { handleListPrompts } = await import("./tools/list-prompts.js");
       return {
         content: [{ type: "text", text: await handleListPrompts() }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -331,20 +350,19 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"'
       ),
     },
-    async (params) => {
+    withToolLogging("platform_get_prompt", async (params) => {
       if (params.version != null && params.tag) {
         return {
           content: [{ type: "text", text: "Error: Provide either 'version' or 'tag', not both." }],
           isError: true,
         };
       }
-      const { requireApiKey } = await import("./config.js");
       requireApiKey();
       const { handleGetPrompt } = await import("./tools/get-prompt.js");
       return {
         content: [{ type: "text", text: await handleGetPrompt(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -369,14 +387,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         'Tags to assign to the new version created by this update.'
       ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_update_prompt", async (params) => {
       requireApiKey();
       const { handleUpdatePrompt } = await import("./tools/update-prompt.js");
       return {
         content: [{ type: "text", text: await handleUpdatePrompt(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -388,14 +405,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       tag: z.string().describe('Tag name (e.g., "production", "staging")'),
       versionId: z.string().describe("The version ID to assign the tag to"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_assign_prompt_tag", async (params) => {
       requireApiKey();
       const { handleAssignPromptTag } = await import("./tools/assign-prompt-tag.js");
       return {
         content: [{ type: "text", text: await handleAssignPromptTag(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -403,14 +419,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     "List all prompt tag definitions for the organization. " +
     "Shows built-in tags (latest, production, staging) and any custom tags.",
     {},
-    async () => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_list_prompt_tags", async () => {
       requireApiKey();
       const { handleListPromptTags } = await import("./tools/list-prompt-tags.js");
       return {
         content: [{ type: "text", text: await handleListPromptTags() }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -420,14 +435,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     {
       name: z.string().describe("Tag name to create"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_create_prompt_tag", async (params) => {
       requireApiKey();
       const { handleCreatePromptTag } = await import("./tools/create-prompt-tag.js");
       return {
         content: [{ type: "text", text: await handleCreatePromptTag(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -437,14 +451,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
       tag: z.string().describe("Current tag name to rename"),
       name: z.string().describe("New tag name"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_rename_prompt_tag", async (params) => {
       requireApiKey();
       const { handleRenamePromptTag } = await import("./tools/rename-prompt-tag.js");
       return {
         content: [{ type: "text", text: await handleRenamePromptTag(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -453,14 +466,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
     {
       tag: z.string().describe("Tag name to delete"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_delete_prompt_tag", async (params) => {
       requireApiKey();
       const { handleDeletePromptTag } = await import("./tools/delete-prompt-tag.js");
       return {
         content: [{ type: "text", text: await handleDeletePromptTag(params) }],
       };
-    }
+    })
   );
 
   // --- Platform Scenario Tools (require API key) ---
@@ -495,8 +507,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .optional()
         .describe("Tags for organizing and filtering scenarios"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_create_scenario", async (params) => {
       requireApiKey();
       const { handleCreateScenario } = await import(
         "./tools/create-scenario.js"
@@ -506,7 +517,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleCreateScenario(params) },
         ],
       };
-    }
+    })
   );
 
   server.tool(
@@ -520,8 +531,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
         ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_list_scenarios", async (params) => {
       requireApiKey();
       const { handleListScenarios } = await import(
         "./tools/list-scenarios.js"
@@ -531,7 +541,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleListScenarios(params) },
         ],
       };
-    }
+    })
   );
 
   server.tool(
@@ -546,14 +556,13 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
         ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_get_scenario", async (params) => {
       requireApiKey();
       const { handleGetScenario } = await import("./tools/get-scenario.js");
       return {
         content: [{ type: "text", text: await handleGetScenario(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -572,8 +581,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .optional()
         .describe("Updated labels"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_update_scenario", async (params) => {
       requireApiKey();
       const { handleUpdateScenario } = await import(
         "./tools/update-scenario.js"
@@ -583,7 +591,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleUpdateScenario(params) },
         ],
       };
-    }
+    })
   );
 
   server.tool(
@@ -592,8 +600,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       scenarioId: z.string().describe("The scenario ID to archive"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_archive_scenario", async (params) => {
       requireApiKey();
       const { handleArchiveScenario } = await import(
         "./tools/archive-scenario.js"
@@ -603,7 +610,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleArchiveScenario(params) },
         ],
       };
-    }
+    })
   );
 
   // --- Platform Evaluator Tools (require API key) ---
@@ -620,8 +627,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.'
         ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_create_evaluator", async (params) => {
       requireApiKey();
       const { handleCreateEvaluator } = await import(
         "./tools/create-evaluator.js"
@@ -631,15 +637,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleCreateEvaluator(params) },
         ],
       };
-    }
+    })
   );
 
   server.tool(
     "platform_list_evaluators",
     "List all evaluators configured on the LangWatch platform.",
     {},
-    async () => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_list_evaluators", async () => {
       requireApiKey();
       const { handleListEvaluators } = await import(
         "./tools/list-evaluators.js"
@@ -647,7 +652,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListEvaluators() }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -658,8 +663,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .string()
         .describe("The evaluator ID or slug to retrieve"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_get_evaluator", async (params) => {
       requireApiKey();
       const { handleGetEvaluator } = await import(
         "./tools/get-evaluator.js"
@@ -667,7 +671,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleGetEvaluator(params) }],
       };
-    }
+    })
   );
 
   server.tool(
@@ -683,8 +687,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "Updated config settings. Note: evaluatorType cannot be changed after creation."
         ),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_update_evaluator", async (params) => {
       requireApiKey();
       const { handleUpdateEvaluator } = await import(
         "./tools/update-evaluator.js"
@@ -694,7 +697,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleUpdateEvaluator(params) },
         ],
       };
-    }
+    })
   );
 
   // --- Platform Model Provider Tools (require API key) ---
@@ -721,8 +724,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .optional()
         .describe("Set as project default model"),
     },
-    async (params) => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_set_model_provider", async (params) => {
       requireApiKey();
       const { handleSetModelProvider } = await import(
         "./tools/set-model-provider.js"
@@ -732,15 +734,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           { type: "text", text: await handleSetModelProvider(params) },
         ],
       };
-    }
+    })
   );
 
   server.tool(
     "platform_list_model_providers",
     "List all model providers configured on the LangWatch platform. API keys are masked in the response.",
     {},
-    async () => {
-      const { requireApiKey } = await import("./config.js");
+    withToolLogging("platform_list_model_providers", async () => {
       requireApiKey();
       const { handleListModelProviders } = await import(
         "./tools/list-model-providers.js"
@@ -748,6 +749,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       return {
         content: [{ type: "text", text: await handleListModelProviders() }],
       };
-    }
+    })
   );
 }
