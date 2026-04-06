@@ -25,9 +25,11 @@ COPY langevals/langevals/ langevals/
 RUN PYTHONPATH="." uv run python langevals/server.py --preload
 
 ENV RUNNING_IN_DOCKER=true
+ENV PATH="/usr/src/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/usr/src/app"
 
 # Copy remaining project files (scripts, docs, etc.)
 COPY langevals/scripts/ scripts/
 COPY langevals/Makefile langevals/README.md langevals/LICENSE.md ./
 
-CMD ["uv", "run", "python", "langevals/server.py"]
+CMD ["python", "langevals/server.py"]

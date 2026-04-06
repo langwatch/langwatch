@@ -35,11 +35,6 @@ global:
     nodeSelector: {}
     affinity: {}
     tolerations: []
-  ## @extra global.security Security settings for all pods.
-  ## @param global.security.allowInsecureImages [boolean] Allow insecure images.
-  security:
-    # Allow insecure images to deal with Bitnami's overall product deprecation
-    allowInsecureImages: true
 
 # =============================================================================
 # Auto-Generation Mode (Development Only)
@@ -75,6 +70,12 @@ secrets:
     # Key for credentials encryption (used by app)
     ## @param secrets.secretKeys.credentialsEncryptionKey [string] Key name for credentials encryption.
     credentialsEncryptionKey: "credentialsEncryptionKey"
+    # Key for cron API key (used by app and cronjobs)
+    ## @param secrets.secretKeys.cronApiKey [string] Key name for cron API key.
+    cronApiKey: "cronApiKey"
+    # Key for NextAuth secret (used by app)
+    ## @param secrets.secretKeys.nextAuthSecret [string] Key name for NextAuth secret.
+    nextAuthSecret: "nextAuthSecret"
 
 # =============================================================================
 # Container Image Configurations
@@ -176,8 +177,6 @@ app:
     skipEnvValidation: false
     # Disable PII (Personally Identifiable Information) redaction
     disablePiiRedaction: false
-    # Enable automatic topic clustering for conversations
-    topicClustering: true
 
   # Upstream service connections
   # Define how the main app connects to other LangWatch services
@@ -505,10 +504,8 @@ app:
     # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     ## @param app.deployment.strategy [object] Deployment strategy overrides.
     strategy: {}
-  # Number of old replicasets to retain
-  # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
-  ## @param app.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
-  revisionHistoryLimit: 10
+    ## @param app.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -611,6 +608,8 @@ workers:
     labels: {}
     ## @param workers.deployment.strategy [object] Deployment strategy overrides.
     strategy: {}
+    ## @param workers.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
   # Additional Kubernetes resources
   ## @param workers.extraEnvs [array] Additional environment variables.
   extraEnvs: []
@@ -721,10 +720,10 @@ langwatch_nlp:
     # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     ## @param langwatch_nlp.deployment.strategy [object] Deployment strategy overrides.
     strategy: {}
-  # Number of old replicasets to retain
-  # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
-  ## @param langwatch_nlp.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
-  revisionHistoryLimit: 10
+    # Number of old replicasets to retain
+    # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
+    ## @param langwatch_nlp.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -843,10 +842,10 @@ langevals:
     # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     ## @param langevals.deployment.strategy [object] Deployment strategy overrides.
     strategy: {}
-  # Number of old replicasets to retain
-  # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
-  ## @param langevals.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
-  revisionHistoryLimit: 10
+    # Number of old replicasets to retain
+    # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
+    ## @param langevals.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -884,16 +883,18 @@ cronjobs:
   # Enable or disable all cron jobs
   ## @param cronjobs.enabled [default: true] Enable all cron jobs.
   enabled: true
+  ## @param cronjobs.labels [object] Additional labels for CronJob resources.
+  labels: {}
 
   # Container image for the cron job pods
   # See: https://kubespec.dev/batch/v1/CronJob#spec.jobTemplate.spec.template.spec.containers.image
   ## @extra cronjobs.image Cron job image.
   ## @param cronjobs.image.repository [string, default: curlimages/curl] Image repository.
-  ## @param cronjobs.image.tag [string, default: latest] Image tag.
+  ## @param cronjobs.image.tag [string, default: 8.12.1] Image tag.
   ## @param cronjobs.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
   image:
     repository: curlimages/curl
-    tag: latest
+    tag: "8.12.1"
     pullPolicy: IfNotPresent
 
   # Resource requirements for cron job pods
@@ -906,13 +907,6 @@ cronjobs:
   resources:
     requests: { cpu: 100m, memory: 64Mi }
     limits: { cpu: 100m, memory: 64Mi }
-
-  # Connection to the main LangWatch application
-  ## @extra cronjobs.upstreams Upstream to app for cron endpoints.
-  ## @param cronjobs.upstreams.langwatch.name [string, default: langwatch-app] App service name.
-  ## @param cronjobs.upstreams.langwatch.port [default: 5560] App service port.
-  upstreams:
-    langwatch: { name: langwatch-app, port: 5560 }
 
   # Individual cron job configurations
   ## @extra cronjobs.jobs Individual cron job endpoints and schedules.
@@ -964,10 +958,6 @@ cronjobs:
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   ## @param cronjobs.containerSecurityContext [object] Container security context overrides.
   containerSecurityContext: {}
-  # PodDisruptionBudget pass-through (spec fields)
-  # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
-  ## @param cronjobs.podDisruptionBudget [object] PodDisruptionBudget spec overrides.
-  podDisruptionBudget: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   ## @param cronjobs.nodeSelector [object] Node selector overrides.
@@ -1039,6 +1029,10 @@ cronjobs:
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
   ## @param cronjobs.extraCronjobsLifecycle [object] Additional lifecycle hooks for cron job container.
   extraCronjobsLifecycle: {}
+  # Additional volume mounts for the CronJobs container
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
+  ## @param cronjobs.extraVolumeMounts [array] Additional volume mounts for cron job container.
+  extraVolumeMounts: []
 
 # =============================================================================
 # Ingress Configuration
@@ -1072,7 +1066,7 @@ ingress:
             pathType: ImplementationSpecific
             backend:
               service:
-                name: "langwatch-app"
+                name: "langwatch-app"  # Override with {{ .Release.Name }}-app in your values
                 port:
                   number: 5560
 
@@ -1117,28 +1111,51 @@ prometheus:
       ## @param prometheus.external.secretKeys.connectionString [string] Secret key for connection string.
       connectionString: "connection-string"
 
-  version: 2.1.23
-
-  # Alertmanager configuration for alert routing
-  # See: https://kubespec.dev/v1/ConfigMap
+  # Alertmanager (disabled — LangWatch does not use Prometheus alerting)
   ## @param prometheus.alertmanager.enabled [default: false] Enable Alertmanager.
   alertmanager:
     enabled: false
 
-  # Pushgateway for batch job metrics
-  # See: https://kubespec.dev/v1/Service
-  ## @param prometheus.pushgateway.enabled [default: false] Enable Pushgateway.
-  pushgateway:
+  # Disable sub-charts that LangWatch does not need
+  ## @param prometheus.kube-state-metrics.enabled [default: false] Enable kube-state-metrics sub-chart.
+  kube-state-metrics:
     enabled: false
+  ## @param prometheus.prometheus-node-exporter.enabled [default: false] Enable node-exporter sub-chart.
+  prometheus-node-exporter:
+    enabled: false
+  ## @param prometheus.prometheus-pushgateway.enabled [default: false] Enable pushgateway sub-chart.
+  prometheus-pushgateway:
+    enabled: false
+
+  # RBAC configuration (top-level in prometheus-community chart)
+  # See: https://kubespec.dev/rbac.authorization.k8s.io/v1/ClusterRole
+  ## @extra prometheus.rbac RBAC settings for Prometheus.
+  ## @param prometheus.rbac.create [default: true] Create RBAC resources.
+  rbac:
+    create: true
+
+  # Service account configuration (top-level in prometheus-community chart)
+  # See: https://kubespec.dev/v1/ServiceAccount
+  ## @extra prometheus.serviceAccounts.server ServiceAccount settings.
+  ## @param prometheus.serviceAccounts.server.create [default: true] Create a dedicated ServiceAccount.
+  serviceAccounts:
+    server:
+      create: true
 
   # Prometheus server configuration
   server:
-    # Image configuration
+    # Use our ConfigMap for the scrape configuration
+    # The ConfigMap is rendered by templates/prometheus.yaml
+    ## @param prometheus.server.configMapOverrideName [string] Override ConfigMap name for scrape config.
+    configMapOverrideName: prometheus-config
+
+    # Image configuration (prometheus-community default: prom/prometheus)
     ## @extra prometheus.server.image Image configuration.
-    ## @param prometheus.server.image.repository [string, default: bitnamilegacy/prometheus] Image repository.
+    ## @param prometheus.server.image.repository [string, default: quay.io/prometheus/prometheus] Image repository.
+    ## @param prometheus.server.image.tag [string, default: v3.2.1] Image tag.
     image:
-      # Use the legacy image to deal with Bitnami's overall product deprecation
-      repository: bitnamilegacy/prometheus
+      repository: quay.io/prometheus/prometheus
+      tag: v3.2.1
 
     # Number of Prometheus replicas
     # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
@@ -1153,13 +1170,13 @@ prometheus:
       scrape_interval: 15s
       evaluation_interval: 15s
 
-    # Persistent storage configuration
+    # Persistent storage configuration (prometheus-community uses persistentVolume)
     # See: https://kubespec.dev/v1/PersistentVolumeClaim
-    ## @extra prometheus.server.persistence Persistent storage configuration.
-    ## @param prometheus.server.persistence.enabled [default: true] Enable persistence.
-    ## @param prometheus.server.persistence.size [string, default: 6Gi] PVC size.
-    ## @param prometheus.server.persistence.storageClass [string] Storage class name.
-    persistence:
+    ## @extra prometheus.server.persistentVolume Persistent storage configuration.
+    ## @param prometheus.server.persistentVolume.enabled [default: true] Enable persistence.
+    ## @param prometheus.server.persistentVolume.size [string, default: 6Gi] PVC size.
+    ## @param prometheus.server.persistentVolume.storageClass [string] Storage class name.
+    persistentVolume:
       enabled: true
       size: 6Gi
       storageClass: ""
@@ -1183,34 +1200,18 @@ prometheus:
         cpu: 500m
         memory: 2Gi
 
-    # Role-based access control configuration
-    # See: https://kubespec.dev/rbac.authorization.k8s.io/v1/ClusterRole
-    ## @extra prometheus.server.rbac RBAC settings for Prometheus.
-    ## @param prometheus.server.rbac.create [default: true] Create RBAC resources.
-    ## @param prometheus.server.rbac.includeDefaultRules [default: true] Include default RBAC rules.
-    rbac:
-      create: true
-      includeDefaultRules: true
-
-    # Service account configuration
-    # See: https://kubespec.dev/v1/ServiceAccount
-    ## @extra prometheus.server.serviceAccount ServiceAccount settings.
-    ## @param prometheus.server.serviceAccount.create [default: true] Create a dedicated ServiceAccount.
-    serviceAccount:
-      create: true
-
     # Service configuration
     # See: https://kubespec.dev/v1/Service
     ## @extra prometheus.server.service Service configuration.
     ## @param prometheus.server.service.type [string, default: ClusterIP] Service type.
-    ## @param prometheus.server.service.port [default: 9090] Service port.
+    ## @param prometheus.server.service.servicePort [default: 9090] Service port.
     service:
       type: ClusterIP
-      port: 9090
+      servicePort: 9090
 
-    # Security context for the Prometheus container
-    # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
-    ## @extra prometheus.server.securityContext Security context for Prometheus container.
+    # Pod security context for the Prometheus server
+    # See: https://kubespec.dev/v1/Pod#spec.securityContext
+    ## @extra prometheus.server.securityContext Pod security context for Prometheus.
     ## @param prometheus.server.securityContext.runAsNonRoot [default: true] Run as non-root user.
     ## @param prometheus.server.securityContext.runAsUser [default: 65534] User ID.
     ## @param prometheus.server.securityContext.fsGroup [default: 65534] FS group ID.
@@ -1247,8 +1248,8 @@ postgresql:
     # via the `existingSecret` field.
     ## @param postgresql.auth.password [string] Database password (do not set inline in production).
     password: ""
-    ## @param postgresql.auth.database [string, default: mydb] Database name.
-    database: mydb
+    ## @param postgresql.auth.database [string, default: langwatch] Database name.
+    database: langwatch
     ## @param postgresql.auth.existingSecret [string] Existing secret for DB credentials.
     existingSecret: "" # See: https://kubespec.dev/v1/Secret
     secretKeys:
@@ -1261,155 +1262,147 @@ postgresql:
       ## @param postgresql.auth.secretKeys.databaseKey [string, default: database] Database key.
       databaseKey: "database"
 
-  # PostgreSQL container image
+  # PostgreSQL container image (official Docker Hub image)
+  ## @extra postgresql.image PostgreSQL container image.
   image:
-    repository: bitnamilegacy/postgresql
-
-  # Data directory path
-  ## @param postgresql.postgresqlDataDir [string, default: /var/lib/postgresql/data/pgdata] Data dir path.
-  postgresqlDataDir: /var/lib/postgresql/data/pgdata
-
-  # Volume permissions initialization
-  volumePermissions:
-    ## @param postgresql.volumePermissions.enabled [default: true] Enable volume permissions init.
-    enabled: true
-    image:
-      repository: bitnamilegacy/os-shell
-      tag: 12-debian-12-r51
+    ## @param postgresql.image.repository [string, default: postgres] Image repository.
+    repository: postgres
+    ## @param postgresql.image.tag [string, default: "17"] Image tag.
+    tag: "17"
+    ## @param postgresql.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
+    pullPolicy: IfNotPresent
 
   # Primary database configuration
   primary:
-    # Persistent storage configuration
-    # See: https://kubespec.dev/v1/PersistentVolumeClaim
     ## @extra postgresql.primary.persistence Persistent volume for primary.
-    ## @param postgresql.primary.persistence.enabled [default: true] Enable persistence.
-    ## @param postgresql.primary.persistence.mountPath [string, default: /var/lib/postgresql/data] Mount path.
-    ## @param postgresql.primary.persistence.size [string, default: 20Gi] PVC size.
-    ## @param postgresql.primary.persistence.storageClass [string] Storage class.
     persistence:
-      enabled: true
-      # Migration note: if you are migrating from a `langwatch-helm` version before 1.0.0, you can set
-      # this property and value in your values.yaml file, and you will not lose any data
-      # from the previous deployment
-
-      # existingClaim: "data-langwatch-postgres-0"
-      mountPath: /var/lib/postgresql/data
+      ## @param postgresql.primary.persistence.size [string, default: 20Gi] PVC size.
       size: 20Gi
+      ## @param postgresql.primary.persistence.storageClass [string] Storage class.
       storageClass: ""
-
-      # Health check probes
-      # See: https://kubespec.dev/v1/Pod#spec.containers.readinessProbe
-      ## @extra postgresql.primary.persistence.readinessProbe Readiness probe toggle.
-      ## @param postgresql.primary.persistence.readinessProbe.enabled [default: true] Enable readiness probe.
-      readinessProbe:
-        enabled: true
-      # See: https://kubespec.dev/v1/Pod#spec.containers.livenessProbe
-      ## @extra postgresql.primary.persistence.livenessProbe Liveness probe toggle.
-      ## @param postgresql.primary.persistence.livenessProbe.enabled [default: true] Enable liveness probe.
-      livenessProbe:
-        enabled: true
-
-  # Resource requirements for PostgreSQL
-  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
-  ## @extra postgresql.resources Resource requests and limits.
-  ## @param postgresql.resources.requests.cpu [string, default: 250m] Requested CPU.
-  ## @param postgresql.resources.requests.memory [string, default: 512Mi] Requested memory.
-  ## @param postgresql.resources.limits.cpu [string, default: 1000m] CPU limit.
-  ## @param postgresql.resources.limits.memory [string, default: 1Gi] Memory limit.
-  resources:
-    requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
+    ## @extra postgresql.primary.resources Resource requests and limits.
+    resources:
+      requests:
+        ## @param postgresql.primary.resources.requests.cpu [string, default: 250m] Requested CPU.
+        cpu: 250m
+        ## @param postgresql.primary.resources.requests.memory [string, default: 512Mi] Requested memory.
+        memory: 512Mi
+      limits:
+        ## @param postgresql.primary.resources.limits.cpu [string, default: 1000m] CPU limit.
+        cpu: 1000m
+        ## @param postgresql.primary.resources.limits.memory [string, default: 1Gi] Memory limit.
+        memory: 1Gi
 
 # =============================================================================
-# OpenSearch Configuration
+# ClickHouse Configuration
 # =============================================================================
-# Search and analytics engine for trace data and logs
-## @section OpenSearch
-opensearch:
-  # Whether to manage OpenSearch via this chart or use external instance
-  ## @param opensearch.chartManaged [default: true] Manage OpenSearch via this chart.
+# Columnar analytics database for traces, spans, and evaluations.
+# Three modes: chart-managed (simple), chart-managed (advanced override), or external.
+# When chart-managed, set replicas/memory/cpu/storage and we derive all ClickHouse internals.
+# replicas=1: standalone MergeTree, no Keeper. replicas=3+: ReplicatedMergeTree + Keeper cluster.
+## @section ClickHouse
+clickhouse:
+  ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
-  # External search engine configuration (when chartManaged: false)
+  # ---------------------------------------------------------------------------
+  # External ClickHouse (when chartManaged: false)
+  # ---------------------------------------------------------------------------
   external:
-    # Search engine to use. Options: opensearch (default), elasticsearch, quickwit
-    # When set to 'opensearch', enables OpenSearch integration
-    # When set to 'elasticsearch', enables Elasticsearch integration
-    # When set to 'quickwit', enables Quickwit integration
-    ## @param opensearch.external.engine [string, default: opensearch] Search engine type (opensearch|elasticsearch|quickwit).
-    engine: opensearch
-    nodeUrl:
-      ## @param opensearch.external.nodeUrl.value [string] External engine node URL.
+    ## @extra clickhouse.external.url ClickHouse connection URL.
+    url:
+      ## @param clickhouse.external.url.value [string] Full ClickHouse URL (http://user:pass@host:8123/database).
       value: ""
-      ## @param opensearch.external.nodeUrl.secretKeyRef [object] Secret ref for external engine node URL.
+      ## @param clickhouse.external.url.secretKeyRef.name [string] Secret name for URL.
+      ## @param clickhouse.external.url.secretKeyRef.key [string] Secret key for URL.
       secretKeyRef: { name: "", key: "" }
-    apiKey:
-      ## @param opensearch.external.apiKey.value [string] API key for external engine.
-      value: ""
-      ## @param opensearch.external.apiKey.secretKeyRef [object] Secret ref for external engine API key.
-      secretKeyRef: { name: "", key: "" }
+    ## @param clickhouse.external.cluster [string] Cluster name for ON CLUSTER DDL (omit for non-replicated).
+    cluster: ""
 
-  # Authentication configuration
-  auth:
-    ## @param opensearch.auth.adminPassword [string] Admin password (autogenerated if empty when chart-managed).
-    adminPassword: "" # Will be auto-generated if not provided
-    ## @param opensearch.auth.existingSecret [string] Existing secret for admin credentials.
-    existingSecret: "" # Use existing secret for production
-    secretKeys:
-      ## @param opensearch.auth.secretKeys.adminPasswordKey [string, default: admin-password] Password key name.
-      adminPasswordKey: "admin-password"
+  # ---------------------------------------------------------------------------
+  # Chart-managed subchart configuration (clickhouse-serverless)
+  # Only used when chartManaged: true.
+  # See charts/clickhouse-serverless/values.yaml for all options.
+  # ---------------------------------------------------------------------------
 
-  # OpenSearch cluster configuration
-  ## @param opensearch.replicas [default: 1] Number of OpenSearch replicas.
+  ## @param clickhouse.replicas [default: 1] ClickHouse replicas. 1 = standalone MergeTree. 3+ = Keeper + ReplicatedMergeTree (must be odd).
   replicas: 1
+  ## @param clickhouse.memory [string, default: 4Gi] Memory limit per ClickHouse pod. Image auto-tunes MAX_SERVER_MEMORY_USAGE (85%), per-query limits (20%), etc.
+  memory: 4Gi
+  ## @param clickhouse.cpu [default: 2] CPU limit per ClickHouse pod. Image auto-tunes merge pool size, insert threads, etc.
+  cpu: 2
 
-  # OpenSearch configuration file
-  ## @extra opensearch.config OpenSearch config file content.
-  config:
-    ## @param opensearch.config.opensearch.yml [string] Contents of opensearch.yml.
-    opensearch.yml: |
-      network.host: 0.0.0.0
-      discovery.type: single-node
-      plugins.security.disabled: true
+  ## @extra clickhouse.storage Hot storage configuration.
+  storage:
+    ## @param clickhouse.storage.size [string, default: 50Gi] PVC size for hot data.
+    size: 50Gi
+    ## @param clickhouse.storage.storageClass [string] Storage class (empty = cluster default).
+    storageClass: ""
 
-  # Additional environment variables
-  # See: https://kubespec.dev/v1/Pod#spec.containers.env
-  ## @extra opensearch.extraEnvs Additional environment variables.
-  ## @skip opensearch.extraEnvs Skip documenting example environment variable item.
-  extraEnvs:
-    - name: cluster.initial_master_nodes
-      value: "" # force empty so the setting is gone
+  ## @extra clickhouse.objectStorage S3-compatible object storage (shared by cold storage and backups).
+  objectStorage:
+    ## @param clickhouse.objectStorage.bucket [string] S3 bucket name.
+    bucket: ""
+    ## @param clickhouse.objectStorage.region [string] S3 region.
+    region: ""
+    ## @param clickhouse.objectStorage.endpoint [string] S3-compatible endpoint URL (e.g. https://s3.us-east-1.amazonaws.com/bucket/).
+    endpoint: ""
+    ## @param clickhouse.objectStorage.useEnvironmentCredentials [default: true] Use IRSA / workload identity instead of static keys.
+    useEnvironmentCredentials: true
+    ## @extra clickhouse.objectStorage.credentials Static S3 credentials (only when useEnvironmentCredentials is false).
+    credentials:
+      secretKeyRef:
+        ## @param clickhouse.objectStorage.credentials.secretKeyRef.name [string] Secret name containing S3 access keys.
+        name: ""
+        ## @param clickhouse.objectStorage.credentials.secretKeyRef.accessKeyKey [string, default: accessKey] Key for access key ID.
+        accessKeyKey: "accessKey"
+        ## @param clickhouse.objectStorage.credentials.secretKeyRef.secretKeyKey [string, default: secretKey] Key for secret access key.
+        secretKeyKey: "secretKey"
 
-  # Persistent storage configuration
-  # See: https://kubespec.dev/v1/PersistentVolumeClaim
-  ## @extra opensearch.persistence Persistent storage configuration.
-  ## @param opensearch.persistence.enabled [default: true] Enable persistence.
-  ## @param opensearch.persistence.size [string, default: 20Gi] PVC size.
-  ## @param opensearch.persistence.accessModes [array, default: [ReadWriteOnce]] Access modes.
-  persistence:
-    enabled: true
-    size: 20Gi
-    accessModes: [ReadWriteOnce]
-    # storageClass: <set if you don't have a default>
+  ## @extra clickhouse.cold Cold storage: tiered hot→cold data movement (requires objectStorage).
+  cold:
+    ## @param clickhouse.cold.enabled [default: false] Enable tiered storage to S3.
+    enabled: false
+    ## @param clickhouse.cold.defaultTtlDays [default: 49] Default TTL days before moving data to cold storage (must be divisible by 7).
+    defaultTtlDays: 49
 
-  # Resource requirements for OpenSearch
-  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
-  ## @extra opensearch.resources Resource requests and limits.
-  ## @param opensearch.resources.requests.cpu [string, default: 1000m] Requested CPU.
-  ## @param opensearch.resources.requests.memory [string, default: 2Gi] Requested memory.
-  ## @param opensearch.resources.limits.cpu [string, default: 2] CPU limit.
-  ## @param opensearch.resources.limits.memory [string, default: 4Gi] Memory limit.
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 2Gi
-    limits:
-      cpu: 2
-      memory: 4Gi
+  ## @extra clickhouse.backup Native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage).
+  backup:
+    ## @param clickhouse.backup.enabled [default: false] Enable automated native ClickHouse backups.
+    enabled: false
+    ## @param clickhouse.backup.database [string, default: langwatch] Database to back up.
+    database: "langwatch"
+    ## @extra clickhouse.backup.full Full backup schedule.
+    full:
+      ## @param clickhouse.backup.full.schedule [string, default: "0 */12 * * *"] Cron schedule for full backups.
+      schedule: "0 */12 * * *"
+    ## @extra clickhouse.backup.incremental Incremental backup schedule.
+    incremental:
+      ## @param clickhouse.backup.incremental.schedule [string, default: "0 * * * *"] Cron schedule for incremental backups.
+      schedule: "0 * * * *"
+
+  ## @extra clickhouse.auth Authentication configuration.
+  auth:
+    ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
+    password: ""
+    ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password.
+    existingSecret: ""
+    ## @extra clickhouse.auth.secretKeys Key mappings for existing secret.
+    secretKeys:
+      ## @param clickhouse.auth.secretKeys.passwordKey [string, default: password] Key name in the existing secret.
+      passwordKey: "password"
+
+  ## @param clickhouse.env [object] Advanced: override any computed ClickHouse env var (applied last).
+  env: {}
+
+  ## @extra clickhouse.scheduling Scheduling constraints for ClickHouse pods.
+  scheduling:
+    ## @param clickhouse.scheduling.nodeSelector [object] Node selector for ClickHouse pods.
+    nodeSelector: {}
+    ## @param clickhouse.scheduling.affinity [object] Affinity rules for ClickHouse pods.
+    affinity: {}
+    ## @param clickhouse.scheduling.tolerations [array] Tolerations for ClickHouse pods.
+    tolerations: []
 
 # =============================================================================
 # Redis Configuration
@@ -1435,9 +1428,15 @@ redis:
       ## @param redis.external.connectionString.secretKeyRef [object] Secret ref for connection string.
       secretKeyRef: { name: "", key: "" }
 
+  # Redis container image (official Docker Hub image)
+  ## @extra redis.image Redis container image.
   image:
-    # Use the legacy image to deal with Bitnami's overall product deprecation
-    repository: bitnamilegacy/redis
+    ## @param redis.image.repository [string, default: redis] Image repository.
+    repository: redis
+    ## @param redis.image.tag [string, default: "8"] Image tag.
+    tag: "8"
+    ## @param redis.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
+    pullPolicy: IfNotPresent
 
   # Authentication configuration
   auth:
@@ -1450,13 +1449,6 @@ redis:
     secretKeys:
       ## @param redis.auth.secretKeys.passwordKey [string, default: password] Password key name.
       passwordKey: "password"
-
-  # Redis architecture (single instance)
-  # Redis architecture to use. Options: standalone (default), cluster
-  # When set to 'standalone', enables single Redis instance
-  # When set to 'cluster', enables Redis cluster mode
-  ## @param redis.architecture [string, default: standalone] Redis architecture (standalone|cluster).
-  architecture: standalone
 
   # Master node configuration
   master:

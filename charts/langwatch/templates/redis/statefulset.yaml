@@ -1,0 +1,98 @@
+{{- if .Values.redis.chartManaged }}
+{{- $authEnabled := .Values.redis.auth.enabled }}
+{{- $secretName := .Values.redis.auth.existingSecret | default (printf "%s-redis" .Release.Name) }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-redis-master
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ .Release.Name }}-redis-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-redis
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-redis
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: redis
+    spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        runAsNonRoot: true
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+          imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
+          {{- if $authEnabled }}
+          command: ["sh", "-c", "redis-server --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\""]
+          {{- else }}
+          command: ["redis-server", "--maxmemory-policy", "noeviction"]
+          {{- end }}
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          {{- if $authEnabled }}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.secretKeys.passwordKey | default "password" }}{{ else }}redis-password{{ end }}
+          {{- end }}
+          {{- with .Values.redis.master.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            exec:
+              {{- if $authEnabled }}
+              command: ["sh", "-c", "REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping"]
+              {{- else }}
+              command: ["redis-cli", "ping"]
+              {{- end }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              {{- if $authEnabled }}
+              command: ["sh", "-c", "REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping"]
+              {{- else }}
+              command: ["redis-cli", "ping"]
+              {{- end }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  {{- if .Values.redis.master.persistence.enabled | default true }}
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.redis.master.persistence.storageClass }}
+        storageClassName: {{ .Values.redis.master.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.redis.master.persistence.size | default "8Gi" }}
+  {{- end }}
+{{- end }}
