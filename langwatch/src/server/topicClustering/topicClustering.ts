@@ -198,13 +198,20 @@ async function fetchCountsFromClickHouse(
   const result = await clickhouse.query({
     query: `
       SELECT
-        toString(count(DISTINCT TraceId)) AS total,
-        toString(countDistinctIf(TraceId, length(ComputedInput) > 0)) AS withInput,
-        toString(countDistinctIf(TraceId, OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countDistinctIf(TraceId, TopicId IS NOT NULL AND TopicId != '')) AS assigned
-      FROM trace_summaries
+        toString(count(*)) AS total,
+        toString(countIf(length(ComputedInput) > 0)) AS withInput,
+        toString(countIf(OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
+        toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
+      FROM trace_summaries t
       WHERE TenantId = {tenantId:String}
         AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+          GROUP BY TenantId, TraceId
+        )
     `,
     query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
@@ -320,9 +327,14 @@ async function fetchTracesFromClickHouse(
   }
 
   if (searchAfter) {
-    conditions.push(
-      "(toUnixTimestamp64Milli(OccurredAt), TraceId) < ({lastTs:UInt64}, {lastTraceId:String})",
-    );
+    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here
+    conditions.push(`(
+      toUnixTimestamp64Milli(OccurredAt) < {lastTs:UInt64}
+      OR (
+        toUnixTimestamp64Milli(OccurredAt) = {lastTs:UInt64}
+        AND TraceId > {lastTraceId:String}
+      )
+    )`);
   }
 
   const baseWhereClause = baseConditions.join(" AND ");
