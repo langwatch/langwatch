@@ -18,9 +18,8 @@ vi.mock("~/server/scenarios/execution/data-prefetcher", () => ({
   prefetchScenarioData: vi.fn(),
 }));
 
-vi.mock("~/server/scenarios/scenario.queue", () => ({
+vi.mock("~/server/scenarios/scenario.ids", () => ({
   generateBatchRunId: vi.fn().mockReturnValue("batch_test_123"),
-  scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job_test_123" }),
 }));
 
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
@@ -66,12 +65,10 @@ vi.mock("~/server/auditLog", () => ({
 // Import mocked functions after mocking
 import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { scheduleScenarioRun } from "~/server/scenarios/scenario.queue";
 import { simulationRunnerRouter } from "../simulation-runner.router";
 import { createInnerTRPCContext } from "../../../trpc";
 
 const mockPrefetchScenarioData = vi.mocked(prefetchScenarioData);
-const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 
 function createTestCaller() {
   const ctx = createInnerTRPCContext({
@@ -123,7 +120,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -161,7 +158,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -197,7 +194,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -233,7 +230,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        expect(mockQueueRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -288,13 +285,10 @@ describe("simulationRunnerRouter.run", () => {
         });
       });
 
-      it("does not schedule the BullMQ job", async () => {
-        try {
-          await caller.run(defaultInput);
-        } catch {
-          // Expected to throw
-        }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+      it("propagates the error as INTERNAL_SERVER_ERROR", async () => {
+        await expect(caller.run(defaultInput)).rejects.toMatchObject({
+          code: "INTERNAL_SERVER_ERROR",
+        });
       });
     });
   });
@@ -354,19 +348,14 @@ describe("simulationRunnerRouter.run", () => {
         );
       });
 
-      it("passes the pre-generated scenarioRunId to scheduleScenarioRun", async () => {
+      it("passes the pre-generated scenarioRunId to queueRun", async () => {
         await caller.run(defaultInput);
 
-        const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
-        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
-          setId: expectedSetId,
-          batchRunId: "batch_test_123",
-          scenarioRunId: "scenariorun_test_456",
-          index: 0,
-        });
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenarioRunId: "scenariorun_test_456",
+          }),
+        );
       });
 
       it("returns scenarioRunId alongside existing fields", async () => {
@@ -375,7 +364,6 @@ describe("simulationRunnerRouter.run", () => {
         const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
         expect(result).toEqual({
           scheduled: true,
-          jobId: "job_test_123",
           setId: expectedSetId,
           batchRunId: "batch_test_123",
           scenarioRunId: "scenariorun_test_456",
@@ -384,22 +372,18 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called with explicit setId", () => {
-      it("preserves the user-provided set ID in scheduleScenarioRun", async () => {
+      it("preserves the user-provided set ID in queueRun", async () => {
         const inputWithSetId = {
           ...defaultInput,
           setId: "production-tests",
         };
         await caller.run(inputWithSetId);
 
-        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
-          setId: "production-tests",
-          batchRunId: "batch_test_123",
-          scenarioRunId: "scenariorun_test_456",
-          index: 0,
-        });
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenarioSetId: "production-tests",
+          }),
+        );
       });
 
       it("dispatches queueRun with user-provided set ID", async () => {
@@ -425,7 +409,6 @@ describe("simulationRunnerRouter.run", () => {
 
         expect(result).toEqual({
           scheduled: true,
-          jobId: "job_test_123",
           setId: "production-tests",
           batchRunId: "batch_test_123",
           scenarioRunId: "scenariorun_test_456",
