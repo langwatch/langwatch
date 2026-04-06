@@ -126,7 +126,7 @@ export const start = async (
 ): Promise<Workers | undefined> => {
   // Fail fast if Prisma client can't connect (e.g. wrong engine binary, DB unreachable)
   const { prisma } = await import("../db");
-  await prisma.$queryRaw`SELECT 1`;
+  await prisma.organization.findFirst({ select: { id: true } });
   logger.info("database connection verified");
 
   // Reset state for restart scenarios - prevents duplicate closeables
