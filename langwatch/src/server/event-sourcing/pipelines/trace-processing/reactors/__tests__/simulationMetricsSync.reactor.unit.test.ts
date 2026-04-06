@@ -47,6 +47,7 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     scenarioRoleCosts: { Agent: 0.001 },
     scenarioRoleLatencies: { Agent: 500 },
     scenarioRoleSpans: {},
+    lastEventOccurredAt: 0,
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,

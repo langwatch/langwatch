@@ -381,6 +381,10 @@ function SidebarButton({
   );
 }
 
+/**
+ * ⚠️  KEEP IN SYNC with run-history-transforms.ts → computeGroupSummary()
+ * Pass rate = passed / settled (totalCount here IS settled count from query).
+ */
 function RunSummaryLine({
   passedCount,
   failedCount,
@@ -390,10 +394,8 @@ function RunSummaryLine({
   failedCount: number;
   totalCount: number;
 }) {
-  if (totalCount === 0) return null;
-
-  const completedCount = passedCount + failedCount;
-  const passRate = completedCount > 0 ? (passedCount / totalCount) * 100 : null;
+  // totalCount = settled count from the ClickHouse query (excludes in-progress/queued)
+  const passRate = totalCount > 0 ? (passedCount / totalCount) * 100 : null;
 
   return (
     <HStack gap={1} color="fg.muted">
@@ -453,17 +455,6 @@ function SidebarListItemWrapper({
       width="full"
       textDecoration="none"
       color="inherit"
-      _before={{
-        content: '""',
-        position: "absolute",
-        transform: "translateY(-50%)",
-        top: "50%",
-        left: 0,
-        width: "2px",
-        height: "33%",
-        backgroundColor: "border.emphasized",
-        display: isSelected ? "block" : "none",
-      }}
     >
       <a href={href ?? "#"}>
         {children}
@@ -520,6 +511,7 @@ function SuiteListItem({
             <Box
               as="button"
               onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onRun();
               }}
@@ -541,6 +533,7 @@ function SuiteListItem({
               aria-label="Run plan options"
               data-testid="suite-menu-button"
               onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onContextMenu(e);
               }}
@@ -559,7 +552,7 @@ function SuiteListItem({
             </Box>
           </HStack>
         </HStack>
-        {runSummary && runSummary.totalCount > 0 && (
+        {runSummary && (
           <RunSummaryLine
             passedCount={runSummary.passedCount}
             failedCount={runSummary.failedCount}
@@ -609,13 +602,11 @@ function ExternalSetListItem({
             </Text>
           )}
         </HStack>
-        {externalSet.totalCount > 0 && (
-          <RunSummaryLine
-            passedCount={externalSet.passedCount}
-            failedCount={externalSet.failedCount}
-            totalCount={externalSet.totalCount}
-          />
-        )}
+        <RunSummaryLine
+          passedCount={externalSet.passedCount}
+          failedCount={externalSet.failedCount}
+          totalCount={externalSet.totalCount}
+        />
       </VStack>
     </SidebarListItemWrapper>
   );

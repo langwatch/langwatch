@@ -18,6 +18,8 @@ interface UseAutoExpansionOptions {
   groups: { groupKey: string }[];
 }
 
+const STORAGE_KEY = "langwatch:run-history-expanded";
+
 /**
  * Module-level cache of which panels have already had their initial auto-expand.
  * Survives component remounts so switching panels doesn't re-expand everything.
@@ -26,9 +28,36 @@ const autoExpandedPanels = new Set<string>();
 
 /**
  * Module-level cache of expanded/collapsed state per panel+groupBy.
- * Preserves user's manual collapse/expand across panel switches.
+ * Preserves user's manual collapse/expand across panel switches and navigation.
+ * Synced to localStorage so state persists across page transitions.
  */
 const expandedStateCache = new Map<string, Set<string>>();
+
+// Hydrate from localStorage on module load
+try {
+  const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+  if (stored) {
+    const parsed = JSON.parse(stored) as Record<string, string[]>;
+    for (const [k, ids] of Object.entries(parsed)) {
+      expandedStateCache.set(k, new Set(ids));
+      autoExpandedPanels.add(k);
+    }
+  }
+} catch {
+  // Ignore parse errors
+}
+
+function persistToStorage() {
+  try {
+    const obj: Record<string, string[]> = {};
+    for (const [k, ids] of expandedStateCache) {
+      obj[k] = [...ids];
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
 
 function cacheKey(panelKey: string, groupBy: string): string {
   return `${panelKey}::${groupBy}`;
@@ -80,6 +109,7 @@ export function useAutoExpansion({
       setExpandedIds(currentIds);
       expandedStateCache.set(key, currentIds);
       autoExpandedPanels.add(key);
+      persistToStorage();
     } else {
       // Subsequent updates — only add genuinely new rows
       setExpandedIds((prev) => {
@@ -88,6 +118,7 @@ export function useAutoExpansion({
         const next = new Set(prev);
         for (const id of newIds) next.add(id);
         expandedStateCache.set(key, next);
+        persistToStorage();
         return next;
       });
     }
@@ -103,6 +134,7 @@ export function useAutoExpansion({
         next.add(id);
       }
       expandedStateCache.set(key, next);
+      persistToStorage();
       return next;
     });
   }, [key]);

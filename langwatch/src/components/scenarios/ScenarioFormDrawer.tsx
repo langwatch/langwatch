@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
-import { useDrawerRunCallbacks } from "../../hooks/useDrawerRunCallbacks";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
@@ -68,13 +67,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
-  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
-
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
-    onRunComplete,
-    onRunFailed,
   });
   const scenarioId = props.scenarioId;
 
@@ -249,10 +244,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Generate batchRunId so the simulations page can show a placeholder immediately
           const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 
-          // Fire the run (don't await — the simulations page will show it via SSE)
+          // Fire the run — no callbacks, simulations page picks up via SSE
           void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
 
-          // Close drawer and navigate to simulations page with pending batch
+          // Close drawer and navigate to simulations page
           onClose();
           void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
         })();

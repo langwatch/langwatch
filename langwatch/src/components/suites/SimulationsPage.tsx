@@ -124,6 +124,7 @@ export default function SimulationsPage() {
     projectId: project?.id ?? "",
     refetch: () => {
       void utils.suites.getSummaries.invalidate();
+      void utils.scenarios.getExternalSetSummaries.invalidate();
     },
     enabled: !!project?.id,
     debounceMs: 500,
@@ -226,8 +227,13 @@ export default function SimulationsPage() {
   });
 
   const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
-    onRunScheduled: () => {
+    onRunScheduled: (suiteId) => {
       void utils.suites.getSummaries.invalidate();
+      // Navigate to the suite so the user sees the run starting
+      const suite = suites?.find((s) => s.id === suiteId);
+      if (suite && selectedSuiteSlug !== suite.slug) {
+        navigateToSuite(suite.slug);
+      }
     },
   });
 
@@ -270,10 +276,9 @@ export default function SimulationsPage() {
     (suiteId: string) => {
       const suite = suites?.find((s) => s.id === suiteId);
       if (!suite) return;
-      navigateToSuite(suite.slug);
       requestRun(suite);
     },
-    [suites, navigateToSuite, requestRun],
+    [suites, requestRun],
   );
 
   const handleDuplicateSuite = useCallback(

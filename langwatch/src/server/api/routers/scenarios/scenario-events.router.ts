@@ -379,7 +379,8 @@ export function filterRunsByTimestamp(
   const filtered = result.runs.filter((run) => {
     const clientTs = runTimestamps[run.scenarioRunId];
     // Include new runs (not in client map) or runs updated since client's last fetch
-    return clientTs === undefined || run.timestamp > clientTs;
+    const runUpdatedAt = run.updatedAt ?? run.timestamp;
+    return clientTs === undefined || runUpdatedAt > clientTs;
   });
 
   if (filtered.length === 0) {

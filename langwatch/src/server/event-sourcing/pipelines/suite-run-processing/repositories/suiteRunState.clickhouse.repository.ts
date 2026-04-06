@@ -46,11 +46,12 @@ interface ClickHouseSuiteRunRecord {
   UpdatedAt: number;
   StartedAt: number | null;
   FinishedAt: number | null;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseSuiteRunWriteRecord = WithDateWrites<
   ClickHouseSuiteRunRecord,
-  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt"
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "LastEventOccurredAt"
 >;
 
 export class SuiteRunStateRepositoryClickHouse<
@@ -80,6 +81,7 @@ export class SuiteRunStateRepositoryClickHouse<
       UpdatedAt: Number(record.UpdatedAt),
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -110,6 +112,7 @@ export class SuiteRunStateRepositoryClickHouse<
       UpdatedAt: new Date(data.UpdatedAt),
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
     };
   }
 
@@ -135,7 +138,8 @@ export class SuiteRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
+            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND BatchRunId = {batchRunId:String}

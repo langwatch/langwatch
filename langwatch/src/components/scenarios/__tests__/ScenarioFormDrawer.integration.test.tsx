@@ -461,9 +461,11 @@ describe("<ScenarioFormDrawer/>", () => {
         expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
       });
 
-      // Drawer closes and navigates to simulations page
+      // Drawer closes and navigates to simulations page with pending batch
       expect(onClose).toHaveBeenCalled();
-      expect(mocks.mockRouterPush).toHaveBeenCalledWith("/my-project/simulations");
+      expect(mocks.mockRouterPush).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/my-project\/simulations\?pendingBatch=/),
+      );
     });
   });
 

@@ -80,6 +80,7 @@ export interface SimulationRunStateData {
   FinishedAt: number | null;
   ArchivedAt: number | null;
   LastSnapshotOccurredAt: number;
+  LastEventOccurredAt: number;
 }
 
 export interface SimulationRunState extends Projection<SimulationRunStateData> {
