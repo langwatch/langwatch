@@ -1,0 +1,195 @@
+{{- if gt (int .Values.replicas) 1 }}
+{{- $replicas := .Values.replicas | int }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}-keeper
+  labels:
+    {{- include "clickhouse-serverless.keeperLabels" . | nindent 4 }}
+spec:
+  serviceName: {{ $fullname }}-keeper-headless
+  replicas: {{ $replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "clickhouse-serverless.keeperSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clickhouse-serverless.keeperSelectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keeper
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 101  # clickhouse group
+      terminationGracePeriodSeconds: 30
+
+      {{- with .Values.scheduling.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduling.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.scheduling.affinity }}
+        {{- toYaml .Values.scheduling.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - {{ $fullname }}-keeper
+                topologyKey: topology.kubernetes.io/zone
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - {{ $fullname }}-keeper
+                topologyKey: kubernetes.io/hostname
+        {{- end }}
+
+      initContainers:
+        # Wait for all Keeper pod DNS entries to be resolvable
+        - name: dns-wait
+          image: busybox:1.37.0
+          command: ['sh', '-c']
+          args:
+            - |
+              REPLICAS={{ $replicas }}
+              NAMESPACE={{ .Release.Namespace }}
+              TIMEOUT=300; ELAPSED=0
+              for i in $(seq 0 $((REPLICAS - 1))); do
+                HOST="{{ $fullname }}-keeper-${i}.{{ $fullname }}-keeper-headless.${NAMESPACE}.svc"
+                echo "Waiting for DNS: ${HOST}"
+                until nslookup "${HOST}" >/dev/null 2>&1; do
+                  echo "  ${HOST} not resolvable yet..."
+                  sleep 2; ELAPSED=$((ELAPSED + 2))
+                  if [ "$ELAPSED" -ge "$TIMEOUT" ]; then echo "TIMEOUT after ${TIMEOUT}s"; exit 1; fi
+                done
+                echo "  ${HOST} resolved"
+              done
+              echo "All Keeper DNS entries resolvable"
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+        # Copy keeper raft config from ConfigMap and substitute pod-specific server_id.
+        # server_id = pod ordinal + 1 (e.g. keeper-0 → 1, keeper-1 → 2, keeper-2 → 3)
+        - name: keeper-init
+          image: busybox:1.37.0
+          command: ['sh', '-c']
+          args:
+            - |
+              POD_INDEX=$(hostname | sed 's/.*-\([0-9]*\)$/\1/')
+              case "${POD_INDEX}" in
+                ''|*[!0-9]*)
+                  echo "Invalid POD_NAME ordinal: $(hostname)" >&2
+                  exit 1
+                  ;;
+              esac
+              SERVER_ID=$((POD_INDEX + 1))
+              cp /mnt/keeper-template/keeper_config.xml /etc/clickhouse-keeper/keeper_config.xml
+              sed -i "s/__SERVER_ID__/${SERVER_ID}/g" /etc/clickhouse-keeper/keeper_config.xml
+              chmod 644 /etc/clickhouse-keeper/keeper_config.xml
+              echo "Keeper server_id=${SERVER_ID}"
+          volumeMounts:
+            - name: keeper-config
+              mountPath: /etc/clickhouse-keeper
+            - name: keeper-raft-template
+              mountPath: /mnt/keeper-template
+              readOnly: true
+          securityContext:
+            runAsUser: 65534
+            runAsNonRoot: true
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+
+      containers:
+        - name: keeper
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["clickhouse-keeper"]
+          args: ["--config-file=/etc/clickhouse-keeper/keeper_config.xml"]
+          ports:
+            - name: keeper
+              containerPort: 9181
+              protocol: TCP
+            - name: raft
+              containerPort: 9234
+              protocol: TCP
+          securityContext:
+            runAsUser: 101  # clickhouse user
+            runAsNonRoot: true
+            readOnlyRootFilesystem: false
+          resources:
+            {{- toYaml .Values.keeper.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "echo ruok | nc 127.0.0.1 9181 | grep -q imok"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "echo ruok | nc 127.0.0.1 9181 | grep -q imok"
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse-keeper
+            - name: keeper-config
+              mountPath: /etc/clickhouse-keeper
+
+      volumes:
+        - name: keeper-config
+          emptyDir: {}
+        - name: keeper-raft-template
+          configMap:
+            name: {{ $fullname }}-keeper-raft
+
+  volumeClaimTemplates:
+    - metadata:
+        name: keeper-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.keeper.storage.storageClass }}
+        storageClassName: {{ .Values.keeper.storage.storageClass | quote }}
+        {{- else if .Values.storage.storageClass }}
+        storageClassName: {{ .Values.storage.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.keeper.storage.size }}
+{{- end }}
