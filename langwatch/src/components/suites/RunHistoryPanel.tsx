@@ -157,12 +157,12 @@ export function RunHistoryPanel({
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
   const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
-    onCancelJobSuccess: (method) => {
+    onCancelJobSuccess: () => {
       setCancellingJobId(null);
       void refetch();
       toaster.create({
-        title: method === "signalled" ? "Cancellation requested" : "Job cancelled",
-        type: method === "signalled" ? "info" : "success",
+        title: "Cancellation requested",
+        type: "info",
       });
     },
     onCancelJobError: (error) => {

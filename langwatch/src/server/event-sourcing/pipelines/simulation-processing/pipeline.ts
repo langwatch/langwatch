@@ -18,6 +18,7 @@ import type { SimulationProcessingEvent } from "./schemas/events";
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  cancellationBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
@@ -50,6 +51,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
       store: deps.simulationRunStore,
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
+    .withReactor("simulationRunState", "cancellationBroadcast", deps.cancellationBroadcastReactor)
     .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
     .withReactor("simulationRunState", "traceMetricsSync", deps.traceMetricsSyncReactor);
 

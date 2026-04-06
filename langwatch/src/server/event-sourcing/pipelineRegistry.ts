@@ -26,6 +26,7 @@ import { createSimulationProcessingPipeline } from "./pipelines/simulation-proce
 import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
@@ -375,6 +376,10 @@ export class PipelineRegistry {
       },
     );
 
+    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
+      publisher: this.deps.eventSourcing.redisConnection ?? null,
+    });
+
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
     const suiteRunSyncReactor = createSuiteRunSyncReactor({
       recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
@@ -412,6 +417,7 @@ export class PipelineRegistry {
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+        cancellationBroadcastReactor,
         suiteRunSyncReactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,

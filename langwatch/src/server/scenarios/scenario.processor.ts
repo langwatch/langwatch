@@ -16,7 +16,7 @@ import { Worker as BullMQWorker } from "bullmq";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
-import { subscribeToCancellations } from "./cancellation-channel";
+import { subscribeToCancellations, type CancellationMessage } from "./cancellation-channel";
 import {
   type JobContextMetadata,
   createContextFromJobData,
@@ -161,6 +161,13 @@ export async function handleCancelledJobResult(
 }
 
 const logger = createLogger("langwatch:scenarios:processor");
+
+/**
+ * Module-level map tracking running child processes by scenarioRunId.
+ * Used by the cancel subscription to find and SIGTERM the right child.
+ * Safe as a module-level singleton because there's one worker per process.
+ */
+const runningChildren = new Map<string, ChildProcess>();
 
 /**
  * Creates a child logger with scenario job context bound.
@@ -396,6 +403,9 @@ async function spawnScenarioChildProcess(
       "Child process spawned",
     );
 
+    // Register in the running children map so cancel broadcasts can find this child
+    runningChildren.set(jobData.scenarioRunId, child);
+
     // Kill the child process when the BullMQ abort signal fires (job cancelled)
     signal?.addEventListener("abort", () => {
       child.kill("SIGTERM");
@@ -438,6 +448,7 @@ async function spawnScenarioChildProcess(
 
     child.on("close", (code) => {
       clearTimeout(timeout);
+      runningChildren.delete(jobData.scenarioRunId);
       if (resolved) return;
       resolved = true;
 
@@ -463,6 +474,7 @@ async function spawnScenarioChildProcess(
 
     child.on("error", (error) => {
       clearTimeout(timeout);
+      runningChildren.delete(jobData.scenarioRunId);
       if (resolved) return;
       resolved = true;
 
@@ -626,11 +638,23 @@ export async function startScenarioProcessor(
     }
   });
 
-  // Subscribe to cancellation signals from the web server.
+  // Subscribe to cancellation signals from the event-sourcing reactor.
   // Redis pub/sub requires a dedicated connection — use duplicate() so the
   // subscriber doesn't interfere with BullMQ's command connection.
   const subscriber = connection.duplicate();
-  const unsubscribe = await subscribeToCancellations({ worker, subscriber });
+  const unsubscribe = await subscribeToCancellations({
+    subscriber,
+    onCancel: (message: CancellationMessage) => {
+      const child = runningChildren.get(message.scenarioRunId);
+      if (child) {
+        logger.info(
+          { scenarioRunId: message.scenarioRunId, pid: child.pid },
+          "Killing child process via event-sourcing cancel broadcast",
+        );
+        child.kill("SIGTERM");
+      }
+    },
+  });
 
   // Clean up the subscriber connection when the worker shuts down
   worker.on("closing", () => {
