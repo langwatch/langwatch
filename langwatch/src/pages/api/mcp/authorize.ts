@@ -46,13 +46,14 @@ export default async function handler(
       .json({ error: "projectId and redirect_uri are required" });
   }
 
-  // Validate redirect_uri scheme to prevent open redirect / XSS
+  // Validate redirect_uri — block javascript: scheme to prevent XSS,
+  // but allow custom schemes for native apps (RFC 8252)
   try {
     const redirectUrl = new URL(redirect_uri);
-    if (!["http:", "https:"].includes(redirectUrl.protocol)) {
+    if (redirectUrl.protocol === "javascript:") {
       return res
         .status(400)
-        .json({ error: "redirect_uri must use http or https" });
+        .json({ error: "redirect_uri uses a disallowed scheme" });
     }
   } catch {
     return res.status(400).json({ error: "Invalid redirect_uri" });
