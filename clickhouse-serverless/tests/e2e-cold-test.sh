@@ -55,7 +55,7 @@ docker run -d --name "$GARAGE" --network "$NET" \
 echo "Waiting for Garage..."
 garage_ready=0
 for i in $(seq 1 30); do
-    if curl -sf http://localhost:3903/health >/dev/null 2>&1; then
+    if curl -sf --connect-timeout 3 --max-time 5 http://localhost:3903/health >/dev/null 2>&1; then
         garage_ready=1
         break
     fi
@@ -105,7 +105,7 @@ docker run -d --name "$CH" --network "$NET" \
 echo "Waiting for ClickHouse..."
 ready=0
 for i in $(seq 1 60); do
-    if curl -sf 'http://localhost:18123/ping' >/dev/null 2>&1; then
+    if curl -sf --connect-timeout 3 --max-time 5 'http://localhost:18123/ping' >/dev/null 2>&1; then
         echo "ClickHouse ready (${i}s)"
         ready=1
         break
@@ -119,7 +119,7 @@ if [ "$ready" -ne 1 ]; then
 fi
 
 # --- Verify ---
-query() { curl -sf "http://localhost:18123/?password=test123" --data "$1"; }
+query() { curl -sf --connect-timeout 5 --max-time 30 "http://localhost:18123/?password=test123" --data "$1"; }
 
 pass=0
 fail=0

@@ -33,7 +33,7 @@ docker run -d --name "$S3" --network "$NET" \
 echo "Waiting for RustFS..."
 s3_ready=0
 for i in $(seq 1 30); do
-    if curl -so /dev/null http://localhost:9000/ 2>/dev/null; then
+    if curl -so /dev/null --connect-timeout 3 --max-time 5 http://localhost:9000/ 2>/dev/null; then
         s3_ready=1; break
     fi
     sleep 1
@@ -70,7 +70,7 @@ docker run -d --name "$CH" --network "$NET" \
 echo "Waiting for ClickHouse..."
 ready=0
 for i in $(seq 1 60); do
-    if curl -sf 'http://localhost:18123/ping' >/dev/null 2>&1; then ready=1; break; fi
+    if curl -sf --connect-timeout 3 --max-time 5 'http://localhost:18123/ping' >/dev/null 2>&1; then ready=1; break; fi
     sleep 1
 done
 if [ "$ready" -ne 1 ]; then
@@ -79,7 +79,7 @@ fi
 
 query() {
     local result
-    result=$(curl -sf "http://localhost:18123/?password=test123" --data "$1")
+    result=$(curl -sf --connect-timeout 5 --max-time 30 "http://localhost:18123/?password=test123" --data "$1")
     if echo "$result" | grep -q "Code:"; then
         echo "QUERY ERROR: $result" >&2
         return 1
@@ -125,9 +125,9 @@ query "OPTIMIZE TABLE default.cold_test FINAL"
 # Wait for merge to complete
 sleep 3
 
-# Verify data moved to cold storage (object disk)
-check "parts on cold disk" \
-    "SELECT disk_name FROM system.parts WHERE table='cold_test' AND active ORDER BY disk_name LIMIT 1" \
+# Verify all active parts moved to cold storage (object disk)
+check "all parts on cold disk" \
+    "SELECT if(countIf(disk_name != 'object') = 0, 'object', 'mixed') FROM system.parts WHERE table='cold_test' AND active" \
     "object"
 
 # Data should still be readable

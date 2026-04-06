@@ -81,6 +81,9 @@ helm_uninstall() {
         && [[ $attempts -lt 30 ]]; do
     sleep 2; attempts=$((attempts + 1))
   done
+  if kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null; then
+    fail "namespace ${NAMESPACE} still exists after 60s — aborting to prevent flakes"
+  fi
 }
 
 # ─── ClickHouse helpers ─────────────────────────────────────────────────────
