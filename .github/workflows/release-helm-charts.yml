@@ -3,7 +3,7 @@ name: Release Helm Charts
 on:
   # Publish Helm chart after Docker images are built and pushed
   workflow_run:
-    workflows: ["Build and Push Docker Images"]
+    workflows: ["Build and Push Docker Images", "Publish ClickHouse Serverless"]
     types: [completed]
   workflow_dispatch:
 
