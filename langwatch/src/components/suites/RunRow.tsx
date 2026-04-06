@@ -191,13 +191,13 @@ function RunRowData({
               paddingY={0.5}
               borderRadius="md"
               border="1px solid"
-              borderColor="red.200"
+              borderColor="gray.300"
               fontSize="xs"
-              color="red.600"
+              color="fg.default"
               cursor={isCancellingBatch ? "default" : "pointer"}
               flexShrink={0}
               opacity={isCancellingBatch ? 0.6 : 1}
-              _hover={isCancellingBatch ? undefined : { bg: "red.50", borderColor: "red.300" }}
+              _hover={isCancellingBatch ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
@@ -213,7 +213,7 @@ function RunRowData({
               aria-disabled={isCancellingBatch}
               data-testid="cancel-all-button"
             >
-              {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+              {isCancellingBatch ? <Spinner size="xs" /> : <Square size={10} />}
               <Text fontSize="xs">Stop</Text>
             </HStack>
           )}

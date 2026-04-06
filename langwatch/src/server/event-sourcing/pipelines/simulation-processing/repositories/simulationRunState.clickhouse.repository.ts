@@ -59,13 +59,14 @@ interface ClickHouseSimulationRunRecord {
   UpdatedAt: number;
   FinishedAt: number | null;
   ArchivedAt: number | null;
+  CancellationRequestedAt: number | null;
   LastSnapshotOccurredAt: number;
   LastEventOccurredAt: number;
 }
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "StartedAt" | "QueuedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt" | "LastEventOccurredAt"
+  "StartedAt" | "QueuedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "CancellationRequestedAt" | "LastSnapshotOccurredAt" | "LastEventOccurredAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
@@ -111,6 +112,7 @@ export class SimulationRunStateRepositoryClickHouse<
       UpdatedAt: Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
       ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
+      CancellationRequestedAt: record.CancellationRequestedAt === null || record.CancellationRequestedAt === undefined ? null : Number(record.CancellationRequestedAt),
       LastSnapshotOccurredAt: Number(record.LastSnapshotOccurredAt ?? 0),
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
@@ -157,6 +159,7 @@ export class SimulationRunStateRepositoryClickHouse<
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
+      CancellationRequestedAt: data.CancellationRequestedAt != null ? new Date(data.CancellationRequestedAt) : null,
       LastSnapshotOccurredAt: data.LastSnapshotOccurredAt ? new Date(data.LastSnapshotOccurredAt) : new Date(0),
       LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
     };
@@ -192,6 +195,7 @@ export class SimulationRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
+            if(CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(CancellationRequestedAt), NULL) AS CancellationRequestedAt,
             toUnixTimestamp64Milli(LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
             toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME}

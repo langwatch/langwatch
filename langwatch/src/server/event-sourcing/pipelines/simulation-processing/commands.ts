@@ -7,6 +7,7 @@ import {
   simulationTextMessageStartEventDataSchema,
   simulationTextMessageEndEventDataSchema,
   simulationRunDeletedEventDataSchema,
+  simulationRunCancelRequestedEventDataSchema,
 } from "./schemas/events";
 
 /**
@@ -107,6 +108,20 @@ export const FinishRunCommand = defineCommand({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:finish-run`,
+});
+
+export const CancelRunCommand = defineCommand({
+  commandType: "lw.simulation_run.cancel",
+  eventType: "lw.simulation_run.cancel_requested",
+  eventVersion: "2026-04-06",
+  aggregateType: "simulation_run",
+  schema: simulationRunCancelRequestedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:cancelRun`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:cancel-run`,
 });
 
 export const DeleteRunCommand = defineCommand({

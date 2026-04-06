@@ -38,6 +38,8 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
+When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — check it with `grep` if available.
+
 ## Structure
 
 ```
@@ -89,6 +91,8 @@ specs/               # BDD feature specs
 | Relying solely on `gh pr checks` to assess CI status | Use `gh run list --branch <branch>` to see all workflow runs — `gh pr checks` deduplicates by check name and can mask failing runs behind passing ones from earlier commits |
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
+
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements |
 
 ## TypeScript
 

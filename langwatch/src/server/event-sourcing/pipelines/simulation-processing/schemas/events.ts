@@ -15,6 +15,11 @@ export const simulationRunQueuedEventDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  /** Target for execution. Added for event-driven execution (replaces BullMQ job data). */
+  target: z.object({
+    type: z.enum(["prompt", "http", "code"]),
+    referenceId: z.string(),
+  }).optional(),
 });
 export type SimulationRunQueuedEventData = z.infer<typeof simulationRunQueuedEventDataSchema>;
 
@@ -142,6 +147,23 @@ export const SimulationRunMetricsComputedEventSchema = EventSchema.extend({
 export type SimulationRunMetricsComputedEvent = z.infer<typeof SimulationRunMetricsComputedEventSchema>;
 
 /**
+ * CancelRequested event - emitted when a user requests cancellation of a run.
+ * Sets CancellationRequestedAt in the fold projection without changing Status.
+ * A reactor broadcasts this to all worker pods via Redis pub/sub.
+ */
+export const simulationRunCancelRequestedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+});
+export type SimulationRunCancelRequestedEventData = z.infer<typeof simulationRunCancelRequestedEventDataSchema>;
+
+export const SimulationRunCancelRequestedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED),
+  data: simulationRunCancelRequestedEventDataSchema,
+});
+export type SimulationRunCancelRequestedEvent = z.infer<typeof SimulationRunCancelRequestedEventSchema>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 export const simulationRunDeletedEventDataSchema = z.object({
@@ -167,6 +189,7 @@ export type SimulationProcessingEvent =
   | SimulationTextMessageEndEvent
   | SimulationRunFinishedEvent
   | SimulationRunMetricsComputedEvent
+  | SimulationRunCancelRequestedEvent
   | SimulationRunDeletedEvent;
 
 export {
@@ -178,5 +201,6 @@ export {
   isSimulationRunFinishedEvent,
   isSimulationRunStartedEvent,
   isSimulationRunMetricsComputedEvent,
+  isSimulationRunCancelRequestedEvent,
 } from "./typeGuards";
 
