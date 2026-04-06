@@ -55,15 +55,15 @@ export const recordsListCommand = async (
     }
 
     // Collect all keys from record entries
-    const allKeys = new Set<string>();
+    const entryKeys = new Set<string>();
     records.forEach((record) => {
-      Object.keys(record.entry).forEach((key) => allKeys.add(key));
+      Object.keys(record.entry).forEach((key) => entryKeys.add(key));
     });
-    const headers = Array.from(allKeys);
+    const headers = ["ID", ...Array.from(entryKeys)];
 
     const tableData = records.map((record) => {
-      const row: Record<string, string> = {};
-      headers.forEach((key) => {
+      const row: Record<string, string> = { ID: record.id };
+      entryKeys.forEach((key) => {
         const value = record.entry[key];
         const str =
           value === null || value === undefined
@@ -77,7 +77,7 @@ export const recordsListCommand = async (
     });
 
     console.log();
-    formatTable(tableData, headers);
+    formatTable(tableData, headers, { ID: chalk.gray });
 
     console.log();
     console.log(
