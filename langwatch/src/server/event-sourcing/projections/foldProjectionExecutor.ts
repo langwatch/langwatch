@@ -33,11 +33,7 @@ export class FoldProjectionExecutor {
     let state = await projection.store.get(key, context) ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
-    // Read from the projection's configured key (PascalCase or camelCase).
-    const leoak = projection.lastEventOccurredAtKey
-      ?? (projection as any).lastEventOccurredAtKeyName
-      ?? "LastEventOccurredAt";
-    const prevLastOccurred = (state as Record<string, unknown>)[leoak] ?? 0;
+    const prevLastOccurred = (state as Record<string, unknown>)[projection.lastEventOccurredAtKey] ?? 0;
 
     state = projection.apply(state, event);
 
@@ -81,7 +77,7 @@ export class FoldProjectionExecutor {
 
       state = projection.init();
       for (const e of allEvents) {
-        state = projection.apply(state, e);
+        state = projection.apply(state, e as E);
       }
     }
 

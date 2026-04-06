@@ -35,6 +35,7 @@ function createFoldState(
     topicId: null,
     subTopicId: null,
     annotationIds: [],
+    lastEventOccurredAt: 0,
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),

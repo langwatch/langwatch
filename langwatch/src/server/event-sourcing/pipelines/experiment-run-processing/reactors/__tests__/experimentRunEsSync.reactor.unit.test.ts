@@ -43,6 +43,7 @@ function createMockFoldState(
     StartedAt: null,
     FinishedAt: null,
     StoppedAt: null,
+    LastEventOccurredAt: 0,
     TotalScoreSum: 0,
     ScoreCount: 0,
     PassedCount: 0,

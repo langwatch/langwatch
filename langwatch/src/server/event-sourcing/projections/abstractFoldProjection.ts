@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Event } from "../domain/types";
 import type {
   FoldProjectionOptions,
   FoldProjectionStore,
@@ -102,9 +103,9 @@ export abstract class AbstractFoldProjection<
   abstract readonly version: string;
   abstract readonly store: FoldProjectionStore<State>;
 
-  protected readonly createdAtKey: CK;
-  protected readonly updatedAtKey: UK;
-  protected readonly lastEventOccurredAtKey: LEOAK;
+  readonly createdAtKey: CK;
+  readonly updatedAtKey: UK;
+  readonly lastEventOccurredAtKey: LEOAK;
 
   constructor({
     createdAtKey,
@@ -134,16 +135,11 @@ export abstract class AbstractFoldProjection<
   /** Optional processing behavior configuration. */
   options?: FoldProjectionOptions;
 
-  /** Key name for the LastEventOccurredAt field — exposed for the executor. */
-  get lastEventOccurredAtKeyName(): string {
-    return this.lastEventOccurredAtKey;
-  }
-
   /**
    * Loads all events for an aggregate, sorted by occurredAt ASC.
    * When provided, the executor re-folds from scratch if an out-of-order event is detected.
    */
-  eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<Array<{ type: string }>>;
+  eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<Event[]>;
 
   /** Lazily-built dispatch map: event type string → handler method name. */
   private _dispatchMap?: Record<string, string>;

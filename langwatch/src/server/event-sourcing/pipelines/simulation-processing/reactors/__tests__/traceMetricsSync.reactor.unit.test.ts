@@ -42,6 +42,7 @@ function makeSimState(overrides: Partial<SimulationRunStateData> = {}): Simulati
     FinishedAt: 3000,
     ArchivedAt: null,
     LastSnapshotOccurredAt: 1000,
+    LastEventOccurredAt: 0,
     ...overrides,
   };
 }

@@ -54,6 +54,7 @@ function createFoldState(
     FinishedAt: Date.now(),
     ArchivedAt: null,
     LastSnapshotOccurredAt: 0,
+    LastEventOccurredAt: 0,
     ...overrides,
   };
 }
