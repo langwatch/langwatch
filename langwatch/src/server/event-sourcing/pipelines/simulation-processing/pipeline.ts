@@ -8,6 +8,7 @@ import {
   TextMessageStartCommand,
   TextMessageEndCommand,
   FinishRunCommand,
+  CancelRunCommand,
   DeleteRunCommand,
 } from "./commands";
 import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
@@ -67,6 +68,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("textMessageStart", TextMessageStartCommand)
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
+    .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance("computeRunMetrics", ComputeRunMetricsCommand, deps.computeRunMetricsCommand, {
       deduplication: {

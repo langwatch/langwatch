@@ -53,6 +53,7 @@ function createFoldState(
     UpdatedAt: Date.now(),
     FinishedAt: Date.now(),
     ArchivedAt: null,
+    CancellationRequestedAt: null,
     LastSnapshotOccurredAt: 0,
     LastEventOccurredAt: 0,
     ...overrides,

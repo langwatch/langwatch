@@ -510,6 +510,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageStart: noop,
         textMessageEnd: noop,
         finishRun: noop,
+        cancelRun: noop,
         deleteRun: noop,
         computeRunMetrics: noop,
       } as AppCommands["simulations"],

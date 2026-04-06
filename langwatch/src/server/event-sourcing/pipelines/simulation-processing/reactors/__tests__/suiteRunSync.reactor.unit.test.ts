@@ -52,6 +52,7 @@ function createFoldState(overrides: Partial<SimulationRunStateData> = {}): Simul
     UpdatedAt: 2000,
     FinishedAt: null,
     ArchivedAt: null,
+    CancellationRequestedAt: null,
     LastSnapshotOccurredAt: 0,
     LastEventOccurredAt: 0,
     ...overrides,
