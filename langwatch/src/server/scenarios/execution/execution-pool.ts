@@ -33,6 +33,7 @@ export type SpawnFunction = (jobData: ExecutionJobData) => Promise<void>;
 export class ScenarioExecutionPool {
   private readonly _running = new Map<string, ChildProcess>();
   private readonly _pending: ExecutionJobData[] = [];
+  private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
   private _spawnFn: SpawnFunction | null = null;
 
@@ -58,6 +59,20 @@ export class ScenarioExecutionPool {
   /** Access running children map (used by cancel subscription). */
   get runningChildren(): Map<string, ChildProcess> {
     return this._running;
+  }
+
+  /**
+   * Mark a scenario as cancelled. Called when the cancel subscription receives
+   * a message and kills the child. The close handler checks this to distinguish
+   * cancellation from crashes.
+   */
+  markCancelled(scenarioRunId: string): void {
+    this._cancelled.add(scenarioRunId);
+  }
+
+  /** Check if a scenario was cancelled via the cancel subscription. */
+  wasCancelled(scenarioRunId: string): boolean {
+    return this._cancelled.has(scenarioRunId);
   }
 
   /**

@@ -373,6 +373,13 @@ async function spawnScenarioChildProcess(
       if (resolved) return;
       resolved = true;
 
+      // Check if this was killed by the cancel subscription
+      if (pool.wasCancelled(jobData.scenarioRunId)) {
+        log("info", "Job cancelled via cancel broadcast");
+        resolve({ success: false, error: "Job was cancelled", cancelled: true });
+        return;
+      }
+
       if (code !== 0) {
         log("error", `Child process exited with code ${code}`, { exitCode: code, stderr });
         resolve({
@@ -447,6 +454,7 @@ export async function startScenarioProcessor(
           { scenarioRunId: message.scenarioRunId, pid: child.pid },
           "Killing child process via event-sourcing cancel broadcast",
         );
+        pool.markCancelled(message.scenarioRunId);
         child.kill("SIGTERM");
       }
     },
