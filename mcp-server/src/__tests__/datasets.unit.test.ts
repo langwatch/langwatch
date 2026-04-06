@@ -220,12 +220,21 @@ describe("MCP server dataset tool registration", () => {
 describe("dataset tools API key requirement", () => {
   describe("when no API key is configured", () => {
     it("requireApiKey throws when apiKey is empty", async () => {
-      const { initConfig, requireApiKey } = await import("../config.js");
-      initConfig({ apiKey: "", endpoint: "http://localhost:0" });
+      const savedKey = process.env.LANGWATCH_API_KEY;
+      delete process.env.LANGWATCH_API_KEY;
 
-      expect(() => requireApiKey()).toThrow(
-        "LANGWATCH_API_KEY is required",
-      );
+      try {
+        const { initConfig, requireApiKey } = await import("../config.js");
+        initConfig({ apiKey: "", endpoint: "http://localhost:0" });
+
+        expect(() => requireApiKey()).toThrow(
+          "LANGWATCH_API_KEY is required",
+        );
+      } finally {
+        if (savedKey !== undefined) {
+          process.env.LANGWATCH_API_KEY = savedKey;
+        }
+      }
     });
   });
 });
