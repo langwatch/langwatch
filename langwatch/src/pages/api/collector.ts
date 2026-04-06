@@ -521,6 +521,10 @@ async function handleCollectorRequest(
     }
   } catch (error) {
     // Catch synchronous errors (e.g., from buildResource)
+    rejectedSpans = spans.length;
+    rejectionErrors = [
+      error instanceof Error ? error.message : String(error),
+    ];
     logger.error(
       { error, projectId: project.id, traceId },
       "Error initializing event sourcing dispatch",

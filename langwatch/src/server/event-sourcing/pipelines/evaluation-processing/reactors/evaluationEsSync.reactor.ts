@@ -22,13 +22,9 @@ export interface EvaluationEsSyncReactorDeps {
 }
 
 /**
- * Creates a reactor that syncs evaluation state to Elasticsearch.
+ * Creates a no-op reactor kept for pipeline registry compatibility.
  *
- * Evaluations are stored as nested documents inside trace documents in ES.
- * This reactor upserts the evaluation into the trace's `evaluations[]` array
- * using the same Painless script as the legacy `updateEvaluationStatusInES`.
- *
- * Fires on CompletedEvent and ReportedEvent — intermediate states are not synced.
+ * ES writes are fully disabled — ClickHouse is the sole data store.
  */
 export function createEvaluationEsSyncReactor(
   deps: EvaluationEsSyncReactorDeps,
