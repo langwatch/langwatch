@@ -92,6 +92,17 @@ ch_query() {
     sh -c 'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "$0"' "$query" "$@"
 }
 
+wait_api() {
+  info "Waiting for Kubernetes API server..."
+  local attempts=0
+  until kubectl --context "$KUBE_CTX" get nodes &>/dev/null; do
+    sleep 2; attempts=$((attempts + 1))
+    if [[ $attempts -ge 30 ]]; then
+      fail "Kubernetes API server not ready after 60s"
+    fi
+  done
+}
+
 wait_ch_ready() {
   local pod="$1"
   local timeout="${2:-${TIMEOUT}}"
