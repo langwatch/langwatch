@@ -174,19 +174,20 @@ Feature: Scenario Failure Handler
   # Child Process Timeout - Stalled Execution Handling
   # ============================================================================
   # When a child process hangs or the worker dies mid-scenario (crash, OOM),
-  # the execution pool's 5-minute timeout kills the child. The failure handler
-  # then emits ERROR events so the UI shows the failure.
+  # the scenario processor's 5-minute timeout (CHILD_PROCESS.TIMEOUT_MS) kills
+  # the child. The failure handler then emits ERROR events so the UI shows
+  # the failure.
 
   @unit
   Scenario: Timed-out child process triggers failure handler
     Given a scenario child process has been running for over 5 minutes
-    When the execution pool timeout fires
+    When the scenario processor timeout fires
     Then the child process is killed
     And the failure handler emits ERROR events
 
   @integration
-  Scenario: Execution pool logs timeout with error level
+  Scenario: Scenario processor logs timeout with error level
     Given a scenario child process is running
-    When the 5-minute timeout fires
+    When the 5-minute processor timeout fires
     Then the event is logged at error level
     And the log includes the scenarioRunId

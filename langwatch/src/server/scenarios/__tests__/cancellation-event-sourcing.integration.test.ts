@@ -10,7 +10,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
@@ -19,10 +19,20 @@ import {
 import {
   publishCancellation,
   subscribeToCancellations,
-  CANCELLATION_CHANNEL,
 } from "../cancellation-channel";
 import type { CancellationMessage, CancellationSubscriber } from "../cancellation-channel";
 import type { Redis } from "ioredis";
+
+/** Poll until condition is true, or throw on timeout. */
+async function waitFor(condition: () => boolean, timeoutMs = 2000, intervalMs = 20): Promise<void> {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("Timed out waiting for condition");
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
 
 /**
  * Simulates a worker pod with a set of "running" child processes.
@@ -94,16 +104,14 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       cleanupFns.push(unsubscribe);
 
       // Give Redis time to process the subscription
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
 
       await publishCancellation({
         publisher: redis,
         message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
       });
 
-      // Wait for pub/sub delivery
-      await new Promise((r) => setTimeout(r, 200));
-
+      await waitFor(() => worker.killed.get("run-1") === true);
       expect(worker.killed.get("run-1")).toBe(true);
     });
   });
@@ -121,7 +129,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       const unsubB = await workerB.subscribe();
       cleanupFns.push(unsubB);
 
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
 
       // Cancel only run-A1
       await publishCancellation({
@@ -129,7 +137,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         message: { projectId: "proj-1", scenarioRunId: "run-A1", batchRunId: "batch-1" },
       });
 
-      await new Promise((r) => setTimeout(r, 200));
+      await waitFor(() => workerA.killed.get("run-A1") === true);
 
       // Worker A: run-A1 killed, run-A2 untouched
       expect(workerA.killed.get("run-A1")).toBe(true);
@@ -153,7 +161,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       const unsubB = await workerB.subscribe();
       cleanupFns.push(unsubB);
 
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
 
       // Cancel all 3 runs (simulates batch cancel dispatching 3 events)
       await Promise.all([
@@ -171,7 +179,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         }),
       ]);
 
-      await new Promise((r) => setTimeout(r, 300));
+      await waitFor(() =>
+        workerA.killed.get("run-1") === true &&
+        workerA.killed.get("run-2") === true &&
+        workerB.killed.get("run-3") === true,
+      );
 
       expect(workerA.killed.get("run-1")).toBe(true);
       expect(workerA.killed.get("run-2")).toBe(true);
@@ -186,14 +198,15 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       const unsubA = await workerA.subscribe();
       cleanupFns.push(unsubA);
 
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
 
       await publishCancellation({
         publisher: redis,
         message: { projectId: "proj-1", scenarioRunId: "run-nonexistent", batchRunId: "batch-1" },
       });
 
-      await new Promise((r) => setTimeout(r, 200));
+      // Give time for message delivery — if it were going to kill, it would by now
+      await new Promise((r) => setTimeout(r, 100));
 
       expect(workerA.killed.get("run-other")).toBe(false);
       expect(workerA.running.size).toBe(1); // Still running
@@ -207,7 +220,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       const unsubA = await workerA.subscribe();
       cleanupFns.push(unsubA);
 
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
 
       // First cancel
       await publishCancellation({
@@ -215,7 +228,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
       });
 
-      await new Promise((r) => setTimeout(r, 200));
+      await waitFor(() => workerA.killed.get("run-1") === true);
       expect(workerA.killed.get("run-1")).toBe(true);
 
       // Second cancel for same run (idempotent — child already removed from running map)
@@ -224,7 +237,8 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
       });
 
-      await new Promise((r) => setTimeout(r, 200));
+      // Give time for the no-op delivery
+      await new Promise((r) => setTimeout(r, 100));
       // No error thrown, still killed
       expect(workerA.killed.get("run-1")).toBe(true);
     });
@@ -238,7 +252,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         message: { projectId: "proj-1", scenarioRunId: "run-late", batchRunId: "batch-1" },
       });
 
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 50));
 
       // Worker subscribes AFTER the cancel was published
       const workerA = createMockWorker(redis);
@@ -246,7 +260,8 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       const unsubA = await workerA.subscribe();
       cleanupFns.push(unsubA);
 
-      await new Promise((r) => setTimeout(r, 200));
+      // Give time — if old cancel were delivered, it would be by now
+      await new Promise((r) => setTimeout(r, 100));
 
       // Worker should NOT have received the old cancel
       expect(workerA.killed.get("run-late")).toBe(false);

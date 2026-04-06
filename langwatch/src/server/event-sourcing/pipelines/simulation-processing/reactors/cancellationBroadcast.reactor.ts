@@ -63,13 +63,15 @@ export function createCancellationBroadcastReactor(
           "Broadcasted cancellation signal",
         );
       } catch (error) {
-        logger.warn(
+        logger.error(
           {
             scenarioRunId: context.foldState.ScenarioRunId,
+            batchRunId: context.foldState.BatchRunId,
             error: error instanceof Error ? error.message : String(error),
           },
-          "Failed to broadcast cancellation signal — non-fatal",
+          "Failed to broadcast cancellation signal",
         );
+        throw error;
       }
     },
   };
