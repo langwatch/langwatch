@@ -455,17 +455,6 @@ function SidebarListItemWrapper({
       width="full"
       textDecoration="none"
       color="inherit"
-      _before={{
-        content: '""',
-        position: "absolute",
-        transform: "translateY(-50%)",
-        top: "50%",
-        left: 0,
-        width: "2px",
-        height: "33%",
-        backgroundColor: "border.emphasized",
-        display: isSelected ? "block" : "none",
-      }}
     >
       <a href={href ?? "#"}>
         {children}
