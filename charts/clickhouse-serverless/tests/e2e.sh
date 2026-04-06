@@ -11,6 +11,7 @@
 #   CLUSTER_NAME            — Kind cluster name (default: ch-test)
 #   TIMEOUT                 — helm --wait timeout in seconds (default: 480)
 #   TEST_REPLICATED=true    — also run the 3-node replicated suite
+#   IMAGE                   — override the Docker image tag (default: langwatch/clickhouse-serverless:0.1.0)
 
 set -euo pipefail
 
@@ -18,7 +19,9 @@ CLUSTER_NAME="${CLUSTER_NAME:-ch-test}"
 RELEASE="ch"
 NAMESPACE="ch-test"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DOCKER_DIR="$(cd "$(dirname "$0")/../../../clickhouse-serverless" && pwd)"
 TIMEOUT="${TIMEOUT:-480}"
+IMAGE="${IMAGE:-langwatch/clickhouse-serverless:0.1.0}"
 
 # Source shared helpers
 # shellcheck source=../../lib/test-helpers.sh
@@ -268,8 +271,16 @@ test_backup() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+build_and_load_image() {
+  info "Building Docker image: $IMAGE"
+  docker build -t "$IMAGE" "$DOCKER_DIR"
+  info "Loading image into Kind cluster: $CLUSTER_NAME"
+  kind load docker-image "$IMAGE" --name "$CLUSTER_NAME"
+}
+
 main() {
   setup_kind
+  build_and_load_image
 
   test_single
   test_upgrade
