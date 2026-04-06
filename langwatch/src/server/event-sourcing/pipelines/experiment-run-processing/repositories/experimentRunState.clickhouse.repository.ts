@@ -1,7 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
-	ErrorCategory,
+	classifyClickHouseError,
 	SecurityError,
 	StoreError,
 	ValidationError,
@@ -197,7 +197,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "getProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to get projection for run ${runId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { runId },
         error,
       );
@@ -262,7 +262,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "storeProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { projectionId: projection.id, runId: String(projection.aggregateId) },
         error,
       );
@@ -323,7 +323,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "storeProjectionBatch",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to batch store ${projections.length} projections: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { count: projections.length },
         error,
       );
