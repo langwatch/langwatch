@@ -10,7 +10,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
@@ -21,6 +21,8 @@ import {
   subscribeToCancellations,
 } from "../cancellation-channel";
 import type { CancellationMessage, CancellationSubscriber } from "../cancellation-channel";
+import { ScenarioExecutionPool } from "../execution/execution-pool";
+import type { ExecutionJobData } from "../execution/execution-pool";
 import type { Redis } from "ioredis";
 
 /** Poll until condition is true, or throw on timeout. */
@@ -265,6 +267,65 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       // Worker should NOT have received the old cancel
       expect(workerA.killed.get("run-late")).toBe(false);
+    });
+  });
+
+  describe("when cancel arrives before execution pool picks up the job", () => {
+    it("pool skips the job and fires onSkipCancelled to write finished(CANCELLED)", async () => {
+      // This tests the full flow:
+      // 1. Cancel broadcast arrives → pool.markCancelled()
+      // 2. Execution reactor later submits the job → pool.submit()
+      // 3. Pool sees it's cancelled → skips execution
+      // 4. Pool calls onSkipCancelled → finished(CANCELLED) dispatched
+
+      const pool = new ScenarioExecutionPool({ concurrency: 3 });
+      const spawnedJobs: ExecutionJobData[] = [];
+      const cancelledJobs: ExecutionJobData[] = [];
+
+      pool.setSpawnFunction(async (jobData) => {
+        spawnedJobs.push(jobData);
+      });
+      pool.setOnSkipCancelled((jobData) => {
+        cancelledJobs.push(jobData);
+      });
+
+      // Subscribe the pool to cancel broadcasts (same as scenario.processor.ts does)
+      const subscriber = redis.duplicate() as unknown as CancellationSubscriber;
+      const unsubscribe = await subscribeToCancellations({
+        subscriber,
+        onCancel: (message: CancellationMessage) => {
+          // This is what the processor does: mark cancelled in the pool
+          pool.markCancelled(message.scenarioRunId);
+        },
+      });
+      cleanupFns.push(unsubscribe);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Step 1: Cancel broadcast arrives (from the cancellationBroadcast reactor)
+      await publishCancellation({
+        publisher: redis,
+        message: { projectId: "proj-1", scenarioRunId: "run-pre-cancel", batchRunId: "batch-1" },
+      });
+
+      await waitFor(() => pool.wasCancelled("run-pre-cancel"));
+
+      // Step 2: Execution reactor submits the job (queued event processed later)
+      pool.submit({
+        projectId: "proj-1",
+        scenarioId: "scen-1",
+        scenarioRunId: "run-pre-cancel",
+        batchRunId: "batch-1",
+        setId: "set-1",
+        target: { type: "http", referenceId: "agent-1" },
+      });
+
+      // Step 3: Job was NOT spawned
+      expect(spawnedJobs).toHaveLength(0);
+
+      // Step 4: onSkipCancelled WAS called — this is what writes finished(CANCELLED)
+      expect(cancelledJobs).toHaveLength(1);
+      expect(cancelledJobs[0]!.scenarioRunId).toBe("run-pre-cancel");
     });
   });
 });
