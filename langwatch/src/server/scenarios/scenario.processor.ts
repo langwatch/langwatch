@@ -468,9 +468,9 @@ export async function startScenarioProcessor(
           { scenarioRunId: message.scenarioRunId, pid: child.pid },
           "Killing child process via event-sourcing cancel broadcast",
         );
-        pool.markCancelled(message.scenarioRunId);
         child.kill("SIGTERM");
       }
+      pool.markCancelled(message.scenarioRunId);
     },
   });
 

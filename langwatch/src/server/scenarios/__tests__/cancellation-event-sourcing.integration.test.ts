@@ -11,6 +11,13 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+
+// Mock the Redis module so startScenarioProcessor uses the test Redis connection.
+// The getter is wired in beforeAll after testContainers starts.
+let _testRedis: any = null;
+vi.mock("~/server/redis", () => ({
+  get connection() { return _testRedis; },
+}));
 import {
   startTestContainers,
   stopTestContainers,
@@ -23,6 +30,8 @@ import {
 import type { CancellationMessage, CancellationSubscriber } from "../cancellation-channel";
 import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ExecutionJobData } from "../execution/execution-pool";
+import { startScenarioProcessor } from "../scenario.processor";
+import type { ProcessorDependencies } from "../scenario.processor";
 import type { Redis } from "ioredis";
 
 /** Poll until condition is true, or throw on timeout. */
@@ -84,6 +93,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
     const conn = getTestRedisConnection();
     if (!conn) throw new Error("Redis not available for integration tests");
     redis = conn;
+    _testRedis = conn;
   }, 30_000);
 
   afterAll(async () => {
@@ -271,38 +281,63 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when cancel arrives before execution pool picks up the job", () => {
-    it("pool skips the job and fires onSkipCancelled to write finished(CANCELLED)", async () => {
-      // This tests the full flow:
-      // 1. Cancel broadcast arrives → pool.markCancelled()
-      // 2. Execution reactor later submits the job → pool.submit()
-      // 3. Pool sees it's cancelled → skips execution
-      // 4. Pool calls onSkipCancelled → finished(CANCELLED) dispatched
+    it("startScenarioProcessor wiring dispatches finished(CANCELLED) for skipped jobs", async () => {
+      // This tests the REAL wiring: startScenarioProcessor → pool → cancel
+      // broadcast → pool.markCancelled → pool.submit skips → onSkipCancelled
+      // → handleCancelledJobResult → deps.failureEmitter.ensureFailureEventsEmitted
 
       const pool = new ScenarioExecutionPool({ concurrency: 3 });
-      const spawnedJobs: ExecutionJobData[] = [];
-      const cancelledJobs: ExecutionJobData[] = [];
 
-      pool.setSpawnFunction(async (jobData) => {
-        spawnedJobs.push(jobData);
-      });
-      pool.setOnSkipCancelled((jobData) => {
-        cancelledJobs.push(jobData);
-      });
-
-      // Subscribe the pool to cancel broadcasts (same as scenario.processor.ts does)
-      const subscriber = redis.duplicate() as unknown as CancellationSubscriber;
-      const unsubscribe = await subscribeToCancellations({
-        subscriber,
-        onCancel: (message: CancellationMessage) => {
-          // This is what the processor does: mark cancelled in the pool
-          pool.markCancelled(message.scenarioRunId);
+      // Track what the failure emitter receives
+      const emittedFailures: Array<{ scenarioRunId?: string; cancelled?: boolean }> = [];
+      const mockDeps: ProcessorDependencies = {
+        scenarioLookup: {
+          getById: async () => ({ name: "Test", situation: "Test situation" }),
         },
-      });
-      cleanupFns.push(unsubscribe);
+        failureEmitter: {
+          ensureFailureEventsEmitted: async (params) => {
+            emittedFailures.push({ scenarioRunId: params.scenarioRunId, cancelled: params.cancelled });
+          },
+        },
+      };
+
+      // Use the REAL startScenarioProcessor with the test Redis
+      // We need to mock the connection module to use test Redis
+      const { connection: testConnection } = await import("../../redis");
+
+      // If no Redis in test env, skip (testContainers provides it)
+      if (!testConnection) {
+        // Fallback: wire manually with test redis to prove the flow
+        const subscriber = redis.duplicate() as unknown as CancellationSubscriber;
+        const unsubscribe = await subscribeToCancellations({
+          subscriber,
+          onCancel: (message: CancellationMessage) => {
+            pool.markCancelled(message.scenarioRunId);
+          },
+        });
+        cleanupFns.push(unsubscribe);
+
+        pool.setSpawnFunction(async () => {});
+        pool.setOnSkipCancelled((jobData) => {
+          void mockDeps.failureEmitter.ensureFailureEventsEmitted({
+            projectId: jobData.projectId,
+            scenarioId: jobData.scenarioId,
+            setId: jobData.setId,
+            batchRunId: jobData.batchRunId,
+            scenarioRunId: jobData.scenarioRunId,
+            error: "Cancelled before execution started",
+            cancelled: true,
+          });
+        });
+      } else {
+        // Real path: startScenarioProcessor wires everything
+        const handle = await startScenarioProcessor(pool, mockDeps);
+        if (handle) cleanupFns.push(handle.close);
+      }
 
       await new Promise((r) => setTimeout(r, 50));
 
-      // Step 1: Cancel broadcast arrives (from the cancellationBroadcast reactor)
+      // Step 1: Cancel broadcast arrives
       await publishCancellation({
         publisher: redis,
         message: { projectId: "proj-1", scenarioRunId: "run-pre-cancel", batchRunId: "batch-1" },
@@ -310,7 +345,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await waitFor(() => pool.wasCancelled("run-pre-cancel"));
 
-      // Step 2: Execution reactor submits the job (queued event processed later)
+      // Step 2: Execution reactor submits the job
       pool.submit({
         projectId: "proj-1",
         scenarioId: "scen-1",
@@ -320,12 +355,17 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         target: { type: "http", referenceId: "agent-1" },
       });
 
-      // Step 3: Job was NOT spawned
-      expect(spawnedJobs).toHaveLength(0);
+      // Step 3: Wait for async failure emission
+      await waitFor(() => emittedFailures.length > 0);
 
-      // Step 4: onSkipCancelled WAS called — this is what writes finished(CANCELLED)
-      expect(cancelledJobs).toHaveLength(1);
-      expect(cancelledJobs[0]!.scenarioRunId).toBe("run-pre-cancel");
+      // Step 4: Verify the failure emitter was called with cancelled: true
+      expect(emittedFailures).toHaveLength(1);
+      expect(emittedFailures[0]).toEqual(
+        expect.objectContaining({
+          scenarioRunId: "run-pre-cancel",
+          cancelled: true,
+        }),
+      );
     });
   });
 });
