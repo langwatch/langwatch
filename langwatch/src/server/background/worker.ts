@@ -45,6 +45,7 @@ import { connection as redis } from "../redis";
 import { startScenarioProcessor } from "../scenarios/scenario.processor";
 import { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
 import { SCENARIO_WORKER } from "../scenarios/scenario.constants";
+import { getScenarioExecutionHandle } from "../app-layer/presets";
 import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
@@ -142,6 +143,11 @@ export const start = async (
   }
 
   const scenarioPool = new ScenarioExecutionPool({ concurrency: SCENARIO_WORKER.CONCURRENCY });
+  // Wire the pool into the execution reactor (late-bound during app init)
+  const executionHandle = getScenarioExecutionHandle();
+  if (executionHandle) {
+    executionHandle.setPool(scenarioPool);
+  }
   const scenarioProcessor = await startScenarioProcessor(scenarioPool);
 
   return new Promise<Workers | undefined>((resolve, reject) => {

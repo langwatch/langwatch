@@ -77,3 +77,4 @@ node_modules/
 
 licenses.json
 .pnpm-store/
+server.log

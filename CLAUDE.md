@@ -38,6 +38,8 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
+When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — check it with `grep` if available.
+
 ## Structure
 
 ```

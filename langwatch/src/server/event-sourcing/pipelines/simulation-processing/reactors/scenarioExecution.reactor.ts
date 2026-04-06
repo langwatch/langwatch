@@ -9,6 +9,9 @@
  * The GroupQueue must continue processing subsequent events (message_snapshot,
  * finished, cancel_requested, etc.) for the same aggregate.
  *
+ * The pool is late-bound via `setPool()` because the pool is created during
+ * worker startup, after the pipeline registry is initialized.
+ *
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
@@ -26,19 +29,22 @@ const logger = createLogger(
   "langwatch:simulation-processing:scenario-execution",
 );
 
-export interface ScenarioExecutionReactorDeps {
-  pool: ScenarioExecutionPool;
+export interface ScenarioExecutionReactorHandle {
+  reactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  /** Wire the execution pool after the reactor is created. Called by worker startup. */
+  setPool: (pool: ScenarioExecutionPool) => void;
 }
 
 /**
  * Creates a reactor that submits queued scenarios to the execution pool.
  *
- * Only runs on worker pods (not on the web server).
+ * Only runs on worker pods (not on the web server). The pool must be
+ * wired via `setPool()` before the reactor can process events.
  */
-export function createScenarioExecutionReactor(
-  deps: ScenarioExecutionReactorDeps,
-): ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData> {
-  return {
+export function createScenarioExecutionReactor(): ScenarioExecutionReactorHandle {
+  let pool: ScenarioExecutionPool | null = null;
+
+  const reactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData> = {
     name: "scenarioExecution",
     options: {
       runIn: ["worker"],
@@ -49,6 +55,14 @@ export function createScenarioExecutionReactor(
       context: ReactorContext<SimulationRunStateData>,
     ): Promise<void> {
       if (!isSimulationRunQueuedEvent(event)) return;
+
+      if (!pool) {
+        logger.warn(
+          { scenarioRunId: context.foldState.ScenarioRunId },
+          "Execution pool not yet wired, skipping",
+        );
+        return;
+      }
 
       const { foldState } = context;
 
@@ -71,7 +85,7 @@ export function createScenarioExecutionReactor(
         return;
       }
 
-      deps.pool.submit({
+      pool.submit({
         projectId: String(event.tenantId),
         scenarioId: foldState.ScenarioId,
         scenarioRunId: foldState.ScenarioRunId,
@@ -86,5 +100,10 @@ export function createScenarioExecutionReactor(
         "Submitted scenario to execution pool",
       );
     },
+  };
+
+  return {
+    reactor,
+    setPool: (p) => { pool = p; },
   };
 }

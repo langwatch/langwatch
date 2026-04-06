@@ -28,7 +28,7 @@ import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processin
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
 import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import type { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
+import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
@@ -124,8 +124,6 @@ export interface PipelineRegistryDeps {
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
-  /** Execution pool for scenario child processes. Provided by the worker bootstrap. */
-  scenarioExecutionPool?: ScenarioExecutionPool;
 }
 
 /**
@@ -157,7 +155,7 @@ export class PipelineRegistry {
     const evalPipeline = this.registerEvaluationPipeline();
     const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
+    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
@@ -171,6 +169,8 @@ export class PipelineRegistry {
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
+      /** Late-bind the execution pool for scenario execution reactor. */
+      scenarioExecutionHandle,
     };
   }
 
@@ -384,9 +384,7 @@ export class PipelineRegistry {
       publisher: this.deps.eventSourcing.redisConnection ?? null,
     });
 
-    const scenarioExecutionReactor = this.deps.scenarioExecutionPool
-      ? createScenarioExecutionReactor({ pool: this.deps.scenarioExecutionPool })
-      : undefined;
+    const scenarioExecutionHandle = createScenarioExecutionReactor();
 
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
     const suiteRunSyncReactor = createSuiteRunSyncReactor({
@@ -426,7 +424,7 @@ export class PipelineRegistry {
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
         cancellationBroadcastReactor,
-        scenarioExecutionReactor,
+        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
         suiteRunSyncReactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,
@@ -486,7 +484,7 @@ export class PipelineRegistry {
       computeRunMetrics: simCommands.computeRunMetrics,
     });
 
-    return simulationPipeline;
+    return { pipeline: simulationPipeline, scenarioExecutionHandle };
   }
 
   private registerBillingReportingPipeline() {
