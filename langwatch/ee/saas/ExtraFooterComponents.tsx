@@ -3,14 +3,13 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import Script from "next/script";
 
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 import posthog from "posthog-js";
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
-  const publicEnv = api.publicEnv.useQuery(undefined, {
-    staleTime: Infinity,
-  });
+  const publicEnv = usePublicEnv();
 
   if (!publicEnv.data?.IS_SAAS) {
     return null;

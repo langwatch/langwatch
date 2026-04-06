@@ -250,7 +250,7 @@ export default async function handler(
             fullName: user?.name ?? session?.user.name,
           };
         },
-      },
+      } as any,
     },
   });
 
