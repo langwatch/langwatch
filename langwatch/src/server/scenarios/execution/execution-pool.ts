@@ -24,7 +24,7 @@ export interface ExecutionJobData {
   batchRunId: string;
   setId: string;
   scenarioName?: string;
-  target: { type: string; referenceId: string };
+  target: { type: "prompt" | "http" | "code"; referenceId: string };
 }
 
 /** Function that spawns a child process for a scenario job. Returns when child exits. */

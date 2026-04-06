@@ -43,10 +43,8 @@ import {
 } from "../clickhouse/metrics";
 import { connection as redis } from "../redis";
 import { startScenarioProcessor } from "../scenarios/scenario.processor";
-import type {
-  ScenarioJob,
-  ScenarioJobResult,
-} from "../scenarios/scenario.queue";
+import { ScenarioExecutionPool } from "../scenarios/execution/execution-pool";
+import { SCENARIO_WORKER } from "../scenarios/scenario.constants";
 import { monitoredQueues } from "./queues";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
@@ -114,7 +112,7 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
-  scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
+  scenarioProcessor: { close: () => Promise<void> } | undefined;
 };
 
 export const start = async (
@@ -143,7 +141,8 @@ export const start = async (
     startStorageStatsCollection(clickHouseClient);
   }
 
-  const scenarioWorker = await startScenarioProcessor();
+  const scenarioPool = new ScenarioExecutionPool({ concurrency: SCENARIO_WORKER.CONCURRENCY });
+  const scenarioProcessor = await startScenarioProcessor(scenarioPool);
 
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
@@ -161,7 +160,7 @@ export const start = async (
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
-    registerCloseable("scenario", scenarioWorker);
+    registerCloseable("scenario", scenarioProcessor);
     registerCloseable("metricsServer", {
       close: () =>
         new Promise<void>((resolve) => metricsServer.close(() => resolve())),
@@ -189,8 +188,6 @@ export const start = async (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
-    scenarioWorker?.on("closing", closingListener);
-
     if (maxRuntimeMs) {
       setTimeout(() => {
         logger.info("max runtime reached, closing worker");
@@ -201,14 +198,13 @@ export const start = async (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
-          scenarioWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
-            scenarioWorker?.close(),
+            scenarioProcessor?.close(),
             new Promise<void>((resolve) =>
               metricsServer.close(() => resolve()),
             ),
@@ -228,7 +224,7 @@ export const start = async (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
-        scenarioWorker,
+        scenarioProcessor,
       });
     }
   });

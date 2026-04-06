@@ -12,10 +12,7 @@ import {
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-} from "~/server/scenarios/scenario.queue";
+import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
@@ -125,22 +122,12 @@ export const simulationRunnerRouter = createTRPCRouter({
         });
       }
 
-      const job = await scheduleScenarioRun({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        target: input.target,
-        setId,
-        batchRunId,
-        scenarioRunId,
-        index: 0,
-      });
+      // No explicit job scheduling — the execution reactor picks up the queued
+      // event via the GroupQueue and spawns the child process.
+      logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
 
-      logger.info({ jobId: job.id, batchRunId, scenarioRunId }, "Scenario scheduled");
-
-      // Return honest response: job was scheduled, not executed
       return {
         scheduled: true,
-        jobId: job.id,
         setId,
         batchRunId,
         scenarioRunId,
