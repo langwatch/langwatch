@@ -150,12 +150,6 @@ spec:
               value: "true"
             {{- end }}
 
-            {{- if .Values.users }}
-            # User management
-            - name: CH_USERS
-              value: {{ .Values.users | quote }}
-            {{- end }}
-
             # Advanced overrides (applied last — override any derived value above)
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}

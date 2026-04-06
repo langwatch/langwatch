@@ -349,50 +349,6 @@ func TestRenderAll_BackupWithoutColdStorage(t *testing.T) {
 	}
 }
 
-func TestRenderAll_CustomUsersCreatesFiles(t *testing.T) {
-	dir := t.TempDir()
-	input := testInput()
-	input.Users = "appuser:s3cret:readwrite:mydb;analyst:pa$$word:readonly:*"
-	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
-
-	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
-		t.Fatalf("RenderAll: %v", err)
-	}
-
-	// User YAML files should exist
-	for _, name := range []string{"appuser", "analyst"} {
-		data, err := os.ReadFile(filepath.Join(dir, "users.d/"+name+".yaml"))
-		if err != nil {
-			t.Fatalf("read %s.yaml: %v", name, err)
-		}
-		if !strings.Contains(string(data), "password_sha256_hex") {
-			t.Errorf("%s.yaml should contain password_sha256_hex", name)
-		}
-	}
-
-	// Password files should exist
-	for _, name := range []string{"appuser", "analyst"} {
-		pwPath := filepath.Join(dir, "user-passwords/"+name+"/password")
-		if _, err := os.Stat(pwPath); os.IsNotExist(err) {
-			t.Errorf("password file for %s should exist", name)
-		}
-	}
-
-	// Verify grant content
-	appData, _ := os.ReadFile(filepath.Join(dir, "users.d/appuser.yaml"))
-	if !strings.Contains(string(appData), "GRANT SELECT ON `mydb`.* TO appuser") {
-		t.Error("appuser should have SELECT grant on mydb")
-	}
-	if !strings.Contains(string(appData), "GRANT INSERT ON `mydb`.* TO appuser") {
-		t.Error("appuser should have INSERT grant on mydb")
-	}
-
-	analystData, _ := os.ReadFile(filepath.Join(dir, "users.d/analyst.yaml"))
-	if !strings.Contains(string(analystData), "GRANT SELECT ON *.* TO analyst") {
-		t.Error("analyst should have SELECT grant on *.*")
-	}
-}
-
 func TestRenderAll_NetworkSettings(t *testing.T) {
 	dir := t.TempDir()
 	input := testInput()

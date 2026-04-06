@@ -90,9 +90,6 @@ type Input struct {
 	TCPKeepAliveTimeout int `env:"TCP_KEEP_ALIVE_TIMEOUT" default:"10"`
 	ListenBacklog       int `env:"LISTEN_BACKLOG" default:"4096"`
 
-	// User management: "user1:password:readwrite:db1;user2:password:readonly:*"
-	Users string `env:"CH_USERS"`
-
 	// Backup connection
 	ClickHouseHost string `env:"CLICKHOUSE_HOST" default:"localhost"`
 	ClickHousePort int    `env:"CLICKHOUSE_PORT" default:"9000"`

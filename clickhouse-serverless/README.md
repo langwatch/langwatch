@@ -22,7 +22,6 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `S3_ENDPOINT` | — | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA) |
 | `CH_REPLICATED` | `false` | Enable ReplicatedMergeTree (requires keeper + data node env vars) |
-| `CH_USERS` | — | Declare users: `name:password:role:databases` separated by `;` |
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
@@ -53,7 +52,7 @@ make e2e-backup      # Full backup → restore → incremental → restore
 
 ## Architecture
 
-```
+```text
 tini → entrypoint-wrapper.sh → ch-config generate → official entrypoint
 ```
 
