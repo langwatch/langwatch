@@ -48,8 +48,6 @@ auth:
     passwordKey: "password"
     clusterSecretKey: "clusterSecret"
 
-# User management: "user1:pass1:readwrite:db1,db2;user2:pass2:readonly:*"
-users: ""
 
 # Advanced: override any computed value (applied last)
 env: {}

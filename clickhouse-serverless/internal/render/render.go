@@ -10,7 +10,6 @@ import (
 
 	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
 	"github.com/langwatch/langwatch/clickhouse-serverless/internal/storage"
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/users"
 )
 
 // RenderAll generates all ClickHouse configuration files under outputDir.
@@ -21,7 +20,6 @@ import (
 //	outputDir/
 //	  config.d/         — ClickHouse server config (limits, storage, keeper, etc.)
 //	  users.d/          — ClickHouse user configs (profiles, passwords, custom users)
-//	  user-passwords/   — plaintext passwords for custom users (mount as K8s secret)
 func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, outputDir string) error {
 	if computed == nil {
 		return fmt.Errorf("computed settings must not be nil")
@@ -80,14 +78,6 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		}
 	}
 
-	// Custom users.
-	if input.Users != "" {
-		if err := renderUsers(input, usersD, outputDir); err != nil {
-			return fmt.Errorf("users: %w", err)
-		}
-		log.Info("custom users configured")
-	}
-
 	log.Info("configuration rendered", zap.String("dir", outputDir))
 	return nil
 }
@@ -98,33 +88,6 @@ func renderStorage(input *config.Input, computed *config.Computed, configD strin
 		return err
 	}
 	return os.WriteFile(filepath.Join(configD, "storage.yaml"), data, 0600)
-}
-
-func renderUsers(input *config.Input, usersD, outputDir string) error {
-	parsed, err := users.ParseUsers(input.Users)
-	if err != nil {
-		return err
-	}
-
-	passwordDir := filepath.Join(outputDir, "user-passwords")
-	for _, u := range parsed {
-		data, err := users.RenderUser(u)
-		if err != nil {
-			return fmt.Errorf("render user %s: %w", u.Name, err)
-		}
-		if err := os.WriteFile(filepath.Join(usersD, u.Name+".yaml"), data, 0600); err != nil {
-			return fmt.Errorf("write user %s: %w", u.Name, err)
-		}
-
-		userDir := filepath.Join(passwordDir, u.Name)
-		if err := os.MkdirAll(userDir, 0700); err != nil {
-			return err
-		}
-		if err := os.WriteFile(filepath.Join(userDir, "password"), []byte(u.Password), 0600); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // writeYAML marshals data to YAML and writes it with 0600 permissions.
