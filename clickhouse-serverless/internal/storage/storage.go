@@ -97,9 +97,11 @@ func Render(input *config.Input, computed *config.Computed) ([]byte, error) {
 			SkipAccessCheck:           true,
 		}
 
-		if input.S3AccessKey != "" && input.S3SecretKey != "" {
-			objectDisk.AccessKeyID = input.S3AccessKey
-			objectDisk.SecretAccessKey = input.S3SecretKey
+		accessKey := strings.TrimSpace(input.S3AccessKey)
+		secretKey := strings.TrimSpace(input.S3SecretKey)
+		if accessKey != "" && secretKey != "" {
+			objectDisk.AccessKeyID = accessKey
+			objectDisk.SecretAccessKey = secretKey
 		}
 
 		disks["local"] = localDisk{
@@ -135,9 +137,11 @@ func Render(input *config.Input, computed *config.Computed) ([]byte, error) {
 			Endpoint:        ensureTrailingSlash(endpoint) + "clickhouse-backup/",
 			SkipAccessCheck: true,
 		}
-		if input.S3AccessKey != "" && input.S3SecretKey != "" {
-			backupsDisk.AccessKeyID = input.S3AccessKey
-			backupsDisk.SecretAccessKey = input.S3SecretKey
+		bAccessKey := strings.TrimSpace(input.S3AccessKey)
+		bSecretKey := strings.TrimSpace(input.S3SecretKey)
+		if bAccessKey != "" && bSecretKey != "" {
+			backupsDisk.AccessKeyID = bAccessKey
+			backupsDisk.SecretAccessKey = bSecretKey
 		}
 
 		// If cold is not enabled, we need to initialize disks in the storage configuration
@@ -156,9 +160,11 @@ func Render(input *config.Input, computed *config.Computed) ([]byte, error) {
 				Endpoint:        ensureTrailingSlash(input.DRS3Endpoint),
 				SkipAccessCheck: true,
 			}
-			if input.S3AccessKey != "" && input.S3SecretKey != "" {
-				drDisk.AccessKeyID = input.S3AccessKey
-				drDisk.SecretAccessKey = input.S3SecretKey
+			drAccessKey := strings.TrimSpace(input.S3AccessKey)
+			drSecretKey := strings.TrimSpace(input.S3SecretKey)
+			if drAccessKey != "" && drSecretKey != "" {
+				drDisk.AccessKeyID = drAccessKey
+				drDisk.SecretAccessKey = drSecretKey
 			}
 			cfg.StorageConfiguration.Disks["backups_dr"] = drDisk
 			allowedDisks = append(allowedDisks, "backups_dr")

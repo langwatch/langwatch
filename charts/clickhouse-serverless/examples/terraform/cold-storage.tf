@@ -14,7 +14,7 @@ variable "s3_region" {
 }
 
 resource "helm_release" "clickhouse_with_cold" {
-  count = var.s3_bucket != "" ? 1 : 0
+  count = length(trimspace(var.s3_bucket)) > 0 ? 1 : 0
 
   name             = "clickhouse"
   repository       = "https://langwatch.github.io/langwatch"

@@ -34,7 +34,7 @@ From 3 inputs (CPU, RAM, replicated), the Go binary derives ~40 parameters:
 | Parameter | Formula |
 |-----------|---------|
 | Server memory | RAM * 85% |
-| Per-query memory | min(RAM * 25%, 4GB) |
+| Per-query memory | min(RAM * 25%, 8GB) |
 | Background pool | max(2, CPU/2) |
 | Concurrent queries | min(CPU*25, 200) |
 | Merge parts limit | 5 / 8 / 15 (by CPU tier) |
