@@ -621,67 +621,77 @@ describe("processCustomGraphTrigger", () => {
   });
 });
 
-describe("sumMetricAcrossGroups", () => {
+describe("sumMetricAcrossGroups()", () => {
   const seriesKey = "0/metadata.trace_id/cardinality";
 
-  it("sums the metric across all groups", () => {
-    const entry: TimeseriesBucket = {
-      date: "2024-01-01",
-      "sentiment.thumbs_up_down": {
-        "Thumbs Up": { [seriesKey]: 10 },
-        "Thumbs Down": { [seriesKey]: 5 },
-      },
-    };
+  describe("when entry has grouped data with the metric", () => {
+    it("sums the metric across all groups", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "sentiment.thumbs_up_down": {
+          "Thumbs Up": { [seriesKey]: 10 },
+          "Thumbs Down": { [seriesKey]: 5 },
+        },
+      };
 
-    expect(
-      sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
-    ).toBe(15);
+      expect(
+        sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+      ).toBe(15);
+    });
   });
 
-  it("returns undefined when groupBy key is missing from entry", () => {
-    const entry: TimeseriesBucket = { date: "2024-01-01" };
+  describe("when some groups lack the metric", () => {
+    it("sums only the groups that have it", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "metadata.model": {
+          "gpt-4": { [seriesKey]: 8 },
+          "claude": { "other/metric": 99 },
+          "gemini": { [seriesKey]: 2 },
+        },
+      };
 
-    expect(
-      sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
-    ).toBeUndefined();
+      expect(
+        sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
+      ).toBe(10);
+    });
   });
 
-  it("returns undefined when no group contains the metric", () => {
-    const entry: TimeseriesBucket = {
-      date: "2024-01-01",
-      "sentiment.thumbs_up_down": {
-        "Thumbs Up": { "other/metric": 10 },
-      },
-    };
+  describe("when groupBy key is missing from entry", () => {
+    it("returns undefined", () => {
+      const entry: TimeseriesBucket = { date: "2024-01-01" };
 
-    expect(
-      sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
-    ).toBeUndefined();
+      expect(
+        sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+      ).toBeUndefined();
+    });
   });
 
-  it("skips groups that lack the metric and sums the rest", () => {
-    const entry: TimeseriesBucket = {
-      date: "2024-01-01",
-      "metadata.model": {
-        "gpt-4": { [seriesKey]: 8 },
-        "claude": { "other/metric": 99 },
-        "gemini": { [seriesKey]: 2 },
-      },
-    };
+  describe("when no group contains the metric", () => {
+    it("returns undefined", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "sentiment.thumbs_up_down": {
+          "Thumbs Up": { "other/metric": 10 },
+        },
+      };
 
-    expect(
-      sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
-    ).toBe(10);
+      expect(
+        sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+      ).toBeUndefined();
+    });
   });
 
-  it("returns undefined when groupBy value is not an object", () => {
-    const entry: TimeseriesBucket = {
-      date: "2024-01-01",
-      "metadata.model": 42,
-    };
+  describe("when groupBy value is not an object", () => {
+    it("returns undefined", () => {
+      const entry: TimeseriesBucket = {
+        date: "2024-01-01",
+        "metadata.model": 42,
+      };
 
-    expect(
-      sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
-    ).toBeUndefined();
+      expect(
+        sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
+      ).toBeUndefined();
+    });
   });
 });
