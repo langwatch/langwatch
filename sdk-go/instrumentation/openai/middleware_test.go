@@ -790,7 +790,7 @@ func TestMiddleware_WithTracerProvider_NoGlobal(t *testing.T) {
 			endpointPath: "/v1/chat/completions",
 			openaiOp: func(t *testing.T, client openai.Client) {
 				stream := client.Chat.Completions.NewStreaming(context.Background(), openai.ChatCompletionNewParams{
-					Model: openai.ChatModelGPT4oMini,
+					Model: completionModelID,
 					Messages: []openai.ChatCompletionMessageParamUnion{
 						openai.UserMessage("count"),
 					},
@@ -817,9 +817,10 @@ func TestMiddleware_WithTracerProvider_NoGlobal(t *testing.T) {
 			name:         "API Error",
 			endpointPath: "/v1/chat/completions",
 			openaiOp: func(t *testing.T, client openai.Client) {
-				_, _ = client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+				_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
 					Model: openai.ChatModelGPT4oMini,
 				})
+				require.Error(t, err)
 			},
 			mockResponseStatus: http.StatusBadRequest,
 			mockResponseBody:   `{"error":{"message":"invalid","type":"invalid_request_error"}}`,
