@@ -918,7 +918,7 @@ function GroupsSettings() {
                       <Table.Cell colSpan={5}>
                         <HStack gap={2}>
                           <Plus size={14} />
-                          <Text fontSize="sm">Add group</Text>
+                          <Text fontSize="sm">Add manual group</Text>
                         </HStack>
                       </Table.Cell>
                     </Table.Row>
