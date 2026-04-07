@@ -210,9 +210,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if and (gt $replicas 1) (eq (mod $replicas 2) 0) }}
     {{- $errors = append $errors "clickhouse.replicas must be odd (1, 3, 5, 7) for Keeper quorum" }}
   {{- end }}
-  {{- if and (empty $chValues.auth.password) (empty $chValues.auth.existingSecret) (not .Values.autogen.enabled) }}
-    {{- $errors = append $errors "clickhouse.auth.password, clickhouse.auth.existingSecret, or autogen must be configured" }}
-  {{- end }}
+  {{/* ClickHouse subchart auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
   {{- if or $chValues.cold.enabled $chValues.backup.enabled }}
     {{- if empty $chValues.objectStorage.bucket }}
       {{- $errors = append $errors "clickhouse.objectStorage.bucket is required when cold.enabled or backup.enabled" }}
@@ -220,9 +218,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
-{{- if and .Values.redis.chartManaged .Values.redis.auth.enabled (not .Values.autogen.enabled) (empty .Values.redis.auth.password) (empty .Values.redis.auth.existingSecret) }}
-  {{- $errors = append $errors "redis.auth.enabled is true but no password or existingSecret is configured (set redis.auth.password, redis.auth.existingSecret, or enable autogen)" }}
-{{- end }}
+{{/* Redis secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
 
 {{- if not .Values.redis.chartManaged }}
   {{- if .Values.redis.external.connectionString.secretKeyRef.name }}
@@ -242,10 +238,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- else if empty .Values.postgresql.external.connectionString.value }}
     {{- $errors = append $errors "postgresql.chartManaged is false but connectionString is not configured" }}
   {{- end }}
-{{- else}}
-  {{- if and (empty .Values.postgresql.auth.password) (empty .Values.postgresql.auth.existingSecret) (not .Values.autogen.enabled) }}
-    {{- $errors = append $errors "neither postgresql.auth.password nor postgresql.auth.existingSecret is configured (enable autogen or provide one)" }}
-  {{- end }}
+{{/* PostgreSQL secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
 {{- end }}
 
 {{- if not .Values.prometheus.chartManaged }}

@@ -92,6 +92,9 @@ spec:
           securityContext:
             runAsUser: 1000
             runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
       containers:
         {{- with .Values.app.extraContainers}}
         {{- toYaml . | nindent 8 }}

@@ -103,18 +103,22 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.langevals.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            failureThreshold: 18
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthcheck
               port: http
-            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /healthcheck
               port: http
-            initialDelaySeconds: 120
             periodSeconds: 30
             timeoutSeconds: 5
           volumeMounts:

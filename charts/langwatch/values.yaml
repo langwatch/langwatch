@@ -592,6 +592,10 @@ workers:
   # See: https://kubespec.dev/v1/Pod#spec.affinity
   ## @param workers.affinity [object] Affinity overrides.
   affinity: {}
+  # Topology spread constraints
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  ## @param workers.topologySpreadConstraints [array] Topology spread constraints overrides.
+  topologySpreadConstraints: []
   # Pod-level configurations
   ## @extra workers.pod Pod-level metadata.
   pod:

@@ -38,10 +38,8 @@ spec:
         {{- toYaml .Values.workers.pod.labels | nindent 8 }}
         {{- end }}
       annotations:
-        {{- if .Values.workers.pod.annotations }}
-        {{- toYaml .Values.workers.pod.annotations | nindent 8 }}
-        {{- else if .Values.global.podAnnotations }}
-        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
+        {{- with (coalesce .Values.workers.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
       {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
@@ -61,6 +59,11 @@ spec:
 
       {{- with (coalesce .Values.workers.affinity .Values.global.scheduling.affinity)}}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.workers.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
@@ -87,10 +90,14 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "kill -0 1"]
+            failureThreshold: 12
+            periodSeconds: 10
           livenessProbe:
             exec:
               command: ["sh", "-c", "kill -0 1"]
-            initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3

@@ -4,6 +4,15 @@
 
 set -euo pipefail
 
+# ─── Sanitise environment ────────────────────────────────────────────────────
+# Prevent leaked env vars from routing kubectl/helm to a real cluster or
+# leaking credentials into test pods.
+unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT 2>/dev/null || true
+unset KUBECONFIG 2>/dev/null || true
+unset DATABASE_URL PGHOST PGUSER PGPASSWORD PGDATABASE 2>/dev/null || true
+unset REDIS_URL REDIS_HOST REDIS_PASSWORD 2>/dev/null || true
+unset CLICKHOUSE_URL CLICKHOUSE_PASSWORD CLICKHOUSE_CLUSTER 2>/dev/null || true
+
 # ─── Formatting ──────────────────────────────────────────────────────────────
 
 RED='\033[0;31m'
