@@ -1,5 +1,19 @@
+import type { AnalyticsBucket } from "../langwatch-api.js";
 import { getAnalyticsTimeseries as apiGetAnalytics } from "../langwatch-api.js";
 import { parseRelativeDate } from "../utils/date-parsing.js";
+
+type GroupedData = Record<string, Record<string, number>>;
+
+function getGroupedData(
+  bucket: AnalyticsBucket,
+  groupBy: string,
+): GroupedData | undefined {
+  const data = bucket[groupBy];
+  if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+    return data as GroupedData;
+  }
+  return undefined;
+}
 
 /**
  * Handles the get_analytics MCP tool invocation.
@@ -51,32 +65,17 @@ export async function handleGetAnalytics(params: {
     lines.push("No data available for this period.");
   } else if (
     params.groupBy &&
-    currentPeriod.some((bucket) => {
-      const groupData = bucket[params.groupBy!];
-      return (
-        typeof groupData === "object" &&
-        groupData !== null &&
-        !Array.isArray(groupData)
-      );
-    })
+    currentPeriod.some((b) => getGroupedData(b, params.groupBy!) !== undefined)
   ) {
     lines.push("| Date | Group | Value |");
     lines.push("|------|-------|-------|");
     for (const bucket of currentPeriod) {
-      const groupData = bucket[params.groupBy];
-      if (
-        typeof groupData === "object" &&
-        groupData !== null &&
-        !Array.isArray(groupData)
-      ) {
-        const groups = groupData as Record<string, Record<string, number>>;
-        for (const [groupKey, metrics] of Object.entries(groups)) {
-          const value =
-            Object.values(metrics).find(
-              (v) => typeof v === "number"
-            ) ?? "N/A";
-          lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
-        }
+      const groups = getGroupedData(bucket, params.groupBy);
+      if (!groups) continue;
+      for (const [groupKey, metrics] of Object.entries(groups)) {
+        const value =
+          Object.values(metrics).find((v) => typeof v === "number") ?? "N/A";
+        lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
       }
     }
   } else {

@@ -10,7 +10,10 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import { getAnalyticsService } from "~/server/analytics/analytics.service";
-import type { TimeseriesResult } from "~/server/analytics/types";
+import type {
+  TimeseriesBucket,
+  TimeseriesResult,
+} from "~/server/analytics/types";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -295,6 +298,42 @@ export const processCustomGraphTrigger = async (
   }
 };
 
+/**
+ * Sum a metric across all groups in a grouped timeseries bucket.
+ *
+ * Grouped buckets nest values as:
+ *   { [groupBy]: { [groupKey]: { [seriesKey]: number } } }
+ *
+ * Returns undefined when no group contains the metric so the
+ * bucket is excluded from aggregation rather than counted as 0.
+ */
+const sumMetricAcrossGroups = (
+  entry: TimeseriesBucket,
+  groupBy: string,
+  seriesKey: string,
+): number | undefined => {
+  const groupData = entry[groupBy];
+  if (
+    typeof groupData !== "object" ||
+    groupData === null ||
+    Array.isArray(groupData)
+  ) {
+    return undefined;
+  }
+
+  const groups = groupData as Record<string, Record<string, number>>;
+  let sum = 0;
+  let found = false;
+  for (const metrics of Object.values(groups)) {
+    const value = metrics[seriesKey];
+    if (typeof value === "number") {
+      found = true;
+      sum += value;
+    }
+  }
+  return found ? sum : undefined;
+};
+
 const calculateCurrentValue = (
   timeseriesResult: TimeseriesResult,
   series: CustomGraphInput["series"][number],
@@ -309,38 +348,13 @@ const calculateCurrentValue = (
   if (dataPoints.length > 0) {
     const values = dataPoints
       .map((entry) => {
-        // Flat (ungrouped) path: value is directly on the entry
         const seriesValue = entry[seriesKey];
         if (typeof seriesValue === "number") {
           return seriesValue;
         }
-
-        // Grouped path: value is nested under groupBy key as
-        // { [groupBy]: { [groupKey]: { [seriesKey]: number } } }
         if (groupBy) {
-          const groupData = entry[groupBy];
-          if (
-            typeof groupData === "object" &&
-            groupData !== null &&
-            !Array.isArray(groupData)
-          ) {
-            const groups = groupData as Record<
-              string,
-              Record<string, number>
-            >;
-            let sum = 0;
-            let hasNumericMetric = false;
-            for (const metrics of Object.values(groups)) {
-              const metricValue = metrics[seriesKey];
-              if (typeof metricValue === "number") {
-                hasNumericMetric = true;
-                sum += metricValue;
-              }
-            }
-            return hasNumericMetric ? sum : undefined;
-          }
+          return sumMetricAcrossGroups(entry, groupBy, seriesKey);
         }
-
         return 0;
       })
       .filter((v): v is number => typeof v === "number");
