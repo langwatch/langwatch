@@ -12,7 +12,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     | { evaluatorType?: string; settings?: Record<string, unknown> }
     | null
     | undefined;
-  const evaluatorType = config?.evaluatorType ?? evaluator.type;
+  const evaluatorType = config?.evaluatorType ?? evaluator.type ?? "—";
 
   console.log();
   console.log(chalk.bold.cyan(evaluator.name));
@@ -51,7 +51,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Settings:"));
     for (const [key, value] of Object.entries(config.settings)) {
       const displayValue =
-        typeof value === "object" || value === null
+        typeof value === "object"
           ? JSON.stringify(value)
           : `${value as string | number | boolean}`;
       console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);

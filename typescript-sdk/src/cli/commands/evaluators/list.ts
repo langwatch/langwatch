@@ -112,7 +112,7 @@ export const listEvaluatorsCommand = async (): Promise<void> => {
           | { evaluatorType?: string }
           | null
           | undefined;
-        const evaluatorType = config?.evaluatorType ?? evaluator.type;
+        const evaluatorType = config?.evaluatorType ?? evaluator.type ?? "—";
 
         return {
           Name: evaluator.name,

@@ -31,11 +31,11 @@ Feature: Evaluator CLI Commands
     Then I see an error that the evaluator was not found
 
   Scenario: Create an evaluator
-    When I run "langwatch evaluator create "My Evaluator" --type langevals/llm_judge"
+    When I run "langwatch evaluator create 'My Evaluator' --type langevals/llm_judge"
     Then a new evaluator is created and I see confirmation with its name and slug
 
   Scenario: Create an evaluator without required type
-    When I run "langwatch evaluator create "My Evaluator""
+    When I run "langwatch evaluator create 'My Evaluator'"
     Then I see an error that the --type option is required
 
   Scenario: Delete an evaluator
