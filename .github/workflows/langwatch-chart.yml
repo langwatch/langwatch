@@ -56,9 +56,21 @@ jobs:
         run: helm template lw . ${{ matrix.flags }} > /dev/null
 
   e2e:
-    name: E2E (Kind)
+    name: "E2E: ${{ matrix.name }}"
     runs-on: ubuntu-latest
     needs: lint-template
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: infra
+            script: make test-e2e
+            cluster: lw-test
+            build_app: true
+          - name: overlays
+            script: make test-e2e-overlays
+            cluster: lw-overlay
+            build_app: false
     defaults:
       run:
         working-directory: charts/langwatch
@@ -70,20 +82,25 @@ jobs:
       - name: Build clickhouse-serverless image
         run: docker build -t langwatch/clickhouse-serverless:0.1.0 ../../clickhouse-serverless/
       - name: Build app image
+        if: matrix.build_app
         run: docker build -t langwatch/langwatch:2.6.0 ../..
       - uses: helm/kind-action@v1
         with:
-          cluster_name: lw-test
+          cluster_name: ${{ matrix.cluster }}
       - name: Load images into Kind
         run: |
-          kind load docker-image langwatch/clickhouse-serverless:0.1.0 --name lw-test
-          kind load docker-image langwatch/langwatch:2.6.0 --name lw-test
-      - run: make test-e2e
+          kind load docker-image langwatch/clickhouse-serverless:0.1.0 --name ${{ matrix.cluster }}
+          if [ "${{ matrix.build_app }}" = "true" ]; then
+            kind load docker-image langwatch/langwatch:2.6.0 --name ${{ matrix.cluster }}
+          fi
+      - run: ${{ matrix.script }}
         env:
           KEEP_CLUSTER: "true"
+          CLUSTER_NAME: ${{ matrix.cluster }}
       - name: Show pod status on failure
         if: failure()
         run: |
-          kubectl -n lw-test get pods -o wide 2>/dev/null || true
-          kubectl -n lw-test describe pods -n lw-test 2>/dev/null | tail -80 || true
-          kubectl -n lw-test get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
+          NS=$(kubectl get ns -o name 2>/dev/null | grep -o 'lw-test\|lw-overlay' | head -1)
+          [ -z "$NS" ] && exit 0
+          kubectl -n "$NS" get pods -o wide 2>/dev/null || true
+          kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true

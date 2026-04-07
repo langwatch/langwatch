@@ -471,8 +471,10 @@ load_images() {
 
 # ─────────────────────────────────────────────────────────────────────────────
 main() {
-  # Start fresh — delete any leftover cluster from a previous run
-  kind delete cluster --name "$CLUSTER_NAME" 2>/dev/null || true
+  # Start fresh locally; in CI (KEEP_CLUSTER=true) the cluster is pre-created
+  if [[ "${KEEP_CLUSTER:-false}" != "true" ]]; then
+    kind delete cluster --name "$CLUSTER_NAME" 2>/dev/null || true
+  fi
 
   setup_kind
   wait_api
