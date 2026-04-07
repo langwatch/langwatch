@@ -25,23 +25,21 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
+# Build mcp-server first — it's a file: dependency of langwatch, so dist/ must
+# exist before pnpm install copies it into the langwatch node_modules store
+COPY mcp-server ./mcp-server
+RUN cd mcp-server && pnpm install --frozen-lockfile && pnpm run build
+
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 COPY langwatch/vendor ./langwatch/vendor
-# mcp-server is a file: dependency of langwatch — must be present before pnpm install
-COPY mcp-server/package.json mcp-server/pnpm-lock.yaml mcp-server/pnpm-workspace.yaml ./mcp-server/
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 # SDK package files needed by generate-sdk-versions.sh during build
 COPY typescript-sdk/package.json ./typescript-sdk/package.json
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
-COPY mcp-server ./mcp-server
-# Install deps and build mcp-server so dist/ exports are available
-RUN cd mcp-server && pnpm install --frozen-lockfile && pnpm run build
 COPY langwatch ./langwatch
 RUN cd langwatch && pnpm run build
-# Symlink mcp-server source for tsx runtime imports (pnpm file: only copies published files)
-RUN rm -rf /app/langwatch/node_modules/@langwatch/mcp-server && ln -s /app/mcp-server /app/langwatch/node_modules/@langwatch/mcp-server
 EXPOSE 5560
 
 ENV NODE_ENV=production
