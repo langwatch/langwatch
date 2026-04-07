@@ -26,11 +26,11 @@ func loadEnv(target any) error {
 			continue
 		}
 
-		raw := os.Getenv(envKey)
-		if raw == "" {
+		raw, ok := os.LookupEnv(envKey)
+		if !ok {
 			raw = field.Tag.Get("default")
 		}
-		if raw == "" {
+		if !ok && raw == "" {
 			continue
 		}
 
@@ -92,8 +92,8 @@ func ApplyEnvOverrides(log *zap.Logger, target any) {
 		if envKey == "" {
 			continue
 		}
-		raw := os.Getenv(envKey)
-		if raw == "" {
+		raw, ok := os.LookupEnv(envKey)
+		if !ok {
 			continue
 		}
 		if err := setField(v.Field(i), raw); err != nil {

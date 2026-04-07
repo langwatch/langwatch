@@ -196,6 +196,11 @@ check "incremental restored checksum" "SELECT sum(value) FROM e2e.events" "1500"
 echo ""
 echo "=== Phase 4: Verify CONFIRM_RESTORE guard ==="
 
+# Drop the target table so a real restore would succeed if the guard were broken.
+# Without this, the test could pass for the wrong reason (restore failing because
+# the table already exists, not because the guard blocked it).
+query "DROP TABLE IF EXISTS e2e.events SYNC"
+
 # restore-data.sh should refuse without CONFIRM_RESTORE=yes
 if docker exec \
     -e CLICKHOUSE_HOST=localhost \

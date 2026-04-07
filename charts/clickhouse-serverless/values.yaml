@@ -70,6 +70,7 @@ serviceAccount:
   create: true
   name: ""  # defaults to <fullname>
   automountServiceAccountToken: false
+  annotations: {}  # e.g. eks.amazonaws.com/role-arn: arn:aws:iam::role/my-role (for IRSA)
 
 # Pod-level settings
 imagePullSecrets: []

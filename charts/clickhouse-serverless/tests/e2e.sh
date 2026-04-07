@@ -137,6 +137,20 @@ test_existing_secret() {
     pass "No chart-managed secret created"
   fi
 
+  # Verify the external secret is actually mounted and contains the expected value
+  local pod="${RELEASE}-clickhouse-0"
+  wait_ch_ready "$pod"
+
+  local mounted_pw
+  mounted_pw=$(kc exec "$pod" -- cat /mnt/secrets/password 2>/dev/null || echo "")
+  assert_eq "Mounted password matches external secret" "$mounted_pw" "externally-managed"
+
+  # Verify ClickHouse authenticates with the externally-managed password
+  local query_result
+  query_result=$(kc exec "$pod" -- \
+    clickhouse-client --password="externally-managed" --query="SELECT 1" 2>/dev/null || echo "")
+  assert_eq "Query with external password succeeds" "$query_result" "1"
+
   helm_uninstall
 }
 
