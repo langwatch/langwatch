@@ -100,6 +100,86 @@ describe("resolveRunStatus()", () => {
     });
   });
 
+  describe("given a run with terminal storedStatus but no RUN_FINISHED event", () => {
+    describe("when storedStatus is SUCCESS and time exceeds threshold", () => {
+      it("returns SUCCESS instead of STALLED", () => {
+        const status = resolveRunStatus({
+          finishedStatus: undefined,
+          storedStatus: ScenarioRunStatus.SUCCESS,
+          lastEventTimestamp: minutesAgo(15),
+          now: NOW,
+        });
+
+        expect(status).toBe(ScenarioRunStatus.SUCCESS);
+      });
+    });
+
+    describe("when storedStatus is FAILED and time exceeds threshold", () => {
+      it("returns FAILED instead of STALLED", () => {
+        const status = resolveRunStatus({
+          finishedStatus: undefined,
+          storedStatus: ScenarioRunStatus.FAILED,
+          lastEventTimestamp: minutesAgo(15),
+          now: NOW,
+        });
+
+        expect(status).toBe(ScenarioRunStatus.FAILED);
+      });
+    });
+
+    describe("when storedStatus is ERROR and time exceeds threshold", () => {
+      it("returns ERROR instead of STALLED", () => {
+        const status = resolveRunStatus({
+          finishedStatus: undefined,
+          storedStatus: ScenarioRunStatus.ERROR,
+          lastEventTimestamp: minutesAgo(15),
+          now: NOW,
+        });
+
+        expect(status).toBe(ScenarioRunStatus.ERROR);
+      });
+    });
+
+    describe("when storedStatus is CANCELLED and time exceeds threshold", () => {
+      it("returns CANCELLED instead of STALLED", () => {
+        const status = resolveRunStatus({
+          finishedStatus: undefined,
+          storedStatus: ScenarioRunStatus.CANCELLED,
+          lastEventTimestamp: minutesAgo(15),
+          now: NOW,
+        });
+
+        expect(status).toBe(ScenarioRunStatus.CANCELLED);
+      });
+    });
+
+    describe("when storedStatus is IN_PROGRESS and time exceeds threshold", () => {
+      it("returns STALLED (non-terminal status is not protected)", () => {
+        const status = resolveRunStatus({
+          finishedStatus: undefined,
+          storedStatus: ScenarioRunStatus.IN_PROGRESS,
+          lastEventTimestamp: minutesAgo(15),
+          now: NOW,
+        });
+
+        expect(status).toBe(ScenarioRunStatus.STALLED);
+      });
+    });
+
+    describe("when storedStatus is undefined", () => {
+      it("falls through to stall detection as before", () => {
+        const status = resolveRunStatus({
+          finishedStatus: undefined,
+          storedStatus: undefined,
+          lastEventTimestamp: minutesAgo(15),
+          now: NOW,
+        });
+
+        expect(status).toBe(ScenarioRunStatus.STALLED);
+      });
+    });
+  });
+
   describe("given stall detection uses the last event timestamp", () => {
     describe("when a MESSAGE_SNAPSHOT event is recent but RUN_STARTED is old", () => {
       it("returns IN_PROGRESS based on the more recent event", () => {

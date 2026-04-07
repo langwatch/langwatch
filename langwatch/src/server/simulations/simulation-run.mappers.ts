@@ -96,9 +96,12 @@ export function mapClickHouseRowToScenarioRunData(
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
-  // Apply stall detection: if run has no finished timestamp, check if it's stalled
+  // Apply stall detection: if run has no finished timestamp, check if it's stalled.
+  // Pass storedStatus so terminal statuses (SUCCESS, FAILED, etc.) are respected
+  // even when FinishedAt is NULL due to a failed completion event dispatch.
   const resolvedStatus = resolveRunStatus({
     finishedStatus: finishedAt != null ? baseStatus : undefined,
+    storedStatus: baseStatus,
     lastEventTimestamp: updatedAt,
     now,
   });
