@@ -12,6 +12,11 @@ concurrency:
 
 jobs:
   check-approval-or-label:
+    # Skip pull_request_review for fork PRs — the read-only token would 403
+    # and the concurrency group could cancel a passing pull_request_target run.
+    if: >-
+      github.event_name != 'pull_request_review' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
