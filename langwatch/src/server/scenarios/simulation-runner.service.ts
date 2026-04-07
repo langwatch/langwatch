@@ -175,8 +175,11 @@ export class SimulationRunnerService {
   }
 
   private getLangWatchEndpoint(): string {
-    // Use BASE_HOST if available (self-referencing), otherwise default
-    return env.BASE_HOST ?? "https://app.langwatch.ai";
+    const endpoint = process.env.LANGWATCH_ENDPOINT;
+    if (!endpoint) {
+      throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
+    }
+    return endpoint;
   }
 
   private resolveAdapter(
