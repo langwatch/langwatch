@@ -351,6 +351,95 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete prompt %s: %s", created.id, e)
 
+    def test_create_list_delete_tag_round_trip(self):
+        """
+        GIVEN a unique tag name
+        WHEN I create the tag, list tags, delete it, then list again
+        THEN the tag appears in the first list and is absent from the second
+        """
+        tag_name = f"e2e-tag-{uuid4().hex[:8]}"
+
+        created = langwatch.prompts.tags.create(tag_name)
+
+        try:
+            assert created["name"] == tag_name
+
+            tags = langwatch.prompts.tags.list()
+            tag_names = [t["name"] for t in tags]
+            assert tag_name in tag_names
+        finally:
+            try:
+                langwatch.prompts.tags.delete(tag_name)
+            except Exception as e:
+                logger.warning("Failed to delete tag %s: %s", tag_name, e)
+
+        tags_after = langwatch.prompts.tags.list()
+        tag_names_after = [t["name"] for t in tags_after]
+        assert tag_name not in tag_names_after
+
+    def test_rename_tag_round_trip(self):
+        """
+        GIVEN a tag named A
+        WHEN I rename it to B
+        THEN list() contains B and not A
+        """
+        tag_a = f"e2e-tag-a-{uuid4().hex[:8]}"
+        tag_b = f"e2e-tag-b-{uuid4().hex[:8]}"
+
+        langwatch.prompts.tags.create(tag_a)
+
+        try:
+            langwatch.prompts.tags.rename(tag_a, new_name=tag_b)
+
+            tags = langwatch.prompts.tags.list()
+            tag_names = [t["name"] for t in tags]
+            assert tag_b in tag_names
+            assert tag_a not in tag_names
+        finally:
+            try:
+                langwatch.prompts.tags.delete(tag_b)
+            except Exception as e:
+                logger.warning("Failed to delete tag %s: %s", tag_b, e)
+
+    def test_delete_tag_cascades_to_assignments(self):
+        """
+        GIVEN a prompt with a custom tag assigned
+        WHEN I delete the tag
+        THEN the tag no longer appears in list()
+        AND the prompt still exists via get(handle)
+        """
+        tag_name = f"e2e-cascade-tag-{uuid4().hex[:8]}"
+        handle = f"e2e-cascade-prompt-{uuid4().hex[:8]}"
+
+        langwatch.prompts.tags.create(tag_name)
+        created = langwatch.prompts.create(handle=handle, prompt="Cascade test")
+
+        try:
+            langwatch.prompts.tags.assign(
+                handle,
+                tag=tag_name,
+                version_id=created.version_id,
+            )
+
+            langwatch.prompts.tags.delete(tag_name)
+
+            tags_after = langwatch.prompts.tags.list()
+            tag_names_after = [t["name"] for t in tags_after]
+            assert tag_name not in tag_names_after
+
+            fetched = langwatch.prompts.get(handle)
+            assert fetched is not None
+            assert fetched.handle == handle
+        finally:
+            try:
+                langwatch.prompts.delete(created.id)
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+            try:
+                langwatch.prompts.tags.delete(tag_name)
+            except Exception:
+                pass
+
     def test_shorthand_syntax_passes_through_as_id(self):
         """
         GIVEN a prompt with a tag assigned via explicit assign

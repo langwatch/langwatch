@@ -304,3 +304,19 @@ class PromptTagsNamespace:
             Dictionary with assignment details (configId, versionId, tag, updatedAt)
         """
         return self._api_service.assign_tag(prompt_id, tag, version_id)
+
+    def list(self) -> List[Dict[str, Any]]:
+        """List all prompt tags for the organization."""
+        return self._api_service.list_tags()
+
+    def create(self, name: str) -> Dict[str, Any]:
+        """Create a custom prompt tag."""
+        return self._api_service.create_tag(name)
+
+    def rename(self, tag: str, *, new_name: str) -> Dict[str, Any]:
+        """Rename a prompt tag."""
+        return self._api_service.rename_tag(tag, new_name)
+
+    def delete(self, tag: str) -> None:
+        """Delete a prompt tag by name."""
+        return self._api_service.delete_tag(tag)

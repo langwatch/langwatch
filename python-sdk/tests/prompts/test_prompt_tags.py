@@ -807,6 +807,513 @@ class TestPromptsFacadeTagsAssign:
 
 
 # ---------------------------------------------------------------------------
+# PromptApiService.list_tags()
+# ---------------------------------------------------------------------------
+
+
+class TestPromptApiServiceListTags:
+    """Tests for PromptApiService.list_tags()."""
+
+    def test_calls_generated_client_and_returns_tags(self):
+        """
+        Given two tags exist
+        When list_tags() is called
+        Then the result is a list of dicts with id, name, createdAt
+        """
+        from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_tags_response_200_item import (
+            GetApiPromptsTagsResponse200Item,
+        )
+
+        item1 = GetApiPromptsTagsResponse200Item(id="tag_1", name="canary", created_at="2024-01-01T00:00:00Z")
+        item2 = GetApiPromptsTagsResponse200Item(id="tag_2", name="staging", created_at="2024-01-02T00:00:00Z")
+        mock_resp = _mock_sync_detailed_response([item1, item2])
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.get_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            result = service.list_tags()
+
+            mock_module.sync_detailed.assert_called_once()
+            assert len(result) == 2
+            assert result[0]["id"] == "tag_1"
+            assert result[0]["name"] == "canary"
+            assert result[0]["createdAt"] == "2024-01-01T00:00:00Z"
+            assert result[1]["id"] == "tag_2"
+            assert result[1]["name"] == "staging"
+
+    def test_returns_empty_list_when_no_tags(self):
+        """
+        Given no tags exist
+        When list_tags() is called
+        Then the result is an empty list
+        """
+        mock_resp = _mock_sync_detailed_response([])
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.get_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            result = service.list_tags()
+
+            assert result == []
+
+    def test_propagates_error_on_api_failure(self):
+        """
+        Given the API returns 401
+        When list_tags() is called
+        Then a RuntimeError is raised
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+        from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_tags_response_401 import (
+            GetApiPromptsTagsResponse401,
+        )
+
+        parsed_401 = GetApiPromptsTagsResponse401.from_dict({"error": "Unauthorized"})
+        mock_resp = Response(
+            status_code=HTTPStatus(401),
+            content=json.dumps({"error": "Unauthorized"}).encode(),
+            headers={},
+            parsed=parsed_401,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.get_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            with pytest.raises(RuntimeError):
+                service.list_tags()
+
+
+# ---------------------------------------------------------------------------
+# PromptApiService.create_tag()
+# ---------------------------------------------------------------------------
+
+
+class TestPromptApiServiceCreateTag:
+    """Tests for PromptApiService.create_tag()."""
+
+    def test_calls_with_name_in_body(self):
+        """
+        Given a prompt API service
+        When create_tag("canary") is called
+        Then post_api_prompts_tags.sync_detailed is called with body.name == "canary"
+        """
+        from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_tags_response_201 import (
+            PostApiPromptsTagsResponse201,
+        )
+
+        parsed = PostApiPromptsTagsResponse201(
+            id="tag_abc",
+            name="canary",
+            created_at="2024-01-01T00:00:00Z",
+        )
+        mock_resp = _mock_sync_detailed_response(parsed, status_code=201)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.create_tag("canary")
+
+            mock_module.sync_detailed.assert_called_once()
+            call_kwargs = mock_module.sync_detailed.call_args[1]
+            body = call_kwargs.get("body")
+            assert body.name == "canary"
+
+    def test_returns_created_tag_dict(self):
+        """
+        Given create_tag() succeeds
+        When the API returns id, name, createdAt
+        Then the result dict contains all three fields
+        """
+        from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_tags_response_201 import (
+            PostApiPromptsTagsResponse201,
+        )
+
+        parsed = PostApiPromptsTagsResponse201(
+            id="tag_abc",
+            name="canary",
+            created_at="2024-01-01T00:00:00Z",
+        )
+        mock_resp = _mock_sync_detailed_response(parsed, status_code=201)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            result = service.create_tag("canary")
+
+            assert result["id"] == "tag_abc"
+            assert result["name"] == "canary"
+            assert result["createdAt"] == "2024-01-01T00:00:00Z"
+
+    def test_propagates_409_conflict_error(self):
+        """
+        Given the API returns 409 (duplicate tag name)
+        When create_tag() is called
+        Then a RuntimeError is raised
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+
+        mock_resp = Response(
+            status_code=HTTPStatus(409),
+            content=json.dumps({"error": "Tag already exists"}).encode(),
+            headers={},
+            parsed=None,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            with pytest.raises(RuntimeError):
+                service.create_tag("canary")
+
+    def test_propagates_422_validation_error(self):
+        """
+        Given the API returns 422 (invalid name)
+        When create_tag() is called
+        Then a RuntimeError is raised
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+        from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_tags_response_422 import (
+            PostApiPromptsTagsResponse422,
+        )
+
+        parsed_422 = PostApiPromptsTagsResponse422.from_dict({"error": "Invalid name"})
+        mock_resp = Response(
+            status_code=HTTPStatus(422),
+            content=json.dumps({"error": "Invalid name"}).encode(),
+            headers={},
+            parsed=parsed_422,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.post_api_prompts_tags"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            with pytest.raises(RuntimeError):
+                service.create_tag("")
+
+
+# ---------------------------------------------------------------------------
+# PromptApiService.rename_tag()
+# ---------------------------------------------------------------------------
+
+
+class TestPromptApiServiceRenameTag:
+    """Tests for PromptApiService.rename_tag()."""
+
+    def test_calls_with_tag_path_and_new_name_body(self):
+        """
+        Given a prompt API service
+        When rename_tag("old", "new") is called
+        Then put_api_prompts_tags_by_tag.sync_detailed is called with tag="old" and body.name="new"
+        """
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_tags_by_tag_response_200 import (
+            PutApiPromptsTagsByTagResponse200,
+        )
+
+        parsed = PutApiPromptsTagsByTagResponse200(
+            id="tag_abc",
+            name="new",
+            created_at="2024-01-01T00:00:00Z",
+        )
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.rename_tag("old", "new")
+
+            mock_module.sync_detailed.assert_called_once()
+            call_kwargs = mock_module.sync_detailed.call_args[1]
+            assert call_kwargs.get("tag") == "old"
+            body = call_kwargs.get("body")
+            assert body.name == "new"
+
+    def test_returns_renamed_tag_dict(self):
+        """
+        Given rename_tag() succeeds
+        When the API returns the updated tag
+        Then the result dict contains id, name, createdAt
+        """
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_tags_by_tag_response_200 import (
+            PutApiPromptsTagsByTagResponse200,
+        )
+
+        parsed = PutApiPromptsTagsByTagResponse200(
+            id="tag_abc",
+            name="new",
+            created_at="2024-01-01T00:00:00Z",
+        )
+        mock_resp = _mock_sync_detailed_response(parsed)
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            result = service.rename_tag("old", "new")
+
+            assert result["id"] == "tag_abc"
+            assert result["name"] == "new"
+            assert result["createdAt"] == "2024-01-01T00:00:00Z"
+
+    def test_propagates_404_when_tag_not_found(self):
+        """
+        Given the tag does not exist
+        When rename_tag() is called
+        Then a ValueError is raised
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_tags_by_tag_response_400 import (
+            PutApiPromptsTagsByTagResponse400,
+        )
+
+        parsed_404 = PutApiPromptsTagsByTagResponse400.from_dict({"error": "Tag not found"})
+        mock_resp = Response(
+            status_code=HTTPStatus(404),
+            content=json.dumps({"error": "Tag not found"}).encode(),
+            headers={},
+            parsed=parsed_404,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            with pytest.raises(ValueError):
+                service.rename_tag("nonexistent", "new")
+
+    def test_propagates_422_when_protected_tag(self):
+        """
+        Given the tag is protected (e.g. built-in)
+        When rename_tag() is called
+        Then a RuntimeError is raised
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+        from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_tags_by_tag_response_422 import (
+            PutApiPromptsTagsByTagResponse422,
+        )
+
+        parsed_422 = PutApiPromptsTagsByTagResponse422.from_dict({"error": "Cannot rename protected tag"})
+        mock_resp = Response(
+            status_code=HTTPStatus(422),
+            content=json.dumps({"error": "Cannot rename protected tag"}).encode(),
+            headers={},
+            parsed=parsed_422,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.put_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            with pytest.raises(RuntimeError):
+                service.rename_tag("production", "new")
+
+
+# ---------------------------------------------------------------------------
+# PromptApiService.delete_tag()
+# ---------------------------------------------------------------------------
+
+
+class TestPromptApiServiceDeleteTag:
+    """Tests for PromptApiService.delete_tag()."""
+
+    def test_calls_with_tag_path(self):
+        """
+        Given a prompt API service
+        When delete_tag("canary") is called
+        Then delete_api_prompts_tags_by_tag.sync_detailed is called with tag="canary"
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+
+        mock_resp = Response(
+            status_code=HTTPStatus(204),
+            content=b"",
+            headers={},
+            parsed=None,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.delete_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            service.delete_tag("canary")
+
+            mock_module.sync_detailed.assert_called_once()
+            call_kwargs = mock_module.sync_detailed.call_args[1]
+            assert call_kwargs.get("tag") == "canary"
+
+    def test_returns_none_on_success(self):
+        """
+        Given the API returns 204
+        When delete_tag() is called
+        Then None is returned
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+
+        mock_resp = Response(
+            status_code=HTTPStatus(204),
+            content=b"",
+            headers={},
+            parsed=None,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.delete_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            result = service.delete_tag("canary")
+
+            assert result is None
+
+    def test_propagates_422_when_protected_tag(self):
+        """
+        Given the tag is protected
+        When delete_tag() is called
+        Then a RuntimeError is raised
+        """
+        from http import HTTPStatus
+        from langwatch.generated.langwatch_rest_api_client.types import Response
+        from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_tags_by_tag_response_422 import (
+            DeleteApiPromptsTagsByTagResponse422,
+        )
+
+        parsed_422 = DeleteApiPromptsTagsByTagResponse422.from_dict({"error": "Cannot delete protected tag"})
+        mock_resp = Response(
+            status_code=HTTPStatus(422),
+            content=json.dumps({"error": "Cannot delete protected tag"}).encode(),
+            headers={},
+            parsed=parsed_422,
+        )
+
+        with patch(
+            "langwatch.prompts.prompt_api_service.delete_api_prompts_tags_by_tag"
+        ) as mock_module:
+            mock_module.sync_detailed.return_value = mock_resp
+            client = Mock()
+            service = PromptApiService(client)
+            with pytest.raises(RuntimeError):
+                service.delete_tag("production")
+
+
+# ---------------------------------------------------------------------------
+# PromptsFacade.tags.list(), create(), rename(), delete() sub-resource
+# ---------------------------------------------------------------------------
+
+
+class TestPromptsFacadeTagsList:
+    """Tests for the tags.list() sub-resource on PromptsFacade."""
+
+    def test_list_delegates_to_api_service(self):
+        """
+        When prompts.tags.list() is called
+        Then api_service.list_tags() is called and result is returned
+        """
+        mock_client = Mock()
+        facade = PromptsFacade(mock_client)
+        expected = [{"id": "tag_1", "name": "canary", "createdAt": "2024-01-01T00:00:00Z"}]
+        facade._api_service.list_tags = Mock(return_value=expected)
+
+        result = facade.tags.list()
+
+        facade._api_service.list_tags.assert_called_once_with()
+        assert result == expected
+
+
+class TestPromptsFacadeTagsCreate:
+    """Tests for the tags.create() sub-resource on PromptsFacade."""
+
+    def test_create_delegates_to_api_service(self):
+        """
+        When prompts.tags.create("canary") is called
+        Then api_service.create_tag("canary") is called and result is returned
+        """
+        mock_client = Mock()
+        facade = PromptsFacade(mock_client)
+        expected = {"id": "tag_abc", "name": "canary", "createdAt": "2024-01-01T00:00:00Z"}
+        facade._api_service.create_tag = Mock(return_value=expected)
+
+        result = facade.tags.create("canary")
+
+        facade._api_service.create_tag.assert_called_once_with("canary")
+        assert result == expected
+
+
+class TestPromptsFacadeTagsRename:
+    """Tests for the tags.rename() sub-resource on PromptsFacade."""
+
+    def test_rename_delegates_with_keyword_arg(self):
+        """
+        When prompts.tags.rename("old", new_name="new") is called
+        Then api_service.rename_tag("old", "new") is called and result is returned
+        """
+        mock_client = Mock()
+        facade = PromptsFacade(mock_client)
+        expected = {"id": "tag_abc", "name": "new", "createdAt": "2024-01-01T00:00:00Z"}
+        facade._api_service.rename_tag = Mock(return_value=expected)
+
+        result = facade.tags.rename("old", new_name="new")
+
+        facade._api_service.rename_tag.assert_called_once_with("old", "new")
+        assert result == expected
+
+
+class TestPromptsFacadeTagsDelete:
+    """Tests for the tags.delete() sub-resource on PromptsFacade."""
+
+    def test_delete_delegates_to_api_service(self):
+        """
+        When prompts.tags.delete("canary") is called
+        Then api_service.delete_tag("canary") is called
+        """
+        mock_client = Mock()
+        facade = PromptsFacade(mock_client)
+        facade._api_service.delete_tag = Mock(return_value=None)
+
+        result = facade.tags.delete("canary")
+
+        facade._api_service.delete_tag.assert_called_once_with("canary")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
 # Integration with langwatch.prompts (global interface)
 # ---------------------------------------------------------------------------
 
