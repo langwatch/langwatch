@@ -25416,6 +25416,10 @@ This page explains what you're deploying when you self-host LangWatch — the co
 ## System Overview
 
 ```mermaid
+---
+config:
+  layout: elk
+---
 architecture-beta
     service llmApp(internet)[Your LLM App]
 
@@ -25440,20 +25444,16 @@ architecture-beta
     service llmProviders(cloud)[External LLMs]
     service notify(internet)[Slack Email Webhooks]
 
-    junction jWorkerOut in platform
-
     llmApp:B --> T:app
     app:B --> T:redis
     app:R --> L:postgres
-    redis:B --> T:spanPipe{group}
-    spanPipe{group}:R --> L:jWorkerOut
-    jWorkerOut:R --> L:clickhouse{group}
-    jWorkerOut:B --> T:app
-    evalPipe{group}:B --> T:langevals
+    redis:B --> T:spanPipe
+    spanPipe:R --> L:clickhouse
+    evalPipe:B --> T:langevals
     langevals:R --> L:llmProviders
     nlp:R --> L:llmProviders
-    reactionPipe{group}:B --> T:notify
-    clickhouse{group}:R --> L:s3{group}
+    reactionPipe:B --> T:notify
+    clickhouse:R --> L:s3
 ```
 
 <CardGroup cols={3}>

@@ -8,25 +8,44 @@ This page explains what you're deploying when you self-host LangWatch — the co
 ## System Overview
 
 ```mermaid
-graph LR
-    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
+---
+config:
+  layout: elk
+---
+architecture-beta
+    service llmApp(internet)[Your LLM App]
 
-    subgraph Workers["Event Sourcing Pipeline"]
-        Pipeline["Event Sourcing Pipeline"]
-    end
+    group platform(cloud)[Your Infrastructure]
 
-    App -->|"enqueue"| Redis["Redis"]
-    Redis -->|"consume"| Workers
-    Workers -->|"events & projections"| CH["ClickHouse"]
-    Workers -->|"SSE updates"| App
-    App -->|"queries"| CH
-    App -->|"control plane"| PG["PostgreSQL"]
-    CH -->|"cold storage"| S3["S3"]
-    Workers -->|"evals"| Evals["LangEvals"]
-    Workers -->|"NLP"| NLP["LangWatch NLP"]
-    Evals -->|"LLM calls"| LLM["External LLMs"]
-    NLP -->|"LLM calls"| LLM
-    Workers -->|"alerts"| Notify["Slack / Email / Webhooks"]
+    service app(server)[LangWatch App] in platform
+    service postgres(database)[PostgreSQL] in platform
+    service redis(database)[Redis BullMQ] in platform
+
+    group eventSourcing(server)[Event Sourcing Pipeline] in platform
+    service spanPipe(disk)[Ingestion and Enrichment] in eventSourcing
+    service evalPipe(disk)[Evaluations and Experiments] in eventSourcing
+    service reactionPipe(disk)[Reactions and Triggers] in eventSourcing
+
+    group dataLayer(database)[Data Layer] in platform
+    service clickhouse(database)[ClickHouse] in dataLayer
+    service s3(disk)[S3 Cold Storage] in dataLayer
+
+    service nlp(server)[LangWatch NLP] in platform
+    service langevals(server)[LangEvals] in platform
+
+    service llmProviders(cloud)[External LLMs]
+    service notify(internet)[Slack Email Webhooks]
+
+    llmApp:B --> T:app
+    app:B --> T:redis
+    app:R --> L:postgres
+    redis:B --> T:spanPipe
+    spanPipe:R --> L:clickhouse
+    evalPipe:B --> T:langevals
+    langevals:R --> L:llmProviders
+    nlp:R --> L:llmProviders
+    reactionPipe:B --> T:notify
+    clickhouse:R --> L:s3
 ```
 
 <CardGroup cols={3}>
