@@ -571,6 +571,14 @@ export async function* runOrchestrator(
   // Track traceId per cell so evaluator_result events can reference it
   const cellTraceIds = new Map<string, string>();
 
+  // Pre-seed from cells that already have a traceId (e.g., evaluator reruns
+  // that skip target execution and won't generate target_result events)
+  for (const cell of cells) {
+    if (cell.traceId) {
+      cellTraceIds.set(`${cell.rowIndex}:${cell.targetId}`, cell.traceId);
+    }
+  }
+
   // Build target metadata for storage
   // For model: first check localPromptConfig, then fall back to loadedPrompts
   // For name: get from loaded entity (prompt, agent, or evaluator)
@@ -619,18 +627,22 @@ export async function* runOrchestrator(
   // Dispatch event to ClickHouse.
   if (experimentId) {
     chDispatchTotal++;
-    await commands.startExperimentRun({
-      tenantId: projectId,
-      runId,
-      experimentId,
-      workflowVersionId: workflowVersionId ?? null,
-      total: totalCells,
-      targets: targetMetadata,
-      occurredAt: Date.now(),
-    }).catch((err) => {
+    try {
+      await commands.startExperimentRun({
+        tenantId: projectId,
+        runId,
+        experimentId,
+        workflowVersionId: workflowVersionId ?? null,
+        total: totalCells,
+        targets: targetMetadata,
+        occurredAt: Date.now(),
+      });
+    } catch (err) {
       chDispatchFailures++;
-      logger.warn({ err, runId }, "Failed to dispatch startExperimentRun to CH");
-    });
+      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+      await abortManager.clearRunning(runId);
+      throw err;
+    }
   }
 
   // Helper to process event for ClickHouse dispatch

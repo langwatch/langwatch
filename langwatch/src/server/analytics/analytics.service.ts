@@ -16,162 +16,46 @@ import type {
   AnalyticsBackend,
 } from "./types";
 import type { TimeseriesInputType } from "./registry";
-import { getElasticsearchAnalyticsService } from "./elasticsearch-analytics.service";
 import { getClickHouseAnalyticsService } from "./clickhouse/clickhouse-analytics.service";
-import {
-  AnalyticsComparator,
-  getAnalyticsComparator,
-} from "./analytics-comparator";
-import { createLogger } from "../../utils/logger/server";
-
-/**
- * Configuration for comparison mode
- */
-export interface AnalyticsServiceConfig {
-  comparisonModeEnabled?: boolean;
-}
 
 /**
  * Dependencies required by AnalyticsService
  */
 export interface AnalyticsServiceDependencies {
-  esService: AnalyticsBackend;
   chService: AnalyticsBackend;
   prisma: PrismaClient;
-  comparator?: AnalyticsComparator;
-  config?: AnalyticsServiceConfig;
 }
 
 /**
  * Analytics Service Facade
  *
- * This facade routes analytics requests to either Elasticsearch or ClickHouse
- * based on the project's configuration. It supports:
- *
- * - ClickHouse-based analytics queries
+ * Routes analytics queries to ClickHouse.
  */
 export class AnalyticsService {
   private readonly prisma: PrismaClient;
-  private readonly esService: AnalyticsBackend;
   private readonly chService: AnalyticsBackend;
-  private readonly comparator: AnalyticsComparator;
-  private readonly config: AnalyticsServiceConfig;
-  private readonly logger = createLogger("langwatch:analytics:service");
   private readonly tracer = getLangWatchTracer("langwatch.analytics.service");
 
   constructor(deps: AnalyticsServiceDependencies) {
-    this.esService = deps.esService;
     this.chService = deps.chService;
     this.prisma = deps.prisma;
-    this.comparator = deps.comparator ?? getAnalyticsComparator();
-    this.config = deps.config ?? {};
   }
 
   /**
-   * Check if comparison mode is enabled
-   * Comparison mode runs both ES and CH queries and logs discrepancies
-   */
-  isComparisonModeEnabled(): boolean {
-    return this.config.comparisonModeEnabled ?? false;
-  }
-
-  /**
-   * Execute an analytics operation with routing logic.
-   *
-   * WHY THIS METHOD EXISTS: Four different analytics operations (getTimeseries,
-   * getDataForFilter, getTopUsedDocuments, getFeedbacks) all share identical routing
-   * logic: check feature flags, route to the correct backend, and optionally run
-   * comparison mode. Extracting this logic into a single method:
-   * 1. Eliminates ~50 lines of duplication per method
-   * 2. Ensures consistent behavior across all operations
-   * 3. Makes it easy to add new routing features in one place
+   * Execute an analytics operation.
    */
   private async executeWithRouting<TResult>(
     operationName: string,
     projectId: string,
-    input: unknown,
-    esCall: () => Promise<TResult>,
     chCall: () => Promise<TResult>,
   ): Promise<TResult> {
     return this.tracer.withActiveSpan(
       `AnalyticsService.${operationName}`,
       { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        const useClickHouse = true;
-        const comparisonMode = this.isComparisonModeEnabled();
-
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
-        span.setAttribute("comparison.mode", comparisonMode);
-
-        if (comparisonMode && this.chService.isAvailable()) {
-          return this.runComparison(
-            operationName,
-            input,
-            esCall,
-            chCall,
-            useClickHouse,
-          );
-        }
-
-        return useClickHouse ? chCall() : esCall();
+      async () => {
+        return chCall();
       },
     );
-  }
-
-  /**
-   * Run both ES and CH queries in comparison mode, log discrepancies, and return
-   * the appropriate result based on the feature flag.
-   */
-  private async runComparison<TResult>(
-    operationName: string,
-    input: unknown,
-    esCall: () => Promise<TResult>,
-    chCall: () => Promise<TResult>,
-    useClickHouse: boolean,
-  ): Promise<TResult> {
-    const [esResult, chResult] = await Promise.allSettled([esCall(), chCall()]);
-
-    const esData = esResult.status === "fulfilled" ? esResult.value : undefined;
-    const chData = chResult.status === "fulfilled" ? chResult.value : undefined;
-
-    if (esData && chData) {
-      this.comparator.compare(operationName, input, esData, chData);
-    } else {
-      this.logComparisonErrors(operationName, esResult, chResult);
-    }
-
-    const primaryData = useClickHouse ? chData : esData;
-    if (!primaryData) {
-      throw new Error(
-        `${useClickHouse ? "ClickHouse" : "Elasticsearch"} ${operationName} query failed in comparison mode`,
-      );
-    }
-    return primaryData;
-  }
-
-  /**
-   * Log errors from comparison mode when one or both backends fail.
-   */
-  private logComparisonErrors<TResult>(
-    operationName: string,
-    esResult: PromiseSettledResult<TResult>,
-    chResult: PromiseSettledResult<TResult>,
-  ): void {
-    if (esResult.status === "rejected") {
-      this.logger.error(
-        { error: esResult.reason },
-        `ES ${operationName} query failed in comparison mode`,
-      );
-    }
-    if (chResult.status === "rejected") {
-      this.logger.error(
-        { error: chResult.reason },
-        `CH ${operationName} query failed in comparison mode`,
-      );
-    }
   }
 
   /**
@@ -181,8 +65,6 @@ export class AnalyticsService {
     return this.executeWithRouting(
       "getTimeseries",
       input.projectId,
-      input,
-      () => this.esService.getTimeseries(input),
       () => this.chService.getTimeseries(input),
     );
   }
@@ -210,18 +92,6 @@ export class AnalyticsService {
     return this.executeWithRouting(
       "getDataForFilter",
       projectId,
-      { projectId, field, startDate, endDate },
-      () =>
-        this.esService.getDataForFilter(
-          projectId,
-          field,
-          startDate,
-          endDate,
-          filters,
-          key,
-          subkey,
-          searchQuery,
-        ),
       () =>
         this.chService.getDataForFilter(
           projectId,
@@ -255,14 +125,6 @@ export class AnalyticsService {
     return this.executeWithRouting(
       "getTopUsedDocuments",
       projectId,
-      { projectId, startDate, endDate },
-      () =>
-        this.esService.getTopUsedDocuments(
-          projectId,
-          startDate,
-          endDate,
-          filters,
-        ),
       () =>
         this.chService.getTopUsedDocuments(
           projectId,
@@ -292,8 +154,6 @@ export class AnalyticsService {
     return this.executeWithRouting(
       "getFeedbacks",
       projectId,
-      { projectId, startDate, endDate },
-      () => this.esService.getFeedbacks(projectId, startDate, endDate, filters),
       () => this.chService.getFeedbacks(projectId, startDate, endDate, filters),
     );
   }
@@ -304,16 +164,10 @@ export class AnalyticsService {
  */
 export function createAnalyticsService(
   prisma: PrismaClient = defaultPrisma,
-  config?: AnalyticsServiceConfig,
 ): AnalyticsService {
   return new AnalyticsService({
-    esService: getElasticsearchAnalyticsService(),
     chService: getClickHouseAnalyticsService(),
     prisma,
-    config: {
-      comparisonModeEnabled: process.env.ANALYTICS_COMPARISON_MODE === "true",
-      ...config,
-    },
   });
 }
 

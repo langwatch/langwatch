@@ -55,8 +55,8 @@ interface ClickHouseScrollCursor {
 /**
  * Service for fetching traces from ClickHouse.
  *
- * Fetches trace summaries and spans using a JOIN query and maps the
- * ClickHouse types to the legacy Trace/Span types.
+ * Fetches trace summaries and, when needed, span rows via separate ClickHouse
+ * queries, combines them in application code, and maps to legacy Trace/Span types.
  */
 export class ClickHouseTraceService {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
