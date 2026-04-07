@@ -119,11 +119,31 @@ export const clickHouseFilterConditions: Record<
       return { sql: "1=0", params: {} };
     }
 
-    // All origin values (including "application") are matched by exact value.
-    // Empty/NULL no longer implies "application".
+    // "application" is the default origin for traces with no explicit
+    // langwatch.origin attribute (empty string or NULL). Expand it to
+    // match all three representations. Other values match directly.
+    const hasApplication = values.includes("application");
+    const otherValues = values.filter((v) => v !== "application");
+
+    const parts: string[] = [];
+    const params: Record<string, unknown> = {};
+
+    if (hasApplication) {
+      parts.push(
+        `(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL OR ts.Attributes['langwatch.origin'] = 'application')`,
+      );
+    }
+
+    if (otherValues.length > 0) {
+      parts.push(
+        `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
+      );
+      params[`${paramId}_values`] = otherValues;
+    }
+
     return {
-      sql: `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
-      params: { [`${paramId}_values`]: values },
+      sql: parts.length === 1 ? parts[0]! : `(${parts.join(" OR ")})`,
+      params,
     };
   },
 
