@@ -54,7 +54,7 @@ jobs:
         run: |
           cr upload \
             --owner "${{ github.repository_owner }}" \
-            --repo "${{ github.event.repository.name }}" \
+            --git-repo "${{ github.event.repository.name }}" \
             --package-path .cr-release-packages \
             --skip-existing
         env:
@@ -64,7 +64,7 @@ jobs:
         run: |
           cr index \
             --owner "${{ github.repository_owner }}" \
-            --repo "${{ github.event.repository.name }}" \
+            --git-repo "${{ github.event.repository.name }}" \
             --package-path .cr-release-packages \
             --push
         env:
