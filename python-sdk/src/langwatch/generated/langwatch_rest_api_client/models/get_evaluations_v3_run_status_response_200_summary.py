@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -14,20 +16,20 @@ class GetEvaluationsV3RunStatusResponse200Summary:
     """Execution summary (only present when completed)
 
     Attributes:
-        run_id (Union[Unset, str]):
-        total_cells (Union[Unset, int]):
-        completed_cells (Union[Unset, int]):
-        failed_cells (Union[Unset, int]):
-        duration (Union[Unset, int]): Total execution time in milliseconds
-        run_url (Union[Unset, str]): URL to view the run in LangWatch
+        run_id (str | Unset):
+        total_cells (int | Unset):
+        completed_cells (int | Unset):
+        failed_cells (int | Unset):
+        duration (int | Unset): Total execution time in milliseconds
+        run_url (str | Unset): URL to view the run in LangWatch
     """
 
-    run_id: Union[Unset, str] = UNSET
-    total_cells: Union[Unset, int] = UNSET
-    completed_cells: Union[Unset, int] = UNSET
-    failed_cells: Union[Unset, int] = UNSET
-    duration: Union[Unset, int] = UNSET
-    run_url: Union[Unset, str] = UNSET
+    run_id: str | Unset = UNSET
+    total_cells: int | Unset = UNSET
+    completed_cells: int | Unset = UNSET
+    failed_cells: int | Unset = UNSET
+    duration: int | Unset = UNSET
+    run_url: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

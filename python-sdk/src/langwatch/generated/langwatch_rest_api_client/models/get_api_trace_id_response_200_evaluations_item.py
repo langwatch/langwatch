@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -22,24 +24,24 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200EvaluationsItem")
 class GetApiTraceIdResponse200EvaluationsItem:
     """
     Attributes:
-        evaluation_id (Union[Unset, str]):  Example: check_VCagriZHNWICSOM09dXjM.
-        name (Union[Unset, str]):  Example: Ragas Answer Relevancy.
-        type_ (Union[Unset, str]):  Example: ragas/answer_relevancy.
-        trace_id (Union[Unset, str]):  Example: trace_BKZL_X0TKSD4oa1aBJTc_.
-        project_id (Union[Unset, str]):  Example: KAXYxPR8MUgTcP8CF193y.
-        status (Union[Unset, str]):  Example: error.
-        timestamps (Union[Unset, GetApiTraceIdResponse200EvaluationsItemTimestamps]):
-        error (Union[Unset, GetApiTraceIdResponse200EvaluationsItemError]):
+        evaluation_id (str | Unset):  Example: check_VCagriZHNWICSOM09dXjM.
+        name (str | Unset):  Example: Ragas Answer Relevancy.
+        type_ (str | Unset):  Example: ragas/answer_relevancy.
+        trace_id (str | Unset):  Example: trace_BKZL_X0TKSD4oa1aBJTc_.
+        project_id (str | Unset):  Example: KAXYxPR8MUgTcP8CF193y.
+        status (str | Unset):  Example: error.
+        timestamps (GetApiTraceIdResponse200EvaluationsItemTimestamps | Unset):
+        error (GetApiTraceIdResponse200EvaluationsItemError | Unset):
     """
 
-    evaluation_id: Union[Unset, str] = UNSET
-    name: Union[Unset, str] = UNSET
-    type_: Union[Unset, str] = UNSET
-    trace_id: Union[Unset, str] = UNSET
-    project_id: Union[Unset, str] = UNSET
-    status: Union[Unset, str] = UNSET
-    timestamps: Union[Unset, "GetApiTraceIdResponse200EvaluationsItemTimestamps"] = UNSET
-    error: Union[Unset, "GetApiTraceIdResponse200EvaluationsItemError"] = UNSET
+    evaluation_id: str | Unset = UNSET
+    name: str | Unset = UNSET
+    type_: str | Unset = UNSET
+    trace_id: str | Unset = UNSET
+    project_id: str | Unset = UNSET
+    status: str | Unset = UNSET
+    timestamps: GetApiTraceIdResponse200EvaluationsItemTimestamps | Unset = UNSET
+    error: GetApiTraceIdResponse200EvaluationsItemError | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,11 +57,11 @@ class GetApiTraceIdResponse200EvaluationsItem:
 
         status = self.status
 
-        timestamps: Union[Unset, dict[str, Any]] = UNSET
+        timestamps: dict[str, Any] | Unset = UNSET
         if not isinstance(self.timestamps, Unset):
             timestamps = self.timestamps.to_dict()
 
-        error: Union[Unset, dict[str, Any]] = UNSET
+        error: dict[str, Any] | Unset = UNSET
         if not isinstance(self.error, Unset):
             error = self.error.to_dict()
 
@@ -108,14 +110,14 @@ class GetApiTraceIdResponse200EvaluationsItem:
         status = d.pop("status", UNSET)
 
         _timestamps = d.pop("timestamps", UNSET)
-        timestamps: Union[Unset, GetApiTraceIdResponse200EvaluationsItemTimestamps]
+        timestamps: GetApiTraceIdResponse200EvaluationsItemTimestamps | Unset
         if isinstance(_timestamps, Unset):
             timestamps = UNSET
         else:
             timestamps = GetApiTraceIdResponse200EvaluationsItemTimestamps.from_dict(_timestamps)
 
         _error = d.pop("error", UNSET)
-        error: Union[Unset, GetApiTraceIdResponse200EvaluationsItemError]
+        error: GetApiTraceIdResponse200EvaluationsItemError | Unset
         if isinstance(_error, Unset):
             error = UNSET
         else:

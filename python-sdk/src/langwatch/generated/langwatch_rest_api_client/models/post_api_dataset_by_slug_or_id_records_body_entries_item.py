@@ -1,46 +1,34 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelBody")
+T = TypeVar("T", bound="PostApiDatasetBySlugOrIdRecordsBodyEntriesItem")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelBody:
-    """
-    Attributes:
-        version_id (str):
-    """
+class PostApiDatasetBySlugOrIdRecordsBodyEntriesItem:
+    """ """
 
-    version_id: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        version_id = self.version_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "versionId": version_id,
-            }
-        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        version_id = d.pop("versionId")
+        post_api_dataset_by_slug_or_id_records_body_entries_item = cls()
 
-        put_api_prompts_by_id_labels_by_label_body = cls(
-            version_id=version_id,
-        )
-
-        put_api_prompts_by_id_labels_by_label_body.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_body
+        post_api_dataset_by_slug_or_id_records_body_entries_item.additional_properties = d
+        return post_api_dataset_by_slug_or_id_records_body_entries_item
 
     @property
     def additional_keys(self) -> list[str]:

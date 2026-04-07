@@ -1,24 +1,26 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse404")
+T = TypeVar("T", bound="DeleteApiPromptsTagsByTagResponse400")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse404:
+class DeleteApiPromptsTagsByTagResponse400:
     """
     Attributes:
         error (str):
-        message (Union[Unset, str]):
+        message (str | Unset):
     """
 
     error: str
-    message: Union[Unset, str] = UNSET
+    message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -45,13 +47,13 @@ class PutApiPromptsByIdLabelsByLabelResponse404:
 
         message = d.pop("message", UNSET)
 
-        put_api_prompts_by_id_labels_by_label_response_404 = cls(
+        delete_api_prompts_tags_by_tag_response_400 = cls(
             error=error,
             message=message,
         )
 
-        put_api_prompts_by_id_labels_by_label_response_404.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_404
+        delete_api_prompts_tags_by_tag_response_400.additional_properties = d
+        return delete_api_prompts_tags_by_tag_response_400
 
     @property
     def additional_keys(self) -> list[str]:

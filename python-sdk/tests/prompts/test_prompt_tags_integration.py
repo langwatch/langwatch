@@ -375,3 +375,294 @@ class TestUpdateWithTags:
 
             finally:
                 os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestCreateWithMultipleTags:
+    """Integration tests for creating prompts with multiple tags."""
+
+    class TestWhenCreatingWithMultipleTags:
+        """Scenario: Create prompt with multiple tags."""
+
+        def test_sends_all_tags_in_request_body(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": "new-prompt",
+                    "handle": "new-prompt",
+                    "scope": "PROJECT",
+                    "name": "New Prompt",
+                    "updatedAt": "2023-01-01T00:00:00Z",
+                    "projectId": "project_1",
+                    "organizationId": "org_1",
+                    "versionId": "version_1",
+                    "version": 1,
+                    "createdAt": "2023-01-01T00:00:00Z",
+                    "prompt": "Hello!",
+                    "messages": [],
+                    "inputs": [],
+                    "outputs": [],
+                    "model": "openai/gpt-4",
+                }
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    prompts.create(
+                        handle="new-prompt",
+                        prompt="Hello!",
+                        tags=["production", "staging", "canary"],
+                    )
+
+                    call_kwargs = mock_request.call_args
+                    json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
+                    assert json_body.get("tags") == ["production", "staging", "canary"]
+
+            finally:
+                os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestListAllTags:
+    """Integration tests for listing all prompt tags."""
+
+    class TestWhenListingTags:
+        """Scenario: List all tags for the organization."""
+
+        def test_sends_get_request(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 200
+                mock_response.json.return_value = [
+                    {"id": "tag_1", "name": "canary", "createdAt": "2024-01-01T00:00:00Z"},
+                    {"id": "tag_2", "name": "staging", "createdAt": "2024-01-02T00:00:00Z"},
+                ]
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    result = prompts.tags.list()
+
+                    call_kwargs = mock_request.call_args
+                    assert call_kwargs.kwargs.get("method") == "get" or call_kwargs[1].get("method") == "get"
+                    url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
+                    assert "/api/prompts/tags" in url
+
+                    assert len(result) == 2
+                    assert result[0]["name"] == "canary"
+                    assert result[1]["name"] == "staging"
+
+            finally:
+                os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestCreateTagIntegration:
+    """Integration tests for creating a prompt tag."""
+
+    class TestWhenCreatingTag:
+        """Scenario: Create a new custom tag."""
+
+        def test_sends_post_request(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 201
+                mock_response.json.return_value = {
+                    "id": "tag_abc",
+                    "name": "canary",
+                    "createdAt": "2024-01-01T00:00:00Z",
+                }
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    result = prompts.tags.create("canary")
+
+                    call_kwargs = mock_request.call_args
+                    assert call_kwargs.kwargs.get("method") == "post" or call_kwargs[1].get("method") == "post"
+                    url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
+                    assert "/api/prompts/tags" in url
+                    json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
+                    assert json_body.get("name") == "canary"
+
+                    assert result["name"] == "canary"
+                    assert result["id"] == "tag_abc"
+
+            finally:
+                os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestRenameTagIntegration:
+    """Integration tests for renaming a prompt tag."""
+
+    class TestWhenRenamingTag:
+        """Scenario: Rename an existing tag."""
+
+        def test_sends_put_request(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": "tag_abc",
+                    "name": "alpha",
+                    "createdAt": "2024-01-01T00:00:00Z",
+                }
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    result = prompts.tags.rename("canary", new_name="alpha")
+
+                    call_kwargs = mock_request.call_args
+                    assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
+                    url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
+                    assert "/api/prompts/tags/canary" in url
+                    json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
+                    assert json_body.get("name") == "alpha"
+
+                    assert result["name"] == "alpha"
+
+            finally:
+                os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestDeleteTagIntegration:
+    """Integration tests for deleting a prompt tag."""
+
+    class TestWhenDeletingTag:
+        """Scenario: Delete a tag by name."""
+
+        def test_sends_delete_request(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 204
+                mock_response.json.return_value = None
+                mock_response.content = b""
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    result = prompts.tags.delete("canary")
+
+                    call_kwargs = mock_request.call_args
+                    assert call_kwargs.kwargs.get("method") == "delete" or call_kwargs[1].get("method") == "delete"
+                    url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
+                    assert "/api/prompts/tags/canary" in url
+
+                    assert result is None
+
+            finally:
+                os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestUpdateWithMultipleTags:
+    """Integration tests for updating prompts with multiple tags."""
+
+    class TestWhenUpdatingWithMultipleTags:
+        """Scenario: Update prompt with multiple tags."""
+
+        def test_sends_all_tags_in_request_body(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "id": "pizza-prompt",
+                    "handle": "pizza-prompt",
+                    "scope": "PROJECT",
+                    "name": "Pizza Prompt",
+                    "updatedAt": "2023-01-01T00:00:00Z",
+                    "projectId": "project_1",
+                    "organizationId": "org_1",
+                    "versionId": "version_2",
+                    "version": 2,
+                    "createdAt": "2023-01-01T00:00:00Z",
+                    "prompt": "Updated!",
+                    "messages": [],
+                    "inputs": [],
+                    "outputs": [],
+                    "model": "openai/gpt-4",
+                }
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    prompts.update(
+                        prompt_id_or_handle="pizza-prompt",
+                        scope="PROJECT",
+                        commit_message="update tags",
+                        prompt="Updated!",
+                        tags=["staging", "canary"],
+                    )
+
+                    call_kwargs = mock_request.call_args
+                    json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
+                    assert json_body.get("tags") == ["staging", "canary"]
+
+            finally:
+                os.chdir(original_cwd)
+
+
+@pytest.mark.integration
+class TestCustomTagAssignment:
+    """Integration tests for custom tag assignment."""
+
+    class TestWhenAssigningCustomTag:
+        """Scenario: Assign custom tag to existing version."""
+
+        def test_sends_put_request_with_custom_tag(self, empty_dir, clean_langwatch):
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(empty_dir)
+
+                mock_response = Mock()
+                mock_response.status_code = 200
+                mock_response.json.return_value = {
+                    "configId": "pizza-prompt",
+                    "versionId": "prompt_version_abc123",
+                    "tag": "canary",
+                    "updatedAt": "2023-01-01T00:00:00Z",
+                }
+
+                with patch("httpx.Client.request") as mock_request:
+                    mock_request.return_value = mock_response
+
+                    result = prompts.tags.assign(
+                        "pizza-prompt",
+                        tag="canary",
+                        version_id="prompt_version_abc123",
+                    )
+
+                    call_kwargs = mock_request.call_args
+                    assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
+                    url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
+                    assert "/api/prompts/pizza-prompt/tags/canary" in url
+                    json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
+                    assert json_body.get("versionId") == "prompt_version_abc123"
+
+                    assert result["versionId"] == "prompt_version_abc123"
+                    assert result["tag"] == "canary"
+
+            finally:
+                os.chdir(original_cwd)

@@ -1,57 +1,48 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse500")
+T = TypeVar("T", bound="PostApiPromptsTagsBody")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse500:
+class PostApiPromptsTagsBody:
     """
     Attributes:
-        error (str):
-        message (Union[Unset, str]):
+        name (str):
     """
 
-    error: str
-    message: Union[Unset, str] = UNSET
+    name: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error
-
-        message = self.message
+        name = self.name
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "error": error,
+                "name": name,
             }
         )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = d.pop("error")
+        name = d.pop("name")
 
-        message = d.pop("message", UNSET)
-
-        put_api_prompts_by_id_labels_by_label_response_500 = cls(
-            error=error,
-            message=message,
+        post_api_prompts_tags_body = cls(
+            name=name,
         )
 
-        put_api_prompts_by_id_labels_by_label_response_500.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_500
+        post_api_prompts_tags_body.additional_properties = d
+        return post_api_prompts_tags_body
 
     @property
     def additional_keys(self) -> list[str]:

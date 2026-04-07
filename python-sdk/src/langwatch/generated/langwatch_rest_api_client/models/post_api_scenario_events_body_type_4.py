@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,12 +26,12 @@ class PostApiScenarioEventsBodyType4:
         scenario_run_id (str):
         message_id (str):
         role (str):
-        raw_event (Union[Unset, Any]):
-        scenario_set_id (Union[Unset, str]):  Default: 'default'.
-        content (Union[Unset, str]):
-        message (Union[Unset, PostApiScenarioEventsBodyType4Message]):
-        trace_id (Union[Unset, str]):
-        message_index (Union[Unset, float]):
+        raw_event (Any | Unset):
+        scenario_set_id (str | Unset):  Default: 'default'.
+        content (str | Unset):
+        message (PostApiScenarioEventsBodyType4Message | Unset):
+        trace_id (str | Unset):
+        message_index (float | Unset):
     """
 
     type_: Literal["SCENARIO_TEXT_MESSAGE_END"]
@@ -39,12 +41,12 @@ class PostApiScenarioEventsBodyType4:
     scenario_run_id: str
     message_id: str
     role: str
-    raw_event: Union[Unset, Any] = UNSET
-    scenario_set_id: Union[Unset, str] = "default"
-    content: Union[Unset, str] = UNSET
-    message: Union[Unset, "PostApiScenarioEventsBodyType4Message"] = UNSET
-    trace_id: Union[Unset, str] = UNSET
-    message_index: Union[Unset, float] = UNSET
+    raw_event: Any | Unset = UNSET
+    scenario_set_id: str | Unset = "default"
+    content: str | Unset = UNSET
+    message: PostApiScenarioEventsBodyType4Message | Unset = UNSET
+    trace_id: str | Unset = UNSET
+    message_index: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,7 +70,7 @@ class PostApiScenarioEventsBodyType4:
 
         content = self.content
 
-        message: Union[Unset, dict[str, Any]] = UNSET
+        message: dict[str, Any] | Unset = UNSET
         if not isinstance(self.message, Unset):
             message = self.message.to_dict()
 
@@ -132,7 +134,7 @@ class PostApiScenarioEventsBodyType4:
         content = d.pop("content", UNSET)
 
         _message = d.pop("message", UNSET)
-        message: Union[Unset, PostApiScenarioEventsBodyType4Message]
+        message: PostApiScenarioEventsBodyType4Message | Unset
         if isinstance(_message, Unset):
             message = UNSET
         else:

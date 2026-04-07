@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
@@ -26,7 +28,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfo:
     local_version: float
     remote_version: float
     differences: list[str]
-    remote_config_data: "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData"
+    remote_config_data: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

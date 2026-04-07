@@ -1,70 +1,59 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PutApiPromptsByIdLabelsByLabelResponse200")
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="DeleteApiPromptsTagsByTagResponse500")
 
 
 @_attrs_define
-class PutApiPromptsByIdLabelsByLabelResponse200:
+class DeleteApiPromptsTagsByTagResponse500:
     """
     Attributes:
-        config_id (str):
-        version_id (str):
-        label (str):
-        updated_at (str):
+        error (str):
+        message (str | Unset):
     """
 
-    config_id: str
-    version_id: str
-    label: str
-    updated_at: str
+    error: str
+    message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        config_id = self.config_id
+        error = self.error
 
-        version_id = self.version_id
-
-        label = self.label
-
-        updated_at = self.updated_at
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "configId": config_id,
-                "versionId": version_id,
-                "label": label,
-                "updatedAt": updated_at,
+                "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        config_id = d.pop("configId")
+        error = d.pop("error")
 
-        version_id = d.pop("versionId")
+        message = d.pop("message", UNSET)
 
-        label = d.pop("label")
-
-        updated_at = d.pop("updatedAt")
-
-        put_api_prompts_by_id_labels_by_label_response_200 = cls(
-            config_id=config_id,
-            version_id=version_id,
-            label=label,
-            updated_at=updated_at,
+        delete_api_prompts_tags_by_tag_response_500 = cls(
+            error=error,
+            message=message,
         )
 
-        put_api_prompts_by_id_labels_by_label_response_200.additional_properties = d
-        return put_api_prompts_by_id_labels_by_label_response_200
+        delete_api_prompts_tags_by_tag_response_500.additional_properties = d
+        return delete_api_prompts_tags_by_tag_response_500
 
     @property
     def additional_keys(self) -> list[str]:

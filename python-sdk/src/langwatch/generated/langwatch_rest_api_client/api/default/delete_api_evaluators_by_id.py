@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -17,50 +18,58 @@ from ...types import Response
 def _get_kwargs(
     id: str,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": f"/api/evaluators/{id}",
+        "url": "/api/evaluators/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
     }
 
     return _kwargs
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[
-    Union[
-        DeleteApiEvaluatorsByIdResponse200,
-        DeleteApiEvaluatorsByIdResponse400,
-        DeleteApiEvaluatorsByIdResponse401,
-        DeleteApiEvaluatorsByIdResponse404,
-        DeleteApiEvaluatorsByIdResponse422,
-        DeleteApiEvaluatorsByIdResponse500,
-    ]
-]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> (
+    DeleteApiEvaluatorsByIdResponse200
+    | DeleteApiEvaluatorsByIdResponse400
+    | DeleteApiEvaluatorsByIdResponse401
+    | DeleteApiEvaluatorsByIdResponse404
+    | DeleteApiEvaluatorsByIdResponse422
+    | DeleteApiEvaluatorsByIdResponse500
+    | None
+):
     if response.status_code == 200:
         response_200 = DeleteApiEvaluatorsByIdResponse200.from_dict(response.json())
 
         return response_200
+
     if response.status_code == 400:
         response_400 = DeleteApiEvaluatorsByIdResponse400.from_dict(response.json())
 
         return response_400
+
     if response.status_code == 401:
         response_401 = DeleteApiEvaluatorsByIdResponse401.from_dict(response.json())
 
         return response_401
+
     if response.status_code == 404:
         response_404 = DeleteApiEvaluatorsByIdResponse404.from_dict(response.json())
 
         return response_404
+
     if response.status_code == 422:
         response_422 = DeleteApiEvaluatorsByIdResponse422.from_dict(response.json())
 
         return response_422
+
     if response.status_code == 500:
         response_500 = DeleteApiEvaluatorsByIdResponse500.from_dict(response.json())
 
         return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -68,16 +77,14 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Union[
-        DeleteApiEvaluatorsByIdResponse200,
-        DeleteApiEvaluatorsByIdResponse400,
-        DeleteApiEvaluatorsByIdResponse401,
-        DeleteApiEvaluatorsByIdResponse404,
-        DeleteApiEvaluatorsByIdResponse422,
-        DeleteApiEvaluatorsByIdResponse500,
-    ]
+    DeleteApiEvaluatorsByIdResponse200
+    | DeleteApiEvaluatorsByIdResponse400
+    | DeleteApiEvaluatorsByIdResponse401
+    | DeleteApiEvaluatorsByIdResponse404
+    | DeleteApiEvaluatorsByIdResponse422
+    | DeleteApiEvaluatorsByIdResponse500
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -90,16 +97,14 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
 ) -> Response[
-    Union[
-        DeleteApiEvaluatorsByIdResponse200,
-        DeleteApiEvaluatorsByIdResponse400,
-        DeleteApiEvaluatorsByIdResponse401,
-        DeleteApiEvaluatorsByIdResponse404,
-        DeleteApiEvaluatorsByIdResponse422,
-        DeleteApiEvaluatorsByIdResponse500,
-    ]
+    DeleteApiEvaluatorsByIdResponse200
+    | DeleteApiEvaluatorsByIdResponse400
+    | DeleteApiEvaluatorsByIdResponse401
+    | DeleteApiEvaluatorsByIdResponse404
+    | DeleteApiEvaluatorsByIdResponse422
+    | DeleteApiEvaluatorsByIdResponse500
 ]:
     """Archive (soft-delete) an evaluator
 
@@ -111,7 +116,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[DeleteApiEvaluatorsByIdResponse200, DeleteApiEvaluatorsByIdResponse400, DeleteApiEvaluatorsByIdResponse401, DeleteApiEvaluatorsByIdResponse404, DeleteApiEvaluatorsByIdResponse422, DeleteApiEvaluatorsByIdResponse500]]
+        Response[DeleteApiEvaluatorsByIdResponse200 | DeleteApiEvaluatorsByIdResponse400 | DeleteApiEvaluatorsByIdResponse401 | DeleteApiEvaluatorsByIdResponse404 | DeleteApiEvaluatorsByIdResponse422 | DeleteApiEvaluatorsByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -128,17 +133,16 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[
-    Union[
-        DeleteApiEvaluatorsByIdResponse200,
-        DeleteApiEvaluatorsByIdResponse400,
-        DeleteApiEvaluatorsByIdResponse401,
-        DeleteApiEvaluatorsByIdResponse404,
-        DeleteApiEvaluatorsByIdResponse422,
-        DeleteApiEvaluatorsByIdResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+) -> (
+    DeleteApiEvaluatorsByIdResponse200
+    | DeleteApiEvaluatorsByIdResponse400
+    | DeleteApiEvaluatorsByIdResponse401
+    | DeleteApiEvaluatorsByIdResponse404
+    | DeleteApiEvaluatorsByIdResponse422
+    | DeleteApiEvaluatorsByIdResponse500
+    | None
+):
     """Archive (soft-delete) an evaluator
 
     Args:
@@ -149,7 +153,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[DeleteApiEvaluatorsByIdResponse200, DeleteApiEvaluatorsByIdResponse400, DeleteApiEvaluatorsByIdResponse401, DeleteApiEvaluatorsByIdResponse404, DeleteApiEvaluatorsByIdResponse422, DeleteApiEvaluatorsByIdResponse500]
+        DeleteApiEvaluatorsByIdResponse200 | DeleteApiEvaluatorsByIdResponse400 | DeleteApiEvaluatorsByIdResponse401 | DeleteApiEvaluatorsByIdResponse404 | DeleteApiEvaluatorsByIdResponse422 | DeleteApiEvaluatorsByIdResponse500
     """
 
     return sync_detailed(
@@ -161,16 +165,14 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
 ) -> Response[
-    Union[
-        DeleteApiEvaluatorsByIdResponse200,
-        DeleteApiEvaluatorsByIdResponse400,
-        DeleteApiEvaluatorsByIdResponse401,
-        DeleteApiEvaluatorsByIdResponse404,
-        DeleteApiEvaluatorsByIdResponse422,
-        DeleteApiEvaluatorsByIdResponse500,
-    ]
+    DeleteApiEvaluatorsByIdResponse200
+    | DeleteApiEvaluatorsByIdResponse400
+    | DeleteApiEvaluatorsByIdResponse401
+    | DeleteApiEvaluatorsByIdResponse404
+    | DeleteApiEvaluatorsByIdResponse422
+    | DeleteApiEvaluatorsByIdResponse500
 ]:
     """Archive (soft-delete) an evaluator
 
@@ -182,7 +184,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[DeleteApiEvaluatorsByIdResponse200, DeleteApiEvaluatorsByIdResponse400, DeleteApiEvaluatorsByIdResponse401, DeleteApiEvaluatorsByIdResponse404, DeleteApiEvaluatorsByIdResponse422, DeleteApiEvaluatorsByIdResponse500]]
+        Response[DeleteApiEvaluatorsByIdResponse200 | DeleteApiEvaluatorsByIdResponse400 | DeleteApiEvaluatorsByIdResponse401 | DeleteApiEvaluatorsByIdResponse404 | DeleteApiEvaluatorsByIdResponse422 | DeleteApiEvaluatorsByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -197,17 +199,16 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[
-    Union[
-        DeleteApiEvaluatorsByIdResponse200,
-        DeleteApiEvaluatorsByIdResponse400,
-        DeleteApiEvaluatorsByIdResponse401,
-        DeleteApiEvaluatorsByIdResponse404,
-        DeleteApiEvaluatorsByIdResponse422,
-        DeleteApiEvaluatorsByIdResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+) -> (
+    DeleteApiEvaluatorsByIdResponse200
+    | DeleteApiEvaluatorsByIdResponse400
+    | DeleteApiEvaluatorsByIdResponse401
+    | DeleteApiEvaluatorsByIdResponse404
+    | DeleteApiEvaluatorsByIdResponse422
+    | DeleteApiEvaluatorsByIdResponse500
+    | None
+):
     """Archive (soft-delete) an evaluator
 
     Args:
@@ -218,7 +219,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[DeleteApiEvaluatorsByIdResponse200, DeleteApiEvaluatorsByIdResponse400, DeleteApiEvaluatorsByIdResponse401, DeleteApiEvaluatorsByIdResponse404, DeleteApiEvaluatorsByIdResponse422, DeleteApiEvaluatorsByIdResponse500]
+        DeleteApiEvaluatorsByIdResponse200 | DeleteApiEvaluatorsByIdResponse400 | DeleteApiEvaluatorsByIdResponse401 | DeleteApiEvaluatorsByIdResponse404 | DeleteApiEvaluatorsByIdResponse422 | DeleteApiEvaluatorsByIdResponse500
     """
 
     return (
