@@ -287,14 +287,18 @@ function MembersList({
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader>Org Role</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
-                  const roleLabel = roleLabelMap.get(member.role) ?? member.role;
+                  const orgBinding = (bindingsByUser.get(member.userId) ?? []).find(
+                    (b) =>
+                      b.scopeType === RoleBindingScopeType.ORGANIZATION &&
+                      b.userId === member.userId,
+                  );
 
                   return (
                     <Table.Row key={member.userId}>
@@ -317,7 +321,17 @@ function MembersList({
                         </HStack>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
-                      <Table.Cell>{roleLabel}</Table.Cell>
+                      <Table.Cell>
+                        {orgBinding ? (
+                          <Badge colorPalette={roleBadgeColor(orgBinding.role)} size="sm">
+                            {orgBinding.customRoleName ?? orgBinding.role}
+                          </Badge>
+                        ) : (
+                          <Badge colorPalette="gray" size="sm">
+                            {roleLabelMap.get(member.role) ?? member.role}
+                          </Badge>
+                        )}
+                      </Table.Cell>
                       <Table.Cell>
                         <MemberAccessDisplay bindings={bindingsByUser.get(member.userId) ?? []} />
                       </Table.Cell>
