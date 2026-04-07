@@ -40,10 +40,11 @@ RUN cd langwatch && CI=true pnpm install --frozen-lockfile
 COPY typescript-sdk/package.json ./typescript-sdk/package.json
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY langwatch ./langwatch
-RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
+RUN --mount=type=cache,target=/app/langwatch/.next/cache \
+  cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
 # Remove dev dependencies — not needed at runtime
-RUN cd langwatch && pnpm prune --prod
+RUN cd langwatch && CI=true pnpm prune --prod
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
