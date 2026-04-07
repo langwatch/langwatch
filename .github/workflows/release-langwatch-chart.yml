@@ -1,8 +1,8 @@
-name: Release LangWatch Chart
+name: release-langwatch-chart
 
 on:
   workflow_run:
-    workflows: ["Build and Push Docker Images"]
+    workflows: ["publish-docker-app"]
     types: [completed]
   workflow_dispatch:
 

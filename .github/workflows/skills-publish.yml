@@ -1,4 +1,4 @@
-name: Publish Skills
+name: skills-publish
 
 on:
   push:
