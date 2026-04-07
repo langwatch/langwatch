@@ -1,8 +1,9 @@
-FROM node:24-alpine
+# ── Stage 1: build ──────────────────────────────────────────────────
+FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@10.24.0
 
-# Install Goose migration tool with SHA256 verification
+# Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
 ARG GOOSE_SHA256_X86_64=8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe
 RUN ARCH=$(uname -m) && \
@@ -40,9 +41,27 @@ COPY typescript-sdk/package.json ./typescript-sdk/package.json
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY langwatch ./langwatch
 RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
-EXPOSE 5560
+
+# Remove dev dependencies — not needed at runtime
+RUN cd langwatch && pnpm prune --prod
+
+# ── Stage 2: runtime ───────────────────────────────────────────────
+FROM node:24-alpine
+RUN apk --no-cache add curl openssl bash
+RUN npm install -g pnpm@10.24.0
+
+COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
+
+WORKDIR /app
+
+# Copy built artifacts from builder (mcp-server is inside langwatch/node_modules via file: dep)
+COPY --from=builder /app/langwatch ./langwatch
+COPY --from=builder /app/typescript-sdk/package.json ./typescript-sdk/package.json
+COPY --from=builder /app/python-sdk/pyproject.toml ./python-sdk/pyproject.toml
+COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 
 ENV NODE_ENV=production
+EXPOSE 5560
 
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
