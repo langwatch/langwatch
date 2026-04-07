@@ -117,7 +117,10 @@ export default async function handler(
   try {
     const timestampMs = body.timestamp ?? Date.now();
     const timestampNano = String(timestampMs * 1_000_000);
-    const spanId = generateOtelSpanId();
+    const spanId = createHash("sha256")
+      .update(`${body.trace_id}:${eventId}`)
+      .digest("hex")
+      .slice(0, 16);
 
     // Build attributes array for the span
     const attributes: {
