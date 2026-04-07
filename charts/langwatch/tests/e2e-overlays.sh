@@ -35,7 +35,7 @@ tmpl() {
 # Check rendered YAML contains a string (uses <<< to avoid broken pipe with large output)
 assert_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if grep -q "$needle" <<< "$haystack"; then
+  if grep -qF "$needle" <<< "$haystack"; then
     pass "$label"
   else
     fail "$label: expected to find '$needle'"
@@ -45,7 +45,7 @@ assert_contains() {
 # Check rendered YAML does NOT contain a string
 assert_not_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if grep -q "$needle" <<< "$haystack"; then
+  if grep -qF "$needle" <<< "$haystack"; then
     fail "$label: expected NOT to find '$needle'"
   else
     pass "$label"

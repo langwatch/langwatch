@@ -67,13 +67,7 @@ ingress:
     - host: langwatch-dev.example.com
       http:
         paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: lw-dev-app
-                port:
-                  number: 5560
+          - { path: /, pathType: Prefix }
 
 cronjobs:
   enabled: true
