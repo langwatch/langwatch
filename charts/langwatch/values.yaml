@@ -564,6 +564,14 @@ workers:
     requests: { cpu: 250m, memory: 2Gi }
     limits: { cpu: 1000m, memory: 4Gi }
 
+  # Connection to the main LangWatch application
+  ## @extra workers.upstreams Upstream to app (callbacks, etc.).
+  ## @param workers.upstreams.langwatch.scheme [string, default: http] Scheme to app.
+  ## @param workers.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
+  ## @param workers.upstreams.langwatch.port [default: 5560] Port to app.
+  upstreams:
+    langwatch: { scheme: http, port: 5560 }
+
   # =============================================================================
   # Kubernetes Pass-Through Configuration
   # =============================================================================

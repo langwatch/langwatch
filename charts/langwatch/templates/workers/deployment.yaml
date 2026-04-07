@@ -86,6 +86,9 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+
             {{- with .Values.workers.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
