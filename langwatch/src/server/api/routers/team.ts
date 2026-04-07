@@ -512,13 +512,15 @@ export const teamRouter = createTRPCRouter({
             });
           }
 
+          const memberRole = memberIsCustomRole
+            ? TeamUserRole.CUSTOM
+            : (member.role as TeamUserRole);
+
           await tx.teamUser.create({
             data: {
               userId: member.userId,
               teamId: team.id,
-              role: memberIsCustomRole
-                ? TeamUserRole.CUSTOM
-                : (member.role as TeamUserRole),
+              role: memberRole,
               assignedRoleId: memberIsCustomRole ? member.customRoleId : null,
             },
           });
@@ -540,6 +542,17 @@ export const teamRouter = createTRPCRouter({
               });
             }
           }
+
+          await tx.roleBinding.create({
+            data: {
+              organizationId: input.organizationId,
+              userId: member.userId,
+              role: memberRole,
+              customRoleId: memberIsCustomRole ? (member.customRoleId ?? null) : null,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: team.id,
+            },
+          });
         }
 
         // Post-creation validation: ensure we have at least one admin

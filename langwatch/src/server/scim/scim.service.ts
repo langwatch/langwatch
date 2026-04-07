@@ -1,4 +1,4 @@
-import type { PrismaClient, User } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { UserService } from "../users/user.service";
 import type {
@@ -62,6 +62,15 @@ export class ScimService {
             role: "MEMBER",
           },
         });
+        await this.prisma.roleBinding.create({
+          data: {
+            organizationId,
+            userId: existingUser.id,
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
           return this.toScimUser(existingUser);
@@ -88,6 +97,15 @@ export class ScimService {
           userId: newUser.id,
           organizationId,
           role: "MEMBER",
+        },
+      });
+      await this.prisma.roleBinding.create({
+        data: {
+          organizationId,
+          userId: newUser.id,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organizationId,
         },
       });
     } catch (e) {

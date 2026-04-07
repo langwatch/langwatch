@@ -3,6 +3,7 @@ import {
   type PrismaClient,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -205,6 +206,16 @@ export const projectRouter = createTRPCRouter({
             userId: userId,
             teamId: team.id,
             role: "ADMIN",
+          },
+        });
+
+        await prisma.roleBinding.create({
+          data: {
+            organizationId: input.organizationId,
+            userId: userId,
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: team.id,
           },
         });
 

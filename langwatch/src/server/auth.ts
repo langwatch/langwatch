@@ -1,5 +1,6 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { Account, Organization } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { compare } from "bcrypt";
 import type { GetServerSidePropsContext, NextApiRequest } from "next";
 import type { NextRequest } from "next/server";
@@ -383,6 +384,16 @@ const createUserAndAddToOrganization = async (
       userId: newUser.id,
       organizationId: organization.id,
       role: "MEMBER",
+    },
+  });
+
+  await prisma.roleBinding.create({
+    data: {
+      organizationId: organization.id,
+      userId: newUser.id,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organization.id,
     },
   });
 
