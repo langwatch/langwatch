@@ -181,12 +181,18 @@ function FieldsFilter({
 	// Ref for selecting the highlighted option from keyboard
 	const selectHighlightedRef = React.useRef<(() => void) | null>(null);
 
-	// Reset keyboard nav state when popover closes
+	// Reset state when popover closes
 	useEffect(() => {
 		if (!open) {
 			setHighlightedIndex(-1);
 			setIsKeyboardNav(false);
+			setQuery("");
+			setImmediateQuery("");
+			if (searchRef.current) {
+				searchRef.current.value = "";
+			}
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open]);
 
 	const currentStringList = Array.isArray(current)
@@ -962,16 +968,13 @@ function ThumbsUpDownVoteFilter({
 									]);
 								} else {
 									const other = field === -1 ? 1 : -1;
-									onChange([
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-									]);
+									const isLast =
+										(min ?? 0) === field && (max ?? 0) === field;
+									if (isLast) {
+										onChange([]);
+									} else {
+										onChange([other.toString(), other.toString()]);
+									}
 								}
 							}}
 						>
