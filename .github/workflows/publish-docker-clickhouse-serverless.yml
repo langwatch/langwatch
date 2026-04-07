@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Custom image tag (default: "next")'
+        required: false
+        default: 'next'
 
 jobs:
   extract-version:
@@ -98,11 +103,13 @@ jobs:
             langwatch/clickhouse-serverless:${HASH}-amd64 \
             langwatch/clickhouse-serverless:${HASH}-arm64
 
-      - name: Create multi-arch manifest (next)
+      - name: Create multi-arch manifest (custom tag)
         if: needs.extract-version.outputs.is_release != 'true'
+        env:
+          TAG: ${{ inputs.tag || 'next' }}
+          HASH: ${{ needs.extract-version.outputs.short_hash }}
         run: |
-          HASH="${{ needs.extract-version.outputs.short_hash }}"
-          docker buildx imagetools create -t langwatch/clickhouse-serverless:next \
+          docker buildx imagetools create -t langwatch/clickhouse-serverless:${TAG} \
             langwatch/clickhouse-serverless:${HASH}-amd64 \
             langwatch/clickhouse-serverless:${HASH}-arm64
 
