@@ -28,8 +28,8 @@ langwatch_nlp:
 langevals:
   replicaCount: 1
   resources:
-    requests: { cpu: 50m, memory: 256Mi }
-    limits:   { cpu: 250m, memory: 512Mi }
+    requests: { cpu: 100m, memory: 1Gi }
+    limits:   { cpu: 500m, memory: 2Gi }
 
 clickhouse:
   chartManaged: true
