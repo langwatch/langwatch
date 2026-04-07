@@ -70,7 +70,7 @@ jobs:
           - image: langwatch_nlp
             dockerfile: Dockerfile.langwatch_nlp
             platform: linux/arm64/v8
-            runner: arm64-runner
+            runner: ubuntu-24.04-arm
             arch: arm64
           - image: langevals
             dockerfile: Dockerfile.langevals
@@ -80,7 +80,7 @@ jobs:
           - image: langevals
             dockerfile: Dockerfile.langevals
             platform: linux/arm64/v8
-            runner: arm64-runner
+            runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
 

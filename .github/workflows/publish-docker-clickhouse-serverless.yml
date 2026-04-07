@@ -51,7 +51,7 @@ jobs:
             runner: ubuntu-latest
             arch: amd64
           - platform: linux/arm64/v8
-            runner: arm64-runner
+            runner: ubuntu-24.04-arm
             arch: arm64
     runs-on: ${{ matrix.runner }}
 
