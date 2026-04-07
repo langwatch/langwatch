@@ -4,16 +4,16 @@ import {
   Button,
   Card,
   createListCollection,
-  Dialog,
   Field,
   Heading,
   HStack,
-  Select,
   Spacer,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Dialog } from "~/components/ui/dialog";
+import { Select } from "~/components/ui/select";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
@@ -22,6 +22,7 @@ import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
@@ -95,12 +96,14 @@ function AddToTeamDialog({
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("MEMBER");
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const queryClient = api.useContext();
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId, includeDeactivated: false },
     { enabled: open },
   );
+  const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
   const create = api.roleBinding.create.useMutation({
     onSuccess: () => {
@@ -119,86 +122,97 @@ function AddToTeamDialog({
   }));
   const userCollection = createListCollection({ items: userItems });
 
+  const allRoleItems = [
+    ...ROLE_ITEMS,
+    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+  ];
+  const allRoleCollection = createListCollection({ items: allRoleItems });
+
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
-        <Dialog.Content maxWidth="440px">
-          <Dialog.Header>
-            <Dialog.Title>Add member to {teamName}</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack gap={4} align="stretch">
-              <Field.Root>
-                <Field.Label>Person</Field.Label>
-                <Select.Root
-                  collection={userCollection}
-                  value={userId ? [userId] : []}
-                  onValueChange={(e) => setUserId(e.value[0] ?? "")}
-                  size="md"
-                >
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="Select person..." />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {userItems.map((item) => (
-                      <Select.Item key={item.value} item={item}>
-                        {item.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Field.Root>
+      <Dialog.Content maxWidth="440px">
+        <Dialog.Header>
+          <Dialog.Title>Add member to {teamName}</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
+          <VStack gap={4} align="stretch">
+            <Field.Root>
+              <Field.Label>Person</Field.Label>
+              <Select.Root
+                collection={userCollection}
+                value={userId ? [userId] : []}
+                onValueChange={(e) => setUserId(e.value[0] ?? "")}
+                size="md"
+              >
+                <Select.Trigger>
+                  <Select.ValueText placeholder="Select person..." />
+                </Select.Trigger>
+                <Select.Content>
+                  {userItems.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Field.Root>
 
-              <Field.Root>
-                <Field.Label>Role on this team</Field.Label>
-                <Select.Root
-                  collection={roleCollection}
-                  value={[role]}
-                  onValueChange={(e) => setRole(e.value[0] ?? "MEMBER")}
-                  size="md"
-                >
-                  <Select.Trigger>
-                    <Select.ValueText />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {ROLE_ITEMS.map((item) => (
-                      <Select.Item key={item.value} item={item}>
-                        {item.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Field.Root>
+            <Field.Root>
+              <Field.Label>Role on this team</Field.Label>
+              <Select.Root
+                collection={allRoleCollection}
+                value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
+                onValueChange={(e) => {
+                  const v = e.value[0] ?? "MEMBER";
+                  if (v.startsWith("CUSTOM:")) {
+                    setRole("CUSTOM");
+                    setCustomRoleId(v.slice(7));
+                  } else {
+                    setRole(v);
+                    setCustomRoleId(undefined);
+                  }
+                }}
+                size="md"
+              >
+                <Select.Trigger>
+                  <Select.ValueText />
+                </Select.Trigger>
+                <Select.Content>
+                  {allRoleItems.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Field.Root>
 
-              <Text fontSize="sm" color="gray.500">
-                This gives them access to all projects in the team at this role
-                level.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!userId}
-              loading={create.isPending}
-              onClick={() =>
-                create.mutate({
-                  organizationId,
-                  userId,
-                  role: role as any,
-                  scopeType: "TEAM",
-                  scopeId: teamId,
-                })
-              }
-            >
-              Add member
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Positioner>
+            <Text fontSize="sm" color="gray.500">
+              This gives them access to all projects in the team at this role level.
+            </Text>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            disabled={!userId}
+            loading={create.isPending}
+            onClick={() =>
+              create.mutate({
+                organizationId,
+                userId,
+                role: (customRoleId ? "CUSTOM" : role) as any,
+                customRoleId,
+                scopeType: "TEAM",
+                scopeId: teamId,
+              })
+            }
+          >
+            Add member
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
     </Dialog.Root>
   );
 }
@@ -220,12 +234,14 @@ function AddToProjectDialog({
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("VIEWER");
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const queryClient = api.useContext();
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId, includeDeactivated: false },
     { enabled: open },
   );
+  const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
   const create = api.roleBinding.create.useMutation({
     onSuccess: () => {
@@ -244,86 +260,97 @@ function AddToProjectDialog({
   }));
   const userCollection = createListCollection({ items: userItems });
 
+  const allRoleItems = [
+    ...ROLE_ITEMS,
+    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+  ];
+  const allRoleCollection = createListCollection({ items: allRoleItems });
+
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
-        <Dialog.Content maxWidth="440px">
-          <Dialog.Header>
-            <Dialog.Title>Add access to {projectName}</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack gap={4} align="stretch">
-              <Field.Root>
-                <Field.Label>Person</Field.Label>
-                <Select.Root
-                  collection={userCollection}
-                  value={userId ? [userId] : []}
-                  onValueChange={(e) => setUserId(e.value[0] ?? "")}
-                  size="md"
-                >
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="Select person..." />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {userItems.map((item) => (
-                      <Select.Item key={item.value} item={item}>
-                        {item.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Field.Root>
+      <Dialog.Content maxWidth="440px">
+        <Dialog.Header>
+          <Dialog.Title>Add access to {projectName}</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
+          <VStack gap={4} align="stretch">
+            <Field.Root>
+              <Field.Label>Person</Field.Label>
+              <Select.Root
+                collection={userCollection}
+                value={userId ? [userId] : []}
+                onValueChange={(e) => setUserId(e.value[0] ?? "")}
+                size="md"
+              >
+                <Select.Trigger>
+                  <Select.ValueText placeholder="Select person..." />
+                </Select.Trigger>
+                <Select.Content>
+                  {userItems.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Field.Root>
 
-              <Field.Root>
-                <Field.Label>Role on this project</Field.Label>
-                <Select.Root
-                  collection={roleCollection}
-                  value={[role]}
-                  onValueChange={(e) => setRole(e.value[0] ?? "VIEWER")}
-                  size="md"
-                >
-                  <Select.Trigger>
-                    <Select.ValueText />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {ROLE_ITEMS.map((item) => (
-                      <Select.Item key={item.value} item={item}>
-                        {item.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Field.Root>
+            <Field.Root>
+              <Field.Label>Role on this project</Field.Label>
+              <Select.Root
+                collection={allRoleCollection}
+                value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
+                onValueChange={(e) => {
+                  const v = e.value[0] ?? "VIEWER";
+                  if (v.startsWith("CUSTOM:")) {
+                    setRole("CUSTOM");
+                    setCustomRoleId(v.slice(7));
+                  } else {
+                    setRole(v);
+                    setCustomRoleId(undefined);
+                  }
+                }}
+                size="md"
+              >
+                <Select.Trigger>
+                  <Select.ValueText />
+                </Select.Trigger>
+                <Select.Content>
+                  {allRoleItems.map((item) => (
+                    <Select.Item key={item.value} item={item}>
+                      {item.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </Field.Root>
 
-              <Text fontSize="sm" color="gray.500">
-                If they&apos;re already on the team, this overrides their team
-                role for this project only.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!userId}
-              loading={create.isPending}
-              onClick={() =>
-                create.mutate({
-                  organizationId,
-                  userId,
-                  role: role as any,
-                  scopeType: "PROJECT",
-                  scopeId: projectId,
-                })
-              }
-            >
-              Add access
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Positioner>
+            <Text fontSize="sm" color="gray.500">
+              If they&apos;re already on the team, this overrides their team role for this project only.
+            </Text>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            disabled={!userId}
+            loading={create.isPending}
+            onClick={() =>
+              create.mutate({
+                organizationId,
+                userId,
+                role: (customRoleId ? "CUSTOM" : role) as any,
+                customRoleId,
+                scopeType: "PROJECT",
+                scopeId: projectId,
+              })
+            }
+          >
+            Add access
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
     </Dialog.Root>
   );
 }
@@ -557,6 +584,8 @@ function TeamCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
+  const { openDrawer } = useDrawer();
+  const { hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useContext();
 
   const deleteBinding = api.roleBinding.delete.useMutation({
@@ -758,19 +787,38 @@ function TeamCard({
             )}
 
             {/* ── Projects ── */}
-            {team.projects.length > 0 && (
-              <Box mt={5}>
+            <Box mt={5}>
+              <HStack mb={3}>
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
                   color="gray.500"
                   textTransform="uppercase"
                   letterSpacing="wider"
-                  mb={3}
                 >
                   Projects
                 </Text>
-                {team.projects.map((proj) => (
+                <Spacer />
+                {hasPermission("project:create") && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDrawer("createProject");
+                    }}
+                  >
+                    <Plus size={12} />
+                    Add project
+                  </Button>
+                )}
+              </HStack>
+              {team.projects.length === 0 ? (
+                <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                  No projects yet.
+                </Text>
+              ) : (
+                team.projects.map((proj) => (
                   <ProjectSection
                     key={proj.id}
                     project={proj}
@@ -778,9 +826,9 @@ function TeamCard({
                     organizationId={organizationId}
                     canManage={canManage}
                   />
-                ))}
-              </Box>
-            )}
+                ))
+              )}
+            </Box>
           </Card.Body>
         )}
       </Card.Root>
@@ -802,6 +850,7 @@ function TeamCard({
 
 function TeamsAndProjects() {
   const { organization, hasPermission } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
 
   const teams = api.team.getTeamsWithRoleBindings.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -824,6 +873,12 @@ function TeamsAndProjects() {
             </Text>
           </Box>
           <Spacer />
+          {hasPermission("project:create") && (
+            <PageLayout.HeaderButton onClick={() => openDrawer("createProject")}>
+              <Plus size={16} />
+              Add project
+            </PageLayout.HeaderButton>
+          )}
           {canManage && (
             <Link href="/settings/teams/new" asChild>
               <PageLayout.HeaderButton>

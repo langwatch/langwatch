@@ -89,9 +89,23 @@ export default function SettingsLayout({
         >
           <MenuLink href="/settings">General Settings</MenuLink>
           {!isLiteMember && (
-            <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
+            <MenuLink href={`/${project?.slug}/setup`}>API Key</MenuLink>
           )}
-          <MenuLink href="/settings/projects">Projects</MenuLink>
+
+          <NavSection
+            label="Models"
+            paths={[
+              "/settings/model-providers",
+              "/settings/model-costs",
+              "/settings/secrets",
+            ]}
+          >
+            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
+            <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+            {!isLiteMember && (
+              <MenuLink href="/settings/secrets">Secrets</MenuLink>
+            )}
+          </NavSection>
 
           <NavSection
             label="Teams & Access"
@@ -123,22 +137,7 @@ export default function SettingsLayout({
             {isEnterprise && !isLiteMember && (
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
-            <MenuLink href="/settings/teams">Teams</MenuLink>
-          </NavSection>
-
-          <NavSection
-            label="Models"
-            paths={[
-              "/settings/model-providers",
-              "/settings/model-costs",
-              "/settings/secrets",
-            ]}
-          >
-            <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
-            <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
-            {!isLiteMember && (
-              <MenuLink href="/settings/secrets">Secrets</MenuLink>
-            )}
+            <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
           </NavSection>
 
           <NavSection

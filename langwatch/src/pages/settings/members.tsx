@@ -2,7 +2,6 @@ import {
   Badge,
   Box,
   Card,
-  Flex,
   Heading,
   HStack,
   Spacer,
@@ -38,6 +37,10 @@ import type {
 } from "../../server/app-layer/organizations/repositories/organization.repository";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
+import type { RouterOutputs } from "../../utils/api";
+import { RoleBindingScopeType } from "@prisma/client";
+
+type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 
 // Create a Map for fast O(1) lookups instead of O(n) .find() in render
 const roleLabelMap = new Map(
@@ -209,6 +212,21 @@ function MembersList({
     onInviteLinkClose();
   };
 
+  const { data: allBindings } = api.roleBinding.listForOrg.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization.id },
+  );
+
+  const bindingsByUser = useMemo(() => {
+    const map = new Map<string, Binding[]>();
+    for (const b of allBindings ?? []) {
+      if (!b.userId) continue;
+      if (!map.has(b.userId)) map.set(b.userId, []);
+      map.get(b.userId)!.push(b);
+    }
+    return map;
+  }, [allBindings]);
+
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
@@ -265,7 +283,7 @@ function MembersList({
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
                   <Table.ColumnHeader>Role</Table.ColumnHeader>
-                  <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -296,10 +314,7 @@ function MembersList({
                       <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>{roleLabel}</Table.Cell>
                       <Table.Cell>
-                        <TeamMembershipsDisplay
-                          teamMemberships={member.user.teamMemberships}
-                          organizationId={organization.id}
-                        />
+                        <MemberAccessDisplay bindings={bindingsByUser.get(member.userId) ?? []} />
                       </Table.Cell>
                       <Table.Cell>
                         <Box
@@ -428,33 +443,35 @@ function MembersList({
   );
 }
 
-interface TeamMembershipsDisplayProps {
-  teamMemberships: Array<{
-    team: { id: string; name: string; slug: string; organizationId: string };
-  }>;
-  organizationId: string;
+function scopeTypeLabel(type: RoleBindingScopeType) {
+  if (type === RoleBindingScopeType.ORGANIZATION) return "🏢";
+  if (type === RoleBindingScopeType.TEAM) return "👥";
+  return "📁";
 }
 
-/**
- * Reusable component to display team memberships as clickable badges
- * Single Responsibility: Renders team memberships as a list of clickable badges
- */
-const TeamMembershipsDisplay = ({
-  teamMemberships,
-  organizationId,
-}: TeamMembershipsDisplayProps) => {
+function roleBadgeColor(role: string) {
+  if (role === "ADMIN") return "red";
+  if (role === "MEMBER") return "blue";
+  return "gray";
+}
+
+function MemberAccessDisplay({ bindings }: { bindings: Binding[] }) {
+  if (bindings.length === 0) {
+    return <Text fontSize="xs" color="fg.subtle" textAlign="right">No access configured</Text>;
+  }
   return (
-    <Flex gap={2} flexWrap="wrap">
-      {teamMemberships
-        .flatMap((m) => m.team)
-        .filter((m) => m.organizationId === organizationId)
-        .map((m) => (
-          <Link href={`/settings/teams/${m.slug}`} key={m.id}>
-            <Badge size="sm" variant="surface">
-              {m.name}
-            </Badge>
-          </Link>
-        ))}
-    </Flex>
+    <VStack gap={1} align="end">
+      {bindings.map((b) => (
+        <HStack key={b.id} gap={1} fontSize="xs">
+          <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+            {b.customRoleName ?? b.role}
+          </Badge>
+          <Text color="fg.muted">on</Text>
+          <Badge colorPalette="purple" size="sm">
+            {scopeTypeLabel(b.scopeType)}{b.scopeType !== RoleBindingScopeType.ORGANIZATION && ` · ${b.scopeName ?? b.scopeId.slice(0, 8) + "…"}`}
+          </Badge>
+        </HStack>
+      ))}
+    </VStack>
   );
-};
+}

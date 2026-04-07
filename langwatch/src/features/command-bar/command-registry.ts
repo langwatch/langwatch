@@ -233,7 +233,7 @@ export const navigationCommands: Command[] = [
     icon: FolderKanban,
     category: "navigation",
     keywords: ["project", "workspace"],
-    path: "/settings/projects",
+    path: "/settings/teams",
   },
   {
     id: "nav-settings-roles",
