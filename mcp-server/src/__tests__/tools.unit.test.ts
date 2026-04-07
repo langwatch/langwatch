@@ -410,6 +410,31 @@ describe("handleGetAnalytics()", () => {
       expect(result).toContain("Grouped by: metadata.model");
     });
 
+    it("formats grouped data with group column", async () => {
+      mockGetAnalytics.mockResolvedValue({
+        currentPeriod: [
+          {
+            date: "2024-01-01",
+            "sentiment.thumbs_up_down": {
+              "Thumbs Up": { "0/metadata.trace_id/cardinality": 10 },
+              "Thumbs Down": { "0/metadata.trace_id/cardinality": 5 },
+            },
+          },
+        ],
+        previousPeriod: [],
+      });
+
+      const result = await handleGetAnalytics({
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+        groupBy: "sentiment.thumbs_up_down",
+      });
+
+      expect(result).toContain("| Date | Group | Value |");
+      expect(result).toContain("| 2024-01-01 | Thumbs Up | 10 |");
+      expect(result).toContain("| 2024-01-01 | Thumbs Down | 5 |");
+    });
+
     it("uses the specified aggregation", async () => {
       mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 

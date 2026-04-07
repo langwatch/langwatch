@@ -49,17 +49,35 @@ export async function handleGetAnalytics(params: {
   const currentPeriod = result.currentPeriod ?? [];
   if (currentPeriod.length === 0) {
     lines.push("No data available for this period.");
+  } else if (params.groupBy) {
+    lines.push("| Date | Group | Value |");
+    lines.push("|------|-------|-------|");
+    for (const bucket of currentPeriod) {
+      const groupData = bucket[params.groupBy];
+      if (
+        typeof groupData === "object" &&
+        groupData !== null &&
+        !Array.isArray(groupData)
+      ) {
+        const groups = groupData as Record<string, Record<string, number>>;
+        for (const [groupKey, metrics] of Object.entries(groups)) {
+          const value =
+            Object.values(metrics).find(
+              (v) => typeof v === "number"
+            ) ?? "N/A";
+          lines.push(`| ${bucket.date} | ${groupKey} | ${value} |`);
+        }
+      }
+    }
   } else {
     lines.push("| Date | Value |");
     lines.push("|------|-------|");
     for (const bucket of currentPeriod) {
-      const date = bucket.date;
-      // Find the metric value - it's typically keyed by index
       const value =
         Object.entries(bucket).find(
           ([k]) => k !== "date" && typeof bucket[k] === "number"
         )?.[1] ?? "N/A";
-      lines.push(`| ${date} | ${value} |`);
+      lines.push(`| ${bucket.date} | ${value} |`);
     }
   }
 

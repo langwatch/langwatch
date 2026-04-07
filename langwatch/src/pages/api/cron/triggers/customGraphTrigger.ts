@@ -166,6 +166,7 @@ export const processCustomGraphTrigger = async (
       timeseriesResult,
       series,
       seriesName,
+      graphData.groupBy,
     );
 
     // Check threshold condition
@@ -298,6 +299,7 @@ const calculateCurrentValue = (
   timeseriesResult: TimeseriesResult,
   series: CustomGraphInput["series"][number],
   seriesKey: string,
+  groupBy?: string,
 ): number => {
   let currentValue = 0;
 
@@ -307,10 +309,34 @@ const calculateCurrentValue = (
   if (dataPoints.length > 0) {
     const values = dataPoints
       .map((entry) => {
-        // Look up the value using the seriesKey (e.g., "0/metadata.trace_id/cardinality")
+        // Flat (ungrouped) path: value is directly on the entry
         const seriesValue = entry[seriesKey];
         if (typeof seriesValue === "number") {
           return seriesValue;
+        }
+
+        // Grouped path: value is nested under groupBy key as
+        // { [groupBy]: { [groupKey]: { [seriesKey]: number } } }
+        if (groupBy) {
+          const groupData = entry[groupBy];
+          if (
+            typeof groupData === "object" &&
+            groupData !== null &&
+            !Array.isArray(groupData)
+          ) {
+            const groups = groupData as Record<
+              string,
+              Record<string, number>
+            >;
+            let sum = 0;
+            for (const metrics of Object.values(groups)) {
+              const metricValue = metrics[seriesKey];
+              if (typeof metricValue === "number") {
+                sum += metricValue;
+              }
+            }
+            return sum;
+          }
         }
 
         return 0;
