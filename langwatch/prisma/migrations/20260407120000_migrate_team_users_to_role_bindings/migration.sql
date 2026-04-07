@@ -21,7 +21,7 @@ SELECT
   gen_random_uuid()::text,
   ou."organizationId",
   ou."userId",
-  ou."role"::"TeamUserRole",
+  ou."role"::text::"TeamUserRole",
   NULL,
   'ORGANIZATION'::"RoleBindingScopeType",
   ou."organizationId",
