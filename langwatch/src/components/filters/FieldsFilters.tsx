@@ -866,10 +866,12 @@ function RangeFilter({
 	const initializedRef = React.useRef(false);
 
 	useEffect(() => {
-		if (filterData.data && !initializedRef.current) {
-			initializedRef.current = true;
-			onChange([min.toString(), max.toString()]);
-		}
+		if (!filterData.data || initializedRef.current) return;
+		initializedRef.current = true;
+		// Skip initialization if the user already has a selected range
+		// (e.g. from a saved view or popover re-open)
+		if (currentValues.length === 2) return;
+		onChange([min.toString(), max.toString()]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [!!filterData.data]);
 
