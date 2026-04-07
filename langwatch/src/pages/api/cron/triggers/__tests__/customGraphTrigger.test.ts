@@ -11,10 +11,6 @@ vi.mock("~/server/analytics/analytics.service", () => ({
   }),
 }));
 
-vi.mock("~/server/analytics/timeseries", () => ({
-  timeseries: vi.fn(),
-}));
-
 vi.mock("~/server/db", () => ({
   prisma: {
     customGraph: {
@@ -45,7 +41,6 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
-import { timeseries } from "~/server/analytics/timeseries";
 import { prisma } from "~/server/db";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "../actions/sendEmail";
