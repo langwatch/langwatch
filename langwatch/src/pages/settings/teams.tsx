@@ -694,7 +694,7 @@ function TeamCard({
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
-                    {canManage && m.bindingId && !m.fromFallback ? (
+                    {canManage && m.bindingId ? (
                       <RoleSelect
                         value={m.role}
                         onChange={(role) =>
@@ -710,7 +710,7 @@ function TeamCard({
                         {m.role}
                       </Badge>
                     )}
-                    {canManage && m.bindingId && !m.fromFallback && (
+                    {canManage && m.bindingId && (
                       <Button
                         size="xs"
                         variant="ghost"
