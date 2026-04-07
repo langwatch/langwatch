@@ -13,6 +13,9 @@ async function resolveScopeNames(
   prisma: PrismaClient,
   bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
 ): Promise<Map<string, string>> {
+  const orgIds = bindings
+    .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
+    .map((b) => b.scopeId);
   const teamIds = bindings
     .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
     .map((b) => b.scopeId);
@@ -20,7 +23,10 @@ async function resolveScopeNames(
     .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
     .map((b) => b.scopeId);
 
-  const [teams, projects] = await Promise.all([
+  const [orgs, teams, projects] = await Promise.all([
+    orgIds.length > 0
+      ? prisma.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } })
+      : [],
     teamIds.length > 0
       ? prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } })
       : [],
@@ -30,6 +36,7 @@ async function resolveScopeNames(
   ]);
 
   const map = new Map<string, string>();
+  for (const o of orgs) map.set(o.id, o.name);
   for (const t of teams) map.set(t.id, t.name);
   for (const p of projects) map.set(p.id, p.name);
   return map;
