@@ -285,12 +285,12 @@ export const prepareLitellmParams = async ({
     }
   }
 
+  // TODO: add azure deployment as params.model as azure/<deployment-name>
+
   return await buildManagedBedrockLitellmParams({
     params,
     projectId,
     model,
     modelProvider,
   });
-
-  return params;
 };
