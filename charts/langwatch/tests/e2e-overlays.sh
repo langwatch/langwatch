@@ -32,10 +32,10 @@ tmpl() {
   helm template "$RELEASE" "$CHART_DIR" "$@" 2>&1
 }
 
-# Check rendered YAML contains a string
+# Check rendered YAML contains a string (uses <<< to avoid broken pipe with large output)
 assert_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if echo "$haystack" | grep -q "$needle"; then
+  if grep -q "$needle" <<< "$haystack"; then
     pass "$label"
   else
     fail "$label: expected to find '$needle'"
@@ -45,7 +45,7 @@ assert_contains() {
 # Check rendered YAML does NOT contain a string
 assert_not_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if echo "$haystack" | grep -q "$needle"; then
+  if grep -q "$needle" <<< "$haystack"; then
     fail "$label: expected NOT to find '$needle'"
   else
     pass "$label"
@@ -55,7 +55,7 @@ assert_not_contains() {
 # Count occurrences of a pattern in rendered YAML
 count_matches() {
   local haystack="$1" pattern="$2"
-  echo "$haystack" | grep -c "$pattern" || echo "0"
+  grep -c "$pattern" <<< "$haystack" || echo "0"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
