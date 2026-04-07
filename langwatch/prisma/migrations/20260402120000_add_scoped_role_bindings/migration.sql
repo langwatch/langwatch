@@ -37,7 +37,14 @@ CREATE TABLE "RoleBinding" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "RoleBinding_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "RoleBinding_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "RoleBinding_principal_check" CHECK (
+        ("userId" IS NOT NULL AND "groupId" IS NULL) OR
+        ("userId" IS NULL AND "groupId" IS NOT NULL)
+    ),
+    CONSTRAINT "RoleBinding_custom_role_check" CHECK (
+        ("role" != 'CUSTOM') OR ("customRoleId" IS NOT NULL)
+    )
 );
 
 -- CreateIndex

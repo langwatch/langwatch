@@ -220,9 +220,14 @@ function MembersList({
   const bindingsByUser = useMemo(() => {
     const map = new Map<string, Binding[]>();
     for (const b of allBindings ?? []) {
-      if (!b.userId) continue;
-      if (!map.has(b.userId)) map.set(b.userId, []);
-      map.get(b.userId)!.push(b);
+      if (b.userId) {
+        if (!map.has(b.userId)) map.set(b.userId, []);
+        map.get(b.userId)!.push(b);
+      }
+      for (const uid of b.memberUserIds) {
+        if (!map.has(uid)) map.set(uid, []);
+        map.get(uid)!.push(b);
+      }
     }
     return map;
   }, [allBindings]);

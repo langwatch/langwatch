@@ -52,6 +52,22 @@ export const roleBindingRouter = createTRPCRouter({
       for (const t of teams) scopeNames.set(t.id, t.name);
       for (const p of projects) scopeNames.set(p.id, p.name);
 
+      const groupIds = bindings
+        .filter((b) => b.groupId != null)
+        .map((b) => b.groupId!);
+      const groupMemberships =
+        groupIds.length > 0
+          ? await ctx.prisma.groupMembership.findMany({
+              where: { groupId: { in: groupIds } },
+              select: { groupId: true, userId: true },
+            })
+          : [];
+      const membersByGroup = new Map<string, string[]>();
+      for (const m of groupMemberships) {
+        if (!membersByGroup.has(m.groupId)) membersByGroup.set(m.groupId, []);
+        membersByGroup.get(m.groupId)!.push(m.userId);
+      }
+
       return bindings.map((b) => ({
         id: b.id,
         userId: b.userId,
@@ -66,6 +82,7 @@ export const roleBindingRouter = createTRPCRouter({
         scopeType: b.scopeType,
         scopeId: b.scopeId,
         scopeName: scopeNames.get(b.scopeId) ?? null,
+        memberUserIds: b.groupId ? (membersByGroup.get(b.groupId) ?? []) : [],
         createdAt: b.createdAt,
       }));
     }),

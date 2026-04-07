@@ -261,6 +261,17 @@ export const groupRouter = createTRPCRouter({
         });
       }
 
+      const orgMember = await ctx.prisma.organizationUser.findFirst({
+        where: { organizationId: input.organizationId, userId: input.userId },
+        select: { userId: true },
+      });
+      if (!orgMember) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "User must belong to the organization before joining a group",
+        });
+      }
+
       return ctx.prisma.groupMembership.create({
         data: { groupId: input.groupId, userId: input.userId },
       });
