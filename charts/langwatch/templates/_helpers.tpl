@@ -458,7 +458,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
-  value: {{ (not (.Values.app.telemetry.usage.enabled | default true)) | quote }}
+  value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
 # Telemetry - Prometheus metrics collection
 {{- if .Values.app.telemetry.metrics.enabled }}
 {{- if .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}

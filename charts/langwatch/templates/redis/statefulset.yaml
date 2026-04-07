@@ -82,7 +82,12 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /data
-  {{- if .Values.redis.master.persistence.enabled | default true }}
+  {{- $persistenceEnabled := ternary .Values.redis.master.persistence.enabled true (hasKey (default (dict) .Values.redis.master.persistence) "enabled") }}
+  {{- if not $persistenceEnabled }}
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+  {{- else }}
   volumeClaimTemplates:
     - metadata:
         name: redis-data
