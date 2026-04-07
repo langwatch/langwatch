@@ -30,7 +30,7 @@ describe("extractEventsFromSpans", () => {
         makeSpan({ params: { "langwatch.span.type": "llm" } }),
       ];
 
-      const result = extractEventsFromSpans(spans, "project-1", "trace-1");
+      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result).toEqual([]);
     });
@@ -51,7 +51,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans(spans, "project-1", "trace-1");
+      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result).toEqual([
         {
@@ -92,7 +92,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans(spans, "project-1", "trace-1");
+      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result).toHaveLength(2);
       expect(result[0]!.event_type).toBe("like");
@@ -109,7 +109,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans(spans, "project-1", "trace-1");
+      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result).toHaveLength(1);
       expect(result[0]!.metrics).toEqual({});
@@ -131,7 +131,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans(spans, "project-1", "trace-1");
+      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result[0]!.metrics).toEqual({ valid: 42 });
     });
@@ -151,7 +151,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans(spans, "project-1", "trace-1");
+      const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result[0]!.timestamps.updated_at).toBe(6000);
     });

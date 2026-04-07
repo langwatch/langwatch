@@ -391,11 +391,15 @@ function createError(
  * Events are stored in ClickHouse as spans with event.* span attributes.
  * After unflattening, these appear as params.event.type, params.event.metrics.*, etc.
  */
-export function extractEventsFromSpans(
-  spans: Span[],
-  projectId: string,
-  traceId: string,
-): Event[] {
+export function extractEventsFromSpans({
+  spans,
+  projectId,
+  traceId,
+}: {
+  spans: Span[];
+  projectId: string;
+  traceId: string;
+}): Event[] {
   const events: Event[] = [];
 
   for (const span of spans) {
@@ -464,7 +468,11 @@ export function mapTraceSummaryToTrace(
     summary.subTopicId,
   );
 
-  const events = extractEventsFromSpans(spans, projectId, summary.traceId);
+  const events = extractEventsFromSpans({
+    spans,
+    projectId,
+    traceId: summary.traceId,
+  });
 
   const trace: Trace = {
     trace_id: summary.traceId,
