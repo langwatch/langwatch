@@ -240,7 +240,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   }, [formWatch, handleSubmit, onSubmit]);
 
   const handleArchive = () => {
-    if (!confirm(`Archive "${team.name}"? This will hide the team and all its projects.`)) return;
+    if (!confirm(`Archive "${team.name}"? This will hide the team and all its projects. Contact LangWatch support to restore it.`)) return;
     archiveTeam.mutate(
       { teamId: team.id },
       {
@@ -278,7 +278,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
                 <VStack align="start" gap={0}>
                   <Text fontWeight="medium">Archive this team</Text>
                   <Text fontSize="sm" color="fg.muted">
-                    Hides the team and all its projects. This can be reversed by an admin.
+                    Hides the team and all its projects. Contact LangWatch support to restore it.
                   </Text>
                 </VStack>
                 <Button
