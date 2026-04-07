@@ -745,6 +745,47 @@ func TestMiddleware_WithTracerProvider_NoGlobal(t *testing.T) {
 			expectedStatusCode: codes.Ok,
 		},
 		{
+			name:         "Chat Completion Success With Recording",
+			endpointPath: "/v1/chat/completions",
+			openaiOp: func(t *testing.T, client openai.Client) {
+				_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+					Model:            completionModelID,
+					Messages:         []openai.ChatCompletionMessageParamUnion{openai.UserMessage("ping")},
+					MaxTokens:        openai.Opt(int64(5)),
+					Temperature:      openai.Opt(float64(0.7)),
+					TopP:             openai.Opt(float64(0.9)),
+					FrequencyPenalty: openai.Opt(float64(0.1)),
+					PresencePenalty:  openai.Opt(float64(0.2)),
+				})
+				require.NoError(t, err)
+			},
+			mockResponseStatus: http.StatusOK,
+			mockResponseBody:   completionRespBody,
+			requestBody:        completionReqBody,
+			middlewareOpts: func(provider *sdktrace.TracerProvider) []Option {
+				return []Option{WithTracerProvider(provider), WithCaptureInput(), WithCaptureOutput()}
+			},
+			expectedAttrs: map[attribute.Key]attribute.Value{
+				semconv.HTTPRequestMethodKey:                    attribute.StringValue(http.MethodPost),
+				semconv.URLPathKey:                              attribute.StringValue("/v1/chat/completions"),
+				semconv.GenAISystemKey:                          semconv.GenAISystemOpenai.Value,
+				semconv.GenAIOperationNameKey:                   attribute.StringValue("chat"),
+				semconv.GenAIRequestModelKey:                    attribute.StringValue(string(completionModelID)),
+				semconv.GenAIRequestTemperatureKey:              attribute.Float64Value(0.7),
+				semconv.GenAIRequestTopPKey:                     attribute.Float64Value(0.9),
+				semconv.GenAIRequestFrequencyPenaltyKey:         attribute.Float64Value(0.1),
+				semconv.GenAIRequestPresencePenaltyKey:          attribute.Float64Value(0.2),
+				semconv.GenAIResponseIDKey:                      attribute.StringValue("cmpl-xyz"),
+				semconv.GenAIResponseModelKey:                   attribute.StringValue("gpt-test-resp"),
+				semconv.GenAIOpenaiResponseSystemFingerprintKey: attribute.StringValue("fp_test_value"),
+				semconv.GenAIUsageInputTokensKey:                attribute.IntValue(2),
+				semconv.GenAIUsageOutputTokensKey:               attribute.IntValue(1),
+				semconv.GenAIResponseFinishReasonsKey:           attribute.StringSliceValue([]string{"stop"}),
+				semconv.HTTPResponseStatusCodeKey:               attribute.IntValue(http.StatusOK),
+			},
+			expectedStatusCode: codes.Ok,
+		},
+		{
 			name:         "Chat Completion Stream Success With Recording",
 			endpointPath: "/v1/chat/completions",
 			openaiOp: func(t *testing.T, client openai.Client) {
