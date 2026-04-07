@@ -159,13 +159,13 @@ app:
 
   # HTTP configuration for the application
   ## @extra app.http HTTP configuration for base/public URLs.
-  ## @param app.http.baseHost [string, default: http://localhost:5560] Internal base URL.
-  ## @param app.http.publicUrl [string, default: http://localhost:5560] Public URL for users.
+  ## @param app.http.baseHost [string, default: http://localhost:30560] Internal base URL.
+  ## @param app.http.publicUrl [string, default: http://localhost:30560] Public URL for users.
   http:
     # Base host URL for internal communication
-    baseHost: "http://localhost:5560"
+    baseHost: "http://localhost:30560"
     # Public URL that users will access the application from
-    publicUrl: "http://localhost:5560"
+    publicUrl: "http://localhost:30560"
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
@@ -1459,11 +1459,9 @@ redis:
     # Persistent storage configuration
     # See: https://kubespec.dev/v1/PersistentVolumeClaim
     ## @extra redis.master.persistence Persistent volume for master.
-    ## @param redis.master.persistence.enabled [default: true] Enable persistence.
     ## @param redis.master.persistence.size [string, default: 10Gi] PVC size.
     ## @param redis.master.persistence.storageClass [string] Storage class.
     persistence:
-      enabled: true
       size: 10Gi
       storageClass: ""
 
