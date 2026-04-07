@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver, validator as zValidator } from "hono-openapi";
 import { z } from "zod";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
@@ -77,11 +77,11 @@ const batchCreateRecordsSchema = z.object({
  * Used on endpoints where the feature spec requires 422 Unprocessable Entity.
  */
 function validationHook(
-  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
+  result: { success: boolean; error?: readonly unknown[] },
   c: { json: (body: unknown, status: number) => Response },
 ): Response | undefined {
   if (!result.success) {
-    const issue = result.error?.issues?.[0];
+    const issue = result.error?.[0] as { message?: string; path?: unknown[] } | undefined;
     return c.json(
       {
         error: "Unprocessable Entity",

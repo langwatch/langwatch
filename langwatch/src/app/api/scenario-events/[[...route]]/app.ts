@@ -1,7 +1,7 @@
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver, validator as zValidator } from "hono-openapi";
 import { getApp } from "~/server/app-layer/app";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";

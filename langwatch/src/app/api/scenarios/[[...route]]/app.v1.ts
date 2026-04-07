@@ -1,5 +1,5 @@
 import type { Scenario } from "@prisma/client";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "hono-openapi";
 import { Hono } from "hono";
 import { z } from "zod";
 import { prisma } from "~/server/db";

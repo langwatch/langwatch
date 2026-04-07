@@ -1,4 +1,4 @@
-import { resolver } from "hono-openapi/zod";
+import { resolver } from "hono-openapi";
 import {
   badRequestSchema,
   conflictSchema,

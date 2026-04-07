@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { IconType } from "react-icons";
 import type { DrawerType } from "~/components/drawerRegistry";
 import { z } from "zod";
 
@@ -8,7 +9,7 @@ export interface Command {
   id: string;
   label: string;
   description?: string;
-  icon: LucideIcon;
+  icon: LucideIcon | IconType;
   category: CommandCategory;
   keywords?: string[];
   shortcut?: string;

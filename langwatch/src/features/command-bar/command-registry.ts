@@ -10,7 +10,6 @@ import {
   DollarSign,
   FileText,
   FlaskConical,
-  Github,
   Home,
   Inbox,
   Key,
@@ -37,6 +36,7 @@ import {
   UserCog,
   Building2,
 } from "lucide-react";
+import { SiGithub } from "react-icons/si";
 import type { Command } from "./types";
 
 /**
@@ -431,7 +431,7 @@ export const supportCommands: Command[] = [
     id: "action-github",
     label: "GitHub Support",
     description: "Get help on GitHub",
-    icon: Github,
+    icon: SiGithub,
     category: "actions",
     keywords: ["github", "support", "help", "community"],
     externalUrl:
