@@ -24,22 +24,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Overlays
           - name: default
             flags: "--set autogen.enabled=true"
+          - name: dev+nodeport
+            flags: "--set autogen.enabled=true -f examples/overlays/size-dev.yaml -f examples/overlays/access-nodeport.yaml"
+          - name: minimal+nodeport
+            flags: "--set autogen.enabled=true -f examples/overlays/size-minimal.yaml -f examples/overlays/access-nodeport.yaml"
+          - name: prod+ingress
+            flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml"
+          - name: ha+ingress+replicated
+            flags: "--set autogen.enabled=true -f examples/overlays/size-ha.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/clickhouse-replicated.yaml"
+          - name: prod+external-ch
+            flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/clickhouse-external.yaml"
+          - name: prod+ext-pg+ext-redis
+            flags: "--set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/postgres-external.yaml -f examples/overlays/redis-external.yaml"
+          # Profiles
           - name: local
             flags: "-f examples/values-local.yaml"
-          - name: test
-            flags: "-f examples/values-test.yaml"
-          - name: hosted-dev
-            flags: "-f examples/values-hosted-dev.yaml"
           - name: hosted-prod
             flags: "-f examples/values-hosted-prod.yaml"
           - name: scalable-prod
             flags: "-f examples/values-scalable-prod.yaml"
-          - name: external-ch
-            flags: "-f examples/values-clickhouse-external.yaml --set autogen.enabled=true"
-          - name: replicated-ch
-            flags: "-f examples/values-local.yaml -f examples/values-clickhouse-replicated.yaml"
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4

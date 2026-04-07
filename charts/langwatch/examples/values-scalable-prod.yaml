@@ -1,24 +1,25 @@
-# values-scalable-prod.yaml — HA production with replicated ClickHouse, external PG/Redis.
-# namespace: langwatch
-# 3-node ClickHouse + Keeper cluster with S3 cold storage.
-# Usage: helm install langwatch . -f examples/values-scalable-prod.yaml -n langwatch --create-namespace
+# values-scalable-prod.yaml — HA production with replicated ClickHouse + S3 cold storage.
+#
+# Same as:  -f overlays/size-ha.yaml -f overlays/access-ingress.yaml
+#           -f overlays/postgres-external.yaml -f overlays/redis-external.yaml
+#           -f overlays/cold-storage-s3.yaml
+#           + secrets and scheduling below
+#
+# Usage:
+#   helm install langwatch . -f examples/values-scalable-prod.yaml -n langwatch --create-namespace
 
-autogen:
-  enabled: false
-
+# --- Secrets (no autogen in production) ---
+autogen: { enabled: false }
 secrets:
   existingSecret: "langwatch-secrets"
 
+# --- overlays/size-ha.yaml ---
 app:
   replicaCount: 3
-  http:
-    baseHost: "https://langwatch.example.com"
-    publicUrl: "https://langwatch.example.com"
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 4Gi }
-  podDisruptionBudget:
-    minAvailable: 2
+  podDisruptionBudget: { minAvailable: 2 }
 
 workers:
   enabled: true
@@ -26,8 +27,7 @@ workers:
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 4Gi }
-  podDisruptionBudget:
-    minAvailable: 2
+  podDisruptionBudget: { minAvailable: 2 }
 
 langwatch_nlp:
   replicaCount: 2
@@ -41,7 +41,25 @@ langevals:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 8Gi }
 
-# Replicated ClickHouse — 3 nodes + Keeper + S3 cold storage + backups
+# --- overlays/access-ingress.yaml (replace langwatch.example.com) ---
+app:
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  tls:
+    - secretName: langwatch-tls
+      hosts: [langwatch.example.com]
+  hosts:
+    - host: langwatch.example.com
+      http:
+        paths:
+          - { path: /, pathType: Prefix }
+
+# --- ClickHouse: replicated + cold storage + backups ---
 clickhouse:
   chartManaged: true
   replicas: 3
@@ -53,7 +71,6 @@ clickhouse:
   objectStorage:
     bucket: "langwatch-clickhouse"
     region: "eu-central-1"
-    endpoint: ""  # uses default AWS S3 URL
     useEnvironmentCredentials: true  # IRSA
   cold:
     enabled: true
@@ -65,53 +82,27 @@ clickhouse:
     existingSecret: "clickhouse-password"
   scheduling:
     tolerations:
-      - key: "dedicated"
-        operator: "Equal"
-        value: "clickhouse"
-        effect: "NoSchedule"
+      - { key: dedicated, operator: Equal, value: clickhouse, effect: NoSchedule }
 
+# --- overlays/postgres-external.yaml ---
 postgresql:
   chartManaged: false
   external:
     connectionString:
-      secretKeyRef:
-        name: "langwatch-db"
-        key: "connectionString"
+      secretKeyRef: { name: "langwatch-db", key: "connectionString" }
 
+# --- overlays/redis-external.yaml ---
 redis:
   chartManaged: false
   external:
     architecture: standalone
     connectionString:
-      secretKeyRef:
-        name: "langwatch-redis"
-        key: "connectionString"
+      secretKeyRef: { name: "langwatch-redis", key: "connectionString" }
 
 prometheus:
   chartManaged: true
   server:
     retention: 60d
-    persistentVolume:
-      size: 50Gi
+    persistentVolume: { size: 50Gi }
 
-ingress:
-  enabled: true
-  className: "nginx"
-  tls:
-    - secretName: langwatch-tls
-      hosts:
-        - langwatch.example.com
-  hosts:
-    - host: langwatch.example.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: langwatch-app  # must match release name + "-app"
-                port:
-                  number: 5560
-
-cronjobs:
-  enabled: true
+cronjobs: { enabled: true }

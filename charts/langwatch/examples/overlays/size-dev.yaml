@@ -1,0 +1,68 @@
+# size-dev.yaml — Local development / small team. Chart-managed deps.
+#
+# Workers enabled, reasonable resources for a laptop or small cloud instance.
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-dev.yaml \
+#     -f examples/overlays/access-nodeport.yaml \
+#     --set autogen.enabled=true
+
+app:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits:   { cpu: 1, memory: 3Gi }
+
+workers:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+clickhouse:
+  chartManaged: true
+  replicas: 1
+  memory: 1Gi
+  cpu: 1
+  storage:
+    size: 5Gi
+
+postgresql:
+  chartManaged: true
+  auth:
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 2Gi
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+redis:
+  chartManaged: true
+  master:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+
+prometheus:
+  chartManaged: false
+
+cronjobs:
+  enabled: false

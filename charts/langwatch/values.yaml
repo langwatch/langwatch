@@ -1386,15 +1386,20 @@ clickhouse:
       schedule: "0 * * * *"
 
   ## @extra clickhouse.auth Authentication configuration.
+  ## The langwatch chart owns the ClickHouse password secret (templates/clickhouse/url-secret.yaml)
+  ## and passes it to the subchart via auth.existingSecret. This ensures the full connection URL
+  ## (with embedded credentials) is stored as a Kubernetes Secret, never interpolated in manifests.
   auth:
     ## @param clickhouse.auth.password [string] ClickHouse password (auto-generated when empty).
     password: ""
-    ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password.
-    existingSecret: ""
+    ## @param clickhouse.auth.existingSecret [string] Name of existing secret containing the password. Supports tpl expressions.
+    existingSecret: '{{ printf "%s-clickhouse" .Release.Name }}'
     ## @extra clickhouse.auth.secretKeys Key mappings for existing secret.
     secretKeys:
       ## @param clickhouse.auth.secretKeys.passwordKey [string, default: password] Key name in the existing secret.
       passwordKey: "password"
+      ## @param clickhouse.auth.secretKeys.clusterSecretKey [string, default: clusterSecret] Key name for cluster secret.
+      clusterSecretKey: "clusterSecret"
 
   ## @param clickhouse.env [object] Advanced: override any computed ClickHouse env var (applied last).
   env: {}

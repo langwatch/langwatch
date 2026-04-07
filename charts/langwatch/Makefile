@@ -62,12 +62,16 @@ template: deps
 test-e2e: deps
 	bash tests/e2e.sh
 
+## Test overlay combinations (template rendering + live installs)
+test-e2e-overlays: deps
+	bash tests/e2e-overlays.sh
+
 ## Deploy full stack to Kind and run integration tests (all images required)
 test-e2e-full: deps
 	bash tests/e2e-full-stack.sh
 
-## Run all checks: lint + template + e2e
-test: lint template test-e2e
+## Run all checks: lint + template + e2e + overlays
+test: lint template test-e2e test-e2e-overlays
 
 # ── Local Development ────────────────────────────────────────────────────────
 

@@ -1,137 +1,127 @@
 ## LangWatch Helm Chart
 
-Deploy LangWatch to Kubernetes using this Helm chart. It includes the LangWatch web app, workers, NLP service, Langevals evaluator service, and system dependencies (ClickHouse, PostgreSQL, Redis, Prometheus).
+Deploy LangWatch to Kubernetes. Includes the web app, workers, NLP service, Langevals, and managed dependencies (ClickHouse, PostgreSQL, Redis, Prometheus).
 
 ### Prerequisites
 
-- Kubernetes 1.24+
-- Helm 3.12+
-- A default StorageClass for persistent components (ClickHouse, PostgreSQL, Redis) if chart-managed
+- Kubernetes 1.24+, Helm 3.12+
+- A default StorageClass for persistent components if chart-managed
 
-### Install (from this repo)
+### Install
+
+Compose values from `examples/overlays/` — pick a **size**, an **access method**, then stack infrastructure overlays:
 
 ```bash
-helm install langwatch ./charts/langwatch \
-  --namespace langwatch --create-namespace
+# Local dev on Kind → http://localhost:30560
+helm install lw ./charts/langwatch \
+  -f examples/overlays/size-dev.yaml \
+  -f examples/overlays/access-nodeport.yaml \
+  -f examples/overlays/local-images.yaml \
+  --set autogen.enabled=true
+
+# Production with Ingress + TLS
+helm install lw ./charts/langwatch -n langwatch --create-namespace \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/access-ingress.yaml \
+  --set "app.http.baseHost=https://langwatch.example.com" \
+  --set "app.http.publicUrl=https://langwatch.example.com" \
+  --set "ingress.hosts[0].host=langwatch.example.com" \
+  --set "ingress.tls[0].hosts[0]=langwatch.example.com"
+
+# HA production with external databases and S3 cold storage
+helm install lw ./charts/langwatch -n langwatch --create-namespace \
+  -f examples/overlays/size-ha.yaml \
+  -f examples/overlays/access-ingress.yaml \
+  -f examples/overlays/postgres-external.yaml \
+  -f examples/overlays/redis-external.yaml \
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set clickhouse.objectStorage.bucket=my-bucket \
+  --set clickhouse.objectStorage.region=eu-central-1
 ```
 
-### Install with your values
+### Overlays
 
-Create a values file (for example `my-values.yaml`) and set required fields:
+All overlays live in `examples/overlays/`:
+
+| Overlay | Description |
+|---------|-------------|
+| **Size** (pick one) | |
+| `size-minimal` | CI smoke test — absolute minimum resources |
+| `size-dev` | Local dev / small team |
+| `size-prod` | Production — single-node ClickHouse, 2 app/worker replicas |
+| `size-ha` | HA production — 3-node replicated ClickHouse, 3 app/worker replicas |
+| **Access** (pick one) | |
+| `access-nodeport` | Kind: NodePort 30560 → http://localhost:30560 |
+| `access-ingress` | Cloud: Ingress + TLS (nginx class) |
+| **Infrastructure** (stack any) | |
+| `local-images` | `pullPolicy: Never` for Kind / minikube |
+| `clickhouse-external` | Use an external ClickHouse instance |
+| `clickhouse-replicated` | Upgrade chart-managed ClickHouse to 3-node |
+| `postgres-external` | External PostgreSQL (RDS, Cloud SQL) |
+| `redis-external` | External Redis (ElastiCache, Memorystore) |
+| `cold-storage-s3` | S3 cold storage tiering + backups |
+
+### All-in-one profiles
+
+For common scenarios, use the bundled profiles in `examples/`:
+
+| Profile | Equivalent overlays |
+|---------|-------------------|
+| `values-local.yaml` | `size-dev` + `access-nodeport` + `local-images` + autogen |
+| `values-hosted-prod.yaml` | `size-prod` + `access-ingress` + `postgres-external` + `redis-external` + secrets |
+| `values-scalable-prod.yaml` | `size-ha` + `access-ingress` + `postgres-external` + `redis-external` + `cold-storage-s3` + secrets |
+
+```bash
+# All-in-one local dev:
+helm install lw . -f examples/values-local.yaml
+```
+
+### Upgrade / Uninstall
+
+```bash
+helm upgrade lw . -f examples/overlays/size-dev.yaml -f examples/overlays/access-nodeport.yaml
+helm uninstall lw
+```
+
+### Secrets
+
+Use `secretKeyRef` to reference existing Kubernetes Secrets instead of inlining values:
 
 ```yaml
-# Example: base URLs
-app:
-  http:
-    publicUrl: https://langwatch.example.com
-
-# Example: use secrets via secretKeyRef pattern
 app:
   credentialsEncryptionKey:
-    secretKeyRef:
-      name: langwatch-secrets
-      key: credentialsEncryptionKey
-  cronApiKey:
-    secretKeyRef:
-      name: langwatch-secrets
-      key: cronApiKey
-
-# Optional: enable managed dependencies
-postgresql:
-  chartManaged: true
-redis:
-  chartManaged: true
-prometheus:
-  chartManaged: true
+    secretKeyRef: { name: langwatch-secrets, key: credentialsEncryptionKey }
 ```
 
-Then install:
+Create the secret first:
 
 ```bash
-helm install langwatch ./charts/langwatch \
-  --namespace langwatch --create-namespace \
-  -f my-values.yaml
+kubectl create secret generic langwatch-secrets -n langwatch \
+  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+  --from-literal=cronApiKey=$(openssl rand -hex 16) \
+  --from-literal=nextAuthSecret=$(openssl rand -hex 16)
 ```
 
-### Complete install guide
-
-For a complete installation guide and more detailed information, please visit our [documentation](https://docs.langwatch.ai/self-hosting/kubernetes-helm).
-
-### Upgrade
-
-```bash
-helm upgrade langwatch ./charts/langwatch \
-  --namespace langwatch \
-  -f my-values.yaml
-```
-
-### Important: Migration from Pre-1.0.0 Helm Charts
-
-> If you're upgrading from a LangWatch Helm chart version before 1.0.0, you may need to preserve your existing PostgreSQL data.
-
-Preserve existing data by setting `postgresql.primary.persistence.existingClaim` in your values file:
-
-```yaml
-postgresql:
-  primary:
-    persistence:
-      existingClaim: "data-langwatch-postgres-0"
-      size: 20Gi
-```
-
-This will prevent data loss during the upgrade process.
-
-### Uninstall
-
-```bash
-helm uninstall langwatch --namespace langwatch
-```
-
-### Secrets pattern (recommended)
-
-Wherever a setting supports secrets, use the `secretKeyRef` block to reference an existing `Secret` instead of inlining sensitive values.
-
-```yaml
-app:
-  nextAuth:
-    secret:
-      secretKeyRef:
-        name: langwatch-secrets
-        key: nextAuthSecret
-```
-
-Corresponding Secret example:
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: langwatch-secrets
-  namespace: langwatch
-type: Opaque
-stringData:
-  credentialsEncryptionKey: "change-me"
-  cronApiKey: "change-me"
-  nextAuthSecret: "change-me"
-  sendgridApiKey: "change-me"
-```
+For development, set `autogen.enabled: true` to auto-generate all secrets.
 
 ### Dependencies
 
-- **ClickHouse** (via [`clickhouse-serverless`](../clickhouse-serverless/) subchart, aliased as `clickhouse`): `clickhouse.chartManaged: true` deploys a single-node or replicated ClickHouse cluster with auto-tuned settings. Set `clickhouse.chartManaged: false` and provide `clickhouse.external.url` for an external ClickHouse.
-- **PostgreSQL**: `postgresql.chartManaged: true` to deploy in-cluster, or set `postgresql.external.connectionString` via `secretKeyRef` to use an external DB (RDS, Cloud SQL, etc.)
-- **Redis**: `redis.chartManaged: true` for in-cluster, or configure `redis.external.connectionString` for external (ElastiCache, Memorystore, etc.)
-- **Prometheus**: `prometheus.chartManaged: true` to deploy a local Prometheus server for metrics collection
+| Component | Chart-managed | External |
+|-----------|--------------|----------|
+| **ClickHouse** | `clickhouse.chartManaged: true` — single or replicated with auto-tuning | `clickhouse.external.url` via secretKeyRef |
+| **PostgreSQL** | `postgresql.chartManaged: true` | `postgresql.external.connectionString` via secretKeyRef |
+| **Redis** | `redis.chartManaged: true` | `redis.external.connectionString` via secretKeyRef |
+| **Prometheus** | `prometheus.chartManaged: true` | Optional — for metrics collection |
+
+For a complete installation guide, visit the [documentation](https://docs.langwatch.ai/self-hosting/kubernetes-helm).
 
 ### Regenerate this table
 
-The Parameters section below is auto-generated from `values.yaml` using Bitnami's README generator for Helm charts. To update it after changing values/metadata:
+The Parameters section below can be auto-generated from `values.yaml` using Bitnami's README generator for Helm charts:
 
 ```bash
 npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 ```
-
-Learn more: `https://github.com/bitnami/readme-generator-for-helm`
 
 ## Parameters
 
@@ -203,7 +193,6 @@ Learn more: `https://github.com/bitnami/readme-generator-for-helm`
 | `app.features`                                                          | Feature flags for the app.                                                                |                         |
 | `app.features.skipEnvValidation`                                        | Skip env var validation (dev only).                                                       | `false`                 |
 | `app.features.disablePiiRedaction`                                      | Disable PII redaction.                                                                    | `false`                 |
-| `app.features.topicClustering`                                          | Enable automatic topic clustering.                                                        | `true`                  |
 | `app.upstreams`                                                         | Upstream connections from app to internal services.                                       |                         |
 | `app.upstreams.nlp.scheme`                                              | Scheme for NLP upstream.                                                                  | `http`                  |
 | `app.upstreams.nlp.name`                                                | Service name for NLP upstream. If empty, defaults to {{ .Release.Name }}-langwatch-nlp.   | `""`                    |
@@ -520,7 +509,7 @@ Learn more: `https://github.com/bitnami/readme-generator-for-helm`
 | `prometheus.rbac.create`                          | Create RBAC resources.                     | `true`                          |
 | `prometheus.serviceAccounts.server`               | ServiceAccount settings.                   |                                 |
 | `prometheus.serviceAccounts.server.create`        | Create a dedicated ServiceAccount.         | `true`                          |
-| `prometheus.server.configMapOverrideName`         | Override ConfigMap name for scrape config. | `""`                            |
+| `prometheus.server.configMapOverrideName`         | Override ConfigMap name for scrape config. | `prometheus-config`             |
 | `prometheus.server.image`                         | Image configuration.                       |                                 |
 | `prometheus.server.image.repository`              | Image repository.                          | `quay.io/prometheus/prometheus` |
 | `prometheus.server.image.tag`                     | Image tag.                                 | `v3.2.1`                        |
@@ -584,8 +573,6 @@ Learn more: `https://github.com/bitnami/readme-generator-for-helm`
 | `clickhouse.external.url.secretKeyRef.name` | Secret name for URL.                                                                          | `""`    |
 | `clickhouse.external.url.secretKeyRef.key`  | Secret key for URL.                                                                           | `""`    |
 | `clickhouse.external.cluster`               | Cluster name for ON CLUSTER DDL (omit for non-replicated).                                    | `""`    |
-| `clickhouse.coldStorageEnabled`             | Enable cold storage TTL reconciliation in the app.                                            | `false` |
-| `clickhouse.coldStorageDefaultTtlDays`      | Default TTL days before moving data to cold storage.                                          | `30`    |
 
 ### ClickHouse (chart-managed subchart options)
 

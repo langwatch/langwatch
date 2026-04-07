@@ -50,7 +50,11 @@ setup_kind() {
   if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
     info "Cluster ${CLUSTER_NAME} already exists, reusing"
   else
-    kind create cluster --name "${CLUSTER_NAME}" --wait 120s
+    local kind_args=(--name "${CLUSTER_NAME}" --wait 120s)
+    if [[ -n "${KIND_CONFIG:-}" ]]; then
+      kind_args+=(--config "${KIND_CONFIG}")
+    fi
+    kind create cluster "${kind_args[@]}"
   fi
   kubectl cluster-info --context "$KUBE_CTX"
 }

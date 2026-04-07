@@ -179,25 +179,101 @@ test_resources() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUITE: helm upgrade — ClickHouse password preserved
+# SUITE: ClickHouse URL secret — langwatch chart owns the secret
+# ─────────────────────────────────────────────────────────────────────────────
+test_clickhouse_url_secret() {
+  sep; info "Suite: ClickHouse URL secret"
+
+  local secret_name="${RELEASE}-clickhouse"
+
+  # Secret must exist with all three keys
+  kc get secret "$secret_name" &>/dev/null \
+    && pass "Secret $secret_name exists" \
+    || fail "Secret $secret_name missing"
+
+  # Verify all required keys are present
+  for key in password clusterSecret url; do
+    local val
+    val=$(kc get secret "$secret_name" -o jsonpath="{.data.${key}}" 2>/dev/null)
+    if [[ -n "$val" ]]; then
+      pass "Secret key '$key' present"
+    else
+      fail "Secret key '$key' missing from $secret_name"
+    fi
+  done
+
+  # URL must contain the password
+  local pw url
+  pw=$(kc get secret "$secret_name" -o jsonpath='{.data.password}' | base64 -d)
+  url=$(kc get secret "$secret_name" -o jsonpath='{.data.url}' | base64 -d)
+
+  if echo "$url" | grep -qF "$pw"; then
+    pass "URL contains the password"
+  else
+    fail "URL does not contain the password: url=$url"
+  fi
+
+  # URL must point at the chart-managed ClickHouse service
+  local expected_host="${RELEASE}-clickhouse:8123"
+  if echo "$url" | grep -qF "$expected_host"; then
+    pass "URL points at $expected_host"
+  else
+    fail "URL does not contain $expected_host: url=$url"
+  fi
+
+  # App deployment must reference the secret via secretKeyRef (not inline value)
+  local ref_name
+  ref_name=$(kc get deployment "${RELEASE}-app" \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_URL")].valueFrom.secretKeyRef.name}' 2>/dev/null)
+  assert_eq "App CLICKHOUSE_URL via secretKeyRef" "$ref_name" "$secret_name"
+
+  local ref_key
+  ref_key=$(kc get deployment "${RELEASE}-app" \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_URL")].valueFrom.secretKeyRef.key}' 2>/dev/null)
+  assert_eq "App CLICKHOUSE_URL key = url" "$ref_key" "url"
+
+  # No CLICKHOUSE_PASSWORD env var should be present (URL is self-contained)
+  local ch_pw_env
+  ch_pw_env=$(kc get deployment "${RELEASE}-app" \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_PASSWORD")].name}' 2>/dev/null)
+  if [[ -z "$ch_pw_env" ]]; then
+    pass "No CLICKHOUSE_PASSWORD env var (URL is self-contained)"
+  else
+    fail "CLICKHOUSE_PASSWORD env var should not exist in default mode"
+  fi
+
+  # Subchart must NOT have created its own secret (langwatch chart owns it)
+  # Verify by checking the secret's labels — should have langwatch labels, not subchart labels
+  local managed_by
+  managed_by=$(kc get secret "$secret_name" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/component}')
+  assert_eq "Secret owned by langwatch chart (component=clickhouse)" "$managed_by" "clickhouse"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: helm upgrade — ClickHouse password and URL preserved
 # ─────────────────────────────────────────────────────────────────────────────
 test_upgrade() {
-  sep; info "Suite: helm upgrade — ClickHouse password preserved"
+  sep; info "Suite: helm upgrade — ClickHouse credentials preserved"
 
-  local pw_before
+  local pw_before url_before
   pw_before=$(kc get secret "${RELEASE}-clickhouse" \
     -o jsonpath='{.data.password}' | base64 -d)
+  url_before=$(kc get secret "${RELEASE}-clickhouse" \
+    -o jsonpath='{.data.url}' | base64 -d)
 
   hc upgrade "$RELEASE" "$CHART_DIR" \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade"
 
-  local pw_after
+  local pw_after url_after
   pw_after=$(kc get secret "${RELEASE}-clickhouse" \
     -o jsonpath='{.data.password}' | base64 -d)
+  url_after=$(kc get secret "${RELEASE}-clickhouse" \
+    -o jsonpath='{.data.url}' | base64 -d)
 
   assert_eq "ClickHouse password unchanged after upgrade" "$pw_after" "$pw_before"
+  assert_eq "ClickHouse URL unchanged after upgrade" "$url_after" "$url_before"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -229,11 +305,21 @@ test_external_clickhouse() {
     && fail "ClickHouse Secret should not exist for external mode" \
     || pass "No ClickHouse Secret (external mode)"
 
-  # App Deployment should have CLICKHOUSE_URL env set to the external value
+  # App Deployment should have CLICKHOUSE_URL env set to the external value (plain, not secretKeyRef)
   local ch_url
   ch_url=$(kc get deployment "${ext_release}-app" \
     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_URL")].value}')
   assert_eq "CLICKHOUSE_URL = external value" "$ch_url" "http://fake-ch:8123/default"
+
+  # No secretKeyRef for CLICKHOUSE_URL in external mode
+  local ch_url_ref
+  ch_url_ref=$(kc get deployment "${ext_release}-app" \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_URL")].valueFrom.secretKeyRef.name}' 2>/dev/null)
+  if [[ -z "$ch_url_ref" ]]; then
+    pass "No secretKeyRef for CLICKHOUSE_URL (external mode uses plain value)"
+  else
+    fail "CLICKHOUSE_URL should not use secretKeyRef in external mode"
+  fi
 
   helm_uninstall "$ext_release"
 }
@@ -453,6 +539,7 @@ main() {
 
   test_install
   test_clickhouse
+  test_clickhouse_url_secret
   test_postgresql
   test_redis
   test_resources

@@ -351,13 +351,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 # ClickHouse connection
 {{- if .Values.clickhouse.chartManaged }}
+{{- $chSecretName := include "langwatch.clickhouse.secretName" . }}
+{{- $chDefaultName := printf "%s-clickhouse" .Release.Name }}
+{{- if eq $chSecretName $chDefaultName }}
+{{/* Langwatch-owned secret — URL is stored as a secret key */}}
+- name: CLICKHOUSE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ $chSecretName }}
+      key: url
+{{- else }}
+{{/* User-provided existingSecret — construct URL from password at runtime */}}
 - name: CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "langwatch.clickhouse.secretName" . }}
+      name: {{ $chSecretName }}
       key: {{ include "langwatch.clickhouse.secretKey" . }}
 - name: CLICKHOUSE_URL
   value: "http://default:$(CLICKHOUSE_PASSWORD)@{{ .Release.Name }}-clickhouse:8123/langwatch"
+{{- end }}
 {{- if gt (int (.Values.clickhouse).replicas) 1 }}
 - name: CLICKHOUSE_CLUSTER
   value: "langwatch"
@@ -485,11 +497,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* ClickHouse Helpers                                            */}}
 {{/* ============================================================ */}}
 
-{{/* ClickHouse: Password secret name (delegates to subchart naming when chart-managed) */}}
+{{/* ClickHouse: Secret name — langwatch chart owns the secret (passed to subchart via auth.existingSecret) */}}
 {{- define "langwatch.clickhouse.secretName" -}}
-  {{- $chValues := .Values.clickhouse -}}
-  {{- if $chValues.auth.existingSecret -}}
-    {{- $chValues.auth.existingSecret -}}
+  {{- if .Values.clickhouse.auth.existingSecret -}}
+    {{- tpl .Values.clickhouse.auth.existingSecret . -}}
   {{- else -}}
     {{- printf "%s-clickhouse" .Release.Name -}}
   {{- end -}}
@@ -497,12 +508,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* ClickHouse: Password secret key */}}
 {{- define "langwatch.clickhouse.secretKey" -}}
-  {{- $chValues := .Values.clickhouse -}}
-  {{- if $chValues.auth.existingSecret -}}
-    {{- $chValues.auth.secretKeys.passwordKey -}}
-  {{- else -}}
-    {{- "password" -}}
-  {{- end -}}
+  {{- .Values.clickhouse.auth.secretKeys.passwordKey | default "password" -}}
 {{- end -}}
 
 {{/* ============================================================ */}}

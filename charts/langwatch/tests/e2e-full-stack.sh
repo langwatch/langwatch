@@ -20,6 +20,7 @@ NAMESPACE="lw-test"
 CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="${CHART_DIR}/../.."
 TIMEOUT="${TIMEOUT:-600}"
+KIND_CONFIG="${KIND_CONFIG:-${CHART_DIR}/../lib/kind-config.yaml}"
 
 # Source shared helpers
 # shellcheck source=../../lib/test-helpers.sh
@@ -143,6 +144,63 @@ test_pod_health() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: ClickHouse URL secret — verify secret structure and app connectivity
+# ─────────────────────────────────────────────────────────────────────────────
+test_clickhouse_url_secret() {
+  sep; info "Suite: ClickHouse URL secret"
+
+  local secret_name="${RELEASE}-clickhouse"
+
+  # Secret exists
+  kc get secret "$secret_name" &>/dev/null \
+    && pass "Secret $secret_name exists" \
+    || fail "Secret $secret_name missing"
+
+  # All three keys present
+  for key in password clusterSecret url; do
+    local val
+    val=$(kc get secret "$secret_name" -o jsonpath="{.data.${key}}" 2>/dev/null)
+    if [[ -n "$val" ]]; then
+      pass "Key '$key' present"
+    else
+      fail "Key '$key' missing"
+    fi
+  done
+
+  # URL embeds the correct password
+  local pw url
+  pw=$(kc get secret "$secret_name" -o jsonpath='{.data.password}' | base64 -d)
+  url=$(kc get secret "$secret_name" -o jsonpath='{.data.url}' | base64 -d)
+  echo "$url" | grep -qF "$pw" \
+    && pass "URL contains password" \
+    || fail "URL missing password: $url"
+  echo "$url" | grep -qF "${RELEASE}-clickhouse:8123" \
+    && pass "URL targets chart-managed CH service" \
+    || fail "URL wrong host: $url"
+
+  # App deployment references secret via secretKeyRef, not inline value
+  local ref_name ref_key
+  ref_name=$(kc get deployment "${RELEASE}-app" \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_URL")].valueFrom.secretKeyRef.name}')
+  ref_key=$(kc get deployment "${RELEASE}-app" \
+    -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CLICKHOUSE_URL")].valueFrom.secretKeyRef.key}')
+  assert_eq "secretKeyRef.name" "$ref_name" "$secret_name"
+  assert_eq "secretKeyRef.key" "$ref_key" "url"
+
+  # Functional: app pod can query ClickHouse through the URL
+  local app_pod
+  app_pod=$(kc get pod \
+    -l "app.kubernetes.io/name=${RELEASE}-app" \
+    -o jsonpath='{.items[0].metadata.name}')
+
+  # Read CLICKHOUSE_URL from the pod environment and curl it
+  local ch_result
+  ch_result=$(kc exec "$app_pod" -- \
+    sh -c 'curl -sf "$CLICKHOUSE_URL/?query=SELECT+1"' 2>/dev/null | tr -d '[:space:]')
+  assert_eq "App can query CH via URL secret" "$ch_result" "1"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Service health — verify health endpoints and basic connectivity
 # ─────────────────────────────────────────────────────────────────────────────
 test_service_health() {
@@ -260,6 +318,7 @@ main() {
 
   test_deploy
   test_pod_health
+  test_clickhouse_url_secret
   test_service_health
   test_api
   test_logs

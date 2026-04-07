@@ -27,6 +27,12 @@ app:
   replicaCount: 1
   features:
     skipEnvValidation: true
+  service:
+    type: NodePort
+    nodePort: 30560
+  http:
+    baseHost: "http://localhost:30560"
+    publicUrl: "http://localhost:30560"
   resources:
     requests: { cpu: 100m, memory: 1Gi }
     limits:   { cpu: 1000m, memory: 2Gi }
