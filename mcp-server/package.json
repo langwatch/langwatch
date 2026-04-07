@@ -4,24 +4,24 @@
   "description": "An MCP server for Langwatch.",
   "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.js"
     },
     "./create-mcp-server": {
       "types": "./src/create-mcp-server.d.ts",
-      "import": "./src/create-mcp-server.ts",
-      "require": "./src/create-mcp-server.ts",
-      "default": "./src/create-mcp-server.ts"
+      "import": "./dist/create-mcp-server.js",
+      "require": "./dist/create-mcp-server.js",
+      "default": "./dist/create-mcp-server.js"
     },
     "./config": {
       "types": "./src/config.d.ts",
-      "import": "./src/config.ts",
-      "require": "./src/config.ts",
-      "default": "./src/config.ts"
+      "import": "./dist/config.js",
+      "require": "./dist/config.js",
+      "default": "./dist/config.js"
     }
   },
   "repository": {
