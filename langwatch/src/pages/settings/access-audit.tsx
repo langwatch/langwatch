@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Button,
   Card,
   Heading,
   HStack,
@@ -10,6 +9,7 @@ import {
   Spinner,
   Table,
   Text,
+  Button,
   VStack,
 } from "@chakra-ui/react";
 import { Users } from "lucide-react";
@@ -25,7 +25,6 @@ import type { RouterOutputs } from "../../utils/api";
 import { RoleBindingScopeType } from "@prisma/client";
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
-
 type ScopeFilter = "ALL" | RoleBindingScopeType;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,81 +48,112 @@ function scopeLabel(type: RoleBindingScopeType) {
   return "Project";
 }
 
+// ── Group bindings by principal ───────────────────────────────────────────────
+
+type Principal = {
+  key: string;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  groupId: string | null;
+  groupName: string | null;
+  groupScimSource: string | null;
+  bindings: Binding[];
+};
+
+function groupByPrincipal(bindings: Binding[]): Principal[] {
+  const map = new Map<string, Principal>();
+
+  for (const b of bindings) {
+    const key = b.userId ?? b.groupId ?? "unknown";
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        userId: b.userId,
+        userName: b.userName,
+        userEmail: b.userEmail,
+        groupId: b.groupId,
+        groupName: b.groupName,
+        groupScimSource: b.groupScimSource,
+        bindings: [],
+      });
+    }
+    map.get(key)!.bindings.push(b);
+  }
+
+  return [...map.values()].sort((a, b) => {
+    const nameA = a.userName ?? a.groupName ?? a.userEmail ?? "";
+    const nameB = b.userName ?? b.groupName ?? b.userEmail ?? "";
+    return nameA.localeCompare(nameB);
+  });
+}
+
 // ── Principal cell ────────────────────────────────────────────────────────────
 
-function PrincipalCell({ binding }: { binding: Binding }) {
-  if (binding.userId) {
+function PrincipalCell({ principal }: { principal: Principal }) {
+  if (principal.userId) {
     return (
       <HStack gap={2}>
         <RandomColorAvatar
-          id={binding.userId}
-          name={binding.userName ?? binding.userEmail ?? "?"}
+          id={principal.userId}
+          name={principal.userName ?? principal.userEmail ?? "?"}
           size="xs"
         />
         <VStack gap={0} align="start">
-          {binding.userName && (
-            <Text fontWeight="medium" fontSize="sm">
-              {binding.userName}
-            </Text>
+          {principal.userName && (
+            <Text fontWeight="medium" fontSize="sm">{principal.userName}</Text>
           )}
-          <Text fontSize="xs" color="fg.muted">
-            {binding.userEmail ?? ""}
-          </Text>
-        </VStack>
-      </HStack>
-    );
-  }
-
-  if (binding.groupId) {
-    return (
-      <HStack gap={2}>
-        <Box
-          width="6"
-          height="6"
-          borderRadius="full"
-          bg="blue.subtle"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-        >
-          <Users size={12} />
-        </Box>
-        <VStack gap={0} align="start">
-          <Text fontWeight="medium" fontSize="sm">
-            {binding.groupName ?? "Unknown group"}
-          </Text>
-          {binding.groupScimSource && (
-            <Badge size="xs" colorPalette="blue">
-              {binding.groupScimSource.toUpperCase()}
-            </Badge>
-          )}
+          <Text fontSize="xs" color="fg.muted">{principal.userEmail ?? ""}</Text>
         </VStack>
       </HStack>
     );
   }
 
   return (
-    <Text color="fg.subtle" fontSize="sm">
-      —
-    </Text>
+    <HStack gap={2}>
+      <Box
+        width="6"
+        height="6"
+        borderRadius="full"
+        bg="blue.subtle"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        flexShrink={0}
+      >
+        <Users size={12} />
+      </Box>
+      <VStack gap={0} align="start">
+        <Text fontWeight="medium" fontSize="sm">
+          {principal.groupName ?? "Unknown group"}
+        </Text>
+        {principal.groupScimSource && (
+          <Badge size="xs" colorPalette="blue">
+            {principal.groupScimSource.toUpperCase()}
+          </Badge>
+        )}
+      </VStack>
+    </HStack>
   );
 }
 
-// ── Scope cell ────────────────────────────────────────────────────────────────
+// ── Bindings cell ─────────────────────────────────────────────────────────────
 
-function ScopeCell({ binding }: { binding: Binding }) {
+function BindingsCell({ bindings }: { bindings: Binding[] }) {
   return (
-    <HStack gap={2}>
-      <Badge colorPalette={scopePillColor(binding.scopeType)} size="sm">
-        {scopeLabel(binding.scopeType)}
-      </Badge>
-      {binding.scopeType !== RoleBindingScopeType.ORGANIZATION && (
-        <Text fontSize="sm" color="fg.muted">
-          {binding.scopeName ?? binding.scopeId.slice(0, 12) + "…"}
-        </Text>
-      )}
-    </HStack>
+    <VStack gap={1} align="end">
+      {bindings.map((b) => (
+        <HStack key={b.id} gap={1}>
+          <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+            {b.customRoleName ?? b.role}
+          </Badge>
+          <Text fontSize="xs" color="fg.muted">on</Text>
+          <Badge colorPalette={scopePillColor(b.scopeType)} size="sm">
+            {scopeLabel(b.scopeType)}{b.scopeType !== RoleBindingScopeType.ORGANIZATION && ` · ${b.scopeName ?? b.scopeId.slice(0, 8) + "…"}`}
+          </Badge>
+        </HStack>
+      ))}
+    </VStack>
   );
 }
 
@@ -136,13 +166,7 @@ const FILTERS: { label: string; value: ScopeFilter }[] = [
   { label: "Project", value: RoleBindingScopeType.PROJECT },
 ];
 
-function FilterBar({
-  active,
-  onChange,
-}: {
-  active: ScopeFilter;
-  onChange: (f: ScopeFilter) => void;
-}) {
+function FilterBar({ active, onChange }: { active: ScopeFilter; onChange: (f: ScopeFilter) => void }) {
   return (
     <HStack gap={1}>
       {FILTERS.map((f) => (
@@ -173,21 +197,13 @@ function AccessAuditPage() {
   );
 
   if (isPlanLoading || !organization) {
-    return (
-      <SettingsLayout>
-        <Spinner />
-      </SettingsLayout>
-    );
+    return <SettingsLayout><Spinner /></SettingsLayout>;
   }
 
   if (!isEnterprise) {
     return (
       <SettingsLayout>
-        <VStack gap={6} align="start" width="full">
-          <Box width="full">
-            <ContactSalesBlock />
-          </Box>
-        </VStack>
+        <Box width="full"><ContactSalesBlock /></Box>
       </SettingsLayout>
     );
   }
@@ -197,37 +213,35 @@ function AccessAuditPage() {
       ? (bindings ?? [])
       : (bindings ?? []).filter((b) => b.scopeType === scopeFilter);
 
+  const principals = groupByPrincipal(filtered);
+
   return (
     <SettingsLayout>
       <VStack align="start" gap={6} width="full">
-        <HStack justify="space-between" width="full">
-          <VStack align="start" gap={1}>
-            <Heading as="h2">Access Audit</Heading>
-            <Text color="fg.muted" fontSize="sm">
-              All role bindings in this organization.
-            </Text>
-          </VStack>
-          <Spacer />
-          {bindings && (
-            <Text fontSize="sm" color="fg.muted">
-              {filtered.length} binding{filtered.length !== 1 ? "s" : ""}
-            </Text>
-          )}
-        </HStack>
+        <VStack align="start" gap={1} width="full">
+          <Heading as="h2">Access Audit</Heading>
+          <Text color="fg.muted" fontSize="sm">
+            All role bindings in this organization.
+          </Text>
+        </VStack>
 
         <Separator />
 
-        <HStack justify="space-between" width="full">
+        <HStack width="full">
           <FilterBar active={scopeFilter} onChange={setScopeFilter} />
+          <Spacer />
+          {bindings && (
+            <Text fontSize="sm" color="fg.muted">
+              {principals.length} {principals.length === 1 ? "principal" : "principals"}
+            </Text>
+          )}
         </HStack>
 
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>
             {isLoading ? (
-              <Box padding={8} display="flex" justifyContent="center">
-                <Spinner />
-              </Box>
-            ) : filtered.length === 0 ? (
+              <Box padding={8} display="flex" justifyContent="center"><Spinner /></Box>
+            ) : principals.length === 0 ? (
               <Box padding={8} textAlign="center">
                 <Text color="fg.muted">No role bindings found.</Text>
               </Box>
@@ -235,30 +249,18 @@ function AccessAuditPage() {
               <Table.Root variant="line" size="md" width="full">
                 <Table.Header>
                   <Table.Row>
-                    <Table.ColumnHeader>Who</Table.ColumnHeader>
-                    <Table.ColumnHeader>Role</Table.ColumnHeader>
-                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                    <Table.ColumnHeader>Added</Table.ColumnHeader>
+                    <Table.ColumnHeader width="240px">Who</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {filtered.map((binding) => (
-                    <Table.Row key={binding.id}>
+                  {principals.map((p) => (
+                    <Table.Row key={p.key}>
                       <Table.Cell>
-                        <PrincipalCell binding={binding} />
+                        <PrincipalCell principal={p} />
                       </Table.Cell>
                       <Table.Cell>
-                        <Badge colorPalette={roleBadgeColor(binding.role)} size="sm">
-                          {binding.customRoleName ?? binding.role}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <ScopeCell binding={binding} />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm" color="fg.muted">
-                          {new Date(binding.createdAt).toLocaleDateString()}
-                        </Text>
+                        <BindingsCell bindings={p.bindings} />
                       </Table.Cell>
                     </Table.Row>
                   ))}

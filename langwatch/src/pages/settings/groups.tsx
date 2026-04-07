@@ -585,7 +585,7 @@ function GroupsSettings() {
                   <Table.Row>
                     <Table.ColumnHeader>Group</Table.ColumnHeader>
                     <Table.ColumnHeader width="120px">Source</Table.ColumnHeader>
-                    <Table.ColumnHeader>Access</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                     <Table.ColumnHeader width="80px" textAlign="right">
                       Members
                     </Table.ColumnHeader>
@@ -604,7 +604,7 @@ function GroupsSettings() {
                         <SourceBadge scimSource={g.scimSource} />
                       </Table.Cell>
                       <Table.Cell>
-                        <HStack gap={2} flexWrap="wrap">
+                        <VStack gap={1} align="end">
                           {g.bindings.map((b, i) => (
                             <HStack key={i} gap={1} fontSize="xs">
                               <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
@@ -617,11 +617,11 @@ function GroupsSettings() {
                             </HStack>
                           ))}
                           {g.bindings.length === 0 && (
-                            <Text fontSize="xs" color="fg.subtle">
+                            <Text fontSize="xs" color="fg.subtle" textAlign="right">
                               No access configured
                             </Text>
                           )}
-                        </HStack>
+                        </VStack>
                       </Table.Cell>
                       <Table.Cell textAlign="right">
                         <Text fontSize="sm" color="fg.muted">
