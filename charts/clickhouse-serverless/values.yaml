@@ -22,8 +22,8 @@ objectStorage:
   credentials:
     secretKeyRef:
       name: ""                     # K8s secret with S3 access key + secret key
-      accessKeyKey: "accessKey"
-      secretKeyKey: "secretKey"
+      accessKeyId: "accessKey"
+      secretAccessKey: "secretKey"
 
 # Cold storage: tiered hot→cold data movement (requires objectStorage)
 cold:

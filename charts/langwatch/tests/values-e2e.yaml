@@ -20,7 +20,7 @@ app:
     skipEnvValidation: true
 
 workers:
-  enabled: false
+  replicaCount: 0
 
 langwatch_nlp:
   replicaCount: 0

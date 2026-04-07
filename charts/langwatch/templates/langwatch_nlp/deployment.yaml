@@ -98,9 +98,9 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- if .Values.langwatch_nlp.extraNlpLifecycle}}
+          {{- if .Values.langwatch_nlp.extraLifecycle}}
           lifecycle:
-            {{- with .Values.langwatch_nlp.extraNlpLifecycle}}
+            {{- with .Values.langwatch_nlp.extraLifecycle}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
@@ -121,7 +121,7 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
           volumeMounts:
-            {{- with .Values.langwatch_nlp.extraNlpVolumeMounts}}
+            {{- with .Values.langwatch_nlp.extraVolumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: tmp-dir

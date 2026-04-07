@@ -526,26 +526,22 @@ app:
 
   # Additional lifecycle hook for the LangWatch app container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  ## @param app.extraAppLifecycle [object] Additional lifecycle hooks for app container.
-  extraAppLifecycle: {}
+  ## @param app.extraLifecycle [object] Additional lifecycle hooks for app container.
+  extraLifecycle: {}
   # Additional volume mounts for the LangWatch app container
   # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
-  ## @param app.extraAppVolumeMounts [array] Additional volume mounts for app container.
-  extraAppVolumeMounts: []
+  ## @param app.extraVolumeMounts [array] Additional volume mounts for app container.
+  extraVolumeMounts: []
 
 # =============================================================================
 # LangWatch Workers Configuration
 # =============================================================================
 # Configuration for running BullMQ background workers in a separate pod.
-# When enabled, workers are deployed as their own Deployment and the main app
-# pod no longer starts in-process workers (START_WORKERS=false).
+# Workers are always deployed as their own Deployment; the main app
+# pod never starts in-process workers (START_WORKERS=false).
 # Uses the same container image as the app but runs `pnpm start:workers`.
 ## @section Workers
 workers:
-  # Enable separate worker deployment
-  # When false, workers run inside the main app pod
-  ## @param workers.enabled [default: true] Deploy workers as a separate pod.
-  enabled: true
 
   # Number of worker replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
@@ -756,12 +752,12 @@ langwatch_nlp:
 
   # Additional lifecycle hook for the LangWatch-NLP container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  ## @param langwatch_nlp.extraNlpLifecycle [object] Additional lifecycle hooks for NLP container.
-  extraNlpLifecycle: {}
+  ## @param langwatch_nlp.extraLifecycle [object] Additional lifecycle hooks for NLP container.
+  extraLifecycle: {}
   # Additional volume mounts for the LangWatch-NLP container
   # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
-  ## @param langwatch_nlp.extraNlpVolumeMounts [array] Additional volume mounts for NLP container.
-  extraNlpVolumeMounts: []
+  ## @param langwatch_nlp.extraVolumeMounts [array] Additional volume mounts for NLP container.
+  extraVolumeMounts: []
 
 # =============================================================================
 # LangEvals Service Configuration
@@ -878,12 +874,12 @@ langevals:
 
   # Additional lifecycle hook for the Langevals container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  ## @param langevals.extraLangevalsLifecycle [object] Additional lifecycle hooks.
-  extraLangevalsLifecycle: {}
+  ## @param langevals.extraLifecycle [object] Additional lifecycle hooks.
+  extraLifecycle: {}
   # Additional volume mounts for the Langevals container
   # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
-  ## @param langevals.extraLangevalsVolumeMounts [array] Additional volume mounts.
-  extraLangevalsVolumeMounts: []
+  ## @param langevals.extraVolumeMounts [array] Additional volume mounts.
+  extraVolumeMounts: []
 
 # =============================================================================
 # CronJobs Configuration
@@ -944,17 +940,6 @@ cronjobs:
       enabled: true
       schedule: "*/3 * * * *" # Every 3 minutes
       endpoint: "/api/cron/triggers"
-
-    # Data retention cleanup job - removes old trace data
-    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
-    ## @extra cronjobs.jobs.tracesRetentionCleanup Traces retention cleanup job.
-    ## @param cronjobs.jobs.tracesRetentionCleanup.enabled [default: true] Enable traces retention cleanup job.
-    ## @param cronjobs.jobs.tracesRetentionCleanup.schedule [string, default: 0 1 * * *] Cron schedule.
-    ## @param cronjobs.jobs.tracesRetentionCleanup.endpoint [string, default: /api/cron/traces_retention_period_cleanup] Endpoint path.
-    tracesRetentionCleanup:
-      enabled: true
-      schedule: "0 1 * * *" # At 1 AM every day
-      endpoint: "/api/cron/traces_retention_period_cleanup"
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration
@@ -1039,8 +1024,8 @@ cronjobs:
 
   # Additional lifecycle hook for the CronJobs container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  ## @param cronjobs.extraCronjobsLifecycle [object] Additional lifecycle hooks for cron job container.
-  extraCronjobsLifecycle: {}
+  ## @param cronjobs.extraLifecycle [object] Additional lifecycle hooks for cron job container.
+  extraLifecycle: {}
   # Additional volume mounts for the CronJobs container
   # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
   ## @param cronjobs.extraVolumeMounts [array] Additional volume mounts for cron job container.
@@ -1361,10 +1346,10 @@ clickhouse:
       secretKeyRef:
         ## @param clickhouse.objectStorage.credentials.secretKeyRef.name [string] Secret name containing S3 access keys.
         name: ""
-        ## @param clickhouse.objectStorage.credentials.secretKeyRef.accessKeyKey [string, default: accessKey] Key for access key ID.
-        accessKeyKey: "accessKey"
-        ## @param clickhouse.objectStorage.credentials.secretKeyRef.secretKeyKey [string, default: secretKey] Key for secret access key.
-        secretKeyKey: "secretKey"
+        ## @param clickhouse.objectStorage.credentials.secretKeyRef.accessKeyId [string, default: accessKey] Key for access key ID in secret.
+        accessKeyId: "accessKey"
+        ## @param clickhouse.objectStorage.credentials.secretKeyRef.secretAccessKey [string, default: secretKey] Key for secret access key in secret.
+        secretAccessKey: "secretKey"
 
   ## @extra clickhouse.cold Cold storage: tiered hot→cold data movement (requires objectStorage).
   cold:

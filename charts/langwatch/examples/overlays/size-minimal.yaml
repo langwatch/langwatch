@@ -17,7 +17,10 @@ app:
     limits:   { cpu: 250m, memory: 512Mi }
 
 workers:
-  enabled: false
+  replicaCount: 1
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits:   { cpu: 250m, memory: 512Mi }
 
 langwatch_nlp:
   replicaCount: 1
@@ -28,8 +31,11 @@ langwatch_nlp:
 langevals:
   replicaCount: 1
   resources:
-    requests: { cpu: 100m, memory: 1Gi }
-    limits:   { cpu: 500m, memory: 2Gi }
+    requests: { cpu: 50m, memory: 256Mi }
+    limits:   { cpu: 250m, memory: 512Mi }
+  extraEnvs:
+    - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
+    - { name: WEB_CONCURRENCY, value: "1" }
 
 clickhouse:
   chartManaged: true

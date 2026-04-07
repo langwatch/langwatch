@@ -191,7 +191,7 @@ test_size_overlays() {
     -f "${OVERLAYS}/size-prod.yaml" \
     -f "${OVERLAYS}/access-ingress.yaml")
   assert_contains "prod: has PodDisruptionBudget" "$prod_out" "kind: PodDisruptionBudget"
-  assert_contains "prod: workers enabled" "$prod_out" "name: ${RELEASE}-workers"
+  assert_contains "prod: workers deployed" "$prod_out" "name: ${RELEASE}-workers"
 
   # size-ha: 3 replicas, ClickHouse replicated
   local ha_out
@@ -360,7 +360,6 @@ test_install_prod_ingress() {
     -f "${OVERLAYS}/size-prod.yaml" \
     -f "${OVERLAYS}/access-ingress.yaml" \
     -f "${CHART_DIR}/tests/values-e2e.yaml" \
-    --set workers.enabled=true \
     --set workers.replicaCount=0
   pass "helm install (prod + ingress)"
 

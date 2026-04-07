@@ -330,14 +330,13 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `app.extraContainers`                 | Additional sidecar containers.                      | `[]`  |
 | `app.extraVolumes`                    | Additional pod volumes.                             | `[]`  |
 | `app.extraInitContainers`             | Additional init containers.                         | `[]`  |
-| `app.extraAppLifecycle`               | Additional lifecycle hooks for app container.       | `{}`  |
-| `app.extraAppVolumeMounts`            | Additional volume mounts for app container.         | `[]`  |
+| `app.extraLifecycle`                  | Additional lifecycle hooks for app container.       | `{}`  |
+| `app.extraVolumeMounts`              | Additional volume mounts for app container.         | `[]`  |
 
 ### Workers
 
 | Name                                      | Description                                     | Value   |
 | ----------------------------------------- | ----------------------------------------------- | ------- |
-| `workers.enabled`                         | Deploy workers as a separate pod.               | `true`  |
 | `workers.replicaCount`                    | Number of worker replicas.                      | `1`     |
 | `workers.resources`                       | Resource requests and limits for workers.       |         |
 | `workers.resources.requests.cpu`          | Requested CPU.                                  | `250m`  |
@@ -400,8 +399,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langwatch_nlp.extraContainers`                 | Additional sidecar containers.                | `[]`            |
 | `langwatch_nlp.extraVolumes`                    | Additional pod volumes.                       | `[]`            |
 | `langwatch_nlp.extraInitContainers`             | Additional init containers.                   | `[]`            |
-| `langwatch_nlp.extraNlpLifecycle`               | Additional lifecycle hooks for NLP container. | `{}`            |
-| `langwatch_nlp.extraNlpVolumeMounts`            | Additional volume mounts for NLP container.   | `[]`            |
+| `langwatch_nlp.extraLifecycle`                  | Additional lifecycle hooks for NLP container. | `{}`            |
+| `langwatch_nlp.extraVolumeMounts`               | Additional volume mounts for NLP container.   | `[]`            |
 
 ### Langevals service
 
@@ -435,8 +434,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `langevals.extraContainers`                 | Additional sidecar containers.          | `[]`        |
 | `langevals.extraVolumes`                    | Additional pod volumes.                 | `[]`        |
 | `langevals.extraInitContainers`             | Additional init containers.             | `[]`        |
-| `langevals.extraLangevalsLifecycle`         | Additional lifecycle hooks.             | `{}`        |
-| `langevals.extraLangevalsVolumeMounts`      | Additional volume mounts.               | `[]`        |
+| `langevals.extraLifecycle`                 | Additional lifecycle hooks.             | `{}`        |
+| `langevals.extraVolumeMounts`              | Additional volume mounts.               | `[]`        |
 
 ### CronJobs
 
@@ -462,10 +461,6 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `cronjobs.jobs.alertTriggers.enabled`           | Enable alert triggers job.                         | `true`                                      |
 | `cronjobs.jobs.alertTriggers.schedule`          | Cron schedule.                                     | `*/3 * * * *`                               |
 | `cronjobs.jobs.alertTriggers.endpoint`          | Endpoint path.                                     | `/api/cron/triggers`                        |
-| `cronjobs.jobs.tracesRetentionCleanup`          | Traces retention cleanup job.                      |                                             |
-| `cronjobs.jobs.tracesRetentionCleanup.enabled`  | Enable traces retention cleanup job.               | `true`                                      |
-| `cronjobs.jobs.tracesRetentionCleanup.schedule` | Cron schedule.                                     | `0 1 * * *`                                 |
-| `cronjobs.jobs.tracesRetentionCleanup.endpoint` | Endpoint path.                                     | `/api/cron/traces_retention_period_cleanup` |
 | `cronjobs.podSecurityContext`                   | Pod security context overrides.                    | `{}`                                        |
 | `cronjobs.containerSecurityContext`             | Container security context overrides.              | `{}`                                        |
 | `cronjobs.nodeSelector`                         | Node selector overrides.                           | `{}`                                        |
@@ -485,7 +480,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `cronjobs.extraContainers`                      | Additional containers.                             | `[]`                                        |
 | `cronjobs.extraVolumes`                         | Additional volumes.                                | `[]`                                        |
 | `cronjobs.extraInitContainers`                  | Additional init containers.                        | `[]`                                        |
-| `cronjobs.extraCronjobsLifecycle`               | Additional lifecycle hooks for cron job container. | `{}`                                        |
+| `cronjobs.extraLifecycle`                       | Additional lifecycle hooks for cron job container. | `{}`                                        |
 | `cronjobs.extraVolumeMounts`                    | Additional volume mounts for cron job container.   | `[]`                                        |
 
 ### Ingress

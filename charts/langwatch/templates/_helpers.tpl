@@ -420,40 +420,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 # Evaluators - Azure OpenAI Integration
 {{- if .Values.app.evaluators.azureOpenAI.enabled }}
-{{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
-- name: AZURE_OPENAI_ENDPOINT
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
-      key: {{ .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
-{{- else if .Values.app.evaluators.azureOpenAI.endpoint.value }}
-- name: AZURE_OPENAI_ENDPOINT
-  value: {{ .Values.app.evaluators.azureOpenAI.endpoint.value | quote }}
-{{- end }}
-{{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
-- name: AZURE_OPENAI_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
-      key: {{ .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
-{{- else if .Values.app.evaluators.azureOpenAI.apiKey.value }}
-- name: AZURE_OPENAI_KEY
-  value: {{ .Values.app.evaluators.azureOpenAI.apiKey.value | quote }}
-{{- end }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_ENDPOINT" "fieldValues" .Values.app.evaluators.azureOpenAI.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_OPENAI_KEY" "fieldValues" .Values.app.evaluators.azureOpenAI.apiKey) }}
 {{- end }}
 
 # Evaluators - Google AI Integration
 {{- if .Values.app.evaluators.google.enabled }}
-{{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
-- name: GOOGLE_APPLICATION_CREDENTIALS
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.app.evaluators.google.credentials.secretKeyRef.name }}
-      key: {{ .Values.app.evaluators.google.credentials.secretKeyRef.key }}
-{{- else if .Values.app.evaluators.google.credentials.value }}
-- name: GOOGLE_APPLICATION_CREDENTIALS
-  value: {{ .Values.app.evaluators.google.credentials.value | quote }}
-{{- end }}
+{{- include "langwatch.secretOrValue" (dict "envName" "GOOGLE_APPLICATION_CREDENTIALS" "fieldValues" .Values.app.evaluators.google.credentials) }}
 {{- end }}
 
 # Telemetry - Usage analytics collection
@@ -461,15 +434,20 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
 # Telemetry - Prometheus metrics collection
 {{- if .Values.app.telemetry.metrics.enabled }}
-{{- if .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
-- name: METRICS_API_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
-      key: {{ .Values.app.telemetry.metrics.apiKey.secretKeyRef.key }}
-{{- else if .Values.app.telemetry.metrics.apiKey.value }}
-- name: METRICS_API_KEY
-  value: {{ .Values.app.telemetry.metrics.apiKey.value | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "METRICS_API_KEY" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
+{{- end }}
+
+# Dataset Object Storage (shared between app and workers)
+{{- if .Values.app.datasetObjectStorage.enabled }}
+- name: USE_S3_STORAGE
+  value: "true"
+- name: S3_BUCKET
+  value: {{ .Values.app.datasetObjectStorage.bucket | quote }}
+{{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.datasetObjectStorage.providers.awsS3.keySalt) }}
 {{- end }}
 {{- end }}
 {{- end }}
@@ -524,9 +502,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end -}}
 {{- end -}}
 
-{{/* Emit env var block for a single OAuth field (secretKeyRef or value) */}}
+{{/* Emit env var block: secretKeyRef takes precedence, then .value */}}
 {{/* Args: dict "envName" <string> "fieldValues" <map with .value and .secretKeyRef> */}}
-{{- define "langwatch.oauthFieldEnv" -}}
+{{- define "langwatch.secretOrValue" -}}
 {{- if .fieldValues.secretKeyRef.name }}
 - name: {{ .envName }}
   valueFrom:

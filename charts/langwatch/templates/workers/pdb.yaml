@@ -1,4 +1,4 @@
-{{- if and .Values.workers.enabled .Values.workers.podDisruptionBudget }}
+{{- if .Values.workers.podDisruptionBudget }}
 {{- with .Values.workers.podDisruptionBudget }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget

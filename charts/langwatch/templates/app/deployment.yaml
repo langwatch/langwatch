@@ -111,10 +111,6 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
-            # When workers are deployed separately, disable in-process workers
-            - name: START_WORKERS
-              value: {{ if .Values.workers.enabled }}"false"{{ else }}"true"{{ end }}
-
             - name: NEXTAUTH_URL
               value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
             - name: NEXTAUTH_URL_INTERNAL
@@ -141,54 +137,6 @@ spec:
                   key: cronApiKey
             {{- end }}
 
-            # Dataset Object Storage
-            {{- if .Values.app.datasetObjectStorage.enabled }}
-            - name: USE_S3_STORAGE
-              value: "true"
-            {{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
-            {{- if .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name }}
-            - name: S3_ENDPOINT
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name }}
-                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.key }}
-            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.endpoint.value }}
-            - name: S3_ENDPOINT
-              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.endpoint.value | quote }}
-            {{- end }}
-            {{- if .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name }}
-            - name: S3_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name }}
-                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.key }}
-            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.value }}
-            - name: S3_ACCESS_KEY_ID
-              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.value | quote }}
-            {{- end }}
-            {{- if .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name }}
-            - name: S3_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name }}
-                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.key }}
-            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.value }}
-            - name: S3_SECRET_ACCESS_KEY
-              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.value | quote }}
-            {{- end }}
-            {{- if .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name }}
-            - name: S3_KEY_SALT
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name }}
-                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.key }}
-            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.keySalt.value }}
-            - name: S3_KEY_SALT
-              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.keySalt.value | quote }}
-            {{- end }}
-            {{- end }}
-            {{- end }}
-
             # Email configuration
             {{- if .Values.app.email.enabled }}
             - name: EMAIL_DEFAULT_FROM
@@ -196,16 +144,7 @@ spec:
             - name: EMAIL_PROVIDER
               value: {{ .Values.app.email.provider | quote }}
             {{- if eq .Values.app.email.provider "sendgrid" }}
-            {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
-            - name: SENDGRID_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
-                  key: {{ .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
-            {{- else if .Values.app.email.providers.sendgrid.apiKey.value }}
-            - name: SENDGRID_API_KEY
-              value: {{ .Values.app.email.providers.sendgrid.apiKey.value | quote }}
-            {{- end }}
+            {{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) | nindent 12 }}
             {{- end }}
             {{- end }}
 
@@ -249,7 +188,7 @@ spec:
             {{- range $field := $provider.fields }}
             {{- $fieldValues := index $providerValues $field }}
             {{- $envName := printf "%s_%s" $provider.prefix (include "langwatch.envSuffix" $field) }}
-            {{- include "langwatch.oauthFieldEnv" (dict "envName" $envName "fieldValues" $fieldValues) | nindent 12 }}
+            {{- include "langwatch.secretOrValue" (dict "envName" $envName "fieldValues" $fieldValues) | nindent 12 }}
             {{- end }}
             {{- end }}
 
@@ -257,9 +196,9 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- if .Values.app.extraAppLifecycle}}
+          {{- if .Values.app.extraLifecycle}}
           lifecycle:
-            {{- with .Values.app.extraAppLifecycle}}
+            {{- with .Values.app.extraLifecycle}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
@@ -284,7 +223,7 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 5
           volumeMounts:
-            {{- with .Values.app.extraAppVolumeMounts}}
+            {{- with .Values.app.extraVolumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: tmp-dir

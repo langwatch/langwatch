@@ -133,12 +133,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.objectStorage.credentials.secretKeyRef.name }}
-                  key: {{ .Values.objectStorage.credentials.secretKeyRef.accessKeyKey }}
+                  key: {{ .Values.objectStorage.credentials.secretKeyRef.accessKeyId }}
             - name: S3_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.objectStorage.credentials.secretKeyRef.name }}
-                  key: {{ .Values.objectStorage.credentials.secretKeyRef.secretKeyKey }}
+                  key: {{ .Values.objectStorage.credentials.secretKeyRef.secretAccessKey }}
             {{- end }}
             {{- end }}
             {{- if .Values.cold.enabled }}

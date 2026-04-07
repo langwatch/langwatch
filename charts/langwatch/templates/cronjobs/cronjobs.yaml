@@ -92,9 +92,9 @@ spec:
                     -X GET \
                     http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
 
-              {{- if $root.Values.cronjobs.extraCronjobsLifecycle}}
+              {{- if $root.Values.cronjobs.extraLifecycle}}
               lifecycle:
-                {{- with $root.Values.cronjobs.extraCronjobsLifecycle}}
+                {{- with $root.Values.cronjobs.extraLifecycle}}
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
               {{- end }}
