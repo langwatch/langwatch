@@ -307,7 +307,7 @@ export const processCustomGraphTrigger = async (
  * Returns undefined when no group contains the metric so the
  * bucket is excluded from aggregation rather than counted as 0.
  */
-const sumMetricAcrossGroups = (
+export const sumMetricAcrossGroups = (
   entry: TimeseriesBucket,
   groupBy: string,
   seriesKey: string,

@@ -1,6 +1,10 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { processCustomGraphTrigger } from "../customGraphTrigger";
+import type { TimeseriesBucket } from "~/server/analytics/types";
+import {
+  processCustomGraphTrigger,
+  sumMetricAcrossGroups,
+} from "../customGraphTrigger";
 
 const { mockGetTimeseries } = vi.hoisted(() => ({
   mockGetTimeseries: vi.fn(),
@@ -614,5 +618,70 @@ describe("processCustomGraphTrigger", () => {
         },
       });
     });
+  });
+});
+
+describe("sumMetricAcrossGroups", () => {
+  const seriesKey = "0/metadata.trace_id/cardinality";
+
+  it("sums the metric across all groups", () => {
+    const entry: TimeseriesBucket = {
+      date: "2024-01-01",
+      "sentiment.thumbs_up_down": {
+        "Thumbs Up": { [seriesKey]: 10 },
+        "Thumbs Down": { [seriesKey]: 5 },
+      },
+    };
+
+    expect(
+      sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+    ).toBe(15);
+  });
+
+  it("returns undefined when groupBy key is missing from entry", () => {
+    const entry: TimeseriesBucket = { date: "2024-01-01" };
+
+    expect(
+      sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+    ).toBeUndefined();
+  });
+
+  it("returns undefined when no group contains the metric", () => {
+    const entry: TimeseriesBucket = {
+      date: "2024-01-01",
+      "sentiment.thumbs_up_down": {
+        "Thumbs Up": { "other/metric": 10 },
+      },
+    };
+
+    expect(
+      sumMetricAcrossGroups(entry, "sentiment.thumbs_up_down", seriesKey),
+    ).toBeUndefined();
+  });
+
+  it("skips groups that lack the metric and sums the rest", () => {
+    const entry: TimeseriesBucket = {
+      date: "2024-01-01",
+      "metadata.model": {
+        "gpt-4": { [seriesKey]: 8 },
+        "claude": { "other/metric": 99 },
+        "gemini": { [seriesKey]: 2 },
+      },
+    };
+
+    expect(
+      sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
+    ).toBe(10);
+  });
+
+  it("returns undefined when groupBy value is not an object", () => {
+    const entry: TimeseriesBucket = {
+      date: "2024-01-01",
+      "metadata.model": 42,
+    };
+
+    expect(
+      sumMetricAcrossGroups(entry, "metadata.model", seriesKey),
+    ).toBeUndefined();
   });
 });
