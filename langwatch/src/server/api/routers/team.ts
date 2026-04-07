@@ -574,7 +574,7 @@ export const teamRouter = createTRPCRouter({
       });
     }),
   archiveById: protectedProcedure
-    .input(z.object({ teamId: z.string(), projectId: z.string() }))
+    .input(z.object({ teamId: z.string() }))
     .use(checkTeamPermission("team:delete"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
