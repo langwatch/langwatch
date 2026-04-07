@@ -39,7 +39,7 @@ RUN cd langwatch && CI=true pnpm install --frozen-lockfile
 COPY typescript-sdk/package.json ./typescript-sdk/package.json
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY langwatch ./langwatch
-RUN cd langwatch && pnpm run build
+RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 EXPOSE 5560
 
 ENV NODE_ENV=production

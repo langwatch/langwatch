@@ -68,6 +68,8 @@ const config = {
     "@aws-sdk/client-s3",
     "@aws-sdk/client-ses",
     "@aws-sdk/client-sts",
+    "tiktoken",
+    "bcrypt",
   ],
 
   experimental: {
