@@ -1,4 +1,3 @@
-import { Heading } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
 import type React from "react";
 import { useCallback } from "react";
@@ -91,7 +90,6 @@ export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.Rea
       <Drawer.Content>
         <Drawer.Header>
           <Drawer.CloseTrigger onClick={closeDrawer} />
-          <Heading>Create New Team</Heading>
         </Drawer.Header>
         <Drawer.Body>
           {organization && (
