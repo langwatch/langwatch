@@ -12,6 +12,11 @@ const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
 /**
  * Factory for evaluator_id EXISTS condition builders.
  * All 5 variants share the same EXISTS subquery template, differing only in the additional WHERE clause.
+ *
+ * NOTE: evaluation_runs.TraceId is Nullable(String) while trace_summaries.TraceId is String.
+ * ClickHouse correlated EXISTS silently fails to filter on Nullable = NonNullable comparisons,
+ * returning TRUE for every outer row. We use assumeNotNull() + IS NOT NULL to work around this.
+ * See: https://github.com/langwatch/langwatch/issues/3000
  */
 function buildEvaluatorExistsCondition(
   additionalWhere: string,
@@ -20,7 +25,8 @@ function buildEvaluatorExistsCondition(
     sql: `EXISTS (
       SELECT 1 FROM evaluation_runs es
       WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
+        AND es.TraceId IS NOT NULL
+        AND assumeNotNull(es.TraceId) = ts.TraceId
         AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
         ${additionalWhere}
     )`,
@@ -181,7 +187,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Passed IN ({${paramId}_values:Array(UInt8)})
       )`,
@@ -207,7 +214,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Score >= {${paramId}_min:Float64}
           AND es.Score <= {${paramId}_max:Float64}
@@ -226,7 +234,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Status IN ({${paramId}_values:Array(String)})
       )`,
@@ -243,7 +252,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Label IN ({${paramId}_values:Array(String)})
       )`,
