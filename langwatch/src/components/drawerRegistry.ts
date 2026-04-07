@@ -42,6 +42,7 @@ import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
+import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
@@ -93,6 +94,7 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  createTeam: CreateTeamDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

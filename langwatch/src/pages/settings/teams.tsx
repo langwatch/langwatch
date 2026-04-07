@@ -880,12 +880,10 @@ function TeamsAndProjects() {
             </PageLayout.HeaderButton>
           )}
           {canManage && (
-            <Link href="/settings/teams/new" asChild>
-              <PageLayout.HeaderButton>
-                <Plus size={16} />
-                New team
-              </PageLayout.HeaderButton>
-            </Link>
+            <PageLayout.HeaderButton onClick={() => openDrawer("createTeam")}>
+              <Plus size={16} />
+              New team
+            </PageLayout.HeaderButton>
           )}
         </HStack>
 
