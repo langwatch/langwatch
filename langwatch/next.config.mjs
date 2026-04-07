@@ -73,7 +73,6 @@ const config = {
   ],
 
   experimental: {
-		reactCompiler: true,
     scrollRestoration: true,
     optimizePackageImports: [
       "@chakra-ui/react",
