@@ -26,7 +26,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* Password secret name */}}
 {{- define "clickhouse-serverless.secretName" -}}
   {{- if .Values.auth.existingSecret -}}
-    {{- .Values.auth.existingSecret -}}
+    {{- tpl .Values.auth.existingSecret . -}}
   {{- else -}}
     {{- include "clickhouse-serverless.fullname" . -}}
   {{- end -}}
