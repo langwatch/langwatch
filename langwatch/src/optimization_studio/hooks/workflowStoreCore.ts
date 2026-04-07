@@ -952,7 +952,10 @@ export const store = (
   setWorkflowSelected: (selected: boolean) => {
     set({ workflowSelected: selected });
     if (selected) {
-      set({ nodes: get().nodes.map((node) => ({ ...node, selected: false })) });
+      set({
+        nodes: get().nodes.map((node) => ({ ...node, selected: false })),
+        clickedNodeId: null,
+      });
     }
   },
   setOpenResultsPanelRequest: (request) => {
