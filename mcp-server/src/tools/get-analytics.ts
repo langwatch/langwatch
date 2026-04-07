@@ -49,7 +49,17 @@ export async function handleGetAnalytics(params: {
   const currentPeriod = result.currentPeriod ?? [];
   if (currentPeriod.length === 0) {
     lines.push("No data available for this period.");
-  } else if (params.groupBy) {
+  } else if (
+    params.groupBy &&
+    currentPeriod.some((bucket) => {
+      const groupData = bucket[params.groupBy!];
+      return (
+        typeof groupData === "object" &&
+        groupData !== null &&
+        !Array.isArray(groupData)
+      );
+    })
+  ) {
     lines.push("| Date | Group | Value |");
     lines.push("|------|-------|-------|");
     for (const bucket of currentPeriod) {

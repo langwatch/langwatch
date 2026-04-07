@@ -329,13 +329,15 @@ const calculateCurrentValue = (
               Record<string, number>
             >;
             let sum = 0;
+            let hasNumericMetric = false;
             for (const metrics of Object.values(groups)) {
               const metricValue = metrics[seriesKey];
               if (typeof metricValue === "number") {
+                hasNumericMetric = true;
                 sum += metricValue;
               }
             }
-            return sum;
+            return hasNumericMetric ? sum : undefined;
           }
         }
 
