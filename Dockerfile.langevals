@@ -33,4 +33,4 @@ ENV PATH="/usr/src/app/.venv/bin:$PATH"
 COPY langevals/scripts/ scripts/
 COPY langevals/Makefile langevals/README.md langevals/LICENSE.md ./
 
-CMD ["python", "langevals/server.py"]
+CMD ["python", "-c", "from langevals.server import main; main()"]
