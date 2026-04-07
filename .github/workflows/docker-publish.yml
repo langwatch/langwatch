@@ -4,13 +4,22 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Custom image tag (e.g., "next"). Defaults to version from manifest on main.'
+        required: false
+        default: ''
 
 jobs:
   extract-version:
     runs-on: ubuntu-latest
-    if: startsWith(github.event.release.tag_name, 'langwatch@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: >-
+      startsWith(github.event.release.tag_name, 'langwatch@')
+      || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     outputs:
       version: ${{ steps.extract_version.outputs.version }}
+      is_custom_tag: ${{ steps.extract_version.outputs.is_custom_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -18,7 +27,10 @@ jobs:
       - name: Extract version
         id: extract_version
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
+          if [ -n "${{ inputs.tag }}" ]; then
+            # Custom tag provided via workflow_dispatch (e.g., "next")
+            VERSION="${{ inputs.tag }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
             # Extract version from release tag (e.g., langwatch@v1.0.0 -> 1.0.0)
             VERSION=${GITHUB_REF#refs/tags/langwatch@v}
           else
@@ -26,6 +38,7 @@ jobs:
             VERSION=$(cat .github/.release-please-manifest.json | grep -o '"\.":\s*"[^"]*"' | grep -o '[0-9][^"]*')
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "is_custom_tag=${{ inputs.tag != '' && 'true' || 'false' }}" >> $GITHUB_OUTPUT
 
   build-and-push-amd64:
     runs-on: ubuntu-latest
@@ -131,6 +144,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Create and push multi-arch manifest for LangWatch (latest)
+        if: needs.extract-version.outputs.is_custom_tag != 'true'
         run: |
           docker buildx imagetools create -t langwatch/langwatch:latest \
             langwatch/langwatch:${{ needs.extract-version.outputs.version }}-amd64 \
@@ -143,6 +157,7 @@ jobs:
             langwatch/langwatch:${{ needs.extract-version.outputs.version }}-arm64
 
       - name: Create and push multi-arch manifest for LangWatch NLP (latest)
+        if: needs.extract-version.outputs.is_custom_tag != 'true'
         run: |
           docker buildx imagetools create -t langwatch/langwatch_nlp:latest \
             langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-amd64 \
@@ -155,6 +170,7 @@ jobs:
             langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-arm64
 
       - name: Create and push multi-arch manifest for LangEvals (latest)
+        if: needs.extract-version.outputs.is_custom_tag != 'true'
         run: |
           docker buildx imagetools create -t langwatch/langevals:latest \
             langwatch/langevals:${{ needs.extract-version.outputs.version }}-amd64 \
@@ -190,6 +206,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     needs: [extract-version, create-manifest]
+    if: needs.extract-version.outputs.is_custom_tag != 'true'
 
     steps:
       - name: Checkout code
