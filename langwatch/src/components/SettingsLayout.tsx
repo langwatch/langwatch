@@ -120,24 +120,24 @@ export default function SettingsLayout({
               "/settings/audit-log",
             ]}
           >
-            {isEnterprise && !isLiteMember && hasPermission("organization:manage") && (
-              <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
+            <MenuLink href="/settings/members" includePath="members">Members</MenuLink>
+            <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
+            {isEnterprise && !isLiteMember && (
+              <MenuLink href="/settings/groups">Groups</MenuLink>
+            )}
+            {isEnterprise && !isLiteMember && (
+              <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
+            )}
+            <MenuLink href="/settings/authentication">Authentication</MenuLink>
+            {isEnterprise && !isLiteMember && (
+              <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
             {isEnterprise && !isLiteMember && (
               <MenuLink href="/settings/access-audit">Access Audit</MenuLink>
             )}
-            <MenuLink href="/settings/authentication">Authentication</MenuLink>
-            {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/groups">Groups</MenuLink>
+            {isEnterprise && !isLiteMember && hasPermission("organization:manage") && (
+              <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
             )}
-            <MenuLink href="/settings/members" includePath="members">Members</MenuLink>
-            {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
-            )}
-            {isEnterprise && !isLiteMember && (
-              <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
-            )}
-            <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
           </NavSection>
 
           <NavSection
