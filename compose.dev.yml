@@ -121,6 +121,8 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
+      - ./langevals:/langevals
       - app_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
     command: >
@@ -128,15 +130,8 @@ services:
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
         mkdir -p /app/node_modules &&
-        LOCK_HASH=$$(md5sum /app/pnpm-lock.yaml | cut -d' ' -f1) &&
-        if [ ! -f /app/node_modules/.install-hash ] ||
-           [ \"$$LOCK_HASH\" != \"$$(cat /app/node_modules/.install-hash)\" ]; then
-          echo 'Lockfile changed — running pnpm install...' &&
-          pnpm install &&
-          echo $$LOCK_HASH > /app/node_modules/.install-hash
-        else
-          echo 'Lockfile unchanged — skipping pnpm install'
-        fi &&
+        (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
+        pnpm install &&
         pnpm prisma generate &&
         pnpm run types:zod:generate
       "
@@ -153,6 +148,8 @@ services:
     working_dir: /app
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
+      - ./langevals:/langevals
       - app_modules:/app/node_modules
     command: >
       sh -c "
@@ -199,6 +196,8 @@ services:
     profiles: [workers, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
+      - ./langevals:/langevals
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
@@ -284,6 +283,8 @@ services:
     profiles: [test, scenarios, full]
     volumes:
       - ./langwatch:/app
+      - ./mcp-server:/mcp-server
+      - ./langevals:/langevals
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && pnpm tsx scripts/ai-server.ts"
     ports:
