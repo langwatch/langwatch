@@ -8,8 +8,22 @@ permissions:
   pages: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/clickhouse-serverless
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.12.0
+      - name: Lint and template
+        run: make template
+
   release:
     runs-on: ubuntu-latest
+    needs: validate
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +42,7 @@ jobs:
 
       - name: Install chart-releaser
         run: |
-          VERSION=1.7.0
+          VERSION=1.6.1
           curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v${VERSION}/chart-releaser_${VERSION}_linux_amd64.tar.gz"
           tar xzf cr.tar.gz cr
           sudo mv cr /usr/local/bin/cr

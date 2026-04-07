@@ -32,7 +32,7 @@ jobs:
 
       - name: Install chart-releaser
         run: |
-          VERSION=1.7.0
+          VERSION=1.6.1
           curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v${VERSION}/chart-releaser_${VERSION}_linux_amd64.tar.gz"
           tar xzf cr.tar.gz cr
           sudo mv cr /usr/local/bin/cr
