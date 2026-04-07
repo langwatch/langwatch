@@ -1,4 +1,4 @@
-name: Low-Risk PR Evaluation
+name: low-risk-evaluation
 
 on:
   pull_request:

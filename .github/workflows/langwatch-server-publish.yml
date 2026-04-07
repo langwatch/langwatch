@@ -1,4 +1,4 @@
-name: Publish LangWatch Server to PyPI
+name: langwatch-server-publish
 
 on:
   release:

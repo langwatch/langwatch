@@ -1,0 +1,57 @@
+name: clickhouse-serverless
+
+on:
+  pull_request:
+    paths:
+      - "clickhouse-serverless/**"
+      - ".github/workflows/clickhouse-serverless.yml"
+  push:
+    branches: [main]
+    paths:
+      - "clickhouse-serverless/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: go tests + lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clickhouse-serverless
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: clickhouse-serverless/go.sum
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.12.0
+      - run: make test
+      - run: make lint
+
+  e2e:
+    name: docker e2e
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: clickhouse-serverless
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: clickhouse-serverless/go.sum
+      - uses: docker/setup-buildx-action@v3
+      - run: make e2e
+      - run: make e2e-cold
+      - run: make e2e-cold-move
+      - run: make e2e-backup
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker logs ch-e2e 2>&1 | tail -100 || true
+          docker logs garage-e2e 2>&1 | tail -50 || true
