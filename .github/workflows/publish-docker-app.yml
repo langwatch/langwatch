@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Custom image tag (default: "next")'
+        required: false
+        default: 'next'
 
 jobs:
   extract-version:
@@ -124,12 +129,14 @@ jobs:
               langwatch/${IMAGE}:${HASH}-arm64
           done
 
-      - name: Create multi-arch manifests (next)
+      - name: Create multi-arch manifests (custom tag)
         if: needs.extract-version.outputs.is_release != 'true'
+        env:
+          TAG: ${{ inputs.tag || 'next' }}
+          HASH: ${{ needs.extract-version.outputs.short_hash }}
         run: |
-          HASH="${{ needs.extract-version.outputs.short_hash }}"
           for IMAGE in langwatch langwatch_nlp langevals; do
-            docker buildx imagetools create -t langwatch/${IMAGE}:next \
+            docker buildx imagetools create -t langwatch/${IMAGE}:${TAG} \
               langwatch/${IMAGE}:${HASH}-amd64 \
               langwatch/${IMAGE}:${HASH}-arm64
           done
