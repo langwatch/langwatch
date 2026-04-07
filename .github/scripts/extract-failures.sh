@@ -12,7 +12,7 @@ OUTPUT_TXT="${2:?Usage: extract-failures.sh <input-json> <output-txt>}"
 
 if [ ! -f "$INPUT_JSON" ]; then
   echo "No test results file found at $INPUT_JSON, skipping extraction" >&2
-  touch "$OUTPUT_TXT"
+  : > "$OUTPUT_TXT"
   exit 0
 fi
 

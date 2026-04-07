@@ -9,6 +9,7 @@ on:
       - "langwatch/**"
       - ".github/workflows/langwatch-app-ci.yml"
       - ".github/.release-please-manifest.json"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 env:
@@ -443,12 +444,16 @@ jobs:
         working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
 
+      - name: Stage canary fixture inside vitest root
+        working-directory: langwatch
+        run: cp ../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+
       - name: Run intentional failure
         id: canary
         continue-on-error: true
         working-directory: langwatch
         run: |
-          pnpm vitest run ../.github/scripts/__fixtures__/intentional-failure.test.ts \
+          pnpm vitest run _ci_canary.test.ts \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract failures
