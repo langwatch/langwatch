@@ -126,7 +126,7 @@ describe("useFilterParams() write operations", () => {
       it("clears both filter params and query param", () => {
         mockRouterQuery = {
           origin: "application",
-          model: "gpt-4",
+          model: "gpt-5-mini",
           query: "hello world",
           view: "table",
         };
