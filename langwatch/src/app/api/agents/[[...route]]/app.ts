@@ -20,6 +20,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
+import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
 
 patchZodOpenapi();
@@ -78,6 +79,20 @@ function mapAgentNotFoundError(error: unknown): never {
   throw error;
 }
 
+/**
+ * Maps ZodError from config validation to a 422 UnprocessableEntityError.
+ * Config is validated against the agent type's DSL schema in the repository layer.
+ */
+function mapConfigValidationError(error: unknown): never {
+  if (error instanceof ZodError) {
+    const issue = error.issues[0];
+    throw new UnprocessableEntityError(
+      issue?.message ?? "Invalid agent config",
+    );
+  }
+  throw error;
+}
+
 export const app = new Hono<{ Variables: Variables }>()
   .basePath("/api/agents")
   .use(tracerMiddleware({ name: "agents" }))
@@ -121,14 +136,19 @@ export const app = new Hono<{ Variables: Variables }>()
       const { name, type, config, workflowId } = c.req.valid("json");
       const service = c.get("agentService");
 
-      const agent = await service.create({
-        id: `agent_${nanoid()}`,
-        projectId: project.id,
-        name,
-        type,
-        config: config as AgentComponentConfig,
-        workflowId,
-      });
+      let agent;
+      try {
+        agent = await service.create({
+          id: `agent_${nanoid()}`,
+          projectId: project.id,
+          name,
+          type,
+          config: config as AgentComponentConfig,
+          workflowId,
+        });
+      } catch (error) {
+        return mapConfigValidationError(error);
+      }
 
       return c.json(
         {
@@ -204,7 +224,10 @@ export const app = new Hono<{ Variables: Variables }>()
           },
         });
       } catch (error) {
-        return mapAgentNotFoundError(error);
+        if (error instanceof Error && error.name === "AgentNotFoundError") {
+          throw new NotFoundError("Agent not found");
+        }
+        return mapConfigValidationError(error);
       }
 
       return c.json({

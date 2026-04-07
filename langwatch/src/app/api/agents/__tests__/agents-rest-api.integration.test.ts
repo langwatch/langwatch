@@ -284,6 +284,27 @@ describe("Feature: Agent REST API", () => {
       });
       expect(res.status).toBe(422);
     });
+
+    describe("when the project has reached its agent plan limit", () => {
+      beforeEach(async () => {
+        await createAgent({ name: "Existing Agent" });
+        mockGetActivePlan.mockResolvedValue({
+          ...FREE_PLAN,
+          maxAgents: 1,
+          overrideAddingLimitations: false,
+        });
+      });
+
+      it("returns 403 Forbidden", async () => {
+        const res = await helpers.api.post("/api/agents", {
+          name: "Over Limit",
+          type: "signature",
+          config: VALID_SIGNATURE_CONFIG,
+        });
+
+        expect(res.status).toBe(403);
+      });
+    });
   });
 
   // ── Get Single Agent ─────────────────────────────────────────

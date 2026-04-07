@@ -143,17 +143,14 @@ export class AgentService {
       workflowId: string | null;
     }>;
   }) {
-    try {
-      return await this.repository.update(input);
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("not found")
-      ) {
-        throw new AgentNotFoundError();
-      }
-      throw error;
+    const existing = await this.repository.findById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (!existing) {
+      throw new AgentNotFoundError();
     }
+    return this.repository.update(input);
   }
 
   /**
