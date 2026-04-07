@@ -29,7 +29,7 @@ function NavSection({
     <VStack align="start" width="full" gap={0}>
       <HStack
         width="full"
-        px={2}
+        px={4}
         py={1}
         cursor="pointer"
         color="fg.muted"
