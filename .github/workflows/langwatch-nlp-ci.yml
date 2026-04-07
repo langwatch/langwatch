@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "langwatch_nlp/**"
+      - "python-sdk/**"
+      - ".github/workflows/langwatch-nlp-ci.yml"
   pull_request:
     paths:
       - "langwatch_nlp/**"
