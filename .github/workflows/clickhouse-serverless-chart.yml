@@ -3,14 +3,17 @@ name: ClickHouse Serverless Chart
 on:
   pull_request:
     paths:
+      - "clickhouse-serverless/**"
       - "charts/clickhouse-serverless/**"
       - "charts/lib/**"
       - ".github/workflows/clickhouse-serverless-chart.yml"
   push:
     branches: [main]
     paths:
+      - "clickhouse-serverless/**"
       - "charts/clickhouse-serverless/**"
       - "charts/lib/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -41,14 +44,9 @@ jobs:
       - uses: azure/setup-helm@v4
         with:
           version: v3.12.0
-      - name: Build Docker image for Kind
-        run: |
-          docker build -t langwatch/clickhouse-serverless:0.1.0 ../../clickhouse-serverless/
       - uses: helm/kind-action@v1
         with:
           cluster_name: ch-test
-      - name: Load image into Kind
-        run: kind load docker-image langwatch/clickhouse-serverless:0.1.0 --name ch-test
       - run: make test-e2e
         env:
           KEEP_CLUSTER: "true"
