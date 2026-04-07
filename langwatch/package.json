@@ -61,7 +61,7 @@
     "@ai-sdk/azure": "^2.0.20",
     "@ai-sdk/google": "^2.0.8",
     "@ai-sdk/openai": "^2.0.27",
-    "@ai-sdk/openai-compatible": "^1.0.15",
+    "@ai-sdk/openai-compatible": "^2.0.40",
     "@ai-sdk/react": "^3.0.118",
     "@aws-sdk/client-bedrock-runtime": "^3.1005.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.987.0",
