@@ -419,7 +419,7 @@ function NestedListSelection({
 					current_[lastKey] = values;
 				} else {
 					for (const key of Object.keys(current_)) {
-						if (!(key in values)) {
+						if (!values.includes(key)) {
 							delete current_[key];
 						}
 					}
@@ -857,12 +857,15 @@ function RangeFilter({
 		min = 0;
 	}
 
+	const initializedRef = React.useRef(false);
+
 	useEffect(() => {
-		if (filterData.data) {
+		if (filterData.data && !initializedRef.current) {
+			initializedRef.current = true;
 			onChange([min.toString(), max.toString()]);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [min, max, !!filterData.data]);
+	}, [!!filterData.data]);
 
 	return (
 		<HStack width="full" gap={3} paddingX={3} paddingY={2}>
