@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -11,9 +12,10 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     slug_or_id: str,
     *,
-    page: Union[Unset, int] = 1,
-    limit: Union[Unset, int] = 50,
+    page: int | Unset = 1,
+    limit: int | Unset = 50,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["page"] = page
@@ -24,21 +26,23 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/api/dataset/{slug_or_id}/records",
+        "url": "/api/dataset/{slug_or_id}/records".format(
+            slug_or_id=quote(str(slug_or_id), safe=""),
+        ),
         "params": params,
     }
 
     return _kwargs
 
 
-def _parse_response(*, client: Union[AuthenticatedClient, Client], response: httpx.Response) -> Optional[Any]:
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | None:
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(*, client: Union[AuthenticatedClient, Client], response: httpx.Response) -> Response[Any]:
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -50,16 +54,16 @@ def _build_response(*, client: Union[AuthenticatedClient, Client], response: htt
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    page: Union[Unset, int] = 1,
-    limit: Union[Unset, int] = 50,
+    client: AuthenticatedClient | Client,
+    page: int | Unset = 1,
+    limit: int | Unset = 50,
 ) -> Response[Any]:
     """List records for a dataset (paginated)
 
     Args:
         slug_or_id (str):
-        page (Union[Unset, int]):  Default: 1.
-        limit (Union[Unset, int]):  Default: 50.
+        page (int | Unset):  Default: 1.
+        limit (int | Unset):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -85,16 +89,16 @@ def sync_detailed(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    page: Union[Unset, int] = 1,
-    limit: Union[Unset, int] = 50,
+    client: AuthenticatedClient | Client,
+    page: int | Unset = 1,
+    limit: int | Unset = 50,
 ) -> Response[Any]:
     """List records for a dataset (paginated)
 
     Args:
         slug_or_id (str):
-        page (Union[Unset, int]):  Default: 1.
-        limit (Union[Unset, int]):  Default: 50.
+        page (int | Unset):  Default: 1.
+        limit (int | Unset):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

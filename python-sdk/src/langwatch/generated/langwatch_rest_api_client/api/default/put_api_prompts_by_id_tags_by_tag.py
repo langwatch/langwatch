@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -12,25 +13,28 @@ from ...models.put_api_prompts_by_id_tags_by_tag_response_401 import PutApiPromp
 from ...models.put_api_prompts_by_id_tags_by_tag_response_404 import PutApiPromptsByIdTagsByTagResponse404
 from ...models.put_api_prompts_by_id_tags_by_tag_response_422 import PutApiPromptsByIdTagsByTagResponse422
 from ...models.put_api_prompts_by_id_tags_by_tag_response_500 import PutApiPromptsByIdTagsByTagResponse500
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     id: str,
     tag: str,
     *,
-    body: PutApiPromptsByIdTagsByTagBody,
+    body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": f"/api/prompts/{id}/tags/{tag}",
+        "url": "/api/prompts/{id}/tags/{tag}".format(
+            id=quote(str(id), safe=""),
+            tag=quote(str(tag), safe=""),
+        ),
     }
 
-    _body = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -38,41 +42,46 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[
-    Union[
-        PutApiPromptsByIdTagsByTagResponse200,
-        PutApiPromptsByIdTagsByTagResponse400,
-        PutApiPromptsByIdTagsByTagResponse401,
-        PutApiPromptsByIdTagsByTagResponse404,
-        PutApiPromptsByIdTagsByTagResponse422,
-        PutApiPromptsByIdTagsByTagResponse500,
-    ]
-]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> (
+    PutApiPromptsByIdTagsByTagResponse200
+    | PutApiPromptsByIdTagsByTagResponse400
+    | PutApiPromptsByIdTagsByTagResponse401
+    | PutApiPromptsByIdTagsByTagResponse404
+    | PutApiPromptsByIdTagsByTagResponse422
+    | PutApiPromptsByIdTagsByTagResponse500
+    | None
+):
     if response.status_code == 200:
         response_200 = PutApiPromptsByIdTagsByTagResponse200.from_dict(response.json())
 
         return response_200
+
     if response.status_code == 400:
         response_400 = PutApiPromptsByIdTagsByTagResponse400.from_dict(response.json())
 
         return response_400
+
     if response.status_code == 401:
         response_401 = PutApiPromptsByIdTagsByTagResponse401.from_dict(response.json())
 
         return response_401
+
     if response.status_code == 404:
         response_404 = PutApiPromptsByIdTagsByTagResponse404.from_dict(response.json())
 
         return response_404
+
     if response.status_code == 422:
         response_422 = PutApiPromptsByIdTagsByTagResponse422.from_dict(response.json())
 
         return response_422
+
     if response.status_code == 500:
         response_500 = PutApiPromptsByIdTagsByTagResponse500.from_dict(response.json())
 
         return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -80,16 +89,14 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Union[
-        PutApiPromptsByIdTagsByTagResponse200,
-        PutApiPromptsByIdTagsByTagResponse400,
-        PutApiPromptsByIdTagsByTagResponse401,
-        PutApiPromptsByIdTagsByTagResponse404,
-        PutApiPromptsByIdTagsByTagResponse422,
-        PutApiPromptsByIdTagsByTagResponse500,
-    ]
+    PutApiPromptsByIdTagsByTagResponse200
+    | PutApiPromptsByIdTagsByTagResponse400
+    | PutApiPromptsByIdTagsByTagResponse401
+    | PutApiPromptsByIdTagsByTagResponse404
+    | PutApiPromptsByIdTagsByTagResponse422
+    | PutApiPromptsByIdTagsByTagResponse500
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -103,31 +110,29 @@ def sync_detailed(
     id: str,
     tag: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: PutApiPromptsByIdTagsByTagBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> Response[
-    Union[
-        PutApiPromptsByIdTagsByTagResponse200,
-        PutApiPromptsByIdTagsByTagResponse400,
-        PutApiPromptsByIdTagsByTagResponse401,
-        PutApiPromptsByIdTagsByTagResponse404,
-        PutApiPromptsByIdTagsByTagResponse422,
-        PutApiPromptsByIdTagsByTagResponse500,
-    ]
+    PutApiPromptsByIdTagsByTagResponse200
+    | PutApiPromptsByIdTagsByTagResponse400
+    | PutApiPromptsByIdTagsByTagResponse401
+    | PutApiPromptsByIdTagsByTagResponse404
+    | PutApiPromptsByIdTagsByTagResponse422
+    | PutApiPromptsByIdTagsByTagResponse500
 ]:
     r"""Assign a tag (e.g. \"production\", \"staging\") to a specific prompt version
 
     Args:
         id (str):
         tag (str):
-        body (PutApiPromptsByIdTagsByTagBody):
+        body (PutApiPromptsByIdTagsByTagBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PutApiPromptsByIdTagsByTagResponse200, PutApiPromptsByIdTagsByTagResponse400, PutApiPromptsByIdTagsByTagResponse401, PutApiPromptsByIdTagsByTagResponse404, PutApiPromptsByIdTagsByTagResponse422, PutApiPromptsByIdTagsByTagResponse500]]
+        Response[PutApiPromptsByIdTagsByTagResponse200 | PutApiPromptsByIdTagsByTagResponse400 | PutApiPromptsByIdTagsByTagResponse401 | PutApiPromptsByIdTagsByTagResponse404 | PutApiPromptsByIdTagsByTagResponse422 | PutApiPromptsByIdTagsByTagResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -147,31 +152,30 @@ def sync(
     id: str,
     tag: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: PutApiPromptsByIdTagsByTagBody,
-) -> Optional[
-    Union[
-        PutApiPromptsByIdTagsByTagResponse200,
-        PutApiPromptsByIdTagsByTagResponse400,
-        PutApiPromptsByIdTagsByTagResponse401,
-        PutApiPromptsByIdTagsByTagResponse404,
-        PutApiPromptsByIdTagsByTagResponse422,
-        PutApiPromptsByIdTagsByTagResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+    body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
+) -> (
+    PutApiPromptsByIdTagsByTagResponse200
+    | PutApiPromptsByIdTagsByTagResponse400
+    | PutApiPromptsByIdTagsByTagResponse401
+    | PutApiPromptsByIdTagsByTagResponse404
+    | PutApiPromptsByIdTagsByTagResponse422
+    | PutApiPromptsByIdTagsByTagResponse500
+    | None
+):
     r"""Assign a tag (e.g. \"production\", \"staging\") to a specific prompt version
 
     Args:
         id (str):
         tag (str):
-        body (PutApiPromptsByIdTagsByTagBody):
+        body (PutApiPromptsByIdTagsByTagBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PutApiPromptsByIdTagsByTagResponse200, PutApiPromptsByIdTagsByTagResponse400, PutApiPromptsByIdTagsByTagResponse401, PutApiPromptsByIdTagsByTagResponse404, PutApiPromptsByIdTagsByTagResponse422, PutApiPromptsByIdTagsByTagResponse500]
+        PutApiPromptsByIdTagsByTagResponse200 | PutApiPromptsByIdTagsByTagResponse400 | PutApiPromptsByIdTagsByTagResponse401 | PutApiPromptsByIdTagsByTagResponse404 | PutApiPromptsByIdTagsByTagResponse422 | PutApiPromptsByIdTagsByTagResponse500
     """
 
     return sync_detailed(
@@ -186,31 +190,29 @@ async def asyncio_detailed(
     id: str,
     tag: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: PutApiPromptsByIdTagsByTagBody,
+    client: AuthenticatedClient | Client,
+    body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
 ) -> Response[
-    Union[
-        PutApiPromptsByIdTagsByTagResponse200,
-        PutApiPromptsByIdTagsByTagResponse400,
-        PutApiPromptsByIdTagsByTagResponse401,
-        PutApiPromptsByIdTagsByTagResponse404,
-        PutApiPromptsByIdTagsByTagResponse422,
-        PutApiPromptsByIdTagsByTagResponse500,
-    ]
+    PutApiPromptsByIdTagsByTagResponse200
+    | PutApiPromptsByIdTagsByTagResponse400
+    | PutApiPromptsByIdTagsByTagResponse401
+    | PutApiPromptsByIdTagsByTagResponse404
+    | PutApiPromptsByIdTagsByTagResponse422
+    | PutApiPromptsByIdTagsByTagResponse500
 ]:
     r"""Assign a tag (e.g. \"production\", \"staging\") to a specific prompt version
 
     Args:
         id (str):
         tag (str):
-        body (PutApiPromptsByIdTagsByTagBody):
+        body (PutApiPromptsByIdTagsByTagBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PutApiPromptsByIdTagsByTagResponse200, PutApiPromptsByIdTagsByTagResponse400, PutApiPromptsByIdTagsByTagResponse401, PutApiPromptsByIdTagsByTagResponse404, PutApiPromptsByIdTagsByTagResponse422, PutApiPromptsByIdTagsByTagResponse500]]
+        Response[PutApiPromptsByIdTagsByTagResponse200 | PutApiPromptsByIdTagsByTagResponse400 | PutApiPromptsByIdTagsByTagResponse401 | PutApiPromptsByIdTagsByTagResponse404 | PutApiPromptsByIdTagsByTagResponse422 | PutApiPromptsByIdTagsByTagResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -228,31 +230,30 @@ async def asyncio(
     id: str,
     tag: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: PutApiPromptsByIdTagsByTagBody,
-) -> Optional[
-    Union[
-        PutApiPromptsByIdTagsByTagResponse200,
-        PutApiPromptsByIdTagsByTagResponse400,
-        PutApiPromptsByIdTagsByTagResponse401,
-        PutApiPromptsByIdTagsByTagResponse404,
-        PutApiPromptsByIdTagsByTagResponse422,
-        PutApiPromptsByIdTagsByTagResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+    body: PutApiPromptsByIdTagsByTagBody | Unset = UNSET,
+) -> (
+    PutApiPromptsByIdTagsByTagResponse200
+    | PutApiPromptsByIdTagsByTagResponse400
+    | PutApiPromptsByIdTagsByTagResponse401
+    | PutApiPromptsByIdTagsByTagResponse404
+    | PutApiPromptsByIdTagsByTagResponse422
+    | PutApiPromptsByIdTagsByTagResponse500
+    | None
+):
     r"""Assign a tag (e.g. \"production\", \"staging\") to a specific prompt version
 
     Args:
         id (str):
         tag (str):
-        body (PutApiPromptsByIdTagsByTagBody):
+        body (PutApiPromptsByIdTagsByTagBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PutApiPromptsByIdTagsByTagResponse200, PutApiPromptsByIdTagsByTagResponse400, PutApiPromptsByIdTagsByTagResponse401, PutApiPromptsByIdTagsByTagResponse404, PutApiPromptsByIdTagsByTagResponse422, PutApiPromptsByIdTagsByTagResponse500]
+        PutApiPromptsByIdTagsByTagResponse200 | PutApiPromptsByIdTagsByTagResponse400 | PutApiPromptsByIdTagsByTagResponse401 | PutApiPromptsByIdTagsByTagResponse404 | PutApiPromptsByIdTagsByTagResponse422 | PutApiPromptsByIdTagsByTagResponse500
     """
 
     return (

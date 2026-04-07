@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -17,6 +19,24 @@ if TYPE_CHECKING:
     )
     from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_guardrails_only_type_2 import (
         PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2,
+    )
+    from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_1 import (
+        PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1,
+    )
+    from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_2 import (
+        PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2,
+    )
+    from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_1 import (
+        PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1,
+    )
+    from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_2 import (
+        PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2,
+    )
+    from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_1 import (
+        PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1,
+    )
+    from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_2 import (
+        PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2,
     )
     from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_type_1 import (
         PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1,
@@ -159,198 +179,225 @@ T = TypeVar("T", bound="PostApiTracesSearchBodyFilters")
 class PostApiTracesSearchBodyFilters:
     """
     Attributes:
-        topics_topics (Union['PostApiTracesSearchBodyFiltersTopicsTopicsType1',
-            'PostApiTracesSearchBodyFiltersTopicsTopicsType2', Unset, list[str]]):
-        topics_subtopics (Union['PostApiTracesSearchBodyFiltersTopicsSubtopicsType1',
-            'PostApiTracesSearchBodyFiltersTopicsSubtopicsType2', Unset, list[str]]):
-        metadata_user_id (Union['PostApiTracesSearchBodyFiltersMetadataUserIdType1',
-            'PostApiTracesSearchBodyFiltersMetadataUserIdType2', Unset, list[str]]):
-        metadata_thread_id (Union['PostApiTracesSearchBodyFiltersMetadataThreadIdType1',
-            'PostApiTracesSearchBodyFiltersMetadataThreadIdType2', Unset, list[str]]):
-        metadata_customer_id (Union['PostApiTracesSearchBodyFiltersMetadataCustomerIdType1',
-            'PostApiTracesSearchBodyFiltersMetadataCustomerIdType2', Unset, list[str]]):
-        metadata_labels (Union['PostApiTracesSearchBodyFiltersMetadataLabelsType1',
-            'PostApiTracesSearchBodyFiltersMetadataLabelsType2', Unset, list[str]]):
-        metadata_key (Union['PostApiTracesSearchBodyFiltersMetadataKeyType1',
-            'PostApiTracesSearchBodyFiltersMetadataKeyType2', Unset, list[str]]):
-        metadata_value (Union['PostApiTracesSearchBodyFiltersMetadataValueType1',
-            'PostApiTracesSearchBodyFiltersMetadataValueType2', Unset, list[str]]):
-        metadata_prompt_ids (Union['PostApiTracesSearchBodyFiltersMetadataPromptIdsType1',
-            'PostApiTracesSearchBodyFiltersMetadataPromptIdsType2', Unset, list[str]]):
-        traces_origin (Union['PostApiTracesSearchBodyFiltersTracesOriginType1',
-            'PostApiTracesSearchBodyFiltersTracesOriginType2', Unset, list[str]]):
-        traces_error (Union['PostApiTracesSearchBodyFiltersTracesErrorType1',
-            'PostApiTracesSearchBodyFiltersTracesErrorType2', Unset, list[str]]):
-        spans_type (Union['PostApiTracesSearchBodyFiltersSpansTypeType1',
-            'PostApiTracesSearchBodyFiltersSpansTypeType2', Unset, list[str]]):
-        spans_model (Union['PostApiTracesSearchBodyFiltersSpansModelType1',
-            'PostApiTracesSearchBodyFiltersSpansModelType2', Unset, list[str]]):
-        evaluations_evaluator_id (Union['PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1',
-            'PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2', Unset, list[str]]):
-        evaluations_evaluator_id_guardrails_only
-            (Union['PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1',
-            'PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2', Unset, list[str]]):
-        evaluations_passed (Union['PostApiTracesSearchBodyFiltersEvaluationsPassedType1',
-            'PostApiTracesSearchBodyFiltersEvaluationsPassedType2', Unset, list[str]]):
-        evaluations_score (Union['PostApiTracesSearchBodyFiltersEvaluationsScoreType1',
-            'PostApiTracesSearchBodyFiltersEvaluationsScoreType2', Unset, list[str]]):
-        evaluations_state (Union['PostApiTracesSearchBodyFiltersEvaluationsStateType1',
-            'PostApiTracesSearchBodyFiltersEvaluationsStateType2', Unset, list[str]]):
-        evaluations_label (Union['PostApiTracesSearchBodyFiltersEvaluationsLabelType1',
-            'PostApiTracesSearchBodyFiltersEvaluationsLabelType2', Unset, list[str]]):
-        events_event_type (Union['PostApiTracesSearchBodyFiltersEventsEventTypeType1',
-            'PostApiTracesSearchBodyFiltersEventsEventTypeType2', Unset, list[str]]):
-        events_metrics_key (Union['PostApiTracesSearchBodyFiltersEventsMetricsKeyType1',
-            'PostApiTracesSearchBodyFiltersEventsMetricsKeyType2', Unset, list[str]]):
-        events_metrics_value (Union['PostApiTracesSearchBodyFiltersEventsMetricsValueType1',
-            'PostApiTracesSearchBodyFiltersEventsMetricsValueType2', Unset, list[str]]):
-        events_event_details_key (Union['PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType1',
-            'PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType2', Unset, list[str]]):
-        annotations_has_annotation (Union['PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType1',
-            'PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType2', Unset, list[str]]):
+        topics_topics (list[str] | PostApiTracesSearchBodyFiltersTopicsTopicsType1 |
+            PostApiTracesSearchBodyFiltersTopicsTopicsType2 | Unset):
+        topics_subtopics (list[str] | PostApiTracesSearchBodyFiltersTopicsSubtopicsType1 |
+            PostApiTracesSearchBodyFiltersTopicsSubtopicsType2 | Unset):
+        metadata_user_id (list[str] | PostApiTracesSearchBodyFiltersMetadataUserIdType1 |
+            PostApiTracesSearchBodyFiltersMetadataUserIdType2 | Unset):
+        metadata_thread_id (list[str] | PostApiTracesSearchBodyFiltersMetadataThreadIdType1 |
+            PostApiTracesSearchBodyFiltersMetadataThreadIdType2 | Unset):
+        metadata_customer_id (list[str] | PostApiTracesSearchBodyFiltersMetadataCustomerIdType1 |
+            PostApiTracesSearchBodyFiltersMetadataCustomerIdType2 | Unset):
+        metadata_labels (list[str] | PostApiTracesSearchBodyFiltersMetadataLabelsType1 |
+            PostApiTracesSearchBodyFiltersMetadataLabelsType2 | Unset):
+        metadata_key (list[str] | PostApiTracesSearchBodyFiltersMetadataKeyType1 |
+            PostApiTracesSearchBodyFiltersMetadataKeyType2 | Unset):
+        metadata_value (list[str] | PostApiTracesSearchBodyFiltersMetadataValueType1 |
+            PostApiTracesSearchBodyFiltersMetadataValueType2 | Unset):
+        metadata_prompt_ids (list[str] | PostApiTracesSearchBodyFiltersMetadataPromptIdsType1 |
+            PostApiTracesSearchBodyFiltersMetadataPromptIdsType2 | Unset):
+        traces_origin (list[str] | PostApiTracesSearchBodyFiltersTracesOriginType1 |
+            PostApiTracesSearchBodyFiltersTracesOriginType2 | Unset):
+        traces_error (list[str] | PostApiTracesSearchBodyFiltersTracesErrorType1 |
+            PostApiTracesSearchBodyFiltersTracesErrorType2 | Unset):
+        spans_type (list[str] | PostApiTracesSearchBodyFiltersSpansTypeType1 |
+            PostApiTracesSearchBodyFiltersSpansTypeType2 | Unset):
+        spans_model (list[str] | PostApiTracesSearchBodyFiltersSpansModelType1 |
+            PostApiTracesSearchBodyFiltersSpansModelType2 | Unset):
+        evaluations_evaluator_id (list[str] | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2 | Unset):
+        evaluations_evaluator_id_guardrails_only (list[str] |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2 | Unset):
+        evaluations_evaluator_id_has_passed (list[str] |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2 | Unset):
+        evaluations_evaluator_id_has_score (list[str] |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2 | Unset):
+        evaluations_evaluator_id_has_label (list[str] |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2 | Unset):
+        evaluations_passed (list[str] | PostApiTracesSearchBodyFiltersEvaluationsPassedType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsPassedType2 | Unset):
+        evaluations_score (list[str] | PostApiTracesSearchBodyFiltersEvaluationsScoreType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsScoreType2 | Unset):
+        evaluations_state (list[str] | PostApiTracesSearchBodyFiltersEvaluationsStateType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsStateType2 | Unset):
+        evaluations_label (list[str] | PostApiTracesSearchBodyFiltersEvaluationsLabelType1 |
+            PostApiTracesSearchBodyFiltersEvaluationsLabelType2 | Unset):
+        events_event_type (list[str] | PostApiTracesSearchBodyFiltersEventsEventTypeType1 |
+            PostApiTracesSearchBodyFiltersEventsEventTypeType2 | Unset):
+        events_metrics_key (list[str] | PostApiTracesSearchBodyFiltersEventsMetricsKeyType1 |
+            PostApiTracesSearchBodyFiltersEventsMetricsKeyType2 | Unset):
+        events_metrics_value (list[str] | PostApiTracesSearchBodyFiltersEventsMetricsValueType1 |
+            PostApiTracesSearchBodyFiltersEventsMetricsValueType2 | Unset):
+        events_event_details_key (list[str] | PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType1 |
+            PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType2 | Unset):
+        annotations_has_annotation (list[str] | PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType1 |
+            PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType2 | Unset):
     """
 
-    topics_topics: Union[
-        "PostApiTracesSearchBodyFiltersTopicsTopicsType1",
-        "PostApiTracesSearchBodyFiltersTopicsTopicsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    topics_subtopics: Union[
-        "PostApiTracesSearchBodyFiltersTopicsSubtopicsType1",
-        "PostApiTracesSearchBodyFiltersTopicsSubtopicsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_user_id: Union[
-        "PostApiTracesSearchBodyFiltersMetadataUserIdType1",
-        "PostApiTracesSearchBodyFiltersMetadataUserIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_thread_id: Union[
-        "PostApiTracesSearchBodyFiltersMetadataThreadIdType1",
-        "PostApiTracesSearchBodyFiltersMetadataThreadIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_customer_id: Union[
-        "PostApiTracesSearchBodyFiltersMetadataCustomerIdType1",
-        "PostApiTracesSearchBodyFiltersMetadataCustomerIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_labels: Union[
-        "PostApiTracesSearchBodyFiltersMetadataLabelsType1",
-        "PostApiTracesSearchBodyFiltersMetadataLabelsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_key: Union[
-        "PostApiTracesSearchBodyFiltersMetadataKeyType1",
-        "PostApiTracesSearchBodyFiltersMetadataKeyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_value: Union[
-        "PostApiTracesSearchBodyFiltersMetadataValueType1",
-        "PostApiTracesSearchBodyFiltersMetadataValueType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_prompt_ids: Union[
-        "PostApiTracesSearchBodyFiltersMetadataPromptIdsType1",
-        "PostApiTracesSearchBodyFiltersMetadataPromptIdsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    traces_origin: Union[
-        "PostApiTracesSearchBodyFiltersTracesOriginType1",
-        "PostApiTracesSearchBodyFiltersTracesOriginType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    traces_error: Union[
-        "PostApiTracesSearchBodyFiltersTracesErrorType1",
-        "PostApiTracesSearchBodyFiltersTracesErrorType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    spans_type: Union[
-        "PostApiTracesSearchBodyFiltersSpansTypeType1", "PostApiTracesSearchBodyFiltersSpansTypeType2", Unset, list[str]
-    ] = UNSET
-    spans_model: Union[
-        "PostApiTracesSearchBodyFiltersSpansModelType1",
-        "PostApiTracesSearchBodyFiltersSpansModelType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_evaluator_id: Union[
-        "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1",
-        "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_evaluator_id_guardrails_only: Union[
-        "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
-        "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_passed: Union[
-        "PostApiTracesSearchBodyFiltersEvaluationsPassedType1",
-        "PostApiTracesSearchBodyFiltersEvaluationsPassedType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_score: Union[
-        "PostApiTracesSearchBodyFiltersEvaluationsScoreType1",
-        "PostApiTracesSearchBodyFiltersEvaluationsScoreType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_state: Union[
-        "PostApiTracesSearchBodyFiltersEvaluationsStateType1",
-        "PostApiTracesSearchBodyFiltersEvaluationsStateType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_label: Union[
-        "PostApiTracesSearchBodyFiltersEvaluationsLabelType1",
-        "PostApiTracesSearchBodyFiltersEvaluationsLabelType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_event_type: Union[
-        "PostApiTracesSearchBodyFiltersEventsEventTypeType1",
-        "PostApiTracesSearchBodyFiltersEventsEventTypeType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_metrics_key: Union[
-        "PostApiTracesSearchBodyFiltersEventsMetricsKeyType1",
-        "PostApiTracesSearchBodyFiltersEventsMetricsKeyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_metrics_value: Union[
-        "PostApiTracesSearchBodyFiltersEventsMetricsValueType1",
-        "PostApiTracesSearchBodyFiltersEventsMetricsValueType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_event_details_key: Union[
-        "PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType1",
-        "PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    annotations_has_annotation: Union[
-        "PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType1",
-        "PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType2",
-        Unset,
-        list[str],
-    ] = UNSET
+    topics_topics: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersTopicsTopicsType1
+        | PostApiTracesSearchBodyFiltersTopicsTopicsType2
+        | Unset
+    ) = UNSET
+    topics_subtopics: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersTopicsSubtopicsType1
+        | PostApiTracesSearchBodyFiltersTopicsSubtopicsType2
+        | Unset
+    ) = UNSET
+    metadata_user_id: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataUserIdType1
+        | PostApiTracesSearchBodyFiltersMetadataUserIdType2
+        | Unset
+    ) = UNSET
+    metadata_thread_id: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataThreadIdType1
+        | PostApiTracesSearchBodyFiltersMetadataThreadIdType2
+        | Unset
+    ) = UNSET
+    metadata_customer_id: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataCustomerIdType1
+        | PostApiTracesSearchBodyFiltersMetadataCustomerIdType2
+        | Unset
+    ) = UNSET
+    metadata_labels: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataLabelsType1
+        | PostApiTracesSearchBodyFiltersMetadataLabelsType2
+        | Unset
+    ) = UNSET
+    metadata_key: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataKeyType1
+        | PostApiTracesSearchBodyFiltersMetadataKeyType2
+        | Unset
+    ) = UNSET
+    metadata_value: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataValueType1
+        | PostApiTracesSearchBodyFiltersMetadataValueType2
+        | Unset
+    ) = UNSET
+    metadata_prompt_ids: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersMetadataPromptIdsType1
+        | PostApiTracesSearchBodyFiltersMetadataPromptIdsType2
+        | Unset
+    ) = UNSET
+    traces_origin: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersTracesOriginType1
+        | PostApiTracesSearchBodyFiltersTracesOriginType2
+        | Unset
+    ) = UNSET
+    traces_error: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersTracesErrorType1
+        | PostApiTracesSearchBodyFiltersTracesErrorType2
+        | Unset
+    ) = UNSET
+    spans_type: (
+        list[str] | PostApiTracesSearchBodyFiltersSpansTypeType1 | PostApiTracesSearchBodyFiltersSpansTypeType2 | Unset
+    ) = UNSET
+    spans_model: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersSpansModelType1
+        | PostApiTracesSearchBodyFiltersSpansModelType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_guardrails_only: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_passed: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_score: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_label: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1
+        | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2
+        | Unset
+    ) = UNSET
+    evaluations_passed: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsPassedType1
+        | PostApiTracesSearchBodyFiltersEvaluationsPassedType2
+        | Unset
+    ) = UNSET
+    evaluations_score: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsScoreType1
+        | PostApiTracesSearchBodyFiltersEvaluationsScoreType2
+        | Unset
+    ) = UNSET
+    evaluations_state: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsStateType1
+        | PostApiTracesSearchBodyFiltersEvaluationsStateType2
+        | Unset
+    ) = UNSET
+    evaluations_label: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEvaluationsLabelType1
+        | PostApiTracesSearchBodyFiltersEvaluationsLabelType2
+        | Unset
+    ) = UNSET
+    events_event_type: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEventsEventTypeType1
+        | PostApiTracesSearchBodyFiltersEventsEventTypeType2
+        | Unset
+    ) = UNSET
+    events_metrics_key: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEventsMetricsKeyType1
+        | PostApiTracesSearchBodyFiltersEventsMetricsKeyType2
+        | Unset
+    ) = UNSET
+    events_metrics_value: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEventsMetricsValueType1
+        | PostApiTracesSearchBodyFiltersEventsMetricsValueType2
+        | Unset
+    ) = UNSET
+    events_event_details_key: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType1
+        | PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType2
+        | Unset
+    ) = UNSET
+    annotations_has_annotation: (
+        list[str]
+        | PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType1
+        | PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType2
+        | Unset
+    ) = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_traces_search_body_filters_annotations_has_annotation_type_1 import (
@@ -358,6 +405,15 @@ class PostApiTracesSearchBodyFilters:
         )
         from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_guardrails_only_type_1 import (
             PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_1 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_1 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_1 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1,
         )
         from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_type_1 import (
             PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1,
@@ -426,7 +482,7 @@ class PostApiTracesSearchBodyFilters:
             PostApiTracesSearchBodyFiltersTracesOriginType1,
         )
 
-        topics_topics: Union[Unset, dict[str, Any], list[str]]
+        topics_topics: dict[str, Any] | list[str] | Unset
         if isinstance(self.topics_topics, Unset):
             topics_topics = UNSET
         elif isinstance(self.topics_topics, list):
@@ -437,7 +493,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             topics_topics = self.topics_topics.to_dict()
 
-        topics_subtopics: Union[Unset, dict[str, Any], list[str]]
+        topics_subtopics: dict[str, Any] | list[str] | Unset
         if isinstance(self.topics_subtopics, Unset):
             topics_subtopics = UNSET
         elif isinstance(self.topics_subtopics, list):
@@ -448,7 +504,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             topics_subtopics = self.topics_subtopics.to_dict()
 
-        metadata_user_id: Union[Unset, dict[str, Any], list[str]]
+        metadata_user_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_user_id, Unset):
             metadata_user_id = UNSET
         elif isinstance(self.metadata_user_id, list):
@@ -459,7 +515,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_user_id = self.metadata_user_id.to_dict()
 
-        metadata_thread_id: Union[Unset, dict[str, Any], list[str]]
+        metadata_thread_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_thread_id, Unset):
             metadata_thread_id = UNSET
         elif isinstance(self.metadata_thread_id, list):
@@ -470,7 +526,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_thread_id = self.metadata_thread_id.to_dict()
 
-        metadata_customer_id: Union[Unset, dict[str, Any], list[str]]
+        metadata_customer_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_customer_id, Unset):
             metadata_customer_id = UNSET
         elif isinstance(self.metadata_customer_id, list):
@@ -481,7 +537,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_customer_id = self.metadata_customer_id.to_dict()
 
-        metadata_labels: Union[Unset, dict[str, Any], list[str]]
+        metadata_labels: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_labels, Unset):
             metadata_labels = UNSET
         elif isinstance(self.metadata_labels, list):
@@ -492,7 +548,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_labels = self.metadata_labels.to_dict()
 
-        metadata_key: Union[Unset, dict[str, Any], list[str]]
+        metadata_key: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_key, Unset):
             metadata_key = UNSET
         elif isinstance(self.metadata_key, list):
@@ -503,7 +559,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_key = self.metadata_key.to_dict()
 
-        metadata_value: Union[Unset, dict[str, Any], list[str]]
+        metadata_value: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_value, Unset):
             metadata_value = UNSET
         elif isinstance(self.metadata_value, list):
@@ -514,7 +570,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_value = self.metadata_value.to_dict()
 
-        metadata_prompt_ids: Union[Unset, dict[str, Any], list[str]]
+        metadata_prompt_ids: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_prompt_ids, Unset):
             metadata_prompt_ids = UNSET
         elif isinstance(self.metadata_prompt_ids, list):
@@ -525,7 +581,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             metadata_prompt_ids = self.metadata_prompt_ids.to_dict()
 
-        traces_origin: Union[Unset, dict[str, Any], list[str]]
+        traces_origin: dict[str, Any] | list[str] | Unset
         if isinstance(self.traces_origin, Unset):
             traces_origin = UNSET
         elif isinstance(self.traces_origin, list):
@@ -536,7 +592,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             traces_origin = self.traces_origin.to_dict()
 
-        traces_error: Union[Unset, dict[str, Any], list[str]]
+        traces_error: dict[str, Any] | list[str] | Unset
         if isinstance(self.traces_error, Unset):
             traces_error = UNSET
         elif isinstance(self.traces_error, list):
@@ -547,7 +603,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             traces_error = self.traces_error.to_dict()
 
-        spans_type: Union[Unset, dict[str, Any], list[str]]
+        spans_type: dict[str, Any] | list[str] | Unset
         if isinstance(self.spans_type, Unset):
             spans_type = UNSET
         elif isinstance(self.spans_type, list):
@@ -558,7 +614,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             spans_type = self.spans_type.to_dict()
 
-        spans_model: Union[Unset, dict[str, Any], list[str]]
+        spans_model: dict[str, Any] | list[str] | Unset
         if isinstance(self.spans_model, Unset):
             spans_model = UNSET
         elif isinstance(self.spans_model, list):
@@ -569,7 +625,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             spans_model = self.spans_model.to_dict()
 
-        evaluations_evaluator_id: Union[Unset, dict[str, Any], list[str]]
+        evaluations_evaluator_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_evaluator_id, Unset):
             evaluations_evaluator_id = UNSET
         elif isinstance(self.evaluations_evaluator_id, list):
@@ -580,7 +636,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             evaluations_evaluator_id = self.evaluations_evaluator_id.to_dict()
 
-        evaluations_evaluator_id_guardrails_only: Union[Unset, dict[str, Any], list[str]]
+        evaluations_evaluator_id_guardrails_only: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_evaluator_id_guardrails_only, Unset):
             evaluations_evaluator_id_guardrails_only = UNSET
         elif isinstance(self.evaluations_evaluator_id_guardrails_only, list):
@@ -594,7 +650,46 @@ class PostApiTracesSearchBodyFilters:
         else:
             evaluations_evaluator_id_guardrails_only = self.evaluations_evaluator_id_guardrails_only.to_dict()
 
-        evaluations_passed: Union[Unset, dict[str, Any], list[str]]
+        evaluations_evaluator_id_has_passed: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_passed, Unset):
+            evaluations_evaluator_id_has_passed = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_passed, list):
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_passed, PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1
+        ):
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed.to_dict()
+        else:
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed.to_dict()
+
+        evaluations_evaluator_id_has_score: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_score, Unset):
+            evaluations_evaluator_id_has_score = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_score, list):
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_score, PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1
+        ):
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score.to_dict()
+        else:
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score.to_dict()
+
+        evaluations_evaluator_id_has_label: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_label, Unset):
+            evaluations_evaluator_id_has_label = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_label, list):
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_label, PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1
+        ):
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label.to_dict()
+        else:
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label.to_dict()
+
+        evaluations_passed: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_passed, Unset):
             evaluations_passed = UNSET
         elif isinstance(self.evaluations_passed, list):
@@ -605,7 +700,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             evaluations_passed = self.evaluations_passed.to_dict()
 
-        evaluations_score: Union[Unset, dict[str, Any], list[str]]
+        evaluations_score: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_score, Unset):
             evaluations_score = UNSET
         elif isinstance(self.evaluations_score, list):
@@ -616,7 +711,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             evaluations_score = self.evaluations_score.to_dict()
 
-        evaluations_state: Union[Unset, dict[str, Any], list[str]]
+        evaluations_state: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_state, Unset):
             evaluations_state = UNSET
         elif isinstance(self.evaluations_state, list):
@@ -627,7 +722,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             evaluations_state = self.evaluations_state.to_dict()
 
-        evaluations_label: Union[Unset, dict[str, Any], list[str]]
+        evaluations_label: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_label, Unset):
             evaluations_label = UNSET
         elif isinstance(self.evaluations_label, list):
@@ -638,7 +733,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             evaluations_label = self.evaluations_label.to_dict()
 
-        events_event_type: Union[Unset, dict[str, Any], list[str]]
+        events_event_type: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_event_type, Unset):
             events_event_type = UNSET
         elif isinstance(self.events_event_type, list):
@@ -649,7 +744,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             events_event_type = self.events_event_type.to_dict()
 
-        events_metrics_key: Union[Unset, dict[str, Any], list[str]]
+        events_metrics_key: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_metrics_key, Unset):
             events_metrics_key = UNSET
         elif isinstance(self.events_metrics_key, list):
@@ -660,7 +755,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             events_metrics_key = self.events_metrics_key.to_dict()
 
-        events_metrics_value: Union[Unset, dict[str, Any], list[str]]
+        events_metrics_value: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_metrics_value, Unset):
             events_metrics_value = UNSET
         elif isinstance(self.events_metrics_value, list):
@@ -671,7 +766,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             events_metrics_value = self.events_metrics_value.to_dict()
 
-        events_event_details_key: Union[Unset, dict[str, Any], list[str]]
+        events_event_details_key: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_event_details_key, Unset):
             events_event_details_key = UNSET
         elif isinstance(self.events_event_details_key, list):
@@ -682,7 +777,7 @@ class PostApiTracesSearchBodyFilters:
         else:
             events_event_details_key = self.events_event_details_key.to_dict()
 
-        annotations_has_annotation: Union[Unset, dict[str, Any], list[str]]
+        annotations_has_annotation: dict[str, Any] | list[str] | Unset
         if isinstance(self.annotations_has_annotation, Unset):
             annotations_has_annotation = UNSET
         elif isinstance(self.annotations_has_annotation, list):
@@ -694,6 +789,7 @@ class PostApiTracesSearchBodyFilters:
             annotations_has_annotation = self.annotations_has_annotation.to_dict()
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update({})
         if topics_topics is not UNSET:
             field_dict["topics.topics"] = topics_topics
@@ -725,6 +821,12 @@ class PostApiTracesSearchBodyFilters:
             field_dict["evaluations.evaluator_id"] = evaluations_evaluator_id
         if evaluations_evaluator_id_guardrails_only is not UNSET:
             field_dict["evaluations.evaluator_id.guardrails_only"] = evaluations_evaluator_id_guardrails_only
+        if evaluations_evaluator_id_has_passed is not UNSET:
+            field_dict["evaluations.evaluator_id.has_passed"] = evaluations_evaluator_id_has_passed
+        if evaluations_evaluator_id_has_score is not UNSET:
+            field_dict["evaluations.evaluator_id.has_score"] = evaluations_evaluator_id_has_score
+        if evaluations_evaluator_id_has_label is not UNSET:
+            field_dict["evaluations.evaluator_id.has_label"] = evaluations_evaluator_id_has_label
         if evaluations_passed is not UNSET:
             field_dict["evaluations.passed"] = evaluations_passed
         if evaluations_score is not UNSET:
@@ -759,6 +861,24 @@ class PostApiTracesSearchBodyFilters:
         )
         from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_guardrails_only_type_2 import (
             PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_1 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_2 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_1 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_2 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_1 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1,
+        )
+        from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_2 import (
+            PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2,
         )
         from ..models.post_api_traces_search_body_filters_evaluations_evaluator_id_type_1 import (
             PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1,
@@ -897,12 +1017,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_topics_topics(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersTopicsTopicsType1",
-            "PostApiTracesSearchBodyFiltersTopicsTopicsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersTopicsTopicsType1
+            | PostApiTracesSearchBodyFiltersTopicsTopicsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -911,7 +1031,7 @@ class PostApiTracesSearchBodyFilters:
                 topics_topics_type_0 = cast(list[str], data)
 
                 return topics_topics_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -919,7 +1039,7 @@ class PostApiTracesSearchBodyFilters:
                 topics_topics_type_1 = PostApiTracesSearchBodyFiltersTopicsTopicsType1.from_dict(data)
 
                 return topics_topics_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -931,12 +1051,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_topics_subtopics(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersTopicsSubtopicsType1",
-            "PostApiTracesSearchBodyFiltersTopicsSubtopicsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersTopicsSubtopicsType1
+            | PostApiTracesSearchBodyFiltersTopicsSubtopicsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -945,7 +1065,7 @@ class PostApiTracesSearchBodyFilters:
                 topics_subtopics_type_0 = cast(list[str], data)
 
                 return topics_subtopics_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -953,7 +1073,7 @@ class PostApiTracesSearchBodyFilters:
                 topics_subtopics_type_1 = PostApiTracesSearchBodyFiltersTopicsSubtopicsType1.from_dict(data)
 
                 return topics_subtopics_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -965,12 +1085,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_user_id(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataUserIdType1",
-            "PostApiTracesSearchBodyFiltersMetadataUserIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataUserIdType1
+            | PostApiTracesSearchBodyFiltersMetadataUserIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -979,7 +1099,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_user_id_type_0 = cast(list[str], data)
 
                 return metadata_user_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -987,7 +1107,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_user_id_type_1 = PostApiTracesSearchBodyFiltersMetadataUserIdType1.from_dict(data)
 
                 return metadata_user_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -999,12 +1119,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_thread_id(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataThreadIdType1",
-            "PostApiTracesSearchBodyFiltersMetadataThreadIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataThreadIdType1
+            | PostApiTracesSearchBodyFiltersMetadataThreadIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1013,7 +1133,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_thread_id_type_0 = cast(list[str], data)
 
                 return metadata_thread_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1021,7 +1141,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_thread_id_type_1 = PostApiTracesSearchBodyFiltersMetadataThreadIdType1.from_dict(data)
 
                 return metadata_thread_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1033,12 +1153,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_customer_id(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataCustomerIdType1",
-            "PostApiTracesSearchBodyFiltersMetadataCustomerIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataCustomerIdType1
+            | PostApiTracesSearchBodyFiltersMetadataCustomerIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1047,7 +1167,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_customer_id_type_0 = cast(list[str], data)
 
                 return metadata_customer_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1055,7 +1175,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_customer_id_type_1 = PostApiTracesSearchBodyFiltersMetadataCustomerIdType1.from_dict(data)
 
                 return metadata_customer_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1067,12 +1187,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_labels(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataLabelsType1",
-            "PostApiTracesSearchBodyFiltersMetadataLabelsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataLabelsType1
+            | PostApiTracesSearchBodyFiltersMetadataLabelsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1081,7 +1201,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_labels_type_0 = cast(list[str], data)
 
                 return metadata_labels_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1089,7 +1209,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_labels_type_1 = PostApiTracesSearchBodyFiltersMetadataLabelsType1.from_dict(data)
 
                 return metadata_labels_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1101,12 +1221,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_key(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataKeyType1",
-            "PostApiTracesSearchBodyFiltersMetadataKeyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataKeyType1
+            | PostApiTracesSearchBodyFiltersMetadataKeyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1115,7 +1235,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_key_type_0 = cast(list[str], data)
 
                 return metadata_key_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1123,7 +1243,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_key_type_1 = PostApiTracesSearchBodyFiltersMetadataKeyType1.from_dict(data)
 
                 return metadata_key_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1135,12 +1255,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_value(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataValueType1",
-            "PostApiTracesSearchBodyFiltersMetadataValueType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataValueType1
+            | PostApiTracesSearchBodyFiltersMetadataValueType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1149,7 +1269,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_value_type_0 = cast(list[str], data)
 
                 return metadata_value_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1157,7 +1277,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_value_type_1 = PostApiTracesSearchBodyFiltersMetadataValueType1.from_dict(data)
 
                 return metadata_value_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1169,12 +1289,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_metadata_prompt_ids(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersMetadataPromptIdsType1",
-            "PostApiTracesSearchBodyFiltersMetadataPromptIdsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersMetadataPromptIdsType1
+            | PostApiTracesSearchBodyFiltersMetadataPromptIdsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1183,7 +1303,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_prompt_ids_type_0 = cast(list[str], data)
 
                 return metadata_prompt_ids_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1191,7 +1311,7 @@ class PostApiTracesSearchBodyFilters:
                 metadata_prompt_ids_type_1 = PostApiTracesSearchBodyFiltersMetadataPromptIdsType1.from_dict(data)
 
                 return metadata_prompt_ids_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1203,12 +1323,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_traces_origin(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersTracesOriginType1",
-            "PostApiTracesSearchBodyFiltersTracesOriginType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersTracesOriginType1
+            | PostApiTracesSearchBodyFiltersTracesOriginType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1217,7 +1337,7 @@ class PostApiTracesSearchBodyFilters:
                 traces_origin_type_0 = cast(list[str], data)
 
                 return traces_origin_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1225,7 +1345,7 @@ class PostApiTracesSearchBodyFilters:
                 traces_origin_type_1 = PostApiTracesSearchBodyFiltersTracesOriginType1.from_dict(data)
 
                 return traces_origin_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1237,12 +1357,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_traces_error(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersTracesErrorType1",
-            "PostApiTracesSearchBodyFiltersTracesErrorType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersTracesErrorType1
+            | PostApiTracesSearchBodyFiltersTracesErrorType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1251,7 +1371,7 @@ class PostApiTracesSearchBodyFilters:
                 traces_error_type_0 = cast(list[str], data)
 
                 return traces_error_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1259,7 +1379,7 @@ class PostApiTracesSearchBodyFilters:
                 traces_error_type_1 = PostApiTracesSearchBodyFiltersTracesErrorType1.from_dict(data)
 
                 return traces_error_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1271,12 +1391,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_spans_type(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersSpansTypeType1",
-            "PostApiTracesSearchBodyFiltersSpansTypeType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersSpansTypeType1
+            | PostApiTracesSearchBodyFiltersSpansTypeType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1285,7 +1405,7 @@ class PostApiTracesSearchBodyFilters:
                 spans_type_type_0 = cast(list[str], data)
 
                 return spans_type_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1293,7 +1413,7 @@ class PostApiTracesSearchBodyFilters:
                 spans_type_type_1 = PostApiTracesSearchBodyFiltersSpansTypeType1.from_dict(data)
 
                 return spans_type_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1305,12 +1425,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_spans_model(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersSpansModelType1",
-            "PostApiTracesSearchBodyFiltersSpansModelType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersSpansModelType1
+            | PostApiTracesSearchBodyFiltersSpansModelType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1319,7 +1439,7 @@ class PostApiTracesSearchBodyFilters:
                 spans_model_type_0 = cast(list[str], data)
 
                 return spans_model_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1327,7 +1447,7 @@ class PostApiTracesSearchBodyFilters:
                 spans_model_type_1 = PostApiTracesSearchBodyFiltersSpansModelType1.from_dict(data)
 
                 return spans_model_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1339,12 +1459,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_evaluations_evaluator_id(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1",
-            "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1353,7 +1473,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_evaluator_id_type_0 = cast(list[str], data)
 
                 return evaluations_evaluator_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1363,7 +1483,7 @@ class PostApiTracesSearchBodyFilters:
                 )
 
                 return evaluations_evaluator_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1375,12 +1495,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_evaluations_evaluator_id_guardrails_only(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
-            "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1389,7 +1509,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_evaluator_id_guardrails_only_type_0 = cast(list[str], data)
 
                 return evaluations_evaluator_id_guardrails_only_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1399,7 +1519,7 @@ class PostApiTracesSearchBodyFilters:
                 )
 
                 return evaluations_evaluator_id_guardrails_only_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1413,14 +1533,134 @@ class PostApiTracesSearchBodyFilters:
             d.pop("evaluations.evaluator_id.guardrails_only", UNSET)
         )
 
+        def _parse_evaluations_evaluator_id_has_passed(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_passed_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_passed_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_passed_type_1 = (
+                    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_passed_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_passed_type_2 = (
+                PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_passed_type_2
+
+        evaluations_evaluator_id_has_passed = _parse_evaluations_evaluator_id_has_passed(
+            d.pop("evaluations.evaluator_id.has_passed", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_score(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_score_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_score_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_score_type_1 = (
+                    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_score_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_score_type_2 = (
+                PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_score_type_2
+
+        evaluations_evaluator_id_has_score = _parse_evaluations_evaluator_id_has_score(
+            d.pop("evaluations.evaluator_id.has_score", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_label(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1
+            | PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_label_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_label_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_label_type_1 = (
+                    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_label_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_label_type_2 = (
+                PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_label_type_2
+
+        evaluations_evaluator_id_has_label = _parse_evaluations_evaluator_id_has_label(
+            d.pop("evaluations.evaluator_id.has_label", UNSET)
+        )
+
         def _parse_evaluations_passed(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEvaluationsPassedType1",
-            "PostApiTracesSearchBodyFiltersEvaluationsPassedType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsPassedType1
+            | PostApiTracesSearchBodyFiltersEvaluationsPassedType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1429,7 +1669,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_passed_type_0 = cast(list[str], data)
 
                 return evaluations_passed_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1437,7 +1677,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_passed_type_1 = PostApiTracesSearchBodyFiltersEvaluationsPassedType1.from_dict(data)
 
                 return evaluations_passed_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1449,12 +1689,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_evaluations_score(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEvaluationsScoreType1",
-            "PostApiTracesSearchBodyFiltersEvaluationsScoreType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsScoreType1
+            | PostApiTracesSearchBodyFiltersEvaluationsScoreType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1463,7 +1703,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_score_type_0 = cast(list[str], data)
 
                 return evaluations_score_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1471,7 +1711,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_score_type_1 = PostApiTracesSearchBodyFiltersEvaluationsScoreType1.from_dict(data)
 
                 return evaluations_score_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1483,12 +1723,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_evaluations_state(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEvaluationsStateType1",
-            "PostApiTracesSearchBodyFiltersEvaluationsStateType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsStateType1
+            | PostApiTracesSearchBodyFiltersEvaluationsStateType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1497,7 +1737,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_state_type_0 = cast(list[str], data)
 
                 return evaluations_state_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1505,7 +1745,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_state_type_1 = PostApiTracesSearchBodyFiltersEvaluationsStateType1.from_dict(data)
 
                 return evaluations_state_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1517,12 +1757,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_evaluations_label(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEvaluationsLabelType1",
-            "PostApiTracesSearchBodyFiltersEvaluationsLabelType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEvaluationsLabelType1
+            | PostApiTracesSearchBodyFiltersEvaluationsLabelType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1531,7 +1771,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_label_type_0 = cast(list[str], data)
 
                 return evaluations_label_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1539,7 +1779,7 @@ class PostApiTracesSearchBodyFilters:
                 evaluations_label_type_1 = PostApiTracesSearchBodyFiltersEvaluationsLabelType1.from_dict(data)
 
                 return evaluations_label_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1551,12 +1791,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_events_event_type(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEventsEventTypeType1",
-            "PostApiTracesSearchBodyFiltersEventsEventTypeType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEventsEventTypeType1
+            | PostApiTracesSearchBodyFiltersEventsEventTypeType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1565,7 +1805,7 @@ class PostApiTracesSearchBodyFilters:
                 events_event_type_type_0 = cast(list[str], data)
 
                 return events_event_type_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1573,7 +1813,7 @@ class PostApiTracesSearchBodyFilters:
                 events_event_type_type_1 = PostApiTracesSearchBodyFiltersEventsEventTypeType1.from_dict(data)
 
                 return events_event_type_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1585,12 +1825,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_events_metrics_key(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEventsMetricsKeyType1",
-            "PostApiTracesSearchBodyFiltersEventsMetricsKeyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEventsMetricsKeyType1
+            | PostApiTracesSearchBodyFiltersEventsMetricsKeyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1599,7 +1839,7 @@ class PostApiTracesSearchBodyFilters:
                 events_metrics_key_type_0 = cast(list[str], data)
 
                 return events_metrics_key_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1607,7 +1847,7 @@ class PostApiTracesSearchBodyFilters:
                 events_metrics_key_type_1 = PostApiTracesSearchBodyFiltersEventsMetricsKeyType1.from_dict(data)
 
                 return events_metrics_key_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1619,12 +1859,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_events_metrics_value(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEventsMetricsValueType1",
-            "PostApiTracesSearchBodyFiltersEventsMetricsValueType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEventsMetricsValueType1
+            | PostApiTracesSearchBodyFiltersEventsMetricsValueType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1633,7 +1873,7 @@ class PostApiTracesSearchBodyFilters:
                 events_metrics_value_type_0 = cast(list[str], data)
 
                 return events_metrics_value_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1641,7 +1881,7 @@ class PostApiTracesSearchBodyFilters:
                 events_metrics_value_type_1 = PostApiTracesSearchBodyFiltersEventsMetricsValueType1.from_dict(data)
 
                 return events_metrics_value_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1653,12 +1893,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_events_event_details_key(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType1",
-            "PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType1
+            | PostApiTracesSearchBodyFiltersEventsEventDetailsKeyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1667,7 +1907,7 @@ class PostApiTracesSearchBodyFilters:
                 events_event_details_key_type_0 = cast(list[str], data)
 
                 return events_event_details_key_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1677,7 +1917,7 @@ class PostApiTracesSearchBodyFilters:
                 )
 
                 return events_event_details_key_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1689,12 +1929,12 @@ class PostApiTracesSearchBodyFilters:
 
         def _parse_annotations_has_annotation(
             data: object,
-        ) -> Union[
-            "PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType1",
-            "PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType1
+            | PostApiTracesSearchBodyFiltersAnnotationsHasAnnotationType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1703,7 +1943,7 @@ class PostApiTracesSearchBodyFilters:
                 annotations_has_annotation_type_0 = cast(list[str], data)
 
                 return annotations_has_annotation_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1713,7 +1953,7 @@ class PostApiTracesSearchBodyFilters:
                 )
 
                 return annotations_has_annotation_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1741,6 +1981,9 @@ class PostApiTracesSearchBodyFilters:
             spans_model=spans_model,
             evaluations_evaluator_id=evaluations_evaluator_id,
             evaluations_evaluator_id_guardrails_only=evaluations_evaluator_id_guardrails_only,
+            evaluations_evaluator_id_has_passed=evaluations_evaluator_id_has_passed,
+            evaluations_evaluator_id_has_score=evaluations_evaluator_id_has_score,
+            evaluations_evaluator_id_has_label=evaluations_evaluator_id_has_label,
             evaluations_passed=evaluations_passed,
             evaluations_score=evaluations_score,
             evaluations_state=evaluations_state,

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,33 +26,33 @@ class PostApiEvaluatorsResponse200:
         id (str):
         project_id (str):
         name (str):
-        slug (Union[None, str]):
+        slug (None | str):
         type_ (str):
-        config (Union['PostApiEvaluatorsResponse200ConfigType0', None]):
-        workflow_id (Union[None, str]):
-        copied_from_evaluator_id (Union[None, str]):
+        config (None | PostApiEvaluatorsResponse200ConfigType0):
+        workflow_id (None | str):
+        copied_from_evaluator_id (None | str):
         created_at (str):
         updated_at (str):
-        fields (list['PostApiEvaluatorsResponse200FieldsItem']):
-        output_fields (list['PostApiEvaluatorsResponse200OutputFieldsItem']):
-        workflow_name (Union[Unset, str]):
-        workflow_icon (Union[Unset, str]):
+        fields (list[PostApiEvaluatorsResponse200FieldsItem]):
+        output_fields (list[PostApiEvaluatorsResponse200OutputFieldsItem]):
+        workflow_name (str | Unset):
+        workflow_icon (str | Unset):
     """
 
     id: str
     project_id: str
     name: str
-    slug: Union[None, str]
+    slug: None | str
     type_: str
-    config: Union["PostApiEvaluatorsResponse200ConfigType0", None]
-    workflow_id: Union[None, str]
-    copied_from_evaluator_id: Union[None, str]
+    config: None | PostApiEvaluatorsResponse200ConfigType0
+    workflow_id: None | str
+    copied_from_evaluator_id: None | str
     created_at: str
     updated_at: str
-    fields: list["PostApiEvaluatorsResponse200FieldsItem"]
-    output_fields: list["PostApiEvaluatorsResponse200OutputFieldsItem"]
-    workflow_name: Union[Unset, str] = UNSET
-    workflow_icon: Union[Unset, str] = UNSET
+    fields: list[PostApiEvaluatorsResponse200FieldsItem]
+    output_fields: list[PostApiEvaluatorsResponse200OutputFieldsItem]
+    workflow_name: str | Unset = UNSET
+    workflow_icon: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -62,21 +64,21 @@ class PostApiEvaluatorsResponse200:
 
         name = self.name
 
-        slug: Union[None, str]
+        slug: None | str
         slug = self.slug
 
         type_ = self.type_
 
-        config: Union[None, dict[str, Any]]
+        config: dict[str, Any] | None
         if isinstance(self.config, PostApiEvaluatorsResponse200ConfigType0):
             config = self.config.to_dict()
         else:
             config = self.config
 
-        workflow_id: Union[None, str]
+        workflow_id: None | str
         workflow_id = self.workflow_id
 
-        copied_from_evaluator_id: Union[None, str]
+        copied_from_evaluator_id: None | str
         copied_from_evaluator_id = self.copied_from_evaluator_id
 
         created_at = self.created_at
@@ -137,16 +139,16 @@ class PostApiEvaluatorsResponse200:
 
         name = d.pop("name")
 
-        def _parse_slug(data: object) -> Union[None, str]:
+        def _parse_slug(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         slug = _parse_slug(d.pop("slug"))
 
         type_ = d.pop("type")
 
-        def _parse_config(data: object) -> Union["PostApiEvaluatorsResponse200ConfigType0", None]:
+        def _parse_config(data: object) -> None | PostApiEvaluatorsResponse200ConfigType0:
             if data is None:
                 return data
             try:
@@ -155,23 +157,23 @@ class PostApiEvaluatorsResponse200:
                 config_type_0 = PostApiEvaluatorsResponse200ConfigType0.from_dict(data)
 
                 return config_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(Union["PostApiEvaluatorsResponse200ConfigType0", None], data)
+            return cast(None | PostApiEvaluatorsResponse200ConfigType0, data)
 
         config = _parse_config(d.pop("config"))
 
-        def _parse_workflow_id(data: object) -> Union[None, str]:
+        def _parse_workflow_id(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         workflow_id = _parse_workflow_id(d.pop("workflowId"))
 
-        def _parse_copied_from_evaluator_id(data: object) -> Union[None, str]:
+        def _parse_copied_from_evaluator_id(data: object) -> None | str:
             if data is None:
                 return data
-            return cast(Union[None, str], data)
+            return cast(None | str, data)
 
         copied_from_evaluator_id = _parse_copied_from_evaluator_id(d.pop("copiedFromEvaluatorId"))
 

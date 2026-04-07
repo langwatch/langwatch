@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -17,6 +19,24 @@ if TYPE_CHECKING:
     )
     from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_2 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2,
     )
     from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
@@ -159,202 +179,229 @@ T = TypeVar("T", bound="PostApiAnalyticsTimeseriesBodySeriesItemFilters")
 class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
     """
     Attributes:
-        topics_topics (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType2', Unset, list[str]]):
-        topics_subtopics (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType2', Unset, list[str]]):
-        metadata_user_id (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType2', Unset, list[str]]):
-        metadata_thread_id (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType2', Unset, list[str]]):
-        metadata_customer_id (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType2', Unset, list[str]]):
-        metadata_labels (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType2', Unset, list[str]]):
-        metadata_key (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType2', Unset, list[str]]):
-        metadata_value (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2', Unset, list[str]]):
-        metadata_prompt_ids (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2', Unset, list[str]]):
-        traces_origin (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2', Unset, list[str]]):
-        traces_error (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2', Unset, list[str]]):
-        spans_type (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType2', Unset, list[str]]):
-        spans_model (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2', Unset, list[str]]):
-        evaluations_evaluator_id (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2', Unset, list[str]]):
-        evaluations_evaluator_id_guardrails_only
-            (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2', Unset, list[str]]):
-        evaluations_passed (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2', Unset, list[str]]):
-        evaluations_score (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType2', Unset, list[str]]):
-        evaluations_state (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType2', Unset, list[str]]):
-        evaluations_label (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType2', Unset, list[str]]):
-        events_event_type (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType2', Unset, list[str]]):
-        events_metrics_key (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType2', Unset, list[str]]):
-        events_metrics_value (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType2', Unset, list[str]]):
-        events_event_details_key (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType2', Unset, list[str]]):
-        annotations_has_annotation
-            (Union['PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1',
-            'PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2', Unset, list[str]]):
+        topics_topics (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType2 | Unset):
+        topics_subtopics (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType2 | Unset):
+        metadata_user_id (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType2 | Unset):
+        metadata_thread_id (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType2 | Unset):
+        metadata_customer_id (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType2 | Unset):
+        metadata_labels (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType2 | Unset):
+        metadata_key (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType2 | Unset):
+        metadata_value (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2 | Unset):
+        metadata_prompt_ids (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2 | Unset):
+        traces_origin (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2 | Unset):
+        traces_error (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2 | Unset):
+        spans_type (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType2 | Unset):
+        spans_model (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2 | Unset):
+        evaluations_evaluator_id (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2 | Unset):
+        evaluations_evaluator_id_guardrails_only (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2 | Unset):
+        evaluations_evaluator_id_has_passed (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2 | Unset):
+        evaluations_evaluator_id_has_score (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2 | Unset):
+        evaluations_evaluator_id_has_label (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2 | Unset):
+        evaluations_passed (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2 | Unset):
+        evaluations_score (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType2 | Unset):
+        evaluations_state (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType2 | Unset):
+        evaluations_label (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType2 | Unset):
+        events_event_type (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType2 | Unset):
+        events_metrics_key (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType2 | Unset):
+        events_metrics_value (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType2 | Unset):
+        events_event_details_key (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType2 | Unset):
+        annotations_has_annotation (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2 | Unset):
     """
 
-    topics_topics: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    topics_subtopics: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_user_id: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_thread_id: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_customer_id: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_labels: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_key: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_value: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    metadata_prompt_ids: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    traces_origin: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    traces_error: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    spans_type: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    spans_model: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_evaluator_id: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_evaluator_id_guardrails_only: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_passed: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_score: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_state: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    evaluations_label: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_event_type: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_metrics_key: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_metrics_value: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    events_event_details_key: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType2",
-        Unset,
-        list[str],
-    ] = UNSET
-    annotations_has_annotation: Union[
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1",
-        "PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2",
-        Unset,
-        list[str],
-    ] = UNSET
+    topics_topics: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType2
+        | Unset
+    ) = UNSET
+    topics_subtopics: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType2
+        | Unset
+    ) = UNSET
+    metadata_user_id: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType2
+        | Unset
+    ) = UNSET
+    metadata_thread_id: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType2
+        | Unset
+    ) = UNSET
+    metadata_customer_id: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType2
+        | Unset
+    ) = UNSET
+    metadata_labels: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType2
+        | Unset
+    ) = UNSET
+    metadata_key: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType2
+        | Unset
+    ) = UNSET
+    metadata_value: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2
+        | Unset
+    ) = UNSET
+    metadata_prompt_ids: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2
+        | Unset
+    ) = UNSET
+    traces_origin: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2
+        | Unset
+    ) = UNSET
+    traces_error: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2
+        | Unset
+    ) = UNSET
+    spans_type: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType2
+        | Unset
+    ) = UNSET
+    spans_model: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_guardrails_only: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_passed: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_score: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_label: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2
+        | Unset
+    ) = UNSET
+    evaluations_passed: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2
+        | Unset
+    ) = UNSET
+    evaluations_score: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType2
+        | Unset
+    ) = UNSET
+    evaluations_state: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType2
+        | Unset
+    ) = UNSET
+    evaluations_label: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType2
+        | Unset
+    ) = UNSET
+    events_event_type: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType2
+        | Unset
+    ) = UNSET
+    events_metrics_key: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType2
+        | Unset
+    ) = UNSET
+    events_metrics_value: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType2
+        | Unset
+    ) = UNSET
+    events_event_details_key: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType2
+        | Unset
+    ) = UNSET
+    annotations_has_annotation: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2
+        | Unset
+    ) = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_analytics_timeseries_body_series_item_filters_annotations_has_annotation_type_1 import (
@@ -362,6 +409,15 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
@@ -430,7 +486,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1,
         )
 
-        topics_topics: Union[Unset, dict[str, Any], list[str]]
+        topics_topics: dict[str, Any] | list[str] | Unset
         if isinstance(self.topics_topics, Unset):
             topics_topics = UNSET
         elif isinstance(self.topics_topics, list):
@@ -441,7 +497,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             topics_topics = self.topics_topics.to_dict()
 
-        topics_subtopics: Union[Unset, dict[str, Any], list[str]]
+        topics_subtopics: dict[str, Any] | list[str] | Unset
         if isinstance(self.topics_subtopics, Unset):
             topics_subtopics = UNSET
         elif isinstance(self.topics_subtopics, list):
@@ -452,7 +508,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             topics_subtopics = self.topics_subtopics.to_dict()
 
-        metadata_user_id: Union[Unset, dict[str, Any], list[str]]
+        metadata_user_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_user_id, Unset):
             metadata_user_id = UNSET
         elif isinstance(self.metadata_user_id, list):
@@ -463,7 +519,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_user_id = self.metadata_user_id.to_dict()
 
-        metadata_thread_id: Union[Unset, dict[str, Any], list[str]]
+        metadata_thread_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_thread_id, Unset):
             metadata_thread_id = UNSET
         elif isinstance(self.metadata_thread_id, list):
@@ -474,7 +530,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_thread_id = self.metadata_thread_id.to_dict()
 
-        metadata_customer_id: Union[Unset, dict[str, Any], list[str]]
+        metadata_customer_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_customer_id, Unset):
             metadata_customer_id = UNSET
         elif isinstance(self.metadata_customer_id, list):
@@ -487,7 +543,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_customer_id = self.metadata_customer_id.to_dict()
 
-        metadata_labels: Union[Unset, dict[str, Any], list[str]]
+        metadata_labels: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_labels, Unset):
             metadata_labels = UNSET
         elif isinstance(self.metadata_labels, list):
@@ -498,7 +554,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_labels = self.metadata_labels.to_dict()
 
-        metadata_key: Union[Unset, dict[str, Any], list[str]]
+        metadata_key: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_key, Unset):
             metadata_key = UNSET
         elif isinstance(self.metadata_key, list):
@@ -509,7 +565,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_key = self.metadata_key.to_dict()
 
-        metadata_value: Union[Unset, dict[str, Any], list[str]]
+        metadata_value: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_value, Unset):
             metadata_value = UNSET
         elif isinstance(self.metadata_value, list):
@@ -520,7 +576,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_value = self.metadata_value.to_dict()
 
-        metadata_prompt_ids: Union[Unset, dict[str, Any], list[str]]
+        metadata_prompt_ids: dict[str, Any] | list[str] | Unset
         if isinstance(self.metadata_prompt_ids, Unset):
             metadata_prompt_ids = UNSET
         elif isinstance(self.metadata_prompt_ids, list):
@@ -533,7 +589,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_prompt_ids = self.metadata_prompt_ids.to_dict()
 
-        traces_origin: Union[Unset, dict[str, Any], list[str]]
+        traces_origin: dict[str, Any] | list[str] | Unset
         if isinstance(self.traces_origin, Unset):
             traces_origin = UNSET
         elif isinstance(self.traces_origin, list):
@@ -544,7 +600,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             traces_origin = self.traces_origin.to_dict()
 
-        traces_error: Union[Unset, dict[str, Any], list[str]]
+        traces_error: dict[str, Any] | list[str] | Unset
         if isinstance(self.traces_error, Unset):
             traces_error = UNSET
         elif isinstance(self.traces_error, list):
@@ -555,7 +611,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             traces_error = self.traces_error.to_dict()
 
-        spans_type: Union[Unset, dict[str, Any], list[str]]
+        spans_type: dict[str, Any] | list[str] | Unset
         if isinstance(self.spans_type, Unset):
             spans_type = UNSET
         elif isinstance(self.spans_type, list):
@@ -566,7 +622,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             spans_type = self.spans_type.to_dict()
 
-        spans_model: Union[Unset, dict[str, Any], list[str]]
+        spans_model: dict[str, Any] | list[str] | Unset
         if isinstance(self.spans_model, Unset):
             spans_model = UNSET
         elif isinstance(self.spans_model, list):
@@ -577,7 +633,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             spans_model = self.spans_model.to_dict()
 
-        evaluations_evaluator_id: Union[Unset, dict[str, Any], list[str]]
+        evaluations_evaluator_id: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_evaluator_id, Unset):
             evaluations_evaluator_id = UNSET
         elif isinstance(self.evaluations_evaluator_id, list):
@@ -590,7 +646,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             evaluations_evaluator_id = self.evaluations_evaluator_id.to_dict()
 
-        evaluations_evaluator_id_guardrails_only: Union[Unset, dict[str, Any], list[str]]
+        evaluations_evaluator_id_guardrails_only: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_evaluator_id_guardrails_only, Unset):
             evaluations_evaluator_id_guardrails_only = UNSET
         elif isinstance(self.evaluations_evaluator_id_guardrails_only, list):
@@ -604,7 +660,49 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             evaluations_evaluator_id_guardrails_only = self.evaluations_evaluator_id_guardrails_only.to_dict()
 
-        evaluations_passed: Union[Unset, dict[str, Any], list[str]]
+        evaluations_evaluator_id_has_passed: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_passed, Unset):
+            evaluations_evaluator_id_has_passed = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_passed, list):
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_passed,
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+        ):
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed.to_dict()
+        else:
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed.to_dict()
+
+        evaluations_evaluator_id_has_score: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_score, Unset):
+            evaluations_evaluator_id_has_score = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_score, list):
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_score,
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+        ):
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score.to_dict()
+        else:
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score.to_dict()
+
+        evaluations_evaluator_id_has_label: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_label, Unset):
+            evaluations_evaluator_id_has_label = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_label, list):
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_label,
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+        ):
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label.to_dict()
+        else:
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label.to_dict()
+
+        evaluations_passed: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_passed, Unset):
             evaluations_passed = UNSET
         elif isinstance(self.evaluations_passed, list):
@@ -615,7 +713,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             evaluations_passed = self.evaluations_passed.to_dict()
 
-        evaluations_score: Union[Unset, dict[str, Any], list[str]]
+        evaluations_score: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_score, Unset):
             evaluations_score = UNSET
         elif isinstance(self.evaluations_score, list):
@@ -626,7 +724,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             evaluations_score = self.evaluations_score.to_dict()
 
-        evaluations_state: Union[Unset, dict[str, Any], list[str]]
+        evaluations_state: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_state, Unset):
             evaluations_state = UNSET
         elif isinstance(self.evaluations_state, list):
@@ -637,7 +735,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             evaluations_state = self.evaluations_state.to_dict()
 
-        evaluations_label: Union[Unset, dict[str, Any], list[str]]
+        evaluations_label: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_label, Unset):
             evaluations_label = UNSET
         elif isinstance(self.evaluations_label, list):
@@ -648,7 +746,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             evaluations_label = self.evaluations_label.to_dict()
 
-        events_event_type: Union[Unset, dict[str, Any], list[str]]
+        events_event_type: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_event_type, Unset):
             events_event_type = UNSET
         elif isinstance(self.events_event_type, list):
@@ -659,7 +757,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             events_event_type = self.events_event_type.to_dict()
 
-        events_metrics_key: Union[Unset, dict[str, Any], list[str]]
+        events_metrics_key: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_metrics_key, Unset):
             events_metrics_key = UNSET
         elif isinstance(self.events_metrics_key, list):
@@ -670,7 +768,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             events_metrics_key = self.events_metrics_key.to_dict()
 
-        events_metrics_value: Union[Unset, dict[str, Any], list[str]]
+        events_metrics_value: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_metrics_value, Unset):
             events_metrics_value = UNSET
         elif isinstance(self.events_metrics_value, list):
@@ -683,7 +781,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             events_metrics_value = self.events_metrics_value.to_dict()
 
-        events_event_details_key: Union[Unset, dict[str, Any], list[str]]
+        events_event_details_key: dict[str, Any] | list[str] | Unset
         if isinstance(self.events_event_details_key, Unset):
             events_event_details_key = UNSET
         elif isinstance(self.events_event_details_key, list):
@@ -696,7 +794,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             events_event_details_key = self.events_event_details_key.to_dict()
 
-        annotations_has_annotation: Union[Unset, dict[str, Any], list[str]]
+        annotations_has_annotation: dict[str, Any] | list[str] | Unset
         if isinstance(self.annotations_has_annotation, Unset):
             annotations_has_annotation = UNSET
         elif isinstance(self.annotations_has_annotation, list):
@@ -711,6 +809,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             annotations_has_annotation = self.annotations_has_annotation.to_dict()
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update({})
         if topics_topics is not UNSET:
             field_dict["topics.topics"] = topics_topics
@@ -742,6 +841,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             field_dict["evaluations.evaluator_id"] = evaluations_evaluator_id
         if evaluations_evaluator_id_guardrails_only is not UNSET:
             field_dict["evaluations.evaluator_id.guardrails_only"] = evaluations_evaluator_id_guardrails_only
+        if evaluations_evaluator_id_has_passed is not UNSET:
+            field_dict["evaluations.evaluator_id.has_passed"] = evaluations_evaluator_id_has_passed
+        if evaluations_evaluator_id_has_score is not UNSET:
+            field_dict["evaluations.evaluator_id.has_score"] = evaluations_evaluator_id_has_score
+        if evaluations_evaluator_id_has_label is not UNSET:
+            field_dict["evaluations.evaluator_id.has_label"] = evaluations_evaluator_id_has_label
         if evaluations_passed is not UNSET:
             field_dict["evaluations.passed"] = evaluations_passed
         if evaluations_score is not UNSET:
@@ -776,6 +881,24 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_2 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2,
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
@@ -914,12 +1037,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_topics_topics(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -928,7 +1051,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 topics_topics_type_0 = cast(list[str], data)
 
                 return topics_topics_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -936,7 +1059,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 topics_topics_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsTopicsType1.from_dict(data)
 
                 return topics_topics_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -948,12 +1071,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_topics_subtopics(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTopicsSubtopicsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -962,7 +1085,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 topics_subtopics_type_0 = cast(list[str], data)
 
                 return topics_subtopics_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -972,7 +1095,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return topics_subtopics_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -986,12 +1109,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_user_id(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataUserIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1000,7 +1123,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_user_id_type_0 = cast(list[str], data)
 
                 return metadata_user_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1010,7 +1133,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return metadata_user_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1022,12 +1145,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_thread_id(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataThreadIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1036,7 +1159,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_thread_id_type_0 = cast(list[str], data)
 
                 return metadata_thread_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1046,7 +1169,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return metadata_thread_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1060,12 +1183,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_customer_id(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataCustomerIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1074,7 +1197,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_customer_id_type_0 = cast(list[str], data)
 
                 return metadata_customer_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1084,7 +1207,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return metadata_customer_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1098,12 +1221,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_labels(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataLabelsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1112,7 +1235,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_labels_type_0 = cast(list[str], data)
 
                 return metadata_labels_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1122,7 +1245,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return metadata_labels_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1134,12 +1257,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_key(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1148,7 +1271,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_key_type_0 = cast(list[str], data)
 
                 return metadata_key_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1156,7 +1279,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_key_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataKeyType1.from_dict(data)
 
                 return metadata_key_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1168,12 +1291,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_value(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1182,7 +1305,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_value_type_0 = cast(list[str], data)
 
                 return metadata_value_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1192,7 +1315,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return metadata_value_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1204,12 +1327,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_metadata_prompt_ids(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1218,7 +1341,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 metadata_prompt_ids_type_0 = cast(list[str], data)
 
                 return metadata_prompt_ids_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1228,7 +1351,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return metadata_prompt_ids_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1242,12 +1365,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_traces_origin(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1256,7 +1379,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 traces_origin_type_0 = cast(list[str], data)
 
                 return traces_origin_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1264,7 +1387,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 traces_origin_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1.from_dict(data)
 
                 return traces_origin_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1276,12 +1399,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_traces_error(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1290,7 +1413,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 traces_error_type_0 = cast(list[str], data)
 
                 return traces_error_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1298,7 +1421,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 traces_error_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1.from_dict(data)
 
                 return traces_error_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1310,12 +1433,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_spans_type(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1324,7 +1447,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 spans_type_type_0 = cast(list[str], data)
 
                 return spans_type_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1332,7 +1455,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 spans_type_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1.from_dict(data)
 
                 return spans_type_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1344,12 +1467,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_spans_model(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1358,7 +1481,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 spans_model_type_0 = cast(list[str], data)
 
                 return spans_model_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1366,7 +1489,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 spans_model_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1.from_dict(data)
 
                 return spans_model_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1378,12 +1501,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_evaluations_evaluator_id(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1392,7 +1515,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 evaluations_evaluator_id_type_0 = cast(list[str], data)
 
                 return evaluations_evaluator_id_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1402,7 +1525,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return evaluations_evaluator_id_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1416,12 +1539,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_evaluations_evaluator_id_guardrails_only(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1430,7 +1553,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 evaluations_evaluator_id_guardrails_only_type_0 = cast(list[str], data)
 
                 return evaluations_evaluator_id_guardrails_only_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1442,7 +1565,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return evaluations_evaluator_id_guardrails_only_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1456,14 +1579,134 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             d.pop("evaluations.evaluator_id.guardrails_only", UNSET)
         )
 
+        def _parse_evaluations_evaluator_id_has_passed(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_passed_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_passed_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_passed_type_1 = (
+                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_passed_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_passed_type_2 = (
+                PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_passed_type_2
+
+        evaluations_evaluator_id_has_passed = _parse_evaluations_evaluator_id_has_passed(
+            d.pop("evaluations.evaluator_id.has_passed", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_score(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_score_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_score_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_score_type_1 = (
+                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_score_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_score_type_2 = (
+                PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_score_type_2
+
+        evaluations_evaluator_id_has_score = _parse_evaluations_evaluator_id_has_score(
+            d.pop("evaluations.evaluator_id.has_score", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_label(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_label_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_label_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_label_type_1 = (
+                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_label_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_label_type_2 = (
+                PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_label_type_2
+
+        evaluations_evaluator_id_has_label = _parse_evaluations_evaluator_id_has_label(
+            d.pop("evaluations.evaluator_id.has_label", UNSET)
+        )
+
         def _parse_evaluations_passed(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1472,7 +1715,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 evaluations_passed_type_0 = cast(list[str], data)
 
                 return evaluations_passed_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1482,7 +1725,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return evaluations_passed_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1496,12 +1739,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_evaluations_score(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1510,7 +1753,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 evaluations_score_type_0 = cast(list[str], data)
 
                 return evaluations_score_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1520,7 +1763,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return evaluations_score_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1534,12 +1777,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_evaluations_state(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsStateType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1548,7 +1791,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 evaluations_state_type_0 = cast(list[str], data)
 
                 return evaluations_state_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1558,7 +1801,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return evaluations_state_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1572,12 +1815,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_evaluations_label(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsLabelType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1586,7 +1829,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 evaluations_label_type_0 = cast(list[str], data)
 
                 return evaluations_label_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1596,7 +1839,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return evaluations_label_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1610,12 +1853,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_events_event_type(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventTypeType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1624,7 +1867,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 events_event_type_type_0 = cast(list[str], data)
 
                 return events_event_type_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1634,7 +1877,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return events_event_type_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1648,12 +1891,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_events_metrics_key(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsKeyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1662,7 +1905,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 events_metrics_key_type_0 = cast(list[str], data)
 
                 return events_metrics_key_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1672,7 +1915,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return events_metrics_key_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1686,12 +1929,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_events_metrics_value(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsMetricsValueType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1700,7 +1943,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 events_metrics_value_type_0 = cast(list[str], data)
 
                 return events_metrics_value_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1710,7 +1953,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return events_metrics_value_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1724,12 +1967,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_events_event_details_key(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEventsEventDetailsKeyType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1738,7 +1981,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 events_event_details_key_type_0 = cast(list[str], data)
 
                 return events_event_details_key_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1748,7 +1991,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return events_event_details_key_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1762,12 +2005,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         def _parse_annotations_has_annotation(
             data: object,
-        ) -> Union[
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1",
-            "PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2",
-            Unset,
-            list[str],
-        ]:
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2
+            | Unset
+        ):
             if isinstance(data, Unset):
                 return data
             try:
@@ -1776,7 +2019,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 annotations_has_annotation_type_0 = cast(list[str], data)
 
                 return annotations_has_annotation_type_0
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
@@ -1786,7 +2029,7 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
                 )
 
                 return annotations_has_annotation_type_1
-            except:  # noqa: E722
+            except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             if not isinstance(data, dict):
                 raise TypeError()
@@ -1814,6 +2057,9 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             spans_model=spans_model,
             evaluations_evaluator_id=evaluations_evaluator_id,
             evaluations_evaluator_id_guardrails_only=evaluations_evaluator_id_guardrails_only,
+            evaluations_evaluator_id_has_passed=evaluations_evaluator_id_has_passed,
+            evaluations_evaluator_id_has_score=evaluations_evaluator_id_has_score,
+            evaluations_evaluator_id_has_label=evaluations_evaluator_id_has_label,
             evaluations_passed=evaluations_passed,
             evaluations_score=evaluations_score,
             evaluations_state=evaluations_state,

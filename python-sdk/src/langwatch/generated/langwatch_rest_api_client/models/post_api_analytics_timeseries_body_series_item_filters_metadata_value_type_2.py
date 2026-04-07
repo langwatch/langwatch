@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -18,10 +20,11 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2:
     """ """
 
     additional_properties: dict[
-        str, "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty"
+        str, PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty
     ] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+
         field_dict: dict[str, Any] = {}
         for prop_name, prop in self.additional_properties.items():
             field_dict[prop_name] = prop.to_dict()
@@ -56,11 +59,11 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2:
 
     def __getitem__(
         self, key: str
-    ) -> "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty":
+    ) -> PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty:
         return self.additional_properties[key]
 
     def __setitem__(
-        self, key: str, value: "PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty"
+        self, key: str, value: PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2AdditionalProperty
     ) -> None:
         self.additional_properties[key] = value
 

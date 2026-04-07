@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -30,20 +32,20 @@ class PostApiAnalyticsTimeseriesBodySeriesItem:
     Attributes:
         metric (PostApiAnalyticsTimeseriesBodySeriesItemMetric):
         aggregation (PostApiAnalyticsTimeseriesBodySeriesItemAggregation):
-        key (Union[Unset, str]):
-        subkey (Union[Unset, str]):
-        pipeline (Union[Unset, PostApiAnalyticsTimeseriesBodySeriesItemPipeline]):
-        filters (Union[Unset, PostApiAnalyticsTimeseriesBodySeriesItemFilters]):
-        as_percent (Union[Unset, bool]):
+        key (str | Unset):
+        subkey (str | Unset):
+        pipeline (PostApiAnalyticsTimeseriesBodySeriesItemPipeline | Unset):
+        filters (PostApiAnalyticsTimeseriesBodySeriesItemFilters | Unset):
+        as_percent (bool | Unset):
     """
 
     metric: PostApiAnalyticsTimeseriesBodySeriesItemMetric
     aggregation: PostApiAnalyticsTimeseriesBodySeriesItemAggregation
-    key: Union[Unset, str] = UNSET
-    subkey: Union[Unset, str] = UNSET
-    pipeline: Union[Unset, "PostApiAnalyticsTimeseriesBodySeriesItemPipeline"] = UNSET
-    filters: Union[Unset, "PostApiAnalyticsTimeseriesBodySeriesItemFilters"] = UNSET
-    as_percent: Union[Unset, bool] = UNSET
+    key: str | Unset = UNSET
+    subkey: str | Unset = UNSET
+    pipeline: PostApiAnalyticsTimeseriesBodySeriesItemPipeline | Unset = UNSET
+    filters: PostApiAnalyticsTimeseriesBodySeriesItemFilters | Unset = UNSET
+    as_percent: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,11 +57,11 @@ class PostApiAnalyticsTimeseriesBodySeriesItem:
 
         subkey = self.subkey
 
-        pipeline: Union[Unset, dict[str, Any]] = UNSET
+        pipeline: dict[str, Any] | Unset = UNSET
         if not isinstance(self.pipeline, Unset):
             pipeline = self.pipeline.to_dict()
 
-        filters: Union[Unset, dict[str, Any]] = UNSET
+        filters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.filters, Unset):
             filters = self.filters.to_dict()
 
@@ -105,14 +107,14 @@ class PostApiAnalyticsTimeseriesBodySeriesItem:
         subkey = d.pop("subkey", UNSET)
 
         _pipeline = d.pop("pipeline", UNSET)
-        pipeline: Union[Unset, PostApiAnalyticsTimeseriesBodySeriesItemPipeline]
+        pipeline: PostApiAnalyticsTimeseriesBodySeriesItemPipeline | Unset
         if isinstance(_pipeline, Unset):
             pipeline = UNSET
         else:
             pipeline = PostApiAnalyticsTimeseriesBodySeriesItemPipeline.from_dict(_pipeline)
 
         _filters = d.pop("filters", UNSET)
-        filters: Union[Unset, PostApiAnalyticsTimeseriesBodySeriesItemFilters]
+        filters: PostApiAnalyticsTimeseriesBodySeriesItemFilters | Unset
         if isinstance(_filters, Unset):
             filters = UNSET
         else:
