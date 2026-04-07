@@ -1,4 +1,4 @@
-name: ClickHouse Serverless Docker
+name: clickhouse-serverless-docker
 
 on:
   pull_request:
@@ -18,24 +18,49 @@ permissions:
   pages: write
 
 jobs:
-  # ── Always: validate Docker build on every commit ────────────────────────
-  build:
-    name: Build Docker Image
+  # ── Always: test + validate on every commit ──────────────────────────────
+  test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clickhouse-serverless
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build image
-        uses: docker/build-push-action@v6
+      - uses: actions/setup-go@v5
         with:
-          context: clickhouse-serverless
-          push: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          go-version: "1.26"
+          cache-dependency-path: clickhouse-serverless/go.sum
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.12.0
+      - run: make test
+      - run: make lint
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: clickhouse-serverless
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: clickhouse-serverless/go.sum
+      - uses: docker/setup-buildx-action@v3
+      - run: make e2e
+      - run: make e2e-cold
+      - run: make e2e-cold-move
+      - run: make e2e-backup
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker logs ch-e2e 2>&1 | tail -100 || true
+          docker logs garage-e2e 2>&1 | tail -50 || true
 
   # ── Publish: only on release or manual dispatch ──────────────────────────
   publish-meta:
-    name: Publish Metadata
     runs-on: ubuntu-latest
     if: >-
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'clickhouse-serverless@'))
@@ -65,9 +90,8 @@ jobs:
           fi
 
   publish-amd64:
-    name: Publish (amd64)
     runs-on: ubuntu-latest
-    needs: [build, publish-meta]
+    needs: [e2e, publish-meta]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -89,7 +113,7 @@ jobs:
   publish-arm64:
     name: Publish (arm64)
     runs-on: arm64-runner-32gb
-    needs: [build, publish-meta]
+    needs: [e2e, publish-meta]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -109,7 +133,6 @@ jobs:
           cache-to: type=gha,mode=max
 
   create-manifest:
-    name: Create Multi-Arch Manifest
     runs-on: ubuntu-latest
     needs: [publish-meta, publish-amd64, publish-arm64]
     env:
@@ -159,7 +182,6 @@ jobs:
 
   # ── Release Helm chart after Docker images are published ─────────────────
   release-chart:
-    name: Release Helm Chart
     runs-on: ubuntu-latest
     needs: [publish-meta, create-manifest]
     steps:
