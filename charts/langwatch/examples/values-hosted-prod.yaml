@@ -25,6 +25,9 @@ app:
     requests: { cpu: 500m, memory: 2Gi }
     limits:   { cpu: 2, memory: 4Gi }
   podDisruptionBudget: { minAvailable: 1 }
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
 
 workers:
   enabled: true
@@ -44,12 +47,6 @@ langevals:
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 8Gi }
-
-# --- overlays/access-ingress.yaml (replace langwatch.example.com) ---
-app:
-  http:
-    baseHost: "https://langwatch.example.com"
-    publicUrl: "https://langwatch.example.com"
 
 ingress:
   enabled: true

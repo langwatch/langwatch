@@ -1068,11 +1068,6 @@ ingress:
         paths:
           - path: /
             pathType: ImplementationSpecific
-            backend:
-              service:
-                name: "langwatch-app"  # Override with {{ .Release.Name }}-app in your values
-                port:
-                  number: 5560
 
   # TLS configuration for HTTPS
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.tls

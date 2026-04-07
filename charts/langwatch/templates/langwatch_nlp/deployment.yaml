@@ -20,7 +20,7 @@ spec:
   strategy: 
     {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
   {{- end }}
-  {{- if .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
+  {{- if hasKey (default (dict) .Values.langwatch_nlp.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
   {{- end }}
   selector:

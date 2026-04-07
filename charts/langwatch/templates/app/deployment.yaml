@@ -20,7 +20,7 @@ spec:
   strategy: 
     {{- toYaml .Values.app.deployment.strategy | nindent 8 }}
   {{- end }}
-  {{- if .Values.app.deployment.revisionHistoryLimit }}
+  {{- if hasKey (default (dict) .Values.app.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.app.deployment.revisionHistoryLimit }}
   {{- end }}
   selector:

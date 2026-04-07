@@ -5,6 +5,20 @@
 #           -f overlays/cold-storage-s3.yaml
 #           + secrets and scheduling below
 #
+# Prerequisites — create secrets first:
+#   kubectl create secret generic langwatch-secrets -n langwatch \
+#     --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+#     --from-literal=cronApiKey=$(openssl rand -hex 16) \
+#     --from-literal=nextAuthSecret=$(openssl rand -hex 16)
+#   kubectl create secret generic clickhouse-password -n langwatch \
+#     --from-literal=password=$(openssl rand -hex 16)
+#   kubectl create secret generic langwatch-db -n langwatch \
+#     --from-literal=connectionString='postgresql://user:pass@host:5432/langwatch'
+#   kubectl create secret generic langwatch-redis -n langwatch \
+#     --from-literal=connectionString='redis://:pass@host:6379'
+#   kubectl create secret tls langwatch-tls -n langwatch \
+#     --cert=tls.crt --key=tls.key
+#
 # Usage:
 #   helm install langwatch . -f examples/values-scalable-prod.yaml -n langwatch --create-namespace
 
@@ -20,6 +34,9 @@ app:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 4Gi }
   podDisruptionBudget: { minAvailable: 2 }
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
 
 workers:
   enabled: true
@@ -40,12 +57,6 @@ langevals:
   resources:
     requests: { cpu: 1, memory: 4Gi }
     limits:   { cpu: 2, memory: 8Gi }
-
-# --- overlays/access-ingress.yaml (replace langwatch.example.com) ---
-app:
-  http:
-    baseHost: "https://langwatch.example.com"
-    publicUrl: "https://langwatch.example.com"
 
 ingress:
   enabled: true
