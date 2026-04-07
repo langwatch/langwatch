@@ -1,0 +1,99 @@
+# values-e2e-full.yaml — Full-stack E2E test values for the langwatch Helm chart.
+#
+# Deploys the complete stack: ClickHouse (3-node replicated), app, workers (2),
+# NLP, and langevals — for end-to-end API testing including trace ingestion.
+#
+# Requirements: all images pre-built and loaded into Kind
+#   make images-local   OR   the e2e-full-stack.sh script builds them automatically
+#
+# Usage: helm install lw . -f tests/values-e2e-full.yaml -n lw-test --create-namespace
+
+autogen:
+  enabled: true
+
+images:
+  app:
+    tag: local
+    pullPolicy: Never
+  langwatch_nlp:
+    tag: local
+    pullPolicy: Never
+  langevals:
+    tag: local
+    pullPolicy: Never
+
+# ── App (1 replica) ─────────────────────────────────────────────────────────
+app:
+  replicaCount: 1
+  features:
+    skipEnvValidation: true
+  resources:
+    requests: { cpu: 100m, memory: 1Gi }
+    limits:   { cpu: 1000m, memory: 2Gi }
+
+# ── Workers (2 replicas) ────────────────────────────────────────────────────
+workers:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests: { cpu: 100m, memory: 1Gi }
+    limits:   { cpu: 1000m, memory: 2Gi }
+
+# ── NLP ──────────────────────────────────────────────────────────────────────
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 1000m, memory: 2Gi }
+
+# ── Langevals ────────────────────────────────────────────────────────────────
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 1000m, memory: 4Gi }
+
+# ── ClickHouse (3-node replicated cluster with Keeper) ──────────────────────
+clickhouse:
+  chartManaged: true
+  image:
+    pullPolicy: Never
+  replicas: 3
+  memory: 1Gi
+  cpu: 500m
+  storage:
+    size: 1Gi
+  auth:
+    password: "e2etest"
+
+# ── PostgreSQL ───────────────────────────────────────────────────────────────
+postgresql:
+  chartManaged: true
+  auth:
+    password: "e2etest"
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+# ── Redis (no auth — simpler for testing) ────────────────────────────────────
+redis:
+  chartManaged: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 25m, memory: 64Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+
+# ── Disabled services ────────────────────────────────────────────────────────
+prometheus:
+  chartManaged: false
+
+cronjobs:
+  enabled: false

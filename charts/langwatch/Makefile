@@ -5,11 +5,12 @@ KUBE_CTX  := kind-$(KIND_CLUSTER)
 CH_IMAGE  := langwatch/clickhouse-serverless:0.1.0
 CH_CHART  := ../clickhouse-serverless
 APP_IMAGE      := langwatch/langwatch:local
+NLP_IMAGE      := langwatch/langwatch_nlp:local
 LANGEVALS_IMAGE := langwatch/langevals:local
 APP_DIR        := ../..
 HELM_SAFE      := ./examples/helm-safe.sh
 
-.PHONY: deps lint template test-e2e test clean \
+.PHONY: deps lint template test-e2e test-e2e-full test clean \
         images images-local \
         example-up example-down example-status
 
@@ -23,12 +24,14 @@ deps:
 images:
 	$(MAKE) -C $(CH_CHART) images
 	docker build -t $(APP_IMAGE) $(APP_DIR)
+	docker build -t $(NLP_IMAGE) -f $(APP_DIR)/Dockerfile.langwatch_nlp $(APP_DIR)
 	docker build -t $(LANGEVALS_IMAGE) -f $(APP_DIR)/Dockerfile.langevals $(APP_DIR)
 
 ## Build + load all images into Kind
 images-local: images
 	kind load docker-image $(CH_IMAGE) --name $(KIND_CLUSTER)
 	kind load docker-image $(APP_IMAGE) --name $(KIND_CLUSTER)
+	kind load docker-image $(NLP_IMAGE) --name $(KIND_CLUSTER)
 	kind load docker-image $(LANGEVALS_IMAGE) --name $(KIND_CLUSTER)
 
 # ── Lint & Template ──────────────────────────────────────────────────────────
@@ -59,6 +62,10 @@ template: deps
 test-e2e: deps
 	bash tests/e2e.sh
 
+## Deploy full stack to Kind and run integration tests (all images required)
+test-e2e-full: deps
+	bash tests/e2e-full-stack.sh
+
 ## Run all checks: lint + template + e2e
 test: lint template test-e2e
 
@@ -72,11 +79,12 @@ example-up: deps
 	  echo "Creating Kind cluster: $(KIND_CLUSTER)"; \
 	  kind create cluster --name $(KIND_CLUSTER) --config ../lib/kind-config.yaml --wait 60s; \
 	fi
-	@if ! docker image inspect $(CH_IMAGE) &>/dev/null || ! docker image inspect $(APP_IMAGE) &>/dev/null || ! docker image inspect $(LANGEVALS_IMAGE) &>/dev/null; then \
+	@if ! docker image inspect $(CH_IMAGE) &>/dev/null || ! docker image inspect $(APP_IMAGE) &>/dev/null || ! docker image inspect $(NLP_IMAGE) &>/dev/null || ! docker image inspect $(LANGEVALS_IMAGE) &>/dev/null; then \
 	  $(MAKE) images; \
 	fi
 	@kind load docker-image $(CH_IMAGE) --name $(KIND_CLUSTER)
 	@kind load docker-image $(APP_IMAGE) --name $(KIND_CLUSTER)
+	@kind load docker-image $(NLP_IMAGE) --name $(KIND_CLUSTER)
 	@kind load docker-image $(LANGEVALS_IMAGE) --name $(KIND_CLUSTER)
 	$(HELM_SAFE) upgrade --install $(RELEASE) . \
 	  -f examples/values-$(or $(PROFILE),local).yaml \
