@@ -36,8 +36,11 @@ COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration
 COPY typescript-sdk/package.json ./typescript-sdk/package.json
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY mcp-server ./mcp-server
+RUN cd mcp-server && pnpm install --frozen-lockfile
 COPY langwatch ./langwatch
 RUN cd langwatch && pnpm run build
+# Symlink mcp-server source for tsx runtime imports (pnpm file: only copies published files)
+RUN rm -rf /app/langwatch/node_modules/@langwatch/mcp-server && ln -s /app/mcp-server /app/langwatch/node_modules/@langwatch/mcp-server
 EXPOSE 5560
 
 ENV NODE_ENV=production
