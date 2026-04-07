@@ -12,9 +12,7 @@ type LangWatchTracer struct {
 }
 
 func Tracer(name string, options ...trace.TracerOption) *LangWatchTracer {
-	return &LangWatchTracer{
-		tracer: otel.Tracer(name, options...),
-	}
+	return TracerFromProvider(nil, name, options...)
 }
 
 // TracerFromProvider creates a LangWatchTracer using the given TracerProvider
