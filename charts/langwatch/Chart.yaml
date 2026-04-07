@@ -16,5 +16,5 @@ dependencies:
   - name: clickhouse-serverless
     alias: clickhouse
     version: "0.1.0-next.1"
-    repository: file://../clickhouse-serverless
+    repository: https://langwatch.github.io/langwatch
     condition: clickhouse.chartManaged

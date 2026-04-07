@@ -3,7 +3,7 @@ dependencies:
   repository: https://prometheus-community.github.io/helm-charts
   version: 25.27.0
 - name: clickhouse-serverless
-  repository: file://../clickhouse-serverless
+  repository: https://langwatch.github.io/langwatch
   version: 0.1.0-next.1
-digest: sha256:0c09b6db1b481d8f1efe2bb1c8c7280209b8e2534811b8c4d67abe12e01a2ad3
-generated: "2026-04-07T10:23:40.43282+02:00"
+digest: sha256:9f45aa86d28a30189012e9ce390279831f8814430b24fbd2a4c0f60c725fb834
+generated: "2026-04-07T10:45:05.682717+02:00"
