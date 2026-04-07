@@ -64,6 +64,7 @@ jobs:
 
       - name: Update index
         run: |
+          mkdir -p .cr-index
           cr index \
             --owner "${{ github.repository_owner }}" \
             --git-repo "${{ github.event.repository.name }}" \
