@@ -26,6 +26,7 @@ RUN PYTHONPATH="." uv run python langevals/server.py --preload
 
 ENV RUNNING_IN_DOCKER=true
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPYCACHEPREFIX=/tmp/pycache
 ENV PATH="/usr/src/app/.venv/bin:$PATH"
 
 # Copy remaining project files (scripts, docs, etc.)
