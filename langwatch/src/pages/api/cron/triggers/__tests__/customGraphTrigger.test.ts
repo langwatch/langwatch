@@ -460,6 +460,55 @@ describe("processCustomGraphTrigger", () => {
       // 10 + 5 = 15, summed across groups
       expect(result.value).toBe(15);
     });
+
+    it("evaluates to 0 when no group contains the monitored metric", async () => {
+      const trigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/metadata.trace_id/cardinality",
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [
+            {
+              name: "traces",
+              metric: "metadata.trace_id",
+              aggregation: "cardinality",
+            },
+          ],
+          groupBy: "sentiment.thumbs_up_down",
+        },
+        filters: {},
+      } as any);
+
+      mockGetTimeseries.mockResolvedValue({
+        currentPeriod: [
+          {
+            date: "2024-01-01",
+            "sentiment.thumbs_up_down": {
+              "Thumbs Up": { "other/metric": 99 },
+            },
+          },
+        ],
+        previousPeriod: [],
+      });
+
+      vi.mocked(checkThreshold).mockReturnValue(false);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(result.value).toBe(0);
+    });
   });
 
   describe("when timeseries calculation uses average aggregation", () => {
