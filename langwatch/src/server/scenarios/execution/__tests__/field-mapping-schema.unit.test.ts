@@ -4,7 +4,6 @@
 
 import { describe, expect, it } from "vitest";
 import { suiteTargetSchema } from "~/server/suites/types";
-import { scenarioJobSchema } from "~/server/scenarios/scenario.queue";
 import { CodeAgentDataSchema, ChildProcessJobDataSchema, TargetConfigSchema } from "../types";
 
 describe("CodeAgentDataSchema", () => {
@@ -106,25 +105,6 @@ describe("TargetConfigSchema", () => {
 
     it("accepts code type", () => {
       expect(TargetConfigSchema.safeParse({ type: "code", referenceId: "c1" }).success).toBe(true);
-    });
-  });
-});
-
-describe("scenarioJobSchema", () => {
-  describe("when a minimal valid payload is provided", () => {
-    it("validates and returns the parsed output", () => {
-      const payload = {
-        projectId: "proj_1",
-        scenarioId: "scen_1",
-        target: { type: "code", referenceId: "agent_1" },
-        setId: "set_1",
-        batchRunId: "batch_1",
-        scenarioRunId: "run_1",
-      };
-
-      const result = scenarioJobSchema.safeParse(payload);
-
-      expect(result.success).toBe(true);
     });
   });
 });
