@@ -111,11 +111,11 @@ export function TargetSelector({
     const next = !open;
     setOpen(next);
     if (next) {
-      // Cap dropdown height to available space above the trigger
+      // Cap dropdown height to available space below the trigger
       const triggerRect = triggerRef.current?.getBoundingClientRect();
       if (triggerRect) {
-        const spaceAbove = triggerRect.top - 8; // 8px padding from viewport edge
-        setMaxDropdownHeight(Math.min(400, Math.max(150, spaceAbove)));
+        const spaceBelow = window.innerHeight - triggerRect.bottom - 8; // 8px padding from viewport edge
+        setMaxDropdownHeight(Math.min(400, Math.max(150, spaceBelow)));
       }
       setTimeout(() => {
         inputRef.current?.focus();
@@ -149,11 +149,11 @@ export function TargetSelector({
       {open && (
         <Box
           position="absolute"
-          bottom="100%"
+          top="100%"
           left={0}
           width="300px"
           maxHeight={`${maxDropdownHeight}px`}
-          marginBottom={1}
+          marginTop={1}
           borderRadius="lg"
           borderWidth="1px"
           borderColor="border"
