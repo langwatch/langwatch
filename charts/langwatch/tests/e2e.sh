@@ -389,6 +389,9 @@ test_cold_storage_and_backup() {
   # Clean up previous release
   helm_uninstall "$RELEASE"
 
+  # Ensure namespace exists (previous suite may have deleted it)
+  kubectl --context "$KUBE_CTX" create namespace "${NAMESPACE}" 2>/dev/null || true
+
   # Deploy RustFS as an S3-compatible service in the cluster
   info "Deploying RustFS..."
   kc apply -f - <<'RUSTFS_EOF'
