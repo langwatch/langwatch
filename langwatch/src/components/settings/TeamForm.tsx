@@ -64,7 +64,7 @@ function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }
                 size="sm"
                 onClick={() => {
                   if (!project) return;
-                  if (confirm("Are you sure you want to archive this project? This action cannot be undone.")) {
+                  if (confirm("Are you sure you want to archive this project? Contact LangWatch support to restore it.")) {
                     archiveProject.mutate({ projectId: project.id, projectToArchiveId: teamProject.id });
                   }
                 }}
