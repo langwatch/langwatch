@@ -333,7 +333,11 @@ function MembersList({
                         )}
                       </Table.Cell>
                       <Table.Cell>
-                        <MemberAccessDisplay bindings={bindingsByUser.get(member.userId) ?? []} />
+                        <MemberAccessDisplay
+                          bindings={(bindingsByUser.get(member.userId) ?? []).filter(
+                            (b) => b.scopeType !== RoleBindingScopeType.ORGANIZATION,
+                          )}
+                        />
                       </Table.Cell>
                       <Table.Cell>
                         <Box
