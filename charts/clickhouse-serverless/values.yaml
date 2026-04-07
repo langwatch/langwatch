@@ -28,6 +28,7 @@ objectStorage:
 # Cold storage: tiered hot→cold data movement (requires objectStorage)
 cold:
   enabled: false
+  defaultTtlDays: 49  # App-side TTL before data moves to cold (must be divisible by 7)
 
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:

@@ -1,0 +1,19 @@
+# access-nodeport.yaml — Expose LangWatch via NodePort (Kind / bare-metal).
+#
+# Requires a Kind cluster created with charts/lib/kind-config.yaml so that
+# host port 30560 is mapped to container port 30560.
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-dev.yaml \
+#     -f examples/overlays/access-nodeport.yaml
+#
+# Then open http://localhost:30560
+
+app:
+  service:
+    type: NodePort
+    nodePort: 30560
+  http:
+    baseHost: "http://localhost:30560"
+    publicUrl: "http://localhost:30560"

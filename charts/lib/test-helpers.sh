@@ -4,6 +4,15 @@
 
 set -euo pipefail
 
+# ─── Sanitise environment ────────────────────────────────────────────────────
+# Prevent leaked env vars from routing kubectl/helm to a real cluster or
+# leaking credentials into test pods.
+unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT 2>/dev/null || true
+unset KUBECONFIG 2>/dev/null || true
+unset DATABASE_URL PGHOST PGUSER PGPASSWORD PGDATABASE 2>/dev/null || true
+unset REDIS_URL REDIS_HOST REDIS_PASSWORD 2>/dev/null || true
+unset CLICKHOUSE_URL CLICKHOUSE_PASSWORD CLICKHOUSE_CLUSTER 2>/dev/null || true
+
 # ─── Formatting ──────────────────────────────────────────────────────────────
 
 RED='\033[0;31m'
@@ -41,7 +50,11 @@ setup_kind() {
   if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
     info "Cluster ${CLUSTER_NAME} already exists, reusing"
   else
-    kind create cluster --name "${CLUSTER_NAME}" --wait 120s
+    local kind_args=(--name "${CLUSTER_NAME}" --wait 120s)
+    if [[ -n "${KIND_CONFIG:-}" ]]; then
+      kind_args+=(--config "${KIND_CONFIG}")
+    fi
+    kind create cluster "${kind_args[@]}"
   fi
   kubectl cluster-info --context "$KUBE_CTX"
 }
@@ -81,6 +94,9 @@ helm_uninstall() {
         && [[ $attempts -lt 30 ]]; do
     sleep 2; attempts=$((attempts + 1))
   done
+  if kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null; then
+    fail "namespace ${NAMESPACE} still exists after 60s — aborting to prevent flakes"
+  fi
 }
 
 # ─── ClickHouse helpers ─────────────────────────────────────────────────────
@@ -90,6 +106,17 @@ ch_query() {
   local query="$1"; shift
   kc exec "$pod" -- \
     sh -c 'clickhouse-client --password "$(cat /mnt/secrets/password)" -q "$0"' "$query" "$@"
+}
+
+wait_api() {
+  info "Waiting for Kubernetes API server..."
+  local attempts=0
+  until kubectl --context "$KUBE_CTX" get nodes &>/dev/null; do
+    sleep 2; attempts=$((attempts + 1))
+    if [[ $attempts -ge 30 ]]; then
+      fail "Kubernetes API server not ready after 60s"
+    fi
+  done
 }
 
 wait_ch_ready() {
