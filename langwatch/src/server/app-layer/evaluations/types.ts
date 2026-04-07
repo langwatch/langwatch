@@ -21,6 +21,7 @@ export const evaluationRunDataSchema = z.object({
   errorDetails: z.string().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  lastEventOccurredAt: z.number(),
   archivedAt: z.number().nullable(),
   scheduledAt: z.number().nullable(),
   startedAt: z.number().nullable(),

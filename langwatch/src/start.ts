@@ -7,6 +7,7 @@ import type { Duplex } from "stream";
 import { parse } from "url";
 import { getApp } from "./server/app-layer/app";
 import { getWorkerMetricsPort } from "./server/background/config";
+import { createMcpHandler } from "./mcp/handler";
 import { shutdownPostHog } from "./server/posthog";
 import { createLogger } from "./utils/logger/server";
 
@@ -78,12 +79,21 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const handle = app.getRequestHandler();
   const upgradeHandler = app.getUpgradeHandler();
 
+  const mcpHandler = createMcpHandler();
+
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(async (req, res) => {
     try {
       // Be sure to pass `true` as the second argument to `url.parse`.
       // This tells it to parse the query portion of the URL.
       const parsedUrl = parse(req.url ?? "", true);
+
+      // MCP routes must be intercepted BEFORE the metrics middleware
+      // to avoid the request body stream being consumed.
+      if (parsedUrl.pathname && mcpHandler.isMcpRoute(parsedUrl.pathname)) {
+        mcpHandler.handleRequest(req, res);
+        return;
+      }
 
       if (
         parsedUrl.pathname === "/metrics" ||
@@ -194,6 +204,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
 
     server.close();
     server.closeAllConnections();
+    mcpHandler.closeAllSessions();
     try {
       await Promise.all([getApp().close(), shutdownPostHog()]);
     } catch (error) {

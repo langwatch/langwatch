@@ -1,7 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
-	ErrorCategory,
+	classifyClickHouseError,
 	SecurityError,
 	StoreError,
 	ValidationError,
@@ -52,11 +52,12 @@ interface ClickHouseExperimentRunRecord {
   ScoreCount: number;
   PassedCount: number;
   GradedCount: number;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
   ClickHouseExperimentRunRecord,
-  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt"
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
 >;
 
 export class ExperimentRunStateRepositoryClickHouse<
@@ -92,6 +93,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
       GradedCount: record.GradedCount ?? 0,
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -129,6 +131,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
     };
   }
 
@@ -159,7 +162,8 @@ export class ExperimentRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
             LastProcessedEventId,
-            TotalScoreSum, ScoreCount, PassedCount, GradedCount
+            TotalScoreSum, ScoreCount, PassedCount, GradedCount,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND RunId = {runId:String}
@@ -193,7 +197,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "getProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to get projection for run ${runId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { runId },
         error,
       );
@@ -258,7 +262,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "storeProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { projectionId: projection.id, runId: String(projection.aggregateId) },
         error,
       );
@@ -319,7 +323,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "storeProjectionBatch",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to batch store ${projections.length} projections: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { count: projections.length },
         error,
       );

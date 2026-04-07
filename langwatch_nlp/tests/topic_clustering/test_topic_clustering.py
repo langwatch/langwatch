@@ -82,7 +82,7 @@ class TestTopicClusteringIntegration:
         response = client.post(
             "/topics/batch_clustering",
             json={
-                "model": "openai/gpt-4o",
+                "model": "openai/gpt-5-mini",
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
@@ -103,7 +103,7 @@ class TestTopicClusteringIntegration:
         response = client.post(
             "/topics/incremental_clustering",
             json={
-                "model": "openai/gpt-4o",
+                "model": "openai/gpt-5-mini",
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
@@ -186,7 +186,7 @@ class TestTopicClusteringIntegration:
         response = client.post(
             "/topics/batch_clustering",
             json={
-                "model": "openai/gpt-4o",
+                "model": "openai/gpt-5-mini",
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",

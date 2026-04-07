@@ -16,6 +16,7 @@ import {
 } from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
+import { useEvaluatorNames } from "../../hooks/useEvaluatorName";
 import type { EvaluatorConfig } from "../../types";
 import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
@@ -41,14 +42,14 @@ type TargetSummaryProps = {
  * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
 // Helper to get evaluator name from the evaluators array
-const getEvaluatorName = (
-  evaluatorId: string,
-  evaluators: EvaluatorConfig[]
-): string => {
-  // For now, just use the evaluator ID as the display name
-  // The proper solution would be to fetch names via tRPC, but that requires
-  // hooks which can't be used in a map iteration
-  return evaluators.find((e) => e.id === evaluatorId)?.id ?? evaluatorId;
+const getEvaluatorName = ({
+  evaluatorId,
+  evaluatorNames,
+}: {
+  evaluatorId: string;
+  evaluatorNames: Map<string, string>;
+}): string => {
+  return evaluatorNames.get(evaluatorId) ?? evaluatorId;
 };
 
 export const TargetSummary = memo(function TargetSummary({
@@ -58,6 +59,7 @@ export const TargetSummary = memo(function TargetSummary({
 }: TargetSummaryProps) {
   const { isOpen, handleMouseEnter, handleMouseLeave } =
     useInteractiveTooltip(150);
+  const evaluatorNames = useEvaluatorNames(evaluators);
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =
@@ -194,7 +196,10 @@ export const TargetSummary = memo(function TargetSummary({
             {aggregates.evaluators.map((evaluator) => (
               <HStack key={evaluator.evaluatorId} justify="space-between">
                 <Text color="white/75" truncate maxWidth="150px">
-                  {getEvaluatorName(evaluator.evaluatorId, evaluators)}
+                  {getEvaluatorName({
+                    evaluatorId: evaluator.evaluatorId,
+                    evaluatorNames,
+                  })}
                 </Text>
                 <HStack gap={2}>
                   {evaluator.passRate !== null && (

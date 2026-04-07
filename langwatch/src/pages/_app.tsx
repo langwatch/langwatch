@@ -24,7 +24,7 @@ import { api } from "~/utils/api";
 import { ColorModeProvider, colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
 import { usePostHog } from "../hooks/usePostHog";
-import { dependencies } from "../injection/dependencies.client";
+import { ExtraFooterComponents } from "../../ee/saas/ExtraFooterComponents";
 import { CommandBarProvider } from "../features/command-bar";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -1282,9 +1282,7 @@ const LangWatch: AppType<{
             <Toaster />
           </CommandBarProvider>
 
-          {dependencies.ExtraFooterComponents && (
-            <dependencies.ExtraFooterComponents />
-          )}
+          <ExtraFooterComponents />
         </ColorModeProvider>
       </ChakraProvider>
     </SessionProvider>

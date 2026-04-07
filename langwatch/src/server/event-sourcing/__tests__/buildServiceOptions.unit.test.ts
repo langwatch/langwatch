@@ -24,6 +24,7 @@ interface TestFoldState {
   count: number;
   CreatedAt: number;
   UpdatedAt: number;
+  LastEventOccurredAt: number;
 }
 
 class TestFoldProjection

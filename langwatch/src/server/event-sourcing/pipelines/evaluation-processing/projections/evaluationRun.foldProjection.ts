@@ -49,7 +49,7 @@ const evaluationRunEvents = [
  * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export class EvaluationRunFoldProjection
-  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents, "createdAt", "updatedAt">
+  extends AbstractFoldProjection<EvaluationRunData, typeof evaluationRunEvents, "createdAt", "updatedAt", "lastEventOccurredAt">
   implements FoldEventHandlers<typeof evaluationRunEvents, EvaluationRunData>
 {
   readonly name = "evaluationRun";
@@ -59,7 +59,7 @@ export class EvaluationRunFoldProjection
   protected readonly events = evaluationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<EvaluationRunData> }) {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt" });
+    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", lastEventOccurredAtKey: "lastEventOccurredAt" });
     this.store = deps.store;
   }
 

@@ -11076,8 +11076,8 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 
 1. Go to **Settings → Connectors**
 2. Click **Add connector**
-3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-4. For authentication, select **Bearer Token** and enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize))
+3. Enter the server URL: `https://app.langwatch.ai/sse`
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
 
 *Requires a Plus or Team plan.*
 
@@ -11086,10 +11086,22 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 
 1. Go to **Settings → Connectors**
 2. Click **Add custom connector**
-3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-4. In **Advanced settings**, enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize)) as the **OAuth Client Secret**. Leave Client ID empty.
+3. Enter the server URL: `https://app.langwatch.ai/mcp`
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
 
 *Requires a Pro or Max plan.*
+
+
+### BoltAI / Other MCP Clients
+
+For any MCP client that supports remote servers with OAuth:
+
+1. Add a new remote MCP server
+2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
+3. Select **OAuth (browser)** authentication
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+
+The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
 
 
 ### Other
@@ -11131,7 +11143,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat). Hosted at `https://mcp.langwatch.ai`. Supports both Bearer token auth (ChatGPT) and OAuth client_credentials (Claude Chat) — each user brings their own key.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE — click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
 
 ## Usage Examples
 
@@ -14553,6 +14565,146 @@ jobs:
 ## Learn More
 
 For complete documentation on all CLI commands, advanced workflows, conflict resolution, and detailed usage examples, see the [Prompts CLI documentation](/prompt-management/cli).
+
+---
+
+# FILE: ./prompt-management/features/essential/tags.mdx
+
+---
+title: "Tags"
+description: "Use tags to manage prompt deployment stages like production, staging, and custom environments in LangWatch."
+---
+
+# Prompt Tags
+
+Tags let you label specific prompt versions for different deployment stages. Instead of fetching by version number, you can fetch by tag — so your application always gets the right version for its environment.
+
+## Built-in Tags
+
+LangWatch provides three built-in tags:
+
+| Tag | Behavior |
+|-----|----------|
+| `latest` | Automatically assigned to the newest version on every save. Cannot be removed. |
+| `production` | Assign this to the version you want your production application to use. |
+| `staging` | Assign this to the version you want your staging environment to use. |
+
+## Assigning Tags via the Deploy Dialog
+
+In the Prompt Playground, click the **Deploy** button to open the Deploy dialog. From there you can:
+
+1. Select a version from the version history
+2. Assign it to `production`, `staging`, or any custom tag
+3. See which versions currently have each tag assigned
+
+This is the recommended way to promote a prompt version to production — it provides a clear audit trail and prevents accidental changes.
+
+## Fetching by Tag in Your Application
+
+### TypeScript SDK
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Fetch the production version
+const prompt = await langwatch.prompts.get("pizza-prompt", { tag: "production" });
+
+// Fetch the staging version
+const staging = await langwatch.prompts.get("pizza-prompt", { tag: "staging" });
+```
+
+### Python SDK
+
+```python
+import langwatch
+
+# Fetch the production version
+prompt = langwatch.prompts.get("pizza-prompt", tag="production")
+
+# Fetch the staging version
+staging = langwatch.prompts.get("pizza-prompt", tag="staging")
+```
+
+### REST API
+
+```bash
+# Using the tag query parameter
+curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  "https://app.langwatch.ai/api/prompts/pizza-prompt?tag=production"
+
+# Using shorthand syntax
+curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  "https://app.langwatch.ai/api/prompts/pizza-prompt:production"
+```
+
+## Shorthand Syntax
+
+LangWatch supports a shorthand syntax for specifying tags in prompt identifiers:
+
+- `pizza-prompt:production` → version pointed to by the `production` tag
+- `pizza-prompt:staging` → version pointed to by the `staging` tag
+- `pizza-prompt:2` → version 2 (numeric values are treated as version numbers)
+- `pizza-prompt:latest` → equivalent to the bare slug `pizza-prompt`
+
+This works anywhere a prompt identifier is accepted: REST API, SDK, and config files.
+
+<Warning>
+  You cannot use both shorthand syntax and the `?tag=` query parameter at the same time. If both are provided, the API returns a 422 error.
+</Warning>
+
+## Custom Tags
+
+Beyond the built-in tags, you can create custom tags for your own deployment workflows:
+
+### Creating Custom Tags
+
+**Via the API:**
+
+```bash
+# Create a custom tag
+curl -X POST -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "canary"}' \
+  "https://app.langwatch.ai/api/prompts/tags"
+```
+
+**Via MCP tools:**
+
+Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_prompt_tag` to assign it to a version.
+
+### Managing Custom Tags
+
+| Operation | API Endpoint | MCP Tool |
+|-----------|-------------|----------|
+| List all tags | `GET /api/prompts/tags` | `platform_list_prompt_tags` |
+| Create tag | `POST /api/prompts/tags` | `platform_create_prompt_tag` |
+| Rename tag | `PUT /api/prompts/tags/{tag}` | `platform_rename_prompt_tag` |
+| Delete tag | `DELETE /api/prompts/tags/{tag}` | `platform_delete_prompt_tag` |
+| Assign tag to version | `PUT /api/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
+
+<Note>
+  Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected and cannot be renamed or deleted. `production` and `staging` are default seeded tags that can be renamed or deleted like any custom tag.
+</Note>
+
+## Common Workflows
+
+### Blue-Green Deployment
+
+1. Create two custom tags: `blue` and `green`
+2. Point your application at one tag (e.g., `blue`)
+3. Update the other tag (`green`) with the new version
+4. Switch your application to read from `green`
+5. If issues arise, switch back to `blue`
+
+### Canary Releases
+
+1. Create a `canary` tag
+2. Assign the new version to `canary`
+3. Route a small percentage of traffic to the `canary` version
+4. Monitor performance via LangWatch analytics
+5. Promote to `production` when satisfied
 
 ---
 

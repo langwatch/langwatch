@@ -1,18 +1,20 @@
 /**
  * Scenario run cancellation logic.
  *
- * Reads run state from fold projections (CH/ES via SimulationFacade).
- * Only removeQueuedJob and signalCancel are transport-specific (BullMQ today).
+ * Uses event-sourcing for cancellation: dispatches cancel_requested events
+ * which are processed by the pipeline (fold projection + reactor). The
+ * reactor broadcasts to all workers via Redis pub/sub. Each worker checks
+ * if it owns the scenario and kills its child process.
  *
- * - Active jobs: worker handles cancellation via AbortSignal and writes events to ES.
- * - Queued jobs: removed from execution queue + a CANCELLED event written to ES
- *   (since no worker will ever run for these, the API is the only writer).
+ * - Active jobs: killed by the worker that owns the child process
+ * - Queued jobs: cancelled immediately via finished(CANCELLED) event
+ *   (no worker will ever execute them)
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
 import { createLogger } from "~/utils/logger/server";
-import { ScenarioEventType, ScenarioRunStatus, isCancellableStatus } from "./scenario-event.enums";
+import { ScenarioRunStatus, isCancellableStatus } from "./scenario-event.enums";
 import type { ScenarioRunData } from "./scenario-event.types";
 
 const logger = createLogger("langwatch:scenarios:cancellation");
@@ -36,10 +38,6 @@ export interface CancelBatchRunParams {
 /** Result of cancelling a single job. */
 export interface CancelJobResult {
   cancelled: boolean;
-  /** "removed" = confirmed cancelled (queued job removed from queue).
-   *  "signalled" = cancellation requested (active job, async — may not take effect if already completed).
-   *  undefined when cancelled is false. */
-  method?: "removed" | "signalled";
 }
 
 /** Result of cancelling a batch run. */
@@ -48,61 +46,45 @@ export interface CancelBatchRunResult {
   skippedCount: number;
 }
 
-/** Minimal event shape for persisting cancellation of queued jobs. */
-interface CancellationEventParams {
-  projectId: string;
-  type: ScenarioEventType.RUN_FINISHED;
-  scenarioId: string;
-  scenarioRunId: string;
-  batchRunId: string;
-  scenarioSetId: string;
-  timestamp: number;
-  status: ScenarioRunStatus.CANCELLED;
-  results: null;
-}
-
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
   /** Read run state from CH/ES fold projections. */
   getRunsForBatch: (params: { projectId: string; scenarioSetId: string; batchRunId: string }) => Promise<ScenarioRunData[]>;
-  /** Remove a queued job from the execution queue (BullMQ today, GroupQueue later). Returns true if the job was found and removed. */
-  removeQueuedJob: (params: { projectId: string; scenarioRunId: string }) => Promise<boolean>;
-  /** Signal an active job to abort (Redis pub/sub). Returns true if the signal was published. */
-  signalCancel: (params: { projectId: string; scenarioRunId: string; batchRunId: string }) => Promise<boolean>;
-  /** Writes a scenario event to ES + CH. Only used for queued jobs that will never be processed by a worker. */
-  saveScenarioEvent: (event: CancellationEventParams) => Promise<void>;
+  /** Dispatch a cancel_requested event via the event-sourcing pipeline. */
+  dispatchCancelRequested: (params: { tenantId: string; scenarioRunId: string; occurredAt: number }) => Promise<void>;
+  /** Dispatch a finished event with CANCELLED status. Used for queued jobs that no worker will pick up. */
+  dispatchFinishRun: (params: { tenantId: string; scenarioRunId: string; status: string; occurredAt: number }) => Promise<void>;
 }
 
+/** Statuses that are queued but not yet picked up by a worker. */
+const QUEUED_STATUSES = new Set<string>([
+  ScenarioRunStatus.QUEUED,
+  ScenarioRunStatus.PENDING,
+]);
+
 /**
- * Service responsible for cancelling scenario runs.
+ * Service responsible for cancelling scenario runs via event-sourcing.
  *
- * Handles both individual job cancellation and batch-level cancellation.
- * Uses fold projections for state reads; only queue removal and cancel
- * signalling are transport-specific.
+ * Dispatches cancel_requested events. The pipeline reactor broadcasts
+ * to workers, and the worker owning the scenario kills its child process.
  */
 export class ScenarioCancellationService {
   private readonly getRunsForBatch: CancellationServiceDeps["getRunsForBatch"];
-  private readonly removeQueuedJob: CancellationServiceDeps["removeQueuedJob"];
-  private readonly signalCancel: CancellationServiceDeps["signalCancel"];
-  private readonly saveScenarioEvent: CancellationServiceDeps["saveScenarioEvent"];
+  private readonly dispatchCancelRequested: CancellationServiceDeps["dispatchCancelRequested"];
+  private readonly dispatchFinishRun: CancellationServiceDeps["dispatchFinishRun"];
 
   constructor(deps: CancellationServiceDeps) {
     this.getRunsForBatch = deps.getRunsForBatch;
-    this.removeQueuedJob = deps.removeQueuedJob;
-    this.signalCancel = deps.signalCancel;
-    this.saveScenarioEvent = deps.saveScenarioEvent;
+    this.dispatchCancelRequested = deps.dispatchCancelRequested;
+    this.dispatchFinishRun = deps.dispatchFinishRun;
   }
 
   /**
-   * Cancel a single scenario job.
+   * Cancel a single scenario run.
    *
-   * 1. Check fold projection — if already terminal, return early (no false positive)
-   * 2. Try removing from queue — if it succeeds, the job was queued
-   * 3. If removal fails, signal cancel — the job is likely active
-   * 4. If both fail, the job is not found
-   *
-   * Only writes a CANCELLED event for removed (queued) jobs. Active jobs
-   * have their status written by the worker's failure handler.
+   * 1. Check fold projection — if already terminal, skip
+   * 2. Dispatch cancel_requested event (always — sets flag + triggers reactor broadcast)
+   * 3. If queued/pending, also dispatch finished(CANCELLED) — no worker will ever act
    */
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
     const { projectId, scenarioRunId, batchRunId, scenarioSetId } = params;
@@ -117,61 +99,34 @@ export class ScenarioCancellationService {
       return { cancelled: false };
     }
 
-    // Try removing from queue (works for QUEUED/WAITING jobs)
-    const removed = await this.removeQueuedJob({ projectId, scenarioRunId });
-    if (removed) {
-      logger.info({ scenarioRunId }, "Job removed from queue (cancelled)");
+    const now = Date.now();
 
-      // Job was queued — write CANCELLED since no worker will process it
-      await this.saveScenarioEvent({
-        projectId: params.projectId,
-        type: ScenarioEventType.RUN_FINISHED,
-        scenarioId: params.scenarioId,
-        scenarioRunId: params.scenarioRunId,
-        batchRunId: params.batchRunId,
-        scenarioSetId: params.scenarioSetId,
-        timestamp: Date.now(),
+    // Dispatch cancel_requested event — reactor will broadcast to all workers
+    await this.dispatchCancelRequested({
+      tenantId: projectId,
+      scenarioRunId,
+      occurredAt: now,
+    });
+
+    // For queued/pending jobs that haven't been picked up yet, also write
+    // the terminal event immediately — no worker will ever execute them
+    if (run && QUEUED_STATUSES.has(run.status)) {
+      await this.dispatchFinishRun({
+        tenantId: projectId,
+        scenarioRunId,
         status: ScenarioRunStatus.CANCELLED,
-        results: null,
+        occurredAt: now + 1, // +1ms to ensure ordering after cancel_requested
       });
-
-      return { cancelled: true, method: "removed" };
     }
 
-    // Try signaling cancel (works for ACTIVE/RUNNING jobs)
-    const signalled = await this.signalCancel({ projectId, scenarioRunId, batchRunId });
-    if (signalled) {
-      logger.info({ scenarioRunId }, "Cancellation signal published for active job");
-      return { cancelled: true, method: "signalled" };
-    }
-
-    // Neither worked — job may be orphaned (exists in data store but not in BullMQ).
-    // If fold projection says it's still cancellable, force-cancel via event write.
-    if (run) {
-      logger.info({ scenarioRunId }, "Force-cancelling orphaned job via event write");
-      await this.saveScenarioEvent({
-        projectId: params.projectId,
-        type: ScenarioEventType.RUN_FINISHED,
-        scenarioId: params.scenarioId,
-        scenarioRunId: params.scenarioRunId,
-        batchRunId: params.batchRunId,
-        scenarioSetId: params.scenarioSetId,
-        timestamp: Date.now(),
-        status: ScenarioRunStatus.CANCELLED,
-        results: null,
-      });
-      return { cancelled: true, method: "removed" };
-    }
-
-    logger.debug({ scenarioRunId }, "Job not found in data store, nothing to cancel");
-    return { cancelled: false };
+    logger.info({ projectId, scenarioRunId, status: run?.status }, "Cancellation event dispatched");
+    return { cancelled: true };
   }
 
   /**
    * Cancel all remaining (non-terminal) jobs in a batch run.
    *
-   * Reads run state from fold projections (CH/ES) and cancels each
-   * cancellable run. Completed/failed/cancelled jobs are left untouched.
+   * Reads run state from fold projections and cancels each cancellable run.
    */
   async cancelBatchRun(params: CancelBatchRunParams): Promise<CancelBatchRunResult> {
     const { projectId, scenarioSetId, batchRunId } = params;

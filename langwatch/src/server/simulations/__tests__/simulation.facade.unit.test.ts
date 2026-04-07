@@ -106,24 +106,15 @@ describe("SimulationFacade", () => {
       });
     });
 
-    describe("when feature flag is disabled", () => {
-      beforeEach(() => {
+    describe("when chService is available", () => {
+      it("always routes to ClickHouse regardless of feature flag", async () => {
         mockProjects.isFeatureEnabled.mockResolvedValue(false);
-      });
 
-      it("routes getScenarioSetsDataForProject to Elasticsearch", async () => {
         const result = await facade.getScenarioSetsDataForProject({ projectId });
 
-        expect(result).toEqual([{ id: "es-set" }]);
-        expect(mockEs.getScenarioSetsDataForProject).toHaveBeenCalledWith({ projectId });
-        expect(mockCh.getScenarioSetsData).not.toHaveBeenCalled();
-      });
-
-      it("routes getScenarioRunData to Elasticsearch", async () => {
-        await facade.getScenarioRunData({ projectId, scenarioRunId: "run_1" });
-
-        expect(mockEs.getScenarioRunData).toHaveBeenCalledWith({ projectId, scenarioRunId: "run_1" });
-        expect(mockCh.getScenarioRunData).not.toHaveBeenCalled();
+        expect(result).toEqual([{ id: "ch-set" }]);
+        expect(mockCh.getScenarioSetsData).toHaveBeenCalledWith({ projectId });
+        expect(mockEs.getScenarioSetsDataForProject).not.toHaveBeenCalled();
       });
     });
   });
@@ -188,7 +179,7 @@ describe("SimulationFacade", () => {
       expect(result).toBe(false);
     });
 
-    it("returns false when feature flag is disabled", async () => {
+    it("returns true when chService is present regardless of feature flag", async () => {
       const mockProjects: MockProjectService = { isFeatureEnabled: vi.fn().mockResolvedValue(false) };
       const facade = new SimulationFacade({
         projects: mockProjects as unknown as ProjectService,
@@ -198,7 +189,7 @@ describe("SimulationFacade", () => {
 
       const result = await facade.isClickHouseReadEnabled(projectId);
 
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
   });
 

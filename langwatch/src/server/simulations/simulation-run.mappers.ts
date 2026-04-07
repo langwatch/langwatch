@@ -156,7 +156,8 @@ export function mapClickHouseRowToScenarioRunData(
     status: resolvedStatus,
     results,
     messages,
-    timestamp: updatedAt,
+    timestamp: startedAt ?? createdAt,
+    updatedAt,
     durationInMs:
       durationMs ?? (finishedAt != null ? finishedAt - startTimestamp : updatedAt - startTimestamp),
     totalCost: row.TotalCost ?? undefined,

@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
 import { SuiteSidebar } from "../SuiteSidebar";
+import { NowProvider } from "../NowProvider";
 import { ALL_RUNS_ID, toExternalSetSelection } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -52,6 +53,7 @@ function makeExternalSet(
 }
 
 const defaultProps = {
+  projectSlug: "my-project",
   suites: [] as SimulationSuite[],
   selectedSuiteSlug: null,
   onSelectSuite: vi.fn(),
@@ -342,6 +344,12 @@ describe("<SuiteSidebar/> External Sets", () => {
       const now = new Date("2025-01-15T12:00:00Z").getTime();
       vi.setSystemTime(now);
 
+      const NowWrapper = ({ children }: { children: React.ReactNode }) => (
+        <ChakraProvider value={defaultSystem}>
+          <NowProvider intervalMs={999999}>{children}</NowProvider>
+        </ChakraProvider>
+      );
+
       try {
         render(
           <SuiteSidebar
@@ -355,11 +363,13 @@ describe("<SuiteSidebar/> External Sets", () => {
               }),
             ]}
           />,
-          { wrapper: Wrapper },
+          { wrapper: NowWrapper },
         );
 
         expect(screen.getByText(/15 passed/)).toBeInTheDocument();
-        expect(screen.getByText(/30m ago/)).toBeInTheDocument();
+        const extSetItems = screen.getAllByTestId("external-set-list-item");
+        const texts = extSetItems.map((el) => el.textContent).join(" ");
+        expect(texts).toMatch(/30m ago/);
       } finally {
         vi.useRealTimers();
       }

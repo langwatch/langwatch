@@ -11,6 +11,7 @@ export async function handleUpdatePrompt(params: {
   messages?: Array<{ role: string; content: string }>;
   model?: string;
   commitMessage: string;
+  tags?: string[];
 }): Promise<string> {
   const { idOrHandle, ...data } = params;
 
@@ -23,6 +24,8 @@ export async function handleUpdatePrompt(params: {
   if (result.latestVersionNumber != null)
     lines.push(`**Version**: v${result.latestVersionNumber}`);
   lines.push(`**Commit**: ${params.commitMessage}`);
+  if (params.tags && params.tags.length > 0)
+    lines.push(`**Tags**: ${params.tags.join(", ")}`);
 
   return lines.join("\n");
 }

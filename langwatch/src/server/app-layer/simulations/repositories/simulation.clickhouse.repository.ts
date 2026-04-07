@@ -115,7 +115,7 @@ const PREVIEW_COLUMNS = `
 /** Minimal columns for inner subquery in aggregation-only queries (count, max, group by) */
 const DEDUP_COLUMNS = `
   TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+  Status, UpdatedAt, CreatedAt, StartedAt, FinishedAt, ArchivedAt` as const;
 
 /** Inner subquery columns for preview queries (getBatchHistory items) */
 const DEDUP_PREVIEW_COLUMNS = `
@@ -777,6 +777,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return this.getSetSummaries({ ...params, filter: "internal-suites" });
   }
 
+  /**
+   * ⚠️  KEEP IN SYNC: The content panel computes pass rate on the frontend
+   * with its own formula (passed / settled, excluding in-progress/queued).
+   * If you change the aggregation here, also update:
+   *   - run-history-transforms.ts → computeGroupSummary() (content panel)
+   */
   private async getSetSummaries({
     projectId,
     startDate,
@@ -810,20 +816,22 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }>(
       `SELECT
         NormalizedSetId AS ScenarioSetId,
-        toString(argMax(RunCount, MaxCreatedAtMs)) AS TotalCount,
-        toString(argMax(PassCount, MaxCreatedAtMs)) AS PassCount,
-        toString(argMax(FailCount, MaxCreatedAtMs)) AS FailCount,
-        toString(max(MaxCreatedAtMs)) AS LastRunAt
+        toString(argMax(SettledCount, MinStartedAtMs)) AS TotalCount,
+        toString(argMax(PassCount, MinStartedAtMs)) AS PassCount,
+        toString(argMax(FailCount, MinStartedAtMs)) AS FailCount,
+        toString(max(MinStartedAtMs)) AS LastRunAt
        FROM (
          SELECT
            NormalizedSetId,
            BatchRunId,
-           count() AS RunCount,
+           -- Settled = all terminal states (excludes in-progress/queued)
+           countIf(Status NOT IN ('IN_PROGRESS', 'PENDING', 'QUEUED', 'RUNNING')) AS SettledCount,
            countIf(Status = 'SUCCESS') AS PassCount,
-           countIf(Status IN ('FAILED','FAILURE','ERROR')) AS FailCount,
-           toUnixTimestamp64Milli(max(CreatedAt)) AS MaxCreatedAtMs
+           countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED')) AS FailCount,
+           -- Use min(StartedAt) to match frontend's minTimestamp (batch creation time)
+           toUnixTimestamp64Milli(min(if(StartedAt IS NOT NULL, StartedAt, CreatedAt))) AS MinStartedAtMs
          FROM (
-           SELECT ${selectId}, BatchRunId, Status, CreatedAt, ArchivedAt
+           SELECT ${selectId}, BatchRunId, Status, CreatedAt, StartedAt, ArchivedAt
            FROM (
              SELECT ${DEDUP_COLUMNS}
              FROM ${TABLE_NAME}

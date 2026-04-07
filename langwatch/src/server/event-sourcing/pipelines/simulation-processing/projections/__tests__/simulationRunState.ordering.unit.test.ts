@@ -26,6 +26,7 @@ import type {
   SimulationProcessingEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
+  SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "../../schemas/events";
 import {
@@ -57,6 +58,27 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<SimulationRunState
 }
 
 // --- Event factories ---
+function createQueuedEvent(occurredAt = 500): SimulationRunQueuedEvent {
+  return {
+    id: "evt-queued",
+    aggregateId: "run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: occurredAt + 50,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    data: {
+      scenarioRunId: "run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "python-examples",
+      name: "test scenario",
+      description: "test",
+    },
+  };
+}
+
 function createStartedEvent(occurredAt = 1000): SimulationRunStartedEvent {
   return {
     id: "evt-started",
@@ -122,6 +144,30 @@ function createFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
   };
 }
 
+function createErrorFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
+  return {
+    id: "evt-finished",
+    aggregateId: "run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: occurredAt + 200,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
+    data: {
+      scenarioRunId: "run-1",
+      results: {
+        verdict: "failure",
+        reasoning: "Cannot connect to API",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: '{"name":"Error","message":"Cannot connect to API"}',
+      },
+      status: "ERROR",
+    },
+  };
+}
+
 function createMetricsComputedEvent(
   traceId: string,
   occurredAt: number,
@@ -145,7 +191,7 @@ function createMetricsComputedEvent(
   };
 }
 
-// --- Simulate incremental fold processing ---
+// --- Simulate incremental fold processing with re-fold on out-of-order ---
 async function processFold(
   events: SimulationProcessingEvent[],
   store: FoldProjectionStore<SimulationRunStateData> & { clear: () => void },
@@ -156,11 +202,33 @@ async function processFold(
     tenantId: TEST_TENANT_ID,
   };
 
+  // Track all events seen so far (for re-fold event loader)
+  const allEventsSoFar: SimulationProcessingEvent[] = [];
+
   store.clear();
   for (const event of events) {
+    allEventsSoFar.push(event);
     const currentState = await store.get("run-1", ctx) ?? projection.init();
+
+    // Capture LastEventOccurredAt before apply
+    const prevLastOccurred = currentState.LastEventOccurredAt ?? 0;
+
     const newState = projection.apply(currentState, event);
-    await store.store(newState, ctx);
+
+    // Simulate FoldProjectionExecutor's out-of-order detection
+    const eventOccurredAt = event.occurredAt ?? 0;
+    if (eventOccurredAt > 0 && eventOccurredAt < prevLastOccurred) {
+      // Re-fold from scratch in occurredAt order
+      const sorted = [...allEventsSoFar].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+      let refolded = projection.init();
+      for (const e of sorted) {
+        refolded = projection.apply(refolded, e);
+      }
+      store.clear();
+      await store.store(refolded, ctx);
+    } else {
+      await store.store(newState, ctx);
+    }
   }
   // Return what ReplacingMergeTree would return
   return (await store.get("run-1", ctx))!;
@@ -302,6 +370,80 @@ describe("simulation run fold — event ordering invariants", () => {
         createMetricsComputedEvent("trace-2", 125100),
       ], store, projection);
       assertCorrectFinalState(state, "duplicate delayed metrics");
+    });
+  });
+
+  // Late-arriving lifecycle events trigger re-fold in occurredAt order
+  describe("when started event arrives after finished (late delivery)", () => {
+    it("re-folds to correct ERROR status", async () => {
+      // Reproduces: queued processed → finished processed → started arrives late
+      // Re-fold replays in occurredAt order: queued(500) → started(1000) → finished(5200)
+      const state = await processFold([
+        createQueuedEvent(500),
+        createErrorFinishedEvent(5200),
+        createStartedEvent(1000),  // late! triggers re-fold
+      ], store, projection);
+
+      expect(state.Status, "Status must be ERROR after re-fold").toBe("ERROR");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+      expect(state.Verdict, "Verdict must be failure").toBe("failure");
+      expect(state.StartedAt, "StartedAt must be set from started event").not.toBeNull();
+    });
+
+    it("re-folds to correct SUCCESS status", async () => {
+      const state = await processFold([
+        createQueuedEvent(500),
+        createFinishedEvent(5200),
+        createStartedEvent(1000),  // late! triggers re-fold
+      ], store, projection);
+
+      expect(state.Status, "Status must be SUCCESS after re-fold").toBe("SUCCESS");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+    });
+
+    it("preserves metadata from all events after re-fold", async () => {
+      const state = await processFold([
+        createQueuedEvent(500),
+        createErrorFinishedEvent(5200),
+        createStartedEvent(1000),  // late! triggers re-fold
+      ], store, projection);
+
+      expect(state.Name, "Name from started should be preserved").toBe("test scenario");
+      expect(state.ScenarioSetId).toBe("python-examples");
+    });
+  });
+
+  describe("when queued event arrives after finished (late delivery)", () => {
+    it("preserves terminal status", async () => {
+      const state = await processFold([
+        createStartedEvent(1000),
+        createErrorFinishedEvent(5200),
+        createQueuedEvent(500),  // late!
+      ], store, projection);
+
+      expect(state.Status, "Status must remain ERROR").toBe("ERROR");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+    });
+  });
+
+  // Full lifecycle with all events in every possible order
+  describe("when all lifecycle events (queued, started, finished, metrics) arrive in any order", () => {
+    const events: SimulationProcessingEvent[] = [
+      createQueuedEvent(500),
+      createStartedEvent(1000),
+      createFinishedEvent(5200),
+      createMetricsComputedEvent("trace-1", 65000),
+    ];
+
+    const allPerms = permutations(events);
+
+    it.each(allPerms.map((perm, i) => ({
+      name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+      perm,
+    })))("$name → final status is SUCCESS", async ({ name, perm }) => {
+      const state = await processFold(perm, store, projection);
+      expect(state.Status, `${name}: Status must be SUCCESS`).toBe("SUCCESS");
+      expect(state.FinishedAt, `${name}: FinishedAt must be set`).not.toBeNull();
     });
   });
 });

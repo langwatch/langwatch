@@ -26,6 +26,9 @@ import { createSimulationProcessingPipeline } from "./pipelines/simulation-proce
 import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
+import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
@@ -152,7 +155,7 @@ export class PipelineRegistry {
     const evalPipeline = this.registerEvaluationPipeline();
     const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
+    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
@@ -166,6 +169,8 @@ export class PipelineRegistry {
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
+      /** Late-bind the execution pool for scenario execution reactor. */
+      scenarioExecutionHandle,
     };
   }
 
@@ -375,6 +380,12 @@ export class PipelineRegistry {
       },
     );
 
+    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
+      publisher: this.deps.eventSourcing.redisConnection ?? null,
+    });
+
+    const scenarioExecutionHandle = createScenarioExecutionReactor();
+
     const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
     const suiteRunSyncReactor = createSuiteRunSyncReactor({
       recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
@@ -412,6 +423,8 @@ export class PipelineRegistry {
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+        cancellationBroadcastReactor,
+        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
         suiteRunSyncReactor,
         traceMetricsSyncReactor,
         computeRunMetricsCommand,
@@ -471,7 +484,7 @@ export class PipelineRegistry {
       computeRunMetrics: simCommands.computeRunMetrics,
     });
 
-    return simulationPipeline;
+    return { pipeline: simulationPipeline, scenarioExecutionHandle };
   }
 
   private registerBillingReportingPipeline() {

@@ -15,6 +15,7 @@ export const SIMULATION_RUN_EVENT_TYPES = {
   FINISHED: "lw.simulation_run.finished",
   DELETED: "lw.simulation_run.deleted",
   METRICS_COMPUTED: "lw.simulation_run.metrics_computed",
+  CANCEL_REQUESTED: "lw.simulation_run.cancel_requested",
 } as const;
 
 export const SIMULATION_PROCESSING_EVENT_TYPES = [
@@ -26,6 +27,7 @@ export const SIMULATION_PROCESSING_EVENT_TYPES = [
   SIMULATION_RUN_EVENT_TYPES.FINISHED,
   SIMULATION_RUN_EVENT_TYPES.DELETED,
   SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
+  SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
 ] as const;
 
 export type SimulationProcessingEventType =
@@ -44,6 +46,7 @@ export const SIMULATION_RUN_COMMAND_TYPES = {
   FINISH: "lw.simulation_run.finish",
   DELETE: "lw.simulation_run.delete",
   COMPUTE_METRICS: "lw.simulation_run.compute_metrics",
+  CANCEL: "lw.simulation_run.cancel",
 } as const;
 
 export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
@@ -55,6 +58,7 @@ export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
   SIMULATION_RUN_COMMAND_TYPES.FINISH,
   SIMULATION_RUN_COMMAND_TYPES.DELETE,
   SIMULATION_RUN_COMMAND_TYPES.COMPUTE_METRICS,
+  SIMULATION_RUN_COMMAND_TYPES.CANCEL,
 ] as const;
 
 export type SimulationProcessingCommandType =
@@ -72,6 +76,7 @@ export const SIMULATION_EVENT_VERSIONS = {
   FINISHED: "2026-02-01",
   DELETED: "2026-02-01",
   METRICS_COMPUTED: "2026-03-27",
+  CANCEL_REQUESTED: "2026-04-06",
 } as const;
 
 /**

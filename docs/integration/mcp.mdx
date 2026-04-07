@@ -92,8 +92,8 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 <Tab title="ChatGPT">
 1. Go to **Settings → Connectors**
 2. Click **Add connector**
-3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-4. For authentication, select **Bearer Token** and enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize))
+3. Enter the server URL: `https://app.langwatch.ai/sse`
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
 
 *Requires a Plus or Team plan.*
 </Tab>
@@ -101,10 +101,21 @@ Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the C
 <Tab title="Claude Chat">
 1. Go to **Settings → Connectors**
 2. Click **Add custom connector**
-3. Enter the server URL: `https://mcp.langwatch.ai/sse`
-4. In **Advanced settings**, enter your LangWatch API key (get one at [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize)) as the **OAuth Client Secret**. Leave Client ID empty.
+3. Enter the server URL: `https://app.langwatch.ai/mcp`
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
 
 *Requires a Pro or Max plan.*
+</Tab>
+
+<Tab title="BoltAI / Other MCP Clients">
+For any MCP client that supports remote servers with OAuth:
+
+1. Add a new remote MCP server
+2. Enter the endpoint URL: `https://app.langwatch.ai/mcp`
+3. Select **OAuth (browser)** authentication
+4. Click **Connect** — you'll be redirected to sign in and authorize access to your project
+
+The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
 </Tab>
 
 <Tab title="Other">
@@ -147,7 +158,7 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 The MCP server runs in two modes:
 
 - **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat). Hosted at `https://mcp.langwatch.ai`. Supports both Bearer token auth (ChatGPT) and OAuth client_credentials (Claude Chat) — each user brings their own key.
+- **Remote (HTTP/SSE)**: For web-based assistants (ChatGPT, Claude Chat, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE — click Connect and sign in via your browser to authorize access to your project. Supports both Streamable HTTP (`/mcp`) and SSE (`/sse`) transports.
 
 ## Usage Examples
 

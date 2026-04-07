@@ -18,8 +18,11 @@ import type {
   BatchCompleteInfo,
 } from "../../../src/server/event-sourcing/replay";
 
-import { createReplayRuntime } from "../../../src/server/event-sourcing/replay/replayPreset";
-import { prisma } from "../../../src/server/db";
+// Dynamic imports: the parent langwatch package is CJS (no "type": "module")
+// while this package is ESM. Static named imports across the CJS→ESM boundary
+// fail on Node 24 + tsx. Dynamic import handles the interop correctly.
+const { createReplayRuntime } = await import("../../../src/server/event-sourcing/replay/replayPreset");
+const { prisma } = await import("../../../src/server/db");
 import { ReplayLog } from "./replayLog";
 import {
   ReplayWizard,

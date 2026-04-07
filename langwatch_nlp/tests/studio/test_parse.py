@@ -220,7 +220,7 @@ def test_parse_signature_with_default_workflow_llm():
         type="signature",
     )
     workflow = copy.deepcopy(basic_workflow)
-    workflow.default_llm = LLMConfig(model="gpt-4o", temperature=0.0, max_tokens=100)
+    workflow.default_llm = LLMConfig(model="gpt-5-mini", temperature=0.0, max_tokens=100)
 
     code, class_name, _ = parse_component(node, workflow)
     with materialized_component_class(code, class_name) as Module:

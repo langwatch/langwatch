@@ -1,7 +1,5 @@
 import { isBuildOrNoRedis, connection as redisConnection } from "../redis";
 
-const REDIS_PREFIX = "ttlcache:";
-
 type MemoryEntry<T> = { value: T; expiresAt: number };
 
 /**
@@ -20,7 +18,7 @@ export class TtlCache<T> {
   private readonly prefix: string;
   private readonly memory = new Map<string, MemoryEntry<T>>();
 
-  constructor(ttlMs: number, prefix: string = REDIS_PREFIX) {
+  constructor(ttlMs: number, prefix: string) {
     this.ttlMs = ttlMs;
     this.ttlSeconds = Math.ceil(ttlMs / 1000);
     this.prefix = prefix;

@@ -320,11 +320,16 @@ export const ComparisonCharts = ({
     }
   };
 
-  // Default X-axis: "runs" if multiple runs, "target" if single run with multiple targets
+  // Default X-axis: "runs" if multiple runs, "target" if single run with multiple real targets.
+  // When all targets are evaluators (simple evaluations without a prompt/agent target),
+  // each evaluator gets its own column but grouping by "target" is not useful — default to "runs".
   const defaultXAxis = useMemo((): XAxisOption => {
     if (comparisonData.length >= 2) return "runs";
-    const targetCount = comparisonData[0]?.data?.targetColumns.length ?? 0;
-    if (targetCount >= 2) return "target";
+    const targets = comparisonData[0]?.data?.targetColumns ?? [];
+    const hasRealTarget = targets.some(
+      (t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"),
+    );
+    if (targets.length >= 2 && hasRealTarget) return "target";
     return "runs";
   }, [comparisonData]);
 

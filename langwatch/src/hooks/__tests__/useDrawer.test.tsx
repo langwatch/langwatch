@@ -26,10 +26,11 @@ let mockQuery: Record<string, string> = {};
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    pathname: "/test",
     asPath:
       Object.keys(mockQuery).length > 0
-        ? "?" + new URLSearchParams(mockQuery).toString()
-        : "/",
+        ? "/test?" + new URLSearchParams(mockQuery).toString()
+        : "/test",
     push: mockPush,
     replace: mockReplace,
   }),

@@ -8,6 +8,7 @@ import {
   TextMessageStartCommand,
   TextMessageEndCommand,
   FinishRunCommand,
+  CancelRunCommand,
   DeleteRunCommand,
 } from "./commands";
 import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
@@ -17,6 +18,8 @@ import type { SimulationProcessingEvent } from "./schemas/events";
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  cancellationBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  scenarioExecutionReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
@@ -49,8 +52,10 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
       store: deps.simulationRunStore,
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
+    .withReactor("simulationRunState", "cancellationBroadcast", deps.cancellationBroadcastReactor)
     .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
-    .withReactor("simulationRunState", "traceMetricsSync", deps.traceMetricsSyncReactor);
+    .withReactor("simulationRunState", "traceMetricsSync", deps.traceMetricsSyncReactor)
+    .withReactor("simulationRunState", "scenarioExecution", deps.scenarioExecutionReactor);
 
   if (deps.customerIoSimulationSyncReactor) {
     builder = builder.withReactor(
@@ -67,6 +72,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("textMessageStart", TextMessageStartCommand)
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
+    .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance("computeRunMetrics", ComputeRunMetricsCommand, deps.computeRunMetricsCommand, {
       deduplication: {

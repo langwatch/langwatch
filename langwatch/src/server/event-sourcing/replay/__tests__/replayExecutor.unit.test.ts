@@ -16,6 +16,7 @@ function createTestProjection(opts?: { keyFn?: (event: any) => string }) {
   > = {
     name: "testProjection",
     version: "2025-01-01",
+    lastEventOccurredAtKey: "LastEventOccurredAt",
     eventTypes: ["test.event"],
     init: () => ({ total: 0, count: 0 }),
     apply: (state, event) => ({

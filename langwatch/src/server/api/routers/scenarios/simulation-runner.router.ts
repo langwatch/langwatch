@@ -12,10 +12,7 @@ import {
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-} from "~/server/scenarios/scenario.queue";
+import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
@@ -39,6 +36,8 @@ const runScenarioSchema = projectSchema.extend({
   target: simulationTargetSchema,
   /** Optional set ID - defaults to internal on-platform set ID for ad-hoc runs */
   setId: z.string().optional(),
+  /** Optional client-generated batch run ID for immediate placeholder feedback */
+  batchRunId: z.string().optional(),
 });
 
 /**
@@ -57,7 +56,7 @@ export const simulationRunnerRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
-      const batchRunId = generateBatchRunId();
+      const batchRunId = input.batchRunId ?? generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
@@ -108,6 +107,8 @@ export const simulationRunnerRouter = createTRPCRouter({
           scenarioId: input.scenarioId,
           batchRunId,
           scenarioSetId: setId,
+          name: prefetchResult.data.scenario.name,
+          target: { type: input.target.type, referenceId: input.target.referenceId },
           occurredAt: Date.now(),
         });
       } catch (error) {
@@ -122,22 +123,12 @@ export const simulationRunnerRouter = createTRPCRouter({
         });
       }
 
-      const job = await scheduleScenarioRun({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        target: input.target,
-        setId,
-        batchRunId,
-        scenarioRunId,
-        index: 0,
-      });
+      // No explicit job scheduling — the execution reactor picks up the queued
+      // event via the GroupQueue and spawns the child process.
+      logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
 
-      logger.info({ jobId: job.id, batchRunId, scenarioRunId }, "Scenario scheduled");
-
-      // Return honest response: job was scheduled, not executed
       return {
         scheduled: true,
-        jobId: job.id,
         setId,
         batchRunId,
         scenarioRunId,

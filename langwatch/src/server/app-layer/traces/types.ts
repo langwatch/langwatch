@@ -84,6 +84,7 @@ export const traceSummaryDataSchema = z.object({
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  lastEventOccurredAt: z.number(),
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;

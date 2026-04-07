@@ -14,6 +14,7 @@ import type {
   SimulationTextMessageEndEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
+  SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
 } from "../schemas/events";
 import {
@@ -24,6 +25,7 @@ import {
   SimulationTextMessageEndEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
 } from "../schemas/events";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
@@ -79,7 +81,9 @@ export interface SimulationRunStateData {
   UpdatedAt: number;
   FinishedAt: number | null;
   ArchivedAt: number | null;
+  CancellationRequestedAt: number | null;
   LastSnapshotOccurredAt: number;
+  LastEventOccurredAt: number;
 }
 
 export interface SimulationRunState extends Projection<SimulationRunStateData> {
@@ -94,6 +98,7 @@ const simulationRunEvents = [
   SimulationTextMessageEndEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -145,6 +150,7 @@ export class SimulationRunStateFoldProjection
       QueuedAt: null,
       FinishedAt: null,
       ArchivedAt: null,
+      CancellationRequestedAt: null,
       LastSnapshotOccurredAt: 0,
     };
   }
@@ -377,6 +383,18 @@ export class SimulationRunStateFoldProjection
       TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
       RoleCosts: roleCosts,
       RoleLatencies: roleLatencies,
+    };
+  }
+
+  handleSimulationRunCancelRequested(
+    _event: SimulationRunCancelRequestedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // Idempotent: keep the original timestamp if already requested
+    if (state.CancellationRequestedAt != null) return state;
+    return {
+      ...state,
+      CancellationRequestedAt: _event.occurredAt,
     };
   }
 

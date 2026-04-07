@@ -5,12 +5,12 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioJob, ScenarioJobResult } from "../scenario.queue";
+import type { ExecutionJobData } from "../execution/execution-pool";
 import type { ProcessorDependencies } from "../scenario.processor";
 import { handleFailedJobResult } from "../scenario.processor";
 
 describe("handleFailedJobResult", () => {
-  const mockJobData: ScenarioJob = {
+  const mockJobData: ExecutionJobData = {
     projectId: "proj_123",
     scenarioId: "scen_456",
     setId: "set_789",

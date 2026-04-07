@@ -7,15 +7,17 @@
  */
 
 import type { SimulationSuite } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { toaster } from "../ui/toaster";
 
 interface UseRunSuiteOptions {
-  onRunScheduled?: (suiteId: string) => void;
+  onRunScheduled?: (suiteId: string, batchRunId: string) => void;
 }
 
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
@@ -26,6 +28,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   optionsRef.current = options;
 
   const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
+  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
@@ -71,10 +74,11 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         });
       }
 
-      optionsRef.current.onRunScheduled?.(variables.id);
+      optionsRef.current.onRunScheduled?.(variables.id, variables.batchRunId ?? result.batchRunId);
     },
     onError: (err, variables) => {
       setPendingSuite(null);
+      setPendingBatchRunId(null);
 
       const isAllArchived =
         err.data?.code === "BAD_REQUEST" &&
@@ -111,10 +115,13 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
 
   const confirmRun = useCallback(() => {
     if (!project || !pendingSuite || runMutation.isPending) return;
+    const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+    setPendingBatchRunId(batchRunId);
     runMutation.mutate({
       projectId: project.id,
       id: pendingSuite.id,
       idempotencyKey: crypto.randomUUID(),
+      batchRunId,
     });
   }, [project, pendingSuite, runMutation]);
 
@@ -145,6 +152,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     confirmRun,
     cancelRun,
     isPending: runMutation.isPending,
+    pendingBatchRunId,
     /** Props to spread onto SuiteRunConfirmationDialog */
     dialogProps: {
       open: !!pendingSuite,

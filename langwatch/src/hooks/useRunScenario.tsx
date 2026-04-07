@@ -25,6 +25,7 @@ interface RunScenarioParams {
   scenarioId: string;
   target: TargetValue;
   setId?: string;
+  batchRunId?: string;
 }
 
 export function useRunScenario({
@@ -44,7 +45,7 @@ export function useRunScenario({
 
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
-      const { scenarioId, target, setId } = params;
+      const { scenarioId, target, setId, batchRunId } = params;
       if (!projectId || !projectSlug || !target) return;
 
       // Check if model providers are configured before attempting to run
@@ -82,28 +83,29 @@ export function useRunScenario({
       }
 
       try {
-        const { setId: returnedSetId, batchRunId } = await runMutation.mutateAsync({
+        const { setId: returnedSetId, batchRunId: returnedBatchRunId } = await runMutation.mutateAsync({
           projectId,
           scenarioId,
           target: { type: target.type, referenceId: target.id },
           setId,
+          batchRunId,
         });
 
         setIsPolling(true);
         const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
-          { projectId, scenarioSetId: returnedSetId, batchRunId },
+          { projectId, scenarioSetId: returnedSetId, batchRunId: returnedBatchRunId },
         );
 
         if (result.success) {
           onRunComplete?.({
             scenarioRunId: result.scenarioRunId,
             setId: returnedSetId,
-            batchRunId,
+            batchRunId: returnedBatchRunId,
           });
         } else if (result.error === "run_error") {
           const runResult = result.scenarioRunId
-            ? { scenarioRunId: result.scenarioRunId, setId: returnedSetId, batchRunId }
+            ? { scenarioRunId: result.scenarioRunId, setId: returnedSetId, batchRunId: returnedBatchRunId }
             : null;
           toaster.create({
             title: "Scenario run failed",

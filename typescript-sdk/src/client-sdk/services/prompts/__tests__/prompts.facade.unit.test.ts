@@ -244,6 +244,21 @@ describe("Prompt Retrieval", () => {
     });
   });
 
+  describe("Scenario: Shorthand syntax passthrough (thin client)", () => {
+    describe("when fetching with colon-separated shorthand", () => {
+      it("passes the full string to the API without parsing", async () => {
+        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        localPromptsService.get.mockResolvedValue(null);
+        promptsApiService.get.mockResolvedValue(productionPrompt);
+
+        const result = await facade.get(`${testHandle}:production`);
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(`${testHandle}:production`, undefined);
+        expect(result).toEqual(new Prompt(productionPrompt));
+      });
+    });
+  });
+
   describe("Scenario: Cache TTL - Version Isolation", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

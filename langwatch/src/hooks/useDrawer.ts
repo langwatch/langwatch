@@ -232,29 +232,41 @@ export const useDrawer = () => {
 
       complexProps = nonSerializableProps;
 
+      // Build query from current non-drawer, non-path query params only.
+      // Path params (project, scenarioSetId, etc.) are part of the URL path
+      // and must NOT be serialized into the query string.
+      const pathParamKeys = new Set(
+        (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+      );
+      const currentQueryOnly = Object.fromEntries(
+        Object.entries(router.query).filter(
+          ([key, value]) =>
+            !key.startsWith("drawer.") &&
+            !pathParamKeys.has(key) &&
+            typeof value !== "function" &&
+            typeof value !== "object",
+        ),
+      );
+
+      const newQuery = qs.stringify(
+        {
+          ...currentQueryOnly,
+          drawer: {
+            open: drawer,
+            ...serializableProps,
+          },
+        },
+        {
+          allowDots: true,
+          arrayFormat: "comma",
+          allowEmptyArrays: true,
+        },
+      );
+
+      // Preserve the current URL path (from asPath) and append the new query
+      const currentPath = router.asPath.split("?")[0]!;
       void router[options.replace ? "replace" : "push"](
-        "?" +
-          qs.stringify(
-            {
-              ...Object.fromEntries(
-                Object.entries(router.query).filter(
-                  ([key, value]) =>
-                    !key.startsWith("drawer.") &&
-                    typeof value !== "function" &&
-                    typeof value !== "object",
-                ),
-              ),
-              drawer: {
-                open: drawer,
-                ...serializableProps, // Only serializable props go to URL
-              },
-            },
-            {
-              allowDots: true,
-              arrayFormat: "comma",
-              allowEmptyArrays: true,
-            },
-          ),
+        `${currentPath}?${newQuery}`,
         undefined,
         { shallow: true },
       );
@@ -373,21 +385,28 @@ export const useDrawer = () => {
     clearFlowCallbacks();
     complexProps = {};
 
+    // Filter out drawer params and path params, keep only actual query params
+    const pathParamKeys = new Set(
+      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+    );
+    const cleanQuery = Object.fromEntries(
+      Object.entries(router.query).filter(
+        ([key]) =>
+          !key.startsWith("drawer.") &&
+          key !== "span" &&
+          !pathParamKeys.has(key),
+      ),
+    );
+    const queryString = qs.stringify(cleanQuery, {
+      allowDots: true,
+      arrayFormat: "comma",
+      // @ts-ignore - allowEmptyArrays exists
+      allowEmptyArrays: true,
+    });
+
+    const currentPath = router.asPath.split("?")[0]!;
     void router.push(
-      "?" +
-        qs.stringify(
-          Object.fromEntries(
-            Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer.") && key !== "span",
-            ),
-          ),
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore - allowEmptyArrays exists
-            allowEmptyArrays: true,
-          },
-        ),
+      queryString ? `${currentPath}?${queryString}` : currentPath,
       undefined,
       { shallow: true },
     );

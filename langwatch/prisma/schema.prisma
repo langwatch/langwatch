@@ -39,11 +39,12 @@ model Account {
 }
 
 model Session {
-    id           String   @id @default(nanoid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    id            String   @id @default(nanoid())
+    sessionToken  String   @unique
+    userId        String
+    expires       DateTime
+    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    impersonating Json?
 
     @@index([userId])
 }

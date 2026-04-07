@@ -30,7 +30,7 @@ describe("TtlCache", () => {
 
   describe("when Redis is available", () => {
     it("stores and retrieves values from Redis", async () => {
-      const cache = new TtlCache<number>(30_000);
+      const cache = new TtlCache<number>(30_000, "test:");
 
       await cache.set("key1", 42);
       const result = await cache.get("key1");
@@ -41,7 +41,7 @@ describe("TtlCache", () => {
     });
 
     it("returns undefined for missing keys", async () => {
-      const cache = new TtlCache<string>(30_000);
+      const cache = new TtlCache<string>(30_000, "test:");
 
       const result = await cache.get("nonexistent");
 
@@ -49,7 +49,7 @@ describe("TtlCache", () => {
     });
 
     it("deletes from Redis", async () => {
-      const cache = new TtlCache<string>(30_000);
+      const cache = new TtlCache<string>(30_000, "test:");
 
       await cache.set("key1", "value");
       await cache.delete("key1");
@@ -60,7 +60,7 @@ describe("TtlCache", () => {
     });
 
     it("uses the correct TTL in seconds", async () => {
-      const cache = new TtlCache<number>(45_000); // 45s
+      const cache = new TtlCache<number>(45_000, "test:"); // 45s
 
       await cache.set("key1", 1);
 
@@ -80,7 +80,7 @@ describe("TtlCache", () => {
     });
 
     it("serializes complex objects to JSON", async () => {
-      const cache = new TtlCache<{ name: string; count: number }>(30_000);
+      const cache = new TtlCache<{ name: string; count: number }>(30_000, "test:");
       const obj = { name: "test", count: 42 };
 
       await cache.set("obj1", obj);
@@ -92,7 +92,7 @@ describe("TtlCache", () => {
 
   describe("when Redis fails on get", () => {
     it("falls back to in-memory cache", async () => {
-      const cache = new TtlCache<number>(30_000);
+      const cache = new TtlCache<number>(30_000, "test:");
 
       // Set succeeds (writes to both Redis and memory)
       await cache.set("key1", 42);
@@ -108,7 +108,7 @@ describe("TtlCache", () => {
 
   describe("when Redis fails on set", () => {
     it("still caches in memory", async () => {
-      const cache = new TtlCache<number>(30_000);
+      const cache = new TtlCache<number>(30_000, "test:");
 
       // Redis set fails
       mockRedis.setex.mockRejectedValueOnce(new Error("connection reset"));
@@ -129,7 +129,7 @@ describe("TtlCache", () => {
     });
 
     it("uses in-memory cache only", async () => {
-      const cache = new TtlCache<number>(30_000);
+      const cache = new TtlCache<number>(30_000, "test:");
 
       await cache.set("key1", 42);
       const result = await cache.get("key1");
@@ -140,7 +140,7 @@ describe("TtlCache", () => {
     });
 
     it("respects TTL for in-memory entries", async () => {
-      const cache = new TtlCache<number>(50); // 50ms
+      const cache = new TtlCache<number>(50, "test:"); // 50ms
 
       await cache.set("key1", 42);
       expect(await cache.get("key1")).toBe(42);
@@ -150,7 +150,7 @@ describe("TtlCache", () => {
     });
 
     it("deletes from memory", async () => {
-      const cache = new TtlCache<number>(30_000);
+      const cache = new TtlCache<number>(30_000, "test:");
 
       await cache.set("key1", 42);
       await cache.delete("key1");

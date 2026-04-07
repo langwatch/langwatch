@@ -1,5 +1,28 @@
 {
   "packages": {
+    "clickhouse-serverless": {
+      "release-type": "simple",
+      "package-name": "clickhouse-serverless",
+      "prerelease": false,
+      "component": "clickhouse-serverless",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {"type": "feat",     "section": "Features"},
+        {"type": "fix",      "section": "Bug Fixes"},
+        {"type": "chore",    "section": "Miscellaneous",    "hidden": false},
+        {"type": "docs",     "section": "Documentation",    "hidden": false},
+        {"type": "refactor", "section": "Code Refactoring", "hidden": false}
+      ],
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "charts/clickhouse-serverless/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        "charts/clickhouse-serverless/values.yaml"
+      ]
+    },
     "sdk-go": {
       "release-type": "go",
       "package-name": "langwatch-go",

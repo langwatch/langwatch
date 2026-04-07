@@ -97,6 +97,7 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
       UpdatedAt: Number(row.UpdatedAt),
       StartedAt: row.StartedAt != null ? Number(row.StartedAt) : null,
       FinishedAt: row.FinishedAt != null ? Number(row.FinishedAt) : null,
+      LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
     };
   }
 }

@@ -272,6 +272,7 @@ export class SuiteService {
     projectId: string;
     organizationId: string;
     idempotencyKey: string;
+    batchRunId?: string;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -300,6 +301,7 @@ export class SuiteService {
           repeatCount: suite.repeatCount,
           skippedArchived: resolved.skippedArchived,
           idempotencyKey: params.idempotencyKey,
+          batchRunId: params.batchRunId,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);

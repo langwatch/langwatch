@@ -219,7 +219,7 @@ describe("computeBatchRunSummary()", () => {
   });
 
   describe("when some runs are still in progress", () => {
-    it("counts in-progress runs in total (lowering pass rate)", () => {
+    it("excludes in-progress runs from pass rate denominator", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS }),
@@ -231,7 +231,8 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
-      expect(summary.passRate).toBe(50);
+      // 1 passed out of 1 completed = 100%, not 50%
+      expect(summary.passRate).toBe(100);
       expect(summary.passedCount).toBe(1);
       expect(summary.failedCount).toBe(0);
       expect(summary.completedCount).toBe(1);
@@ -241,7 +242,7 @@ describe("computeBatchRunSummary()", () => {
   });
 
   describe("when all runs are stalled", () => {
-    it("returns null pass rate (no verdict runs)", () => {
+    it("returns 0% pass rate (stalled is a terminal failure)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_1" }),
@@ -250,7 +251,7 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
-      expect(summary.passRate).toBeNull();
+      expect(summary.passRate).toBe(0);
       expect(summary.completedCount).toBe(0);
       expect(summary.stalledCount).toBe(2);
       expect(summary.totalCount).toBe(2);
@@ -258,7 +259,7 @@ describe("computeBatchRunSummary()", () => {
   });
 
   describe("when all runs are cancelled", () => {
-    it("returns null pass rate", () => {
+    it("returns 0% pass rate (cancelled is terminal)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_1" }),
@@ -266,14 +267,14 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
-      expect(summary.passRate).toBeNull();
+      expect(summary.passRate).toBe(0);
       expect(summary.completedCount).toBe(0);
       expect(summary.cancelledCount).toBe(1);
     });
   });
 
   describe("when passed and stalled runs are mixed", () => {
-    it("computes pass rate as passed / total", () => {
+    it("includes stalled in pass rate denominator (stalled is a terminal failure)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
@@ -283,6 +284,7 @@ describe("computeBatchRunSummary()", () => {
       });
 
       const summary = computeBatchRunSummary({ batchRun });
+      // 2 passed / 3 settled (2 passed + 1 stalled) ≈ 66.67%
       expect(summary.passRate).toBeCloseTo(66.67, 0);
       expect(summary.completedCount).toBe(2);
       expect(summary.passedCount).toBe(2);
@@ -308,7 +310,7 @@ describe("computeBatchRunSummary()", () => {
   });
 
   describe("when mix of passed, failed, stalled, cancelled", () => {
-    it("computes pass rate as passed / total with completedCount = passed + failed", () => {
+    it("computes pass rate as passed / settled (excludes in-progress and queued)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
@@ -954,7 +956,7 @@ describe("resolveOriginLabel()", () => {
         suiteNameMap,
       });
 
-      expect(result).toBe("On-Platform Scenarios");
+      expect(result).toBe("Manual Run");
     });
   });
 
@@ -967,7 +969,7 @@ describe("resolveOriginLabel()", () => {
         suiteNameMap,
       });
 
-      expect(result).toBe("On-Platform Scenarios");
+      expect(result).toBe("Manual Run");
     });
   });
 });

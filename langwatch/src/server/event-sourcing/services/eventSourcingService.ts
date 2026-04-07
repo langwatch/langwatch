@@ -8,6 +8,7 @@ import {
   getEventSourcingEventsStoredCounter,
 } from "~/server/metrics";
 import type { AggregateType } from "../domain/aggregateType";
+import { createTenantId } from "../domain/tenantId";
 import type { Event, Projection } from "../domain/types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import { ProjectionRouter } from "../projections/projectionRouter";
@@ -110,9 +111,23 @@ export class EventSourcingService<
       replayMarkerChecker,
     );
 
-    // Register fold projections
+    // Register fold projections and auto-wire event loaders for out-of-order re-fold
     if (foldProjections) {
       for (const fold of foldProjections) {
+        // If the projection doesn't already have an eventLoader, provide one
+        // that fetches events from the event store sorted by occurredAt.
+        if (!fold.eventLoader && eventStore) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          fold.eventLoader = async (ctx: { tenantId: string; aggregateId: string }) => {
+            const events = await capturedEventStore.getEvents(
+              ctx.aggregateId,
+              { tenantId: createTenantId(ctx.tenantId) },
+              capturedAggregateType,
+            );
+            return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+          };
+        }
         this.router.registerFoldProjection(fold);
       }
     }

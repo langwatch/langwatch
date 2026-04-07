@@ -28,7 +28,7 @@ import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
-import { dependencies } from "../injection/dependencies.client";
+import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
@@ -279,7 +279,10 @@ export const DashboardLayout = ({
   compactMenu: compactMenuProp = false,
   ...props
 }: DashboardLayoutProps) => {
-  const isSmallScreen = useBreakpointValue({ base: true, lg: false });
+  // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
+  // so the menu starts expanded and only compacts after hydration on small screens.
+  // This avoids the compact→expanded flicker on desktop page navigations.
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
 
@@ -470,9 +473,7 @@ export const DashboardLayout = ({
             {session && (
               <Portal>
                 <Menu.Content>
-                  {dependencies.ExtraMenuItems && (
-                    <dependencies.ExtraMenuItems />
-                  )}
+                  <ImpersonationSwitchBackMenuItem />
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >

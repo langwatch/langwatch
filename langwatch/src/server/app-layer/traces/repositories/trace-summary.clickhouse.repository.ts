@@ -15,7 +15,7 @@ const logger = createLogger(
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt"
+  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
 >;
 
 interface ClickHouseSummaryRecord {
@@ -54,6 +54,7 @@ interface ClickHouseSummaryRecord {
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
   SpanCosts: Record<string, number>;
+  LastEventOccurredAt: number;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
@@ -261,6 +262,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
+      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -279,6 +281,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
+      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,

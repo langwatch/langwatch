@@ -24,6 +24,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
@@ -40,6 +41,7 @@ import {
 } from "./run-history-transforms";
 import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
 import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { useScrollToBatch } from "./useScrollToBatch";
 
 export type RunHistoryStats = {
   runCount: number;
@@ -57,8 +59,10 @@ type RunHistoryPanelProps = {
   expectedJobCount?: number;
   /** For All Runs view to show suite names on rows */
   suiteNameMap?: Map<string, string>;
-  /** When true, shows an initializing placeholder while the run mutation is in flight */
-  isRunStarting?: boolean;
+  /** When set, shows an initializing placeholder until this batch appears in the data */
+  pendingBatchRunId?: string | null;
+  /** When set, the matching batch row is scrolled into view and highlighted. */
+  highlightBatchId?: string | null;
 };
 
 export function RunHistoryPanel({
@@ -67,7 +71,8 @@ export function RunHistoryPanel({
   onStatsReady,
   expectedJobCount,
   suiteNameMap,
-  isRunStarting,
+  pendingBatchRunId,
+  highlightBatchId,
 }: RunHistoryPanelProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -81,6 +86,8 @@ export function RunHistoryPanel({
   const setFilters = useRunHistoryStore((s) => s.setFilters);
   const syncToUrl = useRunHistoryStore((s) => s.syncToUrl);
   const hydrateFromUrl = useRunHistoryStore((s) => s.hydrateFromUrl);
+
+  const runListRef = useRef<HTMLDivElement>(null);
 
   // Hydrate from URL on mount
   const hasHydrated = useRef(false);
@@ -150,12 +157,12 @@ export function RunHistoryPanel({
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
   const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
-    onCancelJobSuccess: (method) => {
+    onCancelJobSuccess: () => {
       setCancellingJobId(null);
       void refetch();
       toaster.create({
-        title: method === "signalled" ? "Cancellation requested" : "Job cancelled",
-        type: method === "signalled" ? "info" : "success",
+        title: "Cancellation requested",
+        type: "info",
       });
     },
     onCancelJobError: (error) => {
@@ -225,6 +232,7 @@ export function RunHistoryPanel({
 
   // Auto-expansion
   const { expandedIds, toggleExpanded } = useAutoExpansion({
+    panelKey: scenarioSetId ?? "all-runs",
     groupBy,
     batchRuns,
     groups,
@@ -253,6 +261,9 @@ export function RunHistoryPanel({
       lastActivityTimestamp,
     });
   }, [totals, lastActivityTimestamp, onStatsReady]);
+
+  // Scroll-to-batch highlighting
+  const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
 
   const isPlatformManaged = (setId: string | undefined) =>
     !!setId && (isOnPlatformSet(setId) || isSuiteSetId(setId));
@@ -297,21 +308,11 @@ export function RunHistoryPanel({
     [setFilters],
   );
 
-  // Keep initializing placeholder until a NEW batch run appears.
-  // Uses useMemo so the placeholder hides in the same render that
-  // adds the new batch row — no flicker gap.
-  const batchCountAtStartRef = useRef<number | null>(null);
-  if (isRunStarting && batchCountAtStartRef.current === null) {
-    batchCountAtStartRef.current = batchRuns.length;
-  }
+  // Show initializing placeholder until the pending batch appears in the data.
   const showInitPlaceholder = useMemo(() => {
-    if (batchCountAtStartRef.current === null) return false;
-    if (batchRuns.length > batchCountAtStartRef.current) {
-      batchCountAtStartRef.current = null;
-      return false;
-    }
-    return true;
-  }, [batchRuns.length]);
+    if (!pendingBatchRunId) return false;
+    return !batchRuns.some((b) => b.batchRunId === pendingBatchRunId);
+  }, [pendingBatchRunId, batchRuns]);
 
   // --- Render ---
 
@@ -401,6 +402,8 @@ export function RunHistoryPanel({
         />
       </Box>
 
+      <ShadowDivider scrollRef={runListRef} />
+
       {/* Run list — own scroll container so RunRow sticky headers don't clash with filters */}
       {itemCount === 0 && !showInitPlaceholder ? (
         <Box paddingX={6} paddingY={8} textAlign="center">
@@ -413,9 +416,9 @@ export function RunHistoryPanel({
           </Text>
         </Box>
       ) : (
-        <VStack align="stretch" gap={0} flex={1} minH={0} overflow="auto">
+        <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
           {showInitPlaceholder && (
-            <RunInitializingPlaceholder />
+            <RunRow loading />
           )}
           {groupBy === "none"
             ? batchRuns.map((batchRun) => {
@@ -446,6 +449,7 @@ export function RunHistoryPanel({
                     onCancelAll={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? () => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
+                    isHighlighted={highlightedBatchId === batchRun.batchRunId}
                   />
                 );
               })
@@ -486,29 +490,3 @@ export function RunHistoryPanel({
   );
 }
 
-function RunInitializingPlaceholder() {
-  return (
-    <HStack
-      paddingX={4}
-      paddingY={3}
-      gap={3}
-      bg="bg.muted"
-      borderBottom="1px solid"
-      borderColor="border"
-      css={{
-        "@keyframes shimmer": {
-          "0%": { opacity: 0.4 },
-          "50%": { opacity: 0.7 },
-          "100%": { opacity: 0.4 },
-        },
-      }}
-    >
-      <Spinner size="xs" color="fg.muted" />
-      <Text fontSize="sm" color="fg.muted">
-        Initializing run...
-      </Text>
-      <Box flex={1} />
-      <Box bg="bg.emphasized" borderRadius="md" h="16px" w="60px" css={{ animation: "shimmer 1.5s ease-in-out infinite" }} />
-    </HStack>
-  );
-}

@@ -1,0 +1,71 @@
+name: Release LangWatch Chart
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Images"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.12.0
+
+      - name: Install chart-releaser
+        run: |
+          VERSION=1.7.0
+          curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v${VERSION}/chart-releaser_${VERSION}_linux_amd64.tar.gz"
+          tar xzf cr.tar.gz cr
+          sudo mv cr /usr/local/bin/cr
+
+      - name: Add Helm repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Build dependencies
+        run: helm dependency build charts/langwatch
+
+      - name: Package chart
+        run: |
+          mkdir -p .cr-release-packages
+          helm package charts/langwatch -d .cr-release-packages
+
+      - name: Upload chart
+        run: |
+          cr upload \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ github.event.repository.name }}" \
+            --package-path .cr-release-packages \
+            --skip-existing
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Update index
+        run: |
+          cr index \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ github.event.repository.name }}" \
+            --package-path .cr-release-packages \
+            --push
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
