@@ -1,0 +1,10 @@
+image:
+  pullPolicy: Never
+replicas: 1
+memory: 1Gi
+cpu: "500m"
+storage:
+  size: 1Gi
+
+auth:
+  password: "e2etest"

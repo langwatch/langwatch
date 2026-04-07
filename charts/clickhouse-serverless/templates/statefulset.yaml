@@ -1,0 +1,256 @@
+{{- $replicas := .Values.replicas | int }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ $fullname }}-headless
+  replicas: {{ $replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "clickhouse-serverless.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clickhouse-serverless.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: clickhouse
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "clickhouse-serverless.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 101  # clickhouse group
+      terminationGracePeriodSeconds: 60
+
+      {{- with .Values.scheduling.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduling.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if gt $replicas 1 }}
+      affinity:
+        {{- if .Values.scheduling.affinity }}
+        {{- toYaml .Values.scheduling.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - {{ $fullname }}
+                topologyKey: topology.kubernetes.io/zone
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - {{ $fullname }}
+                topologyKey: kubernetes.io/hostname
+        {{- end }}
+      {{- else if .Values.scheduling.affinity }}
+      affinity:
+        {{- toYaml .Values.scheduling.affinity | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: clickhouse
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8123
+              protocol: TCP
+            - name: native
+              containerPort: 9000
+              protocol: TCP
+          # Image runs as uid 101 (clickhouse) via USER directive
+          env:
+            # Primary inputs — the image derives all ClickHouse parameters from these
+            - name: CH_CPU
+              value: {{ .Values.cpu | quote }}
+            - name: CH_RAM
+              value: {{ .Values.memory | quote }}
+            - name: CH_REPLICATED
+              value: {{ if gt $replicas 1 }}"true"{{ else }}"false"{{ end }}
+
+            - name: CLICKHOUSE_PASSWORD_FILE
+              value: "/mnt/secrets/password"
+
+            {{- if gt $replicas 1 }}
+            - name: CLICKHOUSE_CLUSTER_SECRET_FILE
+              value: "/mnt/secrets/cluster-secret"
+            - name: CH_CLUSTER
+              value: {{ .Values.clusterName | quote }}
+            - name: CH_SHARD
+              value: "shard_01"
+            - name: CH_REPLICA
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CH_KEEPER_NODES
+              value: {{ include "clickhouse-serverless.keeperNodes" . | quote }}
+            - name: CH_KEEPER_PORT
+              value: "9181"
+            - name: CH_DATA_NODES
+              value: {{ include "clickhouse-serverless.dataNodes" . | quote }}
+            - name: CH_DATA_NODE_PORT
+              value: "9000"
+            {{- end }}
+
+            {{- if or .Values.cold.enabled .Values.backup.enabled }}
+            # Remote storage configuration (shared by cold storage and backups)
+            - name: S3_ENDPOINT
+              value: {{ if .Values.objectStorage.endpoint }}{{ .Values.objectStorage.endpoint | quote }}{{ else }}{{ printf "https://s3.%s.amazonaws.com/%s/" .Values.objectStorage.region .Values.objectStorage.bucket | quote }}{{ end }}
+            - name: S3_BUCKET
+              value: {{ .Values.objectStorage.bucket | quote }}
+            - name: S3_REGION
+              value: {{ .Values.objectStorage.region | quote }}
+            - name: USE_ENVIRONMENT_CREDENTIALS
+              value: {{ .Values.objectStorage.useEnvironmentCredentials | quote }}
+            {{- if and .Values.objectStorage.credentials.secretKeyRef.name (not .Values.objectStorage.useEnvironmentCredentials) }}
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.objectStorage.credentials.secretKeyRef.name }}
+                  key: {{ .Values.objectStorage.credentials.secretKeyRef.accessKeyKey }}
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.objectStorage.credentials.secretKeyRef.name }}
+                  key: {{ .Values.objectStorage.credentials.secretKeyRef.secretKeyKey }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.cold.enabled }}
+            - name: COLD_STORAGE_ENABLED
+              value: "true"
+            {{- end }}
+            {{- if .Values.backup.enabled }}
+            - name: BACKUP_ENABLED
+              value: "true"
+            {{- end }}
+
+            # Advanced overrides (applied last — override any derived value above)
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+
+          resources:
+            requests:
+              cpu: {{ .Values.cpu }}
+              memory: {{ .Values.memory }}
+            limits:
+              cpu: {{ .Values.cpu }}
+              memory: {{ .Values.memory }}
+
+          {{- if gt $replicas 1 }}
+          # Multi-replica: check Keeper connectivity (needs auth)
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - clickhouse-client --user default --password "$(cat /mnt/secrets/password)" --query "SELECT 1"
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - clickhouse-client --user default --password "$(cat /mnt/secrets/password)" --receive_timeout=3 --query "SELECT 1 FROM system.zookeeper WHERE path='/'"
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - clickhouse-client --user default --password "$(cat /mnt/secrets/password)" --receive_timeout=3 --query "SELECT 1 FROM system.zookeeper WHERE path='/'"
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          {{- else }}
+          # Single-replica: simple HTTP ping
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          {{- end }}
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: config-d
+              mountPath: /etc/clickhouse-server/config.d
+            - name: users-d
+              mountPath: /etc/clickhouse-server/users.d
+            - name: secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+
+      volumes:
+        - name: config-d
+          emptyDir: {}
+        - name: users-d
+          emptyDir: {}
+        - name: secrets
+          secret:
+            secretName: {{ include "clickhouse-serverless.secretName" . }}
+            items:
+              - key: {{ include "clickhouse-serverless.secretKey" . }}
+                path: password
+              {{- if gt $replicas 1 }}
+              - key: {{ include "clickhouse-serverless.clusterSecretKey" . }}
+                path: cluster-secret
+              {{- end }}
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.storage.storageClass }}
+        storageClassName: {{ .Values.storage.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}
