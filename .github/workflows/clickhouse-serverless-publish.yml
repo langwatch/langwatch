@@ -1,4 +1,4 @@
-name: Publish ClickHouse Serverless
+name: clickhouse-serverless-publish
 
 on:
   release:
