@@ -12,6 +12,26 @@ export function getProviderFromModel(model: string): string {
   return model.split("/")[0] ?? "";
 }
 
+/**
+ * Determines whether a model is disabled for generation.
+ * When `modelOption` is present (model is in the static registry), delegates to its `isDisabled` flag.
+ * When `modelOption` is absent (e.g., custom Azure deployment not in registry), falls back to
+ * checking whether the model's provider is enabled in the project's provider settings.
+ */
+export function isModelDisabledForProvider({
+  modelOption,
+  providers,
+  model,
+}: {
+  modelOption: { isDisabled: boolean } | undefined;
+  providers: Record<string, { enabled: boolean }> | undefined;
+  model: string;
+}): boolean {
+  if (modelOption) return modelOption.isDisabled;
+  const providerKey = getProviderFromModel(model);
+  return !(providers?.[providerKey]?.enabled ?? false);
+}
+
 export type EffectiveDefaults = {
   defaultModel: string;
   topicClusteringModel: string;
