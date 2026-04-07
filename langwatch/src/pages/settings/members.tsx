@@ -468,7 +468,7 @@ function MemberAccessDisplay({ bindings }: { bindings: Binding[] }) {
           </Badge>
           <Text color="fg.muted">on</Text>
           <Badge colorPalette="purple" size="sm">
-            {scopeTypeLabel(b.scopeType)}{b.scopeType !== RoleBindingScopeType.ORGANIZATION && ` · ${b.scopeName ?? b.scopeId.slice(0, 8) + "…"}`}
+            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
         </HStack>
       ))}

@@ -25,6 +25,9 @@ export const roleBindingRouter = createTRPCRouter({
         orderBy: { createdAt: "asc" },
       });
 
+      const orgIds = bindings
+        .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
+        .map((b) => b.scopeId);
       const teamIds = bindings
         .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
         .map((b) => b.scopeId);
@@ -32,7 +35,10 @@ export const roleBindingRouter = createTRPCRouter({
         .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
         .map((b) => b.scopeId);
 
-      const [teams, projects] = await Promise.all([
+      const [orgs, teams, projects] = await Promise.all([
+        orgIds.length > 0
+          ? ctx.prisma.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } })
+          : [],
         teamIds.length > 0
           ? ctx.prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } })
           : [],
@@ -42,6 +48,7 @@ export const roleBindingRouter = createTRPCRouter({
       ]);
 
       const scopeNames = new Map<string, string>();
+      for (const o of orgs) scopeNames.set(o.id, o.name);
       for (const t of teams) scopeNames.set(t.id, t.name);
       for (const p of projects) scopeNames.set(p.id, p.name);
 

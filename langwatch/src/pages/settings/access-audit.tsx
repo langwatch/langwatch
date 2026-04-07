@@ -149,7 +149,7 @@ function BindingsCell({ bindings }: { bindings: Binding[] }) {
           </Badge>
           <Text fontSize="xs" color="fg.muted">on</Text>
           <Badge colorPalette={scopePillColor(b.scopeType)} size="sm">
-            {scopeLabel(b.scopeType)}{b.scopeType !== RoleBindingScopeType.ORGANIZATION && ` · ${b.scopeName ?? b.scopeId.slice(0, 8) + "…"}`}
+            {scopeLabel(b.scopeType)} · {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
         </HStack>
       ))}
