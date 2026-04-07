@@ -157,8 +157,6 @@ model Team {
     createdAt       DateTime     @default(now())
     updatedAt       DateTime     @default(now()) @updatedAt
     archivedAt      DateTime?
-    externalScimId    String?
-    @@unique([organizationId, externalScimId])
     @@index([organizationId])
 }
 
