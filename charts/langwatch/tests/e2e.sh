@@ -55,7 +55,8 @@ test_clickhouse() {
   # HTTP ping directly inside the pod
   kc exec "$pod" -- \
     sh -c 'curl -sf http://localhost:8123/ping' | grep -q 'Ok\.' \
-    && pass "ClickHouse HTTP /ping → Ok."
+    && pass "ClickHouse HTTP /ping → Ok." \
+    || fail "ClickHouse HTTP /ping failed"
 
   # Basic query
   assert_eq "SELECT 1" "$(ch_query "$pod" 'SELECT 1')" "1"
@@ -85,11 +86,13 @@ test_clickhouse() {
 
   # Secret has expected name (the app deployment references ${RELEASE}-clickhouse)
   kc get secret "${RELEASE}-clickhouse" &>/dev/null \
-    && pass "Secret ${RELEASE}-clickhouse exists"
+    && pass "Secret ${RELEASE}-clickhouse exists" \
+    || fail "Secret ${RELEASE}-clickhouse missing"
 
   # Headless service exists (required by StatefulSet)
   kc get svc "${RELEASE}-clickhouse-headless" &>/dev/null \
-    && pass "Headless service ${RELEASE}-clickhouse-headless exists"
+    && pass "Headless service ${RELEASE}-clickhouse-headless exists" \
+    || fail "Headless service ${RELEASE}-clickhouse-headless missing"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,10 +114,12 @@ test_postgresql() {
   assert_eq "PostgreSQL SELECT 1" "$result" "1"
 
   kc get secret "${RELEASE}-postgresql" &>/dev/null \
-    && pass "Secret ${RELEASE}-postgresql exists"
+    && pass "Secret ${RELEASE}-postgresql exists" \
+    || fail "Secret ${RELEASE}-postgresql missing"
 
   kc get svc "${RELEASE}-postgresql" &>/dev/null \
-    && pass "Service ${RELEASE}-postgresql exists"
+    && pass "Service ${RELEASE}-postgresql exists" \
+    || fail "Service ${RELEASE}-postgresql missing"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -141,7 +146,8 @@ test_redis() {
   assert_eq "Redis SET/GET roundtrip" "$val" "hello"
 
   kc get svc "${RELEASE}-redis-master" &>/dev/null \
-    && pass "Service ${RELEASE}-redis-master exists"
+    && pass "Service ${RELEASE}-redis-master exists" \
+    || fail "Service ${RELEASE}-redis-master missing"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -369,15 +375,9 @@ test_workers() {
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (workers enabled)"
 
-  # Workers pod should be running (no HTTP probe — just verify it starts)
-  local pod
-  pod=$(kc get pod \
-    -l "app.kubernetes.io/name=${RELEASE}-workers" \
-    -o jsonpath='{.items[0].metadata.name}')
-
-  local phase
-  phase=$(kc get pod "$pod" -o jsonpath='{.status.phase}')
-  assert_eq "Workers pod is Running" "$phase" "Running"
+  # Workers pod should be ready
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
+  pass "Workers pod ready"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1266,8 +1266,8 @@ postgresql:
   image:
     ## @param postgresql.image.repository [string, default: postgres] Image repository.
     repository: postgres
-    ## @param postgresql.image.tag [string, default: "17"] Image tag.
-    tag: "17"
+    ## @param postgresql.image.tag [string, default: "17.5"] Image tag.
+    tag: "17.5"
     ## @param postgresql.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
 
@@ -1437,8 +1437,8 @@ redis:
   image:
     ## @param redis.image.repository [string, default: redis] Image repository.
     repository: redis
-    ## @param redis.image.tag [string, default: "8"] Image tag.
-    tag: "8"
+    ## @param redis.image.tag [string, default: "8.0"] Image tag.
+    tag: "8.0"
     ## @param redis.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
 

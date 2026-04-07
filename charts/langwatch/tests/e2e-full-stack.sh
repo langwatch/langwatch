@@ -126,13 +126,13 @@ test_pod_health() {
   while [[ "$worker_count" -lt 2 ]] && [[ $attempts -lt 60 ]]; do
     worker_count=$(kc get pods \
       -l "app.kubernetes.io/name=${RELEASE}-workers" \
-      --field-selector=status.phase=Running \
-      -o name 2>/dev/null | wc -l | tr -d ' ')
+      -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' 2>/dev/null \
+      | grep -c "True" || echo "0")
     if [[ "$worker_count" -lt 2 ]]; then
       sleep 5; attempts=$((attempts + 1))
     fi
   done
-  assert_eq "Workers running" "$worker_count" "2"
+  assert_eq "Workers ready" "$worker_count" "2"
 
   # NLP
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-langwatch-nlp" 300

@@ -182,7 +182,7 @@ test_size_overlays() {
   min_out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-minimal.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_not_contains "minimal: workers disabled" "$min_out" "kind: Deployment.*workers"
+  assert_not_contains "minimal: workers disabled" "$min_out" "name: ${RELEASE}-workers"
   assert_contains "minimal: app replicas 1" "$min_out" "replicas: 1"
 
   # size-prod: 2 app replicas, PDB
