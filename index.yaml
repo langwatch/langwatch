@@ -1,5 +1,22 @@
 apiVersion: v1
 entries:
+  clickhouse-serverless:
+  - apiVersion: v2
+    appVersion: 25.10.2.65
+    created: "2026-04-07T08:44:17.642460593Z"
+    description: ClickHouse with auto-tuning from CPU/RAM, tiered storage, and optional
+      replication via embedded Keeper
+    digest: c79e293920b01ba5f1b4b91b88884e4e751b4b2c6e64095f2135d6886bdcef68
+    home: https://github.com/langwatch/langwatch
+    maintainers:
+    - name: LangWatch Team
+    name: clickhouse-serverless
+    sources:
+    - https://github.com/langwatch/langwatch/tree/main/clickhouse-serverless
+    type: application
+    urls:
+    - https://github.com/langwatch/langwatch/releases/download/clickhouse-serverless-0.1.0-next.1/clickhouse-serverless-0.1.0-next.1.tgz
+    version: 0.1.0-next.1
   langwatch-helm:
   - annotations:
       category: Observability
@@ -392,4 +409,4 @@ entries:
     urls:
     - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-0.1.2/langwatch-helm-0.1.2.tgz
     version: 0.1.2
-generated: "2026-03-02T07:00:16.311318195Z"
+generated: "2026-04-07T08:44:17.642511418Z"
