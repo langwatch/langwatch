@@ -12,13 +12,11 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
-import { Key, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Key, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { CopyInput } from "../../components/CopyInput";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
-import { Select } from "../../components/ui/select";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

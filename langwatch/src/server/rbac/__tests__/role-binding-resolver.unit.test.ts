@@ -1,5 +1,5 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   checkRoleBindingPermission,
   resolveEffectiveRole,
@@ -59,7 +59,6 @@ const projectScope: ScopeRef = {
   id: PROJECT_ID,
   teamId: TEAM_ID,
 };
-const orgScope: ScopeRef = { type: "org", id: ORG_ID };
 
 // ============================================================================
 // resolveEffectiveRole — scope resolution
