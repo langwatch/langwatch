@@ -2,13 +2,13 @@ import { generate } from "@langwatch/ksuid";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { createHash } from "node:crypto";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { normalizeHeaderValue } from "~/utils/headers";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { generateOtelSpanId } from "~/utils/trace";
 import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
 import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
@@ -117,7 +117,10 @@ export default async function handler(
   try {
     const timestampMs = body.timestamp ?? Date.now();
     const timestampNano = String(timestampMs * 1_000_000);
-    const spanId = generateOtelSpanId();
+    const spanId = createHash("sha256")
+      .update(`${body.trace_id}:${eventId}`)
+      .digest("hex")
+      .slice(0, 16);
 
     // Build attributes array for the span
     const attributes: {
