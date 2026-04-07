@@ -9,6 +9,14 @@ Deploy LangWatch to Kubernetes. Includes the web app, workers, NLP service, Lang
 
 ### Install
 
+Add the required Helm repositories:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+```
+
 Compose values from `examples/overlays/` — pick a **size**, an **access method**, then stack infrastructure overlays:
 
 ```bash
