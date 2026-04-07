@@ -227,6 +227,14 @@ describe("clickHouseFilterConditions", () => {
       expect(result.sql).toContain("es.Score IS NOT NULL");
       expect(result.params).toEqual({ f0_values: ["eval-1"] });
     });
+
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
   });
 
   describe("evaluations.evaluator_id.has_label", () => {
@@ -240,6 +248,24 @@ describe("clickHouseFilterConditions", () => {
       expect(result.sql).toContain("es.Label != ''");
       expect(result.sql).toContain("es.Label NOT IN ('succeeded', 'failed')");
       expect(result.params).toEqual({ f0_values: ["eval-1"] });
+    });
+
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
+  describe("evaluations.evaluator_id.guardrails_only", () => {
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.guardrails_only"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
     });
   });
 
