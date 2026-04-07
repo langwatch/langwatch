@@ -51,7 +51,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Settings:"));
     for (const [key, value] of Object.entries(config.settings)) {
       const displayValue =
-        typeof value === "object" ? JSON.stringify(value) : String(value);
+        typeof value === "object" || value === null
+          ? JSON.stringify(value)
+          : `${value as string | number | boolean}`;
       console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
     }
   }
