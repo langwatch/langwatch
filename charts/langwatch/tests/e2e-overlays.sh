@@ -451,7 +451,7 @@ test_install_profile_local() {
 load_images() {
   sep; info "Building and loading images for install tests"
 
-  local ch_image="langwatch/clickhouse-serverless:0.1.0"
+  local ch_image="langwatch/clickhouse-serverless:next"
   local ch_dir="${CHART_DIR}/../../clickhouse-serverless"
 
   if ! docker image inspect "$ch_image" &>/dev/null 2>&1; then

@@ -1,6 +1,6 @@
 RELEASE   := ch-test
 NAMESPACE := ch-test
-CH_IMAGE  := langwatch/clickhouse-serverless:0.1.0
+CH_IMAGE  := langwatch/clickhouse-serverless:next
 CH_DIR    := ../../clickhouse-serverless
 
 .PHONY: lint template test-e2e test clean images

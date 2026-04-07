@@ -32,7 +32,7 @@ trap cleanup_cluster EXIT
 APP_IMAGE="langwatch/langwatch:local"
 NLP_IMAGE="langwatch/langwatch_nlp:local"
 LANGEVALS_IMAGE="langwatch/langevals:local"
-CH_IMAGE="langwatch/clickhouse-serverless:0.1.0"
+CH_IMAGE="langwatch/clickhouse-serverless:next"
 
 # ─── Helpers ───────────────────────────────────────────────────────────────
 pg_query() {
