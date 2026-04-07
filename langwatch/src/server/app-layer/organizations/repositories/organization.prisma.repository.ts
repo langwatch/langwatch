@@ -1,6 +1,7 @@
 import {
   OrganizationUserRole,
   PricingModel,
+  RoleBindingScopeType,
   TeamUserRole,
   type Currency,
   type Prisma,
@@ -470,6 +471,37 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { role },
       });
 
+      // Keep ORGANIZATION-scoped RoleBinding in sync (skip EXTERNAL)
+      if (role !== OrganizationUserRole.EXTERNAL) {
+        await tx.roleBinding.deleteMany({
+          where: {
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
+        await tx.roleBinding.create({
+          data: {
+            organizationId,
+            userId,
+            role: role as unknown as TeamUserRole,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
+      } else {
+        // EXTERNAL users have no org-level binding
+        await tx.roleBinding.deleteMany({
+          where: {
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
+      }
+
       const organizationTeams = await tx.team.findMany({
         where: { organizationId },
         select: { id: true },
@@ -581,6 +613,21 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             assignedRoleId: shouldClearCustomRole
               ? null
               : teamRoleUpdate.customRoleId,
+          },
+        });
+
+        // Keep TEAM-scoped RoleBinding in sync
+        await tx.roleBinding.deleteMany({
+          where: { organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        });
+        await tx.roleBinding.create({
+          data: {
+            organizationId,
+            userId,
+            role: nextRole,
+            customRoleId: shouldClearCustomRole ? null : (teamRoleUpdate.customRoleId ?? null),
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
           },
         });
       }
