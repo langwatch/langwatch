@@ -8,51 +8,59 @@ This page explains what you're deploying when you self-host LangWatch — the co
 ## System Overview
 
 ```mermaid
-graph TD
-    LLMApp["Your LLM App<br/><i>LangWatch SDK</i>"]
+graph LR
+    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
 
-    subgraph Platform["Your Infrastructure"]
-
-        LLMApp -->|"OTel / REST"| App
-
-        subgraph Pipeline["Event Sourcing Pipeline"]
-            SI["Span Ingestion"] --- TS["Trace Summarisation"]
-            TS --- EP["Experiment Processing"]
-            TS --- UB["UI Update Broadcasting"]
-            TS --- GT["Generate Topics"]
-            TS --- LMP["LLM Metric Processing"]
-            TS --- LCE["LLM Cost Enrichment"]
-            TS --- AP["Annotation Processing"]
-            TS --- EE["Evaluation Execution"]
-            TS --- EMB["Embedding Extraction"]
-            TS --- ATS["Automation / Triggers"]
-            TS --- PII["PII Redaction"]
-        end
-
-        Redis["Redis<br/><i>BullMQ</i>"]
-        App["LangWatch App<br/><i>:5560</i>"]
-        PG["PostgreSQL"]
-        CH["ClickHouse"]
-        S3["S3"]
-        NLP["LangWatch NLP<br/><i>:5561</i>"]
-        Evals["LangEvals<br/><i>:5562</i>"]
-
-        App -->|"enqueue jobs"| Redis
-        Redis -->|"consume jobs"| Pipeline
-        Pipeline -->|"SSE updates"| App
-        Pipeline -->|"events & projections"| CH
-        Pipeline -->|"evaluation requests"| Evals
-        Pipeline -->|"NLP tasks"| NLP
-        App -->|"queries"| CH
-        App -->|"control plane"| PG
-        CH -->|"cold data + datasets"| S3
-        Pipeline -->|"alerts"| Notifications["Slack, Email, Webhooks"]
+    subgraph Workers["Event Sourcing Pipeline"]
+        Pipeline["Event Sourcing Pipeline"]
     end
 
-    ExtLLM["External LLMs<br/><i>OpenAI, Azure, etc.</i>"]
-    Evals -->|"LLM evals"| ExtLLM
-    NLP -->|"workflow runs"| ExtLLM
+    App -->|"enqueue"| Redis["Redis"]
+    Redis -->|"consume"| Workers
+    Workers -->|"events & projections"| CH["ClickHouse"]
+    Workers -->|"SSE updates"| App
+    App -->|"queries"| CH
+    App -->|"control plane"| PG["PostgreSQL"]
+    CH -->|"cold storage"| S3["S3"]
+    Workers -->|"evals"| Evals["LangEvals"]
+    Workers -->|"NLP"| NLP["LangWatch NLP"]
+    Evals -->|"LLM calls"| LLM["External LLMs"]
+    NLP -->|"LLM calls"| LLM
+    Workers -->|"alerts"| Notify["Slack / Email / Webhooks"]
 ```
+
+<CardGroup cols={3}>
+<Card title="API Layer" icon="globe">
+**LangWatch App** (:5560)
+
+Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The only externally-exposed component.
+</Card>
+<Card title="Processing" icon="microchip">
+**LangWatch Workers**
+
+Event sourcing pipeline via BullMQ — span ingestion, trace summarisation, cost enrichment, evaluations, PII redaction, and more.
+</Card>
+<Card title="Services" icon="flask">
+**LangWatch NLP** (:5561) and **LangEvals** (:5562)
+
+NLP workflows, topic clustering, built-in evaluators, guardrails. Call external LLMs for model-based operations.
+</Card>
+<Card title="Control Plane" icon="database">
+**PostgreSQL**
+
+Users, teams, projects, configurations, prompt versions. Managed via Prisma with auto-migrations.
+</Card>
+<Card title="Data Plane" icon="chart-bar">
+**ClickHouse**
+
+All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold storage on S3. Auto-tuned via the clickhouse-serverless subchart.
+</Card>
+<Card title="Queue & Storage" icon="layer-group">
+**Redis** — BullMQ job queue, caching, sessions.
+
+**S3** — ClickHouse cold storage, backups, datasets.
+</Card>
+</CardGroup>
 
 ## Components
 

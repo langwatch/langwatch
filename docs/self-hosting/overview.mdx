@@ -6,10 +6,15 @@ description: "Deploy LangWatch on your own infrastructure for full data control"
 LangWatch is an open-source LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines. You can self-host LangWatch for full data sovereignty, regulatory compliance (GDPR, SOC 2), or air-gapped environments. The self-hosted edition runs the same software that powers LangWatch Cloud -- there is no separate "community" or "enterprise" build.
 
 <Tip>
-**Get the entire LangWatch platform running in one command:**
+**Get the entire LangWatch platform running with a single Helm install:**
 
 ```bash
-helm install langwatch oci://ghcr.io/langwatch/langwatch --set autogen.enabled=true
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+helm pull langwatch/langwatch --untar
+helm install langwatch ./langwatch \
+  --namespace langwatch --create-namespace \
+  -f langwatch/examples/values-local.yaml
 ```
 
 See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
@@ -21,18 +26,18 @@ See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup
 
 ## Architecture at a Glance
 
-LangWatch is composed of several services that work together. The table below summarizes each component and its role.
-
-| Component | Role |
-|-----------|------|
-| **LangWatch App** | Web UI, API, trace ingestion (port 5560) |
-| **LangWatch Workers** | Event sourcing pipeline via BullMQ |
-| **LangWatch NLP** | NLP processing, workflows (port 5561) |
-| **LangEvals** | Built-in evaluators, guardrails (port 5562) |
-| **PostgreSQL** | Control plane (users, projects, config) |
-| **ClickHouse** | Data plane (traces, spans, evaluations) |
-| **Redis** | Job queue, caching |
-| **S3** | Cold storage, datasets, backups (optional) |
+```mermaid
+graph LR
+    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
+    App -->|"enqueue"| Redis["Redis"]
+    Redis -->|"consume"| Workers["LangWatch Workers"]
+    Workers -->|"events &<br/>projections"| CH["ClickHouse"]
+    Workers -->|"evals"| Evals["LangEvals"]
+    Workers -->|"NLP"| NLP["LangWatch NLP"]
+    App -->|"queries"| CH
+    App -->|"control plane"| PG["PostgreSQL"]
+    CH -->|"cold storage"| S3["S3"]
+```
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers.
 
