@@ -25782,7 +25782,7 @@ Fully managed by the LangWatch team. No infrastructure to manage — sign up and
 [Sign up at langwatch.ai](https://langwatch.ai)
 </Card>
 
-<Card title="Self-Managed" icon="server">
+<Card title="Self-Managed" icon="server" href="/self-hosting/deployment/kubernetes-helm">
 Deploy the complete LangWatch stack on your own infrastructure — AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
 </Card>
 
@@ -25792,10 +25792,8 @@ LangWatch manages the application. Your data lives on exclusive, dedicated insta
 [Contact sales](https://langwatch.ai/schedule-demo)
 </Card>
 
-<Card title="Hybrid" icon="arrows-split-up-and-left">
-LangWatch manages compute (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
-
-[Contact sales](https://langwatch.ai/schedule-demo)
+<Card title="Hybrid" icon="arrows-split-up-and-left" href="/hybrid-setup/overview">
+LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 </Card>
 </CardGroup>
 
@@ -26500,6 +26498,93 @@ If you encounter issues during an upgrade:
 - Check the [Troubleshooting guide](/self-hosting/troubleshooting)
 - Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
 - Contact [support](https://langwatch.ai/support)
+
+---
+
+# FILE: ./hybrid-setup/overview.mdx
+
+---
+title: Hybrid Setup
+description: Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+---
+
+# Hybrid Setup
+
+The hybrid setup gives you the best of both worlds: LangWatch manages the **control plane** (application, UI, evaluations, prompt management), while your sensitive data stays in **your own infrastructure**.
+
+## How It Works
+
+<Frame>
+```
+┌──────────────────────────────────┐     ┌──────────────────────────────────┐
+│      LangWatch Cloud             │     │      Your Infrastructure        │
+│      (Control Plane)             │     │      (Data Plane)               │
+│                                  │     │                                 │
+│  ┌────────────────────────┐      │     │  ┌───────────────────────┐      │
+│  │  LangWatch App         │◄─────┼─────┼──┤  ClickHouse           │      │
+│  │  • UI & Dashboard      │      │     │  │  • Traces & spans     │      │
+│  │  • Evaluations         │      │     │  │  • Evaluation results │      │
+│  │  • Prompt Management   │      │     │  │  • Analytics data     │      │
+│  │  • Scenario Testing    │      │     │  └───────────────────────┘      │
+│  └────────────────────────┘      │     │                                 │
+│                                  │     │  ┌───────────────────────┐      │
+│                                  │     │  │  S3 / Object Storage  │      │
+│                                  │     │  │  • Datasets           │      │
+│                                  │     │  │  • Cold storage       │      │
+│                                  │     │  │  • Backups            │      │
+│                                  │     │  └───────────────────────┘      │
+└──────────────────────────────────┘     └──────────────────────────────────┘
+```
+</Frame>
+
+### What stays in your infrastructure
+
+- **ClickHouse** — All trace data, span payloads, evaluation results, and analytics. This is where your LLM inputs/outputs and sensitive content live.
+- **S3-compatible object storage** — Datasets, ClickHouse cold storage tiers, and backups.
+
+### What LangWatch Cloud manages
+
+- Application UI and API
+- Evaluation orchestration
+- Prompt management and versioning
+- Scenario testing and simulations
+- User management and access control
+
+## Benefits
+
+- **Data ownership** — Sensitive LLM interactions never leave your infrastructure. You can pull the plug at any time.
+- **Compliance** — Meet data residency requirements by deploying the data plane in your preferred region.
+- **No operational overhead** — LangWatch handles application updates, scaling, and maintenance of the control plane.
+- **Full functionality** — All LangWatch features work identically to the fully-hosted version.
+
+## Requirements
+
+The data plane requires:
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **ClickHouse** | Single node, 2 vCPU, 4 GiB RAM | 3-node replicated cluster |
+| **S3 storage** | Any S3-compatible provider | Same region as ClickHouse |
+
+ClickHouse can be deployed as:
+- A managed service (e.g., ClickHouse Cloud, Aiven, Altinity)
+- Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/charts/clickhouse-serverless)
+- Self-hosted on VMs
+
+## Getting Started
+
+The hybrid setup requires coordination with our team to configure the secure connection between LangWatch Cloud and your data plane.
+
+**To get started:**
+
+1. **Contact us** at [support@langwatch.ai](mailto:support@langwatch.ai) or through your account manager
+2. **Provision your data plane** — We'll help you set up ClickHouse and S3 in your infrastructure
+3. **Configure the connection** — We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
+4. **Verify** — Run traces and confirm data flows correctly while staying in your infrastructure
+
+<Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
+  Contact our team to discuss your requirements and get started with a hybrid deployment.
+</Card>
 
 ---
 

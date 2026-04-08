@@ -467,6 +467,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
           },
@@ -841,16 +842,12 @@
       "destination": "/self-hosting/infrastructure/architecture"
     },
     {
-      "source": "/hybrid-setup/overview",
-      "destination": "/self-hosting/overview"
-    },
-    {
       "source": "/hybrid-setup/elasticsearch",
-      "destination": "/self-hosting/overview"
+      "destination": "/hybrid-setup/overview"
     },
     {
       "source": "/hybrid-setup/s3-storage",
-      "destination": "/self-hosting/configuration/backups"
+      "destination": "/hybrid-setup/overview"
     },
     {
       "source": "/self-hosting/docker-compose",
