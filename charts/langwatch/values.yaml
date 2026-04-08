@@ -159,13 +159,13 @@ app:
 
   # HTTP configuration for the application
   ## @extra app.http HTTP configuration for base/public URLs.
-  ## @param app.http.baseHost [string, default: http://localhost:30560] Internal base URL.
-  ## @param app.http.publicUrl [string, default: http://localhost:30560] Public URL for users.
+  ## @param app.http.baseHost [string, default: http://localhost:5560] Internal base URL.
+  ## @param app.http.publicUrl [string, default: http://localhost:5560] Public URL for users.
   http:
     # Base host URL for internal communication
-    baseHost: "http://localhost:30560"
+    baseHost: "http://localhost:5560"
     # Public URL that users will access the application from
-    publicUrl: "http://localhost:30560"
+    publicUrl: "http://localhost:5560"
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
