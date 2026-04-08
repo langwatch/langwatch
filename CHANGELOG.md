@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.0-prerelease.2](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.1...langwatch@v3.0.0-prerelease.2) (2026-04-08)
+
+
+### Bug Fixes
+
+* regenerate Chart.lock for clickhouse-serverless 0.2.0 ([#3029](https://github.com/langwatch/langwatch/issues/3029)) ([afd5f6e](https://github.com/langwatch/langwatch/commit/afd5f6e0ad8e814c560b1a285fbfa9450d1c20a7))
+* set clickhouse-serverless default image tag to 0.2.0 ([#3030](https://github.com/langwatch/langwatch/issues/3030)) ([aef43d7](https://github.com/langwatch/langwatch/commit/aef43d71fff0e392a006e50f4265f48c0f18f84c))
+* set clickhouse-serverless image tag to 0.2.0 (was 'next' which doesn't exist) ([aef43d7](https://github.com/langwatch/langwatch/commit/aef43d71fff0e392a006e50f4265f48c0f18f84c))
+
+
+### Documentation
+
+* overhaul self-hosting documentation for 3.0 (ClickHouse, Helm, no ES) ([#3027](https://github.com/langwatch/langwatch/issues/3027)) ([f468b77](https://github.com/langwatch/langwatch/commit/f468b774adec1d2903efd363bbb97982c2617fcc))
+
 ## [3.0.0-prerelease.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.1...langwatch@v3.0.0-prerelease.1) (2026-04-08)
 
 
