@@ -114,15 +114,15 @@ export const clickHouseFilterConditions: Record<
   }),
 
   // Traces
+  // The dropdown maps empty/NULL origin to "application" via ifNull().
+  // Apply the same mapping here so the condition matches what the dropdown counted.
   "traces.origin": (values, paramId) => {
     if (values.length === 0) {
       return { sql: "1=0", params: {} };
     }
 
-    // All origin values (including "application") are matched by exact value.
-    // Empty/NULL no longer implies "application".
     return {
-      sql: `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
+      sql: `if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({${paramId}_values:Array(String)})`,
       params: { [`${paramId}_values`]: values },
     };
   },
