@@ -28,7 +28,7 @@ Database migrations run automatically on startup.
 helm repo update
 
 # Upgrade the release
-helm upgrade langwatch langwatch/langwatch \
+helm upgrade langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
@@ -38,10 +38,10 @@ helm upgrade langwatch langwatch/langwatch \
 
 ```bash
 # List available versions
-helm search repo langwatch/langwatch --versions
+helm search repo langwatch/langwatch-helm --versions
 
 # Install a specific chart version
-helm upgrade langwatch langwatch/langwatch \
+helm upgrade langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   --version 3.0.0 \
   -f values-production.yaml

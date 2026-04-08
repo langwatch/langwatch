@@ -11,7 +11,7 @@ LangWatch is an open-source LLM Ops platform for evaluation, observability, and 
 ```bash
 helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
-helm pull langwatch/langwatch --untar
+helm pull langwatch/langwatch-helm --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   -f langwatch/examples/values-local.yaml

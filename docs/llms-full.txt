@@ -23467,7 +23467,7 @@ clickhouse:
 Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and backups:
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/cold-storage-s3.yaml
 ```
@@ -24048,7 +24048,7 @@ For local development and small teams.
 
 ```yaml
 # Example: helm install with dev sizing
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/values-local.yaml \
   --set autogen.enabled=true
 ```
@@ -24068,7 +24068,7 @@ For production with single-node ClickHouse.
 - Total: ~12 CPU, ~28 Gi RAM requests
 
 ```yaml
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/access-ingress.yaml
 ```
@@ -24088,7 +24088,7 @@ For production with replicated ClickHouse.
 - Total: ~25 CPU, ~70 Gi RAM requests (plus 3x ClickHouse)
 
 ```yaml
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-ha.yaml \
   -f examples/overlays/access-ingress.yaml \
   -f examples/overlays/cold-storage-s3.yaml
@@ -24853,7 +24853,7 @@ helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
 
 # Install with auto-generated secrets (development only)
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
   --wait --timeout 10m
@@ -25000,7 +25000,7 @@ prometheus:
 ### 3. Install
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
@@ -25084,7 +25084,7 @@ redis:
 ```
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-ha.yaml \
   --wait --timeout 15m
@@ -25130,7 +25130,7 @@ Overlays are composable — later files override earlier ones:
 
 ```bash
 # Production with external DBs and S3 cold storage
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/access-ingress.yaml \
   -f examples/overlays/postgres-external.yaml \
@@ -25185,7 +25185,7 @@ You only need to set these two values — the subchart computes optimal settings
 
 ```bash
 helm repo update
-helm upgrade langwatch langwatch/langwatch \
+helm upgrade langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
@@ -25743,7 +25743,7 @@ LangWatch is an open-source LLM Ops platform for evaluation, observability, and 
 ```bash
 helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
-helm pull langwatch/langwatch --untar
+helm pull langwatch/langwatch-helm --untar
 helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   -f langwatch/examples/values-local.yaml
@@ -26306,7 +26306,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 Yes. Use the external database overlays:
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/postgres-external.yaml \
   -f examples/overlays/redis-external.yaml
 ```
@@ -26387,7 +26387,7 @@ Database migrations run automatically on startup.
 helm repo update
 
 # Upgrade the release
-helm upgrade langwatch langwatch/langwatch \
+helm upgrade langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
@@ -26397,10 +26397,10 @@ helm upgrade langwatch langwatch/langwatch \
 
 ```bash
 # List available versions
-helm search repo langwatch/langwatch --versions
+helm search repo langwatch/langwatch-helm --versions
 
 # Install a specific chart version
-helm upgrade langwatch langwatch/langwatch \
+helm upgrade langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   --version 3.0.0 \
   -f values-production.yaml

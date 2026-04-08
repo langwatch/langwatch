@@ -52,7 +52,7 @@ For local development and small teams.
 
 ```yaml
 # Example: helm install with dev sizing
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/values-local.yaml \
   --set autogen.enabled=true
 ```
@@ -72,7 +72,7 @@ For production with single-node ClickHouse.
 - Total: ~12 CPU, ~28 Gi RAM requests
 
 ```yaml
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/access-ingress.yaml
 ```
@@ -92,7 +92,7 @@ For production with replicated ClickHouse.
 - Total: ~25 CPU, ~70 Gi RAM requests (plus 3x ClickHouse)
 
 ```yaml
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-ha.yaml \
   -f examples/overlays/access-ingress.yaml \
   -f examples/overlays/cold-storage-s3.yaml

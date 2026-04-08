@@ -70,7 +70,7 @@ clickhouse:
 Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and backups:
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/cold-storage-s3.yaml
 ```

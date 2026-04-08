@@ -241,7 +241,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 Yes. Use the external database overlays:
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/postgres-external.yaml \
   -f examples/overlays/redis-external.yaml
 ```

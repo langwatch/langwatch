@@ -23,7 +23,7 @@ helm repo add langwatch https://langwatch.github.io/langwatch
 helm repo update
 
 # Install with auto-generated secrets (development only)
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
   --wait --timeout 10m
@@ -170,7 +170,7 @@ prometheus:
 ### 3. Install
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
@@ -254,7 +254,7 @@ redis:
 ```
 
 ```bash
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-ha.yaml \
   --wait --timeout 15m
@@ -300,7 +300,7 @@ Overlays are composable — later files override earlier ones:
 
 ```bash
 # Production with external DBs and S3 cold storage
-helm install langwatch langwatch/langwatch \
+helm install langwatch langwatch/langwatch-helm \
   -f examples/overlays/size-prod.yaml \
   -f examples/overlays/access-ingress.yaml \
   -f examples/overlays/postgres-external.yaml \
@@ -355,7 +355,7 @@ You only need to set these two values — the subchart computes optimal settings
 
 ```bash
 helm repo update
-helm upgrade langwatch langwatch/langwatch \
+helm upgrade langwatch langwatch/langwatch-helm \
   --namespace langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
