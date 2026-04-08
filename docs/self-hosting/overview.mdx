@@ -1,62 +1,133 @@
 ---
-title: Overview
-description: LangWatch offers a fully self-hosted version of the platform for companies that require strict data control and compliance.
+title: Self-Hosting Overview
+description: "Deploy LangWatch on your own infrastructure for full data control"
 ---
 
-## LangWatch High-Level Architecture
+LangWatch is an open-source LLM Ops platform for evaluation, observability, and optimization of AI agents and pipelines. You can self-host LangWatch for full data sovereignty, regulatory compliance (GDPR, SOC 2), or air-gapped environments. The self-hosted edition runs the same software that powers LangWatch Cloud -- there is no separate "community" or "enterprise" build.
 
-Below is a high-level overview of the LangWatch architecture.
+<Tip>
+**Get the entire LangWatch platform running with a single Helm install:**
 
-<Frame>
-<img
-  className="block"
-  src="/images/simple-architecture.png"
-  alt="LangWatch"
-/>
-</Frame>
+```bash
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+helm pull langwatch/langwatch --untar
+helm install langwatch ./langwatch \
+  --namespace langwatch --create-namespace \
+  -f langwatch/examples/values-local.yaml
+```
 
-LangWatch is composed of a few core components:
+See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+</Tip>
 
-- **LangWatch App**: The main application and user interface for the platform.
-- **LangEvals**: The evaluation service for LangWatch built-in evaluators.
-- **LangWatch NLP**: The service the runs workflows and custom built evaluators in the platform.
-- **LangWatch Workers**: Background workers that process traces, trigger alerts, run real-time evaluations and so on. By default, workers are deployed as a separate pod for independent scaling.
-- **Redis**: A redis queue that coordinates and add resiliency for the traces to be processed.
-- **Elasticsearch/OpenSearch**: The main database for the platform, storing traces and evaluation results.
-- **PostgreSQL**: The core database for the platform, storing user accounts, teams, and other metadata.
+<Note>
+  Looking for a managed solution? [LangWatch Cloud](https://langwatch.ai) is fully maintained by the LangWatch team and is the fastest way to get started.
+</Note>
 
-Check out the [OnPrem](/self-hosting/onprem) page for more in-depth architecture information, and below you can find the deployment options for self-hosting LangWatch.
+## Architecture at a Glance
 
-## Deployment Options
+```mermaid
+graph LR
+    SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
+    App -->|"enqueue"| Redis["Redis"]
+    Redis -->|"consume"| Workers["LangWatch Workers"]
+    Workers -->|"events &<br/>projections"| CH["ClickHouse"]
+    Workers -->|"evals"| Evals["LangEvals"]
+    Workers -->|"NLP"| NLP["LangWatch NLP"]
+    App -->|"queries"| CH
+    App -->|"control plane"| PG["PostgreSQL"]
+    CH -->|"cold storage"| S3["S3"]
+```
 
-<img src="/images/onprem-logo.png" alt="LangWatch On Prem" width="400px" style={{marginTop: "50px"}} />
+See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers.
 
-<img src="/images/onprem-clouds.png" alt="On Prem Clouds" width="200px" />
+## Deployment Models
 
-### Enterprise OnPrem Solution
+<CardGroup cols={2}>
+<Card title="LangWatch Cloud" icon="cloud">
+Fully managed by the LangWatch team. No infrastructure to manage — sign up and start sending traces in minutes.
 
-For organizations that require the data to never leave their own infrastructure, we offer a managed on-premise service.
+[Sign up at langwatch.ai](https://langwatch.ai)
+</Card>
 
-If you need to manage the installation yourself for compliance reasons, you can follow our detailed deployment instructions which we will provide after an [onboarding call](https://meetings-eu1.hubspot.com/manouk-draisma). However, granting our team temporary access to an isolated area of your infrastructure can streamline the process, ensuring a quick and efficient setup of LangWatch on your premises.
+<Card title="Self-Managed" icon="server">
+Deploy the complete LangWatch stack on your own infrastructure — AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
 
-Check out the [OnPrem](/self-hosting/onprem) page for more details.
+[Get started with Kubernetes](/self-hosting/deployment/kubernetes-helm)
+</Card>
 
-### Hybrid Setup
+<Card title="Cloud Enterprise" icon="building">
+LangWatch manages the application. Your data lives on exclusive, dedicated instances deployed in your preferred cloud region. The convenience of managed, with the isolation of self-hosted.
 
-We offer seamless integrations with S3-compatible storage and Elasticsearch, supporting both cloud and on-premise environments.
+[Contact sales](https://langwatch.ai/schedule-demo)
+</Card>
 
-For hybrid deployments, you can choose between a fully managed service on your infrastructure or a self-managed setup. If you need to retain full control for compliance or security reasons, our team will provide detailed deployment instructions after a brief [onboarding call](https://meetings-eu1.hubspot.com/manouk-draisma). To accelerate the setup, you may optionally grant us temporary access to an isolated environment within your infrastructure.
+<Card title="Hybrid" icon="arrows-split-up-and-left">
+LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
 
-Check out the [Hybrid Setup](/hybrid-setup/overview) page for more details.
+[Learn more](/hybrid-setup/overview)
+</Card>
+</CardGroup>
 
-### Docker Compose
+### At a Glance
 
-For the open-source version, deploy LangWatch using Docker Compose for easy local setups that support observability, evaluations, and AI agent testing.
+| | **Cloud** | **Self-Managed** | **Cloud Enterprise** | **Hybrid** |
+|---|:---:|:---:|:---:|:---:|
+| You manage infrastructure | | Yes | | |
+| You manage data storage | | Yes | Yes | Yes |
+| LangWatch manages app | Yes | | Yes | Yes |
+| Data stays in your network | | Yes | Yes | Yes |
+| Setup time | Minutes | Hours | Days | Days |
 
-Check out the [Docker Compose](/self-hosting/docker-compose) page for more details.
+## Quick Start
 
-### Helm Chart
+Choose the deployment method that fits your environment.
 
-LangWatch open-source is also available as a Helm chart for easy deployment on Kubernetes.
+<CardGroup cols={3}>
+  <Card
+    title="Docker Compose"
+    icon="docker"
+    href="/self-hosting/deployment/docker-compose"
+  >
+    Quick local setup with Docker. Coming soon for v3 — currently available for v2.
+  </Card>
+  <Card
+    title="Kubernetes (Helm)"
+    icon="dharmachakra"
+    href="/self-hosting/deployment/kubernetes-helm"
+  >
+    Production deployment on any Kubernetes cluster.
+  </Card>
+  <Card
+    title="Local Kubernetes"
+    icon="laptop-code"
+    href="/self-hosting/deployment/kubernetes-local"
+  >
+    Test the Helm chart locally with Kind.
+  </Card>
+</CardGroup>
 
-Check out the [Helm Chart](/self-hosting/kubernetes-helm) page for more details.
+## What's New in v3
+
+<Tip>
+  LangWatch v3 is a major architecture upgrade. If you are migrating from v2, review the deployment guides for updated requirements.
+</Tip>
+
+- **ClickHouse replaces Elasticsearch** as the primary data store, delivering faster analytical queries and lower operational overhead.
+- **Event-sourcing architecture** ensures reliable, ordered processing of traces, evaluations, and experiment runs.
+- **S3 cold storage tiering** moves older data to object storage automatically, reducing ClickHouse disk costs.
+- **Native ClickHouse backup/restore** simplifies disaster recovery without third-party tooling.
+- **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
+- **Composable Helm chart overlays** let you customize deployments without forking the chart.
+- **Deep OpenTelemetry integration** — ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring
+
+## Enterprise
+
+For Cloud Enterprise or Hybrid deployments, [contact the LangWatch team](https://langwatch.ai/schedule-demo) to discuss your requirements.
+
+Enterprise capabilities include:
+
+- **SSO / SCIM** -- integrate with your identity provider for seamless user provisioning
+- **Role-based access control** -- fine-grained permissions across projects and teams
+- **Audit logs** -- full visibility into who did what and when
+- **Priority support** -- dedicated engineering assistance and SLA-backed response times

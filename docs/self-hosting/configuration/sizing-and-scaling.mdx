@@ -1,0 +1,170 @@
+---
+title: Sizing & Scaling
+description: "Resource requirements, size profiles, and scaling recommendations for LangWatch"
+---
+
+## Minimum Requirements
+
+### Docker Compose (local development)
+
+- 4 CPU cores, 16 GB RAM, 50 GB disk
+- Suitable for evaluation and small teams (&lt; 5 users)
+
+### Kubernetes (production)
+
+- Minimum 3 nodes with 4 CPU / 16 GB each
+- StorageClass that supports dynamic provisioning
+- See size profiles below for detailed per-component requirements
+
+## Component Resource Defaults
+
+These are the default resource requests and limits from the Helm chart (`values.yaml`):
+
+| Component | CPU Request | CPU Limit | Memory Request | Memory Limit | Storage |
+|-----------|-------------|-----------|----------------|--------------|---------|
+| LangWatch App | 250m | 1000m | 2Gi | 4Gi | --- |
+| LangWatch Workers | 250m | 1000m | 2Gi | 4Gi | --- |
+| LangWatch NLP | 1000m | 2000m | 2Gi | 4Gi | --- |
+| LangEvals | 1000m | 2000m | 6Gi | 8Gi | --- |
+| PostgreSQL | 250m | 1000m | 512Mi | 1Gi | 20Gi |
+| ClickHouse | 2 cores | 2 cores | 4Gi | 4Gi | 50Gi |
+| Redis | 250m | 500m | 256Mi | 512Mi | 10Gi |
+| Prometheus | 200m | 500m | 512Mi | 2Gi | 6Gi |
+
+<Note>ClickHouse auto-tunes internal parameters (memory limits, thread pools, merge settings) based on the CPU and memory you allocate. You only need to set `clickhouse.cpu` and `clickhouse.memory`.</Note>
+
+## Size Profiles
+
+The Helm chart ships with composable overlay files in `examples/overlays/`. Use them with `helm install -f`:
+
+### Development (`values-local.yaml`)
+
+For local development and small teams.
+
+- LangWatch App: 1 replica, 250m/1 CPU, 1Gi/3Gi memory
+- LangWatch Workers: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- LangWatch NLP: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- LangEvals: 1 replica, 100m/500m CPU, 512Mi/1Gi memory
+- ClickHouse: 1 CPU, 1Gi memory, 5Gi storage
+- PostgreSQL: 100m/500m CPU, 256Mi/512Mi memory, 2Gi storage
+- Redis: 50m/250m CPU, 64Mi/256Mi memory, 1Gi storage
+- Total: ~1 CPU, ~4 Gi RAM requests
+
+```yaml
+# Example: helm install with dev sizing
+helm install langwatch langwatch/langwatch \
+  -f examples/values-local.yaml \
+  --set autogen.enabled=true
+```
+
+### Production (`size-prod.yaml`)
+
+For production with single-node ClickHouse.
+
+- LangWatch App: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory, PDB minAvailable 1
+- LangWatch Workers: 2 replicas, 500m/2 CPU, 2Gi/4Gi memory
+- LangWatch NLP: 1 replica, 1/2 CPU, 2Gi/4Gi memory
+- LangEvals: 1 replica, 1/2 CPU, 4Gi/8Gi memory
+- ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
+- PostgreSQL: 20Gi storage
+- Redis: 5Gi storage
+- Prometheus: 30d retention, 20Gi storage
+- Total: ~12 CPU, ~28 Gi RAM requests
+
+```yaml
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/access-ingress.yaml
+```
+
+### High Availability (`size-ha.yaml`)
+
+For production with replicated ClickHouse.
+
+- LangWatch App: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
+- LangWatch Workers: 3 replicas, 1/2 CPU, 4Gi/4Gi memory, PDB minAvailable 2
+- LangWatch NLP: 2 replicas, 1/2 CPU, 2Gi/4Gi memory
+- LangEvals: 2 replicas, 1/2 CPU, 4Gi/8Gi memory
+- ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
+- PostgreSQL: 50Gi storage
+- Redis: 10Gi storage
+- Prometheus: 60d retention, 50Gi storage
+- Total: ~25 CPU, ~70 Gi RAM requests (plus 3x ClickHouse)
+
+```yaml
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-ha.yaml \
+  -f examples/overlays/access-ingress.yaml \
+  -f examples/overlays/cold-storage-s3.yaml
+```
+
+## Scaling Guidelines
+
+### What to scale first
+
+| Bottleneck | Component to Scale | How |
+|---|---|---|
+| Trace ingestion is slow / queue backlog | LangWatch Workers | Increase `workers.replicaCount` |
+| UI is slow / many concurrent users | LangWatch App | Increase `app.replicaCount` |
+| ClickHouse queries are slow | ClickHouse | Increase `clickhouse.cpu` and `clickhouse.memory` |
+| Evaluations are slow | LangEvals | Increase `langevals.replicaCount` |
+| Topic clustering is slow | LangWatch NLP | Increase `langwatch_nlp.replicaCount` |
+
+### Horizontal Pod Autoscaler (HPA)
+
+```yaml
+# Example HPA for workers
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langwatch-workers
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: langwatch-workers
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+```
+
+## Storage Sizing
+
+### ClickHouse hot storage
+
+- ~1 KB per span (compressed, varies with payload size)
+- 100K traces/day with avg 5 spans = ~500 MB/day = ~15 GB/month
+- 1M traces/day with avg 5 spans = ~5 GB/day = ~150 GB/month
+- Plan for 3-6 months of hot data before cold storage kicks in
+
+### ClickHouse cold storage (S3)
+
+- Enable with `clickhouse.cold.enabled: true`
+- Default TTL: 49 days (data older than this moves to S3)
+- S3 cost is typically 10-20x cheaper than SSD storage
+
+### PostgreSQL
+
+- Grows slowly --- metadata only (users, projects, configurations)
+- 10-20 GB is sufficient for most deployments
+
+### Redis
+
+- Minimal storage --- job queue and cache only
+- 1-5 GB is sufficient
+
+## Cloud Instance Recommendations
+
+| Cloud | General Nodes | ClickHouse Nodes | Notes |
+|-------|--------------|------------------|-------|
+| AWS | m7g.xlarge (4 vCPU, 16 GB) | r7g.2xlarge (8 vCPU, 64 GB) | Graviton (ARM) for cost efficiency |
+| GCP | e2-standard-4 (4 vCPU, 16 GB) | n2-highmem-8 (8 vCPU, 64 GB) | |
+| Azure | Standard_D4s_v5 (4 vCPU, 16 GB) | Standard_E8s_v5 (8 vCPU, 64 GB) | |
+
+<Tip>For ClickHouse, prioritize memory over CPU. ClickHouse benefits from large memory for caching and merge operations.</Tip>

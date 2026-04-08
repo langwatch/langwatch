@@ -1,40 +1,78 @@
 ---
-title: Overview
-description: Learn how LangWatch's hybrid setup ensures strict data control, compliance needs, and secure AI agent testing infrastructure.
+title: Hybrid Setup
+description: Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
 ---
 
-# Hybrid Setup Overview
+# Hybrid Setup
 
-### Elasticsearch for Trace Data
+The hybrid setup gives you the best of both worlds: LangWatch manages the **control plane** (application, UI, evaluations, prompt management), while your sensitive data stays in **your own infrastructure**.
 
-- Enables high-performance search across all your LLM interactions
-- Supports complex filtering and aggregation for analytics
-- Can be deployed within your own infrastructure while connecting to LangWatch's management plane
+## How It Works
 
-### S3 Storage for Datasets
+```mermaid
+graph LR
+    subgraph cloud["LangWatch Cloud (Control Plane)"]
+        App["LangWatch App<br/>UI · Evaluations · Prompts"]
+        Workers["Workers"]
+        NLP["NLP"]
+        Evals["LangEvals"]
+    end
+    subgraph customer["Your Infrastructure (Data Plane)"]
+        CH["ClickHouse<br/>Traces · Spans · Analytics"]
+        S3["S3 / Object Storage<br/>Datasets · Cold storage · Backups"]
+    end
+    App -->|"queries"| CH
+    Workers -->|"events & projections"| CH
+    CH -->|"cold tiering"| S3
+    Workers -->|"evals"| Evals
+    Workers -->|"NLP"| NLP
+```
 
-S3 storage for datasets provides a secure and scalable solution for your data:
+### What stays in your infrastructure
 
-- Evaluation datasets
-- Custom datasets
+- **ClickHouse** — All trace data, span payloads, evaluation results, and analytics. This is where your LLM inputs/outputs and sensitive content live.
+- **S3-compatible object storage** — Datasets, ClickHouse cold storage tiers, and backups.
 
-This storage can be configured within your compatible cloud provider account while still integrating with LangWatch's observability tools.
+### What LangWatch Cloud manages
 
-## Getting Started with Hybrid Setup
+- Application UI and API
+- Evaluation orchestration
+- Prompt management and versioning
+- Scenario testing and simulations
+- User management and access control
 
-The hybrid setup requires collaboration with our team to properly configure and integrate with your infrastructure. 
+## Benefits
 
-**Contact us to set up your hybrid deployment:**
+- **Data ownership** — Sensitive LLM interactions never leave your infrastructure. You can pull the plug at any time.
+- **Compliance** — Meet data residency requirements by deploying the data plane in your preferred region.
+- **No operational overhead** — LangWatch handles application updates, scaling, and maintenance of the control plane.
+- **Full functionality** — All LangWatch features work identically to the fully-hosted version.
 
-1. Reach out to our sales team at [Email Support](mailto:support@langwatch.ai)
-2. Schedule a consultation to discuss your specific requirements
-3. Work with our integration specialists to configure your hybrid deployment
-4. Receive ongoing support for your custom setup
+## Requirements
 
-For more information or to schedule a consultation, please [contact our sales team](https://meetings-eu1.hubspot.com/manouk-draisma).
+The data plane requires:
 
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **ClickHouse** | Single node, 2 vCPU, 4 GiB RAM | 3-node replicated cluster |
+| **S3 storage** | Any S3-compatible provider | Same region as ClickHouse |
 
+ClickHouse can be deployed as:
+- A managed service (e.g., ClickHouse Cloud, Aiven, Altinity)
+- Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/charts/clickhouse-serverless)
+- Self-hosted on VMs
 
+## Getting Started
 
+The hybrid setup requires coordination with our team to configure the secure connection between LangWatch Cloud and your data plane.
 
+**To get started:**
 
+1. **Contact us** at [support@langwatch.ai](mailto:support@langwatch.ai) or through your account manager
+2. **Provision your data plane** — We'll help you set up ClickHouse and S3 in your infrastructure
+3. **Configure the connection** — We'll establish a secure link (typically via VPC peering, PrivateLink, or VPN) between LangWatch Cloud and your data plane
+4. **Verify** — Run traces and confirm data flows correctly while staying in your infrastructure
+
+<Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
+  Contact our team to discuss your requirements and get started with a hybrid deployment.
+</Card>

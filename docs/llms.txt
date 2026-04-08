@@ -311,25 +311,36 @@ Always navigate to docs links using the .md extension for better readability.
 
 # Self Hosting
 
-## Deployment
+## Overview
 
-- [Overview](https://langwatch.ai/docs/self-hosting/overview.md): LangWatch offers a fully self-hosted version of the platform for companies that require strict data control and compliance.
-- [Docker Compose](https://langwatch.ai/docs/self-hosting/docker-compose.md): Deploy LangWatch using Docker Compose for easy local setups supporting observability, evaluations, and AI agent testing.
-- [Docker Images](https://langwatch.ai/docs/self-hosting/docker-images.md): Explore LangWatch Docker images and endpoints for setting up observability, evaluations, and AI agent testing environments.
-- [Kubernetes (Helm Chart)](https://langwatch.ai/docs/self-hosting/kubernetes-helm.md): Install LangWatch using a Kubernetes Helm chart for production-grade deployments supporting LLM and agent testing workflows.
-- [OnPrem](https://langwatch.ai/docs/self-hosting/onprem.md): Deploy LangWatch on-premises for full control over data, compliance, and secure AI agent evaluation workflows.
+- [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
+- [Hybrid Setup](https://langwatch.ai/docs/hybrid-setup/overview.md): Use LangWatch Cloud with your own data plane — keep full data ownership while leveraging LangWatch's managed control plane.
+- [Troubleshooting & FAQ](https://langwatch.ai/docs/self-hosting/troubleshooting.md): Common issues and solutions for LangWatch self-hosting
 
 ## Configuration
 
-- [Environment Variables](https://langwatch.ai/docs/self-hosting/env-variables.md): Review all environment variables available for LangWatch self-hosting to configure observability and AI agent testing pipelines.
-- [SSO](https://langwatch.ai/docs/self-hosting/sso-setup-langwatch.md): Configure SSO for LangWatch to secure access to evaluation dashboards, observability data, and agent testing environments.
-- [Infra Monitoring](https://langwatch.ai/docs/self-hosting/grafana.md): Set up Grafana and Prometheus for LangWatch infra monitoring to track system health in large-scale agent testing setups.
+- [Environment Variables](https://langwatch.ai/docs/self-hosting/configuration/environment-variables.md): Complete environment variable reference for LangWatch self-hosting
+- [Sizing & Scaling](https://langwatch.ai/docs/self-hosting/configuration/sizing-and-scaling.md): Resource requirements, size profiles, and scaling recommendations for LangWatch
+- [Backups](https://langwatch.ai/docs/self-hosting/configuration/backups.md): Backup and restore strategies for LangWatch data stores
+- [SSO Configuration](https://langwatch.ai/docs/self-hosting/configuration/sso.md): Set up Single Sign-On for LangWatch with your identity provider
+- [Observability & Monitoring](https://langwatch.ai/docs/self-hosting/configuration/observability.md): Monitor LangWatch infrastructure with Prometheus, Grafana, and health checks
+- [Third-Party Integrations](https://langwatch.ai/docs/self-hosting/configuration/third-party-integrations.md): Configure email, error tracking, analytics, and external services for LangWatch
 
-## Hybrid Setup
+## Deployment
 
-- [Overview](https://langwatch.ai/docs/hybrid-setup/overview.md): Learn how LangWatch's hybrid setup ensures strict data control, compliance needs, and secure AI agent testing infrastructure.
-- [Elasticsearch](https://langwatch.ai/docs/hybrid-setup/elasticsearch.md): Set up Elasticsearch for LangWatch Hybrid deployments to enable scalable search and analysis of traces and agent evaluations.
-- [S3 Storage](https://langwatch.ai/docs/hybrid-setup/s3-storage.md): Configure S3 storage for LangWatch Hybrid deployments to store traces, evaluations, and AI agent testing datasets.
+- [Docker Compose](https://langwatch.ai/docs/self-hosting/deployment/docker-compose.md): Get LangWatch running locally in minutes with Docker Compose
+- [Docker Images](https://langwatch.ai/docs/self-hosting/deployment/docker-images.md): LangWatch Docker image reference — what each container does and how they communicate
+- [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
+- [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
+
+## Infrastructure
+
+- [Architecture & Infrastructure](https://langwatch.ai/docs/self-hosting/infrastructure/architecture.md): How LangWatch components fit together — what you're deploying and how data flows through the system
+
+## Operations
+
+- [Security](https://langwatch.ai/docs/self-hosting/security.md): Security model, encryption, secrets management, and hardening for LangWatch
+- [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
 
 # API Reference
 
