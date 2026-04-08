@@ -62,36 +62,23 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
 };
 
 export const getEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+  checkApiKey();
+
+  const service = new EvaluatorsApiService();
+  const spinner = ora(`Fetching evaluator "${idOrSlug}"...`).start();
+
   try {
-    checkApiKey();
-
-    const service = new EvaluatorsApiService();
-    const spinner = ora(`Fetching evaluator "${idOrSlug}"...`).start();
-
-    try {
-      const evaluator = await service.get(idOrSlug);
-      spinner.succeed(`Found evaluator "${evaluator.name}"`);
-      formatEvaluatorDetails(evaluator);
-    } catch (error) {
-      spinner.fail();
-      if (error instanceof EvaluatorsApiError) {
-        console.error(chalk.red(`Error: ${error.message}`));
-      } else {
-        console.error(
-          chalk.red(
-            `Error fetching evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
-          ),
-        );
-      }
-      process.exit(1);
-    }
+    const evaluator = await service.get(idOrSlug);
+    spinner.succeed(`Found evaluator "${evaluator.name}"`);
+    formatEvaluatorDetails(evaluator);
   } catch (error) {
+    spinner.fail();
     if (error instanceof EvaluatorsApiError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
       console.error(
         chalk.red(
-          `Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
         ),
       );
     }
