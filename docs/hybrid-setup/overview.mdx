@@ -9,28 +9,24 @@ The hybrid setup gives you the best of both worlds: LangWatch manages the **cont
 
 ## How It Works
 
-<Frame>
+```mermaid
+graph LR
+    subgraph cloud["LangWatch Cloud (Control Plane)"]
+        App["LangWatch App<br/>UI · Evaluations · Prompts"]
+        Workers["Workers"]
+        NLP["NLP"]
+        Evals["LangEvals"]
+    end
+    subgraph customer["Your Infrastructure (Data Plane)"]
+        CH["ClickHouse<br/>Traces · Spans · Analytics"]
+        S3["S3 / Object Storage<br/>Datasets · Cold storage · Backups"]
+    end
+    App -->|"queries"| CH
+    Workers -->|"events & projections"| CH
+    CH -->|"cold tiering"| S3
+    Workers -->|"evals"| Evals
+    Workers -->|"NLP"| NLP
 ```
-┌──────────────────────────────────┐     ┌──────────────────────────────────┐
-│      LangWatch Cloud             │     │      Your Infrastructure        │
-│      (Control Plane)             │     │      (Data Plane)               │
-│                                  │     │                                 │
-│  ┌────────────────────────┐      │     │  ┌───────────────────────┐      │
-│  │  LangWatch App         │◄─────┼─────┼──┤  ClickHouse           │      │
-│  │  • UI & Dashboard      │      │     │  │  • Traces & spans     │      │
-│  │  • Evaluations         │      │     │  │  • Evaluation results │      │
-│  │  • Prompt Management   │      │     │  │  • Analytics data     │      │
-│  │  • Scenario Testing    │      │     │  └───────────────────────┘      │
-│  └────────────────────────┘      │     │                                 │
-│                                  │     │  ┌───────────────────────┐      │
-│                                  │     │  │  S3 / Object Storage  │      │
-│                                  │     │  │  • Datasets           │      │
-│                                  │     │  │  • Cold storage       │      │
-│                                  │     │  │  • Backups            │      │
-│                                  │     │  └───────────────────────┘      │
-└──────────────────────────────────┘     └──────────────────────────────────┘
-```
-</Frame>
 
 ### What stays in your infrastructure
 
