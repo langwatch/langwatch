@@ -284,6 +284,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Manage user permissions and access levels in LangWatch with RBAC to secure evaluation workflows and agent testing environments.
 - [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Track user actions and changes in LangWatch
 - [SCIM Provisioning](https://langwatch.ai/docs/platform/scim.md): Automatically provision and deprovision users in LangWatch using SCIM 2.0 with your identity provider (Okta, Azure AD, etc.).
+- [SCIM Groups & Role Mapping](https://langwatch.ai/docs/platform/scim-groups.md): Automatically assign roles to users in LangWatch based on groups pushed from your identity provider.
 
 ## Examples & Cookbooks
 
