@@ -1,6 +1,6 @@
 # Changelog
 
-## [3.1.0-prerelease.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.1...langwatch@v3.1.0-prerelease.1) (2026-04-08)
+## [3.0.0-prerelease.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.1...langwatch@v3.0.0-prerelease.1) (2026-04-08)
 
 
 ### Features
