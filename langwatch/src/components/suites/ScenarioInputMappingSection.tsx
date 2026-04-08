@@ -98,6 +98,15 @@ export function ScenarioInputMappingSection({
   const displayMappings = useMemo(() => invertMappings(mappings), [mappings]);
   const agentSource = useMemo(() => buildAgentInputSource(inputs), [inputs]);
 
+  const valueMappings = useMemo(
+    () =>
+      Object.entries(mappings).filter(
+        (entry): entry is [string, { type: "value"; value: string }] =>
+          entry[1].type === "value",
+      ),
+    [mappings],
+  );
+
   const outputCollection = useMemo(
     () =>
       createListCollection({
@@ -132,6 +141,11 @@ export function ScenarioInputMappingSection({
         type: "source",
         sourceId: "scenario",
         path: [scenarioField],
+      });
+    } else if (displayMapping?.type === "value") {
+      onMappingChange(scenarioField, {
+        type: "value",
+        value: displayMapping.value,
       });
     }
   };
@@ -172,6 +186,23 @@ export function ScenarioInputMappingSection({
           readOnly={true}
           title="Inputs"
         />
+        {valueMappings.length > 0 && (
+          <VStack align="stretch" gap={1} marginTop={2}>
+            {valueMappings.map(([identifier, mapping]) => (
+              <Box key={identifier}>
+                <Text as="span" fontSize="xs" color="fg.muted" fontFamily="mono">
+                  {identifier}
+                </Text>
+                <Text as="span" fontSize="xs" color="fg.muted">
+                  {": "}
+                </Text>
+                <Text as="span" fontSize="xs">
+                  {mapping.value}
+                </Text>
+              </Box>
+            ))}
+          </VStack>
+        )}
       </Box>
 
       {/* Output mapping */}
