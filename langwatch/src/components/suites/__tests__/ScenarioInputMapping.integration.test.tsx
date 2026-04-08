@@ -178,34 +178,38 @@ describe("ScenarioInputMappingSection", () => {
   });
 
   // ============================================================================
-  // Scenario: Static value mapping emitted by section (Gap B — handleDisplayMappingChange)
+  // Scenario: Static value mappings can NOT be created from the inverted UI
+  //
+  // The scenario-field-row display has no natural agent-input target for a literal,
+  // so the section intentionally ignores type:"value" emissions from the child widget.
+  // Stored static values still render read-only (see the round-trip test below).
+  // Creating/editing value mappings belongs in a future agent-input-row UI.
   // ============================================================================
 
   describe("given the mapping UI with an empty mappings state", () => {
     describe("when the child widget emits a type:value mapping for scenario_message", () => {
-      it("calls onMappingChange with the value mapping preserved", async () => {
+      it("does not forward the value mapping to storage", async () => {
         const user = userEvent.setup();
         const onMappingChange = vi.fn();
 
         renderSection({ onMappingChange });
 
-        // Open the mapping dropdown for scenario_message
         await user.click(screen.getByTestId("mapping-input-scenario_message"));
 
-        // Type a free-text value to trigger the "use as value" option
         const input = screen.getByTestId("mapping-input-scenario_message");
         await user.type(input, "hello");
 
-        // The widget should show a "use as value" option for the typed text
         const valueOption = await screen.findByTestId("use-as-value-option");
         await user.click(valueOption);
 
-        // onMappingChange should have been called — and NOT with undefined or a source mapping
-        // The section currently drops type:"value" mappings, so this FAILS
-        expect(onMappingChange).toHaveBeenCalledWith(
-          expect.any(String),
-          expect.objectContaining({ type: "value", value: "hello" }),
+        // No call with a type:"value" payload should ever reach storage from
+        // the inverted scenario-field-row UI — the keyspace has no place for it.
+        const valueCalls = onMappingChange.mock.calls.filter(
+          ([, mapping]) =>
+            mapping !== undefined &&
+            (mapping as FieldMapping).type === "value",
         );
+        expect(valueCalls).toHaveLength(0);
       });
     });
   });

@@ -142,12 +142,11 @@ export function ScenarioInputMappingSection({
         sourceId: "scenario",
         path: [scenarioField],
       });
-    } else if (displayMapping?.type === "value") {
-      onMappingChange(scenarioField, {
-        type: "value",
-        value: displayMapping.value,
-      });
     }
+    // Static value mappings are not editable from this inverted UI:
+    // a scenario-field row has no natural agent-input target to bind a literal to.
+    // Existing type:"value" entries render read-only below; creating or editing them
+    // belongs in a follow-up that rebuilds the section with agent-input rows.
   };
 
   return (
