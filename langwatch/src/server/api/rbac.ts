@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import { resolveHighestRole } from "~/server/scim/scim-role-resolver";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -530,14 +531,38 @@ async function resolveRoleFromBindings({
     },
   });
 
-  if (bindings.length === 0) return null;
+  if (bindings.length === 0) {
+    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
+    const teamScope = scopes.find(
+      (s) => s.scopeType === RoleBindingScopeType.TEAM,
+    );
+    if (!teamScope) return null;
 
-  // Pick the binding with the highest scope priority
-  const best = bindings.reduce((a, b) =>
-    (SCOPE_PRIORITY[a.scopeType] ?? 0) >= (SCOPE_PRIORITY[b.scopeType] ?? 0) ? a : b,
+    const teamUser = await prisma.teamUser.findFirst({
+      where: { userId, teamId: teamScope.scopeId },
+      select: { role: true, assignedRoleId: true },
+    });
+
+    if (!teamUser) return null;
+    return { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null };
+  }
+
+  // Collect all bindings at the highest scope priority, then pick the highest role
+  const maxPriority = Math.max(
+    ...bindings.map((b) => SCOPE_PRIORITY[b.scopeType] ?? 0),
   );
+  const bestBindings = bindings.filter(
+    (b) => (SCOPE_PRIORITY[b.scopeType] ?? 0) === maxPriority,
+  );
+  const highest = resolveHighestRole(bestBindings.map((b) => b.role));
+  const customRoleId =
+    highest === TeamUserRole.CUSTOM
+      ? (bestBindings.find(
+          (b) => b.role === TeamUserRole.CUSTOM && b.customRoleId,
+        )?.customRoleId ?? null)
+      : null;
 
-  return { role: best.role, customRoleId: best.customRoleId };
+  return { role: highest, customRoleId };
 }
 
 /**

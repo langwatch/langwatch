@@ -204,7 +204,7 @@ export const roleBindingRouter = createTRPCRouter({
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-async function assertScopeInOrg({
+export async function assertScopeInOrg({
   prisma,
   organizationId,
   scopeType,

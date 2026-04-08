@@ -6,6 +6,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
+import { assertScopeInOrg } from "./roleBinding";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 
@@ -169,6 +170,18 @@ export const groupRouter = createTRPCRouter({
 
       const baseSlug = slugify(input.name, { lower: true, strict: true });
 
+      // Validate all binding scopes belong to this org before starting the transaction
+      if (input.bindings?.length) {
+        for (const b of input.bindings) {
+          await assertScopeInOrg({
+            prisma: ctx.prisma,
+            organizationId: input.organizationId,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          });
+        }
+      }
+
       return ctx.prisma.$transaction(async (tx) => {
         const existing = await tx.group.count({
           where: {
@@ -227,6 +240,13 @@ export const groupRouter = createTRPCRouter({
       if (!group) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
+
+      await assertScopeInOrg({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+        scopeType: input.scopeType,
+        scopeId: input.scopeId,
+      });
 
       return ctx.prisma.roleBinding.create({
         data: {
