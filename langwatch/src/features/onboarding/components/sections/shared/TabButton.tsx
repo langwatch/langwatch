@@ -31,7 +31,7 @@ export function TabButton({
       border="1px solid"
       borderColor={active ? { base: "orange.200", _dark: "orange.800" } : "transparent"}
       transition="all 0.17s ease"
-      _hover={{ bg: active ? "bg.panel" : "bg.muted" }}
+      _hover={{ bg: active ? "bg.panel" : "bg.muted", color: "orange.500" }}
       letterSpacing="-0.01em"
     >
       {label}

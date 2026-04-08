@@ -8,9 +8,10 @@ const lightTheme: PrismTheme = {
   plain: { color: "#24292e", backgroundColor: "transparent" },
   styles: [
     { types: ["property"], style: { color: "#005cc5" } },
-    { types: ["string", "attr-value"], style: { color: "#032f62" } },
+    { types: ["string"], style: { color: "#22863a" } },
     { types: ["number", "boolean", "null"], style: { color: "#e36209" } },
-    { types: ["punctuation", "operator"], style: { color: "#24292e" } },
+    { types: ["operator"], style: { color: "#d73a49" } },
+    { types: ["punctuation"], style: { color: "#586069" } },
   ],
 };
 
@@ -18,9 +19,10 @@ const darkTheme: PrismTheme = {
   plain: { color: "#e1e4e8", backgroundColor: "transparent" },
   styles: [
     { types: ["property"], style: { color: "#79b8ff" } },
-    { types: ["string", "attr-value"], style: { color: "#9ecbff" } },
+    { types: ["string"], style: { color: "#85e89d" } },
     { types: ["number", "boolean", "null"], style: { color: "#ffab70" } },
-    { types: ["punctuation", "operator"], style: { color: "#e1e4e8" } },
+    { types: ["operator"], style: { color: "#f97583" } },
+    { types: ["punctuation"], style: { color: "#959da5" } },
   ],
 };
 
