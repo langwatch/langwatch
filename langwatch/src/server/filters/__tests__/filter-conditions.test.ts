@@ -46,42 +46,30 @@ describe("clickHouseFilterConditions", () => {
   });
 
   describe("traces.origin", () => {
-    it("expands 'application' to match empty, NULL, and literal 'application'", () => {
+    const expectedSql =
+      "if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({f0_values:Array(String)})";
+
+    it("maps empty/NULL origins to 'application' via ifNull, matching the dropdown", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       expect(builder).not.toBeNull();
       const result = builder!(["application"], "f0");
-      expect(result.sql).toBe(
-        "(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL OR ts.Attributes['langwatch.origin'] = 'application')",
-      );
-      expect(result.params).toEqual({});
+      expect(result.sql).toBe(expectedSql);
+      expect(result.params).toEqual({ f0_values: ["application"] });
     });
 
-    it("uses IN clause for specific non-application values", () => {
+    it("passes non-application values through directly", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       const result = builder!(["evaluation"], "f0");
-      expect(result.sql).toBe(
-        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
-      );
+      expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({ f0_values: ["evaluation"] });
     });
 
-    it("combines application expansion with IN clause for mixed values", () => {
+    it("handles mixed application and other values", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       const result = builder!(["application", "evaluation"], "f0");
-      expect(result.sql).toBe(
-        "((ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL OR ts.Attributes['langwatch.origin'] = 'application') OR ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)}))",
-      );
-      expect(result.params).toEqual({ f0_values: ["evaluation"] });
-    });
-
-    it("handles multiple non-application values", () => {
-      const builder = clickHouseFilterConditions["traces.origin"];
-      const result = builder!(["evaluation", "simulation"], "f0");
-      expect(result.sql).toBe(
-        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
-      );
+      expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({
-        f0_values: ["evaluation", "simulation"],
+        f0_values: ["application", "evaluation"],
       });
     });
 

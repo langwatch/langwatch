@@ -114,36 +114,16 @@ export const clickHouseFilterConditions: Record<
   }),
 
   // Traces
+  // The dropdown maps empty/NULL origin to "application" via ifNull().
+  // Apply the same mapping here so the condition matches what the dropdown counted.
   "traces.origin": (values, paramId) => {
     if (values.length === 0) {
       return { sql: "1=0", params: {} };
     }
 
-    // "application" is the default origin for traces with no explicit
-    // langwatch.origin attribute (empty string or NULL). Expand it to
-    // match all three representations. Other values match directly.
-    const hasApplication = values.includes("application");
-    const otherValues = values.filter((v) => v !== "application");
-
-    const parts: string[] = [];
-    const params: Record<string, unknown> = {};
-
-    if (hasApplication) {
-      parts.push(
-        `(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL OR ts.Attributes['langwatch.origin'] = 'application')`,
-      );
-    }
-
-    if (otherValues.length > 0) {
-      parts.push(
-        `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
-      );
-      params[`${paramId}_values`] = otherValues;
-    }
-
     return {
-      sql: parts.length === 1 ? parts[0]! : `(${parts.join(" OR ")})`,
-      params,
+      sql: `if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({${paramId}_values:Array(String)})`,
+      params: { [`${paramId}_values`]: values },
     };
   },
 
