@@ -17,10 +17,10 @@
       "extra-files": [
         {
           "type": "yaml",
-          "path": "charts/clickhouse-serverless/Chart.yaml",
+          "path": "../charts/clickhouse-serverless/Chart.yaml",
           "jsonpath": "$.version"
         },
-        "charts/clickhouse-serverless/values.yaml"
+        "../charts/clickhouse-serverless/values.yaml"
       ]
     },
     "sdk-go": {
