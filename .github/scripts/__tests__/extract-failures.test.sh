@@ -61,6 +61,7 @@ assert_contains "$TMP_OUT" "FAIL " "contains FAIL line"
 assert_contains "$TMP_OUT" "traces.test.ts" "contains first failing file"
 assert_contains "$TMP_OUT" "TraceDetails.test.tsx" "contains second failing file"
 assert_contains "$TMP_OUT" "AssertionError:" "contains AssertionError line"
+assert_contains "$TMP_OUT" "AssertionError: Error: Unable to find an element" "non-AssertionError message is prefixed with AssertionError:"
 
 # Passing file should NOT appear
 if grep -q "formatters.test.ts" "$TMP_OUT"; then

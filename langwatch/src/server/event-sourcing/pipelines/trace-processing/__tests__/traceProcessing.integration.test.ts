@@ -314,8 +314,7 @@ const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
 );
 
-// TODO(#3022): pre-existing failures unmasked by #3001 — re-enable after fix
-describe.skip(
+describe.skipIf(!hasTestcontainers)(
   "Trace Processing Pipeline",
   () => {
     let pipeline: ReturnType<typeof createTraceTestPipeline>;
@@ -336,7 +335,8 @@ describe.skip(
     });
 
     describe("given a single span is recorded", () => {
-      it("creates a trace summary with span metrics", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("creates a trace summary with span metrics", async () => {
         const traceId = generateTestTraceId();
         const spanId = generateTestSpanId();
         const now = Date.now();
@@ -373,7 +373,8 @@ describe.skip(
         expect(data.containsErrorStatus).toBe(false);
       });
 
-      it("writes the span to stored_spans via map projection", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("writes the span to stored_spans via map projection", async () => {
         const traceId = generateTestTraceId();
         const spanId = generateTestSpanId();
 
@@ -392,7 +393,8 @@ describe.skip(
     });
 
     describe("given multiple spans arrive for the same trace", () => {
-      it("accumulates span count and duration in the trace summary", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("accumulates span count and duration in the trace summary", async () => {
         const traceId = generateTestTraceId();
         const now = Date.now();
 
@@ -445,7 +447,8 @@ describe.skip(
     });
 
     describe("given a span with an error status", () => {
-      it("records the error in the trace summary", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("records the error in the trace summary", async () => {
         const traceId = generateTestTraceId();
 
         await pipeline.commands.recordSpan.send({
@@ -478,7 +481,8 @@ describe.skip(
     });
 
     describe("given a span with token usage attributes", () => {
-      it("aggregates token counts in the trace summary", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("aggregates token counts in the trace summary", async () => {
         const traceId = generateTestTraceId();
 
         await pipeline.commands.recordSpan.send({
@@ -515,7 +519,8 @@ describe.skip(
     });
 
     describe("given a topic is assigned after spans are recorded", () => {
-      it("updates the trace summary with topic and subtopic", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("updates the trace summary with topic and subtopic", async () => {
         const traceId = generateTestTraceId();
         const topicId = `topic-${Date.now()}`;
         const subtopicId = `subtopic-${Date.now()}`;
@@ -563,7 +568,8 @@ describe.skip(
     });
 
     describe("given a span with resource attributes", () => {
-      it("extracts SDK and service info into trace summary attributes", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("extracts SDK and service info into trace summary attributes", async () => {
         const traceId = generateTestTraceId();
 
         await pipeline.commands.recordSpan.send({
@@ -601,7 +607,8 @@ describe.skip(
     });
 
     describe("given a span with langwatch.origin attribute", () => {
-      it("persists langwatch.origin in trace summary attributes", async () => {
+      // TODO(#3048): pre-existing failure unmasked by #3001
+      it.skip("persists langwatch.origin in trace summary attributes", async () => {
         const traceId = generateTestTraceId();
 
         await pipeline.commands.recordSpan.send({

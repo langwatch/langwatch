@@ -33,7 +33,10 @@ jq -r --arg repo_root "$REPO_ROOT" '
       | select(.status == "failed")
       | .failureMessages[0]? // ""
       | split("\n")[0]
-      | if . != "" then . else empty end
+      | if . == "" then empty
+        elif test("^AssertionError:") then .
+        else "AssertionError: " + .
+        end
     )
 ' "$INPUT_JSON" > "$OUTPUT_TXT" 2>/dev/null || true
 

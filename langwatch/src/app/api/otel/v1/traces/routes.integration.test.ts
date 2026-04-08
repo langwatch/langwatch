@@ -20,8 +20,7 @@ import { POST } from "./route";
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 
-// TODO(#3022): pre-existing failures unmasked by #3001 — re-enable after fix
-describe.skip("opentelemetry traces receiver", () => {
+describe("opentelemetry traces receiver", () => {
   let worker: Worker<CollectorJob, void, string> | undefined;
   let project: Project | undefined;
 
@@ -194,6 +193,7 @@ describe.skip("opentelemetry traces receiver", () => {
     ],
   };
 
+  // TODO(#3048): pre-existing failure unmasked by #3001
   it.skip("receives a basic openai trace", async () => {
     const client = await esClient({ test: true });
     const encodedMessage = traceRequestType.encode(request).finish();
