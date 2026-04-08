@@ -208,7 +208,7 @@ spec:
             httpGet:
               path: /api/health
               port: http
-            failureThreshold: 12
+            failureThreshold: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
