@@ -63,8 +63,10 @@ const formatTable = (
 
 const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "—";
+
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
 
   const seconds = Math.floor(diffMs / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -78,7 +80,7 @@ const formatRelativeTime = (dateString: string): string => {
   if (days > 0) return `${days}d ago`;
   if (hours > 0) return `${hours}h ago`;
   if (minutes > 0) return `${minutes}m ago`;
-  return `${seconds}s ago`;
+  return seconds === 0 ? "just now" : `${seconds}s ago`;
 };
 
 export const listEvaluatorsCommand = async (): Promise<void> => {
