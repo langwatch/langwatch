@@ -33,12 +33,11 @@ type ProjectAccessEntry = TeamData["projectAccess"][string][number];
 
 // ── Role options ──────────────────────────────────────────────────────────────
 
-const ROLE_ITEMS = [
+const BASE_ROLE_ITEMS = [
   { label: "Admin", value: "ADMIN" },
   { label: "Member", value: "MEMBER" },
   { label: "Viewer", value: "VIEWER" },
 ];
-const roleCollection = createListCollection({ items: ROLE_ITEMS });
 
 function roleBadgeColor(role: string) {
   if (role === "ADMIN") return "red";
@@ -50,26 +49,48 @@ function roleBadgeColor(role: string) {
 
 function RoleSelect({
   value,
+  customRoleId,
+  organizationId,
   onChange,
   size = "sm",
 }: {
   value: string;
-  onChange: (v: string) => void;
+  customRoleId?: string | null;
+  organizationId: string;
+  onChange: (role: string, customRoleId?: string) => void;
   size?: "sm" | "md";
 }) {
+  const customRoles = api.role.getAll.useQuery({ organizationId });
+
+  const roleItems = [
+    ...BASE_ROLE_ITEMS,
+    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+  ];
+  const roleCollection = createListCollection({ items: roleItems });
+
+  const selectValue = value === "CUSTOM" && customRoleId ? `CUSTOM:${customRoleId}` : value;
+
   return (
     <Select.Root
       collection={roleCollection}
-      value={[value]}
-      onValueChange={(e) => onChange(e.value[0] ?? value)}
+      value={[selectValue]}
+      onValueChange={(e) => {
+        const v = e.value[0] ?? value;
+        if (v.startsWith("CUSTOM:")) {
+          onChange("CUSTOM", v.slice(7));
+        } else {
+          onChange(v, undefined);
+        }
+      }}
+      disabled={customRoles.isLoading}
       size={size}
-      width="120px"
+      width="140px"
     >
       <Select.Trigger>
         <Select.ValueText />
       </Select.Trigger>
       <Select.Content>
-        {ROLE_ITEMS.map((item) => (
+        {roleItems.map((item) => (
           <Select.Item key={item.value} item={item}>
             {item.label}
           </Select.Item>
@@ -123,7 +144,7 @@ function AddToTeamDialog({
   const userCollection = createListCollection({ items: userItems });
 
   const allRoleItems = [
-    ...ROLE_ITEMS,
+    ...BASE_ROLE_ITEMS,
     ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
   ];
   const allRoleCollection = createListCollection({ items: allRoleItems });
@@ -261,7 +282,7 @@ function AddToProjectDialog({
   const userCollection = createListCollection({ items: userItems });
 
   const allRoleItems = [
-    ...ROLE_ITEMS,
+    ...BASE_ROLE_ITEMS,
     ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
   ];
   const allRoleCollection = createListCollection({ items: allRoleItems });
@@ -697,11 +718,14 @@ function TeamCard({
                     {canManage && m.bindingId ? (
                       <RoleSelect
                         value={m.role}
-                        onChange={(role) =>
+                        customRoleId={m.customRoleId}
+                        organizationId={organizationId}
+                        onChange={(role, customRoleId) =>
                           updateBinding.mutate({
                             organizationId,
                             bindingId: m.bindingId!,
                             role: role as any,
+                            customRoleId,
                           })
                         }
                       />
