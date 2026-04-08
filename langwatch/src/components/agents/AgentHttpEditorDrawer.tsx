@@ -50,6 +50,7 @@ import {
   OutputPathInput,
   useHttpTest,
 } from "./http";
+import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
 
 // ============================================================================
 // Constants
@@ -210,6 +211,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Custom variables (in addition to fixed ones)
   const [customVariables, setCustomVariables] = useState<Variable[]>([]);
+  // Scenario mappings (persisted on agent config)
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>({});
   // Default to variables tab when in evaluations context (has availableSources)
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 
@@ -220,6 +223,22 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const variables = useMemo(() => {
     return [...FIXED_VARIABLES, ...customVariables];
   }, [customVariables]);
+
+  // Handle scenario mapping change (persisted on agent config)
+  const handleScenarioMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      setScenarioMappings((prev) => {
+        if (!mapping) {
+          const next = { ...prev };
+          delete next[identifier];
+          return next;
+        }
+        return { ...prev, [identifier]: mapping };
+      });
+      setHasUnsavedChanges(true);
+    },
+    [],
+  );
 
   // Handle variable changes (only affects custom variables)
   const handleVariablesChange = useCallback((newVariables: Variable[]) => {
@@ -551,6 +570,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                         }}
                       />
                     </Field.Root>
+                    <ScenarioInputMappingSection
+                      inputs={variables}
+                      mappings={scenarioMappings}
+                      onMappingChange={handleScenarioMappingChange}
+                    />
                   </VStack>
                 </Tabs.Content>
 
