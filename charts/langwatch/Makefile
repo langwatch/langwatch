@@ -1,5 +1,8 @@
 RELEASE   := lw
-NAMESPACE := lw-local
+PROFILE   ?= local
+VALUES    := examples/values-$(PROFILE).yaml
+_NS       := $(shell grep -m1 '^. namespace:' $(VALUES) 2>/dev/null | cut -d: -f2 | tr -d ' ')
+NAMESPACE := $(if $(_NS),$(_NS),default)
 KIND_CLUSTER := lw-local
 KUBE_CTX  := kind-$(KIND_CLUSTER)
 CH_IMAGE  := langwatch/clickhouse-serverless:next
@@ -91,7 +94,7 @@ example-up: deps
 	@kind load docker-image $(NLP_IMAGE) --name $(KIND_CLUSTER)
 	@kind load docker-image $(LANGEVALS_IMAGE) --name $(KIND_CLUSTER)
 	$(HELM_SAFE) upgrade --install $(RELEASE) . \
-	  -f examples/values-$(or $(PROFILE),local).yaml \
+	  -f $(VALUES) \
 	  --wait --timeout 10m
 
 ## Tear down the example release

@@ -1,4 +1,5 @@
 # values-hosted-prod.yaml — Production on cloud Kubernetes.
+# namespace: langwatch
 #
 # Same as:  -f overlays/size-prod.yaml -f overlays/access-ingress.yaml
 #           -f overlays/postgres-external.yaml -f overlays/redis-external.yaml
@@ -26,8 +27,8 @@ app:
     limits:   { cpu: 2, memory: 4Gi }
   podDisruptionBudget: { minAvailable: 1 }
   http:
-    baseHost: "https://langwatch.example.com"
-    publicUrl: "https://langwatch.example.com"
+    baseHost: "https://langwatch.example.com"   # TODO: replace with your actual domain
+    publicUrl: "https://langwatch.example.com"  # TODO: replace with your actual domain
 
 workers:
   enabled: true
@@ -53,9 +54,9 @@ ingress:
   className: "nginx"
   tls:
     - secretName: langwatch-tls
-      hosts: [langwatch.example.com]
+      hosts: [langwatch.example.com]  # TODO: replace with your actual domain
   hosts:
-    - host: langwatch.example.com
+    - host: langwatch.example.com  # TODO: replace with your actual domain
       http:
         paths:
           - { path: /, pathType: Prefix }
