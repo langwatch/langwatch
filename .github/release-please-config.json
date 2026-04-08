@@ -307,7 +307,12 @@
           "path": "charts/langwatch/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
-        "charts/langwatch/values.yaml"
+        "charts/langwatch/values.yaml",
+        {
+          "type": "json",
+          "path": "langwatch/package.json",
+          "jsonpath": "$.version"
+        }
       ]
     },
     "skills": {

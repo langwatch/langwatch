@@ -87,7 +87,7 @@ spec:
               command: ["/bin/sh", "-c"]
               args:
                 - |
-                  curl -i \
+                  curl --retry 5 --retry-delay 10 --retry-connrefused -i \
                     -H "Authorization: Bearer ${CRON_API_KEY}" \
                     -X GET \
                     http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
