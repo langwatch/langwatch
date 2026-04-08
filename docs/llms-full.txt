@@ -25397,7 +25397,7 @@ Images haven't been loaded into Kind. Run `make images-local`.
 Ensure the Kind cluster was created with the port mapping config (`charts/lib/kind-config.yaml`). Recreate the cluster if needed: `make clean && make example-up`.
 
 **Pods stuck in `Pending`:**
-Check if your Docker daemon has enough resources. Kind needs at least 4 CPU and 8 GB RAM allocated to Docker.
+Check if your Docker daemon has enough resources. Kind needs at least 4 CPU and 16 GB RAM allocated to Docker.
 
 **Slow startup:**
 First-time image builds take several minutes. Subsequent `make example-up` runs reuse cached images and are much faster.
