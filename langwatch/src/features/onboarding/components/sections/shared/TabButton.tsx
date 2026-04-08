@@ -20,7 +20,7 @@ export function TabButton({
       py={1.5}
       fontSize="sm"
       fontWeight={active ? "semibold" : "medium"}
-      color={active ? "fg.DEFAULT" : "fg.muted"}
+      color={active ? "orange.500" : "fg.muted"}
       bg={active ? "bg.panel" : "transparent"}
       backdropFilter={active ? "blur(20px) saturate(1.3)" : undefined}
       boxShadow={
@@ -29,7 +29,7 @@ export function TabButton({
           : undefined
       }
       border="1px solid"
-      borderColor={active ? "gray.200" : "transparent"}
+      borderColor={active ? { base: "orange.200", _dark: "orange.800" } : "transparent"}
       transition="all 0.17s ease"
       _hover={{ bg: active ? "bg.panel" : "bg.muted" }}
       letterSpacing="-0.01em"
