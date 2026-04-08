@@ -137,9 +137,6 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
-      # Dummy Stripe key so ee/billing modules can import without throwing.
-      # Stripe client construction is side-effect-free; no real API calls are made in tests.
-      STRIPE_SECRET_KEY: "sk_test_dummy_ci_key"
       BUILD_TIME: "true"
       CI: "true"
 

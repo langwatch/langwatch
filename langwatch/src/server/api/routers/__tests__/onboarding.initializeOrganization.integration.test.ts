@@ -32,6 +32,10 @@ vi.mock("../../../../env.mjs", async (importOriginal) => {
     env: {
       ...original.env,
       IS_SAAS: true,
+      // Dummy Stripe key scoped to this test file. The real Stripe
+      // billing integration tests guard on process.env.STRIPE_SECRET_KEY
+      // directly (not this mock), so they stay auto-skipped in CI.
+      STRIPE_SECRET_KEY: "sk_test_dummy_for_onboarding_test",
     },
   };
 });
