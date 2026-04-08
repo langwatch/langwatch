@@ -201,7 +201,7 @@ export async function prefetchScenarioData(
       target,
     },
     telemetry: {
-      endpoint: env.BASE_HOST ?? "https://app.langwatch.ai",
+      endpoint: process.env.LANGWATCH_ENDPOINT!,
       apiKey: project.apiKey,
     },
   };
