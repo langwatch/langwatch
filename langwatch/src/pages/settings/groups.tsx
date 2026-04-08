@@ -12,7 +12,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { RoleBindingScopeType } from "@prisma/client";
 import { Plus, Trash2 } from "lucide-react";
 import { MoreVertical } from "react-feather";
 import { useState } from "react";
