@@ -10,7 +10,6 @@ import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
 import { getApp } from "../../../../../server/app-layer/app";
-import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluationNameAutoslug";
 import {
   type DataForEvaluation,
@@ -407,7 +406,7 @@ export async function handleEvaluatorCall(
     // Emit evaluation reported event — single atomic event for the fold projection
     // Note: Event sourcing errors are logged but not re-thrown because the evaluation
     // result should be returned even if event tracking fails. Errors are captured for monitoring.
-    if (project.featureEventSourcingEvaluationIngestion) {
+    {
       await getApp()
         .evaluations.reportEvaluation({
           tenantId: project.id,
@@ -466,43 +465,6 @@ export async function handleEvaluatorCall(
             ...result!,
             ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
-
-  if (
-    params.trace_id &&
-    !project.featureEventSourcingEvaluationIngestion &&
-    !project.disableElasticSearchEvaluationWriting
-  ) {
-    await updateEvaluationStatusInES({
-      check: {
-        evaluation_id: evaluationId,
-        evaluator_id: evaluatorId,
-        type: checkType as EvaluatorTypes,
-        name: evaluatorName ?? monitor?.name ?? params.name ?? checkType,
-      },
-      trace: {
-        trace_id: params.trace_id,
-        project_id: project.id,
-      },
-      status: result!.status,
-      is_guardrail: isGuardrail ?? undefined,
-      ...(result!.status === "error"
-        ? {
-            error: {
-              details: result!.details,
-              stack: result!.traceback,
-            },
-          }
-        : {}),
-      ...(result!.status === "processed"
-        ? {
-            score: result!.score,
-            passed: result!.passed,
-            label: result!.label,
-          }
-        : {}),
-      details: "details" in result! ? (result!.details ?? "") : "",
-    });
-  }
 
   return res.status(200).json(resultWithoutTraceback);
 }

@@ -117,9 +117,7 @@ describe("ClickHouseTraceService", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    mockPrismaFindUnique.mockResolvedValue({
-      featureClickHouseDataSourceTraces: true,
-    });
+    mockPrismaFindUnique.mockResolvedValue({});
 
     // Dynamic import to get fresh module after mocks are set
     const mod = await import("../clickhouse-trace.service");

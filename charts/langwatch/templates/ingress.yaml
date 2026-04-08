@@ -26,7 +26,22 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- if .Values.ingress.hosts }}
-    {{- .Values.ingress.hosts | toYaml | nindent 4 }}
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .http.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              {{- if .backend }}
+              {{- toYaml .backend | nindent 14 }}
+              {{- else }}
+              service:
+                name: {{ $.Release.Name }}-app
+                port:
+                  number: {{ $.Values.app.service.port | default 5560 }}
+              {{- end }}
+          {{- end }}
     {{- end }}
 {{- end }}

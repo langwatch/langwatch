@@ -1,7 +1,13 @@
 RELEASE   := ch-test
 NAMESPACE := ch-test
+CH_IMAGE  := langwatch/clickhouse-serverless:next
+CH_DIR    := ../../clickhouse-serverless
 
-.PHONY: lint template test-e2e test clean
+.PHONY: lint template test-e2e test clean images
+
+## Build the clickhouse-serverless Docker image
+images:
+	docker build -t $(CH_IMAGE) $(CH_DIR)
 
 ## Lint the chart
 lint:

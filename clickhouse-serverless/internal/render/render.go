@@ -21,6 +21,12 @@ import (
 //	  config.d/         — ClickHouse server config (limits, storage, keeper, etc.)
 //	  users.d/          — ClickHouse user configs (profiles, passwords, custom users)
 func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, outputDir string) error {
+	if input == nil {
+		return fmt.Errorf("input must not be nil")
+	}
+	if log == nil {
+		return fmt.Errorf("logger must not be nil")
+	}
 	if computed == nil {
 		return fmt.Errorf("computed settings must not be nil")
 	}

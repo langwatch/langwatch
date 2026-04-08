@@ -1,0 +1,77 @@
+# values-local.yaml — All-in-one for local Kind development.
+#
+# Same as:  -f overlays/size-dev.yaml -f overlays/access-nodeport.yaml -f overlays/local-images.yaml --set autogen.enabled=true
+#
+# Setup:
+#   kind create cluster --config charts/lib/kind-config.yaml
+#   make images-local   # build + load images
+#   helm install lw . -f examples/values-local.yaml
+#   open http://localhost:30560
+
+autogen:
+  enabled: true
+
+images:
+  app:        { tag: local, pullPolicy: Never }
+  langwatch_nlp: { tag: local, pullPolicy: Never }
+  langevals:  { tag: local, pullPolicy: Never }
+
+app:
+  replicaCount: 1
+  service: { type: NodePort, port: 5560, nodePort: 30560 }
+  http:
+    baseHost: "http://localhost:30560"
+    publicUrl: "http://localhost:30560"
+  resources:
+    requests: { cpu: 250m, memory: 1Gi }
+    limits:   { cpu: 1, memory: 3Gi }
+
+workers:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+langwatch_nlp:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits:   { cpu: 500m, memory: 1Gi }
+
+langevals:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  extraEnvs:
+    - { name: DISABLE_EVALUATORS_PRELOAD, value: "true" }
+    - { name: WEB_CONCURRENCY, value: "1" }
+
+clickhouse:
+  chartManaged: true
+  image: { pullPolicy: Never }
+  replicas: 1
+  memory: 1Gi
+  cpu: 1
+  storage: { size: 5Gi }
+
+postgresql:
+  chartManaged: true
+  auth: { database: langwatch }
+  primary:
+    persistence: { size: 2Gi }
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+redis:
+  chartManaged: true
+  master:
+    persistence: { size: 1Gi }
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+
+prometheus: { chartManaged: false }
+cronjobs:   { enabled: false }

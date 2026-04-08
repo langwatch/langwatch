@@ -15,8 +15,8 @@ metadata:
     {{- toYaml $root.Values.cronjobs.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- if $root.Values.cronjobs.job.annotations }}
-    {{- toYaml $root.Values.cronjobs.job.annotations | nindent 4 }}
+    {{- if $root.Values.cronjobs.cronjob.annotations }}
+    {{- toYaml $root.Values.cronjobs.cronjob.annotations | nindent 4 }}
     {{- end }}
 spec:
   schedule: {{ $jobConfig.schedule | quote }}
@@ -51,29 +51,31 @@ spec:
             {{- end }}
         spec:
           # Pod security context
+          {{- with (coalesce $root.Values.cronjobs.podSecurityContext $root.Values.global.podSecurityContext) }}
           securityContext:
-            {{- toYaml $root.Values.global.podSecurityContext | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           # Node selection
-          {{- with $root.Values.global.scheduling.nodeSelector }}
+          {{- with (coalesce $root.Values.cronjobs.nodeSelector $root.Values.global.scheduling.nodeSelector) }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with $root.Values.global.scheduling.affinity }}
+          {{- with (coalesce $root.Values.cronjobs.affinity $root.Values.global.scheduling.affinity) }}
           affinity:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with $root.Values.global.scheduling.tolerations }}
+          {{- with (coalesce $root.Values.cronjobs.tolerations $root.Values.global.scheduling.tolerations) }}
           tolerations:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with $root.Values.global.scheduling.topologySpreadConstraints }}
+          {{- with (coalesce $root.Values.cronjobs.topologySpreadConstraints $root.Values.global.scheduling.topologySpreadConstraints) }}
           topologySpreadConstraints:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           containers:
             - name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
               securityContext:
-                {{- toYaml $root.Values.global.containerSecurityContext | nindent 16 }}
+                {{- toYaml (coalesce $root.Values.cronjobs.containerSecurityContext $root.Values.global.containerSecurityContext) | nindent 16 }}
               image: "{{ $root.Values.cronjobs.image.repository }}:{{ $root.Values.cronjobs.image.tag }}"
               imagePullPolicy: {{ $root.Values.cronjobs.image.pullPolicy }}
               env:
@@ -90,9 +92,9 @@ spec:
                     -X GET \
                     http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
 
-              {{- if $root.Values.cronjobs.extraCronjobsLifecycle}}
+              {{- if $root.Values.cronjobs.extraLifecycle}}
               lifecycle:
-                {{- with $root.Values.cronjobs.extraCronjobsLifecycle}}
+                {{- with $root.Values.cronjobs.extraLifecycle}}
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
               {{- end }}

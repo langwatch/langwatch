@@ -228,15 +228,6 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          featureClickHouseDataSourceSimulations: true,
-          featureClickHouseDataSourceEvaluations: true,
-          featureClickHouseDataSourceTraces: true,
-          featureEventSourcingSimulationIngestion: true,
-          featureEventSourcingEvaluationIngestion: true,
-          featureEventSourcingTraceIngestion: true,
-          disableElasticSearchTraceWriting: true,
-          disableElasticSearchEvaluationWriting: true,
-          disableElasticSearchSimulationWriting: true,
         },
       });
 

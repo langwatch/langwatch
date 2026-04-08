@@ -74,8 +74,8 @@ Shared by cold storage and backups. Required when either `cold.enabled` or `back
 | `objectStorage.endpoint` | Custom S3-compatible endpoint (MinIO, R2, etc.) | `""` |
 | `objectStorage.useEnvironmentCredentials` | Use IRSA / workload identity / pod SA | `true` |
 | `objectStorage.credentials.secretKeyRef.name` | Secret name for static S3 credentials | `""` |
-| `objectStorage.credentials.secretKeyRef.accessKeyKey` | Key for access key in secret | `accessKey` |
-| `objectStorage.credentials.secretKeyRef.secretKeyKey` | Key for secret key in secret | `secretKey` |
+| `objectStorage.credentials.secretKeyRef.accessKeyId` | Key for access key ID in secret | `accessKey` |
+| `objectStorage.credentials.secretKeyRef.secretAccessKey` | Key for secret access key in secret | `secretKey` |
 
 ### Backups
 

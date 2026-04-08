@@ -84,39 +84,31 @@ export const evaluationsRouter = createTRPCRouter({
         });
       }
 
-      // Dispatch to evaluation processing pipeline when flag is ON
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: {
-          featureEventSourcingEvaluationIngestion: true,
-        },
-      });
-      if (project?.featureEventSourcingEvaluationIngestion && result) {
+      // Dispatch to evaluation processing pipeline
+      if (result) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-        void (async () => {
-          try {
-            const app = getApp();
-            await app.evaluations.reportEvaluation({
-              tenantId: input.projectId,
-              evaluationId,
-              evaluatorId: input.evaluatorType,
-              evaluatorType: input.evaluatorType,
-              traceId: input.traceId,
-              status: result.status,
-              score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
-              passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
-              label: result.status === "processed" ? (result.label ?? undefined) : undefined,
-              details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
-              error: result.status === "error" ? result.details : undefined,
-              occurredAt: Date.now(),
-            });
-          } catch (error) {
-            logger.warn(
-              { error, evaluationId, evaluatorType: input.evaluatorType },
-              "Failed to dispatch single re-eval to evaluation processing pipeline",
-            );
-          }
-        })();
+        try {
+          const app = getApp();
+          await app.evaluations.reportEvaluation({
+            tenantId: input.projectId,
+            evaluationId,
+            evaluatorId: input.evaluatorType,
+            evaluatorType: input.evaluatorType,
+            traceId: input.traceId,
+            status: result.status,
+            score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
+            passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
+            label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+            details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
+            error: result.status === "error" ? result.details : undefined,
+            occurredAt: Date.now(),
+          });
+        } catch (error) {
+          logger.warn(
+            { error, evaluationId, evaluatorType: input.evaluatorType },
+            "Failed to dispatch single re-eval to evaluation processing pipeline",
+          );
+        }
       }
 
       return result;

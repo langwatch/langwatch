@@ -6,11 +6,6 @@ import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
-import {
-  BATCH_EVALUATION_INDEX,
-  batchEvaluationId,
-  esClient,
-} from "../../../../server/elasticsearch";
 import { mapEsTargetsToTargets } from "../../../../server/evaluations-v3/services/mappers";
 import type {
   ESBatchEvaluation,
@@ -235,12 +230,6 @@ const processBatchEvaluation = async (
     workflowId: param.workflow_id ?? undefined,
   });
 
-  const id = batchEvaluationId({
-    projectId: project.id,
-    experimentId: experiment.id,
-    runId: run_id,
-  });
-
   // Process targets with type extraction from metadata
   const processedTargets = processTargets(param.targets);
 
@@ -260,120 +249,9 @@ const processBatchEvaluation = async (
   };
 
   // To guarantee no extra keys
-  const validatedBatchEvaluation =
-    eSBatchEvaluationSchema.parse(batchEvaluation);
+  eSBatchEvaluationSchema.parse(batchEvaluation);
 
-  const script = {
-    source: `
-      if (ctx._source.evaluations == null) {
-        ctx._source.evaluations = [];
-      }
-      for (newEvaluation in params.evaluations) {
-        boolean exists = false;
-        for (e in ctx._source.evaluations) {
-          // Check evaluator, index, AND target_id for uniqueness
-          // target_id can be null for single-target evaluations
-          def newTargetId = newEvaluation.target_id;
-          def existingTargetId = e.target_id;
-          boolean targetMatch = (newTargetId == null && existingTargetId == null) ||
-                                (newTargetId != null && newTargetId.equals(existingTargetId));
-          if (e.evaluator == newEvaluation.evaluator && e.index == newEvaluation.index && targetMatch) {
-            exists = true;
-            break;
-          }
-        }
-        if (!exists) {
-          ctx._source.evaluations.add(newEvaluation);
-        }
-      }
-
-      if (ctx._source.dataset == null) {
-        ctx._source.dataset = [];
-      }
-      for (newDataset in params.dataset) {
-        boolean exists = false;
-        for (d in ctx._source.dataset) {
-          // Check index AND target_id for uniqueness (like evaluations)
-          // target_id can be null for single-target evaluations
-          def newTargetId = newDataset.target_id;
-          def existingTargetId = d.target_id;
-          boolean targetMatch = (newTargetId == null && existingTargetId == null) ||
-                                (newTargetId != null && newTargetId.equals(existingTargetId));
-          if (d.index == newDataset.index && targetMatch) {
-            exists = true;
-            break;
-          }
-        }
-        if (!exists) {
-          ctx._source.dataset.add(newDataset);
-        }
-      }
-
-      // Merge targets (by id)
-      if (params.targets != null && params.targets.size() > 0) {
-        if (ctx._source.targets == null) {
-          ctx._source.targets = [];
-        }
-        for (newTarget in params.targets) {
-          boolean exists = false;
-          for (t in ctx._source.targets) {
-            if (t.id == newTarget.id) {
-              exists = true;
-              break;
-            }
-          }
-          if (!exists) {
-            ctx._source.targets.add(newTarget);
-          }
-        }
-      }
-
-      ctx._source.timestamps.updated_at = params.updated_at;
-      if (params.finished_at != null) {
-        ctx._source.timestamps.finished_at = params.finished_at;
-      }
-      if (params.stopped_at != null) {
-        ctx._source.timestamps.stopped_at = params.stopped_at;
-      }
-      if (params.progress != null) {
-        ctx._source.progress = params.progress;
-      }
-      if (params.total != null) {
-        ctx._source.total = params.total;
-      }
-    `,
-    params: {
-      evaluations: batchEvaluation.evaluations,
-      dataset: batchEvaluation.dataset,
-      targets: batchEvaluation.targets ?? [],
-      updated_at: new Date().getTime(),
-      finished_at: batchEvaluation.timestamps.finished_at,
-      stopped_at: batchEvaluation.timestamps.stopped_at,
-      progress: batchEvaluation.progress,
-      total: batchEvaluation.total,
-    },
-  };
-
-  // Skip direct ES writes when:
-  // - featureEventSourcingEvaluationIngestion is ON (reactor handles it)
-  // - disableElasticSearchEvaluationWriting is ON (ES writes fully disabled)
-  if (
-    !project.featureEventSourcingEvaluationIngestion &&
-    !project.disableElasticSearchEvaluationWriting
-  ) {
-    const client = await esClient({ projectId: project.id });
-    await client.update({
-      index: BATCH_EVALUATION_INDEX.alias,
-      id,
-      body: {
-        script,
-        upsert: validatedBatchEvaluation,
-      },
-      retry_on_conflict: 5,
-    });
-  }
-
-  // Dual-write to ClickHouse via event sourcing (unconditional)
+  // Write to ClickHouse via event sourcing
   await dispatchToClickHouse(project, experiment.id, batchEvaluation);
 };
 
@@ -404,11 +282,11 @@ const dispatchToClickHouse = async (
       occurredAt: Date.now(),
     });
   } catch (error) {
-    logger.warn(
+    logger.error(
       { error, runId, projectId: project.id },
-      "Failed to dispatch startExperimentRun to CH — aborting CH dual-write for this batch",
+      "Failed to dispatch startExperimentRun to CH — aborting dispatch for this batch",
     );
-    return; // Without start, individual results would be orphaned
+    throw error; // CH is the sole data store — surface the failure
   }
 
   // Dispatch target and evaluator results — best-effort, log failures
@@ -486,33 +364,30 @@ const dispatchToClickHouse = async (
   }
 
   // Per-evaluation processing pipeline dispatches
-  if (project.featureEventSourcingEvaluationIngestion) {
+  {
     const app = getApp();
-    for (const evaluation of batchEvaluation.evaluations) {
-      // Use a deterministic ID so repeated API calls (e.g. SDK progress
-      // updates) don't create duplicate evaluation aggregates.
+    const evalPromises = batchEvaluation.evaluations.map((evaluation) => {
       const targetId = evaluation.target_id ?? "";
       const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
-      try {
-        await app.evaluations.reportEvaluation({
-          tenantId: project.id,
-          evaluationId,
-          evaluatorId: evaluation.evaluator,
-          evaluatorType: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
-          details: evaluation.details ?? undefined,
-          occurredAt: Date.now(),
-        });
-      } catch (err) {
+      return app.evaluations.reportEvaluation({
+        tenantId: project.id,
+        evaluationId,
+        evaluatorId: evaluation.evaluator,
+        evaluatorType: evaluation.evaluator,
+        evaluatorName: evaluation.name ?? undefined,
+        status: evaluation.status,
+        score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
+        passed: evaluation.passed ?? undefined,
+        label: evaluation.label ?? undefined,
+        details: evaluation.details ?? undefined,
+        occurredAt: Date.now(),
+      }).catch((err) => {
         logger.warn(
           { err, evaluationId, evaluator: evaluation.evaluator },
           "Failed to dispatch evaluation to evaluation processing pipeline",
         );
-      }
-    }
+      });
+    });
+    await Promise.all(evalPromises);
   }
 };

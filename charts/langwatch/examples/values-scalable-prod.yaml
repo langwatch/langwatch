@@ -1,0 +1,119 @@
+# values-scalable-prod.yaml — HA production with replicated ClickHouse + S3 cold storage.
+#
+# Same as:  -f overlays/size-ha.yaml -f overlays/access-ingress.yaml
+#           -f overlays/postgres-external.yaml -f overlays/redis-external.yaml
+#           -f overlays/cold-storage-s3.yaml
+#           + secrets and scheduling below
+#
+# Prerequisites — create secrets first:
+#   kubectl create secret generic langwatch-secrets -n langwatch \
+#     --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+#     --from-literal=cronApiKey=$(openssl rand -hex 16) \
+#     --from-literal=nextAuthSecret=$(openssl rand -hex 16)
+#   kubectl create secret generic clickhouse-password -n langwatch \
+#     --from-literal=password=$(openssl rand -hex 16)
+#   kubectl create secret generic langwatch-db -n langwatch \
+#     --from-literal=connectionString='postgresql://user:pass@host:5432/langwatch'
+#   kubectl create secret generic langwatch-redis -n langwatch \
+#     --from-literal=connectionString='redis://:pass@host:6379'
+#   kubectl create secret tls langwatch-tls -n langwatch \
+#     --cert=tls.crt --key=tls.key
+#
+# Usage:
+#   helm install langwatch . -f examples/values-scalable-prod.yaml -n langwatch --create-namespace
+
+# --- Secrets (no autogen in production) ---
+autogen: { enabled: false }
+secrets:
+  existingSecret: "langwatch-secrets"
+
+# --- overlays/size-ha.yaml ---
+app:
+  replicaCount: 3
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+  podDisruptionBudget: { minAvailable: 2 }
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
+
+workers:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+  podDisruptionBudget: { minAvailable: 2 }
+
+langwatch_nlp:
+  replicaCount: 2
+  resources:
+    requests: { cpu: 1, memory: 2Gi }
+    limits:   { cpu: 2, memory: 4Gi }
+
+langevals:
+  replicaCount: 2
+  resources:
+    requests: { cpu: 1, memory: 4Gi }
+    limits:   { cpu: 2, memory: 8Gi }
+
+ingress:
+  enabled: true
+  className: "nginx"
+  tls:
+    - secretName: langwatch-tls
+      hosts: [langwatch.example.com]
+  hosts:
+    - host: langwatch.example.com
+      http:
+        paths:
+          - { path: /, pathType: Prefix }
+
+# --- ClickHouse: replicated + cold storage + backups ---
+clickhouse:
+  chartManaged: true
+  replicas: 3
+  memory: 16Gi
+  cpu: 4
+  storage:
+    size: 300Gi
+    storageClass: "gp3"
+  objectStorage:
+    bucket: "langwatch-clickhouse"
+    region: "eu-central-1"
+    useEnvironmentCredentials: true  # IRSA
+  cold:
+    enabled: true
+    defaultTtlDays: 49
+  backup:
+    enabled: true
+    database: "langwatch"
+  auth:
+    existingSecret: "clickhouse-password"
+  scheduling:
+    tolerations:
+      - { key: dedicated, operator: Equal, value: clickhouse, effect: NoSchedule }
+
+# --- overlays/postgres-external.yaml ---
+postgresql:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef: { name: "langwatch-db", key: "connectionString" }
+
+# --- overlays/redis-external.yaml ---
+redis:
+  chartManaged: false
+  external:
+    architecture: standalone
+    connectionString:
+      secretKeyRef: { name: "langwatch-redis", key: "connectionString" }
+
+prometheus:
+  chartManaged: true
+  server:
+    retention: 60d
+    persistentVolume: { size: 50Gi }
+
+cronjobs: { enabled: true }

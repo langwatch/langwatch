@@ -1,0 +1,24 @@
+# cold-storage-s3.yaml — Enable S3 cold storage tiering and backups for ClickHouse.
+#
+# Requires chart-managed ClickHouse. For IRSA (recommended), ensure the
+# ClickHouse ServiceAccount has the right IAM role annotation.
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/size-ha.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     -f examples/overlays/cold-storage-s3.yaml \
+#     --set clickhouse.objectStorage.bucket=my-bucket \
+#     --set clickhouse.objectStorage.region=eu-central-1
+
+clickhouse:
+  objectStorage:
+    bucket: ""       # required — set via --set
+    region: ""       # required — set via --set
+    useEnvironmentCredentials: true  # IRSA / workload identity
+  cold:
+    enabled: true
+    defaultTtlDays: 49
+  backup:
+    enabled: true
+    database: "langwatch"

@@ -56,14 +56,6 @@ async function main() {
       s3AccessKeyId: null,
       s3SecretAccessKey: null,
       s3Bucket: null,
-      // Enable ClickHouse-based trace ingestion (matches new project defaults)
-      featureClickHouseDataSourceTraces: true,
-      featureEventSourcingTraceIngestion: true,
-      featureEventSourcingSimulationIngestion: true,
-      featureEventSourcingEvaluationIngestion: true,
-      disableElasticSearchTraceWriting: true,
-      disableElasticSearchEvaluationWriting: true,
-      disableElasticSearchSimulationWriting: true,
     },
   });
 

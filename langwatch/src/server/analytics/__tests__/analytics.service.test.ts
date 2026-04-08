@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AnalyticsService,
-  createAnalyticsService,
   getAnalyticsService,
   resetAnalyticsService,
 } from "../analytics.service";
@@ -94,33 +93,6 @@ function createFakePrisma() {
 }
 
 describe("AnalyticsService", () => {
-  describe("isComparisonModeEnabled", () => {
-    it("returns false when config does not enable comparison mode", () => {
-      const service = new AnalyticsService({
-        esService: createFakeBackend(),
-        chService: createFakeBackend(),
-        prisma: createFakePrisma(),
-      });
-
-      const result = service.isComparisonModeEnabled();
-
-      expect(result).toBe(false);
-    });
-
-    it("returns true when config enables comparison mode", () => {
-      const service = new AnalyticsService({
-        esService: createFakeBackend(),
-        chService: createFakeBackend(),
-        prisma: createFakePrisma(),
-        config: { comparisonModeEnabled: true },
-      });
-
-      const result = service.isComparisonModeEnabled();
-
-      expect(result).toBe(true);
-    });
-  });
-
   describe("getTimeseries", () => {
     const input = {
       projectId: "test-project",
@@ -137,12 +109,10 @@ describe("AnalyticsService", () => {
     };
 
     it("routes to CH service", async () => {
-      const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
       const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
-        esService: fakeES,
         chService: fakeCH,
         prisma: fakePrisma,
       });
@@ -151,18 +121,15 @@ describe("AnalyticsService", () => {
 
       expect(result.currentPeriod).toHaveLength(1);
       expect(fakeCH.getTimeseriesCalled).toBe(true);
-      expect(fakeES.getTimeseriesCalled).toBe(false);
     });
   });
 
   describe("getDataForFilter", () => {
     it("routes to CH service", async () => {
-      const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
       const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
-        esService: fakeES,
         chService: fakeCH,
         prisma: fakePrisma,
       });
@@ -177,18 +144,15 @@ describe("AnalyticsService", () => {
 
       expect(result.options).toHaveLength(1);
       expect(fakeCH.getDataForFilterCalled).toBe(true);
-      expect(fakeES.getDataForFilterCalled).toBe(false);
     });
   });
 
   describe("getTopUsedDocuments", () => {
     it("routes to CH service", async () => {
-      const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
       const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
-        esService: fakeES,
         chService: fakeCH,
         prisma: fakePrisma,
       });
@@ -202,18 +166,15 @@ describe("AnalyticsService", () => {
 
       expect(result.topDocuments).toHaveLength(1);
       expect(fakeCH.getTopUsedDocumentsCalled).toBe(true);
-      expect(fakeES.getTopUsedDocumentsCalled).toBe(false);
     });
   });
 
   describe("getFeedbacks", () => {
     it("routes to CH service", async () => {
-      const fakeES = createFakeBackend();
       const fakeCH = createFakeBackend({ available: true });
       const fakePrisma = createFakePrisma();
 
       const service = new AnalyticsService({
-        esService: fakeES,
         chService: fakeCH,
         prisma: fakePrisma,
       });
@@ -227,7 +188,6 @@ describe("AnalyticsService", () => {
 
       expect(result.events).toHaveLength(1);
       expect(fakeCH.getFeedbacksCalled).toBe(true);
-      expect(fakeES.getFeedbacksCalled).toBe(false);
     });
   });
 });
