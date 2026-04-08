@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Integration tests for useFilterParams write operations.
- * Tests setFilter, setFilters, clearFilters, setNegateFilters.
+ * Tests setFilter, clearFilters, setNegateFilters.
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
