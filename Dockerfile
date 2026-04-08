@@ -44,6 +44,8 @@ RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
 # Remove dev dependencies — not needed at runtime
 RUN cd langwatch && CI=true pnpm prune --prod
+# Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
+RUN cd langwatch && pnpm prisma generate
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
