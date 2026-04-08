@@ -176,6 +176,21 @@ Feature: Scenario Input Mapping
     Then the fieldMappings for "context" has type "value" with that text
 
   @integration
+  Scenario: Static value mapping round-trips through save and reload
+    Given a code agent with inputs "query" and "context"
+    And a stored mapping for "context" with type "value" and text "Use the KB"
+    When the agent editor opens the Scenario Mappings section
+    Then the row for "context" displays the static text "Use the KB"
+    And editing the row preserves the static value in the stored mappings
+
+  @integration
+  Scenario: HTTP agent editor renders Scenario Mappings section
+    Given a new HTTP agent editor drawer is open
+    When the editor renders
+    Then a "Scenario Mappings" section appears below the body template
+    And selecting a scenario source for an input updates the agent config's scenarioMappings on save
+
+  @integration
   Scenario: Mapping changes update form state on suite target
     Given a suite with a code agent target
     When the user maps "query" to "Scenario message"
