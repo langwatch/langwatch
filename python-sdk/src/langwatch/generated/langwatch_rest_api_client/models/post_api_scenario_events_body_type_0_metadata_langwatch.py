@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -18,12 +20,12 @@ class PostApiScenarioEventsBodyType0MetadataLangwatch:
     Attributes:
         target_reference_id (str):
         target_type (PostApiScenarioEventsBodyType0MetadataLangwatchTargetType):
-        simulation_suite_id (Union[Unset, str]):
+        simulation_suite_id (str | Unset):
     """
 
     target_reference_id: str
     target_type: PostApiScenarioEventsBodyType0MetadataLangwatchTargetType
-    simulation_suite_id: Union[Unset, str] = UNSET
+    simulation_suite_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

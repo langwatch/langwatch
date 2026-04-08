@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -15,11 +17,11 @@ T = TypeVar("T", bound="DatasetPostEntries")
 class DatasetPostEntries:
     """
     Attributes:
-        entries (list['DatasetPostEntriesEntriesItem']):  Example: [{'input': 'hi', 'output': 'Hello, how can I help you
+        entries (list[DatasetPostEntriesEntriesItem]):  Example: [{'input': 'hi', 'output': 'Hello, how can I help you
             today?'}].
     """
 
-    entries: list["DatasetPostEntriesEntriesItem"]
+    entries: list[DatasetPostEntriesEntriesItem]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

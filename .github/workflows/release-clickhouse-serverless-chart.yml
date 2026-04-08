@@ -1,0 +1,74 @@
+name: release-clickhouse-serverless-chart
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/clickhouse-serverless
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.12.0
+      - name: Lint and template
+        run: make template
+
+  release:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.12.0
+
+      - name: Install chart-releaser
+        run: |
+          VERSION=1.6.1
+          curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v${VERSION}/chart-releaser_${VERSION}_linux_amd64.tar.gz"
+          tar xzf cr.tar.gz cr
+          sudo mv cr /usr/local/bin/cr
+
+      - name: Package chart
+        run: |
+          mkdir -p .cr-release-packages
+          helm package charts/clickhouse-serverless -d .cr-release-packages
+
+      - name: Upload chart
+        run: |
+          cr upload \
+            --owner "${{ github.repository_owner }}" \
+            --git-repo "${{ github.event.repository.name }}" \
+            --package-path .cr-release-packages \
+            --skip-existing
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Update index
+        run: |
+          mkdir -p .cr-index
+          cr index \
+            --owner "${{ github.repository_owner }}" \
+            --git-repo "${{ github.event.repository.name }}" \
+            --package-path .cr-release-packages \
+            --push
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

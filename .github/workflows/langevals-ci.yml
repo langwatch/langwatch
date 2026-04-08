@@ -1,4 +1,4 @@
-name: LangEvals CI
+name: langevals-ci
 
 on:
   push:

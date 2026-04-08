@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,14 +21,14 @@ T = TypeVar("T", bound="PostApiScenarioEventsBodyType0Metadata")
 class PostApiScenarioEventsBodyType0Metadata:
     """
     Attributes:
-        name (Union[Unset, str]):
-        description (Union[Unset, str]):
-        langwatch (Union[Unset, PostApiScenarioEventsBodyType0MetadataLangwatch]):
+        name (str | Unset):
+        description (str | Unset):
+        langwatch (PostApiScenarioEventsBodyType0MetadataLangwatch | Unset):
     """
 
-    name: Union[Unset, str] = UNSET
-    description: Union[Unset, str] = UNSET
-    langwatch: Union[Unset, "PostApiScenarioEventsBodyType0MetadataLangwatch"] = UNSET
+    name: str | Unset = UNSET
+    description: str | Unset = UNSET
+    langwatch: PostApiScenarioEventsBodyType0MetadataLangwatch | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,7 +36,7 @@ class PostApiScenarioEventsBodyType0Metadata:
 
         description = self.description
 
-        langwatch: Union[Unset, dict[str, Any]] = UNSET
+        langwatch: dict[str, Any] | Unset = UNSET
         if not isinstance(self.langwatch, Unset):
             langwatch = self.langwatch.to_dict()
 
@@ -62,7 +64,7 @@ class PostApiScenarioEventsBodyType0Metadata:
         description = d.pop("description", UNSET)
 
         _langwatch = d.pop("langwatch", UNSET)
-        langwatch: Union[Unset, PostApiScenarioEventsBodyType0MetadataLangwatch]
+        langwatch: PostApiScenarioEventsBodyType0MetadataLangwatch | Unset
         if isinstance(_langwatch, Unset):
             langwatch = UNSET
         else:

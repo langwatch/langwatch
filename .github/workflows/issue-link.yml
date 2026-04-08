@@ -1,4 +1,4 @@
-name: 'Issue Links'
+name: issue-link
 on:
   pull_request:
     types: [opened]

@@ -1,4 +1,4 @@
-name: Remove low-risk-change label on new commits
+name: low-risk-label-reset
 
 on:
   pull_request:

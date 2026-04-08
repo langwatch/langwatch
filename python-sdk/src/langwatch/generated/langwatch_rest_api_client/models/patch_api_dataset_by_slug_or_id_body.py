@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,18 +21,18 @@ T = TypeVar("T", bound="PatchApiDatasetBySlugOrIdBody")
 class PatchApiDatasetBySlugOrIdBody:
     """
     Attributes:
-        name (Union[Unset, str]):
-        column_types (Union[Unset, list['PatchApiDatasetBySlugOrIdBodyColumnTypesItem']]):
+        name (str | Unset):
+        column_types (list[PatchApiDatasetBySlugOrIdBodyColumnTypesItem] | Unset):
     """
 
-    name: Union[Unset, str] = UNSET
-    column_types: Union[Unset, list["PatchApiDatasetBySlugOrIdBodyColumnTypesItem"]] = UNSET
+    name: str | Unset = UNSET
+    column_types: list[PatchApiDatasetBySlugOrIdBodyColumnTypesItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
-        column_types: Union[Unset, list[dict[str, Any]]] = UNSET
+        column_types: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.column_types, Unset):
             column_types = []
             for column_types_item_data in self.column_types:
@@ -56,12 +58,14 @@ class PatchApiDatasetBySlugOrIdBody:
         d = dict(src_dict)
         name = d.pop("name", UNSET)
 
-        column_types = []
         _column_types = d.pop("columnTypes", UNSET)
-        for column_types_item_data in _column_types or []:
-            column_types_item = PatchApiDatasetBySlugOrIdBodyColumnTypesItem.from_dict(column_types_item_data)
+        column_types: list[PatchApiDatasetBySlugOrIdBodyColumnTypesItem] | Unset = UNSET
+        if _column_types is not UNSET:
+            column_types = []
+            for column_types_item_data in _column_types:
+                column_types_item = PatchApiDatasetBySlugOrIdBodyColumnTypesItem.from_dict(column_types_item_data)
 
-            column_types.append(column_types_item)
+                column_types.append(column_types_item)
 
         patch_api_dataset_by_slug_or_id_body = cls(
             name=name,

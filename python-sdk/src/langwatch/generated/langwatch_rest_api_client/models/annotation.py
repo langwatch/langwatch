@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -13,26 +15,26 @@ T = TypeVar("T", bound="Annotation")
 class Annotation:
     """
     Attributes:
-        id (Union[Unset, str]): The ID of the annotation
-        project_id (Union[Unset, str]): The ID of the project
-        trace_id (Union[Unset, str]): The ID of the trace
-        comment (Union[Unset, str]): The comment of the annotation
-        is_thumbs_up (Union[Unset, bool]): The thumbs up status of the annotation
-        user_id (Union[Unset, str]): The ID of the user
-        created_at (Union[Unset, str]): The created at of the annotation
-        updated_at (Union[Unset, str]): The updated at of the annotation
-        email (Union[Unset, str]): The email of the user
+        id (str | Unset): The ID of the annotation
+        project_id (str | Unset): The ID of the project
+        trace_id (str | Unset): The ID of the trace
+        comment (str | Unset): The comment of the annotation
+        is_thumbs_up (bool | Unset): The thumbs up status of the annotation
+        user_id (str | Unset): The ID of the user
+        created_at (str | Unset): The created at of the annotation
+        updated_at (str | Unset): The updated at of the annotation
+        email (str | Unset): The email of the user
     """
 
-    id: Union[Unset, str] = UNSET
-    project_id: Union[Unset, str] = UNSET
-    trace_id: Union[Unset, str] = UNSET
-    comment: Union[Unset, str] = UNSET
-    is_thumbs_up: Union[Unset, bool] = UNSET
-    user_id: Union[Unset, str] = UNSET
-    created_at: Union[Unset, str] = UNSET
-    updated_at: Union[Unset, str] = UNSET
-    email: Union[Unset, str] = UNSET
+    id: str | Unset = UNSET
+    project_id: str | Unset = UNSET
+    trace_id: str | Unset = UNSET
+    comment: str | Unset = UNSET
+    is_thumbs_up: bool | Unset = UNSET
+    user_id: str | Unset = UNSET
+    created_at: str | Unset = UNSET
+    updated_at: str | Unset = UNSET
+    email: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

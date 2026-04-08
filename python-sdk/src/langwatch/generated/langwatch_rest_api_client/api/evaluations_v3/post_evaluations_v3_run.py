@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -14,29 +15,35 @@ from ...types import Response
 def _get_kwargs(
     slug: str,
 ) -> dict[str, Any]:
+
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": f"/api/evaluations/v3/{slug}/run",
+        "url": "/api/evaluations/v3/{slug}/run".format(
+            slug=quote(str(slug), safe=""),
+        ),
     }
 
     return _kwargs
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404 | None:
     if response.status_code == 200:
         response_200 = PostEvaluationsV3RunResponse200.from_dict(response.json())
 
         return response_200
+
     if response.status_code == 401:
         response_401 = PostEvaluationsV3RunResponse401.from_dict(response.json())
 
         return response_401
+
     if response.status_code == 404:
         response_404 = PostEvaluationsV3RunResponse404.from_dict(response.json())
 
         return response_404
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -44,8 +51,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -57,8 +64,8 @@ def _build_response(
 def sync_detailed(
     slug: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Response[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]:
+    client: AuthenticatedClient | Client,
+) -> Response[PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404]:
     """Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for
     polling, or streams SSE events if Accept: text/event-stream header is provided.
 
@@ -70,7 +77,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]
+        Response[PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -87,8 +94,8 @@ def sync_detailed(
 def sync(
     slug: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]:
+    client: AuthenticatedClient | Client,
+) -> PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404 | None:
     """Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for
     polling, or streams SSE events if Accept: text/event-stream header is provided.
 
@@ -100,7 +107,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]
+        PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404
     """
 
     return sync_detailed(
@@ -112,8 +119,8 @@ def sync(
 async def asyncio_detailed(
     slug: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Response[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]:
+    client: AuthenticatedClient | Client,
+) -> Response[PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404]:
     """Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for
     polling, or streams SSE events if Accept: text/event-stream header is provided.
 
@@ -125,7 +132,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]
+        Response[PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -140,8 +147,8 @@ async def asyncio_detailed(
 async def asyncio(
     slug: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-) -> Optional[Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]]:
+    client: AuthenticatedClient | Client,
+) -> PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404 | None:
     """Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for
     polling, or streams SSE events if Accept: text/event-stream header is provided.
 
@@ -153,7 +160,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostEvaluationsV3RunResponse200, PostEvaluationsV3RunResponse401, PostEvaluationsV3RunResponse404]
+        PostEvaluationsV3RunResponse200 | PostEvaluationsV3RunResponse401 | PostEvaluationsV3RunResponse404
     """
 
     return (

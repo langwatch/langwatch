@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import Any, Literal, TypeVar, Union, cast
+from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -20,9 +22,9 @@ class PostApiScenarioEventsBodyType3:
         scenario_run_id (str):
         message_id (str):
         role (str):
-        raw_event (Union[Unset, Any]):
-        scenario_set_id (Union[Unset, str]):  Default: 'default'.
-        message_index (Union[Unset, float]):
+        raw_event (Any | Unset):
+        scenario_set_id (str | Unset):  Default: 'default'.
+        message_index (float | Unset):
     """
 
     type_: Literal["SCENARIO_TEXT_MESSAGE_START"]
@@ -32,9 +34,9 @@ class PostApiScenarioEventsBodyType3:
     scenario_run_id: str
     message_id: str
     role: str
-    raw_event: Union[Unset, Any] = UNSET
-    scenario_set_id: Union[Unset, str] = "default"
-    message_index: Union[Unset, float] = UNSET
+    raw_event: Any | Unset = UNSET
+    scenario_set_id: str | Unset = "default"
+    message_index: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

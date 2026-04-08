@@ -17,6 +17,10 @@ from .delete_api_prompts_by_id_response_401 import DeleteApiPromptsByIdResponse4
 from .delete_api_prompts_by_id_response_404 import DeleteApiPromptsByIdResponse404
 from .delete_api_prompts_by_id_response_422 import DeleteApiPromptsByIdResponse422
 from .delete_api_prompts_by_id_response_500 import DeleteApiPromptsByIdResponse500
+from .delete_api_prompts_tags_by_tag_response_400 import DeleteApiPromptsTagsByTagResponse400
+from .delete_api_prompts_tags_by_tag_response_401 import DeleteApiPromptsTagsByTagResponse401
+from .delete_api_prompts_tags_by_tag_response_422 import DeleteApiPromptsTagsByTagResponse422
+from .delete_api_prompts_tags_by_tag_response_500 import DeleteApiPromptsTagsByTagResponse500
 from .delete_api_scenario_events_response_200 import DeleteApiScenarioEventsResponse200
 from .delete_api_scenario_events_response_400 import DeleteApiScenarioEventsResponse400
 from .delete_api_scenario_events_response_401 import DeleteApiScenarioEventsResponse401
@@ -219,6 +223,11 @@ from .get_api_prompts_response_400 import GetApiPromptsResponse400
 from .get_api_prompts_response_401 import GetApiPromptsResponse401
 from .get_api_prompts_response_422 import GetApiPromptsResponse422
 from .get_api_prompts_response_500 import GetApiPromptsResponse500
+from .get_api_prompts_tags_response_200_item import GetApiPromptsTagsResponse200Item
+from .get_api_prompts_tags_response_400 import GetApiPromptsTagsResponse400
+from .get_api_prompts_tags_response_401 import GetApiPromptsTagsResponse401
+from .get_api_prompts_tags_response_422 import GetApiPromptsTagsResponse422
+from .get_api_prompts_tags_response_500 import GetApiPromptsTagsResponse500
 from .get_api_trace_id_response_200 import GetApiTraceIdResponse200
 from .get_api_trace_id_response_200_error_type_0 import GetApiTraceIdResponse200ErrorType0
 from .get_api_trace_id_response_200_evaluations_item import GetApiTraceIdResponse200EvaluationsItem
@@ -298,6 +307,33 @@ from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_guardr
 )
 from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_guardrails_only_type_2_additional_property import (
     PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_label_type_1 import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasLabelType1,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_label_type_2 import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasLabelType2,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_label_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasLabelType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_passed_type_1 import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasPassedType1,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_passed_type_2 import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasPassedType2,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_passed_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasPassedType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_score_type_1 import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasScoreType1,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_score_type_2 import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasScoreType2,
+)
+from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_has_score_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasScoreType2AdditionalProperty,
 )
 from .post_api_analytics_timeseries_body_filters_evaluations_evaluator_id_type_1 import (
     PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdType1,
@@ -521,6 +557,33 @@ from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluat
 from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_2_additional_property import (
     PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2AdditionalProperty,
 )
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_2 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_2 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2AdditionalProperty,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_2 import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2,
+)
+from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_2_additional_property import (
+    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2AdditionalProperty,
+)
 from .post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
     PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
 )
@@ -741,6 +804,8 @@ from .post_api_analytics_timeseries_response_500 import PostApiAnalyticsTimeseri
 from .post_api_annotations_trace_id_body import PostApiAnnotationsTraceIdBody
 from .post_api_dataset_body import PostApiDatasetBody
 from .post_api_dataset_body_column_types_item import PostApiDatasetBodyColumnTypesItem
+from .post_api_dataset_by_slug_or_id_records_body import PostApiDatasetBySlugOrIdRecordsBody
+from .post_api_dataset_by_slug_or_id_records_body_entries_item import PostApiDatasetBySlugOrIdRecordsBodyEntriesItem
 from .post_api_evaluators_body import PostApiEvaluatorsBody
 from .post_api_evaluators_body_config import PostApiEvaluatorsBodyConfig
 from .post_api_evaluators_response_200 import PostApiEvaluatorsResponse200
@@ -1002,6 +1067,12 @@ from .post_api_prompts_response_401 import PostApiPromptsResponse401
 from .post_api_prompts_response_409 import PostApiPromptsResponse409
 from .post_api_prompts_response_422 import PostApiPromptsResponse422
 from .post_api_prompts_response_500 import PostApiPromptsResponse500
+from .post_api_prompts_tags_body import PostApiPromptsTagsBody
+from .post_api_prompts_tags_response_201 import PostApiPromptsTagsResponse201
+from .post_api_prompts_tags_response_400 import PostApiPromptsTagsResponse400
+from .post_api_prompts_tags_response_401 import PostApiPromptsTagsResponse401
+from .post_api_prompts_tags_response_422 import PostApiPromptsTagsResponse422
+from .post_api_prompts_tags_response_500 import PostApiPromptsTagsResponse500
 from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
 from .post_api_scenario_events_body_type_0_metadata_langwatch import PostApiScenarioEventsBodyType0MetadataLangwatch
@@ -1050,6 +1121,33 @@ from .post_api_traces_search_body_filters_evaluations_evaluator_id_guardrails_on
 )
 from .post_api_traces_search_body_filters_evaluations_evaluator_id_guardrails_only_type_2_additional_property import (
     PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2AdditionalProperty,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_1 import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_2 import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_label_type_2_additional_property import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2AdditionalProperty,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_1 import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_2 import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_passed_type_2_additional_property import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2AdditionalProperty,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_1 import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_2 import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2,
+)
+from .post_api_traces_search_body_filters_evaluations_evaluator_id_has_score_type_2_additional_property import (
+    PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2AdditionalProperty,
 )
 from .post_api_traces_search_body_filters_evaluations_evaluator_id_type_1 import (
     PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1,
@@ -1277,14 +1375,6 @@ from .put_api_prompts_by_id_body_outputs_item_json_schema import PutApiPromptsBy
 from .put_api_prompts_by_id_body_outputs_item_type import PutApiPromptsByIdBodyOutputsItemType
 from .put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
-from .put_api_prompts_by_id_labels_by_label_body import PutApiPromptsByIdLabelsByLabelBody
-from .put_api_prompts_by_id_labels_by_label_label import PutApiPromptsByIdLabelsByLabelLabel
-from .put_api_prompts_by_id_labels_by_label_response_200 import PutApiPromptsByIdLabelsByLabelResponse200
-from .put_api_prompts_by_id_labels_by_label_response_400 import PutApiPromptsByIdLabelsByLabelResponse400
-from .put_api_prompts_by_id_labels_by_label_response_401 import PutApiPromptsByIdLabelsByLabelResponse401
-from .put_api_prompts_by_id_labels_by_label_response_404 import PutApiPromptsByIdLabelsByLabelResponse404
-from .put_api_prompts_by_id_labels_by_label_response_422 import PutApiPromptsByIdLabelsByLabelResponse422
-from .put_api_prompts_by_id_labels_by_label_response_500 import PutApiPromptsByIdLabelsByLabelResponse500
 from .put_api_prompts_by_id_response_200 import PutApiPromptsByIdResponse200
 from .put_api_prompts_by_id_response_200_demonstrations import PutApiPromptsByIdResponse200Demonstrations
 from .put_api_prompts_by_id_response_200_demonstrations_inline import PutApiPromptsByIdResponse200DemonstrationsInline
@@ -1341,6 +1431,12 @@ from .put_api_prompts_by_id_tags_by_tag_response_401 import PutApiPromptsByIdTag
 from .put_api_prompts_by_id_tags_by_tag_response_404 import PutApiPromptsByIdTagsByTagResponse404
 from .put_api_prompts_by_id_tags_by_tag_response_422 import PutApiPromptsByIdTagsByTagResponse422
 from .put_api_prompts_by_id_tags_by_tag_response_500 import PutApiPromptsByIdTagsByTagResponse500
+from .put_api_prompts_tags_by_tag_body import PutApiPromptsTagsByTagBody
+from .put_api_prompts_tags_by_tag_response_200 import PutApiPromptsTagsByTagResponse200
+from .put_api_prompts_tags_by_tag_response_400 import PutApiPromptsTagsByTagResponse400
+from .put_api_prompts_tags_by_tag_response_401 import PutApiPromptsTagsByTagResponse401
+from .put_api_prompts_tags_by_tag_response_422 import PutApiPromptsTagsByTagResponse422
+from .put_api_prompts_tags_by_tag_response_500 import PutApiPromptsTagsByTagResponse500
 from .put_api_scenarios_by_id_body import PutApiScenariosByIdBody
 from .search_request import SearchRequest
 from .search_request_filters import SearchRequestFilters
@@ -1366,6 +1462,10 @@ __all__ = (
     "DeleteApiPromptsByIdResponse404",
     "DeleteApiPromptsByIdResponse422",
     "DeleteApiPromptsByIdResponse500",
+    "DeleteApiPromptsTagsByTagResponse400",
+    "DeleteApiPromptsTagsByTagResponse401",
+    "DeleteApiPromptsTagsByTagResponse422",
+    "DeleteApiPromptsTagsByTagResponse500",
     "DeleteApiScenarioEventsResponse200",
     "DeleteApiScenarioEventsResponse400",
     "DeleteApiScenarioEventsResponse401",
@@ -1482,6 +1582,11 @@ __all__ = (
     "GetApiPromptsResponse401",
     "GetApiPromptsResponse422",
     "GetApiPromptsResponse500",
+    "GetApiPromptsTagsResponse200Item",
+    "GetApiPromptsTagsResponse400",
+    "GetApiPromptsTagsResponse401",
+    "GetApiPromptsTagsResponse422",
+    "GetApiPromptsTagsResponse500",
     "GetApiTraceIdResponse200",
     "GetApiTraceIdResponse200ErrorType0",
     "GetApiTraceIdResponse200EvaluationsItem",
@@ -1544,6 +1649,15 @@ __all__ = (
     "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
     "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
     "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasLabelType1",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasLabelType2",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasLabelType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasPassedType1",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasPassedType2",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasPassedType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasScoreType1",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasScoreType2",
+    "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdHasScoreType2AdditionalProperty",
     "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdType1",
     "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdType2",
     "PostApiAnalyticsTimeseriesBodyFiltersEvaluationsEvaluatorIdType2AdditionalProperty",
@@ -1620,6 +1734,15 @@ __all__ = (
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2AdditionalProperty",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2",
+    "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2AdditionalProperty",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2",
     "PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType2AdditionalProperty",
@@ -1700,6 +1823,8 @@ __all__ = (
     "PostApiAnnotationsTraceIdBody",
     "PostApiDatasetBody",
     "PostApiDatasetBodyColumnTypesItem",
+    "PostApiDatasetBySlugOrIdRecordsBody",
+    "PostApiDatasetBySlugOrIdRecordsBodyEntriesItem",
     "PostApiEvaluatorsBody",
     "PostApiEvaluatorsBodyConfig",
     "PostApiEvaluatorsResponse200",
@@ -1823,6 +1948,12 @@ __all__ = (
     "PostApiPromptsResponse409",
     "PostApiPromptsResponse422",
     "PostApiPromptsResponse500",
+    "PostApiPromptsTagsBody",
+    "PostApiPromptsTagsResponse201",
+    "PostApiPromptsTagsResponse400",
+    "PostApiPromptsTagsResponse401",
+    "PostApiPromptsTagsResponse422",
+    "PostApiPromptsTagsResponse500",
     "PostApiScenarioEventsBodyType0",
     "PostApiScenarioEventsBodyType0Metadata",
     "PostApiScenarioEventsBodyType0MetadataLangwatch",
@@ -1856,6 +1987,15 @@ __all__ = (
     "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1",
     "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2",
     "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2AdditionalProperty",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType1",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasLabelType2AdditionalProperty",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType1",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasPassedType2AdditionalProperty",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType1",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2",
+    "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdHasScoreType2AdditionalProperty",
     "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType1",
     "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2",
     "PostApiTracesSearchBodyFiltersEvaluationsEvaluatorIdType2AdditionalProperty",
@@ -1974,14 +2114,6 @@ __all__ = (
     "PutApiPromptsByIdBodyOutputsItemType",
     "PutApiPromptsByIdBodySchemaVersion",
     "PutApiPromptsByIdBodyScope",
-    "PutApiPromptsByIdLabelsByLabelBody",
-    "PutApiPromptsByIdLabelsByLabelLabel",
-    "PutApiPromptsByIdLabelsByLabelResponse200",
-    "PutApiPromptsByIdLabelsByLabelResponse400",
-    "PutApiPromptsByIdLabelsByLabelResponse401",
-    "PutApiPromptsByIdLabelsByLabelResponse404",
-    "PutApiPromptsByIdLabelsByLabelResponse422",
-    "PutApiPromptsByIdLabelsByLabelResponse500",
     "PutApiPromptsByIdResponse200",
     "PutApiPromptsByIdResponse200Demonstrations",
     "PutApiPromptsByIdResponse200DemonstrationsInline",
@@ -2018,6 +2150,12 @@ __all__ = (
     "PutApiPromptsByIdTagsByTagResponse404",
     "PutApiPromptsByIdTagsByTagResponse422",
     "PutApiPromptsByIdTagsByTagResponse500",
+    "PutApiPromptsTagsByTagBody",
+    "PutApiPromptsTagsByTagResponse200",
+    "PutApiPromptsTagsByTagResponse400",
+    "PutApiPromptsTagsByTagResponse401",
+    "PutApiPromptsTagsByTagResponse422",
+    "PutApiPromptsTagsByTagResponse500",
     "PutApiScenariosByIdBody",
     "SearchRequest",
     "SearchRequestFilters",

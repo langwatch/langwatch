@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -17,18 +19,18 @@ T = TypeVar("T", bound="PutApiEvaluatorsByIdBody")
 class PutApiEvaluatorsByIdBody:
     """
     Attributes:
-        name (Union[Unset, str]):
-        config (Union[Unset, PutApiEvaluatorsByIdBodyConfig]):
+        name (str | Unset):
+        config (PutApiEvaluatorsByIdBodyConfig | Unset):
     """
 
-    name: Union[Unset, str] = UNSET
-    config: Union[Unset, "PutApiEvaluatorsByIdBodyConfig"] = UNSET
+    name: str | Unset = UNSET
+    config: PutApiEvaluatorsByIdBodyConfig | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
-        config: Union[Unset, dict[str, Any]] = UNSET
+        config: dict[str, Any] | Unset = UNSET
         if not isinstance(self.config, Unset):
             config = self.config.to_dict()
 
@@ -50,7 +52,7 @@ class PutApiEvaluatorsByIdBody:
         name = d.pop("name", UNSET)
 
         _config = d.pop("config", UNSET)
-        config: Union[Unset, PutApiEvaluatorsByIdBodyConfig]
+        config: PutApiEvaluatorsByIdBodyConfig | Unset
         if isinstance(_config, Unset):
             config = UNSET
         else:

@@ -1,0 +1,195 @@
+name: publish-docker-app
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Custom image tag (default: "next")'
+        required: false
+        default: 'next'
+
+jobs:
+  extract-version:
+    runs-on: ubuntu-latest
+    if: >-
+      startsWith(github.event.release.tag_name, 'langwatch@')
+      || github.event_name == 'workflow_dispatch'
+    outputs:
+      short_hash: ${{ steps.extract_version.outputs.short_hash }}
+      version: ${{ steps.extract_version.outputs.version }}
+      is_release: ${{ steps.extract_version.outputs.is_release }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Extract version and short hash
+        id: extract_version
+        run: |
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          echo "short_hash=${SHORT_HASH}" >> $GITHUB_OUTPUT
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/langwatch@v}
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+
+            # Draft releases must use a semver prerelease suffix (e.g., 1.0.0-rc.1) or "next"
+            if [ "${{ github.event.release.draft }}" = "true" ]; then
+              if [ "${VERSION}" != "next" ] && ! echo "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-.+'; then
+                echo "::error::Draft releases require a semver prerelease suffix (e.g., 1.0.0-rc.1) or 'next'"
+                exit 1
+              fi
+            fi
+          else
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-push:
+    needs: extract-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: langwatch
+            dockerfile: Dockerfile
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - image: langwatch
+            dockerfile: Dockerfile
+            platform: linux/arm64/v8
+            runner: arm64-runner-32gb
+            arch: arm64
+          - image: langwatch_nlp
+            dockerfile: Dockerfile.langwatch_nlp
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - image: langwatch_nlp
+            dockerfile: Dockerfile.langwatch_nlp
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
+          - image: langevals
+            dockerfile: Dockerfile.langevals
+            platform: linux/amd64
+            runner: ubuntu-latest
+            arch: amd64
+          - image: langevals
+            dockerfile: Dockerfile.langevals
+            platform: linux/arm64/v8
+            runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.image }} (${{ matrix.arch }})
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          tags: |
+            langwatch/${{ matrix.image }}:${{ needs.extract-version.outputs.short_hash }}-${{ matrix.arch }}
+
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: [extract-version, build-and-push]
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create multi-arch manifests (short hash)
+        run: |
+          HASH="${{ needs.extract-version.outputs.short_hash }}"
+          for IMAGE in langwatch langwatch_nlp langevals; do
+            docker buildx imagetools create -t langwatch/${IMAGE}:${HASH} \
+              langwatch/${IMAGE}:${HASH}-amd64 \
+              langwatch/${IMAGE}:${HASH}-arm64
+          done
+
+      - name: Create multi-arch manifests (custom tag)
+        if: needs.extract-version.outputs.is_release != 'true'
+        env:
+          TAG: ${{ inputs.tag || 'next' }}
+          HASH: ${{ needs.extract-version.outputs.short_hash }}
+        run: |
+          for IMAGE in langwatch langwatch_nlp langevals; do
+            docker buildx imagetools create -t langwatch/${IMAGE}:${TAG} \
+              langwatch/${IMAGE}:${HASH}-amd64 \
+              langwatch/${IMAGE}:${HASH}-arm64
+          done
+
+      - name: Create multi-arch manifests (version + latest)
+        if: needs.extract-version.outputs.is_release == 'true'
+        run: |
+          VERSION="${{ needs.extract-version.outputs.version }}"
+          HASH="${{ needs.extract-version.outputs.short_hash }}"
+
+          for IMAGE in langwatch langwatch_nlp langevals; do
+            # Version tag
+            docker buildx imagetools create -t langwatch/${IMAGE}:${VERSION} \
+              langwatch/${IMAGE}:${HASH}-amd64 \
+              langwatch/${IMAGE}:${HASH}-arm64
+
+            # Latest tag (skip for prerelease versions with a hyphen suffix)
+            if ! echo "${VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-.+'; then
+              docker buildx imagetools create -t langwatch/${IMAGE}:latest \
+                langwatch/${IMAGE}:${HASH}-amd64 \
+                langwatch/${IMAGE}:${HASH}-arm64
+            fi
+          done
+
+      - name: Delete temporary architecture-specific tags
+        run: |
+          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+            -d '{"username": "${{ secrets.DOCKERHUB_USERNAME }}", "password": "${{ secrets.DOCKERHUB_TOKEN }}"}' \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+
+          HASH="${{ needs.extract-version.outputs.short_hash }}"
+          for IMAGE in langwatch langwatch_nlp langevals; do
+            for ARCH in amd64 arm64; do
+              curl -s -X DELETE \
+                -H "Authorization: JWT ${TOKEN}" \
+                "https://hub.docker.com/v2/repositories/langwatch/${IMAGE}/tags/${HASH}-${ARCH}/"
+            done
+          done
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [extract-version, create-manifest]
+    if: needs.extract-version.outputs.is_release == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            CHANGELOG.md \
+            "LangWatch" \
+            "${{ needs.extract-version.outputs.version }}"
