@@ -322,15 +322,9 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
-                        {orgBinding ? (
-                          <Badge colorPalette={roleBadgeColor(orgBinding.role)} size="sm">
-                            {orgBinding.customRoleName ?? orgBinding.role}
-                          </Badge>
-                        ) : (
-                          <Badge colorPalette="gray" size="sm">
-                            {roleLabelMap.get(member.role) ?? member.role}
-                          </Badge>
-                        )}
+                        <Badge colorPalette={roleBadgeColor(member.role)} size="sm">
+                          {orgBinding?.customRoleName ?? roleLabelMap.get(member.role) ?? member.role}
+                        </Badge>
                       </Table.Cell>
                       <Table.Cell>
                         <MemberAccessDisplay

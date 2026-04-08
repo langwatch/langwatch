@@ -104,10 +104,12 @@ export default function UserDetailsPage() {
             type: "success",
             duration: 2000,
           });
-          void apiContext.organization.getMemberById.invalidate();
-          void apiContext.organization.getAll.invalidate();
-          void apiContext.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
-          void apiContext.roleBinding.listForOrg.invalidate();
+          void Promise.all([
+            apiContext.organization.getMemberById.invalidate(),
+            apiContext.organization.getAll.invalidate(),
+            apiContext.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
+            apiContext.roleBinding.listForOrg.invalidate(),
+          ]);
         },
         onError: () => {
           toaster.create({
@@ -229,10 +231,12 @@ export default function UserDetailsPage() {
         type: "success",
         duration: 2500,
       });
-      await apiContext.organization.getMemberById.invalidate();
-      await apiContext.organization.getAll.invalidate();
-      void apiContext.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
-      void apiContext.roleBinding.listForOrg.invalidate();
+      await Promise.all([
+        apiContext.organization.getMemberById.invalidate(),
+        apiContext.organization.getAll.invalidate(),
+        apiContext.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
+        apiContext.roleBinding.listForOrg.invalidate(),
+      ]);
     } catch (error) {
       if (isHandledByGlobalHandler(error)) return;
       toaster.create({

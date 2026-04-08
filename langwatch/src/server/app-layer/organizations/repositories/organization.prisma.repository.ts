@@ -513,7 +513,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         });
       } else {
-        // EXTERNAL users have no org-level binding
+        // EXTERNAL (Lite Member) users have no org-level binding
         await tx.roleBinding.deleteMany({
           where: {
             organizationId,
