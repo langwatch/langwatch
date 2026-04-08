@@ -107,21 +107,10 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
     ui: createInitialUIState(),
   };
 
-  // Fetch project feature flag for event sourcing routing
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      featureEventSourcingEvaluationIngestion: true,
-      disableElasticSearchEvaluationWriting: true,
-    },
-  });
-
   // Stream SSE events
   return streamSSE(c, async (stream) => {
     try {
-      // Only save to Elasticsearch for full runs (not single cell/row/target executions)
       const isFullRun = request.scope.type === "full";
-      const shouldSaveToEs = !!request.experimentId && isFullRun;
 
       const orchestrator = runOrchestrator({
         projectId,
@@ -133,10 +122,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         loadedPrompts,
         loadedAgents,
         loadedEvaluators,
-        saveToEs: shouldSaveToEs,
         concurrency: request.concurrency,
-        featureEventSourcingEvaluationIngestion: project?.featureEventSourcingEvaluationIngestion ?? false,
-        disableElasticSearchEvaluationWriting: project?.disableElasticSearchEvaluationWriting ?? false,
       });
 
       for await (const event of orchestrator) {

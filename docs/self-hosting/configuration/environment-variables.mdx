@@ -1,0 +1,201 @@
+---
+title: Environment Variables
+description: "Complete environment variable reference for LangWatch self-hosting"
+---
+
+LangWatch is configured through environment variables. How you set them depends on your deployment method:
+
+- **Docker Compose**: Set in your `.env` file
+- **Helm chart**: Set via `values.yaml` (the chart maps values to env vars automatically)
+- **Raw Kubernetes**: Set directly in your Deployment manifests
+
+<Tip>
+When using the Helm chart, you rarely need to set environment variables directly. The `values.yaml` file provides a structured way to configure everything. See the [Helm chart mapping table](#helm-chart-mapping) below.
+</Tip>
+
+## Core Configuration
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes | — |
+| `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | — |
+| `REDIS_URL` | Redis connection string | Yes | — |
+| `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
+| `BASE_HOST` | Internal base URL for the application | Yes | — |
+| `NEXTAUTH_URL` | Public URL for authentication callbacks | Yes | Same as `BASE_HOST` |
+| `START_WORKERS` | Run workers in-process (`true`/`false`) | No | `false` |
+
+## Secrets
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `API_TOKEN_JWT_SECRET` | JWT signing key for API tokens | Yes |
+| `CREDENTIALS_SECRET` | Encryption key for stored API keys and credentials | Yes |
+| `NEXTAUTH_SECRET` | Session encryption key for NextAuth.js | Yes |
+| `CRON_API_KEY` | API key for authenticating internal cron job HTTP calls | Yes |
+
+<Warning>
+Never commit secrets to version control. In production, use a secrets manager (AWS Secrets Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
+</Warning>
+
+## Authentication
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azureAd`, `cognito`, `okta`, `auth0` | `email` |
+
+### SSO Provider Variables
+
+Each SSO provider requires specific variables. See [SSO Configuration](/self-hosting/configuration/sso) for detailed setup guides.
+
+**Auth0:**
+
+| Variable | Description |
+|----------|-------------|
+| `AUTH0_CLIENT_ID` | Auth0 application client ID |
+| `AUTH0_CLIENT_SECRET` | Auth0 application client secret |
+| `AUTH0_ISSUER` | Auth0 issuer URL (e.g. `https://your-tenant.auth0.com`) |
+
+**Azure AD:**
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
+| `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
+| `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
+
+**AWS Cognito:**
+
+| Variable | Description |
+|----------|-------------|
+| `COGNITO_CLIENT_ID` | Cognito user pool client ID |
+| `COGNITO_CLIENT_SECRET` | Cognito user pool client secret |
+| `COGNITO_ISSUER` | Cognito issuer URL |
+
+**GitHub:**
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
+
+**GitLab:**
+
+| Variable | Description |
+|----------|-------------|
+| `GITLAB_CLIENT_ID` | GitLab OAuth app client ID |
+| `GITLAB_CLIENT_SECRET` | GitLab OAuth app client secret |
+
+**Google:**
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+
+**Okta:**
+
+| Variable | Description |
+|----------|-------------|
+| `OKTA_CLIENT_ID` | Okta application client ID |
+| `OKTA_CLIENT_SECRET` | Okta application client secret |
+| `OKTA_ISSUER` | Okta issuer URL |
+
+## Services
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LANGWATCH_NLP_SERVICE` | URL of the NLP service | `http://langwatch-nlp:5561` |
+| `LANGEVALS_ENDPOINT` | URL of the LangEvals service | `http://langevals:5562` |
+
+## Object Storage (S3)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATASET_OBJECT_STORAGE_ENABLED` | Enable S3 for dataset storage | `false` |
+| `DATASET_OBJECT_STORAGE_PROVIDER` | Storage provider (`awsS3`) | `awsS3` |
+| `DATASET_OBJECT_STORAGE_BUCKET` | S3 bucket name | `langwatch-dataset` |
+| `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, etc.) | — |
+| `S3_ACCESS_KEY_ID` | S3 access key ID | — |
+| `S3_SECRET_ACCESS_KEY` | S3 secret access key | — |
+| `S3_KEY_SALT` | Optional key salt for S3 object keys | — |
+
+<Note>
+When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need to set S3 access keys. The pod's service account will assume the IAM role automatically.
+</Note>
+
+## Email
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EMAIL_ENABLED` | Enable email notifications | `false` |
+| `EMAIL_PROVIDER` | Email provider (`sendgrid`) | `sendgrid` |
+| `SENDGRID_API_KEY` | SendGrid API key | — |
+| `EMAIL_DEFAULT_FROM` | Default "from" address | — |
+
+## Evaluator Providers
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AZURE_OPENAI_EVALUATOR_ENABLED` | Enable Azure OpenAI for evaluations | `false` |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL | — |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | — |
+| `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
+| `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | — |
+
+## Feature Flags
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
+| `DISABLE_PII_REDACTION` | Disable automatic PII redaction in traces | `false` |
+| `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup | `false` |
+
+## Telemetry
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
+| `SENTRY_DSN` | Sentry DSN for error tracking | — |
+| `METRICS_API_KEY` | API key for metrics collection | — |
+
+## Helm Chart Mapping {#helm-chart-mapping}
+
+When using the Helm chart, configuration is set in `values.yaml` rather than environment variables directly. Here's how key values map:
+
+| Helm Value | Environment Variable |
+|------------|---------------------|
+| `app.http.baseHost` | `BASE_HOST` |
+| `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
+| `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
+| `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
+| `app.cronApiKey.value` | `CRON_API_KEY` |
+| `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
+| `app.features.disablePiiRedaction` | `DISABLE_PII_REDACTION` |
+| `app.email.enabled` | `EMAIL_ENABLED` |
+| `app.email.provider` | `EMAIL_PROVIDER` |
+| `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
+| `app.evaluators.azureOpenAI.enabled` | `AZURE_OPENAI_EVALUATOR_ENABLED` |
+| `app.evaluators.azureOpenAI.endpoint.value` | `AZURE_OPENAI_EVALUATOR_ENDPOINT` |
+| `app.evaluators.azureOpenAI.apiKey.value` | `AZURE_OPENAI_EVALUATOR_API_KEY` |
+| `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
+| `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
+| `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
+| `app.datasetObjectStorage.enabled` | `DATASET_OBJECT_STORAGE_ENABLED` |
+| `app.datasetObjectStorage.bucket` | `DATASET_OBJECT_STORAGE_BUCKET` |
+| `postgresql.external.connectionString.value` | `DATABASE_URL` |
+| `redis.external.connectionString.value` | `REDIS_URL` |
+| `workers.enabled` | Inverse of `START_WORKERS` |
+
+<Tip>
+For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:
+
+```yaml
+app:
+  credentialsEncryptionKey:
+    secretKeyRef:
+      name: langwatch-secrets
+      key: credentialsEncryptionKey
+```
+</Tip>

@@ -1,0 +1,219 @@
+---
+title: SSO Configuration
+description: "Set up Single Sign-On for LangWatch with your identity provider"
+---
+
+LangWatch supports SSO via NextAuth.js. Choose one provider and configure it as described below.
+
+## Supported Providers
+
+| Provider | `NEXTAUTH_PROVIDER` value | Requires |
+|----------|--------------------------|----------|
+| Email/Password | `email` (default) | Nothing extra |
+| Auth0 | `auth0` | Client ID, Client Secret, Issuer |
+| Azure AD | `azureAd` | Client ID, Client Secret, Tenant ID |
+| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
+| GitHub | `github` | Client ID, Client Secret |
+| GitLab | `gitlab` | Client ID, Client Secret |
+| Google | `google` | Client ID, Client Secret |
+| Okta | `okta` | Client ID, Client Secret, Issuer |
+
+## OAuth Redirect URL
+
+When configuring your identity provider, set the redirect/callback URL to:
+
+```
+https://your-langwatch-domain.com/api/auth/callback/{provider}
+```
+
+Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, or `okta`.
+
+## Provider Setup
+
+### Auth0
+
+1. Create an application in the [Auth0 Dashboard](https://manage.auth0.com/)
+2. Set **Allowed Callback URLs** to `https://your-domain.com/api/auth/callback/auth0`
+3. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: auth0
+    providers:
+      auth0:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: auth0ClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: auth0ClientSecret }
+        issuer:
+          value: "https://your-tenant.auth0.com"
+```
+
+Or via environment variables:
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `auth0` |
+| `AUTH0_CLIENT_ID` | Your Auth0 client ID |
+| `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
+| `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
+
+### Azure AD
+
+1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
+2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
+3. Create a client secret under **Certificates & secrets**
+4. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: azureAd
+    providers:
+      azureAd:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: azureClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: azureClientSecret }
+        tenantId:
+          value: "your-tenant-id"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `azureAd` |
+| `AZURE_AD_CLIENT_ID` | Application (client) ID |
+| `AZURE_AD_CLIENT_SECRET` | Client secret value |
+| `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
+
+### AWS Cognito
+
+1. Create a User Pool in [AWS Cognito](https://console.aws.amazon.com/cognito/)
+2. Add an app client with a **Callback URL**: `https://your-domain.com/api/auth/callback/cognito`
+3. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: cognito
+    providers:
+      cognito:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
+        issuer:
+          value: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_XXXXX"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `cognito` |
+| `COGNITO_CLIENT_ID` | User pool app client ID |
+| `COGNITO_CLIENT_SECRET` | User pool app client secret |
+| `COGNITO_ISSUER` | `https://cognito-idp.{region}.amazonaws.com/{userPoolId}` |
+
+### GitHub
+
+1. Create an OAuth App in [GitHub Developer Settings](https://github.com/settings/developers)
+2. Set **Authorization callback URL** to `https://your-domain.com/api/auth/callback/github`
+3. Configure:
+
+```yaml
+app:
+  nextAuth:
+    provider: github
+    providers:
+      github:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: githubClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: githubClientSecret }
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `github` |
+| `GITHUB_CLIENT_ID` | OAuth app client ID |
+| `GITHUB_CLIENT_SECRET` | OAuth app client secret |
+
+### GitLab
+
+1. Create an application in [GitLab > Applications](https://gitlab.com/-/profile/applications)
+2. Set **Redirect URI** to `https://your-domain.com/api/auth/callback/gitlab`
+3. Select scopes: `read_user`, `openid`, `profile`, `email`
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `gitlab` |
+| `GITLAB_CLIENT_ID` | Application ID |
+| `GITLAB_CLIENT_SECRET` | Application secret |
+
+### Google
+
+1. Create credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Add an **Authorized redirect URI**: `https://your-domain.com/api/auth/callback/google`
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `google` |
+| `GOOGLE_CLIENT_ID` | OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
+
+### Okta
+
+1. Create an application in [Okta Admin Console](https://developer.okta.com/)
+2. Set **Sign-in redirect URI** to `https://your-domain.com/api/auth/callback/okta`
+
+```yaml
+app:
+  nextAuth:
+    provider: okta
+    providers:
+      okta:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oktaClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oktaClientSecret }
+        issuer:
+          value: "https://your-org.okta.com"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `okta` |
+| `OKTA_CLIENT_ID` | Client ID |
+| `OKTA_CLIENT_SECRET` | Client secret |
+| `OKTA_ISSUER` | `https://your-org.okta.com` |
+
+## Domain-to-Organization Mapping
+
+For on-premises deployments with SSO, map email domains to organizations:
+
+```sql
+-- Connect to PostgreSQL and run:
+UPDATE "Organization"
+SET "ssoProvider" = 'okta',
+    "ssoEmailDomain" = 'yourcompany.com'
+WHERE "id" = 'your-org-id';
+```
+
+This ensures users with `@yourcompany.com` emails are automatically associated with the correct organization.
+
+## Migrating from Email/Password to SSO
+
+1. Enable SSO by setting the provider configuration above
+2. Flag existing email/password users for SSO migration:
+
+```sql
+UPDATE "User"
+SET "pendingSsoSetup" = true
+WHERE "email" LIKE '%@yourcompany.com';
+```
+
+3. When flagged users next sign in via SSO, their accounts are automatically linked
+
+<Note>
+Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.
+</Note>

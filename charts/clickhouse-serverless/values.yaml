@@ -1,6 +1,6 @@
 image:
   repository: langwatch/clickhouse-serverless
-  tag: "0.1.0"  # x-release-please-version
+  tag: "0.2.0"  # x-release-please-version
   pullPolicy: IfNotPresent
 
 # Primary inputs — the image auto-tunes all ClickHouse parameters from these
@@ -22,12 +22,13 @@ objectStorage:
   credentials:
     secretKeyRef:
       name: ""                     # K8s secret with S3 access key + secret key
-      accessKeyKey: "accessKey"
-      secretKeyKey: "secretKey"
+      accessKeyId: "accessKey"
+      secretAccessKey: "secretKey"
 
 # Cold storage: tiered hot→cold data movement (requires objectStorage)
 cold:
   enabled: false
+  defaultTtlDays: 49  # App-side TTL before data moves to cold (must be divisible by 7)
 
 # Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
 backup:

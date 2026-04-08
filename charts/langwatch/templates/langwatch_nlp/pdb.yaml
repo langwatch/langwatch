@@ -6,6 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ $.Release.Name }}-langwatch-nlp
     app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: langwatch-nlp
     {{- include "langwatch.labels" $ | nindent 4 }}
 spec:
   selector:
