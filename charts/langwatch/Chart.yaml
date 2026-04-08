@@ -1,5 +1,5 @@
 apiVersion: v2
-name: langwatch-helm
+name: langwatch
 description: Helm chart for LangWatch application
 type: application
 appVersion: 3.0.0-prerelease.2
