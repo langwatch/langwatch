@@ -1,8 +1,28 @@
-import { ClientOnly, CodeBlock, createShikiAdapter } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
+import { Highlight, Prism } from "prism-react-renderer";
 import type React from "react";
-import { useMemo } from "react";
-import type { HighlighterGeneric } from "shiki";
+import type { PrismTheme } from "prism-react-renderer";
 import { useColorMode } from "~/components/ui/color-mode";
+
+const lightTheme: PrismTheme = {
+  plain: { color: "#24292e", backgroundColor: "transparent" },
+  styles: [
+    { types: ["property"], style: { color: "#005cc5" } },
+    { types: ["string", "attr-value"], style: { color: "#032f62" } },
+    { types: ["number", "boolean", "null"], style: { color: "#e36209" } },
+    { types: ["punctuation", "operator"], style: { color: "#24292e" } },
+  ],
+};
+
+const darkTheme: PrismTheme = {
+  plain: { color: "#e1e4e8", backgroundColor: "transparent" },
+  styles: [
+    { types: ["property"], style: { color: "#79b8ff" } },
+    { types: ["string", "attr-value"], style: { color: "#9ecbff" } },
+    { types: ["number", "boolean", "null"], style: { color: "#ffab70" } },
+    { types: ["punctuation", "operator"], style: { color: "#e1e4e8" } },
+  ],
+};
 
 export function JsonHighlight({
   code,
@@ -10,76 +30,34 @@ export function JsonHighlight({
   code: string;
 }): React.ReactElement {
   const { colorMode } = useColorMode();
-
-  const shikiAdapter = useMemo(
-    () =>
-      createShikiAdapter<HighlighterGeneric<any, any>>({
-        async load() {
-          const { createHighlighter } = await import("shiki");
-          return createHighlighter({
-            langs: ["json"],
-            themes: ["github-dark", "github-light"],
-          });
-        },
-        theme: colorMode === "dark" ? "github-dark" : "github-light",
-      }),
-    [colorMode],
-  );
+  const theme = colorMode === "dark" ? darkTheme : lightTheme;
 
   return (
-    <CodeBlock.AdapterProvider value={shikiAdapter}>
-      <ClientOnly
-        fallback={
-          <pre
-            style={{
-              padding: "16px 48px 16px 20px",
-              fontSize: "12.5px",
-              fontFamily:
-                "'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace",
-              lineHeight: "1.8",
-              overflowX: "hidden",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-              letterSpacing: "0.01em",
-              fontWeight: "500",
-            }}
-          >
-            {code}
-          </pre>
-        }
-      >
-        {() => (
-          <CodeBlock.Root
-            code={code}
-            language="json"
-            size="sm"
-            bg="transparent"
-            border="none"
-            borderRadius="0"
-          >
-            <CodeBlock.Content
-              overflowX="hidden"
-              css={{
-                "& pre": {
-                  padding: "16px 48px 16px 20px",
-                  fontSize: "12.5px",
-                  fontFamily:
-                    "'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace",
-                  lineHeight: "1.8",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-all",
-                  letterSpacing: "0.01em",
-                  background: "transparent",
-                },
-              }}
-            >
-              <CodeBlock.Code>
-                <CodeBlock.CodeText />
-              </CodeBlock.Code>
-            </CodeBlock.Content>
-          </CodeBlock.Root>
-        )}
-      </ClientOnly>
-    </CodeBlock.AdapterProvider>
+    <Highlight prism={Prism} theme={theme} code={code} language="json">
+      {({ tokens, getLineProps, getTokenProps }) => (
+        <Box
+          as="pre"
+          px={5}
+          py={4}
+          pr={12}
+          fontSize="12.5px"
+          fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
+          lineHeight="1.8"
+          overflowX="hidden"
+          whiteSpace="pre-wrap"
+          wordBreak="break-all"
+          letterSpacing="0.01em"
+          bg="transparent"
+        >
+          {tokens.map((line, i) => (
+            <div key={i} {...getLineProps({ line })}>
+              {line.map((token, key) => (
+                <span key={key} {...getTokenProps({ token })} />
+              ))}
+            </div>
+          ))}
+        </Box>
+      )}
+    </Highlight>
   );
 }
