@@ -7,6 +7,8 @@ import {
 import { ScimService } from "~/server/scim/scim.service";
 import { scimCreateUserRequestSchema, isScimError } from "~/server/scim/scim.types";
 
+const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
+
 export async function GET(request: NextRequest) {
   const auth = await authenticateScimRequest(request);
   if (isAuthError(auth)) return auth;
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
     count,
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, { headers: SCIM_HEADERS });
 }
 
 export async function POST(request: NextRequest) {
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
         status: "400",
         detail: "Invalid JSON in request body",
       },
-      { status: 400 }
+      { status: 400, headers: SCIM_HEADERS }
     );
   }
 
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
         status: "400",
         detail: parsed.error.message,
       },
-      { status: 400 }
+      { status: 400, headers: SCIM_HEADERS }
     );
   }
 
@@ -66,9 +68,8 @@ export async function POST(request: NextRequest) {
   });
 
   if (isScimError(result)) {
-    return NextResponse.json(result, { status: parseInt(result.status, 10) });
+    return NextResponse.json(result, { status: parseInt(result.status, 10), headers: SCIM_HEADERS });
   }
 
-  return NextResponse.json(result, { status: 201 });
+  return NextResponse.json(result, { status: 201, headers: SCIM_HEADERS });
 }
-

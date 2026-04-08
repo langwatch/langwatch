@@ -27,18 +27,20 @@ export class ScimGroupService {
     filter,
     startIndex = 1,
     count = 100,
+    excludeMembers = false,
   }: {
     organizationId: string;
     filter?: string;
     startIndex?: number;
     count?: number;
+    excludeMembers?: boolean;
   }): Promise<ScimListResponse<ScimGroup>> {
     const displayNameFilter = this.parseDisplayNameFilter(filter);
 
     const where = {
       organizationId,
       scimSource: { not: null as string | null },
-      ...(displayNameFilter ? { name: displayNameFilter } : {}),
+      ...(displayNameFilter ? { name: { equals: displayNameFilter, mode: 'insensitive' as const } } : {}),
     };
 
     const [groups, totalCount] = await Promise.all([
@@ -61,16 +63,18 @@ export class ScimGroupService {
       totalResults: totalCount,
       startIndex,
       itemsPerPage: count,
-      Resources: groups.map((g) => this.toScimGroup(g, g.members)),
+      Resources: groups.map((g) => this.toScimGroup(g, g.members, excludeMembers)),
     };
   }
 
   async getGroup({
     externalScimId,
     organizationId,
+    excludeMembers = false,
   }: {
     externalScimId: string;
     organizationId: string;
+    excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
     const group = await this.findGroup({ externalScimId, organizationId });
     if (!group) return this.scimError({ status: "404", detail: "Group not found" });
@@ -80,7 +84,7 @@ export class ScimGroupService {
       include: { user: { select: { id: true, email: true, name: true } } },
     });
 
-    return this.toScimGroup(group, members);
+    return this.toScimGroup(group, members, excludeMembers);
   }
 
   async createGroup({
@@ -282,6 +286,14 @@ export class ScimGroupService {
         return;
       }
 
+      // Handle value object containing "displayName" (no path variant)
+      if (!operation.path && typeof operation.value === "object" && operation.value !== null) {
+        const valueObj = operation.value as Record<string, unknown>;
+        if ("displayName" in valueObj && typeof valueObj.displayName === "string") {
+          await this.prisma.group.update({ where: { id: group.id }, data: { name: valueObj.displayName } });
+        }
+      }
+
       // Full member replace (path="members" or no path with members in value)
       const members = this.extractMemberIds(
         operation.path === "members"
@@ -313,15 +325,18 @@ export class ScimGroupService {
   private toScimGroup(
     group: Group,
     members: Array<{ userId: string; user: { id: string; email: string | null; name: string | null } }>,
+    excludeMembers = false,
   ): ScimGroup {
     return {
       schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
       id: group.id,
       displayName: group.name,
-      members: members.map((m) => ({
-        value: m.userId,
-        display: m.user.email ?? m.user.name ?? undefined,
-      })),
+      ...(excludeMembers ? {} : {
+        members: members.map((m) => ({
+          value: m.userId,
+          display: m.user.email ?? m.user.name ?? undefined,
+        })),
+      }),
       meta: {
         resourceType: "Group",
         created: group.createdAt.toISOString(),

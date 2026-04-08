@@ -48,10 +48,7 @@ export class ScimService {
         });
 
       if (existingMembership) {
-        // User already in org — return their record so the IdP learns our internal ID.
-        // This is "find-or-create" semantics: avoids the IdP storing its own opaque ID
-        // and then failing to match group member references later.
-        return this.toScimUser(existingUser);
+        return this.scimError({ status: "409", detail: "User already exists in this organization" });
       }
 
       try {
@@ -160,7 +157,7 @@ export class ScimService {
     };
 
     if (emailFilter) {
-      whereClause.user = { email: emailFilter };
+      whereClause.user = { email: { equals: emailFilter, mode: 'insensitive' } };
     }
 
     const [memberships, totalCount] = await Promise.all([
@@ -249,33 +246,53 @@ export class ScimService {
     }
 
     for (const operation of patchRequest.Operations) {
-      if (operation.op === "replace" && operation.value != null && typeof operation.value === "object") {
-        const value = operation.value as Record<string, unknown>;
-        const updates: { name?: string; email?: string } = {};
+      if (operation.op !== "replace") continue;
 
-        if ("active" in value) {
-          if (value.active === false) {
-            await this.userService.deactivate({ id });
-          } else {
-            await this.userService.reactivate({ id });
-          }
+      // Handle path="active" with a scalar boolean value (e.g. Okta/Azure AD style)
+      if (operation.path === "active") {
+        if (operation.value === false || operation.value === "false") {
+          await this.userService.deactivate({ id });
+        } else {
+          await this.userService.reactivate({ id });
         }
+        continue;
+      }
 
-        if ("userName" in value && typeof value.userName === "string") {
-          updates.email = value.userName;
-        }
+      if (operation.value == null || typeof operation.value !== "object") continue;
 
-        if ("name" in value && typeof value.name === "object") {
-          const nameObj = value.name as Record<string, string>;
-          const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
-          if (parts.length > 0) {
-            updates.name = parts.join(" ");
-          }
-        }
+      const value = operation.value as Record<string, unknown>;
+      const updates: { name?: string; email?: string } = {};
 
-        if (Object.keys(updates).length > 0) {
-          await this.userService.updateProfile({ id, ...updates });
+      if ("active" in value) {
+        if (value.active === false) {
+          await this.userService.deactivate({ id });
+        } else {
+          await this.userService.reactivate({ id });
         }
+      }
+
+      if ("userName" in value && typeof value.userName === "string") {
+        updates.email = value.userName;
+      }
+
+      if ("name" in value && typeof value.name === "object") {
+        const nameObj = value.name as Record<string, string>;
+        const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
+        if (parts.length > 0) {
+          updates.name = parts.join(" ");
+        }
+      } else if ("name.givenName" in value || "name.familyName" in value) {
+        // Dot-notation attribute paths in value object (RFC 7644 §3.5.2)
+        const given = typeof value["name.givenName"] === "string" ? value["name.givenName"] : null;
+        const family = typeof value["name.familyName"] === "string" ? value["name.familyName"] : null;
+        const parts = [given, family].filter(Boolean);
+        if (parts.length > 0) {
+          updates.name = parts.join(" ");
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await this.userService.updateProfile({ id, ...updates });
       }
     }
 
@@ -306,6 +323,14 @@ export class ScimService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
+    await this.prisma.$transaction([
+      this.prisma.organizationUser.delete({
+        where: { userId_organizationId: { userId: id, organizationId } },
+      }),
+      this.prisma.roleBinding.deleteMany({
+        where: { userId: id, organizationId },
+      }),
+    ]);
     await this.userService.deactivate({ id });
     return null;
   }

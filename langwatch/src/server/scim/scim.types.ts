@@ -79,7 +79,7 @@ export interface ScimGroup {
   schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"];
   id: string;
   displayName: string;
-  members: Array<{
+  members?: Array<{
     value: string;
     display?: string;
   }>;

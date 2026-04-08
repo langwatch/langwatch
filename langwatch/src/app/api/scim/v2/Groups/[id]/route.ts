@@ -13,18 +13,28 @@ import {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
+
 export async function GET(request: NextRequest, context: RouteContext) {
   const auth = await authenticateScimRequest(request);
   if (isAuthError(auth)) return auth;
 
   const { id } = await context.params;
+  const params = request.nextUrl.searchParams;
+
+  const excludedAttributes = (params.get("excludedAttributes") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const result = await ScimGroupService.create(prisma).getGroup({
     externalScimId: id,
     organizationId: auth.organizationId,
+    excludeMembers: excludedAttributes.includes("members"),
   });
 
-  if (isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10) });
-  return NextResponse.json(result);
+  if (isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10), headers: SCIM_HEADERS });
+  return NextResponse.json(result, { headers: SCIM_HEADERS });
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
@@ -39,7 +49,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   } catch {
     return NextResponse.json(
       { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: "400", detail: "Invalid JSON" },
-      { status: 400 },
+      { status: 400, headers: SCIM_HEADERS },
     );
   }
 
@@ -47,7 +57,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (!parsed.success) {
     return NextResponse.json(
       { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: "400", detail: parsed.error.message },
-      { status: 400 },
+      { status: 400, headers: SCIM_HEADERS },
     );
   }
 
@@ -57,8 +67,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     request: parsed.data,
   });
 
-  if (isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10) });
-  return NextResponse.json(result);
+  if (isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10), headers: SCIM_HEADERS });
+  return NextResponse.json(result, { headers: SCIM_HEADERS });
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
@@ -73,7 +83,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   } catch {
     return NextResponse.json(
       { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: "400", detail: "Invalid JSON" },
-      { status: 400 },
+      { status: 400, headers: SCIM_HEADERS },
     );
   }
 
@@ -81,7 +91,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (!parsed.success) {
     return NextResponse.json(
       { schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"], status: "400", detail: parsed.error.message },
-      { status: 400 },
+      { status: 400, headers: SCIM_HEADERS },
     );
   }
 
@@ -91,8 +101,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     patchRequest: parsed.data,
   });
 
-  if (isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10) });
-  return NextResponse.json(result);
+  if (isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10), headers: SCIM_HEADERS });
+  return NextResponse.json(result, { headers: SCIM_HEADERS });
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
@@ -105,6 +115,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     organizationId: auth.organizationId,
   });
 
-  if (result && isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10) });
+  if (result && isScimError(result)) return NextResponse.json(result, { status: parseInt(result.status, 10), headers: SCIM_HEADERS });
   return new NextResponse(null, { status: 204 });
 }
