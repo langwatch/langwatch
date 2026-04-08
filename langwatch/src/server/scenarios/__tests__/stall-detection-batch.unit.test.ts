@@ -52,7 +52,7 @@ describe("getScenarioRunDataBatch()", () => {
         const projectId = "test-project";
 
         // Run A: finished with SUCCESS 20 min ago
-        // Run B: started 35 min ago, no finish -> beyond 30-min threshold -> STALLED
+        // Run B: started 15 min ago, no finish -> beyond 10-min threshold -> STALLED
         // Run C: started 2 min ago, no finish -> within threshold -> IN_PROGRESS
         mockGetRunStartedEvents.mockResolvedValue(
           new Map([
@@ -71,7 +71,7 @@ describe("getScenarioRunDataBatch()", () => {
               "run-B",
               {
                 type: ScenarioEventType.RUN_STARTED,
-                timestamp: minutesAgo(35),
+                timestamp: minutesAgo(15),
                 batchRunId: "batch-1",
                 scenarioId: "scenario-2",
                 scenarioRunId: "run-B",

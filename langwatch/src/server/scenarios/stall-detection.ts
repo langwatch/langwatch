@@ -1,12 +1,11 @@
 import { ScenarioRunStatus } from "./scenario-event.enums";
-import { CHILD_PROCESS } from "./scenario.constants";
 
 /**
  * Threshold in milliseconds after which a run without RUN_FINISHED
- * is considered stalled. Set to 2x the child process timeout
+ * is considered stalled. Set to 10 minutes (2x the 5-minute job timeout)
  * to cover all reasonable completion scenarios.
  */
-export const STALL_THRESHOLD_MS = CHILD_PROCESS.TIMEOUT_MS * 2;
+export const STALL_THRESHOLD_MS = 10 * 60 * 1000;
 
 /**
  * Resolves the effective status of a scenario run, deriving STALLED

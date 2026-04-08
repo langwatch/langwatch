@@ -29,7 +29,7 @@ describe("resolveRunStatus()", () => {
       it("returns STALLED", () => {
         const status = resolveRunStatus({
           finishedStatus: undefined,
-          lastEventTimestamp: minutesAgo(35),
+          lastEventTimestamp: minutesAgo(15),
           now: NOW,
         });
 
