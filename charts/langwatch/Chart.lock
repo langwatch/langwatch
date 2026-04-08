@@ -4,6 +4,6 @@ dependencies:
   version: 25.27.0
 - name: clickhouse-serverless
   repository: file://../clickhouse-serverless
-  version: 0.1.0-next.1
-digest: sha256:0c09b6db1b481d8f1efe2bb1c8c7280209b8e2534811b8c4d67abe12e01a2ad3
-generated: "2026-04-07T12:48:55.72505+02:00"
+  version: 0.2.0
+digest: sha256:d07d0835bb544bf6821e073e13682ebfbb689b8adb45b7ff89c63af7d3ca1b08
+generated: "2026-04-08T13:34:59.98963+02:00"
