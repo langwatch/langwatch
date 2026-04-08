@@ -41,17 +41,21 @@ describe("filterOutEmptyFilters()", () => {
       });
     });
 
-    it("strips objects where all leaf arrays are empty", () => {
+    it("keeps objects with empty leaf arrays (key selected, sub-values pending)", () => {
       const filters = {
         "evaluations.passed": { "eval-1": [] },
       } as Partial<Record<FilterField, FilterParam>>;
 
-      expect(filterOutEmptyFilters(filters)).toEqual({});
+      expect(filterOutEmptyFilters(filters)).toEqual({
+        "evaluations.passed": { "eval-1": [] },
+      });
     });
+  });
 
-    it("strips objects with multiple empty leaf arrays", () => {
+  describe("when filter is an empty object", () => {
+    it("strips empty objects", () => {
       const filters = {
-        "evaluations.passed": { "eval-1": [], "eval-2": [] },
+        "evaluations.passed": {},
       } as Partial<Record<FilterField, FilterParam>>;
 
       expect(filterOutEmptyFilters(filters)).toEqual({});
@@ -59,17 +63,19 @@ describe("filterOutEmptyFilters()", () => {
   });
 
   describe("when filter has mixed empty and non-empty entries", () => {
-    it("keeps only non-empty entries", () => {
+    it("keeps all non-empty entries including pending nested selections", () => {
       const filters = {
         "spans.model": ["gpt-4"],
         "evaluations.passed": { "eval-1": [] },
         "traces.origin": ["application"],
+        "evaluations.score": {},
       } as Partial<Record<FilterField, FilterParam>>;
 
       const result = filterOutEmptyFilters(filters);
 
       expect(result).toEqual({
         "spans.model": ["gpt-4"],
+        "evaluations.passed": { "eval-1": [] },
         "traces.origin": ["application"],
       });
     });

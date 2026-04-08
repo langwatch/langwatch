@@ -1,16 +1,6 @@
 import type { FilterParam } from "../../hooks/useFilterParams";
 import type { FilterField } from "../filters/types";
 
-const hasNonEmptyLeaf = (
-  obj: FilterParam | string | null | undefined,
-): boolean => {
-  if (obj == null) return false;
-  if (typeof obj === "string") return !!obj;
-  if (Array.isArray(obj)) return obj.length > 0;
-  if (typeof obj !== "object") return false;
-  return Object.values(obj).some((v) => hasNonEmptyLeaf(v as FilterParam));
-};
-
 export const filterOutEmptyFilters = (
   filters: Partial<Record<FilterField, FilterParam | string>> | undefined,
 ): Record<FilterField, FilterParam> => {
@@ -18,6 +8,14 @@ export const filterOutEmptyFilters = (
     return {} as Record<FilterField, FilterParam>;
   }
   return Object.fromEntries(
-    Object.entries(filters).filter(([_, f]) => hasNonEmptyLeaf(f)),
+    Object.entries(filters).filter(([_, f]) => {
+      if (f == null) return false;
+      if (typeof f === "string") return !!f;
+      if (Array.isArray(f)) return f.length > 0;
+      // Shallow check: keep objects with keys even if leaf arrays are empty.
+      // { "eval-1": [] } means "key selected, sub-values pending" and must
+      // be preserved so the nested filter UI can render the sub-options.
+      return Object.keys(f).length > 0;
+    }),
   ) as Record<FilterField, FilterParam>;
 };
