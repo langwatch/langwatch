@@ -148,10 +148,22 @@ export function AddMembersForm({
       .split(/[\s,;]+/)
       .map((e) => e.trim())
       .filter(Boolean);
+
+    // Normalize team roles to match org role constraints
+    const normalizedTeams = data.teams.map((team) => {
+      if (data.orgRole === OrganizationUserRole.EXTERNAL) {
+        return { teamId: team.teamId, role: TeamUserRole.VIEWER, customRoleId: undefined };
+      }
+      if (data.orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
+        return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
+      }
+      return team;
+    });
+
     const invites: InviteData[] = emails.map((email) => ({
       email,
       orgRole: data.orgRole,
-      teams: data.teams,
+      teams: normalizedTeams,
     }));
     void onSubmit({ invites });
   };
@@ -269,6 +281,7 @@ export function AddMembersForm({
                           size="sm"
                           colorPalette="red"
                           variant="ghost"
+                          aria-label="Remove team assignment"
                           onClick={() => removeTeam(teamIndex)}
                         >
                           <Trash2 size={16} />

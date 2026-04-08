@@ -43,7 +43,7 @@ CREATE TABLE "RoleBinding" (
         ("userId" IS NULL AND "groupId" IS NOT NULL)
     ),
     CONSTRAINT "RoleBinding_custom_role_check" CHECK (
-        ("role" != 'CUSTOM') OR ("customRoleId" IS NOT NULL)
+        ("role" = 'CUSTOM') = ("customRoleId" IS NOT NULL)
     )
 );
 
@@ -62,8 +62,9 @@ CREATE INDEX "GroupMembership_userId_idx" ON "GroupMembership"("userId");
 -- CreateIndex
 CREATE INDEX "GroupMembership_groupId_idx" ON "GroupMembership"("groupId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "RoleBinding_userId_groupId_role_scopeType_scopeId_key" ON "RoleBinding"("userId", "groupId", "role", "scopeType", "scopeId");
+-- CreateIndex: partial unique indexes so NULL values don't bypass deduplication
+CREATE UNIQUE INDEX "RoleBinding_user_role_scope_key" ON "RoleBinding"("userId", "role", "scopeType", "scopeId") WHERE "userId" IS NOT NULL;
+CREATE UNIQUE INDEX "RoleBinding_group_role_scope_key" ON "RoleBinding"("groupId", "role", "scopeType", "scopeId") WHERE "groupId" IS NOT NULL;
 
 -- CreateIndex
 CREATE INDEX "RoleBinding_organizationId_idx" ON "RoleBinding"("organizationId");

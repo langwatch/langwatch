@@ -146,6 +146,17 @@ export const groupRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string().min(1).max(100),
+        bindings: z
+          .array(
+            z.object({
+              role: z.nativeEnum(TeamUserRole),
+              customRoleId: z.string().optional(),
+              scopeType: z.nativeEnum(RoleBindingScopeType),
+              scopeId: z.string(),
+            }),
+          )
+          .optional(),
+        memberIds: z.array(z.string()).optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:manage"))
@@ -157,21 +168,40 @@ export const groupRouter = createTRPCRouter({
       });
 
       const baseSlug = slugify(input.name, { lower: true, strict: true });
-      // Ensure slug uniqueness within org
-      const existing = await ctx.prisma.group.count({
-        where: {
-          organizationId: input.organizationId,
-          slug: { startsWith: baseSlug },
-        },
-      });
-      const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
 
-      return ctx.prisma.group.create({
-        data: {
-          organizationId: input.organizationId,
-          name: input.name,
-          slug,
-        },
+      return ctx.prisma.$transaction(async (tx) => {
+        const existing = await tx.group.count({
+          where: {
+            organizationId: input.organizationId,
+            slug: { startsWith: baseSlug },
+          },
+        });
+        const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
+
+        const group = await tx.group.create({
+          data: { organizationId: input.organizationId, name: input.name, slug },
+        });
+
+        if (input.bindings?.length) {
+          await tx.roleBinding.createMany({
+            data: input.bindings.map((b) => ({
+              organizationId: input.organizationId,
+              groupId: group.id,
+              role: b.role,
+              customRoleId: b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+              scopeType: b.scopeType,
+              scopeId: b.scopeId,
+            })),
+          });
+        }
+
+        if (input.memberIds?.length) {
+          await tx.groupMembership.createMany({
+            data: input.memberIds.map((userId) => ({ groupId: group.id, userId })),
+          });
+        }
+
+        return group;
       });
     }),
 

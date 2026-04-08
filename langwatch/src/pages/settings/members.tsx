@@ -335,8 +335,9 @@ function MembersList({
                       <Table.Cell>
                         <MemberAccessDisplay
                           bindings={(bindingsByUser.get(member.userId) ?? []).filter(
-                            (b) => b.scopeType !== RoleBindingScopeType.ORGANIZATION,
+                            (b) => b.id !== orgBinding?.id,
                           )}
+                          isLoading={allBindings === undefined}
                         />
                       </Table.Cell>
                       <Table.Cell>
@@ -478,7 +479,10 @@ function roleBadgeColor(role: string) {
   return "gray";
 }
 
-function MemberAccessDisplay({ bindings }: { bindings: Binding[] }) {
+function MemberAccessDisplay({ bindings, isLoading }: { bindings: Binding[]; isLoading?: boolean }) {
+  if (isLoading) {
+    return <Text fontSize="xs" color="fg.subtle" textAlign="right">—</Text>;
+  }
   if (bindings.length === 0) {
     return <Text fontSize="xs" color="fg.subtle" textAlign="right">No access configured</Text>;
   }
@@ -493,6 +497,11 @@ function MemberAccessDisplay({ bindings }: { bindings: Binding[] }) {
           <Badge colorPalette="purple" size="sm">
             {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
           </Badge>
+          {b.groupId && (
+            <Text color="fg.subtle" fontSize="xs" title={`via group: ${b.groupName ?? b.groupId}`}>
+              via {b.groupName ?? "group"}
+            </Text>
+          )}
         </HStack>
       ))}
     </VStack>

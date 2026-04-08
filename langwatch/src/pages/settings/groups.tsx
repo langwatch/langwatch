@@ -414,6 +414,7 @@ function GroupDetailDialog({
                             size="xs"
                             variant="ghost"
                             color="fg.muted"
+                            aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
                             loading={removeBinding.isPending}
                             onClick={() =>
                               removeBinding.mutate({
@@ -477,6 +478,7 @@ function GroupDetailDialog({
                           size="xs"
                           variant="ghost"
                           color="fg.muted"
+                          aria-label={`Remove ${m.name ?? m.email} from group`}
                           loading={removeMember.isPending}
                           onClick={() =>
                             removeMember.mutate({
@@ -583,10 +585,8 @@ function CreateGroupDialog({
   );
 
   const createGroup = api.group.create.useMutation();
-  const addBinding = api.group.addBinding.useMutation();
-  const addMember = api.group.addMember.useMutation();
 
-  const isSubmitting = createGroup.isPending || addBinding.isPending || addMember.isPending;
+  const isSubmitting = createGroup.isPending;
 
   function reset() {
     setName("");
@@ -599,20 +599,17 @@ function CreateGroupDialog({
   async function handleCreate() {
     if (!name.trim()) return;
     try {
-      const group = await createGroup.mutateAsync({ organizationId, name: name.trim() });
-      for (const b of pendingBindings) {
-        await addBinding.mutateAsync({
-          organizationId,
-          groupId: group.id,
+      await createGroup.mutateAsync({
+        organizationId,
+        name: name.trim(),
+        bindings: pendingBindings.map((b) => ({
           role: b.role as any,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
           scopeId: b.scopeId,
-        });
-      }
-      for (const userId of pendingMemberIds) {
-        await addMember.mutateAsync({ organizationId, groupId: group.id, userId });
-      }
+        })),
+        memberIds: pendingMemberIds,
+      });
       void queryClient.group.listAll.invalidate();
       reset();
       onClose();
@@ -665,6 +662,7 @@ function CreateGroupDialog({
                         size="xs"
                         variant="ghost"
                         color="fg.muted"
+                        aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
                         onClick={() => setPendingBindings((prev) => prev.filter((_, j) => j !== i))}
                       >
                         <X size={14} />
@@ -697,6 +695,7 @@ function CreateGroupDialog({
                           size="xs"
                           variant="ghost"
                           color="fg.muted"
+                          aria-label={`Remove ${member?.user.name ?? member?.user.email ?? userId} from group`}
                           onClick={() => setPendingMemberIds((prev) => prev.filter((id) => id !== userId))}
                         >
                           <X size={14} />
@@ -883,6 +882,7 @@ function GroupsSettings() {
                               <Button
                                 variant="ghost"
                                 size="xs"
+                                aria-label={`Actions for ${g.name}`}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <MoreVertical size={16} />
