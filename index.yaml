@@ -39,6 +39,30 @@ entries:
       keywords: ai,observability,monitoring,secrets
       maintainers: LangWatch Team
     apiVersion: v2
+    appVersion: 3.0.0-prerelease.4
+    created: "2026-04-08T14:54:19.117554266Z"
+    dependencies:
+    - condition: prometheus.chartManaged
+      name: prometheus
+      repository: https://prometheus-community.github.io/helm-charts
+      version: 25.27.0
+    - alias: clickhouse
+      condition: clickhouse.chartManaged
+      name: clickhouse-serverless
+      repository: file://../clickhouse-serverless
+      version: 0.2.0
+    description: Helm chart for LangWatch application
+    digest: 0572251ba5b5805929aa65020f589339f0692718300c26b4f8bc5338c845b5da
+    name: langwatch
+    type: application
+    urls:
+    - https://github.com/langwatch/langwatch/releases/download/langwatch-3.0.0-prerelease.4/langwatch-3.0.0-prerelease.4.tgz
+    version: 3.0.0-prerelease.4
+  - annotations:
+      category: Observability
+      keywords: ai,observability,monitoring,secrets
+      maintainers: LangWatch Team
+    apiVersion: v2
     appVersion: 3.0.0-prerelease.3
     created: "2026-04-08T13:35:07.42236269Z"
     dependencies:
@@ -570,4 +594,4 @@ entries:
     urls:
     - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-0.1.2/langwatch-helm-0.1.2.tgz
     version: 0.1.2
-generated: "2026-04-08T13:35:07.422441046Z"
+generated: "2026-04-08T14:54:19.117630939Z"
