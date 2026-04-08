@@ -14,7 +14,9 @@ import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import {
   Controller,
+  type Control,
   type SubmitHandler,
+  type UseFormSetValue,
   useFieldArray,
   useForm,
   useWatch,
@@ -331,7 +333,7 @@ function TeamSelect({
   getAvailableTeamOptions,
 }: {
   teamIndex: number;
-  control: any;
+  control: Control<InternalForm>;
   getAvailableTeamOptions: (currentTeamIndex?: number) => Option[];
 }) {
   const availableOptions = getAvailableTeamOptions(teamIndex);
@@ -405,10 +407,10 @@ function TeamRoleSelect({
   isInviterAdmin,
 }: {
   teamIndex: number;
-  control: any;
+  control: Control<InternalForm>;
   organizationId: string;
   orgRole: OrganizationUserRole;
-  setValue: any;
+  setValue: UseFormSetValue<InternalForm>;
   isInviterAdmin: boolean;
 }) {
   const customRoles = api.role.getAll.useQuery({ organizationId });
