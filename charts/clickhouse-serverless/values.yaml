@@ -1,6 +1,6 @@
 image:
   repository: langwatch/clickhouse-serverless
-  tag: "next"
+  tag: "0.2.0"  # x-release-please-version
   pullPolicy: IfNotPresent
 
 # Primary inputs — the image auto-tunes all ClickHouse parameters from these
