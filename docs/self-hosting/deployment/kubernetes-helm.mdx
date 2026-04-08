@@ -12,6 +12,7 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - `kubectl` configured for your cluster
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
+- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
 ## Quick Start
 
@@ -270,9 +271,10 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Size Overlays
 
-| Overlay | Use Case | Approx Resources |
+| Overlay | Use Case | Approx Resources (requests) |
 |---------|----------|-----------------|
-| `values-local.yaml` | Local dev, small teams | ~1 CPU, ~4 Gi |
+| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
 | `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
 | `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
 
