@@ -6,6 +6,11 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import {
+  getEvaluatorDefaultSettings,
+  getEvaluatorDefinitions,
+} from "~/server/evaluations/getEvaluator";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -157,12 +162,26 @@ app.post(
       "Creating evaluator",
     );
 
+    // Merge user-provided settings with defaults from the evaluator definition.
+    // User-provided values take precedence over defaults.
+    const evaluatorType = data.config.evaluatorType as string;
+    const evaluatorDef = getEvaluatorDefinitions(evaluatorType);
+    const defaultSettings = getEvaluatorDefaultSettings(
+      evaluatorDef as Parameters<typeof getEvaluatorDefaultSettings>[0],
+      project,
+    );
+    const userSettings = (data.config.settings ?? {}) as Record<string, unknown>;
+    const mergedConfig = {
+      ...data.config,
+      settings: { ...defaultSettings, ...userSettings },
+    };
+
     const evaluator = await service.create({
       id: `evaluator_${nanoid()}`,
       projectId: project.id,
       name: data.name,
       type: "evaluator",
-      config: data.config as Prisma.InputJsonValue,
+      config: mergedConfig as Prisma.InputJsonValue,
     });
 
     const enriched = await service.enrichWithFields(evaluator);
