@@ -253,7 +253,7 @@
     ".": {
       "release-type": "simple",
       "package-name": "langwatch",
-      "prerelease": true,
+      "prerelease": false,
       "component": "langwatch",
       "include-component-in-tag": true,
       "tag-separator": "@",
