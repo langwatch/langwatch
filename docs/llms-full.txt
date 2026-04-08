@@ -24842,6 +24842,7 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - `kubectl` configured for your cluster
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
+- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
 ## Quick Start
 
@@ -24875,6 +24876,22 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 <Warning>
 `autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production — secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
+
+## Low-Resources Deployment
+
+The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
+
+```bash
+curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
+
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch --create-namespace \
+  --set autogen.enabled=true \
+  -f size-dev.yaml \
+  --wait --timeout 10m
+```
+
+This configures smaller resource limits, single replicas, and disables evaluator preloading to reduce memory usage. Suitable for development, demos, and small teams.
 
 ## Production Deployment
 
@@ -24914,7 +24931,7 @@ kubectl create secret generic langwatch-redis \
 
 ### 2. Create a Values File
 
-Start from the production example and customize:
+Start from the production example and customize. This configuration requests approximately **~8.5 CPU and ~28 Gi RAM** across all pods:
 
 ```yaml
 # values-production.yaml
@@ -25021,7 +25038,7 @@ kubectl -n langwatch logs deploy/langwatch-app --tail=50
 
 ## High-Availability Deployment
 
-For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets:
+For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~36 CPU and ~84 Gi RAM** across all pods:
 
 ```yaml
 # values-ha.yaml (extends production values above)
@@ -25100,9 +25117,10 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 ### Size Overlays
 
-| Overlay | Use Case | Approx Resources |
+| Overlay | Use Case | Approx Resources (requests) |
 |---------|----------|-----------------|
-| `values-local.yaml` | Local dev, small teams | ~1 CPU, ~4 Gi |
+| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
 | `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
 | `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
 
