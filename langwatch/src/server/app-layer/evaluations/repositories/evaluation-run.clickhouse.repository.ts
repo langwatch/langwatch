@@ -39,11 +39,12 @@ interface ClickHouseEvaluationRunRecord {
   CompletedAt: number | null;
   CostId: string | null;
   LastProcessedEventId: string;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -87,6 +88,60 @@ export class EvaluationRunClickHouseRepository
       logger.error(
         { tenantId, evaluationId: data.evaluationId, error: errorMessage },
         "Failed to store evaluation run in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async upsertBatch(
+    entries: Array<{ data: EvaluationRunData; tenantId: string }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    const tenantId = entries[0]!.tenantId;
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.upsertBatch",
+    );
+
+    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
+    if (mixedTenant) {
+      throw new Error(
+        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
+        `Each batch must contain a single tenant to ensure correct DB routing.`,
+      );
+    }
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const records = entries.map(({ data, tenantId: tid }) => {
+        const projectionId = data.scheduledAt
+          ? IdUtils.generateDeterministicEvaluationRunId(
+              tid,
+              data.evaluationId,
+              data.scheduledAt,
+            )
+          : data.evaluationId;
+        return this.toClickHouseRecord(
+          data,
+          tid,
+          projectionId,
+          EVALUATION_PROJECTION_VERSIONS.STATE,
+        );
+      });
+
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, count: entries.length, error: errorMessage },
+        "Failed to batch store evaluation runs in ClickHouse",
       );
       throw error;
     }
@@ -139,7 +194,6 @@ export class EvaluationRunClickHouseRepository
         `,
         query_params: { tenantId, evaluationId },
         format: "JSONEachRow",
-        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseEvaluationRunRecord>();
@@ -167,10 +221,10 @@ export class EvaluationRunClickHouseRepository
       evaluatorType: record.EvaluatorType,
       evaluatorName: record.EvaluatorName,
       traceId: record.TraceId,
-      isGuardrail: record.IsGuardrail === 1,
+      isGuardrail: !!record.IsGuardrail,
       status: record.Status as EvaluationRunData["status"],
       score: record.Score,
-      passed: record.Passed === null ? null : record.Passed === 1,
+      passed: record.Passed === null ? null : !!record.Passed,
       label: record.Label,
       details: record.Details,
       inputs: record.Inputs
@@ -180,6 +234,7 @@ export class EvaluationRunClickHouseRepository
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
+      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
@@ -216,6 +271,7 @@ export class EvaluationRunClickHouseRepository
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
+      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,

@@ -1,26 +1,21 @@
-# Documentation
+# LangWatch and LangEvals Documentation
 
-## Foundational
+This is the documentation repository for [LangWatch](https://github.com/langwatch/langwatch).
 
-Cross-cutting principles that apply everywhere:
+### Development
 
-- **CODING_STANDARDS.md** - Clean code, SOLID, readability
-- **TESTING_PHILOSOPHY.md** - Test hierarchy, BDD workflow
+Install the [Mintlify CLI](https://www.npmjs.com/package/mintlify) to preview the documentation changes locally. To install, use the following command:
 
-## Language & Framework Specific
+```
+npm i -g mintlify
+```
 
-- **best_practices/** - TypeScript, React, Git, logging, repository-service conventions
-- **design/** - UI design system
-- **TESTING.md** - Test hierarchy, workflow, E2E patterns
+Run the following command:
 
-## Architecture
+```
+mintlify dev
+```
 
-- **adr/** - Architecture Decision Records (RBAC, event sourcing, logging, feature flags, Redis)
+### Publishing Changes
 
-## Also See
-
-- `CLAUDE.md` (root) - Project overview, common mistakes
-
-## Writing Docs
-
-Be token-conscious. Only document project-specific decisions, not googlable content.
+Install our Github App to auto propagate changes from your repo to your deployment. Changes will be deployed to production automatically after pushing to the default branch. Find the link to install on your dashboard.

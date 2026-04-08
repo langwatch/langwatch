@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Flex,
@@ -17,6 +16,7 @@ import { format } from "date-fns";
 import numeral from "numeral";
 import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
+import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
   AreaChart,
@@ -396,10 +396,9 @@ const CustomGraph_ = React.memo(
     );
 
     const sortedKeys = expectedKeys
-      .filter((key) => keysToSum[key]! !== 0)
       .toSorted((a, b) => {
-        const totalA = keysToSum[a]!;
-        const totalB = keysToSum[b]!;
+        const totalA = keysToSum[a] ?? 0;
+        const totalB = keysToSum[b] ?? 0;
 
         return totalB - totalA;
       });
@@ -442,6 +441,7 @@ const CustomGraph_ = React.memo(
               .replace("Evaluation passed failed", "Evaluation Failed")
               .replace("Contains error", "Traces")
               .replace(/^Evaluation label /i, "")
+              .replace(/^Thumbs up\/down /i, "")
             : (series?.name ?? aggKey);
       },
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
@@ -504,6 +504,9 @@ const CustomGraph_ = React.memo(
     const valueFormats = Array.from(
       new Set(
         input.series.map((series) => {
+          if (series.aggregation === "cardinality") {
+            return "0a";
+          }
           const metric = getMetric(series.metric);
           return metric?.format ?? "0a";
         }),
@@ -544,49 +547,72 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
+      const effectiveFormat =
+        series?.aggregation === "cardinality" ? "0a" : metric?.format;
 
-      return formatWith(metric?.format, value as number);
+      return formatWith(effectiveFormat, value as number);
     };
 
     const container = (child: React.ReactNode) => {
+      const dataLoaded = !timeseries.isLoading && timeseries.data;
       const allEmpty =
-        currentAndPreviousData &&
-        (maxValue == 0 || currentAndPreviousData?.length === 0);
+        dataLoaded &&
+        (allValues.length === 0 || currentAndPreviousData?.length === 0);
 
       return (
         <Box width="full" height="full" position="relative">
-          {input.graphType !== "summary" && timeseries.isFetching && (
+          {timeseries.isFetching && !timeseries.isLoading && (
             <Delayed>
               <Spinner position="absolute" right={4} top={4} />
             </Delayed>
           )}
-          {timeseries.error && (
-            <Alert.Root
-              status="error"
-              position="absolute"
-              borderStartWidth="4px"
-              borderStartColor="colorPalette.solid"
-              width="fit-content"
-              right={4}
-              top={4}
-            >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>Error loading graph data</Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
+          {timeseries.error && !timeseries.data ? (
+            <ChartErrorState
+              errorMessage={timeseries.error.message}
+              onRetry={() => void timeseries.refetch()}
+            />
+          ) : (
+            <>
+              {timeseries.error && timeseries.data && (
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    right: 16,
+                    top: 16,
+                    zIndex: 1,
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                  }}
+                  aria-label="Retry loading chart data"
+                  onClick={() => void timeseries.refetch()}
+                  title={timeseries.error.message}
+                >
+                  <Badge
+                    colorPalette="red"
+                    variant="solid"
+                    fontSize="xs"
+                  >
+                    Refresh failed — click to retry
+                  </Badge>
+                </button>
+              )}
+              {allEmpty && input.graphType !== "monitor_graph" ? (
+                <Box
+                  position="absolute"
+                  top="50%"
+                  left="50%"
+                  transform="translate(-50%, -50%)"
+                >
+                  No data
+                </Box>
+              ) : (
+                child
+              )}
+            </>
           )}
-          {input.graphType !== "summary" && allEmpty && (
-            <Box
-              position="absolute"
-              top="50%"
-              left="50%"
-              transform="translate(-50%, -50%)"
-            >
-              No data
-            </Box>
-          )}
-          {child}
         </Box>
       );
     };
@@ -799,7 +825,7 @@ const CustomGraph_ = React.memo(
               }}
               style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
             >
-              {summaryData.current.map((entry, index) => (
+              {sortedCurrentData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={colorForSeries(entry.key, index)}
@@ -1006,7 +1032,9 @@ const CustomGraph_ = React.memo(
     return (
       JSON.stringify(prevProps.input) === JSON.stringify(nextProps.input) &&
       JSON.stringify(prevProps.titleProps) ===
-      JSON.stringify(nextProps.titleProps) &&
+        JSON.stringify(nextProps.titleProps) &&
+      JSON.stringify(prevProps.filters) ===
+        JSON.stringify(nextProps.filters) &&
       prevProps.onDataPointClick === nextProps.onDataPointClick
     );
   },
@@ -1084,18 +1112,17 @@ const shapeDataForGraph = (
   const flattenPreviousPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
-  const currentAndPreviousData =
-    flattenPreviousPeriod &&
-    flattenCurrentPeriod?.map((entry, index) => {
-      return {
-        ...entry,
-        ...Object.fromEntries(
-          Object.entries(flattenPreviousPeriod[index] ?? {}).map(
-            ([key, value]) => [`previous>${key}`, value ?? 0],
-          ),
+  const currentAndPreviousData = flattenCurrentPeriod?.map((entry, index) => {
+    if (!flattenPreviousPeriod) return entry;
+    return {
+      ...entry,
+      ...Object.fromEntries(
+        Object.entries(flattenPreviousPeriod[index] ?? {}).map(
+          ([key, value]) => [`previous>${key}`, value ?? 0],
         ),
-      };
-    });
+      ),
+    };
+  });
 
   return currentAndPreviousData as
     | ({ date: string } & Record<string, number>)[]
@@ -1127,10 +1154,15 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
+      // Count aggregations should use integer format regardless of metric's default
+      const isCardinalitySeries = series?.aggregation === "cardinality";
+      const formatOverride =
+        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
+
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric,
+        metric: formatOverride,
         value: totalValue,
       };
     });
@@ -1153,7 +1185,7 @@ const collectAllDays = (
       if (!result[key]) {
         result[key] = [];
       }
-      result[key]!.push(entry[key]!);
+      result[key]?.push(entry[key] ?? 0);
     }
   }
 
@@ -1275,6 +1307,7 @@ function MonitorGraph({
     : currentAndPreviousData
       ?.map((entry) => entry[firstKey]!)
       .filter((x) => x !== undefined && x !== null);
+  const hasData = allValues !== undefined && allValues.length > 0;
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -1286,7 +1319,7 @@ function MonitorGraph({
   // TODO: allow user to define the thresholds instead of hardcoded amounts
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
-    : average > 0.8 || !hasLoaded
+    : !hasData || average > 0.8 || !hasLoaded
       ? "greenTones"
       : average < 0.4
         ? "redTones"
@@ -1355,7 +1388,11 @@ function MonitorGraph({
         <HStack gap={2}>
           <Text fontSize="2xl" fontWeight="bold">
             {hasLoaded ? (
-              numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              hasData ? (
+                numeral(average).format(isPassRate ? "0%" : "0.[00]")
+              ) : (
+                "-"
+              )
             ) : (
               <Skeleton
                 width="56px"
@@ -1365,7 +1402,11 @@ function MonitorGraph({
             )}
           </Text>
           <Text fontSize="xs">
-            {isPassRate ? "Pass Rate" : "Average Score"}
+            {hasData
+              ? isPassRate
+                ? "Pass Rate"
+                : "Average Score"
+              : "No data yet"}
           </Text>
         </HStack>
         <Text fontSize="xs">

@@ -1,4 +1,3 @@
-import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import path from "path";
@@ -9,9 +8,6 @@ const bundleAnalyser =
     : null;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-const aliasPath =
-  process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
 
 const isProduction =
   process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test";
@@ -32,10 +28,6 @@ const cspHeader = `
     frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev;
 
 `;
-
-const existingNodeModules = new Set(
-  fs.readdirSync(path.join(__dirname, "node_modules")),
-);
 
 /**
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
@@ -62,29 +54,6 @@ const config = {
       "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
       "*.snippet.yaml": { loaders: ["raw-loader"], as: "*.js" },
     },
-    resolveAlias: {
-      "@injected-dependencies.client": path.join(
-        aliasPath,
-        "injection.client.ts",
-      ),
-      "@injected-dependencies.server": path.join(
-        aliasPath,
-        "injection.server.ts",
-      ),
-
-      // read all folders from ./saas-src/node_modules and create a map like the above
-      ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
-        ? Object.fromEntries(
-            fs
-              .readdirSync(path.join(__dirname, "saas-src", "node_modules"))
-              .filter((key) => !existingNodeModules.has(key))
-              .flatMap((key) => [
-                [key, `./saas-src/node_modules/${key}`],
-                [`${key}/*`, `./saas-src/node_modules/${key}/*`],
-              ]),
-          )
-        : {}),
-    },
   },
 
   serverExternalPackages: [
@@ -98,10 +67,13 @@ const config = {
     "@aws-sdk/client-cloudwatch-logs",
     "@aws-sdk/client-s3",
     "@aws-sdk/client-ses",
+    "@aws-sdk/client-sts",
+    "tiktoken",
+    "bcrypt",
   ],
 
   experimental: {
-		reactCompiler: true,
+    reactCompiler: true,
     scrollRestoration: true,
     optimizePackageImports: [
       "@chakra-ui/react",
@@ -145,15 +117,6 @@ const config = {
   },
 
   webpack: (config) => {
-    config.resolve.alias["@injected-dependencies.client"] = path.join(
-      aliasPath,
-      "injection.client.ts",
-    );
-    config.resolve.alias["@injected-dependencies.server"] = path.join(
-      aliasPath,
-      "injection.server.ts",
-    );
-
     // Ensures that only a single version of those are ever loaded
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys below
     config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
@@ -178,28 +141,6 @@ const config = {
         "node:async_hooks": false,
       };
     }
-
-    config.module.rules.push({
-      test: /\.(js|jsx|ts|tsx)$/,
-      use: [
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/node_modules\//g,
-            replace: "",
-            flags: "g",
-          },
-        },
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/src\//g,
-            replace: "~/",
-            flags: "g",
-          },
-        },
-      ],
-    });
 
     // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
     config.module.rules.push({

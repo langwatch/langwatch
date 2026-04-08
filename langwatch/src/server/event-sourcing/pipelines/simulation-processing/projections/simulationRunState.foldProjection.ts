@@ -1,24 +1,33 @@
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import type { Projection } from "../../../";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+} from "../../../projections/abstractFoldProjection";
+import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import { SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "../../../projections/foldProjection.types";
+  SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
+  SimulationMessageSnapshotEvent,
+  SimulationTextMessageStartEvent,
+  SimulationTextMessageEndEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunCancelRequestedEvent,
+  SimulationRunDeletedEvent,
+} from "../schemas/events";
 import {
-  SIMULATION_PROCESSING_EVENT_TYPES,
-  SIMULATION_PROJECTION_VERSIONS,
-} from "../schemas/constants";
-import type { SimulationProcessingEvent } from "../schemas/events";
-import {
-  isSimulationMessageSnapshotEvent,
-  isSimulationRunDeletedEvent,
-  isSimulationRunFinishedEvent,
-  isSimulationRunMetricsUpdatedEvent,
-  isSimulationRunQueuedEvent,
-  isSimulationRunStartedEvent,
-  isSimulationTextMessageEndEvent,
-  isSimulationTextMessageStartEvent,
-} from "../schemas/typeGuards";
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunDeletedEventSchema,
+} from "../schemas/events";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 
 function buildMessageRestJson(messageFields: Record<string, unknown>): string {
@@ -43,7 +52,7 @@ export interface SimulationMessageRow {
  * Matches the simulation_runs ClickHouse table schema.
  *
  * This is both the fold state and the stored data -- one type, not two.
- * `apply()` does all computation. Store is a dumb read/write layer.
+ * Handlers do all computation. Store is a dumb read/write layer.
  */
 export interface SimulationRunStateData {
   ScenarioRunId: string;
@@ -72,50 +81,84 @@ export interface SimulationRunStateData {
   UpdatedAt: number;
   FinishedAt: number | null;
   ArchivedAt: number | null;
+  CancellationRequestedAt: number | null;
   LastSnapshotOccurredAt: number;
+  LastEventOccurredAt: number;
 }
 
 export interface SimulationRunState extends Projection<SimulationRunStateData> {
   data: SimulationRunStateData;
 }
 
-function init(): SimulationRunStateData {
-  return {
-    ScenarioRunId: "",
-    ScenarioId: "",
-    BatchRunId: "",
-    ScenarioSetId: "",
-    Status: "PENDING",
-    Name: null,
-    Description: null,
-    Metadata: null,
-    Messages: [],
-    TraceIds: [],
-    Verdict: null,
-    Reasoning: null,
-    MetCriteria: [],
-    UnmetCriteria: [],
-    Error: null,
-    DurationMs: null,
-    TotalCost: null,
-    RoleCosts: {},
-    RoleLatencies: {},
-    TraceMetrics: {},
-    StartedAt: null,
-    QueuedAt: null,
-    CreatedAt: Date.now(),
-    UpdatedAt: Date.now(),
-    FinishedAt: null,
-    ArchivedAt: null,
-    LastSnapshotOccurredAt: 0,
-  };
-}
+const simulationRunEvents = [
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunDeletedEventSchema,
+] as const;
 
-function apply(
-  state: SimulationRunStateData,
-  event: SimulationProcessingEvent,
-): SimulationRunStateData {
-  if (isSimulationRunQueuedEvent(event)) {
+/**
+ * Type-safe fold projection for simulation run state.
+ *
+ * - `implements FoldEventHandlers` enforces a handler exists for every event schema
+ * - Handler names derived from event type strings (e.g. `"lw.simulation_run.queued"` -> `handleSimulationRunQueued`)
+ * - `UpdatedAt` is auto-managed by the base class after each handler call
+ */
+export class SimulationRunStateFoldProjection
+  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
+  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
+{
+  readonly name = "simulationRunState";
+  readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
+  readonly store: FoldProjectionStore<SimulationRunStateData>;
+
+  protected readonly events = simulationRunEvents;
+
+  constructor(deps: { store: FoldProjectionStore<SimulationRunStateData> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return {
+      ScenarioRunId: "",
+      ScenarioId: "",
+      BatchRunId: "",
+      ScenarioSetId: "",
+      Status: "PENDING",
+      Name: null,
+      Description: null,
+      Metadata: null,
+      Messages: [],
+      TraceIds: [],
+      Verdict: null,
+      Reasoning: null,
+      MetCriteria: [],
+      UnmetCriteria: [],
+      Error: null,
+      DurationMs: null,
+      TotalCost: null,
+      RoleCosts: {},
+      RoleLatencies: {},
+      TraceMetrics: {},
+      StartedAt: null,
+      QueuedAt: null,
+      FinishedAt: null,
+      ArchivedAt: null,
+      CancellationRequestedAt: null,
+      LastSnapshotOccurredAt: 0,
+    };
+  }
+
+  handleSimulationRunQueued(
+    event: SimulationRunQueuedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     return {
       ...state,
       ScenarioRunId: event.data.scenarioRunId,
@@ -127,11 +170,13 @@ function apply(
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       QueuedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationRunStartedEvent(event)) {
+  handleSimulationRunStarted(
+    event: SimulationRunStartedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
@@ -143,11 +188,13 @@ function apply(
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationMessageSnapshotEvent(event)) {
+  handleSimulationRunMessageSnapshot(
+    event: SimulationMessageSnapshotEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     // Out-of-order protection: ignore snapshots older than the latest applied
     if (event.occurredAt <= state.LastSnapshotOccurredAt) return state;
 
@@ -172,11 +219,13 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationTextMessageStartEvent(event)) {
+  handleSimulationRunTextMessageStart(
+    event: SimulationTextMessageStartEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     // Idempotency: skip if message already exists
     if (state.Messages.some((m) => m.Id === event.data.messageId)) return state;
 
@@ -207,11 +256,13 @@ function apply(
       Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationTextMessageEndEvent(event)) {
+  handleSimulationRunTextMessageEnd(
+    event: SimulationTextMessageEndEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     const existingIndex = state.Messages.findIndex(
       (m) => m.Id === event.data.messageId,
     );
@@ -261,11 +312,13 @@ function apply(
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: updatedMessages,
       TraceIds: traceIds,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationRunFinishedEvent(event)) {
+  handleSimulationRunFinished(
+    event: SimulationRunFinishedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
 
@@ -292,11 +345,13 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationRunMetricsUpdatedEvent(event)) {
+  handleSimulationRunMetricsComputed(
+    event: SimulationRunMetricsComputedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     // Store per-trace breakdown, then recompute aggregates
     const traceMetrics = {
       ...state.TraceMetrics,
@@ -328,39 +383,29 @@ function apply(
       TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
       RoleCosts: roleCosts,
       RoleLatencies: roleLatencies,
-      UpdatedAt: event.occurredAt,
     };
   }
 
-  if (isSimulationRunDeletedEvent(event)) {
+  handleSimulationRunCancelRequested(
+    _event: SimulationRunCancelRequestedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // Idempotent: keep the original timestamp if already requested
+    if (state.CancellationRequestedAt != null) return state;
+    return {
+      ...state,
+      CancellationRequestedAt: _event.occurredAt,
+    };
+  }
+
+  handleSimulationRunDeleted(
+    event: SimulationRunDeletedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       ArchivedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
     };
   }
-
-  return state;
-}
-
-/**
- * Creates FoldProjection definition for simulation run state.
- *
- * Fold state = stored data. Pure state transitions, no side effects.
- */
-export function createSimulationRunStateFoldProjection(deps: {
-  store: FoldProjectionStore<SimulationRunStateData>;
-}): FoldProjectionDefinition<
-  SimulationRunStateData,
-  SimulationProcessingEvent
-> {
-  return {
-    name: "simulationRunState",
-    version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-    eventTypes: SIMULATION_PROCESSING_EVENT_TYPES,
-    init,
-    apply,
-    store: deps.store,
-  };
 }

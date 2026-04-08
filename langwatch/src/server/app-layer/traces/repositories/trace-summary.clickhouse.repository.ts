@@ -15,7 +15,7 @@ const logger = createLogger(
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt"
+  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
 >;
 
 interface ClickHouseSummaryRecord {
@@ -48,10 +48,13 @@ interface ClickHouseSummaryRecord {
   BlockedByGuardrail: number;
   TopicId: string | null;
   SubTopicId: string | null;
+  AnnotationIds: string[];
   HasAnnotation: number | null;
   ScenarioRoleCosts: Record<string, number>;
   ScenarioRoleLatencies: Record<string, number>;
   ScenarioRoleSpans: Record<string, string>;
+  SpanCosts: Record<string, number>;
+  LastEventOccurredAt: number;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
@@ -82,7 +85,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
 
     } catch (error) {
@@ -91,6 +94,59 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       logger.error(
         { tenantId, traceId: data.traceId, error: errorMessage },
         "Failed to store trace summary in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async upsertBatch(
+    entries: Array<{ data: TraceSummaryData; tenantId: string }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    const tenantId = entries[0]!.tenantId;
+    EventUtils.validateTenantId(
+      { tenantId },
+      "TraceSummaryClickHouseRepository.upsertBatch",
+    );
+
+    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
+    if (mixedTenant) {
+      throw new Error(
+        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
+        `Each batch must contain a single tenant to ensure correct DB routing.`,
+      );
+    }
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const records = entries.map(({ data, tenantId: tid }) => {
+        const projectionId =
+          IdUtils.generateDeterministicTraceSummaryIdFromData(
+            tid,
+            data.traceId,
+            data.occurredAt,
+          );
+        return this.toClickHouseRecord(
+          data,
+          tid,
+          projectionId,
+          TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        );
+      });
+
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, count: entries.length, error: errorMessage },
+        "Failed to batch store trace summaries in ClickHouse",
       );
       throw error;
     }
@@ -139,10 +195,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             BlockedByGuardrail,
             TopicId,
             SubTopicId,
+            AnnotationIds,
             HasAnnotation,
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
-            ScenarioRoleSpans
+            ScenarioRoleSpans,
+            SpanCosts
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -151,7 +209,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
-        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSummaryRecord>();
@@ -183,28 +240,29 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       timeToFirstTokenMs: record.TimeToFirstTokenMs,
       timeToLastTokenMs: record.TimeToLastTokenMs,
       tokensPerSecond: record.TokensPerSecond,
-      containsErrorStatus: record.ContainsErrorStatus === 1,
-      containsOKStatus: record.ContainsOKStatus === 1,
+      containsErrorStatus: !!record.ContainsErrorStatus,
+      containsOKStatus: !!record.ContainsOKStatus,
       errorMessage: record.ErrorMessage,
       models: record.Models,
       totalCost: record.TotalCost,
-      tokensEstimated: record.TokensEstimated === true,
+      tokensEstimated: !!record.TokensEstimated,
       totalPromptTokenCount: record.TotalPromptTokenCount,
       totalCompletionTokenCount: record.TotalCompletionTokenCount,
-      outputFromRootSpan: record.OutputFromRootSpan === 1,
+      outputFromRootSpan: !!record.OutputFromRootSpan,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
-      blockedByGuardrail: record.BlockedByGuardrail === 1,
+      blockedByGuardrail: !!record.BlockedByGuardrail,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
-      hasAnnotation:
-        record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
+      annotationIds: record.AnnotationIds ?? [],
       attributes: record.Attributes ?? {},
       scenarioRoleCosts: record.ScenarioRoleCosts ?? {},
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
       scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
+      spanCosts: record.SpanCosts ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
+      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -223,13 +281,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
+      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
-      TimeToFirstTokenMs: data.timeToFirstTokenMs,
-      TimeToLastTokenMs: data.timeToLastTokenMs,
-      TotalDurationMs: data.totalDurationMs,
-      TokensPerSecond: data.tokensPerSecond,
+      TimeToFirstTokenMs: data.timeToFirstTokenMs != null ? Math.round(data.timeToFirstTokenMs) : null,
+      TimeToLastTokenMs: data.timeToLastTokenMs != null ? Math.round(data.timeToLastTokenMs) : null,
+      TotalDurationMs: Math.round(data.totalDurationMs),
+      TokensPerSecond: data.tokensPerSecond != null ? Math.round(data.tokensPerSecond) : null,
       SpanCount: data.spanCount,
       ContainsErrorStatus: data.containsErrorStatus ? 1 : 0,
       ContainsOKStatus: data.containsOKStatus ? 1 : 0,
@@ -244,11 +303,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
-      HasAnnotation:
-        data.hasAnnotation != null ? (data.hasAnnotation ? 1 : 0) : null,
+      AnnotationIds: data.annotationIds,
+      HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
       ScenarioRoleCosts: data.scenarioRoleCosts ?? {},
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
+      SpanCosts: data.spanCosts ?? {},
     };
   }
 }

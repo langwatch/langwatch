@@ -171,32 +171,23 @@ Feature: Scenario Failure Handler
     And I can click to view the error details
 
   # ============================================================================
-  # Worker Death Handling - Stalled Job Behavior
+  # Child Process Timeout - Stalled Execution Handling
   # ============================================================================
-  # When a worker dies mid-scenario (crash, OOM, network partition), BullMQ
-  # detects the stalled job after ~30s. These scenarios ensure stalled jobs
-  # fail cleanly instead of retrying indefinitely.
+  # When a child process hangs or the worker dies mid-scenario (crash, OOM),
+  # the scenario processor's 5-minute timeout (CHILD_PROCESS.TIMEOUT_MS) kills
+  # the child. The failure handler then emits ERROR events so the UI shows
+  # the failure.
 
   @unit
-  Scenario: Stalled jobs fail without retry
-    Given a scenario job has stalled
-    When BullMQ processes the stalled job
-    Then the job fails immediately
-    And no retry is attempted
+  Scenario: Timed-out child process triggers failure handler
+    Given a scenario child process has been running for over 5 minutes
+    When the scenario processor timeout fires
+    Then the child process is killed
+    And the failure handler emits ERROR events
 
   @integration
-  Scenario: Worker logs stalled jobs with warning level
-    Given a scenario worker is processing jobs
-    When a job becomes stalled
-    Then the worker emits a "stalled" event
-    And the event is logged at warning level
-    And the log includes the job ID
-
-  @integration
-  Scenario: Stalled job triggers failure handler after detection
-    Given a scenario job is being processed
-    And the worker dies mid-execution
-    When BullMQ detects the stalled job after ~30 seconds
-    Then the job transitions to failed state
-    And ScenarioFailureHandler.ensureFailureEventsEmitted is called
-    And the error message indicates the job was stalled
+  Scenario: Scenario processor logs timeout with error level
+    Given a scenario child process is running
+    When the 5-minute processor timeout fires
+    Then the event is logged at error level
+    And the log includes the scenarioRunId

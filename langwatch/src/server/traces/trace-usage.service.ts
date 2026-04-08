@@ -22,13 +22,8 @@ const BATCH_SIZE = 10;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Module-level cache for getCurrentMonthCount */
-const monthCountCache = new TtlCache<number>(CACHE_TTL_MS);
+const monthCountCache = new TtlCache<number>(CACHE_TTL_MS, "ttlcache:traceUsage:monthCount:");
 
-
-/** Clear cache (for testing) */
-export const clearMonthCountCache = (): void => {
-  monthCountCache.clear();
-};
 
 /**
  * Service for trace usage tracking and limit enforcement
@@ -65,7 +60,7 @@ export class TraceUsageService {
     const billingMonth = getBillingMonth();
     const cacheKey = `${organizationId}:traces:${billingMonth}`;
 
-    const cached = monthCountCache.get(cacheKey);
+    const cached = await monthCountCache.get(cacheKey);
     if (cached !== undefined) {
       logger.info({ organizationId, cached, billingMonth }, "getCurrentMonthCount: cache hit");
       return cached;
@@ -77,7 +72,7 @@ export class TraceUsageService {
 
     if (clickHouseTotal !== null) {
       logger.info({ organizationId, clickHouseTotal, billingMonth }, "getCurrentMonthCount: ClickHouse result");
-      monthCountCache.set(cacheKey, clickHouseTotal);
+      await monthCountCache.set(cacheKey, clickHouseTotal);
       return clickHouseTotal;
     }
 
@@ -95,7 +90,7 @@ export class TraceUsageService {
     });
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
-    monthCountCache.set(cacheKey, total);
+    await monthCountCache.set(cacheKey, total);
     return total;
   }
 
@@ -150,27 +145,7 @@ export class TraceUsageService {
       return { chProjectIds: [], esProjectIds: projectIds };
     }
 
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, featureClickHouseDataSourceTraces: true },
-    });
-
-    const flagMap = new Map(
-      projects.map((p) => [p.id, p.featureClickHouseDataSourceTraces]),
-    );
-
-    const chProjectIds: string[] = [];
-    const esProjectIds: string[] = [];
-
-    for (const id of projectIds) {
-      if (flagMap.get(id)) {
-        chProjectIds.push(id);
-      } else {
-        esProjectIds.push(id);
-      }
-    }
-
-    return { chProjectIds, esProjectIds };
+    return { chProjectIds: projectIds, esProjectIds: [] };
   }
 
   private async getCountsFromClickHouse(

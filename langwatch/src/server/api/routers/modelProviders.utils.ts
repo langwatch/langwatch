@@ -1,4 +1,4 @@
-import { dependencies } from "../../../injection/dependencies.server";
+import { buildManagedBedrockLitellmParams } from "../../../../ee/managed-providers/managedBedrockConfig";
 import { prisma } from "../../db";
 import type {
   LLMModelEntry,
@@ -285,16 +285,12 @@ export const prepareLitellmParams = async ({
     }
   }
 
-  if (dependencies.managedModelProviderLitellmParams) {
-    return await dependencies.managedModelProviderLitellmParams({
-      params,
-      projectId,
-      model,
-      modelProvider,
-    });
-  }
-
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 
-  return params;
+  return await buildManagedBedrockLitellmParams({
+    params,
+    projectId,
+    model,
+    modelProvider,
+  });
 };

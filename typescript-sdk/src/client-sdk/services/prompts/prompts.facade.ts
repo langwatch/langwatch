@@ -1,9 +1,10 @@
-import { PromptsApiService } from "./prompts-api.service";
+import { PromptsApiService, type AssignLabelResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
+import type { CreatePromptBody, UpdatePromptBody, PromptData, TagDefinition, CreatedTag } from "./types";
 import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
+import { PromptsError } from "./errors";
 
 /**
  * Options for fetching a prompt.
@@ -11,6 +12,8 @@ import { LocalPromptsService } from "./local-prompts.service";
 export interface GetPromptOptions {
   /** Specific version to fetch */
   version?: string;
+  /** Label to fetch (e.g., "production", "staging", or a custom label) */
+  label?: string;
   /** Fetch policy to use */
   fetchPolicy?: FetchPolicy;
   /** Cache TTL in minutes (only used with CACHE_TTL policy) */
@@ -35,10 +38,23 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
+  readonly tags: {
+    assign(id: string, params: { label: string; versionId: string }): Promise<AssignLabelResult>;
+    list(): Promise<TagDefinition[]>;
+    create(params: { name: string }): Promise<CreatedTag>;
+    delete(tagName: string): Promise<void>;
+  };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
+    this.tags = {
+      assign: (id, { label, versionId }) =>
+        this.promptsApiService.assignLabel({ id, label, versionId }),
+      list: () => this.promptsApiService.listTags(),
+      create: ({ name }) => this.promptsApiService.createTag({ name }),
+      delete: (tagName) => this.promptsApiService.deleteTag(tagName),
+    };
   }
 
   /**
@@ -54,7 +70,11 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
 
   /**
    * Retrieves a prompt by handle or ID.
-   * @param handleOrId The prompt's handle or unique identifier.
+   *
+   * Supports shorthand `handle:label` syntax — e.g. `get("pizza-prompt:production")`.
+   * Shorthand is parsed server-side; the SDK passes the string through as-is.
+   *
+   * @param handleOrId The prompt's handle, unique identifier, or `handle:label` shorthand.
    * @param options Optional parameters for the request.
    * @returns The Prompt instance.
    * @throws {PromptsError} If the prompt is not found or the API call fails.
@@ -105,7 +125,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
       if (localPrompt) {
         return new Prompt(localPrompt);
       }
-      throw new Error(`Prompt "${handleOrId}" not found locally or on server`);
+      throw new PromptsError(`Prompt "${handleOrId}" not found locally or on server`);
     }
   }
 
@@ -114,14 +134,12 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     if (localPrompt) {
       return new Prompt(localPrompt);
     }
-    throw new Error(`Prompt "${handleOrId}" not found in materialized files`);
+    throw new PromptsError(`Prompt "${handleOrId}" not found in materialized files`);
   }
 
-  /**
-   * Builds a cache key that includes both handle and version to prevent collisions.
-   */
   private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    return `${handleOrId}::version:${options?.version ?? ''}`;
+    const labelSegment = options?.label != null ? `::label:${options.label}` : '';
+    return `${handleOrId}::version:${options?.version ?? ''}${labelSegment}`;
   }
 
   private async getCacheTtl(
@@ -146,7 +164,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
       if (localPrompt) {
         return new Prompt(localPrompt);
       }
-      throw new Error(`Prompt "${handleOrId}" not found locally or on server`);
+      throw new PromptsError(`Prompt "${handleOrId}" not found locally or on server`);
     }
   }
 

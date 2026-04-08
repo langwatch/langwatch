@@ -58,7 +58,11 @@ function EvaluatorInputsTooltip({
   inputs?: Record<string, any> | null;
   children: React.ReactNode;
 }) {
-  if (inputs === undefined || inputs === null || Object.keys(inputs).length === 0) {
+  if (
+    inputs === undefined ||
+    inputs === null ||
+    Object.keys(inputs).length === 0
+  ) {
     return <>{children}</>;
   }
 
@@ -169,7 +173,14 @@ export function EvaluationStatusItem({
             )}
 
             <VStack align="start" gap={0} minWidth={0}>
-              <Text fontWeight="semibold" fontSize="sm" lineClamp={1}>
+              <Text
+                fontWeight="semibold"
+                fontSize="sm"
+                lineClamp={1}
+                borderBottom={check.inputs ? "1px solid" : undefined}
+                borderColor="border.emphasized"
+                borderStyle="dashed"
+              >
                 {check.name || evaluator?.name}
               </Text>
               {customPrompt ? (
@@ -278,8 +289,7 @@ export function EvaluationStatusItem({
           )}
 
           {/* Processing/Scheduled badge */}
-          {(check.status === "in_progress" ||
-            check.status === "scheduled") && (
+          {(check.status === "in_progress" || check.status === "scheduled") && (
             <Text fontSize="xs" color="fg.subtle">
               {check.status === "in_progress" ? "Processing..." : "Scheduled"}
             </Text>
@@ -319,7 +329,7 @@ export function EvaluationStatusItem({
                 <MoreVertical size={14} />
               </IconButton>
             </Menu.Trigger>
-            <Menu.Content minWidth="160px" zIndex="popover">
+            <Menu.Content minWidth="160px">
               <Menu.Item value="edit" onClick={handleOpenConfig}>
                 <HStack gap={2}>
                   <Pencil size={14} />
@@ -341,10 +351,7 @@ export function EvaluationStatusItem({
             paddingTop={2}
           >
             <Text fontSize="sm" color="fg.subtle">
-              <HoverableBigText
-                expandedVersion={check.details!}
-                lineClamp={3}
-              >
+              <HoverableBigText expandedVersion={check.details!} lineClamp={3}>
                 <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
                   {check.details}
                 </Box>

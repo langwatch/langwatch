@@ -188,13 +188,13 @@ export function ScenarioTargetRow({
             paddingY={0.5}
             borderRadius="md"
             border="1px solid"
-            borderColor="red.200"
+            borderColor="gray.300"
             fontSize="xs"
-            color="red.600"
+            color="fg.default"
             cursor={isCancelling ? "default" : "pointer"}
             opacity={isCancelling ? 0.6 : 1}
             flexShrink={0}
-            _hover={isCancelling ? undefined : { bg: "red.50", borderColor: "red.300" }}
+            _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               if (!isCancelling) onCancel?.();
@@ -210,7 +210,7 @@ export function ScenarioTargetRow({
             aria-disabled={isCancelling}
             data-testid="cancel-run-button"
           >
-            {isCancelling ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+            {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
             <Text fontSize="xs">Stop</Text>
           </HStack>
         )}

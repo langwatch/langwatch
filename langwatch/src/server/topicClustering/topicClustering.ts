@@ -23,7 +23,6 @@ import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { getPayloadSizeHistogram } from "../metrics";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
@@ -45,33 +44,19 @@ export const clusterTopicsForProject = async (
 ): Promise<void> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { team: true },
   });
   if (!project) {
     throw new Error("Project not found");
   }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    logger.info(
-      { projectId },
-      "skipping clustering for project as monthly limit has been reached",
-    );
+
+  const clickhouse = await getClickHouseClientForProject(projectId);
+
+  if (!clickhouse) {
+    throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
 
-  const clickhouse = project.featureClickHouseDataSourceTraces
-    ? await getClickHouseClientForProject(projectId)
-    : null;
-
   const { totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount } =
-    clickhouse
-      ? await fetchCountsFromClickHouse(clickhouse, projectId)
-      : await fetchCountsFromElasticsearch(projectId);
+    await fetchCountsFromClickHouse(clickhouse, projectId);
 
   logger.info(
     {
@@ -79,7 +64,7 @@ export const clusterTopicsForProject = async (
       totalTraces: totalTracesCount,
       tracesWithInput: tracesWithInputCount,
       recentTraces: recentTracesCount,
-      backend: clickhouse ? "clickhouse" : "elasticsearch",
+      backend: "clickhouse",
     },
     "Debug: Project trace counts",
   );
@@ -134,22 +119,14 @@ export const clusterTopicsForProject = async (
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = clickhouse
-    ? await fetchTracesFromClickHouse(
-        clickhouse,
-        projectId,
-        isIncrementalProcessing,
-        topicIds,
-        subtopicIds,
-        searchAfter,
-      )
-    : await fetchTracesFromElasticsearch(
-        projectId,
-        isIncrementalProcessing,
-        topicIds,
-        subtopicIds,
-        searchAfter,
-      );
+  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse(
+    clickhouse,
+    projectId,
+    isIncrementalProcessing,
+    topicIds,
+    subtopicIds,
+    searchAfter,
+  );
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -221,13 +198,20 @@ async function fetchCountsFromClickHouse(
   const result = await clickhouse.query({
     query: `
       SELECT
-        toString(count(DISTINCT TraceId)) AS total,
-        toString(countDistinctIf(TraceId, length(ComputedInput) > 0)) AS withInput,
-        toString(countDistinctIf(TraceId, OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countDistinctIf(TraceId, TopicId IS NOT NULL AND TopicId != '')) AS assigned
-      FROM trace_summaries
+        toString(count(*)) AS total,
+        toString(countIf(length(ComputedInput) > 0)) AS withInput,
+        toString(countIf(OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
+        toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
+      FROM trace_summaries t
       WHERE TenantId = {tenantId:String}
         AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+          GROUP BY TenantId, TraceId
+        )
     `,
     query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
@@ -319,13 +303,15 @@ async function fetchTracesFromClickHouse(
 ): Promise<TraceSearchResult> {
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
-  const conditions = [
+  const baseConditions = [
     "TenantId = {tenantId:String}",
     "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
     "OccurredAt < now64(3)",
     "ComputedInput IS NOT NULL",
     "ComputedInput != ''",
   ];
+
+  const conditions = [...baseConditions];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
     // Must either not have any of the known topics, or not have any of the known subtopics
@@ -341,29 +327,36 @@ async function fetchTracesFromClickHouse(
   }
 
   if (searchAfter) {
-    conditions.push(
-      "(toUnixTimestamp64Milli(OccurredAt), TraceId) < ({lastTs:UInt64}, {lastTraceId:String})",
-    );
+    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here
+    conditions.push(`(
+      toUnixTimestamp64Milli(OccurredAt) < {lastTs:UInt64}
+      OR (
+        toUnixTimestamp64Milli(OccurredAt) = {lastTs:UInt64}
+        AND TraceId > {lastTraceId:String}
+      )
+    )`);
   }
 
+  const baseWhereClause = baseConditions.join(" AND ");
   const whereClause = conditions.join(" AND ");
 
   const result = await clickhouse.query({
     query: `
       SELECT
-        TraceId,
-        ComputedInput,
-        TopicId,
-        SubTopicId,
-        toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
-      FROM (
-        SELECT *
-        FROM trace_summaries
-        WHERE ${whereClause}
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
-      )
-      ORDER BY OccurredAt DESC, TraceId ASC
+        t.TraceId AS TraceId,
+        t.ComputedInput AS ComputedInput,
+        t.TopicId AS TopicId,
+        t.SubTopicId AS SubTopicId,
+        toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
+      FROM trace_summaries t
+      WHERE ${whereClause}
+        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries
+          WHERE ${baseWhereClause}
+          GROUP BY TenantId, TraceId
+        )
+      ORDER BY t.OccurredAt DESC, t.TraceId ASC
       LIMIT 2000
     `,
     query_params: {
@@ -776,52 +769,39 @@ export const storeResults = async (
     });
   }
 
-  // Emit TopicAssignedEvents via command queue (only for ES-enabled projects)
+  // Emit TopicAssignedEvents via command queue
   if (tracesToAssign.length > 0) {
     try {
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { featureEventSourcingTraceIngestion: true },
-      });
+      const app = getApp();
 
-      if (!project?.featureEventSourcingTraceIngestion) {
-        logger.debug(
-          { projectId },
-          "Skipping AssignTopic commands - event sourcing not enabled for project",
-        );
-      } else {
-        const app = getApp();
+      // Build topic name lookup maps
+      const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
+      const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
 
-        // Build topic name lookup maps
-        const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
-        const subtopicNameMap = new Map(subtopics.map((s) => [s.id, s.name]));
+      // Send commands in parallel (queue handles batching internally)
+      await Promise.all(
+        tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
+          app.traces.assignTopic({
+            tenantId: projectId,
+            traceId: trace_id,
+            topicId: topic_id,
+            topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
+            subtopicId: subtopic_id,
+            subtopicName: subtopic_id
+              ? (subtopicNameMap.get(subtopic_id) ?? null)
+              : null,
+            isIncremental,
+            occurredAt: Date.now(),
+          }),
+        ),
+      );
 
-        // Send commands in parallel (queue handles batching internally)
-        await Promise.all(
-          tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-            app.traces.assignTopic({
-              tenantId: projectId,
-              traceId: trace_id,
-              topicId: topic_id,
-              topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
-              subtopicId: subtopic_id,
-              subtopicName: subtopic_id
-                ? (subtopicNameMap.get(subtopic_id) ?? null)
-                : null,
-              isIncremental,
-              occurredAt: Date.now(),
-            }),
-          ),
-        );
-
-        logger.info(
-          { projectId, commandsSent: tracesToAssign.length },
-          "Sent AssignTopic commands to queue",
-        );
-      }
+      logger.info(
+        { projectId, commandsSent: tracesToAssign.length },
+        "Sent AssignTopic commands to queue",
+      );
     } catch (error) {
       logger.error({ projectId, error }, "Failed to send AssignTopic commands");
-      // Don't fail the job - ES update already succeeded
     }
   }
 

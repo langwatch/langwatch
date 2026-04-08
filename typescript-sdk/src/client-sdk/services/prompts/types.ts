@@ -45,6 +45,15 @@ export type PromptResponse = NonNullable<
 // Extract the PromptScope type from the API client
 export type PromptScope = paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
 
+// Extract tag definition types from the OpenAPI schema
+export type TagDefinition = NonNullable<
+  paths["/api/prompts/tags"]["get"]["responses"]["200"]["content"]["application/json"]
+>[number];
+
+export type CreatedTag = NonNullable<
+  paths["/api/prompts/tags"]["post"]["responses"]["201"]["content"]["application/json"]
+>;
+
 /**
  * Fetch policy for prompt retrieval.
  * Controls how prompts are fetched and cached.

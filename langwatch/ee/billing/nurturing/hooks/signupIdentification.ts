@@ -56,6 +56,7 @@ export function fireSignupNurturingCalls({
     has_evaluations: false,
     has_prompts: false,
     has_simulations: false,
+    has_subscription: false,
     createdAt: new Date().toISOString(),
   };
 

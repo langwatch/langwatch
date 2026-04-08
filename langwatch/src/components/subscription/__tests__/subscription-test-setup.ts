@@ -13,6 +13,7 @@
  */
 import { vi } from "vitest";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { DisplayInvoice } from "../../../server/app-layer/subscription/subscription.service";
 
 // ---------------------------------------------------------------------------
 // Mutable mock organisation (reset per-test via resetMocks)
@@ -160,7 +161,7 @@ export const mockCreateInvites = vi.fn(() => ({
 }));
 
 export const mockListInvoices = vi.fn(() => ({
-  data: [],
+  data: [] as DisplayInvoice[],
   isLoading: false,
   isError: false,
 }));
@@ -201,7 +202,7 @@ export function resetMocks() {
     isLoading: false,
   });
   mockListInvoices.mockReturnValue({
-    data: [],
+    data: [] as DisplayInvoice[],
     isLoading: false,
     isError: false,
   });

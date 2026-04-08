@@ -1,0 +1,65 @@
+---
+title: OpenAI Agents SDK Instrumentation
+sidebarTitle: OpenAI Agents
+description: Instrument OpenAI Agents with the LangWatch Python SDK to capture traces, run AI agent evaluations, and debug agent testing scenarios.
+keywords: openai-agents, instrumentation, openinference, langwatch, python, tracing
+---
+
+LangWatch integrates with OpenAI Agents through OpenInference instrumentation to monitor agent execution, LLM calls, and tool usage.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch openai-agents openinference-instrumentation-openai-agents
+```
+
+```bash uv
+uv add langwatch openai-agents openinference-instrumentation-openai-agents
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use the OpenInference instrumentation for OpenAI Agents by passing `OpenAIAgentsInstrumentor` to `langwatch.setup()`.
+
+```python
+import langwatch
+from agents import Agent, Runner
+from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
+import os
+import asyncio
+
+langwatch.setup(instrumentors=[OpenAIAgentsInstrumentor()])
+
+agent = Agent(name="ExampleAgent", instructions="You are a helpful assistant.")
+
+
+@langwatch.trace(name="OpenAI Agent Run with OpenInference")
+async def run_agent_with_openinference(prompt: str):
+    result = await Runner.run(agent, prompt)
+    return result.final_output
+
+
+async def main():
+    user_query = "Tell me a joke"
+    response = await run_agent_with_openinference(user_query)
+    print(f"User: {user_query}")
+    print(f"AI: {response}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+The `OpenAIAgentsInstrumentor` automatically captures agent activities, LLM calls, and tool usage. Use `@langwatch.trace()` to create a parent trace under which agent operations will be nested.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your OpenAI Agents applications

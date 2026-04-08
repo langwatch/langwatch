@@ -1,0 +1,865 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "LangWatch",
+  "colors": {
+    "primary": "#e17100",
+    "light": "#fe9a00",
+    "dark": "#e17100"
+  },
+  "appearance": {
+    "default": "system",
+    "strict": false
+  },
+  "logo": {
+    "light": "/logo/dark.svg",
+    "dark": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "banner": {
+    "content": "**[Get started with LangWatch Skills in seconds](https://langwatch.ai/docs/skills/directory):** Set up evals, scenario tests, and tracing just by asking your AI coding assistant.",
+    "dismissible": true
+  },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
+  },
+  "api": {
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": [
+        "python",
+        "typescript",
+        "curl"
+      ],
+      "defaults": "required"
+    },
+    "mdx": {
+      "server": "https://app.langwatch.ai/api/evaluations",
+      "auth": {
+        "method": "key",
+        "name": "x-api-key"
+      }
+    }
+  },
+  "navigation": {
+    "anchors": [
+      {
+        "anchor": "Documentation",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              {
+                "group": "LangWatch Skills",
+                "pages": [
+                  "skills/directory",
+                  "skills/pms-and-domain-experts"
+                ]
+              },
+              "integration/mcp",
+              "better-agents/overview"
+            ]
+          },
+          {
+            "group": "Agent Simulations",
+            "pages": [
+              "agent-simulations/introduction",
+              "agent-simulations/overview",
+              "agent-simulations/getting-started",
+              "agent-simulations/set-overview",
+              "agent-simulations/batch-runs",
+              "agent-simulations/individual-run"
+            ]
+          },
+          {
+            "group": "Observability",
+            "pages": [
+              "observability/overview",
+              "integration/quick-start",
+              "concepts",
+              {
+                "group": "User Events",
+                "pages": [
+                  "user-events/overview",
+                  "user-events/thumbs-up-down",
+                  "user-events/waited-to-finish",
+                  "user-events/selected-text",
+                  "user-events/custom"
+                ]
+              },
+              "features/automations",
+              "features/embedded-analytics"
+            ]
+          },
+          {
+            "group": "Evaluations",
+            "pages": [
+              "evaluations/overview",
+              {
+                "group": "Experiments",
+                "pages": [
+                  "evaluations/experiments/overview",
+                  "evaluations/experiments/sdk",
+                  {
+                    "group": "Via UI",
+                    "pages": [
+                      "evaluations/experiments/ui/answer-correctness",
+                      "evaluations/experiments/ui/llm-as-a-judge"
+                    ]
+                  },
+                  "evaluations/experiments/ci-cd",
+                  "evaluations/experiments/multimodal-evaluation"
+                ]
+              },
+              {
+                "group": "Online Evaluation",
+                "pages": [
+                  "evaluations/online-evaluation/overview",
+                  "evaluations/online-evaluation/setup-monitors",
+                  "evaluations/online-evaluation/by-thread"
+                ]
+              },
+              {
+                "group": "Guardrails",
+                "pages": [
+                  "evaluations/guardrails/overview",
+                  "evaluations/guardrails/code-integration"
+                ]
+              },
+              {
+                "group": "Evaluators",
+                "pages": [
+                  "evaluations/evaluators/overview",
+                  "evaluations/evaluators/built-in-evaluators",
+                  "evaluations/evaluators/saved-evaluators",
+                  "evaluations/evaluators/custom-scoring",
+                  "evaluations/evaluators/list"
+                ]
+              },
+              {
+                "group": "Datasets",
+                "pages": [
+                  "datasets/overview",
+                  "datasets/programmatic-access",
+                  "datasets/ai-dataset-generation",
+                  "datasets/automatically-from-traces",
+                  "datasets/dataset-threads",
+                  "datasets/dataset-images"
+                ]
+              },
+              "features/annotations"
+            ]
+          },
+          {
+            "group": "Prompt Management",
+            "pages": [
+              "prompt-management/overview",
+              "prompt-management/getting-started",
+              "prompt-management/cli",
+              "prompt-management/prompt-playground",
+              {
+                "group": "Features",
+                "pages": [
+                  "prompt-management/features/essential/version-control",
+                  "prompts/template-syntax",
+                  "prompt-management/data-model",
+                  "prompt-management/scope",
+                  "prompt-management/features/essential/analytics",
+                  "prompt-management/features/essential/github-integration",
+                  "prompt-management/features/advanced/link-to-traces",
+                  "prompt-management/features/advanced/optimization-studio",
+                  "prompt-management/features/advanced/guaranteed-availability",
+                  "prompt-management/features/advanced/a-b-testing"
+                ]
+              },
+              {
+                "group": "Optimization Studio",
+                "pages": [
+                  "optimization-studio/overview",
+                  "optimization-studio/llm-nodes",
+                  "optimization-studio/datasets",
+                  "optimization-studio/evaluating",
+                  "optimization-studio/optimizing"
+                ]
+              },
+              {
+                "group": "DSPy Optimization",
+                "pages": [
+                  "dspy-visualization/quickstart",
+                  "dspy-visualization/custom-optimizer",
+                  "dspy-visualization/rag-visualization"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Platform",
+            "pages": [
+              {
+                "group": "Administration",
+                "pages": [
+                  "platform/rbac",
+                  "platform/audit-log",
+                  "platform/scim"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Examples & Cookbooks",
+            "pages": [
+              {
+                "group": "Cookbooks",
+                "pages": [
+                  "/cookbooks/build-a-simple-rag-app",
+                  "/cookbooks/finetuning-embedding-models",
+                  "/cookbooks/vector-vs-hybrid-search",
+                  "/cookbooks/tool-selection",
+                  "/cookbooks/finetuning-agents",
+                  "/cookbooks/evaluating-multi-turn-conversations"
+                ]
+              },
+              {
+                "group": "Use Cases",
+                "pages": [
+                  "use-cases/technical-rag",
+                  "use-cases/ai-coach",
+                  "use-cases/structured-outputs"
+                ]
+              },
+              "integration/code-examples"
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "support",
+              "status"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "Integrations",
+        "icon": "plug",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "integration/overview"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              {
+                "group": "Python",
+                "icon": "python",
+                "pages": [
+                  "integration/python/guide",
+                  "integration/python/reference",
+                  "integration/python/tutorials/manual-instrumentation",
+                  "integration/python/tutorials/open-telemetry"
+                ]
+              },
+              {
+                "group": "TypeScript",
+                "icon": "square-js",
+                "pages": [
+                  "integration/typescript/guide",
+                  "integration/typescript/reference",
+                  "integration/typescript/tutorials/filtering-spans",
+                  "integration/typescript/tutorials/manual-instrumentation",
+                  "integration/typescript/tutorials/opentelemetry-migration",
+                  "integration/typescript/tutorials/debugging-typescript",
+                  "integration/typescript/tutorials/semantic-conventions"
+                ]
+              },
+              {
+                "group": "Go",
+                "icon": "golang",
+                "pages": [
+                  "integration/go/guide",
+                  "integration/go/reference"
+                ]
+              },
+              "integration/opentelemetry/guide",
+              "integration/metadata-and-labels",
+              {
+                "group": "Tutorials",
+                "pages": [
+                  {
+                    "group": "Capturing Input/Output",
+                    "pages": [
+                      "integration/python/tutorials/capturing-mapping-input-output",
+                      "integration/typescript/tutorials/capturing-input-output"
+                    ]
+                  },
+                  {
+                    "group": "Capturing RAG",
+                    "pages": [
+                      "integration/python/tutorials/capturing-rag",
+                      "integration/typescript/tutorials/capturing-rag"
+                    ]
+                  },
+                  {
+                    "group": "Capturing Metadata",
+                    "pages": [
+                      "integration/python/tutorials/capturing-metadata",
+                      "integration/typescript/tutorials/capturing-metadata"
+                    ]
+                  },
+                  {
+                    "group": "Tracking LLM Costs",
+                    "pages": [
+                      "integration/python/tutorials/tracking-llm-costs",
+                      "integration/typescript/tutorials/tracking-llm-costs"
+                    ]
+                  },
+                  {
+                    "group": "Tracking Tool Calls",
+                    "pages": [
+                      "integration/python/tutorials/tracking-tool-calls",
+                      "integration/typescript/tutorials/tracking-tool-calls"
+                    ]
+                  },
+                  {
+                    "group": "Tracking Conversations",
+                    "pages": [
+                      "integration/python/tutorials/tracking-conversations",
+                      "integration/typescript/tutorials/tracking-conversations"
+                    ]
+                  },
+                  {
+                    "group": "Evaluations & Guardrails",
+                    "pages": [
+                      "integration/python/tutorials/capturing-evaluations-guardrails"
+                    ]
+                  },
+                  "integration/tutorials/open-telemetry"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Frameworks",
+            "pages": [
+              {
+                "group": "LangChain",
+                "pages": [
+                  "integration/python/integrations/langchain",
+                  "integration/typescript/integrations/langchain"
+                ]
+              },
+              {
+                "group": "LangGraph",
+                "pages": [
+                  "integration/python/integrations/langgraph",
+                  "integration/typescript/integrations/langgraph"
+                ]
+              },
+              "integration/typescript/integrations/vercel-ai-sdk",
+              "integration/python/integrations/lite-llm",
+              "integration/python/integrations/open-ai-agents",
+              "integration/python/integrations/pydantic-ai",
+              "integration/typescript/integrations/mastra",
+              "integration/python/integrations/dspy",
+              "integration/python/integrations/llamaindex",
+              "integration/python/integrations/haystack",
+              "integration/python/integrations/strand-agents",
+              "integration/python/integrations/agno",
+              "integration/python/integrations/crew-ai",
+              "integration/python/integrations/autogen",
+              "integration/python/integrations/semantic-kernel",
+              "integration/java/integrations/spring-ai",
+              "integration/python/integrations/promptflow",
+              "integration/python/integrations/instructor",
+              "integration/python/integrations/smolagents",
+              "integration/python/integrations/google-ai",
+              "integration/python/integrations/other"
+            ]
+          },
+          {
+            "group": "Model Providers",
+            "pages": [
+              "integration/custom-models",
+              {
+                "group": "OpenAI",
+                "pages": [
+                  "integration/python/integrations/open-ai",
+                  "integration/typescript/integrations/open-ai",
+                  "integration/go/integrations/open-ai"
+                ]
+              },
+              {
+                "group": "Anthropic (Claude)",
+                "pages": [
+                  "integration/python/integrations/anthropic",
+                  "integration/go/integrations/anthropic"
+                ]
+              },
+              {
+                "group": "Microsoft Azure",
+                "pages": [
+                  "integration/python/integrations/azure-ai",
+                  "integration/python/integrations/open-ai-azure",
+                  "integration/typescript/integrations/azure",
+                  "integration/go/integrations/azure-openai"
+                ]
+              },
+              {
+                "group": "Google Cloud",
+                "pages": [
+                  "integration/python/integrations/vertex-ai",
+                  "integration/go/integrations/google-gemini"
+                ]
+              },
+              {
+                "group": "Amazon Web Services",
+                "pages": [
+                  "integration/python/integrations/aws-bedrock"
+                ]
+              },
+              "integration/go/integrations/groq",
+              "integration/go/integrations/grok",
+              "integration/go/integrations/ollama",
+              "integration/go/integrations/openrouter"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "integration/tools/integrations/claude-code",
+              "integration/openclaw"
+            ]
+          },
+          {
+            "group": "No-Code Platforms",
+            "pages": [
+              "integration/n8n",
+              "integration/langflow",
+              "integration/flowise"
+            ]
+          },
+          {
+            "group": "Direct Integrations",
+            "pages": [
+              "integration/opentelemetry/guide",
+              "integration/rest-api"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "Self Hosting",
+        "icon": "server",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "self-hosting/overview",
+              "hybrid-setup/overview",
+              "self-hosting/troubleshooting"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "self-hosting/configuration/environment-variables",
+              "self-hosting/configuration/sizing-and-scaling",
+              "self-hosting/configuration/backups",
+              "self-hosting/configuration/sso",
+              "self-hosting/configuration/observability",
+              "self-hosting/configuration/third-party-integrations"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "self-hosting/deployment/docker-compose",
+              "self-hosting/deployment/docker-images",
+              "self-hosting/deployment/kubernetes-helm",
+              "self-hosting/deployment/kubernetes-local"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "self-hosting/infrastructure/architecture"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "self-hosting/security",
+              "self-hosting/upgrade"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "API Reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Traces",
+            "pages": [
+              "api-reference/traces/overview",
+              "api-reference/traces/get-trace",
+              "api-reference/traces/get-thread-details",
+              "api-reference/traces/search",
+              "api-reference/traces/create-public-trace-path",
+              "api-reference/traces/delete-public-trace-path"
+            ]
+          },
+          {
+            "group": "Prompts",
+            "pages": [
+              "api-reference/prompts/overview",
+              "api-reference/prompts/get-prompts",
+              "api-reference/prompts/create-prompt",
+              "api-reference/prompts/get-prompt",
+              "api-reference/prompts/update-prompt",
+              "api-reference/prompts/delete-prompt",
+              "api-reference/prompts/get-prompt-versions",
+              "api-reference/prompts/create-prompt-version"
+            ]
+          },
+          {
+            "group": "Annotations",
+            "pages": [
+              "api-reference/annotations/overview",
+              "api-reference/annotations/get-annotation",
+              "api-reference/annotations/get-single-annotation",
+              "api-reference/annotations/delete-annotation",
+              "api-reference/annotations/patch-annotation",
+              "api-reference/annotations/get-all-annotations-trace",
+              "api-reference/annotations/create-annotation-trace"
+            ]
+          },
+          {
+            "group": "Datasets",
+            "pages": [
+              "api-reference/datasets/post-dataset-entries"
+            ]
+          },
+          {
+            "group": "Automations",
+            "pages": [
+              "api-reference/automations/create-slack-automation"
+            ]
+          },
+          {
+            "group": "Scenarios",
+            "pages": [
+              "api-reference/scenarios/overview",
+              "api-reference/scenarios/create-event"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "pages": [
+              "api-reference/evaluators/overview",
+              "api-reference/evaluators/exact-match-evaluator",
+              "api-reference/evaluators/llm-answer-match",
+              "api-reference/evaluators/bleu-score",
+              "api-reference/evaluators/llm-factual-match",
+              "api-reference/evaluators/rouge-score",
+              "api-reference/evaluators/sql-query-equivalence",
+              "api-reference/evaluators/llm-as-a-judge-boolean-evaluator",
+              "api-reference/evaluators/llm-as-a-judge-category-evaluator",
+              "api-reference/evaluators/llm-as-a-judge-score-evaluator",
+              "api-reference/evaluators/rubrics-based-scoring",
+              "api-reference/evaluators/ragas-answer-correctness",
+              "api-reference/evaluators/ragas-answer-relevancy",
+              "api-reference/evaluators/ragas-context-precision",
+              "api-reference/evaluators/ragas-context-recall",
+              "api-reference/evaluators/ragas-context-relevancy",
+              "api-reference/evaluators/ragas-context-utilization",
+              "api-reference/evaluators/ragas-faithfulness",
+              "api-reference/evaluators/ragas-faithfulness-1",
+              "api-reference/evaluators/ragas-response-context-precision",
+              "api-reference/evaluators/ragas-response-context-recall",
+              "api-reference/evaluators/ragas-response-relevancy",
+              "api-reference/evaluators/context-f1",
+              "api-reference/evaluators/context-precision",
+              "api-reference/evaluators/context-recall",
+              "api-reference/evaluators/azure-content-safety",
+              "api-reference/evaluators/azure-jailbreak-detection",
+              "api-reference/evaluators/azure-prompt-shield",
+              "api-reference/evaluators/openai-moderation",
+              "api-reference/evaluators/presidio-pii-detection",
+              "api-reference/evaluators/custom-basic-evaluator",
+              "api-reference/evaluators/competitor-blocklist",
+              "api-reference/evaluators/competitor-allowlist-check",
+              "api-reference/evaluators/competitor-llm-check",
+              "api-reference/evaluators/off-topic-evaluator",
+              "api-reference/evaluators/query-resolution",
+              "api-reference/evaluators/semantic-similarity-evaluator",
+              "api-reference/evaluators/summarization-score",
+              "api-reference/evaluators/valid-format-evaluator",
+              "api-reference/evaluators/lingua-language-detection"
+            ]
+          },
+          {
+            "group": "Saved Evaluators",
+            "pages": [
+              "api-reference/saved-evaluators/overview",
+              "api-reference/saved-evaluators/get-evaluators",
+              "api-reference/saved-evaluators/get-evaluator",
+              "api-reference/saved-evaluators/create-evaluator"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "Sign In to LangWatch",
+          "href": "https://app.langwatch.ai",
+          "icon": "house"
+        },
+        {
+          "anchor": "Visit GitHub",
+          "href": "https://github.com/langwatch/langwatch",
+          "icon": "github"
+        },
+        {
+          "anchor": "Get Support",
+          "href": "https://docs.langwatch.ai/support#email-support",
+          "icon": "life-ring"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "llms.txt",
+        "href": "https://docs.langwatch.ai/llms.txt"
+      },
+      {
+        "label": "Sign In",
+        "href": "https://app.langwatch.ai"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/langwatch/langwatch"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/langwatch/langwatch",
+      "website": "https://langwatch.ai",
+      "x-twitter": "https://x.com/langwatchai",
+      "linkedin": "https://www.linkedin.com/company/langwatch/",
+      "youtube": "https://www.youtube.com/@LangWatch"
+    }
+  },
+  "integrations": {
+    "gtm": {
+      "tagId": "GTM-KJ4S6Z9C"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/ci/cache/busted/1775647477",
+      "destination": "/"
+    },
+    {
+      "source": "/langevals/:path*",
+      "destination": "https://github.com/langwatch/langevals"
+    },
+    {
+      "source": "/integration/cookbooks",
+      "destination": "/integration/code-examples"
+    },
+    {
+      "source": "/guardrails/:path*",
+      "destination": "/evaluations/guardrails/overview"
+    },
+    {
+      "source": "/evaluations/custom-evaluator-integration",
+      "destination": "/evaluations/evaluators/custom-scoring"
+    },
+    {
+      "source": "/evaluations/evaluators/custom-evaluators",
+      "destination": "/evaluations/evaluators/custom-scoring"
+    },
+    {
+      "source": "/evaluations/evaluation-by-thread",
+      "destination": "/evaluations/online-evaluation/by-thread"
+    },
+    {
+      "source": "/llm-evaluation/overview",
+      "destination": "/evaluations/overview"
+    },
+    {
+      "source": "/llm-evaluation/offline/code/evaluation-api",
+      "destination": "/evaluations/experiments/sdk"
+    },
+    {
+      "source": "/llm-evaluation/offline/platform/answer-correctness",
+      "destination": "/evaluations/experiments/ui/answer-correctness"
+    },
+    {
+      "source": "/llm-evaluation/offline/platform/llm-as-a-judge",
+      "destination": "/evaluations/experiments/ui/llm-as-a-judge"
+    },
+    {
+      "source": "/llm-evaluation/realtime/setup",
+      "destination": "/evaluations/online-evaluation/setup-monitors"
+    },
+    {
+      "source": "/llm-evaluation/list",
+      "destination": "/evaluations/evaluators/list"
+    },
+    {
+      "source": "/llm-evaluation/offline-evaluation",
+      "destination": "/evaluations/experiments/overview"
+    },
+    {
+      "source": "/llm-evaluation/real-time-evaluation",
+      "destination": "/evaluations/online-evaluation/overview"
+    },
+    {
+      "source": "/llm-evaluation/:path*",
+      "destination": "/evaluations/overview"
+    },
+    {
+      "source": "/features/datasets",
+      "destination": "/datasets/quickstart"
+    },
+    {
+      "source": "/self-hosting/sso-hybrid",
+      "destination": "/self-hosting/configuration/sso"
+    },
+    {
+      "source": "/self-hosting/open-source",
+      "destination": "/self-hosting/docker-compose"
+    },
+    {
+      "source": "/simulations/overview",
+      "destination": "/agent-simulations/overview"
+    },
+    {
+      "source": "/simulations/getting-started",
+      "destination": "/agent-simulations/getting-started"
+    },
+    {
+      "source": "/simulations/set-overview",
+      "destination": "/agent-simulations/set-overview"
+    },
+    {
+      "source": "/simulations/batch-runs",
+      "destination": "/agent-simulations/batch-runs"
+    },
+    {
+      "source": "/simulations/individual-run",
+      "destination": "/agent-simulations/individual-run"
+    },
+    {
+      "source": "/simulations/introduction",
+      "destination": "/agent-simulations/introduction"
+    },
+    {
+      "source": "/features/prompt-versioning",
+      "destination": "/prompt-management/overview"
+    },
+    {
+      "source": "/self-hosting/helm",
+      "destination": "/self-hosting/kubernetes-helm"
+    },
+    {
+      "source": "/hybrid-setup/sso-setup-langwatch",
+      "destination": "/self-hosting/sso-setup-langwatch"
+    },
+    {
+      "source": "/skills/overview",
+      "destination": "/skills/directory"
+    },
+    {
+      "source": "/skills/developers",
+      "destination": "/skills/directory"
+    },
+    {
+      "source": "/skills/code-prompts",
+      "destination": "/skills/directory"
+    },
+    {
+      "source": "/skills/recipes",
+      "destination": "/skills/directory"
+    },
+    {
+      "source": "/skills/teams",
+      "destination": "/skills/pms-and-domain-experts"
+    },
+    {
+      "source": "/skills/platform",
+      "destination": "/skills/pms-and-domain-experts"
+    },
+    {
+      "source": "/skills/platform-prompts",
+      "destination": "/skills/pms-and-domain-experts"
+    },
+    {
+      "source": "/skills/manual",
+      "destination": "/integration/quick-start"
+    },
+    {
+      "source": "/features/batch-evaluations",
+      "destination": "/evaluations/experiments/sdk"
+    },
+    {
+      "source": "/integration/rags-context-tracking",
+      "destination": "/integration/python/tutorials/capturing-rag"
+    },
+    {
+      "source": "/self-hosting/env-variables",
+      "destination": "/self-hosting/configuration/environment-variables"
+    },
+    {
+      "source": "/self-hosting/sso-setup-langwatch",
+      "destination": "/self-hosting/configuration/sso"
+    },
+    {
+      "source": "/self-hosting/grafana",
+      "destination": "/self-hosting/configuration/observability"
+    },
+    {
+      "source": "/self-hosting/onprem",
+      "destination": "/self-hosting/infrastructure/architecture"
+    },
+    {
+      "source": "/hybrid-setup/elasticsearch",
+      "destination": "/hybrid-setup/overview"
+    },
+    {
+      "source": "/hybrid-setup/s3-storage",
+      "destination": "/hybrid-setup/overview"
+    },
+    {
+      "source": "/self-hosting/docker-compose",
+      "destination": "/self-hosting/deployment/docker-compose"
+    },
+    {
+      "source": "/self-hosting/docker-images",
+      "destination": "/self-hosting/deployment/docker-images"
+    },
+    {
+      "source": "/self-hosting/kubernetes-helm",
+      "destination": "/self-hosting/deployment/kubernetes-helm"
+    }
+  ]
+}

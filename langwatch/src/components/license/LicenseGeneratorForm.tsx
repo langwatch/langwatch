@@ -496,7 +496,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
             <Select.Trigger width="full">
               <Select.ValueText placeholder="Select plan type" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover">
+            <Select.Content paddingY={2}>
               {planTypeCollection.items.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   {item.label}
@@ -519,7 +519,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
             <Select.Trigger width="full">
               <Select.ValueText placeholder="Select usage unit" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover">
+            <Select.Content paddingY={2}>
               {usageUnitCollection.items.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   {item.label}

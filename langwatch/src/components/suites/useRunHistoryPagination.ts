@@ -54,6 +54,7 @@ export function useRunHistoryPagination({
     {
       enabled: !!project,
       refetchInterval: pages.length <= 1 ? 30_000 : undefined,
+      trpc: { context: { skipBatch: true } },
     },
   );
 

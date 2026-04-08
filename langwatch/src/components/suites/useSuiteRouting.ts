@@ -1,9 +1,16 @@
 /**
- * Hook for URL-based suite routing.
+ * Hook for path-based suite routing.
  *
- * Reads suite slug from the `?suite=` query parameter and provides
- * navigation helpers for shallow client-side transitions.
- * Also supports `?externalSet=<scenarioSetId>` for external SDK/CI sets.
+ * All simulation sub-paths are handled by a single catch-all page file
+ * ([[...path]].tsx), so sidebar navigation uses shallow routing — no
+ * full page transitions, no remounting, no skeleton flicker.
+ *
+ * Derives the active selection from router.query.path:
+ *   []                            → All Runs
+ *   ["run-plans", slug]           → Suite detail
+ *   ["run-plans", slug, batchId]  → Suite + highlight batch
+ *   [setSlug]                     → External set
+ *   [setSlug, batchId]            → External set + highlight batch
  */
 import { useCallback } from "react";
 import { useRouter } from "next/router";
@@ -29,15 +36,18 @@ export function toExternalSetSelection(scenarioSetId: string): string {
 type SuiteRouting = {
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;
+  highlightBatchId: string | null;
 };
 
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
 
-  const selectedSuiteSlug = deriveSelectedSuiteSlug({
+  // Derive from asPath (actual URL) rather than query.path, because
+  // shallow routing on catch-all [[...path]] may not update query.path
+  // consistently across Next.js versions.
+  const { selectedSuiteSlug, highlightBatchId } = deriveFromPath({
     isReady: router.isReady,
-    suiteParam: router.query.suite,
-    externalSetParam: router.query.externalSet,
+    path: router.query.path ?? extractPathFromAsPath(router.asPath),
   });
 
   const projectSlug = router.query.project as string | undefined;
@@ -46,42 +56,38 @@ export function useSuiteRouting(): SuiteRouting {
     (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
 
-      const basePath = `/${projectSlug}/simulations/suites`;
-
       // Preserve date params so period survives navigation
       const dateParams: Record<string, string> = {};
       if (typeof router.query.startDate === "string") dateParams.startDate = router.query.startDate;
       if (typeof router.query.endDate === "string") dateParams.endDate = router.query.endDate;
 
+      let pathSegments: string[];
+      if (slug === ALL_RUNS_ID) {
+        pathSegments = [];
+      } else if (isExternalSetSelection(slug)) {
+        pathSegments = [extractExternalSetId(slug)];
+      } else {
+        pathSegments = ["run-plans", slug];
+      }
+
+      const displayPath = pathSegments.length > 0
+        ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
+        : `/${projectSlug}/simulations`;
+
       const dateQueryString = Object.entries(dateParams)
         .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
         .join("&");
+      const asUrl = dateQueryString ? `${displayPath}?${dateQueryString}` : displayPath;
 
-      if (isExternalSetSelection(slug)) {
-        const setId = extractExternalSetId(slug);
-        const qs = `externalSet=${encodeURIComponent(setId)}${dateQueryString ? `&${dateQueryString}` : ""}`;
-        void router.push(
-          {
-            pathname: "/[project]/simulations/suites",
-            query: { project: projectSlug, externalSet: setId, ...dateParams },
-          },
-          `${basePath}?${qs}`,
-          { shallow: true },
-        );
-        return;
-      }
-
-      const selectionQs = slug === ALL_RUNS_ID ? "" : `suite=${slug}`;
-      const qs = [selectionQs, dateQueryString].filter(Boolean).join("&");
-      const asUrl = qs ? `${basePath}?${qs}` : basePath;
-
+      // All routes are handled by the same [[...path]] page, so shallow works
       void router.push(
         {
-          pathname: "/[project]/simulations/suites",
-          query:
-            slug === ALL_RUNS_ID
-              ? { project: projectSlug, ...dateParams }
-              : { project: projectSlug, suite: slug, ...dateParams },
+          pathname: "/[project]/simulations/[[...path]]",
+          query: {
+            project: projectSlug,
+            ...(pathSegments.length > 0 ? { path: pathSegments } : {}),
+            ...dateParams,
+          },
         },
         asUrl,
         { shallow: true },
@@ -90,29 +96,44 @@ export function useSuiteRouting(): SuiteRouting {
     [router, projectSlug],
   );
 
-  return { selectedSuiteSlug, navigateToSuite };
+  return { selectedSuiteSlug, navigateToSuite, highlightBatchId };
 }
 
-function deriveSelectedSuiteSlug({
+/** Determines which selection is active from the catch-all path segments. */
+export function deriveFromPath({
   isReady,
-  suiteParam,
-  externalSetParam,
+  path,
 }: {
   isReady: boolean;
-  suiteParam: string | string[] | undefined;
-  externalSetParam: string | string[] | undefined;
-}): string | typeof ALL_RUNS_ID | null {
-  if (!isReady) return null;
+  path: string | string[] | undefined;
+}): { selectedSuiteSlug: string | typeof ALL_RUNS_ID | null; highlightBatchId: string | null } {
+  if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };
 
-  if (externalSetParam) {
-    const setId = Array.isArray(externalSetParam)
-      ? externalSetParam[0]
-      : externalSetParam;
-    if (setId) return toExternalSetSelection(setId);
+  const segments = Array.isArray(path) ? path : path ? [path] : [];
+
+  // [] → All Runs
+  if (segments.length === 0) {
+    return { selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null };
   }
 
-  if (!suiteParam) return ALL_RUNS_ID;
+  // ["run-plans", slug] or ["run-plans", slug, batchId]
+  if (segments[0] === "run-plans" && segments.length >= 2) {
+    return {
+      selectedSuiteSlug: segments[1]!,
+      highlightBatchId: segments[2] ?? null,
+    };
+  }
 
-  const slug = Array.isArray(suiteParam) ? suiteParam[0] : suiteParam;
-  return slug ?? ALL_RUNS_ID;
+  // [setSlug] or [setSlug, batchId]
+  return {
+    selectedSuiteSlug: toExternalSetSelection(segments[0]!),
+    highlightBatchId: segments[1] ?? null,
+  };
+}
+
+/** Extract path segments from asPath (e.g., "/project/simulations/run-plans/slug" → ["run-plans", "slug"]) */
+function extractPathFromAsPath(asPath: string): string[] | undefined {
+  const match = asPath.match(/\/simulations(?:\/(.+?))?(?:\?|$)/);
+  if (!match?.[1]) return undefined;
+  return match[1].split("/");
 }

@@ -1,49 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { NormalizedSpan } from "../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import {
-  applySpanToSummary,
-  createTraceSummaryFoldProjection,
-  type TraceSummaryData,
-} from "../traceSummary.foldProjection";
-
-const traceSummaryProjection = createTraceSummaryFoldProjection({
-  store: { store: async () => {}, get: async () => null },
-});
-
-function createInitState(): TraceSummaryData {
-  return traceSummaryProjection.init();
-}
-
-function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
-  return {
-    id: "span-1",
-    traceId: "trace-1",
-    spanId: "span-1",
-    tenantId: "tenant-1",
-    parentSpanId: "parent-1",
-    parentTraceId: null,
-    parentIsRemote: null,
-    sampled: true,
-    startTimeUnixMs: 1000,
-    endTimeUnixMs: 2000,
-    durationMs: 1000,
-    name: "test-span",
-    kind: NormalizedSpanKind.INTERNAL,
-    resourceAttributes: {},
-    spanAttributes: {},
-    events: [],
-    links: [],
-    statusMessage: null,
-    statusCode: NormalizedStatusCode.UNSET,
-    instrumentationScope: { name: "test", version: null },
-    droppedAttributesCount: 0 as const,
-    droppedEventsCount: 0 as const,
-    droppedLinksCount: 0 as const,
-    ...overrides,
-  };
-}
+import { applySpanToSummary } from "../traceSummary.foldProjection";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary I/O logic", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;

@@ -3,7 +3,23 @@
 set -e
 
 COMPOSE="docker compose -f compose.dev.yml"
-LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice"
+
+# Auto-detect worktree for container/volume isolation
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+  WORKTREE_NAME=$(basename "$(git rev-parse --show-toplevel)")
+  # "langwatch" is the expected main checkout directory name (repo name)
+  if [ "$WORKTREE_NAME" != "langwatch" ]; then
+    # Sanitize for Docker Compose project/volume naming (only [a-z0-9_-], must start with letter/digit)
+    WORKTREE_NAME=$(echo "$WORKTREE_NAME" \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed -E 's/[^a-z0-9_-]+/-/g; s/^-+//; s/-+$//')
+    [ -z "$WORKTREE_NAME" ] && WORKTREE_NAME="langwatch"
+    export COMPOSE_PROJECT_NAME="${WORKTREE_NAME}"
+    export VOLUME_PREFIX="${WORKTREE_NAME}"
+  fi
+fi
+
+LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-${COMPOSE_PROJECT_NAME:-langwatch}"
 
 # Check for required .env files
 check_env_files() {
@@ -55,7 +71,7 @@ find_free_port() {
 
 # Auto-detect free ports
 export APP_PORT=$(find_free_port 5560)
-export BULLBOARD_PORT=$(find_free_port 3000)
+export BULLBOARD_PORT=$(find_free_port 6380)
 export AI_SERVER_PORT=$(find_free_port 3456)
 
 # Load last choice if exists
@@ -137,7 +153,8 @@ case $choice in
   r|R)
     echo "Rebuilding (removes container node_modules)..."
     $COMPOSE --profile full down
-    docker volume rm "${PWD##*/}_app_modules" 2>/dev/null || true
+    docker volume rm "${VOLUME_PREFIX:-langwatch}-app-modules" 2>/dev/null || true
+    docker volume rm "${VOLUME_PREFIX:-langwatch}-bullboard-modules" 2>/dev/null || true
     # Re-run with last profile
     if [ -n "$LAST" ]; then
       echo "Restarting with last profile..."

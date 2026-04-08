@@ -1,0 +1,130 @@
+---
+title: 'Overview'
+description: 'Browse all available evaluators in LangWatch to find the right scoring method for your AI agent evaluation use case.'
+---
+
+## Intro
+
+LangWatch offers an extensive library of evaluators to help you evaluate the quality and guarantee the safety of your LLM apps.
+
+While here you can find a reference list, to get the execution code you can use the [Experiments via UI](https://app.langwatch.ai/@project/evaluations) on LangWatch platform.
+
+## Authentication
+
+To make a call to the Evaluators API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
+
+#### Allowed Methods
+
+- `POST /api/evaluations/{evaluator}/evaluate` - Run an evaluation using a specific evaluator
+
+## Evaluators List
+
+import EvaluatorsList from "/snippets/evaluators-list.mdx"
+
+<EvaluatorsList />
+
+## Running Evaluations
+
+Set up your first evaluation using the [Experiments via UI](https://app.langwatch.ai/@project/evaluations):
+
+<a href="https://app.langwatch.ai/@project/evaluations" target="_blank">
+<Frame>
+<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} noZoom />
+</Frame>
+</a>
+
+## Using Evaluators
+
+<CardGroup cols={2}>
+  <Card
+    title="Built-in Evaluators"
+    description="Use evaluators directly in your code."
+    icon="bolt"
+    href="/evaluations/evaluators/built-in-evaluators"
+  />
+  <Card
+    title="Saved Evaluators"
+    description="Create and reuse evaluator configurations."
+    icon="bookmark"
+    href="/evaluations/evaluators/saved-evaluators"
+  />
+  <Card
+    title="Custom Scoring"
+    description="Send scores from your own evaluation logic."
+    icon="code"
+    href="/evaluations/evaluators/custom-scoring"
+  />
+</CardGroup>
+
+## The `name` Parameter
+
+<Warning>
+**Important for Analytics:** When calling evaluators from code (Real-Time Evaluations), always provide a descriptive `name` parameter to distinguish between different evaluation checks in Analytics.
+</Warning>
+
+When running the same evaluator type multiple times for different purposes, you must use unique `name` values to:
+- Track results separately in the Analytics dashboard
+- Filter and group evaluation results by purpose
+- Avoid confusion when multiple evaluations use the same evaluator type
+
+**Example: Running multiple category checks**
+
+If you're using the LLM Category evaluator to check different aspects of your output:
+
+<CodeGroup>
+```python Python
+import langwatch
+
+# Check 1: Is the answer complete?
+langwatch.evaluation.evaluate(
+    "langevals/llm_category",
+    name="Answer Completeness Check",  # Unique name for this check
+    data={"input": user_input, "output": response},
+    settings={"categories": [{"name": "complete"}, {"name": "incomplete"}]}
+)
+
+# Check 2: Is the tone appropriate?
+langwatch.evaluation.evaluate(
+    "langevals/llm_category",
+    name="Tone Appropriateness Check",  # Different name for this check
+    data={"input": user_input, "output": response},
+    settings={"categories": [{"name": "professional"}, {"name": "casual"}, {"name": "inappropriate"}]}
+)
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// Check 1: Is the answer complete?
+await langwatch.evaluations.evaluate("langevals/llm_category", {
+    name: "Answer Completeness Check",  // Unique name for this check
+    data: { input: userInput, output: response },
+    settings: { categories: [{ name: "complete" }, { name: "incomplete" }] }
+});
+
+// Check 2: Is the tone appropriate?
+await langwatch.evaluations.evaluate("langevals/llm_category", {
+    name: "Tone Appropriateness Check",  // Different name for this check
+    data: { input: userInput, output: response },
+    settings: { categories: [{ name: "professional" }, { name: "casual" }, { name: "inappropriate" }] }
+});
+```
+</CodeGroup>
+
+Without unique names, all results would be grouped under the same auto-generated identifier (e.g., `custom_eval_langevalsllm_category`), making it impossible to analyze them separately.
+
+## Common Request Format
+
+All evaluator endpoints follow a similar pattern:
+
+```
+POST /api/evaluations/{evaluator_path}/evaluate
+```
+
+Each evaluator accepts specific input parameters and settings. Refer to the individual evaluator documentation pages for detailed request/response schemas and examples.
+
+## Response Format
+
+Successful evaluations return an array of evaluation results with scores, details, and metadata specific to each evaluator type.

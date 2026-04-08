@@ -192,6 +192,7 @@ class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData>
 export const testFoldProjection: FoldProjectionDefinition<TestProjectionData, TestEvent> = {
   name: "testProjection",
   version: "2025-01-01",
+  lastEventOccurredAtKey: "LastEventOccurredAt",
   eventTypes: [TEST_EVENT_TYPE],
 
   init(): TestProjectionData {

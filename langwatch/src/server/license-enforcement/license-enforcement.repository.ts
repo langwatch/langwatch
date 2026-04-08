@@ -44,37 +44,6 @@ interface MemberClassificationContext {
 }
 
 /**
- * Minimal interface for cost checking operations.
- * Follows Interface Segregation Principle - callers only depend on what they need.
- * Used by workers and API routes that just need to check cost limits.
- */
-export interface ICostChecker {
-  getCurrentMonthCost(organizationId: string): Promise<number>;
-  maxMonthlyUsageLimit(organizationId: string): Promise<number>;
-}
-
-/**
- * Factory function to create a minimal cost checker.
- * Used by callers that only need cost checking (evaluate.ts, evaluationsWorker.ts, topicClustering.ts).
- */
-export function createCostChecker(prisma: PrismaClient): ICostChecker {
-  const repository = new LicenseEnforcementRepository(prisma);
-  return {
-    getCurrentMonthCost: (organizationId: string) =>
-      repository.getCurrentMonthCost(organizationId),
-    /**
-     * Get the maximum monthly usage limit for the organization.
-     * FIXME: This was recently changed to return Infinity,
-     * but still takes the organizationId as a parameter.
-     *
-     * Either we remove the organizationId parameter from all the calls to this function,
-     * or we use to get the plan and return it correctly.
-     */
-    maxMonthlyUsageLimit: (_organizationId: string) => Promise.resolve(Infinity),
-  };
-}
-
-/**
  * Repository interface for license enforcement.
  * Defines the contract for counting resources - allows for easy testing
  * and follows Dependency Inversion Principle (DIP).
@@ -390,8 +359,10 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all experiments for license enforcement.
-   * Experiments do not support archival - all experiments count against limits.
+   * Counts non-real-time experiments for license enforcement.
+   * Excludes experiments where `workbenchState.task === "real_time"` because
+   * those are online evaluations already counted under `maxOnlineEvaluations`
+   * via `getOnlineEvaluationCount`. Including them here would double-count.
    *
    * Note: Experiment model has RLS policy requiring direct projectId filter,
    * so we first get project IDs then filter by them.
@@ -403,6 +374,12 @@ export class LicenseEnforcementRepository
     return this.prisma.experiment.count({
       where: {
         projectId: { in: projectIds },
+        NOT: {
+          workbenchState: {
+            path: ["task"],
+            equals: "real_time",
+          },
+        },
       },
     });
   }

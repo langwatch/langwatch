@@ -2,88 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../utils/apiKey";
-
-// Helper to strip ANSI codes for length calculation
-const stripAnsi = (str: string): string => {
-  // eslint-disable-next-line no-control-regex
-  return str.replace(/\u001b\[[0-9;]*m/g, "");
-};
-
-// Simple table formatting helper
-const formatTable = (
-  data: Array<Record<string, string>>,
-  headers: string[],
-): void => {
-  if (data.length === 0) {
-    console.log(chalk.gray("No prompts found"));
-    return;
-  }
-
-  // Calculate column widths (strip ANSI codes for accurate length calculation)
-  const colWidths: Record<string, number> = {};
-  headers.forEach((header) => {
-    colWidths[header] = Math.max(
-      header.length,
-      ...data.map((row) => stripAnsi(row[header] ?? "").length),
-    );
-  });
-
-  // Print header
-  const headerRow = headers
-    .map((header) => chalk.bold(header.padEnd(colWidths[header]!)))
-    .join("  ");
-  console.log(headerRow);
-
-  // Print separator
-  const separator = headers
-    .map((header) => "─".repeat(colWidths[header]!))
-    .join("  ");
-  console.log(chalk.gray(separator));
-
-  // Print data rows
-  data.forEach((row) => {
-    const dataRow = headers
-      .map((header) => {
-        const value = row[header] ?? "";
-        const strippedLength = stripAnsi(value).length;
-        const paddingNeeded = colWidths[header]! - strippedLength;
-        const paddedValue = value + " ".repeat(Math.max(0, paddingNeeded));
-
-        // Color coding
-        if (header === "Name") {
-          return chalk.cyan(paddedValue);
-        } else if (header === "Version") {
-          return chalk.green(paddedValue);
-        } else if (header === "Model") {
-          return chalk.yellow(paddedValue);
-        } else {
-          return chalk.gray(paddedValue);
-        }
-      })
-      .join("  ");
-    console.log(dataRow);
-  });
-};
-
-const formatRelativeTime = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-
-  const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  const months = Math.floor(days / 30);
-  const years = Math.floor(days / 365);
-
-  if (years > 0) return `${years}y ago`;
-  if (months > 0) return `${months}mo ago`;
-  if (days > 0) return `${days}d ago`;
-  if (hours > 0) return `${hours}h ago`;
-  if (minutes > 0) return `${minutes}m ago`;
-  return `${seconds}s ago`;
-};
+import { formatTable, formatRelativeTime } from "../utils/formatting";
 
 export const listCommand = async (): Promise<void> => {
   try {
@@ -131,7 +50,16 @@ export const listCommand = async (): Promise<void> => {
       }));
 
       // Display table
-      formatTable(tableData, ["Name", "Version", "Model", "Updated"]);
+      formatTable({
+        data: tableData,
+        headers: ["Name", "Version", "Model", "Updated"],
+        colorMap: {
+          Name: chalk.cyan,
+          Version: chalk.green,
+          Model: chalk.yellow,
+        },
+        emptyMessage: "No prompts found",
+      });
 
       console.log();
       console.log(

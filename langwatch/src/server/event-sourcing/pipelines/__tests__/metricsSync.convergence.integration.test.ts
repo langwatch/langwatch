@@ -33,8 +33,8 @@ import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
 import { AssignTopicCommand } from "../trace-processing/commands/assignTopicCommand";
-import { createSpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
-import { createTraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
+import { SpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
+import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
 import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
@@ -144,11 +144,11 @@ describe.skipIf(!hasTestcontainers)(
         .withAggregateType("trace" as AggregateType)
         .withFoldProjection(
           "traceSummary",
-          createTraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
+          new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any,
         )
         .withMapProjection(
           "spanStorage",
-          createSpanStorageMapProjection({ store: spanAppendStore }) as any,
+          new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
         .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
         .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)

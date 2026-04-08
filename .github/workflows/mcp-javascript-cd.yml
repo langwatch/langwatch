@@ -16,14 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
         with:
           version: 10.24.0
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 24
           cache: pnpm

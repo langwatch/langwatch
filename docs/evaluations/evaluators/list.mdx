@@ -1,0 +1,117 @@
+---
+title: List of Evaluators
+description: Browse all available evaluators in LangWatch to find the right scoring method for your AI agent evaluation use case.
+---
+
+LangWatch offers an extensive library of evaluators to help you evaluate the quality and guarantee the safety of your LLM apps.
+
+<Info>
+**How to use these evaluators:**
+- [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use directly in your code with the slug (e.g., `ragas/faithfulness`)
+- [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Configure on the platform and reuse via `evaluators/{slug}`
+- [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send your own evaluation scores
+</Info>
+
+<Card title="Evaluators API Reference" icon="code" href="/api-reference/evaluators/overview">
+  Full API documentation for running evaluations programmatically.
+</Card>
+
+## Evaluators List
+
+import EvaluatorsList from "/snippets/evaluators-list.mdx"
+
+<EvaluatorsList />
+
+## Quick Start
+
+### Using a Built-in Evaluator
+
+Use any evaluator from the list above directly in your code:
+
+<CodeGroup>
+```python Python
+import langwatch
+
+@langwatch.span()
+def my_llm_step(user_input: str):
+    output = my_llm(user_input)
+
+    # Use any evaluator from the list above
+    result = langwatch.evaluation.evaluate(
+        "ragas/faithfulness",  # Evaluator slug from the list
+        name="Faithfulness Check",
+        data={
+            "input": user_input,
+            "output": output,
+            "contexts": contexts,
+        },
+    )
+
+    return output
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myLLMStep(userInput: string): Promise<string> {
+  const output = await myLLM(userInput);
+
+  // Use any evaluator from the list above
+  const result = await langwatch.evaluations.evaluate("ragas/faithfulness", {
+    name: "Faithfulness Check",
+    data: {
+      input: userInput,
+      output: output,
+      contexts: contexts,
+    },
+  });
+
+  return output;
+}
+```
+</CodeGroup>
+
+[Learn more about using built-in evaluators →](/evaluations/evaluators/built-in-evaluators)
+
+## Running Evaluations via UI
+
+You can also run evaluations through the Experiments Workbench without writing code:
+
+<a href="https://app.langwatch.ai/@project/evaluations" target="_blank">
+<Frame>
+<img src="/images/offline-evaluation/Screenshot_2025-04-17_at_16.53.38.png" alt="" style={{ maxWidth: '400px' }} noZoom />
+</Frame>
+</a>
+
+[Learn more about experiments →](/evaluations/experiments/overview)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Built-in Evaluators"
+    description="How to use evaluators directly in your code."
+    icon="bolt"
+    href="/evaluations/evaluators/built-in-evaluators"
+  />
+  <Card
+    title="Saved Evaluators"
+    description="Create reusable evaluator configurations."
+    icon="bookmark"
+    href="/evaluations/evaluators/saved-evaluators"
+  />
+  <Card
+    title="Custom Scoring"
+    description="Send scores from your own evaluation logic."
+    icon="code"
+    href="/evaluations/evaluators/custom-scoring"
+  />
+  <Card
+    title="API Reference"
+    description="Full API documentation for evaluators."
+    icon="book"
+    href="/api-reference/evaluators/overview"
+  />
+</CardGroup>

@@ -1,43 +1,11 @@
-import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { HomePage } from "../../components/home/HomePage";
-import { dependencies } from "../../injection/dependencies.client";
-import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 
 function ProjectRouter() {
-  const router = useRouter();
-
-  const path =
-    "/" +
-    (typeof router.query.project == "string" ? router.query.project : "/");
-
-  const Page = dependencies.extraPagesRoutes?.[path];
-  if (Page) {
-    return <Page />;
-  }
-
   return <HomePageWithReturnTo />;
 }
-
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const path =
-    "/" +
-    (typeof context.query.project == "string" ? context.query.project : "/");
-
-  const serverSideProps =
-    serverDependencies.extraPagesGetServerSideProps?.[path];
-  if (serverSideProps) {
-    return serverSideProps(context);
-  }
-
-  return {
-    props: {},
-  };
-};
 
 /**
  * HomePageWithReturnTo

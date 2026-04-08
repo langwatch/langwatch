@@ -1,0 +1,152 @@
+---
+title: Evaluating a RAG Chatbot for Technical Manuals
+description: Use LangWatch to evaluate a technical RAG chatbot by measuring retrieval quality, hallucination rates, and agent performance.
+keywords: RAG, technical documentation, evaluation, LangWatch, embeddings, chunking, faithfulness, retrieval evaluation, ground truth
+---
+
+This guide shows you how to evaluate a RAG (Retrieval-Augmented Generation) chatbot designed to answer technical questions from complex product manuals. In this example, the chatbot is for technicians servicing advanced milking machines.
+
+The goal is to verify that the chatbot provides accurate, relevant, and faithful answers based on the official documentation. We'll use LangWatch to automate this evaluation, making it easy to integrate into a CI/CD workflow.
+
+### **1. The Scenario**
+Our RAG chatbot must answer precise technical questions from operators and technicians. The quality of its answers is critical for safety and proper machine maintenance.
+
+* **Knowledge Base**: A collection of long, dense PDF manuals for different machine models.
+* **Input**: A technical question like, "What is the recommended torque setting for the Model A primary valve?"
+* **Output**: A concise, accurate answer with citations from the manuals.
+
+We need to evaluate if the RAG pipeline can reliably retrieve the correct information and synthesize an accurate answer.
+
+### **2. Setup and Data Preparation**
+First, let's set up the environment. For this evaluation, we'll use a "golden dataset" that contains question-answer pairs.
+
+```python
+import langwatch
+import pandas as pd
+import json
+
+# Authenticate with LangWatch
+# This will prompt you for an API key if the environment variable is not set.
+langwatch.login()
+
+data = {
+    "input": [
+        "What is the recommended torque for the Model A primary valve?",
+        "How often should the Model A cooling system be flushed?",
+        "What are the emergency shutdown procedures for Model A?",
+    ],
+    "expected_output": [
+        "The recommended torque setting for the Model A primary valve is 45 Nm.",
+        "The Model A cooling system should be flushed every 500 operating hours or every 6 months, whichever comes first.",
+        "To perform an emergency shutdown on Model A, press the red button located on the main control panel. This will immediately cut power to all systems.",
+    ]
+}
+df = pd.DataFrame(data)
+```
+
+### **3. Defining the RAG Pipeline**
+Next, we'll define placeholder functions for our RAG pipeline. In a real application, these would contain your logic for vector search and calling an LLM.
+
+```python
+# Placeholder for your document retrieval system (e.g., a vector database)
+def retrieve_documents(question: str) -> list[str]:
+    """
+    Simulates retrieving relevant chunks from the technical manuals.
+    """
+    print(f"Retrieving documents for: '{question}'")
+    if "torque" in question.lower():
+        return ["Manual Section 4.2.1: The primary valve assembly requires a torque of 45 Nm. Do not overtighten."]
+    if "cooling system" in question.lower():
+        return ["Manual Section 8.5: The cooling system must be flushed every 500 hours or 6 months. Use only approved coolant."]
+    if "emergency shutdown" in question.lower():
+        return [
+            "Manual Section 2.1: The main control panel features a large red emergency shutdown button.",
+            "Safety Protocol 1.A: In an emergency, pressing the red button cuts all power."
+        ]
+    return ["General information about Model A."]
+
+# Placeholder for your generation logic
+def generate_answer(question: str, contexts: List[str]) -> str:
+    system_prompt = "You are a helpful technical assistant. Use the following document chunks to answer the user's question accurately."
+
+    response = client.responses.create(
+        model="gpt-5",
+        instructions=system_prompt,
+        input=[{"role": "user", "content": f"Documents:\n{chr(10).join(contexts)}"}, {"role": "user", "content": f"Question: {question}"}
+        ]
+    )
+
+    return response.output
+```
+
+### **4. Implementing the Evaluation Script**
+Now, we'll use LangWatch to evaluate our RAG pipeline against the golden dataset. We'll initialize an evaluation run, loop through our questions, and use LangWatch's built-in evaluators to score the results.
+
+This script can be triggered automatically in a CI workflow whenever the RAG pipeline or its underlying model is updated.
+
+```python
+# Initialize a new evaluation run. Use descriptive names to track experiments.
+evaluation = langwatch.experiment.init("model-a-rag-evaluation-v2")
+
+# Use evaluation.loop() to iterate over our dataset
+for idx, row in evaluation.loop(df.iterrows()):
+    question = row["input"]
+    expected_answer = row["expected_output"]
+
+    # 1. Execute the RAG pipeline
+    retrieved_contexts = retrieve_documents(question)
+    generated_answer = generate_answer(question, retrieved_contexts)
+
+    # 2. Use LangWatch built-in evaluators to score RAG quality
+    # This runs 'ragas/faithfulness' to check if the answer is supported by the contexts.
+    evaluation.run(
+        "ragas/faithfulness",
+        index=idx,
+        data={
+            "question": question,
+            "answer": generated_answer,
+            "contexts": retrieved_contexts,
+        }
+    )
+
+    # This runs 'ragas/answer_relevancy' to check if the answer is relevant to the question.
+    evaluation.run(
+        "ragas/answer_relevancy",
+        index=idx,
+        data={
+            "question": question,
+            "answer": generated_answer,
+            "contexts": retrieved_contexts,
+        }
+    )
+
+    # 3. Log a custom metric for semantic similarity or exact match
+    # Here, we'll just do a simple check for correctness.
+    is_correct = expected_answer.lower() in generated_answer.lower()
+    evaluation.log(
+        "expected_answer_accuracy",
+        index=idx,
+        passed=is_correct,
+        data={
+            "input": question,
+            "output": generated_answer,
+            "expected": expected_answer,
+            "contexts": retrieved_contexts
+        }
+    )
+
+print("Evaluation complete! Check your results in the LangWatch dashboard.")
+```
+
+### **5. Analyzing the Results**
+Once the script finishes, you can go to the LangWatch dashboard to analyze the performance of your RAG pipeline. The dashboard allows you to:
+
+* **Compare Experiments**: Easily compare the performance of `model-a-rag-evaluation-v1` against `v2` to see if your changes had a positive impact on metrics like faithfulness and accuracy.
+* **Drill into Failures**: Filter for all samples where `expected_answer_accuracy` failed. For each failure, you can inspect the question, the contexts that were retrieved, the generated answer, and the expected answer to quickly diagnose the root cause (e.g. a retrieval issue or a generation problem).
+* **Collaborate with Experts**: Share direct links to evaluation results with the domain experts who created the dataset, making it easy to close the feedback loop.
+
+### **6. Conclusion**
+
+By implementing this evaluation-driven approach with LangWatch, you can transform dense technical documentation into a reliable RAG-based assistant that technicians and operators can trust. The continuous monitoring and evaluation ensure that as documentation evolves, your AI assistant maintains its accuracy and reliability.
+
+For more implementation examples, check out our [RAG cookbook](/cookbooks/build-a-simple-rag-app).

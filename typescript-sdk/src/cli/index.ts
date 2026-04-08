@@ -55,6 +55,27 @@ const createCommand = async (name: string, options: Record<string, unknown>): Pr
   return createCommandImpl(name, options);
 };
 
+// Evaluator commands
+const listEvaluatorsCommand = async (): Promise<void> => {
+  const { listEvaluatorsCommand: impl } = await import("./commands/evaluators/list.js");
+  return impl();
+};
+
+const getEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+  const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
+  return impl(idOrSlug);
+};
+
+const createEvaluatorCommand = async (name: string, options: { type: string }): Promise<void> => {
+  const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
+  return impl(name, options);
+};
+
+const deleteEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+  const { deleteEvaluatorCommand: impl } = await import("./commands/evaluators/delete.js");
+  return impl(idOrSlug);
+};
+
 const program = new Command();
 
 program
@@ -182,6 +203,60 @@ promptCmd
   .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
     try {
       await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+// Add evaluator command group
+const evaluatorCmd = program
+  .command("evaluator")
+  .description("Manage evaluator definitions");
+
+evaluatorCmd
+  .command("list")
+  .description("List all evaluators in the project")
+  .action(async () => {
+    try {
+      await listEvaluatorsCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("get <idOrSlug>")
+  .description("Get evaluator details by ID or slug")
+  .action(async (idOrSlug: string) => {
+    try {
+      await getEvaluatorCommand(idOrSlug);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("create <name>")
+  .description("Create a new evaluator")
+  .requiredOption("--type <evaluatorType>", "Evaluator type (e.g. langevals/llm_judge)")
+  .action(async (name: string, options: { type: string }) => {
+    try {
+      await createEvaluatorCommand(name, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("delete <idOrSlug>")
+  .description("Archive (soft-delete) an evaluator")
+  .action(async (idOrSlug: string) => {
+    try {
+      await deleteEvaluatorCommand(idOrSlug);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);

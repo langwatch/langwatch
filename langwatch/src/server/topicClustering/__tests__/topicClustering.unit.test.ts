@@ -33,13 +33,6 @@ vi.mock("../../env.mjs", () => ({
   env: { TOPIC_CLUSTERING_SERVICE: "http://localhost:1234" },
 }));
 
-vi.mock("~/server/license-enforcement/license-enforcement.repository", () => ({
-  createCostChecker: () => ({
-    maxMonthlyUsageLimit: vi.fn().mockResolvedValue(Infinity),
-    getCurrentMonthCost: vi.fn().mockResolvedValue(0),
-  }),
-}));
-
 vi.mock("~/server/background/queues/topicClusteringQueue", () => ({
   scheduleTopicClusteringNextPage: vi.fn(),
 }));
@@ -90,8 +83,6 @@ function makeProject(overrides: Record<string, unknown> = {}) {
     id: "proj-1",
     name: "Test Project",
     topicClusteringModel: "openai/gpt-4",
-    featureClickHouseDataSourceTraces: false,
-    featureEventSourcingTraceIngestion: false,
     team: { organizationId: "org-1" },
     ...overrides,
   };
@@ -103,30 +94,10 @@ describe("clusterTopicsForProject", () => {
     vi.mocked(prisma.topic.findMany).mockResolvedValue([]);
   });
 
-  describe("when CH flag is off", () => {
-    it("reads counts from ES, does not call CH", async () => {
-      vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject() as any,
-      );
-      vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
-
-      // 4 count queries return low counts
-      mockEsClient.count.mockResolvedValue({ count: 0 });
-      mockEsClient.search.mockResolvedValue({
-        hits: { total: { value: 0 }, hits: [] },
-      });
-
-      await clusterTopicsForProject("proj-1", undefined, false);
-
-      expect(mockEsClient.count).toHaveBeenCalledTimes(4);
-      expect(mockClickHouseQuery).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when CH flag is on", () => {
+  describe("when ClickHouse is available", () => {
     it("reads counts from CH and searches CH, no ES calls", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject({ featureClickHouseDataSourceTraces: true }) as any,
+        makeProject() as any,
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
@@ -154,7 +125,7 @@ describe("clusterTopicsForProject", () => {
 
     it("maps CH results to TopicClusteringTrace and calls clustering", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject({ featureClickHouseDataSourceTraces: true }) as any,
+        makeProject() as any,
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
@@ -191,28 +162,23 @@ describe("clusterTopicsForProject", () => {
     });
   });
 
-  describe("when CH flag is on but getClickHouseClientForProject returns null", () => {
-    it("falls back to ES", async () => {
+  describe("when getClickHouseClientForProject returns null", () => {
+    it("throws because ClickHouse is required", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject({ featureClickHouseDataSourceTraces: true }) as any,
+        makeProject() as any,
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
 
-      mockEsClient.count.mockResolvedValue({ count: 0 });
-      mockEsClient.search.mockResolvedValue({
-        hits: { total: { value: 0 }, hits: [] },
-      });
-
-      await clusterTopicsForProject("proj-1", undefined, false);
-
-      expect(mockEsClient.count).toHaveBeenCalledTimes(4);
+      await expect(
+        clusterTopicsForProject("proj-1", undefined, false),
+      ).rejects.toThrow("ClickHouse client not available for project proj-1");
     });
   });
 
   describe("when CH search uses pagination (search_after)", () => {
     it("passes cursor params to CH query", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject({ featureClickHouseDataSourceTraces: true }) as any,
+        makeProject() as any,
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,
@@ -248,7 +214,7 @@ describe("clusterTopicsForProject", () => {
   describe("when CH search returns ComputedInput", () => {
     it("extracts input text from JSON-stringified ComputedInput", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
-        makeProject({ featureClickHouseDataSourceTraces: true }) as any,
+        makeProject() as any,
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue({
         query: mockClickHouseQuery,

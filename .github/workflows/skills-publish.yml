@@ -1,4 +1,4 @@
-name: Publish Skills
+name: skills-publish
 
 on:
   push:
@@ -13,14 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Read version
         id: version
         run: echo "version=$(cat skills/version.txt)" >> $GITHUB_OUTPUT
 
       - name: Checkout skills repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: langwatch/skills
           path: _skills-publish

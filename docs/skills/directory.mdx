@@ -1,0 +1,47 @@
+---
+title: "Skills Directory"
+description: "Get started with LangWatch in seconds. Install a skill, and your AI agent does the rest."
+sidebarTitle: "Skills Directory"
+---
+
+import { SkillAccordion } from "/snippets/skill-accordion.jsx"
+import { InfoBox } from "/snippets/info-box.jsx"
+import { PROMPTS } from "/snippets/prompts-data.jsx"
+
+<Note>
+For the best experience, [install the LangWatch MCP](/integration/mcp) before using skills — they work even better together.
+</Note>
+
+## Core Skills
+
+<SkillAccordion title="Instrument my code with LangWatch" skill="langwatch/skills/tracing" slashCommand="/tracing" prompt={PROMPTS.tracing} />
+<SkillAccordion title="Set up evaluations for my agent" skill="langwatch/skills/evaluations" slashCommand="/evaluations" prompt={PROMPTS.evaluations} />
+<SkillAccordion title="Add scenario tests for my agent" skill="langwatch/skills/scenarios" slashCommand="/scenarios" prompt={PROMPTS.scenarios} />
+<SkillAccordion title="Version my prompts with LangWatch" skill="langwatch/skills/prompts" slashCommand="/prompts" prompt={PROMPTS.prompts} />
+<SkillAccordion boldPrefix="⭐ All of the above:" title="Take my agent to the next level" skill="langwatch/skills/level-up" slashCommand="/level-up" prompt={PROMPTS.level_up} />
+
+<InfoBox>
+If you prefer, select all the LangWatch core skills you want to install at once:
+```bash
+npx skills add langwatch/skills
+```
+</InfoBox>
+
+## Recipes
+
+Common recipes for improving your agent, your coding agent can execute these directly.
+
+<SkillAccordion boldPrefix="⭐" title="What should I do next to improve my agent?" skill="langwatch/skills/recipes/improve-setup" slashCommand="/improve-setup" prompt={PROMPTS.recipe_improve_setup} />
+<SkillAccordion title="How is my agent performing?" skill="langwatch/skills/analytics" slashCommand="/analytics" prompt={PROMPTS.analytics} />
+<SkillAccordion title="Debug and improve my agent instrumentation" skill="langwatch/skills/recipes/debug-instrumentation" slashCommand="/debug-instrumentation" prompt={PROMPTS.recipe_debug_instrumentation} />
+<SkillAccordion title="Evaluate my multimodal agent" skill="langwatch/skills/recipes/evaluate-multimodal" slashCommand="/evaluate-multimodal" prompt={PROMPTS.recipe_evaluate_multimodal} />
+<SkillAccordion title="Generate an evaluation dataset from my RAG knowledge base" skill="langwatch/skills/recipes/generate-rag-dataset" slashCommand="/generate-rag-dataset" prompt={PROMPTS.recipe_generate_rag_dataset} />
+<SkillAccordion title="Check my agent doesn't give prescriptive advice" skill="langwatch/skills/recipes/test-compliance" slashCommand="/test-compliance" prompt={PROMPTS.recipe_test_compliance} />
+<SkillAccordion title="Test my CLI is well usable by AI agents" skill="langwatch/skills/recipes/test-cli-usability" slashCommand="/test-cli-usability" prompt={PROMPTS.recipe_test_cli_usability} />
+
+<InfoBox>
+Install all additional recipes for improving your agent:
+```bash
+npx skills add langwatch/skills/recipes
+```
+</InfoBox>

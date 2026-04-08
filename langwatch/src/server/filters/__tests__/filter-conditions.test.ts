@@ -46,42 +46,30 @@ describe("clickHouseFilterConditions", () => {
   });
 
   describe("traces.origin", () => {
-    it("matches only explicit 'application' value (not empty/NULL)", () => {
+    const expectedSql =
+      "if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({f0_values:Array(String)})";
+
+    it("maps empty/NULL origins to 'application' via ifNull, matching the dropdown", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       expect(builder).not.toBeNull();
       const result = builder!(["application"], "f0");
-      expect(result.sql).toBe(
-        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
-      );
+      expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({ f0_values: ["application"] });
     });
 
-    it("uses IN clause for specific non-application values", () => {
+    it("passes non-application values through directly", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       const result = builder!(["evaluation"], "f0");
-      expect(result.sql).toBe(
-        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
-      );
+      expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({ f0_values: ["evaluation"] });
     });
 
-    it("uses IN clause for mixed values including application", () => {
+    it("handles mixed application and other values", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       const result = builder!(["application", "evaluation"], "f0");
-      expect(result.sql).toBe(
-        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
-      );
-      expect(result.params).toEqual({ f0_values: ["application", "evaluation"] });
-    });
-
-    it("handles multiple non-application values", () => {
-      const builder = clickHouseFilterConditions["traces.origin"];
-      const result = builder!(["evaluation", "simulation"], "f0");
-      expect(result.sql).toBe(
-        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
-      );
+      expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({
-        f0_values: ["evaluation", "simulation"],
+        f0_values: ["application", "evaluation"],
       });
     });
 
@@ -197,6 +185,88 @@ describe("clickHouseFilterConditions", () => {
     });
   });
 
+  describe("evaluations.evaluator_id.has_passed", () => {
+    it("generates EXISTS subquery filtering on Passed IS NOT NULL", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["eval-1", "eval-2"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain("es.Passed IS NOT NULL");
+      expect(result.params).toEqual({ f0_values: ["eval-1", "eval-2"] });
+    });
+
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
+  describe("evaluations.evaluator_id.has_score", () => {
+    it("generates EXISTS subquery filtering on Score IS NOT NULL", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain("es.Score IS NOT NULL");
+      expect(result.params).toEqual({ f0_values: ["eval-1"] });
+    });
+
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
+  describe("evaluations.evaluator_id.has_label", () => {
+    it("generates EXISTS subquery filtering on Label IS NOT NULL and excludes succeeded/failed", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain("es.Label IS NOT NULL");
+      expect(result.sql).toContain("es.Label != ''");
+      expect(result.sql).toContain("es.Label NOT IN ('succeeded', 'failed')");
+      expect(result.params).toEqual({ f0_values: ["eval-1"] });
+    });
+
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
+  describe("evaluations.evaluator_id.guardrails_only", () => {
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id.guardrails_only"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
+  describe("evaluations.evaluator_id (base)", () => {
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.evaluator_id"];
+      const result = builder!(["eval-1"], "f0");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
   describe("evaluations.passed", () => {
     it("returns 1=0 when key is missing", () => {
       const builder = clickHouseFilterConditions["evaluations.passed"];
@@ -216,6 +286,14 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions["evaluations.passed"];
       const result = builder!(["true", "false"], "f0", "eval-1");
       expect(result.params.f0_values).toEqual([1, 0]);
+    });
+
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.passed"];
+      const result = builder!(["true"], "f0", "eval-1");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
     });
   });
 
@@ -241,6 +319,14 @@ describe("clickHouseFilterConditions", () => {
       expect(result.params.f0_max).toBe(0.9);
     });
 
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.score"];
+      const result = builder!(["0.5", "0.9"], "f0", "eval-1");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+
     it("returns no-match condition for invalid numeric values", () => {
       const builder = clickHouseFilterConditions["evaluations.score"];
       const result = builder!(["invalid", "NaN"], "f0", "eval-1");
@@ -253,6 +339,26 @@ describe("clickHouseFilterConditions", () => {
       const result = builder!(["0.9", "0.5"], "f0", "eval-1");
       expect(result.sql).toBe("1=0");
       expect(result.params).toEqual({});
+    });
+  });
+
+  describe("evaluations.state", () => {
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.state"];
+      const result = builder!(["processed"], "f0", "eval-1");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
+    });
+  });
+
+  describe("evaluations.label", () => {
+    it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
+      const builder = clickHouseFilterConditions["evaluations.label"];
+      const result = builder!(["positive"], "f0", "eval-1");
+      expect(result.sql).toContain("es.TraceId IS NOT NULL");
+      expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
+      expect(result.sql).not.toMatch(/es\.TraceId = ts\.TraceId/);
     });
   });
 });

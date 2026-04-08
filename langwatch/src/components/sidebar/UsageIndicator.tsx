@@ -78,8 +78,12 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
   });
   if (!display.visible) return null;
 
+  // When currentMonthMessagesCount is null (unlimited plan), don't show the usage bar
+  const currentCount = usage.data.currentMonthMessagesCount;
+  if (currentCount === null) return null;
+
   const percentage = Math.min(
-    (usage.data.currentMonthMessagesCount /
+    (currentCount /
       usage.data.activePlan.maxMessagesPerMonth) *
       100,
     100,
@@ -87,7 +91,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
 
   return (
     <Tooltip
-      content={`You have used ${usage.data.currentMonthMessagesCount.toLocaleString()} ${display.unitLabel} out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
+      content={`You have used ${currentCount.toLocaleString()} ${display.unitLabel} out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
       positioning={{ placement: "right", offset: { mainAxis: 8 } }}
     >
       <Link href="/settings/usage" width={showLabel ? "full" : "auto"}>
@@ -118,7 +122,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
                 </Text>
               </HStack>
               <Progress.Root
-                value={Math.min(usage.data.currentMonthMessagesCount, usage.data.activePlan.maxMessagesPerMonth)}
+                value={Math.min(currentCount, usage.data.activePlan.maxMessagesPerMonth)}
                 max={usage.data.activePlan.maxMessagesPerMonth}
                 colorPalette="orange"
                 width="full"

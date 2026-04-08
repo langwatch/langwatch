@@ -125,7 +125,10 @@ export const useFilterParams = () => {
           {
             ...Object.fromEntries(
               Object.entries(router.query).filter(
-                ([key]) => key !== "project" && !key.startsWith(filterUrl),
+                ([key]) =>
+                  key !== "project" &&
+                  key !== filterUrl &&
+                  !key.startsWith(filterUrl + "."),
               ),
             ),
             [filterUrl]: params,
@@ -151,8 +154,8 @@ export const useFilterParams = () => {
               Object.entries(router.query).filter(
                 ([key]) =>
                   key !== "project" &&
-                  !Object.values(availableFilters).some((f) =>
-                    key.startsWith(f.urlKey),
+                  !Object.values(availableFilters).some(
+                    (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
                   ),
               ),
             ),
@@ -184,8 +187,10 @@ export const useFilterParams = () => {
         query: Object.fromEntries(
           Object.entries(router.query).filter(
             ([key]) =>
-              !Object.values(availableFilters).some((filter) =>
-                key.startsWith(filter.urlKey),
+              key !== "query" &&
+              !Object.values(availableFilters).some(
+                (filter) =>
+                  key === filter.urlKey || key.startsWith(filter.urlKey + "."),
               ),
           ),
         ),
@@ -212,10 +217,18 @@ export const useFilterParams = () => {
     const { project: _project, ...rest } = router.query;
     void router.push(
       "?" +
-        qs.stringify({
-          ...rest,
-          negateFilters: negateFilters ? "true" : "false",
-        }),
+        qs.stringify(
+          {
+            ...rest,
+            negateFilters: negateFilters ? "true" : "false",
+          },
+          {
+            allowDots: true,
+            arrayFormat: "comma",
+            // @ts-ignore of course it exists
+            allowEmptyArrays: true,
+          },
+        ),
       undefined,
       { shallow: true, scroll: false },
     );
@@ -236,7 +249,12 @@ export const useFilterParams = () => {
     filterCount,
     hasAnyFilters,
     queryOpts: {
-      enabled: !!project && !!startDate && !!endDate,
+      enabled:
+        !!project &&
+        !!startDate &&
+        !isNaN(startDate.getTime()) &&
+        !!endDate &&
+        !isNaN(endDate.getTime()),
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       trpc: {

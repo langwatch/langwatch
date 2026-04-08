@@ -71,6 +71,7 @@ const mocks = vi.hoisted(() => ({
   mockCloseDrawer: vi.fn(),
   mockSetFlowCallbacks: vi.fn(),
   mockRunScenario: vi.fn(),
+  mockRouterPush: vi.fn(),
   mockGetByIdData: null as { id: string; name: string; situation: string; criteria: string[]; labels: string[] } | null,
 }));
 
@@ -131,6 +132,9 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      reportLimitBlocked: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     useContext: () => ({
       scenarios: {
@@ -158,6 +162,17 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
+  }),
+}));
+
+vi.mock("next/router", () => ({
+  useRouter: () => ({
+    query: { project: "my-project" },
+    pathname: "/[project]/simulations/scenarios",
+    asPath: "/my-project/simulations/scenarios",
+    push: mocks.mockRouterPush,
+    replace: vi.fn(),
+    isReady: true,
   }),
 }));
 
@@ -433,7 +448,7 @@ describe("<ScenarioFormDrawer/>", () => {
       mocks.mockRunScenario.mockResolvedValue(undefined);
     });
 
-    it("keeps the drawer open", async () => {
+    it("closes the drawer and navigates to simulations page", async () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
@@ -446,8 +461,11 @@ describe("<ScenarioFormDrawer/>", () => {
         expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
       });
 
-      // Drawer should remain open after save-and-run
-      expect(onClose).not.toHaveBeenCalled();
+      // Drawer closes and navigates to simulations page with pending batch
+      expect(onClose).toHaveBeenCalled();
+      expect(mocks.mockRouterPush).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/my-project\/simulations\?pendingBatch=/),
+      );
     });
   });
 

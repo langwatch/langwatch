@@ -53,7 +53,6 @@ export function QueryStringFieldsFilters({
 	const { project, hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
-	const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
 
 	return (
 		<FieldsFilters
@@ -61,7 +60,7 @@ export function QueryStringFieldsFilters({
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
 			actionButton={
 				<HStack gap={1}>
-					{hasClickHouse && hasAnyFilters && (
+					{hasAnyFilters && (
 						<SaveAsViewButton />
 					)}
 					{hasPermission("triggers:manage") && !hideTriggerButton && (
@@ -92,12 +91,8 @@ export function FieldsFilters({
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 	actionButton?: React.ReactNode;
 }) {
-	const { project } = useOrganizationTeamProject();
-	const hasClickHouse =
-		project?.featureClickHouseDataSourceTraces === true;
-
 	const filterKeys: FilterField[] = [
-		...(hasClickHouse ? (["traces.origin"] as const) : []),
+		"traces.origin",
 		"metadata.prompt_ids",
 		"spans.model",
 		"metadata.labels",
@@ -186,12 +181,18 @@ function FieldsFilter({
 	// Ref for selecting the highlighted option from keyboard
 	const selectHighlightedRef = React.useRef<(() => void) | null>(null);
 
-	// Reset keyboard nav state when popover closes
+	// Reset state when popover closes
 	useEffect(() => {
 		if (!open) {
 			setHighlightedIndex(-1);
 			setIsKeyboardNav(false);
+			setQuery("");
+			setImmediateQuery("");
+			if (searchRef.current) {
+				searchRef.current.value = "";
+			}
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open]);
 
 	const currentStringList = Array.isArray(current)
@@ -424,7 +425,7 @@ function NestedListSelection({
 					current_[lastKey] = values;
 				} else {
 					for (const key of Object.keys(current_)) {
-						if (!(key in values)) {
+						if (!values.includes(key)) {
 							delete current_[key];
 						}
 					}
@@ -862,12 +863,17 @@ function RangeFilter({
 		min = 0;
 	}
 
+	const initializedRef = React.useRef(false);
+
 	useEffect(() => {
-		if (filterData.data) {
-			onChange([min.toString(), max.toString()]);
-		}
+		if (!filterData.data || initializedRef.current) return;
+		initializedRef.current = true;
+		// Skip initialization if the user already has a selected range
+		// (e.g. from a saved view or popover re-open)
+		if (currentValues.length === 2) return;
+		onChange([min.toString(), max.toString()]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [min, max, !!filterData.data]);
+	}, [!!filterData.data]);
 
 	return (
 		<HStack width="full" gap={3} paddingX={3} paddingY={2}>
@@ -964,16 +970,13 @@ function ThumbsUpDownVoteFilter({
 									]);
 								} else {
 									const other = field === -1 ? 1 : -1;
-									onChange([
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-									]);
+									const isLast =
+										(min ?? 0) === field && (max ?? 0) === field;
+									if (isLast) {
+										onChange([]);
+									} else {
+										onChange([other.toString(), other.toString()]);
+									}
 								}
 							}}
 						>

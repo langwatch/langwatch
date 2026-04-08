@@ -1,0 +1,35 @@
+# access-ingress.yaml — Expose LangWatch via Ingress with TLS.
+#
+# Replace LANGWATCH_HOST with your real domain before installing.
+#
+# Usage:
+#   export LANGWATCH_HOST=langwatch.example.com
+#   helm install lw . \
+#     -f examples/overlays/size-prod.yaml \
+#     -f examples/overlays/access-ingress.yaml \
+#     --set "app.http.baseHost=https://${LANGWATCH_HOST}" \
+#     --set "app.http.publicUrl=https://${LANGWATCH_HOST}" \
+#     --set "ingress.hosts[0].host=${LANGWATCH_HOST}" \
+#     --set "ingress.tls[0].hosts[0]=${LANGWATCH_HOST}"
+
+app:
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.example.com
+  hosts:
+    - host: langwatch.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix

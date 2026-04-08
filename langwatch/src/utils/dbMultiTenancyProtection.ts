@@ -44,6 +44,11 @@ const EXEMPT_MODELS = [
    * SCIM tokens are organization-level, used for IdP provisioning
    */
   "ScimToken",
+  /**
+   * Custom prompt tag definitions are organization-level, not project-level.
+   * They are scoped by organizationId.
+   */
+  "PromptTag",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

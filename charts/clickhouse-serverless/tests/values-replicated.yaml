@@ -1,0 +1,22 @@
+image:
+  pullPolicy: Never
+replicas: 3
+memory: 1Gi
+cpu: "500m"
+storage:
+  size: 1Gi
+
+auth:
+  password: "e2etest"
+  clusterSecret: "e2e-cluster-secret"
+
+keeper:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  storage:
+    size: 1Gi

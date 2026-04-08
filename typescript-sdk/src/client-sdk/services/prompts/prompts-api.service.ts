@@ -1,5 +1,5 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { type PromptResponse } from "./types";
+import type { paths, operations } from "@/internal/generated/openapi/api-client";
+import { type PromptResponse, type TagDefinition, type CreatedTag } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
@@ -9,6 +9,10 @@ import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/ap
 import { PromptsApiError } from "./errors";
 
 export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
+
+export type AssignLabelResult = NonNullable<
+  operations["putApiPromptsByIdTagsByTag"]["responses"]["200"]["content"]["application/json"]
+>;
 
 export type ConfigData = NonNullable<
   paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
@@ -91,10 +95,13 @@ export class PromptsApiService {
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
+   * @param options Optional parameters for the request.
+   * @param options.version Specific version to fetch (numeric string or "latest").
+   * @param options.label Label to fetch ("production" or "staging").
    * @returns Raw PromptResponse data.
    * @throws {PromptsApiError} If the API call fails.
    */
-  get = async (id: string, options?: { version?: string }): Promise<PromptResponse> => {
+  get = async (id: string, options?: { version?: string; label?: string }): Promise<PromptResponse> => {
     // Parse version to number, skip for "latest" or invalid values
     const versionNumber = options?.version && options.version !== "latest"
       ? parseInt(options.version, 10)
@@ -103,9 +110,12 @@ export class PromptsApiService {
     const { data, error } = await this.apiClient.GET(
       "/api/prompts/{id}",
       {
-        params: { path: { id } },
-        query: {
-          version: Number.isNaN(versionNumber) ? undefined : versionNumber,
+        params: {
+          path: { id },
+          query: {
+            version: Number.isNaN(versionNumber) ? undefined : versionNumber,
+            tag: options?.label,
+          },
         },
       },
     );
@@ -173,6 +183,64 @@ export class PromptsApiService {
       });
     if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
     return updatedPrompt;
+  }
+
+  /**
+   * Lists all prompt tags (built-in and custom) for the organization.
+   * @returns Array of tag definitions.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async listTags(): Promise<TagDefinition[]> {
+    const { data, error } = await this.apiClient.GET("/api/prompts/tags");
+    if (error) this.handleApiError("list tags", error);
+    return data;
+  }
+
+  /**
+   * Creates a custom prompt tag for the organization.
+   * @param params.name The tag name (must match /^[a-z][a-z0-9_-]*$/).
+   * @returns The created tag.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async createTag({ name }: { name: string }): Promise<CreatedTag> {
+    const { data, error } = await this.apiClient.POST("/api/prompts/tags", {
+      body: { name },
+    });
+    if (error) this.handleApiError("create tag", error);
+    return data;
+  }
+
+  /**
+   * Deletes a custom prompt tag by name.
+   * @param tagName The tag name to delete.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async deleteTag(tagName: string): Promise<void> {
+    const { error } = await this.apiClient.DELETE(
+      "/api/prompts/tags/{tag}" as any,
+      { params: { path: { tag: tagName } } } as any,
+    );
+    if (error) this.handleApiError(`delete tag "${tagName}"`, error);
+  }
+
+  async assignLabel({
+    id,
+    label,
+    versionId,
+  }: {
+    id: string;
+    label: string;
+    versionId: string;
+  }): Promise<AssignLabelResult> {
+    const { data, error } = await this.apiClient.PUT(
+      "/api/prompts/{id}/tags/{tag}",
+      {
+        params: { path: { id, tag: label } },
+        body: { versionId },
+      },
+    );
+    if (error) this.handleApiError(`assign label "${label}" to prompt "${id}"`, error);
+    return data;
   }
 
   /**

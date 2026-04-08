@@ -78,14 +78,14 @@ function CapabilityCard({
       flex={1}
       borderRadius="xl"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor={{ base: "orange.200", _dark: "orange.800" }}
       bg="bg.panel/70"
       backdropFilter="blur(20px) saturate(1.3)"
       boxShadow="0 1px 3px rgba(0,0,0,0.04)"
       transition="all 0.2s ease"
       cursor="pointer"
       _hover={{
-        borderColor: "orange.200",
+        borderColor: "orange.emphasized",
         boxShadow:
           "0 6px 28px rgba(237,137,38,0.06)",
         transform: "translateY(-2px)",
@@ -157,7 +157,7 @@ export function ViaPlatformScreen(): React.ReactElement {
             alignItems="center"
             gap="4px"
             fontSize="13px"
-            color="#51676C"
+            color={{ base: "#51676C", _dark: "white" }}
             textDecoration="none"
           >
             Read the docs

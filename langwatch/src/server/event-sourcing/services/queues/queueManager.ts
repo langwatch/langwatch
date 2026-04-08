@@ -241,7 +241,7 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
-        scoreFn: (event: any) => event.createdAt,
+        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
@@ -301,7 +301,7 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
-        scoreFn: (event: any) => event.createdAt,
+        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
         process: async (event: any) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
@@ -329,6 +329,8 @@ export class QueueManager<EventType extends Event = Event> {
     commandRegistrations: Array<{
       name: string;
       handlerClass: CommandHandlerClass<any, any, EventType>;
+      /** Pre-constructed instance — when provided, used instead of `new handlerClass()`. */
+      handlerInstance?: CommandHandler<any, EventType>;
       options?: CommandHandlerOptions<Payload>;
     }>,
     storeEvents: (
@@ -362,7 +364,7 @@ export class QueueManager<EventType extends Event = Event> {
       const handlerClass = registration.handlerClass;
       const schema = handlerClass.schema;
       const commandType = schema.type;
-      const handlerInstance = new handlerClass();
+      const handlerInstance = registration.handlerInstance ?? new handlerClass();
 
       const getAggregateId =
         registration.options?.getAggregateId ??
@@ -434,6 +436,7 @@ export class QueueManager<EventType extends Event = Event> {
             storeEventsFn: storeEvents,
             aggregateType: this.aggregateType,
             commandName: cmdEntry.commandName,
+            pipelineName: this.pipelineName,
             featureFlagService: this.featureFlagService,
             killSwitchOptions: cmdEntry.killSwitchOptions,
             logger,

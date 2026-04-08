@@ -121,7 +121,7 @@ export const CopyDatasetDialog = ({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select project" />
                 </Select.Trigger>
-                <Select.Content zIndex="1600">
+                <Select.Content>
                   {projectCollection.items.map((project) => (
                     <Select.Item key={project.value} item={project}>
                       {project.label}

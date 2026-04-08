@@ -44,6 +44,10 @@ async function inspectDataHash(groupId: string) {
   return redis.hgetall(`${keyPrefix()}group:${groupId}:data`);
 }
 
+async function inspectDedupKey(dedupId: string) {
+  return redis.get(`${keyPrefix()}dedup:${dedupId}`);
+}
+
 function makeJob(overrides: Partial<Parameters<typeof scripts.stage>[0]> = {}) {
   return {
     stagedJobId: `job-${crypto.randomUUID().slice(0, 8)}`,
@@ -52,6 +56,8 @@ function makeJob(overrides: Partial<Parameters<typeof scripts.stage>[0]> = {}) {
     dedupId: "",
     dedupTtlMs: 0,
     jobDataJson: JSON.stringify({ hello: "world" }),
+    shouldExtend: true,
+    shouldReplace: true,
     ...overrides,
   };
 }
@@ -111,7 +117,7 @@ describe("GroupStagingScripts", () => {
 
     describe("when staging with deduplication", () => {
       describe("when dedup key exists", () => {
-        it("replaces old job, returns false", async () => {
+        it("squashes onto original job, returns false", async () => {
           const first = await scripts.stage(
             makeJob({
               stagedJobId: "j1",
@@ -132,14 +138,14 @@ describe("GroupStagingScripts", () => {
           );
           expect(second).toBe(false);
 
-          // Only j2 should remain
+          // j1 stays (squash-in-place keeps original ID)
           const jobs = await inspectGroupJobs("group-a");
-          expect(jobs[0]).toBe("j2");
+          expect(jobs[0]).toBe("j1");
 
-          // Data should contain j2 but not j1
+          // Data updated to j2's payload, keyed under j1
           const data = await inspectDataHash("group-a");
-          expect(data["j2"]).toBeDefined();
-          expect(data["j1"]).toBeUndefined();
+          expect(data["j1"]).toBe(JSON.stringify({ version: 2 }));
+          expect(data["j2"]).toBeUndefined();
         });
       });
 
@@ -171,6 +177,444 @@ describe("GroupStagingScripts", () => {
           expect(jobs).toContain("j1");
           expect(jobs).toContain("j2");
         });
+      });
+    });
+
+    describe("squash-in-place deduplication", () => {
+      it("keeps original stagedJobId, updates data and score", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "squash-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 1000,
+            jobDataJson: JSON.stringify({ version: 1 }),
+          }),
+        );
+
+        const result = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "squash-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 2000,
+            jobDataJson: JSON.stringify({ version: 2 }),
+          }),
+        );
+
+        expect(result).toBe(false);
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j1", "2000"]);
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j1"]).toBe(JSON.stringify({ version: 2 }));
+        expect(data["j2"]).toBeUndefined();
+
+        const dedupValue = await inspectDedupKey("squash-1");
+        expect(dedupValue).toBe("j1");
+      });
+
+      it("accumulates correctly across triple squash", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "triple-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 1000,
+            jobDataJson: JSON.stringify({ v: 1 }),
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "triple-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 2000,
+            jobDataJson: JSON.stringify({ v: 2 }),
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j3",
+            dedupId: "triple-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 3000,
+            jobDataJson: JSON.stringify({ v: 3 }),
+          }),
+        );
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j1", "3000"]);
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j1"]).toBe(JSON.stringify({ v: 3 }));
+
+        const dedupValue = await inspectDedupKey("triple-1");
+        expect(dedupValue).toBe("j1");
+      });
+    });
+
+    describe("when dedup key exists but job already dispatched (TOCTOU race)", () => {
+      it("treats as new job, not silent over-stage", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "race-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+          }),
+        );
+
+        const dispatched = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+        expect(dispatched).not.toBeNull();
+        expect(dispatched!.stagedJobId).toBe("j1");
+
+        const jobsAfterDispatch = await inspectGroupJobs("group-a");
+        expect(jobsAfterDispatch).toEqual([]);
+
+        const result = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "race-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+          }),
+        );
+
+        expect(result).toBe(true);
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j2", "5000"]);
+
+        const active = await inspectActiveKey("group-a");
+        expect(active).toBe("j1");
+
+        const dedupValue = await inspectDedupKey("race-1");
+        expect(dedupValue).toBe("j2");
+      });
+
+      it("handles race with multiple dispatch cycles", async () => {
+        // Stage j1, dispatch it
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "multi-race",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+          }),
+        );
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+
+        // j2 is new (j1 dispatched)
+        const r2 = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "multi-race",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+          }),
+        );
+        expect(r2).toBe(true);
+
+        // Complete j1, dispatch j2
+        await scripts.complete({ groupId: "group-a", stagedJobId: "j1" });
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+
+        // j3 is new (j2 dispatched)
+        const r3 = await scripts.stage(
+          makeJob({
+            stagedJobId: "j3",
+            dedupId: "multi-race",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+          }),
+        );
+        expect(r3).toBe(true);
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j3", "5000"]);
+      });
+    });
+
+    describe("extend/replace flags", () => {
+      it("updates score when extend is true", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "ext-true",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 1000,
+            shouldExtend: true,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "ext-true",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+            shouldExtend: true,
+          }),
+        );
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j1", "5000"]);
+      });
+
+      it("preserves original score when extend is false", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "ext-false",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 1000,
+            shouldExtend: true,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "ext-false",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 9999,
+            shouldExtend: false,
+          }),
+        );
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j1", "1000"]);
+
+        // Dedup key should still exist (TTL refreshed)
+        const dedupValue = await inspectDedupKey("ext-false");
+        expect(dedupValue).toBe("j1");
+      });
+
+      it("preserves original data when replace is false", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "rep-false",
+            dedupTtlMs: 60000,
+            jobDataJson: JSON.stringify({ original: true }),
+            shouldReplace: true,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "rep-false",
+            dedupTtlMs: 60000,
+            jobDataJson: JSON.stringify({ updated: true }),
+            shouldReplace: false,
+          }),
+        );
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j1"]).toBe(JSON.stringify({ original: true }));
+      });
+
+      it("updates data when replace is true", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "rep-true",
+            dedupTtlMs: 60000,
+            jobDataJson: JSON.stringify({ v: 1 }),
+            shouldReplace: true,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "rep-true",
+            dedupTtlMs: 60000,
+            jobDataJson: JSON.stringify({ v: 2 }),
+            shouldReplace: true,
+          }),
+        );
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j1"]).toBe(JSON.stringify({ v: 2 }));
+      });
+
+      it("keeps both score and data unchanged with extend:false + replace:false", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "both-false",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+            jobDataJson: JSON.stringify({ first: true }),
+            shouldExtend: false,
+            shouldReplace: false,
+          }),
+        );
+
+        const result = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "both-false",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 9999,
+            jobDataJson: JSON.stringify({ second: true }),
+            shouldExtend: false,
+            shouldReplace: false,
+          }),
+        );
+
+        expect(result).toBe(false);
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j1", "5000"]);
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j1"]).toBe(JSON.stringify({ first: true }));
+
+        const dedupValue = await inspectDedupKey("both-false");
+        expect(dedupValue).toBe("j1");
+      });
+
+      it("keeps schedule but updates payload with extend:false + replace:true", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "ext-false-rep-true",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 1000,
+            jobDataJson: JSON.stringify({ v: 1 }),
+            shouldExtend: false,
+            shouldReplace: true,
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "ext-false-rep-true",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 9999,
+            jobDataJson: JSON.stringify({ v: 2 }),
+            shouldExtend: false,
+            shouldReplace: true,
+          }),
+        );
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toEqual(["j1", "1000"]);
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j1"]).toBe(JSON.stringify({ v: 2 }));
+      });
+    });
+
+    describe("edge cases", () => {
+      it("creates genuinely new job after dedup TTL expires", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "exp-1",
+            dedupTtlMs: 1,
+            dispatchAfterMs: 1000,
+          }),
+        );
+
+        await new Promise((r) => setTimeout(r, 10));
+
+        const result = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "exp-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 2000,
+          }),
+        );
+
+        expect(result).toBe(true);
+
+        const jobs = await inspectGroupJobs("group-a");
+        expect(jobs).toContain("j1");
+        expect(jobs).toContain("j2");
+      });
+
+      it("does not interfere across different dedup IDs in different groups", async () => {
+        const r1 = await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "group-a",
+            dedupId: "cross-1",
+            dedupTtlMs: 60000,
+          }),
+        );
+        const r2 = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            groupId: "group-b",
+            dedupId: "cross-2",
+            dedupTtlMs: 60000,
+          }),
+        );
+
+        expect(r1).toBe(true);
+        expect(r2).toBe(true);
+
+        const jobsA = await inspectGroupJobs("group-a");
+        expect(jobsA).toContain("j1");
+
+        const jobsB = await inspectGroupJobs("group-b");
+        expect(jobsB).toContain("j2");
+      });
+
+      it("returns squashed data on dispatch after dedup squash", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "squash-dispatch",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+            jobDataJson: JSON.stringify({ v: 1 }),
+          }),
+        );
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "squash-dispatch",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+            jobDataJson: JSON.stringify({ v: 2 }),
+          }),
+        );
+
+        const dispatched = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+        expect(dispatched).not.toBeNull();
+        expect(dispatched!.stagedJobId).toBe("j1");
+        expect(dispatched!.jobDataJson).toBe(JSON.stringify({ v: 2 }));
+      });
+
+      it("does not leak data hash entries on race condition", async () => {
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "leak-check",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+          }),
+        );
+
+        // Dispatch cleans data hash for j1
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "leak-check",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+          }),
+        );
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j2"]).toBeDefined();
+        expect(data["j1"]).toBeUndefined();
       });
     });
   });
@@ -219,6 +663,107 @@ describe("GroupStagingScripts", () => {
 
         // j1 replaces j0 (dedup), j2 is new
         expect(count).toBe(1);
+      });
+    });
+
+    describe("when batch contains race condition", () => {
+      it("treats dispatched dedup as new, squashes staged dedup", async () => {
+        // j0 with dedupId "batch-race", dispatch it
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j0",
+            groupId: "group-x",
+            dedupId: "batch-race",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+          }),
+        );
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+
+        // Batch: j1 has same dedup (race — j0 already dispatched), j2 is no dedup
+        const count = await scripts.stageBatch([
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "group-x",
+            dedupId: "batch-race",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+          }),
+          makeJob({
+            stagedJobId: "j2",
+            groupId: "group-y",
+            dispatchAfterMs: 1000,
+          }),
+        ]);
+
+        // Both are new (j1 because of race, j2 because no dedup)
+        expect(count).toBe(2);
+
+        const jobsX = await inspectGroupJobs("group-x");
+        expect(jobsX).toContain("j1");
+        expect(jobsX).not.toContain("j0");
+
+        const jobsY = await inspectGroupJobs("group-y");
+        expect(jobsY).toContain("j2");
+      });
+    });
+
+    describe("when batch has mix of squash and race", () => {
+      it("squashes staged dedup and creates new for dispatched dedup", async () => {
+        // j0 still in staging with dedupId "mix-a"
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j0",
+            groupId: "group-a",
+            dedupId: "mix-a",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 1000,
+            jobDataJson: JSON.stringify({ from: "j0" }),
+          }),
+        );
+
+        // j1 dispatched with dedupId "mix-b"
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "group-a",
+            dedupId: "mix-b",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+          }),
+        );
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+
+        // Batch: j2 squashes onto j0 (mix-a), j3 is new (mix-b race)
+        const count = await scripts.stageBatch([
+          makeJob({
+            stagedJobId: "j2",
+            groupId: "group-a",
+            dedupId: "mix-a",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 2000,
+            jobDataJson: JSON.stringify({ from: "j2" }),
+          }),
+          makeJob({
+            stagedJobId: "j3",
+            groupId: "group-a",
+            dedupId: "mix-b",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 3000,
+          }),
+        ]);
+
+        // j2 squashed (0 new), j3 is new (1 new)
+        expect(count).toBe(1);
+
+        const jobs = await inspectGroupJobs("group-a");
+        // j0 should still be there (squashed with j2's data)
+        expect(jobs).toContain("j0");
+        // j3 should be there as new
+        expect(jobs).toContain("j3");
+
+        const data = await inspectDataHash("group-a");
+        expect(data["j0"]).toBe(JSON.stringify({ from: "j2" }));
       });
     });
   });

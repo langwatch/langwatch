@@ -1,12 +1,12 @@
 import { Alert, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
 import type { Span } from "../../server/tracer/types";
-import { api } from "../../utils/api";
+
 import {
   CheckStatusIcon,
   evaluationStatusColor,
@@ -266,60 +266,54 @@ export function SpanTree(props: SpanTreeProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
-  const [keepRefetching, setKeepRefetching] = useState(false);
-  const spans = api.spans.getAllForTrace.useQuery(
-    { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    {
-      enabled: !!project && !!traceId,
-      refetchOnWindowFocus: false,
-      refetchInterval: keepRefetching ? 5_000 : undefined,
-    },
-  );
-
-  useEffect(() => {
-    if ((trace.data?.timestamps.inserted_at ?? 0) < Date.now() - 10 * 1000) {
-      return;
-    }
-
-    setKeepRefetching(true);
-    const timeout = setTimeout(() => {
-      setKeepRefetching(false);
-    }, 10_000);
-    return () => clearTimeout(timeout);
-  }, [trace.data?.timestamps.inserted_at]);
+  // Use spans from trace.data directly — avoids a duplicate ClickHouse query.
+  // traces.getById already fetches spans via getTracesWithSpans.
+  const sortedSpans = useMemo(() => {
+    if (!trace.data?.spans) return undefined;
+    return [...trace.data.spans].sort((a, b) => {
+      const startDiff =
+        (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
+      if (startDiff === 0) {
+        return (
+          (b.timestamps?.finished_at ?? 0) - (a.timestamps?.finished_at ?? 0)
+        );
+      }
+      return startDiff;
+    });
+  }, [trace.data?.spans]);
 
   useTraceUpdateListener({
     projectId: project?.id ?? "",
     traceId,
-    onSpanStored: (_traceIds) => void spans.refetch(),
+    onSpanStored: (_traceIds) => void trace.refetch(),
     onTraceSummaryUpdated: (_traceIds) => void trace.refetch(),
     enabled: !!project && !!traceId,
   });
 
   const span = spanId
-    ? spans.data?.find((span) => span.span_id === spanId)
-    : spans.data?.[0];
+    ? sortedSpans?.find((span) => span.span_id === spanId)
+    : sortedSpans?.[0];
 
   useEffect(() => {
     if (
       (!spanId || spanId !== span?.span_id) &&
       project &&
       traceId &&
-      spans.data &&
-      spans.data[0]
+      sortedSpans &&
+      sortedSpans[0]
     ) {
       void router.replace(
         {
           query: {
             ...router.query,
-            span: spans.data[0].span_id,
+            span: sortedSpans[0].span_id,
           },
         },
         undefined,
         { shallow: true },
       );
     }
-  }, [project, router, span?.span_id, spanId, spans.data, traceId]);
+  }, [project, router, span?.span_id, spanId, sortedSpans, traceId]);
 
   if (!trace.data) {
     return null;
@@ -327,7 +321,7 @@ export function SpanTree(props: SpanTreeProps) {
 
   return (
     <VStack width="full">
-      {spans.data ? (
+      {sortedSpans ? (
         <HStack
           align="start"
           width="full"
@@ -335,16 +329,16 @@ export function SpanTree(props: SpanTreeProps) {
           paddingX={6}
           flexDirection={{ base: "column", xl: "row" }}
         >
-          <TreeRenderer spans={spans.data} />
+          <TreeRenderer spans={sortedSpans} />
           {project && span && (
             <SpanDetails
               project={project}
               span={span}
-              allSpans={spans.data}
+              allSpans={sortedSpans}
             />
           )}
         </HStack>
-      ) : spans.isError ? (
+      ) : trace.isError ? (
         <Alert.Root status="error">
           <Alert.Indicator />
           <Alert.Content>

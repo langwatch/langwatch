@@ -12,8 +12,17 @@ type LangWatchTracer struct {
 }
 
 func Tracer(name string, options ...trace.TracerOption) *LangWatchTracer {
+	return TracerFromProvider(nil, name, options...)
+}
+
+// TracerFromProvider creates a LangWatchTracer using the given TracerProvider
+// instead of the global one. If provider is nil, it falls back to the global TracerProvider.
+func TracerFromProvider(provider trace.TracerProvider, name string, options ...trace.TracerOption) *LangWatchTracer {
+	if provider == nil {
+		provider = otel.GetTracerProvider()
+	}
 	return &LangWatchTracer{
-		tracer: otel.Tracer(name, options...),
+		tracer: provider.Tracer(name, options...),
 	}
 }
 

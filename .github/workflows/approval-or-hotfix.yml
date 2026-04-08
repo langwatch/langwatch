@@ -1,8 +1,8 @@
-name: Approval or Exception Required
+name: approval-or-hotfix
 
 on:
-  pull_request:
-    types: [labeled, unlabeled]
+  pull_request_target:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
   pull_request_review:
     types: [submitted, dismissed]
 
@@ -12,6 +12,11 @@ concurrency:
 
 jobs:
   check-approval-or-label:
+    # Skip pull_request_review for fork PRs — the read-only token would 403
+    # and the concurrency group could cancel a passing pull_request_target run.
+    if: >-
+      github.event_name != 'pull_request_review' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
@@ -19,7 +24,7 @@ jobs:
 
     steps:
       - name: Check for approval or exception labels
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const pr = context.payload.pull_request;

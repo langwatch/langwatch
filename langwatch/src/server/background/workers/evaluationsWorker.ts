@@ -35,7 +35,6 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
-import { createCostChecker } from "../../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
@@ -54,6 +53,10 @@ import {
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
+import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../../evaluations/threadMappingResolver";
 import {
   type MappingState,
   mapTraceToDatasetEntry,
@@ -114,19 +117,6 @@ export async function runEvaluationJob(
     workflowId,
   });
 }
-
-/**
- * Check if any mapping has type "thread"
- * Single Responsibility: Detect if thread-based mappings are present
- */
-const hasThreadMappings = (mappingState: MappingState | null): boolean => {
-  if (!mappingState) {
-    return false;
-  }
-  return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread",
-  );
-};
 
 /**
  * Build thread-based data for evaluation
@@ -386,6 +376,22 @@ const buildDataForEvaluation = async (
     }
 
     data = mappedData;
+
+    // Resolve any thread-typed mappings mixed into trace-level evaluations
+    if (mappings && hasThreadMappings(mappings)) {
+      await resolveThreadMappingsIntoData({
+        data: data as Record<string, unknown>,
+        trace,
+        mappings,
+        getThreadTraces: (threadId) =>
+          getTracesGroupedByThreadId({
+            connConfig: { projectId },
+            threadId,
+            protections,
+            includeSpans: true,
+          }),
+      });
+    }
   }
 
   // Workflow evaluators and custom evaluators pass data through as-is
@@ -498,27 +504,6 @@ export const runEvaluation = async ({
   workflowId?: string | null;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, archivedAt: null },
-    include: { team: true },
-  });
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return {
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    };
-  }
-
   if (data.type === "custom") {
     return customEvaluation(
       projectId,

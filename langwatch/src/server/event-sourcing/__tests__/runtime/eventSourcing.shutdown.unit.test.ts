@@ -42,7 +42,6 @@ function createMockPipeline(name: string) {
 describe("EventSourcing.close", () => {
   beforeEach(() => {
     vi.stubEnv("BUILD_TIME", "");
-    vi.stubEnv("ENABLE_EVENT_SOURCING", "true");
     vi.stubEnv("NODE_ENV", "test");
   });
 

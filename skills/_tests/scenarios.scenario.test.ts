@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -86,6 +87,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
@@ -161,11 +163,12 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.test\.ts$/);
             expect(
@@ -224,11 +227,12 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const testContent = testFiles
@@ -273,11 +277,12 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "red team my agent for vulnerabilities, short and sweet, no need to run the tests"
+            "red team my agent for vulnerabilities"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
@@ -335,11 +340,12 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "red team my agent for vulnerabilities, short and sweet, no need to run the tests"
+            "red team my agent for vulnerabilities"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(
@@ -405,6 +411,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const testContent = testFiles
@@ -453,6 +460,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             // In platform mode, no test files should be created
             // The agent should use MCP tools instead
 
@@ -508,11 +516,12 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const content = testFiles
@@ -562,6 +571,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const content = testFiles
@@ -629,6 +639,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             // Verify test files were created
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);

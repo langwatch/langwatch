@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -84,11 +85,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             // Verify the agent modified main.py to use langwatch prompts
             const mainPy = fs.readFileSync(
@@ -147,11 +149,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -207,11 +210,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             const mainPy = fs.readFileSync(
               path.join(tempFolder, "main.py"),
@@ -270,11 +274,12 @@ describe("Prompts Skill", () => {
         ],
         script: [
           scenario.user(
-            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+            "version my agent prompts with langwatch"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
 
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
@@ -337,6 +342,7 @@ describe("Prompts Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
             const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
             // Either the code was updated to use langwatch prompts, or prompt files were created
             const hasPromptsJson = fs.existsSync(
@@ -358,6 +364,66 @@ describe("Prompts Skill", () => {
           scenario.judge(),
         ],
       });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "guides tag-based deployment workflow for Python",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-prompts-tags-py-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python prompt tags deployment",
+        description:
+          "Setting up tag-based prompt deployment in a Python OpenAI project using the LangWatch Prompts CLI.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent explains or sets up tag-based deployment (production/staging tags)",
+              "Agent updates code to fetch prompts by tag instead of bare slug",
+              "Agent mentions the Deploy dialog or platform_assign_prompt_tag for assigning tags",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "set up tag-based deployment for my prompts so I can use production and staging versions separately"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            assertSkillWasRead(state, "prompts");
+
+            const mainPy = fs.readFileSync(
+              path.join(tempFolder, "main.py"),
+              "utf8"
+            );
+
+            // Code should reference tag-based fetching
+            const usesTagFetch = /tag\s*=\s*["']production["']|tag\s*=\s*["']staging["']|{\s*tag:/.test(mainPy);
+            const usesLangwatch = /langwatch/.test(mainPy);
+
+            expect(
+              usesTagFetch || usesLangwatch,
+              "Expected code to use tag-based prompt fetching or langwatch integration"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+
       expect(result.success).toBe(true);
     },
     600_000

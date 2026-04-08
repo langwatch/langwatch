@@ -9,20 +9,15 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import React, { useCallback, useMemo } from "react";
-import { ChevronDown, Info, Plus, Trash2, X } from "react-feather";
+import React, { useMemo } from "react";
+import { Info, Plus, Trash2, X } from "react-feather";
 import {
   Controller,
   type FieldErrors,
   useFieldArray,
   useFormContext,
-  useWatch,
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
-import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
-import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import { Popover } from "~/components/ui/popover";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import type {
@@ -85,72 +80,7 @@ const ModelSelectorWithWarning = ({
   );
 };
 
-/**
- * Bridging component that connects react-hook-form's flat structure
- * with LLMConfigPopover's object-based API.
- *
- * Renders a compact model selector (like ModelSelectFieldMini) that
- * reads model and max_tokens from form context, constructs LLMConfig
- * object, and updates both fields on change.
- */
-const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
-  const { setValue, control } = useFormContext();
-
-  // Watch both fields for changes
-  const model = useWatch({ control, name: `${prefix}.model` }) as
-    | string
-    | undefined;
-  const maxTokens = useWatch({ control, name: `${prefix}.max_tokens` }) as
-    | number
-    | undefined;
-
-  // Construct LLMConfig object
-  const llmConfig: LLMConfig = useMemo(
-    () => ({
-      model: model ?? "",
-      max_tokens: maxTokens,
-    }),
-    [model, maxTokens],
-  );
-
-  // Handle changes from LLMConfigPopover
-  const handleChange = useCallback(
-    (newConfig: LLMConfig) => {
-      setValue(`${prefix}.model`, newConfig.model, { shouldDirty: true });
-      if (newConfig.max_tokens !== undefined) {
-        setValue(`${prefix}.max_tokens`, newConfig.max_tokens, {
-          shouldDirty: true,
-        });
-      }
-    },
-    [prefix, setValue],
-  );
-
-  return (
-    <Popover.Root positioning={{ placement: "bottom-start" }}>
-      <Popover.Trigger asChild>
-        <HStack
-          width="full"
-          paddingY={2}
-          paddingX={3}
-          borderRadius="md"
-          border="1px solid"
-          borderColor="border"
-          cursor="pointer"
-          _hover={{ bg: "gray.50" }}
-          transition="background 0.15s"
-          justify="space-between"
-        >
-          <LLMModelDisplay model={model ?? ""} />
-          <Box color="fg.muted">
-            <ChevronDown size={16} />
-          </Box>
-        </HStack>
-      </Popover.Trigger>
-      <LLMConfigPopover values={llmConfig} onChange={handleChange} />
-    </Popover.Root>
-  );
-};
+import { EvaluatorLLMConfigField } from "./EvaluatorLLMConfigField";
 
 // Separate component for array fields to handle useFieldArray hook
 const ArrayField = <T extends EvaluatorTypes>({

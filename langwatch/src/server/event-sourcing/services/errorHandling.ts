@@ -402,3 +402,51 @@ export function categorizeError(error: unknown): ErrorCategory {
   // Callers can override based on context
   return ErrorCategory.RECOVERABLE;
 }
+
+/**
+ * ClickHouse error codes that indicate transient/overload conditions.
+ * These should be retried rather than treated as fatal.
+ *
+ * - 159: TIMEOUT_EXCEEDED
+ * - 160: TOO_SLOW
+ * - 202: TOO_MANY_SIMULTANEOUS_QUERIES
+ * - 203: NO_FREE_CONNECTION
+ * - 209: SOCKET_TIMEOUT
+ * - 210: NETWORK_ERROR
+ * - 241: MEMORY_LIMIT_EXCEEDED
+ * - 252: TOO_MANY_PARTS
+ */
+const CLICKHOUSE_TRANSIENT_CODES = new Set([
+  "159", "160", "202", "203", "209", "210", "241", "252",
+]);
+
+/**
+ * Classifies a ClickHouse error as RECOVERABLE (transient) or CRITICAL.
+ *
+ * Transient errors (overload, timeouts, connection issues) should be retried
+ * by the group queue. Only true data-integrity errors are CRITICAL.
+ */
+export function classifyClickHouseError(error: unknown): ErrorCategory {
+  if (
+    error != null &&
+    typeof error === "object" &&
+    "code" in error &&
+    CLICKHOUSE_TRANSIENT_CODES.has(String((error as { code: unknown }).code))
+  ) {
+    return ErrorCategory.RECOVERABLE;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message.includes("Too many simultaneous queries") ||
+    message.includes("TIMEOUT_EXCEEDED") ||
+    message.includes("SOCKET_TIMEOUT") ||
+    message.includes("NETWORK_ERROR") ||
+    message.includes("connect ECONNREFUSED") ||
+    message.includes("connect ETIMEDOUT")
+  ) {
+    return ErrorCategory.RECOVERABLE;
+  }
+
+  return ErrorCategory.CRITICAL;
+}

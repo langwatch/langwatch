@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useActivePlan } from "~/hooks/useActivePlan";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PageLayout } from "./ui/layouts/PageLayout";
@@ -11,12 +12,13 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project } = useOrganizationTeamProject({
+  const { project, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
   const { isEnterprise } = useActivePlan();
+  const { isLiteMember } = useLiteMemberGuard();
 
   return (
     <DashboardLayout compactMenu>
@@ -35,36 +37,46 @@ export default function SettingsLayout({
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
-          <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
+          {!isLiteMember && (
+            <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
+          )}
           <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
           <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
-          <MenuLink href="/settings/secrets">Secrets</MenuLink>
-          <MenuLink href={`/${project?.slug}/automations`}>Automations</MenuLink>
+          {!isLiteMember && (
+            <MenuLink href="/settings/secrets">Secrets</MenuLink>
+          )}
+          {!isLiteMember && (
+            <MenuLink href={`/${project?.slug}/automations`}>Automations</MenuLink>
+          )}
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
           <MenuLink href="/settings/members" includePath="members">
             Members
           </MenuLink>
-          {isEnterprise && (
+          {isEnterprise && !isLiteMember && (
             <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
           )}
-          {isEnterprise && (
+          {isEnterprise && !isLiteMember && hasPermission("organization:manage") && (
             <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
           )}
 
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores
           </MenuLink>
-          <MenuLink href="/settings/topic-clustering">
-            Topic Clustering
-          </MenuLink>
+          {!isLiteMember && (
+            <MenuLink href="/settings/topic-clustering">
+              Topic Clustering
+            </MenuLink>
+          )}
           <MenuLink href="/settings/authentication">Authentication</MenuLink>
-          {isEnterprise && (
+          {isEnterprise && !isLiteMember && (
             <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
           )}
-          <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
-          {isSaaS && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
-          {!isSaaS && <MenuLink href="/settings/license">License</MenuLink>}
+          {!isLiteMember && (
+            <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
+          )}
+          {isSaaS && !isLiteMember && <MenuLink href="/settings/subscription">Subscription</MenuLink>}
+          {!isSaaS && !isLiteMember && <MenuLink href="/settings/license">License</MenuLink>}
         </VStack>
         <Container maxWidth="1280px" padding={4} paddingBottom={16}>
           {children}

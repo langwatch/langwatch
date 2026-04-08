@@ -4,10 +4,11 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import { dependencies } from "../../injection/dependencies.client";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { KEY_CHECK } from "../../utils/constants";
 import { SmallLabel } from "../SmallLabel";
+import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
+import { api } from "../../utils/api";
 
 /**
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
@@ -42,25 +43,30 @@ export const CredentialsSection = ({
   apiKeyValidationError?: string;
   onApiKeyValidationClear?: () => void;
 }) => {
-  const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
-    projectId: projectId ?? "",
-    organizationId: organizationId ?? "",
-    provider,
-  });
-  // Type assertion needed: managedModelProviderComponent is dynamically injected and may vary by deployment
-  const ManagedModelProviderAny = ManagedModelProvider as
-    | React.ComponentType<{ provider: MaybeStoredModelProvider }>
-    | undefined;
+  const { data: managedProviderData } =
+    api.modelProvider.isManagedProvider.useQuery(
+      {
+        organizationId: organizationId ?? "",
+        provider: provider.provider,
+      },
+      { enabled: !!organizationId },
+    );
+  const isManaged = managedProviderData?.managed ?? false;
 
   useEffect(() => {
-    if (ManagedModelProviderAny) {
+    if (isManaged) {
       actions.setManaged(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(state.customKeys)]);
+  }, [isManaged]);
 
-  if (ManagedModelProviderAny) {
-    return React.createElement(ManagedModelProviderAny, { provider });
+  if (isManaged) {
+    return (
+      <ManagedModelProviderAlert
+        provider={provider}
+        error={state.errors.customKeysRoot}
+      />
+    );
   }
 
   return (

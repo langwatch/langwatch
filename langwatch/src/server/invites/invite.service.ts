@@ -437,6 +437,47 @@ export class InviteService {
   }
 
   /**
+   * Finds the best project slug to redirect to after accepting an invite.
+   * Tries the first assigned team first, then falls back to any non-archived
+   * project in the org so the client can land directly in the app rather than
+   * hitting the onboarding flow.
+   */
+  async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
+    // Collect all invited team IDs from either format
+    const invitedTeamIds = (() => {
+      if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+        const assignments = invite.teamAssignments as Array<{ teamId: string }>;
+        return assignments.map((a) => a.teamId).filter(Boolean);
+      }
+      return invite.teamIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    })();
+
+    // Look for a project in any of the invited teams
+    const project =
+      (invitedTeamIds.length > 0
+        ? await this.prisma.project.findFirst({
+            where: { teamId: { in: invitedTeamIds }, archivedAt: null },
+            select: { slug: true },
+          })
+        : null) ??
+      // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
+      (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER
+        ? await this.prisma.project.findFirst({
+            where: {
+              team: { organizationId: invite.organizationId, archivedAt: null },
+              archivedAt: null,
+            },
+            select: { slug: true },
+          })
+        : null);
+
+    return project?.slug ?? null;
+  }
+
+  /**
    * Approves all PAYMENT_PENDING invites for a given subscription:
    * - Transitions each to PENDING with 48-hour expiration
    * - Sends invite emails

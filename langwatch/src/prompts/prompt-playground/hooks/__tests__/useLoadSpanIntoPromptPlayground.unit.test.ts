@@ -41,6 +41,7 @@ function buildSpanData(
     promptHandle: null,
     promptVersionNumber: null,
     promptVariables: null,
+    promptTag: null,
   };
 }
 

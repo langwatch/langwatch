@@ -5,6 +5,7 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
+import { createLogger } from "~/utils/logger";
 import {
   deriveResponseFormatFromOutputs,
   type inputsSchema,
@@ -15,6 +16,7 @@ import {
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
+import { TagValidationError } from "./repositories/llm-config-tag.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
@@ -22,6 +24,8 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
+import { PromptTagAssignmentRepository } from "./repositories/llm-config-tag.repository";
+import { PromptTagRepository } from "./repositories/prompt-tag.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -32,6 +36,8 @@ import {
   transformCamelToSnake,
   transformSnakeToCamel,
 } from "./transformToDbFormat";
+
+const logger = createLogger("langwatch:prompt-service");
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -103,10 +109,14 @@ export type VersionedPrompt = {
 export class PromptService {
   readonly repository: LlmConfigRepository;
   readonly versionService: PromptVersionService;
+  readonly tagRepository: PromptTagAssignmentRepository;
+  readonly promptTagRepository: PromptTagRepository;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
     this.versionService = new PromptVersionService(prisma);
+    this.tagRepository = new PromptTagAssignmentRepository(prisma);
+    this.promptTagRepository = new PromptTagRepository(prisma);
   }
 
   /**
@@ -146,18 +156,71 @@ export class PromptService {
     version?: number;
     organizationId?: string;
     versionId?: string;
+    /** Optional: fetch the version pointed to by this tag */
+    tag?: string;
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
+
+    if (params.tag && (params.version !== undefined || params.versionId !== undefined)) {
+      logger.warn(
+        { idOrHandle, tag: params.tag, version: params.version, versionId: params.versionId },
+        "Mutual exclusion: cannot specify both version/versionId and tag",
+      );
+      throw new TagValidationError(
+        "Cannot specify both 'version'/'versionId' and 'tag'. Use one or the other.",
+      );
+    }
+
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(projectId));
+
+    // If a tag is provided, resolve it to a versionId
+    let resolvedVersionId = params.versionId;
+    if (params.tag) {
+      const config = await this.repository.getPromptByIdOrHandle({
+        idOrHandle,
+        projectId,
+        organizationId,
+      });
+
+      if (!config) {
+        return null;
+      }
+
+      const tagId = await this.resolveTagNameToId({
+        tagName: params.tag,
+        organizationId,
+      });
+
+      if (!tagId) {
+        throw new NotFoundError(
+          `Tag "${params.tag}" not found for prompt "${idOrHandle}"`,
+        );
+      }
+
+      const versionTag = await this.tagRepository.getByConfigAndTagId({
+        configId: config.id,
+        tagId,
+        projectId,
+      });
+
+      if (!versionTag) {
+        throw new NotFoundError(
+          `Tag "${params.tag}" not found for prompt "${idOrHandle}"`,
+        );
+      }
+
+      resolvedVersionId = versionTag.versionId;
+    }
+
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
       {
         idOrHandle,
         projectId,
         organizationId,
         version: params.version,
-        versionId: params.versionId,
+        versionId: resolvedVersionId,
       },
     );
 
@@ -1006,5 +1069,64 @@ export class PromptService {
       projectId: params.projectId,
       organizationId,
     });
+  }
+
+  // --- Tag operations ---
+
+  /** Get all tags for a prompt config. */
+  async getTagsForConfig(params: { configId: string; projectId: string }) {
+    return this.tagRepository.getTagsForConfig(params);
+  }
+
+  /** Assign (or reassign) a tag to a specific prompt version. */
+  async assignTag(params: {
+    configId: string;
+    versionId: string;
+    tag: string;
+    projectId: string;
+    userId?: string;
+    organizationId?: string;
+  }) {
+    // Always resolve organizationId from projectId to prevent org mismatch attacks
+    const organizationId = await this.getOrganizationIdFromProjectId(
+      params.projectId,
+    );
+
+    const tagId = await this.resolveTagNameToId({
+      tagName: params.tag,
+      organizationId,
+    });
+
+    if (!tagId) {
+      throw new TagValidationError(
+        `Invalid tag "${params.tag}". Must be a custom tag defined for this org.`,
+      );
+    }
+
+    return this.tagRepository.assignTag({
+      configId: params.configId,
+      versionId: params.versionId,
+      tagId,
+      projectId: params.projectId,
+      userId: params.userId,
+    });
+  }
+
+  /**
+   * Resolves a tag name to its PromptTag ID for the given org.
+   * Returns null if no matching tag definition exists.
+   */
+  private async resolveTagNameToId({
+    tagName,
+    organizationId,
+  }: {
+    tagName: string;
+    organizationId: string;
+  }): Promise<string | null> {
+    const promptTag = await this.promptTagRepository.findByOrgAndName({
+      organizationId,
+      name: tagName,
+    });
+    return promptTag?.id ?? null;
   }
 }

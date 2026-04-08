@@ -256,6 +256,52 @@ describe("<SpanDetails/>", () => {
     });
   });
 
+  describe("when prompt reference is on a sibling span (not parent)", () => {
+    it("renders a dropdown menu trigger button", () => {
+      const parentSpan = buildLLMSpan({
+        span_id: "parent-span",
+        type: "span" as Span["type"],
+        params: null,
+      });
+      const siblingSpan = buildLLMSpan({
+        span_id: "sibling-span",
+        parent_id: "parent-span",
+        type: "span" as Span["type"],
+        timestamps: {
+          started_at: Date.now() - 2000,
+          finished_at: Date.now() - 1500,
+        },
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sibling-prompt:2",
+            },
+          },
+        },
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[parentSpan, siblingSpan, llmSpan]}
+          />
+        </ChakraProvider>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+  });
+
   describe("when span is not an LLM type", () => {
     it("does not render any Open in Prompts button", () => {
       const span = buildLLMSpan({ type: "span" as Span["type"] });

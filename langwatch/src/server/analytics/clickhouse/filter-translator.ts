@@ -4,10 +4,16 @@
  * WHY REGISTRY PATTERN: ClickHouse requires different WHERE clause patterns
  * depending on where data is stored (trace_summaries vs stored_spans vs
  * evaluation_runs). Some filters use simple attribute lookups, others need
- * EXISTS subqueries with JOINs. The registry pattern:
+ * IN subqueries. The registry pattern:
  * 1. Makes it easy to add new filter types without modifying existing code (OCP)
  * 2. Centralizes the mapping of filter fields to their translation logic
  * 3. Provides a clear, testable contract for each filter type
+ *
+ * WHY IN SUBQUERIES (NOT EXISTS): ClickHouse v25.10 planner crashes with
+ * "Cannot clone Sorting plan step" when EXISTS subqueries are combined with
+ * LIMIT 1 BY in JOINed subqueries (issue #2660). All cross-table filters use
+ * `ts.TraceId IN (SELECT TraceId FROM ... WHERE TenantId = {tenantId:String} AND ...)`
+ * which is semantically equivalent to EXISTS and avoids the planner bug.
  */
 
 import type { FilterField } from "../../filters/types";
@@ -23,8 +29,6 @@ export interface FilterTranslation {
   requiredJoins: CHTable[];
   /** Parameter values for parameterized queries */
   params: Record<string, unknown>;
-  /** Whether this filter uses EXISTS subquery pattern */
-  usesExistsSubquery?: boolean;
 }
 
 /**
@@ -91,6 +95,15 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
   "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
   "evaluations.evaluator_id.guardrails_only": (values) =>
     translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.has_passed": (values) =>
+    translateEvaluatorIdFilter(values, "AND Passed IS NOT NULL"),
+  "evaluations.evaluator_id.has_score": (values) =>
+    translateEvaluatorIdFilter(values, "AND Score IS NOT NULL"),
+  "evaluations.evaluator_id.has_label": (values) =>
+    translateEvaluatorIdFilter(
+      values,
+      "AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('succeeded', 'failed')",
+    ),
   "evaluations.passed": (values, key) =>
     translateEvaluationPassedFilter(values, key),
   "evaluations.score": (values, key) =>
@@ -328,26 +341,28 @@ function translateErrorFilter(values: string[]): FilterTranslation {
 /**
  * Translate span type filter (requires JOIN).
  *
- * WHY EXISTS SUBQUERY: Span-level filters use EXISTS instead of direct JOINs
+ * WHY IN SUBQUERY: Span-level filters use IN subqueries instead of direct JOINs
  * because a trace can have multiple spans. A direct JOIN would duplicate the
- * trace for each matching span, inflating count metrics. EXISTS returns true
- * once a matching span is found, preserving correct trace counts.
+ * trace for each matching span, inflating count metrics. IN returns true
+ * once a matching TraceId is found, preserving correct trace counts.
+ *
+ * WHY NOT EXISTS: ClickHouse v25.10 planner crashes with "Cannot clone Sorting
+ * plan step" when EXISTS subqueries are combined with LIMIT 1 BY in JOINed
+ * subqueries (issue #2660). IN subqueries are semantically equivalent and avoid
+ * this planner bug.
  */
 function translateSpanTypeFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
   const paramName = genParamName("spanTypes");
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM stored_spans ${ss}
-      WHERE ${ss}.TenantId = ${ts}.TenantId
-        AND ${ss}.TraceId = ${ts}.TraceId
-        AND ${ss}.SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM stored_spans
+      WHERE TenantId = {tenantId:String}
+        AND SpanAttributes['langwatch.span.type'] IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
     params: { [paramName]: values },
-    usesExistsSubquery: true,
   };
 }
 
@@ -356,40 +371,42 @@ function translateSpanTypeFilter(values: string[]): FilterTranslation {
  */
 function translateSpanModelFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
   const paramName = genParamName("models");
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM stored_spans ${ss}
-      WHERE ${ss}.TenantId = ${ts}.TenantId
-        AND ${ss}.TraceId = ${ts}.TraceId
-        AND ${ss}.SpanAttributes['gen_ai.request.model'] IN ({${paramName}:Array(String)})
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM stored_spans
+      WHERE TenantId = {tenantId:String}
+        AND SpanAttributes['gen_ai.request.model'] IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
     params: { [paramName]: values },
-    usesExistsSubquery: true,
   };
 }
 
 /**
- * Translate evaluator ID filter (requires JOIN)
+ * Translate evaluator ID filter (requires JOIN).
+ *
+ * @param additionalWhere - Optional extra WHERE predicates appended inside the
+ *   subquery (e.g. "AND Passed IS NOT NULL"). Used by the has_passed / has_score /
+ *   has_label variants so the subquery filters by result-type, not just EvaluatorId.
  */
-function translateEvaluatorIdFilter(values: string[]): FilterTranslation {
+function translateEvaluatorIdFilter(
+  values: string[],
+  additionalWhere = "",
+): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evaluatorIds");
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_runs ${es}
-      WHERE ${es}.TenantId = ${ts}.TenantId
-        AND ${es}.TraceId = ${ts}.TraceId
-        AND ${es}.EvaluatorId IN ({${paramName}:Array(String)})
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
+        AND EvaluatorId IN ({${paramName}:Array(String)})
+        ${additionalWhere}
     )`,
     requiredJoins: [],
     params: { [paramName]: values },
-    usesExistsSubquery: true,
   };
 }
 
@@ -401,7 +418,6 @@ function translateEvaluationPassedFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evalPassed");
 
   // Convert string values to UInt8 (boolean in CH)
@@ -414,21 +430,19 @@ function translateEvaluationPassedFilter(
 
   if (evaluatorId) {
     const evalIdParam = genParamName("evaluatorId");
-    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    evaluatorCondition = `AND EvaluatorId = {${evalIdParam}:String}`;
     params[evalIdParam] = evaluatorId;
   }
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_runs ${es}
-      WHERE ${es}.TenantId = ${ts}.TenantId
-        AND ${es}.TraceId = ${ts}.TraceId
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
         ${evaluatorCondition}
-        AND ${es}.Passed IN ({${paramName}:Array(UInt8)})
+        AND Passed IN ({${paramName}:Array(UInt8)})
     )`,
     requiredJoins: [],
     params,
-    usesExistsSubquery: true,
   };
 }
 
@@ -440,7 +454,6 @@ function translateEvaluationScoreFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_runs;
   const minParam = genParamName("scoreMin");
   const maxParam = genParamName("scoreMax");
 
@@ -456,22 +469,20 @@ function translateEvaluationScoreFilter(
 
   if (evaluatorId) {
     const evalIdParam = genParamName("evaluatorId");
-    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    evaluatorCondition = `AND EvaluatorId = {${evalIdParam}:String}`;
     params[evalIdParam] = evaluatorId;
   }
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_runs ${es}
-      WHERE ${es}.TenantId = ${ts}.TenantId
-        AND ${es}.TraceId = ${ts}.TraceId
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
         ${evaluatorCondition}
-        AND ${es}.Score >= {${minParam}:Float64}
-        AND ${es}.Score <= {${maxParam}:Float64}
+        AND Score >= {${minParam}:Float64}
+        AND Score <= {${maxParam}:Float64}
     )`,
     requiredJoins: [],
     params,
-    usesExistsSubquery: true,
   };
 }
 
@@ -483,7 +494,6 @@ function translateEvaluationLabelFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evalLabels");
 
   const params: Record<string, unknown> = { [paramName]: values };
@@ -491,21 +501,19 @@ function translateEvaluationLabelFilter(
 
   if (evaluatorId) {
     const evalIdParam = genParamName("evaluatorId");
-    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    evaluatorCondition = `AND EvaluatorId = {${evalIdParam}:String}`;
     params[evalIdParam] = evaluatorId;
   }
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_runs ${es}
-      WHERE ${es}.TenantId = ${ts}.TenantId
-        AND ${es}.TraceId = ${ts}.TraceId
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
         ${evaluatorCondition}
-        AND ${es}.Label IN ({${paramName}:Array(String)})
+        AND Label IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
     params,
-    usesExistsSubquery: true,
   };
 }
 
@@ -517,7 +525,6 @@ function translateEvaluationStateFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evalStates");
 
   const params: Record<string, unknown> = { [paramName]: values };
@@ -525,21 +532,19 @@ function translateEvaluationStateFilter(
 
   if (evaluatorId) {
     const evalIdParam = genParamName("evaluatorId");
-    evaluatorCondition = `AND ${es}.EvaluatorId = {${evalIdParam}:String}`;
+    evaluatorCondition = `AND EvaluatorId = {${evalIdParam}:String}`;
     params[evalIdParam] = evaluatorId;
   }
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_runs ${es}
-      WHERE ${es}.TenantId = ${ts}.TenantId
-        AND ${es}.TraceId = ${ts}.TraceId
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM evaluation_runs
+      WHERE TenantId = {tenantId:String}
         ${evaluatorCondition}
-        AND ${es}.Status IN ({${paramName}:Array(String)})
+        AND Status IN ({${paramName}:Array(String)})
     )`,
     requiredJoins: [],
     params,
-    usesExistsSubquery: true,
   };
 }
 
@@ -548,19 +553,16 @@ function translateEvaluationStateFilter(
  */
 function translateEventTypeFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
   const paramName = genParamName("eventTypes");
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM stored_spans ${ss}
-      WHERE ${ss}.TenantId = ${ts}.TenantId
-        AND ${ss}.TraceId = ${ts}.TraceId
-        AND hasAny(${ss}."Events.Name", {${paramName}:Array(String)})
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM stored_spans
+      WHERE TenantId = {tenantId:String}
+        AND hasAny("Events.Name", {${paramName}:Array(String)})
     )`,
     requiredJoins: [],
     params: { [paramName]: values },
-    usesExistsSubquery: true,
   };
 }
 
@@ -575,7 +577,6 @@ function translateEventMetricKeyFilter(
   eventType?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
   const keysParam = genParamName("metricKeys");
 
   const params: Record<string, unknown> = { [keysParam]: values };
@@ -590,27 +591,25 @@ function translateEventMetricKeyFilter(
     metricKeyCondition = `arrayExists(
       (name, attrs) -> name = {${eventTypeParam}:String}
         AND arrayExists(k -> mapContains(attrs, k), {${keysParam}:Array(String)}),
-      ${ss}."Events.Name",
-      ${ss}."Events.Attributes"
+      "Events.Name",
+      "Events.Attributes"
     )`;
   } else {
     // No event type filter, just check attributes
     metricKeyCondition = `arrayExists(
       x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}),
-      ${ss}."Events.Attributes"
+      "Events.Attributes"
     )`;
   }
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM stored_spans ${ss}
-      WHERE ${ss}.TenantId = ${ts}.TenantId
-        AND ${ss}.TraceId = ${ts}.TraceId
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM stored_spans
+      WHERE TenantId = {tenantId:String}
         AND ${metricKeyCondition}
     )`,
     requiredJoins: [],
     params,
-    usesExistsSubquery: true,
   };
 }
 
@@ -626,7 +625,6 @@ function translateEventMetricValueFilter(
   metricKey?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
 
   if (!metricKey) {
     return { whereClause: "1=1", requiredJoins: [], params: {} };
@@ -656,28 +654,26 @@ function translateEventMetricValueFilter(
       (name, attrs) -> name = {${eventTypeParam}:String}
         AND toFloat64OrNull(attrs[{${metricKeyParam}:String}]) >= {${minParam}:Float64}
         AND toFloat64OrNull(attrs[{${metricKeyParam}:String}]) <= {${maxParam}:Float64},
-      ${ss}."Events.Name",
-      ${ss}."Events.Attributes"
+      "Events.Name",
+      "Events.Attributes"
     )`;
   } else {
     // No event type filter, just check attribute value range
     valueCondition = `arrayExists(
       x -> toFloat64OrNull(x[{${metricKeyParam}:String}]) >= {${minParam}:Float64}
         AND toFloat64OrNull(x[{${metricKeyParam}:String}]) <= {${maxParam}:Float64},
-      ${ss}."Events.Attributes"
+      "Events.Attributes"
     )`;
   }
 
   return {
-    whereClause: `EXISTS (
-      SELECT 1 FROM stored_spans ${ss}
-      WHERE ${ss}.TenantId = ${ts}.TenantId
-        AND ${ss}.TraceId = ${ts}.TraceId
+    whereClause: `${ts}.TraceId IN (
+      SELECT TraceId FROM stored_spans
+      WHERE TenantId = {tenantId:String}
         AND ${valueCondition}
     )`,
     requiredJoins: [],
     params,
-    usesExistsSubquery: true,
   };
 }
 
@@ -703,13 +699,13 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
 
   if (hasTrue && !hasFalse) {
     return {
-      whereClause: `${ts}.HasAnnotation = 1`,
+      whereClause: `${ts}.HasAnnotation = true`,
       requiredJoins: [],
       params: {},
     };
   } else if (hasFalse && !hasTrue) {
     return {
-      whereClause: `(${ts}.HasAnnotation = 0 OR ${ts}.HasAnnotation IS NULL)`,
+      whereClause: `(${ts}.HasAnnotation = false OR ${ts}.HasAnnotation IS NULL)`,
       requiredJoins: [],
       params: {},
     };

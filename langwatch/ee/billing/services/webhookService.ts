@@ -14,6 +14,7 @@ import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalcul
 import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from "../utils/growthSeatEvent";
 import { SubscriptionRecordNotFoundError } from "../errors";
 import { traced } from "../../../src/server/app-layer/tracing";
+import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -252,6 +253,34 @@ export class EEWebhookService implements WebhookService {
     }
 
     await this.subscriptionRepository.cancel({ id: existingSubscription.id });
+
+    // Send "Subscription cancelled" Slack notification
+    try {
+      const org = await this.organizationRepository.findNameById(
+        existingSubscription.organizationId,
+      );
+      await getApp().notifications.sendSlackSubscriptionEvent({
+        type: "cancelled",
+        organizationId: existingSubscription.organizationId,
+        organizationName: org?.name ?? "Unknown",
+        plan: existingSubscription.plan,
+        subscriptionId: existingSubscription.id,
+        cancellationDate: new Date(),
+      });
+    } catch (err) {
+      logger.error(
+        { stripeSubscriptionId, err },
+        "[stripeWebhook] Failed to send cancellation notification",
+      );
+    }
+
+    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+      existingSubscription.organizationId,
+    );
+    fireSubscriptionSyncNurturing({
+      organizationId: existingSubscription.organizationId,
+      hasSubscription: !!remainingActive,
+    });
   }
 
   async handleSubscriptionUpdated({
@@ -282,6 +311,14 @@ export class EEWebhookService implements WebhookService {
       // When the period ends, Stripe fires `customer.subscription.deleted`
       // which is handled by handleSubscriptionDeleted.
       await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
+
+      const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
+        existingSubForUpdate.organizationId,
+      );
+      fireSubscriptionSyncNurturing({
+        organizationId: existingSubForUpdate.organizationId,
+        hasSubscription: !!remainingActive,
+      });
     } else if (subscription.status === "active") {
       const shouldNotify =
         existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
@@ -379,6 +416,36 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
+    // Guard: a $0 invoice generated during cancellation must not reactivate the subscription.
+    // Stripe fires invoice.payment_succeeded for $0 prorated invoices even when the subscription
+    // is being cancelled. Check the authoritative Stripe status before activating.
+    let stripeCanceled = false;
+    try {
+      const stripeSubscription =
+        await this.stripe.subscriptions.retrieve(subscriptionId);
+      stripeCanceled = stripeSubscription.status === "canceled";
+    } catch (err) {
+      logger.warn(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to verify Stripe subscription status, proceeding with activation",
+      );
+      if (previousSubscription.status === SubscriptionStatus.CANCELLED) {
+        logger.info(
+          { subscriptionId },
+          "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
+        );
+        return;
+      }
+    }
+
+    if (stripeCanceled) {
+      logger.info(
+        { subscriptionId },
+        "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
+      );
+      return;
+    }
+
     const updatedSubscription = await this.subscriptionRepository.activate({
       id: previousSubscription.id,
       previousStatus: previousSubscription.status,
@@ -423,6 +490,11 @@ export class EEWebhookService implements WebhookService {
         startDate: updatedSubscription.startDate,
         maxMembers: updatedSubscription.maxMembers,
         maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+      });
+
+      fireSubscriptionSyncNurturing({
+        organizationId: updatedSubscription.organizationId,
+        hasSubscription: true,
       });
     }
   }

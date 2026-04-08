@@ -4,8 +4,8 @@ import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { getApp } from "~/server/app-layer/app";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
-import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
+import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -83,11 +83,7 @@ app.post(
     // ScenarioSetLimitExceededError (DomainError with httpStatus 403)
     // propagates to handleError which returns 403 + meta fields.
     await checkScenarioSetLimitForRunStarted({ project, event });
-
-    // Dual-write to ClickHouse via event-sourcing
-    if (project.featureEventSourcingSimulationIngestion) {
-      await dispatchSimulationEvent(project.id, event);
-    }
+    await dispatchSimulationEvent(project.id, event);
 
     // Streaming events: broadcast only, no persistence
     if (isStreamingEvent(event.type)) {
@@ -105,47 +101,8 @@ app.post(
       await broadcastStreamingEvent(project.id, event);
     }
 
-    // Legacy ES write (best-effort, will be removed)
-    if (!project.disableElasticSearchSimulationWriting) {
-      try {
-        const scenarioRunnerService = new ScenarioEventService();
-        await scenarioRunnerService.saveScenarioEvent({
-          projectId: project.id,
-          ...event,
-        });
-      } catch (err) {
-        logger.warn({ err, projectId: project.id }, "Failed to write scenario event to ES (best-effort)");
-      }
-    }
-
-    // Broadcast non-streaming events for ES-only projects.
-    // When event-sourcing is ON, the snapshotUpdateBroadcast reactor handles this.
-    if (!project.featureEventSourcingSimulationIngestion) {
-      if (
-        event.type === ScenarioEventType.RUN_STARTED ||
-        event.type === ScenarioEventType.MESSAGE_SNAPSHOT ||
-        event.type === ScenarioEventType.RUN_FINISHED
-      ) {
-        try {
-          const payload = JSON.stringify({
-            event: "simulation_updated",
-            scenarioRunId: event.scenarioRunId,
-            batchRunId: event.batchRunId,
-            scenarioSetId: event.scenarioSetId,
-          });
-          await getApp().broadcast.broadcastToTenant(
-            project.id,
-            payload,
-            "simulation_updated",
-          );
-        } catch (err) {
-          logger.warn({ err, projectId: project.id }, "Failed to broadcast non-streaming event");
-        }
-      }
-    }
-
     const path = `/${project.slug}/simulations/${
-      event.scenarioSetId ?? "default"
+      event.scenarioSetId || DEFAULT_SET_ID
     }`;
 
     const base = process.env.BASE_HOST;
@@ -182,22 +139,7 @@ export const route = app.delete(
   async (c) => {
     const { project } = c.var;
 
-    // Event-sourcing archive (primary)
-    if (project.featureEventSourcingSimulationIngestion) {
-      await archiveAllSimulationRuns(project.id);
-    }
-
-    // Legacy ES delete (best-effort, will be removed)
-    if (!project.disableElasticSearchSimulationWriting) {
-      try {
-        const scenarioRunnerService = new ScenarioEventService();
-        await scenarioRunnerService.deleteAllEventsForProject({
-          projectId: project.id,
-        });
-      } catch (err) {
-        logger.warn({ err, projectId: project.id }, "Failed to delete events from ES (best-effort)");
-      }
-    }
+    await archiveAllSimulationRuns(project.id);
 
     return c.json({ success: true }, 200);
   },
@@ -220,7 +162,7 @@ async function dispatchSimulationEvent(
       ...basePayload,
       scenarioId: event.scenarioId,
       batchRunId: event.batchRunId,
-      scenarioSetId: event.scenarioSetId ?? "default",
+      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
       name: event.metadata?.name,
       description: event.metadata?.description,
       metadata: event.metadata,

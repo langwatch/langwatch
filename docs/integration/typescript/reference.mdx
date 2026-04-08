@@ -1,0 +1,1158 @@
+---
+title: TypeScript SDK API Reference
+sidebarTitle: Reference
+description: Access the LangWatch TypeScript SDK reference to instrument LLMs, capture traces, and support AI agent testing workflows.
+keywords: langwatch, typescript, sdk, api, reference, observability, tracing, logging, data capture, data collection, data ingestion
+icon: terminal
+---
+
+## Setup
+
+### `setupObservability()`
+
+Initializes the LangWatch observability system for Node.js environments, enabling data collection and tracing for your LLM application. This is typically the first function you'll call when integrating LangWatch.
+
+<CodeGroup>
+```typescript Basic Setup
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT_URL
+  },
+  serviceName: "my-service"
+});
+```
+
+```typescript Advanced Setup
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+
+setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT_URL,
+    processorType: "batch" // or "simple"
+  },
+  serviceName: "my-service",
+  attributes: {
+    "service.version": "1.0.0",
+    "deployment.environment.name": "production"
+  },
+  dataCapture: "all", // or "input", "output", "none"
+  debug: {
+    consoleTracing: true,
+    logLevel: "debug"
+  }
+});
+```
+
+```typescript Custom Configuration
+import { setupObservability } from "langwatch/observability/node";
+import { SpanProcessor } from "@opentelemetry/sdk-trace-base";
+
+const customSpanProcessor: SpanProcessor = /* your custom processor */;
+
+setupObservability({
+  langwatch: "disabled", // Disable LangWatch integration
+  spanProcessors: [customSpanProcessor],
+  dataCapture: {
+    mode: "all"
+  },
+  debug: {
+    consoleTracing: true,
+    logger: customLogger
+  }
+});
+```
+</CodeGroup>
+
+<ParamField path="options" type="SetupObservabilityOptions" default="{}">
+  Configuration options for the LangWatch observability system.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="handle" type="ObservabilityHandle">
+  An object containing a `shutdown()` method for graceful cleanup.
+</ResponseField>
+
+### `SetupObservabilityOptions`
+
+Configuration options for setting up LangWatch observability.
+
+<ResponseField name="langwatch" type="Optional<LangWatchConfig | 'disabled'>">
+  LangWatch configuration. Set to 'disabled' to completely disable LangWatch integration.
+</ResponseField>
+
+<ResponseField name="serviceName" type="Optional<string>">
+  Name of the service being instrumented.
+</ResponseField>
+
+<ResponseField name="attributes" type="Optional<SemConvAttributes>">
+  Global attributes added to all telemetry data.
+</ResponseField>
+
+<ResponseField name="dataCapture" type="Optional<DataCaptureOptions>">
+  Configuration for automatic data capture. Can be "all", "input", "output", "none", or a configuration object.
+</ResponseField>
+
+<ResponseField name="spanProcessors" type="Optional<SpanProcessor[]>">
+  Custom span processors for advanced trace processing.
+</ResponseField>
+
+<ResponseField name="debug" type="Optional<DebugOptions>">
+  Debug and development options.
+</ResponseField>
+
+<ResponseField name="advanced" type="Optional<AdvancedOptions>">
+  Advanced and potentially unsafe configuration options.
+</ResponseField>
+
+### `LangWatchConfig`
+
+Configuration for LangWatch integration.
+
+<ResponseField name="apiKey" type="Optional<string>" default="process.env.LANGWATCH_API_KEY">
+  LangWatch API key for authentication.
+</ResponseField>
+
+<ResponseField name="endpoint" type="Optional<string>" default="https://app.langwatch.ai">
+  LangWatch endpoint URL for sending traces and logs.
+</ResponseField>
+
+<ResponseField name="processorType" type="Optional<'simple' | 'batch'>" default="'simple'">
+  Type of span processor to use for LangWatch exporter.
+</ResponseField>
+
+### `DebugOptions`
+
+Debug and development options.
+
+<ResponseField name="consoleTracing" type="Optional<boolean>" default="false">
+  Enable console output for traces (debugging).
+</ResponseField>
+
+<ResponseField name="consoleLogging" type="Optional<boolean>" default="false">
+  Enable console output for logs (debugging).
+</ResponseField>
+
+<ResponseField name="logLevel" type="Optional<'debug' | 'info' | 'warn' | 'error'>" default="'warn'">
+  Log level for LangWatch SDK internal logging.
+</ResponseField>
+
+<ResponseField name="logger" type="Optional<Logger>">
+  Custom logger for LangWatch SDK internal logging.
+</ResponseField>
+
+### `ObservabilityHandle`
+
+Handle returned from observability setup.
+
+<ResponseField name="shutdown" type="() => Promise<void>">
+  Gracefully shuts down the observability system.
+</ResponseField>
+
+## Tracing
+
+### `getLangWatchTracer()`
+
+Returns a LangWatch tracer instance that provides enhanced tracing capabilities for LLM applications.
+
+```typescript
+import { getLangWatchTracer } from "langwatch";
+
+const tracer = getLangWatchTracer("my-service", "1.0.0");
+```
+
+<ParamField path="name" type="string" required>
+  The name of the tracer/service.
+</ParamField>
+
+<ParamField path="version" type="Optional<string>" default="undefined">
+  The version of the tracer/service.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="tracer" type="LangWatchTracer">
+  A `LangWatchTracer` instance with enhanced methods for LLM observability.
+</ResponseField>
+
+### `getLangWatchTracerFromProvider()`
+
+Get a LangWatch tracer from a specific OpenTelemetry tracer provider.
+
+```typescript
+import { getLangWatchTracerFromProvider } from "langwatch/observability";
+
+const tracer = getLangWatchTracerFromProvider(
+  customTracerProvider,
+  "my-service",
+  "1.0.0"
+);
+```
+
+<ParamField path="tracerProvider" type="TracerProvider" required>
+  The OpenTelemetry tracer provider to use.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  The name of the tracer/service.
+</ParamField>
+
+<ParamField path="version" type="Optional<string>" default="undefined">
+  The version of the tracer/service.
+</ParamField>
+
+### `LangWatchTracer`
+
+The `LangWatchTracer` extends the standard OpenTelemetry `Tracer` with additional methods for LLM observability.
+
+#### Methods
+
+<ParamField path="startSpan" type="(name: string, options?: SpanOptions, context?: Context) => LangWatchSpan">
+  Starts a new `LangWatchSpan` without setting it on context. This method does NOT modify the current Context.
+</ParamField>
+
+<ParamField path="startActiveSpan" type="(name: string, fn: (span: LangWatchSpan) => T) => T">
+  Starts a new `LangWatchSpan` and calls the given function passing it the created span as first argument. The new span gets set in context and this context is activated for the duration of the function call.
+</ParamField>
+
+<ParamField path="withActiveSpan" type="(name: string, fn: (span: LangWatchSpan) => Promise<T> | T) => Promise<T>">
+  Starts a new `LangWatchSpan`, runs the provided async function, and automatically handles error recording, status setting, and span ending. This is a safer and more ergonomic alternative to manually using try/catch/finally blocks.
+</ParamField>
+
+### `createLangWatchSpan()`
+
+Creates a LangWatchSpan, which adds additional methods to an OpenTelemetry Span. You probably don't need to use this directly, but it's here for completeness.
+
+```typescript
+import { createLangWatchSpan } from "langwatch/observability";
+
+const otelSpan = tracer.startSpan('llm-call');
+const span = createLangWatchSpan(otelSpan);
+span.setType('llm').setInput('Prompt').setOutput('Completion');
+```
+
+<ParamField path="span" type="Span" required>
+  The OpenTelemetry Span to add LangWatch methods to.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="span" type="LangWatchSpan">
+  A LangWatchSpan with additional methods for LLM/GenAI observability.
+</ResponseField>
+
+### `LangWatchSpan`
+
+The `LangWatchSpan` extends the standard OpenTelemetry `Span` with additional methods for LLM observability.
+
+#### Span Configuration Methods
+
+<ParamField path="setType" type="(type: SpanType) => this">
+  Set the type of the span (e.g., 'llm', 'rag', 'tool', etc). This is used for downstream filtering and analytics.
+</ParamField>
+
+<ParamField path="setRequestModel" type="(model: string) => this">
+  Set the request model name for the span. This is typically the model name sent in the API request (e.g., 'gpt-5', 'claude-3').
+</ParamField>
+
+<ParamField path="setResponseModel" type="(model: string) => this">
+  Set the response model name for the span. This is the model name returned in the API response, if different from the request.
+</ParamField>
+
+<ParamField path="setRAGContexts" type="(ragContexts: LangWatchSpanRAGContext[]) => this">
+  Set multiple RAG contexts for the span. Use this to record all retrieved documents/chunks used as context for a generation.
+</ParamField>
+
+<ParamField path="setRAGContext" type="(ragContext: LangWatchSpanRAGContext) => this">
+  Set a single RAG context for the span. Use this if only one context was retrieved.
+</ParamField>
+
+<ParamField path="setMetrics" type="(metrics: LangWatchSpanMetrics) => this">
+  Set the metrics for the span.
+</ParamField>
+
+<ParamField path="setSelectedPrompt" type="(prompt: Prompt) => this">
+  Set the selected prompt for the span. This will attach this prompt to the trace. If this is set on multiple spans, the last one will be used.
+</ParamField>
+
+#### Input/Output Methods
+
+<ParamField path="setInput" type="(input: unknown) => this">
+  Record the input to the span with automatic type detection.
+</ParamField>
+
+<ParamField path="setInput" type="(type: InputOutputType, input: unknown) => this">
+  Record the input to the span with explicit type control. Supports "text", "raw", "chat_messages", "list", "json", "guardrail_result", and "evaluation_result" types.
+</ParamField>
+
+<ParamField path="setOutput" type="(output: unknown) => this">
+  Record the output from the span with automatic type detection.
+</ParamField>
+
+<ParamField path="setOutput" type="(type: InputOutputType, output: unknown) => this">
+  Record the output from the span with explicit type control. Supports "text", "raw", "chat_messages", "list", "json", "guardrail_result", and "evaluation_result" types.
+</ParamField>
+
+## Client SDK
+
+### `LangWatch`
+
+The main LangWatch client class that provides access to LangWatch services.
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT_URL
+});
+```
+
+<ParamField path="options" type="LangWatchConstructorOptions" default="{}">
+  Configuration options for the LangWatch client.
+</ParamField>
+
+#### Properties
+
+<ResponseField name="prompts" type="PromptsFacade">
+  Access to prompt management functionality.
+</ResponseField>
+
+<ResponseField name="traces" type="TracesFacade">
+  Access to trace management functionality.
+</ResponseField>
+
+## Prompt Management
+
+### `langwatch.prompts.get()`
+
+Retrieves a prompt from the LangWatch platform.
+
+```typescript
+// Get a prompt without variables
+const prompt = await langwatch.prompts.get("prompt-id");
+```
+
+<ParamField path="id" type="string" required>
+  The ID of the prompt to retrieve.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="prompt" type="Prompt">
+  The prompt or compiled prompt object.
+</ResponseField>
+
+<ResponseField name="error" type="Error">
+  Throws an error if the specified prompt version is not found.
+</ResponseField>
+
+### `langwatch.prompts.create()`
+
+Creates a new prompt in the LangWatch platform.
+
+```typescript
+// Create a basic prompt
+const prompt = await langwatch.prompts.create({
+  handle: "customer-support-bot",
+  name: "Customer Support Bot",
+  prompt: "You are a helpful customer support assistant.",
+  // ... any other prompt properties
+});
+```
+
+<ParamField path="options" type="CreatePromptOptions" required>
+  Configuration options for creating the prompt.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="prompt" type="Prompt">
+  The newly created prompt object.
+</ResponseField>
+
+### `langwatch.prompts.update()`
+
+Updates an existing prompt, creating a new version automatically.
+
+```typescript
+// Update prompt content
+const updatedPrompt = await langwatch.prompts.update("customer-support-bot", {
+  prompt: "You are a helpful and friendly customer support assistant.",
+  // ... any other prompt properties
+});
+```
+
+<ParamField path="handle" type="string" required>
+  The handle (identifier) of the prompt to update.
+</ParamField>
+
+<ParamField path="options" type="UpdatePromptOptions" required>
+  Configuration options for updating the prompt.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="prompt" type="Prompt">
+  The updated prompt object (new version).
+</ResponseField>
+
+<Warning>
+Each update operation creates a new version of the prompt. Previous versions are preserved for version control and rollback purposes.
+</Warning>
+
+### `langwatch.prompts.delete()`
+
+Deletes a prompt and all its versions from the LangWatch platform.
+
+```typescript
+// Delete prompts programmatically using LangWatch to manage versioning and maintain clean evaluation pipelines.
+const result = await langwatch.prompts.delete("customer-support-bot");
+```
+
+<ParamField path="handle" type="string" required>
+  The handle (identifier) of the prompt to delete.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="result" type="DeletePromptResult">
+  Confirmation of the deletion operation.
+</ResponseField>
+
+<Warning>
+This action is irreversible and will permanently remove the prompt and all its versions.
+</Warning>
+
+### Prompt Compilation
+
+#### `prompt.compile()`
+
+Compiles a prompt template with provided variables, using lenient compilation that handles missing variables gracefully.
+
+```typescript
+// Compile a prompt with variables
+const compiledPrompt = prompt.compile({
+  name: "Alice",
+  topic: "weather"
+});
+
+```
+
+<ParamField path="variables" type="Record<string, any>" required>
+  Variables to substitute into the prompt template.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="compiledPrompt" type="CompiledPrompt">
+  The compiled prompt with resolved variables and messages.
+</ResponseField>
+
+<Info>
+Lenient compilation will not throw errors for missing variables, making it suitable for dynamic content where some variables may be optional.
+</Info>
+
+#### `prompt.compileStrict()`
+
+Compiles a prompt template with strict variable validation, throwing an error if any required variables are missing.
+
+```typescript
+// Strict compilation with all required variables
+const compiledPrompt = prompt.compileStrict({
+  name: "Alice",
+  topic: "weather"
+});
+```
+
+<ParamField path="variables" type="Record<string, any>" required>
+  Variables to substitute into the prompt template. All template variables must be provided.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="compiledPrompt" type="CompiledPrompt">
+  The compiled prompt with resolved variables and messages.
+</ResponseField>
+
+<ResponseField name="error" type="PromptCompilationError">
+  Throws an error if any template variables are missing or invalid.
+</ResponseField>
+
+<Warning>
+Strict compilation will throw a `PromptCompilationError` if any template variables are missing, ensuring all required data is provided.
+</Warning>
+
+## Processors
+
+### `FilterableBatchSpanProcessor`
+
+A span processor that filters spans before processing them.
+
+```typescript
+import { LangWatchExporter, FilterableBatchSpanProcessor } from "langwatch";
+
+const processor = new FilterableBatchSpanProcessor(
+  new LangWatchExporter(), // Uses environment variables
+  [
+    {
+      fieldName: "span_name",
+      matchValue: "health-check",
+      matchOperation: "exact_match"
+    }
+  ]
+);
+```
+
+<ParamField path="exporter" type="SpanExporter" required>
+  The span exporter to use.
+</ParamField>
+
+<ParamField path="excludeRules" type="SpanProcessingExcludeRule[]" required>
+  Rules to exclude spans from processing.
+</ParamField>
+
+## LangChain Integration
+
+### `LangWatchCallbackHandler`
+
+A LangChain callback handler that automatically traces LangChain operations and integrates them with LangWatch.
+
+```typescript
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+import { ChatOpenAI } from "@langchain/openai";
+
+const handler = new LangWatchCallbackHandler();
+const llm = new ChatOpenAI({
+  callbacks: [handler]
+});
+
+// All operations will now be automatically traced
+const response = await llm.invoke("Hello, world!");
+```
+
+The `LangWatchCallbackHandler` automatically:
+- Creates spans for LLM calls, chains, tools, and retrievers
+- Captures input/output data
+- Sets appropriate span types and metadata
+- Handles errors and status codes
+- Integrates with the LangWatch tracing system
+
+### `convertFromLangChainMessages`
+
+Utility function to convert LangChain messages to a format compatible with LangWatch GenAI events.
+
+```typescript
+import { convertFromLangChainMessages } from "langwatch/observability/instrumentation/langchain";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+
+const messages = [
+  new SystemMessage("You are a helpful assistant."),
+  new HumanMessage("Hello!"),
+];
+
+const convertedMessages = convertFromLangChainMessages(messages);
+// Use with span.setInput("chat_messages", convertedMessages)
+```
+
+## Exporters
+
+### `LangWatchExporter`
+
+A LangWatch exporter for sending traces to the LangWatch platform. Extends the OpenTelemetry OTLP HTTP trace exporter with proper authentication and metadata headers.
+
+```typescript
+import { LangWatchExporter } from "langwatch";
+
+// Using environment variables/fallback configuration
+const exporter = new LangWatchExporter();
+
+// Using custom API key and endpoint
+const exporter = new LangWatchExporter({
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT_URL
+});
+```
+
+<ParamField path="apiKey" type="Optional<string>" default="process.env.LANGWATCH_API_KEY">
+  Optional API key for LangWatch authentication. If not provided, will use environment variables or fallback configuration.
+</ParamField>
+
+<ParamField path="endpointURL" type="Optional<string>" default="process.env.LANGWATCH_ENDPOINT_URL or https://app.langwatch.com">
+  Optional custom endpoint URL for LangWatch ingestion. If not provided, will use environment variables or fallback configuration.
+</ParamField>
+
+### `LangWatchTraceExporter`
+
+A LangWatch trace exporter with configuration options.
+
+```typescript
+import { LangWatchTraceExporter } from "langwatch/observability";
+
+const exporter = new LangWatchTraceExporter({
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT_URL
+});
+```
+
+### `LangWatchLogsExporter`
+
+A LangWatch logs exporter with configuration options.
+
+```typescript
+import { LangWatchLogsExporter } from "langwatch/observability";
+
+const exporter = new LangWatchLogsExporter({
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT_URL
+});
+```
+
+## Data Capture
+
+### `DataCaptureOptions`
+
+Configuration for automatic data capture.
+
+```typescript
+// Simple mode
+dataCapture: "all" | "input" | "output" | "none"
+
+// Configuration object
+dataCapture: {
+  mode: "all" | "input" | "output" | "none"
+}
+```
+
+### `DataCapturePresets`
+
+Predefined data capture configurations.
+
+```typescript
+import { DataCapturePresets } from "langwatch/observability";
+
+// Use predefined configurations
+dataCapture: DataCapturePresets.CAPTURE_ALL // Captures everything
+dataCapture: DataCapturePresets.CAPTURE_NONE // Captures nothing
+dataCapture: DataCapturePresets.INPUT_ONLY // Captures only inputs
+dataCapture: DataCapturePresets.OUTPUT_ONLY // Captures only outputs
+```
+
+## Logging
+
+### `getLangWatchLogger()`
+
+Returns a LangWatch logger instance for structured logging.
+
+```typescript
+import { getLangWatchLogger } from "langwatch";
+
+const logger = getLangWatchLogger("my-service");
+```
+
+### `getLangWatchLoggerFromProvider()`
+
+Get a LangWatch logger from a specific logger provider.
+
+```typescript
+import { getLangWatchLoggerFromProvider } from "langwatch/observability";
+
+const logger = getLangWatchLoggerFromProvider(
+  customLoggerProvider,
+  "my-service"
+);
+```
+
+### `ConsoleLogger`
+
+A console-based logger with configurable log levels and prefixes.
+
+```typescript
+import { logger } from "langwatch";
+
+const logger = new logger.ConsoleLogger({
+  level: "info",
+  prefix: "MyApp"
+});
+
+logger.info("Application started");
+logger.warn("Deprecated feature used");
+logger.error("An error occurred");
+```
+
+<ParamField path="options" type="ConsoleLoggerOptions" default="{ level: 'warn' }">
+  Logger configuration options.
+</ParamField>
+
+### `NoOpLogger`
+
+A no-operation logger that discards all log messages.
+
+```typescript
+import { logger } from "langwatch";
+
+const logger = new logger.NoOpLogger();
+// All log calls are ignored
+```
+
+## CLI
+
+The LangWatch CLI provides command-line tools for managing prompts and interacting with the LangWatch platform.
+
+```bash
+# Login to LangWatch
+langwatch login
+
+# Initialize a new prompts project
+langwatch prompt init
+
+# Create a new prompt
+langwatch prompt create my-prompt
+
+# Add a prompt from the registry
+langwatch prompt add sentiment-analyzer
+
+# List installed prompts
+langwatch prompt list
+
+# Sync prompts with the registry (pull + push)
+langwatch prompt sync
+
+# Pull remote prompts only
+langwatch prompt pull
+
+# Push local prompts only
+langwatch prompt push
+
+# Remove a prompt
+langwatch prompt remove my-prompt
+```
+
+## Core Data Types
+
+### `SpanType`
+
+Supported types of spans for LangWatch observability:
+
+```typescript
+type SpanType =
+  | "span"
+  | "llm"
+  | "chain"
+  | "tool"
+  | "agent"
+  | "guardrail"
+  | "evaluation"
+  | "rag"
+  | "prompt"
+  | "workflow"
+  | "component"
+  | "module"
+  | "server"
+  | "client"
+  | "producer"
+  | "consumer"
+  | "task"
+  | "unknown";
+```
+
+### `InputOutputType`
+
+Supported input/output types for span data:
+
+```typescript
+type InputOutputType =
+  | "text"
+  | "raw"
+  | "chat_messages"
+  | "list"
+  | "json"
+  | "guardrail_result"
+  | "evaluation_result";
+```
+
+### `LangWatchSpanRAGContext`
+
+Context for a RAG (Retrieval-Augmented Generation) span.
+
+<ResponseField name="document_id" type="string" required>
+  Unique identifier for the source document.
+</ResponseField>
+
+<ResponseField name="chunk_id" type="string" required>
+  Unique identifier for the chunk within the document.
+</ResponseField>
+
+<ResponseField name="content" type="string" required>
+  The actual content of the chunk provided to the model.
+</ResponseField>
+
+### `LangWatchSpanMetrics`
+
+Metrics for a LangWatch span.
+
+<ResponseField name="promptTokens" type="Optional<number>">
+  The number of prompt tokens used.
+</ResponseField>
+
+<ResponseField name="completionTokens" type="Optional<number>">
+  The number of completion tokens used.
+</ResponseField>
+
+<ResponseField name="cost" type="Optional<number>">
+  The cost of the span.
+</ResponseField>
+
+### `SpanProcessingExcludeRule`
+
+Defines a rule to filter out spans before they are exported to LangWatch.
+
+<ResponseField name="fieldName" type="'span_name'" required>
+  The field of the span to match against. Currently, only `"span_name"` is supported.
+</ResponseField>
+
+<ResponseField name="matchValue" type="string" required>
+  The value to match for the specified `fieldName`.
+</ResponseField>
+
+<ResponseField name="matchOperation" type="'includes' | 'exact_match' | 'starts_with' | 'ends_with'" required>
+  The operation to use for matching.
+</ResponseField>
+
+### `PromptResponse`
+
+The raw prompt response type extracted from the OpenAPI schema.
+
+```typescript
+type PromptResponse = NonNullable<
+  paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
+>;
+```
+
+### `Prompt`
+
+A prompt object retrieved from the LangWatch platform with compilation capabilities.
+
+<ResponseField name="id" type="string">
+  Unique identifier for the prompt.
+</ResponseField>
+
+<ResponseField name="projectId" type="string">
+  Project identifier the prompt belongs to.
+</ResponseField>
+
+<ResponseField name="organizationId" type="string">
+  Organization identifier the prompt belongs to.
+</ResponseField>
+
+<ResponseField name="handle" type="string | null">
+  Optional handle/slug for the prompt.
+</ResponseField>
+
+<ResponseField name="scope" type="'ORGANIZATION' | 'PROJECT'">
+  Scope of the prompt - either organization-wide or project-specific.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the prompt.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  Last update timestamp.
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  Version number.
+</ResponseField>
+
+<ResponseField name="versionId" type="string">
+  Version identifier.
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  Model used for the prompt.
+</ResponseField>
+
+<ResponseField name="prompt" type="string">
+  The prompt template.
+</ResponseField>
+
+<ResponseField name="messages" type="Array">
+  Array of message objects.
+</ResponseField>
+
+<ResponseField name="responseFormat" type="object">
+  Response format configuration.
+</ResponseField>
+
+<ResponseField name="authorId" type="string | null">
+  ID of the prompt author.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  Creation timestamp.
+</ResponseField>
+
+<ResponseField name="inputs" type="Array">
+  Input definitions for the prompt.
+</ResponseField>
+
+<ResponseField name="outputs" type="Array">
+  Output definitions for the prompt.
+</ResponseField>
+
+### `CompiledPrompt`
+
+A compiled prompt that extends Prompt with reference to the original template.
+
+<ResponseField name="original" type="Prompt">
+  The original prompt object before compilation.
+</ResponseField>
+
+### `TemplateVariables`
+
+Template variables for prompt compilation.
+
+```typescript
+type TemplateVariables = Record<string, string | number | boolean | object | null>;
+```
+
+### `PromptCompilationError`
+
+Error thrown when prompt compilation fails.
+
+<ResponseField name="template" type="string">
+  The template that failed to compile.
+</ResponseField>
+
+<ResponseField name="originalError" type="any">
+  The original compilation error.
+</ResponseField>
+
+### `LangWatchConstructorOptions`
+
+Configuration options for the LangWatch client.
+
+<ResponseField name="apiKey" type="Optional<string>">
+  Your LangWatch API key. Defaults to `process.env.LANGWATCH_API_KEY`.
+</ResponseField>
+
+<ResponseField name="endpoint" type="Optional<string>">
+  The LangWatch endpoint URL. Defaults to `process.env.LANGWATCH_ENDPOINT`.
+</ResponseField>
+
+<ResponseField name="options" type="Optional<{ logger?: Logger }>">
+  Additional options including custom logger.
+</ResponseField>
+
+## Usage Examples
+
+### Basic Tracing
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service"
+});
+
+const tracer = getLangWatchTracer("my-service");
+
+await tracer.withActiveSpan("process-request", async (span) => {
+  span.setType("llm");
+  span.setRequestModel("gpt-5");
+
+  // Your LLM call here
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [{ role: "user", content: "Hello!" }]
+  });
+
+  span.setOutput(response.choices[0].message.content);
+  span.setMetrics({
+    promptTokens: response.usage?.prompt_tokens,
+    completionTokens: response.usage?.completion_tokens
+  });
+});
+```
+
+### RAG Operations
+
+```typescript
+await tracer.withActiveSpan("rag-query", async (span) => {
+  span.setType("rag");
+
+  // Retrieve documents
+  const documents = await vectorStore.similaritySearch("query", 5);
+
+  // Set RAG contexts
+  span.setRAGContexts(documents.map(doc => ({
+    document_id: doc.metadata.id,
+    chunk_id: doc.metadata.chunk_id,
+    content: doc.pageContent
+  })));
+
+  // Generate response
+  const response = await llm.generate([documents, "query"]);
+  span.setOutput(response);
+});
+```
+
+### Using Semantic Conventions
+
+```typescript
+import { attributes, VAL_GEN_AI_SYSTEM_OPENAI } from "langwatch/observability";
+import { getLangWatchTracer } from "langwatch";
+
+const tracer = getLangWatchTracer("my-service");
+
+await tracer.withActiveSpan("llm-call", async (span) => {
+  // Use semantic convention attributes for consistency
+  span.setType("llm");
+  span.setAttribute("langwatch.streaming", false);
+
+  // Set input/output with proper typing
+  span.setInput("chat_messages", [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user", content: "Hello!" }
+  ]);
+
+  // Set output
+  span.setOutput("text", "Hello! How can I help you today?");
+});
+```
+
+### Prompt Management
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({
+  apiKey: process.env.LANGWATCH_API_KEY
+});
+
+const prompt = await langwatch.prompts.get("customer-support");
+
+const compiledPrompt = prompt.compile({
+  name: "John Doe",
+  product: "LangWatch"
+});
+
+console.log(compiledPrompt.content);
+// Output: "Hello John Doe! How can I help you with LangWatch today?"
+```
+
+### LangChain Integration
+
+```typescript
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+import { ChatOpenAI } from "@langchain/openai";
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability();
+
+const handler = new LangWatchCallbackHandler();
+const llm = new ChatOpenAI({
+  callbacks: [handler],
+  model: "gpt-5-mini"
+});
+
+// All operations are automatically traced
+const response = await llm.invoke("What is the capital of France?");
+```
+
+### Custom Span Processing
+
+```typescript
+import { LangWatchExporter, FilterableBatchSpanProcessor } from "langwatch";
+import { setupObservability } from "langwatch/observability/node";
+
+const processor = new FilterableBatchSpanProcessor(
+  new LangWatchExporter(),
+  [
+    {
+      fieldName: "span_name",
+      matchValue: "health-check",
+      matchOperation: "exact_match"
+    }
+  ]
+);
+
+setupObservability({
+  langwatch: 'disabled', // Prevent double exporting to LangWatch
+  spanProcessors: [processor]
+});
+```
+
+### Advanced Setup with Data Capture
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: "batch"
+  },
+  serviceName: "my-service",
+  attributes: {
+    "service.version": "1.0.0",
+    "deployment.environment.name": "production"
+  },
+  dataCapture: (context) => {
+    // Don't capture sensitive data in production
+    if (context.environment === "production" &&
+        context.operationName.includes("password")) {
+      return "none";
+    }
+    return "all";
+  },
+  debug: {
+    consoleTracing: true,
+    logLevel: "debug"
+  }
+});
+```
+
+### Graceful Shutdown
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+const { shutdown } = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('Shutting down observability...');
+  await shutdown();
+  console.log('Observability shutdown complete');
+  process.exit(0);
+});
+```
+
+## Related Documentation
+
+For practical examples and advanced usage patterns, see:
+
+- **[Integration Guide](/integration/typescript/guide)** - Get started with LangWatch TypeScript SDK
+- **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Advanced span management techniques
+- **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - Standardized attribute naming guidelines
+- **[Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript)** - Troubleshoot integration issues
+- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific setup and examples
+
+<Tip>
+Start with the [Integration Guide](/integration/typescript/guide) for a quick setup, then refer to this API reference for detailed configuration options.
+</Tip>

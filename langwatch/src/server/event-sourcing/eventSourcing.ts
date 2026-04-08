@@ -22,6 +22,7 @@ import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/p
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import type { ReactorDefinition } from "./reactors/reactor.types";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
@@ -284,6 +285,9 @@ export class EventSourcing {
           featureFlagService: definition.featureFlagService,
           globalRegistry: this.projectionRegistry,
           processRole: this._processRole,
+          replayMarkerChecker: this._redis
+            ? new RedisReplayMarkerChecker(this._redis)
+            : undefined,
         });
 
         // Get command dispatchers
@@ -329,7 +333,7 @@ export class EventSourcing {
     this._initialized = true;
 
     if (!this._enabled) {
-      logger.info("Event sourcing is disabled via ENABLE_EVENT_SOURCING=false");
+      logger.info("Event sourcing is disabled (enabled=false)");
       return;
     }
 
@@ -390,6 +394,8 @@ export class EventSourcing {
       logger.debug("Using in-memory event store (non-production)");
     } else {
       // In production without ClickHouse, leave stores undefined
+      // TODO: if you're hitting this, see the ClickHouse migration and setup guide:
+      // https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/004-docker-dev-environment.md
       logger.warn(
         "ClickHouse not available in production - event sourcing will be disabled. " +
           "Set CLICKHOUSE_URL to enable event sourcing.",
@@ -461,7 +467,7 @@ export class EventSourcing {
     if (!this._loggedDisabledWarning) {
       logger.warn(
         context,
-        "Event sourcing is disabled via ENABLE_EVENT_SOURCING=false. Operations will be no-ops.",
+        "Event sourcing is disabled. Operations will be no-ops.",
       );
       this._loggedDisabledWarning = true;
     } else {
@@ -496,11 +502,13 @@ export class EventSourcing {
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
+    processRole?: ProcessRole;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
+      processRole: options.processRole,
     });
 
     es._initialized = true;
@@ -523,18 +531,14 @@ function buildServiceOptions<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
 >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>) {
+  // Pass class instances directly — do NOT spread.
+  // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
   const foldProjections = Array.from(definition.foldProjections.values()).map(
-    ({ definition: fold, options }) => ({
-      ...fold,
-      options: options ?? fold.options,
-    }),
+    ({ definition: fold }) => fold,
   );
 
   const mapProjections = Array.from(definition.mapProjections.values()).map(
-    ({ definition: mapProj, options }) => ({
-      ...mapProj,
-      options: options ?? mapProj.options,
-    }),
+    ({ definition: mapProj }) => mapProj,
   );
 
   const commandRegistrations =
@@ -542,6 +546,7 @@ function buildServiceOptions<
       ? definition.commands.map((cmd) => ({
           name: cmd.name,
           handlerClass: cmd.handlerClass,
+          handlerInstance: cmd.handlerInstance,
           options: cmd.options,
         }))
       : undefined;

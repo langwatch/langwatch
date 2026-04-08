@@ -8,6 +8,7 @@ import { prisma } from "~/server/db";
 import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
+import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -115,10 +116,14 @@ app.post(
     );
 
     const rawTraces = results.groups.flat() as Trace[];
+    const enrichedTraces = enrichTracesWithEvaluations({
+      traces: rawTraces,
+      traceChecks: results.traceChecks,
+    });
 
     let traces: unknown[];
     if (format === "digest") {
-      traces = rawTraces.map((trace) => ({
+      traces = enrichedTraces.map((trace) => ({
         trace_id: trace.trace_id,
         formatted_trace: formatTraceSummaryDigest(trace),
         input: trace.input,
@@ -126,9 +131,10 @@ app.post(
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         error: trace.error,
+        evaluations: trace.evaluations,
       }));
     } else {
-      traces = rawTraces;
+      traces = enrichedTraces;
     }
 
     return c.json({

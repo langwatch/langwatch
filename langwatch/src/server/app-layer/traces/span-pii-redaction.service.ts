@@ -1,6 +1,7 @@
 import { env } from "~/env.mjs";
 import {
-  clearPII as defaultClearPII,
+  batchPresidioClearPII as defaultBatchPresidioClearPII,
+  googleDLPClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
 import { createLogger } from "~/utils/logger/server";
@@ -9,31 +10,12 @@ import {
   type PIIRedactionLevel,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
+  OtlpAnyValue,
   OtlpKeyValue,
+  OtlpResource,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
-
-/**
- * Default attribute keys known to contain PII-bearing content.
- * Only these keys are scanned for PII to minimize processing cost.
- */
-export const DEFAULT_PII_BEARING_ATTRIBUTE_KEYS = new Set([
-  // OpenTelemetry GenAI semantic conventions (legacy)
-  "gen_ai.prompt",
-  "gen_ai.completion",
-  "gen_ai.input.messages",
-  "gen_ai.output.messages",
-  // OpenTelemetry GenAI semantic conventions (latest)
-  "gen_ai.request.input_messages",
-  "gen_ai.response.output_messages",
-  // LangWatch conventions
-  "langwatch.input",
-  "langwatch.output",
-  // OpenInference conventions
-  "input.value",
-  "output.value",
-]);
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.
@@ -43,22 +25,20 @@ export const DEFAULT_PII_BEARING_ATTRIBUTE_KEYS = new Set([
 export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 /**
- * Function type for PII clearing.
+ * Function type for batch PII clearing.
+ * Returns an array where each element is the anonymized text (or null if unchanged).
  */
-export type ClearPIIFunction = (
-  object: Record<string | number, unknown>,
-  keysPath: (string | number)[],
+export type BatchClearPIIFunction = (
+  texts: string[],
   options: PIICheckOptions,
-) => Promise<void>;
+) => Promise<(string | null)[]>;
 
 /**
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
 export interface OtlpSpanPiiRedactionServiceDependencies {
-  /** Function to clear PII from objects */
-  clearPII: ClearPIIFunction;
-  /** Set of attribute keys known to contain PII-bearing content */
-  piiBearingAttributeKeys: Set<string>;
+  /** Batch function to clear PII from multiple text values in one call */
+  batchClearPII: BatchClearPIIFunction;
   /** Whether LANGEVALS_ENDPOINT is configured (truthy check) */
   isLangevalsConfigured: boolean;
   /** Whether running in production (NODE_ENV === "production") */
@@ -68,21 +48,61 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
 }
 
 /**
+ * Default batch PII clearing: uses Presidio batch API, falls back to individual Google DLP calls.
+ */
+const runGoogleDlpBatch = (
+  texts: string[],
+  piiRedactionLevel: PIIRedactionLevel,
+): Promise<(string | null)[]> =>
+  Promise.all(
+    texts.map(async (text) => {
+      const wrapper = { value: text };
+      await googleDLPClearPII(wrapper, "value", piiRedactionLevel);
+      return wrapper.value !== text ? wrapper.value : null;
+    }),
+  );
+
+const defaultBatchClearPII: BatchClearPIIFunction = async (texts, options) => {
+  const { piiRedactionLevel, mainMethod } = options;
+
+  if (mainMethod === "google_dlp") {
+    return runGoogleDlpBatch(texts, piiRedactionLevel);
+  }
+
+  try {
+    return await defaultBatchPresidioClearPII(texts, piiRedactionLevel);
+  } catch {
+    return await runGoogleDlpBatch(texts, piiRedactionLevel);
+  }
+};
+
+/**
  * Static defaults for PII service deps (no lazy caching, no mutable state).
  */
 const PII_DEFAULTS: OtlpSpanPiiRedactionServiceDependencies = {
-  clearPII: defaultClearPII,
-  piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+  batchClearPII: defaultBatchClearPII,
   isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
   isProduction: env.NODE_ENV === "production",
   piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
 };
 
 /**
+ * A collected string value with a back-reference for applying the redacted result.
+ */
+type StringEntry = {
+  /** The object containing the string value */
+  owner: OtlpAnyValue | { message?: string | null };
+  /** The property name on owner that holds the string value */
+  field: "stringValue" | "message";
+  /** The original text value */
+  text: string;
+};
+
+/**
  * Service responsible for redacting PII from OTLP span data.
- * Scans specific PII-bearing attribute keys and redacts detected PII.
- * This service should be applied BEFORE creating immutable events
- * in the event sourcing pipeline.
+ * Scans all string attribute values and sends them in a single batch
+ * to the PII detection service. This service should be applied BEFORE
+ * creating immutable events in the event sourcing pipeline.
  */
 export class OtlpSpanPiiRedactionService {
   private readonly deps: OtlpSpanPiiRedactionServiceDependencies;
@@ -101,25 +121,22 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * Redacts PII from specific PII-bearing attributes in the span.
-   * Mutates the span in place for efficiency.
+   * Redacts PII from all string attributes in the span and resource.
+   * Mutates the span and resource in place for efficiency.
    *
-   * Mirrors the PII redaction behavior from piiCheck.ts:
-   * 1. Checks process.env.DISABLE_PII_REDACTION - if set, skips entirely
-   * 2. Checks piiRedactionLevel !== "DISABLED" - if disabled, skips
-   * 3. Checks LANGEVALS_ENDPOINT is set for presidio method
-   * 4. Sets enforced: env.NODE_ENV === "production" - in prod, errors fail; otherwise warn and continue
-   *
-   * Only scans attributes with keys in piiBearingAttributeKeys to minimize cost.
+   * Collects all string values from span attributes, events, links,
+   * status.message, and resource attributes, then sends them in a
+   * single batch to the PII detection service.
    *
    * @param span - The OTLP span to redact
+   * @param resource - The OTLP resource to redact (nullable)
    * @param piiRedactionLevel - The project's PII redaction level
    */
   async redactSpan(
     span: OtlpSpan,
+    resource: OtlpResource | null,
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
-    // Mirror collectorWorker.ts behavior - check global disable first
     if (process.env.DISABLE_PII_REDACTION) {
       return;
     }
@@ -128,17 +145,14 @@ export class OtlpSpanPiiRedactionService {
       return;
     }
 
-    // In production, enforce PII redaction (errors fail); otherwise warn and continue
     const piiEnforced = this.deps.isProduction;
 
-    // Mirror cleanupPIIs pre-check: presidio requires LANGEVALS_ENDPOINT
     if (!this.deps.isLangevalsConfigured) {
       if (piiEnforced) {
         throw new Error(
           "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
         );
       }
-      // In non-production, skip PII check but allow processing to continue
       return;
     }
 
@@ -148,18 +162,54 @@ export class OtlpSpanPiiRedactionService {
       mainMethod: "presidio",
     };
 
-    const redactionPromises: Promise<void>[] = [];
+    const entries: StringEntry[] = [];
     let anySkipped = false;
     let anyRedacted = false;
+    let totalLength = 0;
 
+    // Collect all string values from span attributes, events, and links
     for (const attrs of this.collectAllAttributeSets(span)) {
-      const result = this.collectPiiBearingAttributeRedactions(
+      const result = this.collectStringEntries(
         attrs,
-        options,
-        redactionPromises,
+        entries,
+        totalLength,
       );
       anySkipped ||= result.skipped;
-      anyRedacted ||= result.redacted;
+      anyRedacted ||= result.collected;
+      totalLength = result.totalLength;
+    }
+
+    // Collect status.message
+    if (
+      span.status?.message != null &&
+      typeof span.status.message === "string" &&
+      span.status.message.length > 0
+    ) {
+      if (
+        totalLength + span.status.message.length >
+        this.deps.piiRedactionMaxAttributeLength
+      ) {
+        anySkipped = true;
+      } else {
+        entries.push({
+          owner: span.status,
+          field: "message",
+          text: span.status.message,
+        });
+        totalLength += span.status.message.length;
+        anyRedacted = true;
+      }
+    }
+
+    // Collect resource attributes
+    if (resource?.attributes) {
+      const result = this.collectStringEntries(
+        resource.attributes,
+        entries,
+        totalLength,
+      );
+      anySkipped ||= result.skipped;
+      anyRedacted ||= result.collected;
     }
 
     // Mark span with pii_redaction_status when any attributes were skipped
@@ -178,7 +228,30 @@ export class OtlpSpanPiiRedactionService {
       }
     }
 
-    await Promise.all(redactionPromises);
+    if (entries.length === 0) {
+      return;
+    }
+
+    // Batch all string values into a single PII detection call
+    const results = await this.deps.batchClearPII(
+      entries.map((e) => e.text),
+      options,
+    );
+
+    if (results.length !== entries.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${entries.length} inputs`,
+      );
+    }
+
+    // Apply redacted values back to their original locations
+    for (let i = 0; i < entries.length; i++) {
+      const redacted = results[i];
+      if (redacted != null) {
+        const entry = entries[i]!;
+        (entry.owner as Record<string, unknown>)[entry.field] = redacted;
+      }
+    }
   }
 
   /**
@@ -221,26 +294,59 @@ export class OtlpSpanPiiRedactionService {
       mainMethod: "presidio",
     };
 
-    const redactionPromises: Promise<void>[] = [];
+    const texts: string[] = [];
+    const refs: { obj: Record<string, string>; key: string }[] = [];
+    const maxLen = this.deps.piiRedactionMaxAttributeLength;
+    let totalLength = 0;
 
-    // Redact body
-    redactionPromises.push(this.deps.clearPII(log, ["body"], options));
+    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
+      if (totalLength + value.length > maxLen) {
+        this.logger.warn(
+          { key, valueLength: value.length, totalLength, maxLength: maxLen },
+          "Skipping PII redaction — cumulative batch size would exceed limit",
+        );
+        return;
+      }
+      texts.push(value);
+      refs.push({ obj, key });
+      totalLength += value.length;
+    };
 
-    // Redact attributes
+    // Body
+    if (log.body) {
+      tryPush(log as unknown as Record<string, string>, "body", log.body);
+    }
+
+    // Attributes
     for (const key of Object.keys(log.attributes)) {
-      redactionPromises.push(
-        this.deps.clearPII(log.attributes, [key], options),
-      );
+      if (log.attributes[key]) {
+        tryPush(log.attributes, key, log.attributes[key]!);
+      }
     }
 
-    // Redact resource attributes
+    // Resource attributes
     for (const key of Object.keys(log.resourceAttributes)) {
-      redactionPromises.push(
-        this.deps.clearPII(log.resourceAttributes, [key], options),
+      if (log.resourceAttributes[key]) {
+        tryPush(log.resourceAttributes, key, log.resourceAttributes[key]!);
+      }
+    }
+
+    if (texts.length === 0) return;
+
+    const results = await this.deps.batchClearPII(texts, options);
+
+    if (results.length !== refs.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${refs.length} inputs`,
       );
     }
 
-    await Promise.all(redactionPromises);
+    for (let i = 0; i < refs.length; i++) {
+      const redacted = results[i];
+      if (redacted != null) {
+        refs[i]!.obj[refs[i]!.key] = redacted;
+      }
+    }
   }
 
   /**
@@ -281,21 +387,52 @@ export class OtlpSpanPiiRedactionService {
       mainMethod: "presidio",
     };
 
-    const redactionPromises: Promise<void>[] = [];
+    const texts: string[] = [];
+    const refs: { obj: Record<string, string>; key: string }[] = [];
+    const maxLen = this.deps.piiRedactionMaxAttributeLength;
+    let totalLength = 0;
+
+    const tryPush = (obj: Record<string, string>, key: string, value: string) => {
+      if (totalLength + value.length > maxLen) {
+        this.logger.warn(
+          { key, valueLength: value.length, totalLength, maxLength: maxLen },
+          "Skipping PII redaction — cumulative batch size would exceed limit",
+        );
+        return;
+      }
+      texts.push(value);
+      refs.push({ obj, key });
+      totalLength += value.length;
+    };
 
     for (const key of Object.keys(metric.attributes)) {
-      redactionPromises.push(
-        this.deps.clearPII(metric.attributes, [key], options),
-      );
+      if (metric.attributes[key]) {
+        tryPush(metric.attributes, key, metric.attributes[key]!);
+      }
     }
 
     for (const key of Object.keys(metric.resourceAttributes)) {
-      redactionPromises.push(
-        this.deps.clearPII(metric.resourceAttributes, [key], options),
+      if (metric.resourceAttributes[key]) {
+        tryPush(metric.resourceAttributes, key, metric.resourceAttributes[key]!);
+      }
+    }
+
+    if (texts.length === 0) return;
+
+    const results = await this.deps.batchClearPII(texts, options);
+
+    if (results.length !== refs.length) {
+      throw new Error(
+        `Incomplete PII batch: got ${results.length} results for ${refs.length} inputs`,
       );
     }
 
-    await Promise.all(redactionPromises);
+    for (let i = 0; i < refs.length; i++) {
+      const redacted = results[i];
+      if (redacted != null) {
+        refs[i]!.obj[refs[i]!.key] = redacted;
+      }
+    }
   }
 
   private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {
@@ -307,42 +444,49 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * Collects redaction promises for attributes with PII-bearing keys.
-   * Returns { skipped, redacted } indicating whether any attributes were
-   * skipped due to exceeding the max length, and whether any were sent for redaction.
+   * Collects string attribute values into the entries array.
+   * Enforces a cumulative character budget — once adding a value would
+   * exceed piiRedactionMaxAttributeLength the value is skipped.
    */
-  private collectPiiBearingAttributeRedactions(
+  private collectStringEntries(
     attributes: OtlpKeyValue[],
-    options: PIICheckOptions,
-    promises: Promise<void>[],
-  ): { skipped: boolean; redacted: boolean } {
+    entries: StringEntry[],
+    currentTotalLength: number,
+  ): { skipped: boolean; collected: boolean; totalLength: number } {
     let skipped = false;
-    let redacted = false;
+    let collected = false;
+    let totalLength = currentTotalLength;
+
     for (const attr of attributes) {
       if (
-        this.deps.piiBearingAttributeKeys.has(attr.key) &&
         attr.value.stringValue !== undefined &&
         attr.value.stringValue !== null
       ) {
         if (
-          attr.value.stringValue.length >
+          totalLength + attr.value.stringValue.length >
           this.deps.piiRedactionMaxAttributeLength
         ) {
           this.logger.warn(
             {
               attributeKey: attr.key,
               valueLength: attr.value.stringValue.length,
+              totalLength,
               maxLength: this.deps.piiRedactionMaxAttributeLength,
             },
-            "Skipping PII redaction for oversized attribute value",
+            "Skipping PII redaction — cumulative batch size would exceed limit",
           );
           skipped = true;
           continue;
         }
-        redacted = true;
-        promises.push(this.deps.clearPII(attr.value, ["stringValue"], options));
+        entries.push({
+          owner: attr.value,
+          field: "stringValue",
+          text: attr.value.stringValue,
+        });
+        totalLength += attr.value.stringValue.length;
+        collected = true;
       }
     }
-    return { skipped, redacted };
+    return { skipped, collected, totalLength };
   }
 }

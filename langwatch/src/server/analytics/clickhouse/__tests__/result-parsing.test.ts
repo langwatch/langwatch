@@ -251,6 +251,293 @@ describe("result-parsing", () => {
     });
   });
 
+  describe("when parsing grouped results for summary charts", () => {
+    /**
+     * Simulates the groupBy branch of parseTimeseriesResults (lines 242-270 in the service).
+     * For timeScale="full", ClickHouse returns rows with `period` and `group_key`.
+     * The parser nests values as: bucket[groupBy][groupKey][seriesName]
+     */
+    function simulateGroupedParsing(
+      rows: Array<Record<string, unknown>>,
+      series: SeriesInputType[],
+      groupBy: string | undefined,
+    ) {
+      type NestedBucket = {
+        date: string;
+        [key: string]: unknown;
+      };
+
+      const bucketMap: {
+        previous: Map<string, NestedBucket>;
+        current: Map<string, NestedBucket>;
+      } = {
+        previous: new Map(),
+        current: new Map(),
+      };
+
+      for (const row of rows) {
+        const period = row.period as string;
+        const dateKey = "full";
+
+        const targetMap =
+          period === "current" ? bucketMap.current : bucketMap.previous;
+
+        let bucket = targetMap.get(dateKey);
+        if (!bucket) {
+          bucket = { date: dateKey };
+          targetMap.set(dateKey, bucket);
+        }
+
+        if (groupBy && row.group_key !== undefined && row.group_key !== null) {
+          // Grouped results — mirrors parseTimeseriesResults lines 242-270
+          const groupKey = String(row.group_key);
+          if (!bucket[groupBy]) {
+            bucket[groupBy] = {};
+          }
+          const groupData = bucket[groupBy] as Record<
+            string,
+            Record<string, number>
+          >;
+          if (!groupData[groupKey]) {
+            groupData[groupKey] = {};
+          }
+
+          for (let i = 0; i < series.length; i++) {
+            const seriesItem = series[i]!;
+            const alias = buildMetricAlias(
+              i,
+              seriesItem.metric,
+              seriesItem.aggregation,
+              seriesItem.key,
+              seriesItem.subkey,
+            );
+            const aggregation =
+              seriesItem.aggregation === "terms"
+                ? "cardinality"
+                : seriesItem.aggregation;
+            const seriesName = seriesItem.pipeline
+              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
+              : seriesItem.key
+                ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
+                : `${i}/${seriesItem.metric}/${aggregation}`;
+            const value = row[alias];
+            if (value !== undefined && value !== null) {
+              groupData[groupKey]![seriesName] = Number(value);
+            }
+          }
+        } else {
+          // Non-grouped results — mirrors parseTimeseriesResults lines 271-288
+          for (let i = 0; i < series.length; i++) {
+            const seriesItem = series[i]!;
+            const alias = buildMetricAlias(
+              i,
+              seriesItem.metric,
+              seriesItem.aggregation,
+              seriesItem.key,
+              seriesItem.subkey,
+            );
+            const aggregation =
+              seriesItem.aggregation === "terms"
+                ? "cardinality"
+                : seriesItem.aggregation;
+            const seriesName = seriesItem.pipeline
+              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
+              : seriesItem.key
+                ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
+                : `${i}/${seriesItem.metric}/${aggregation}`;
+            const value = row[alias];
+            if (value !== undefined && value !== null) {
+              bucket[seriesName] = Number(value);
+            }
+          }
+        }
+      }
+
+      const currentPeriod = Array.from(bucketMap.current.values());
+      const previousPeriod = Array.from(bucketMap.previous.values());
+
+      return { currentPeriod, previousPeriod };
+    }
+
+    it("produces nested structure from grouped summary rows", () => {
+      // Simulate ClickHouse rows for timeScale="full" with group_key
+      const simulatedRows = [
+        {
+          period: "current",
+          group_key: "cat_a",
+          "0__metadata_trace_id__cardinality": 150,
+        },
+        {
+          period: "current",
+          group_key: "cat_b",
+          "0__metadata_trace_id__cardinality": 160,
+        },
+        {
+          period: "previous",
+          group_key: "cat_a",
+          "0__metadata_trace_id__cardinality": 100,
+        },
+        {
+          period: "previous",
+          group_key: "cat_b",
+          "0__metadata_trace_id__cardinality": 110,
+        },
+      ];
+
+      const series: SeriesInputType[] = [
+        {
+          metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality",
+        },
+      ];
+
+      const { currentPeriod, previousPeriod } = simulateGroupedParsing(
+        simulatedRows,
+        series,
+        "evaluations.evaluation_label",
+      );
+
+      // Verify nested structure exists for current period
+      expect(currentPeriod).toHaveLength(1);
+      const currentBucket = currentPeriod[0]!;
+      expect(currentBucket["evaluations.evaluation_label"]).toBeDefined();
+
+      const currentGroupData = currentBucket[
+        "evaluations.evaluation_label"
+      ] as Record<string, Record<string, number>>;
+
+      // cat_a gets its value under the series name key
+      expect(currentGroupData["cat_a"]!["0/metadata.trace_id/cardinality"]).toBe(150);
+      // cat_b gets its value under the series name key
+      expect(currentGroupData["cat_b"]!["0/metadata.trace_id/cardinality"]).toBe(160);
+
+      // Verify nested structure exists for previous period
+      expect(previousPeriod).toHaveLength(1);
+      const previousBucket = previousPeriod[0]!;
+      const previousGroupData = previousBucket[
+        "evaluations.evaluation_label"
+      ] as Record<string, Record<string, number>>;
+
+      expect(previousGroupData["cat_a"]!["0/metadata.trace_id/cardinality"]).toBe(100);
+      expect(previousGroupData["cat_b"]!["0/metadata.trace_id/cardinality"]).toBe(110);
+    });
+
+    it("produces flat structure when no groupBy for summary rows", () => {
+      // Same data shape but without group_key — all values go into the flat bucket
+      const simulatedRows = [
+        {
+          period: "current",
+          "0__metadata_trace_id__cardinality": 310,
+        },
+        {
+          period: "previous",
+          "0__metadata_trace_id__cardinality": 210,
+        },
+      ];
+
+      const series: SeriesInputType[] = [
+        {
+          metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality",
+        },
+      ];
+
+      const { currentPeriod, previousPeriod } = simulateGroupedParsing(
+        simulatedRows,
+        series,
+        undefined, // no groupBy
+      );
+
+      expect(currentPeriod).toHaveLength(1);
+      // Flat structure: series name directly on the bucket
+      expect(currentPeriod[0]!["0/metadata.trace_id/cardinality"]).toBe(310);
+
+      expect(previousPeriod).toHaveLength(1);
+      expect(previousPeriod[0]!["0/metadata.trace_id/cardinality"]).toBe(210);
+    });
+
+    it("handles mixed group keys with pipeline metrics", () => {
+      // Simulate a pipeline metric (avg threads per user) with group_key
+      const simulatedRows = [
+        {
+          period: "current",
+          group_key: "group_x",
+          "0__metadata_thread_id__cardinality": 3.5,
+        },
+        {
+          period: "current",
+          group_key: "group_y",
+          "0__metadata_thread_id__cardinality": 7.2,
+        },
+      ];
+
+      const series: SeriesInputType[] = [
+        {
+          metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality",
+          pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+        },
+      ];
+
+      const { currentPeriod } = simulateGroupedParsing(
+        simulatedRows,
+        series,
+        "metadata.user_id",
+      );
+
+      expect(currentPeriod).toHaveLength(1);
+      const groupData = currentPeriod[0]![
+        "metadata.user_id"
+      ] as Record<string, Record<string, number>>;
+
+      // Each group key gets its own metric value under the pipeline series name
+      expect(
+        groupData["group_x"]!["0/metadata.thread_id/cardinality/user_id/avg"],
+      ).toBe(3.5);
+      expect(
+        groupData["group_y"]!["0/metadata.thread_id/cardinality/user_id/avg"],
+      ).toBe(7.2);
+    });
+
+    it("handles empty group_key values by including them in the nested structure", () => {
+      const simulatedRows = [
+        {
+          period: "current",
+          group_key: "",
+          "0__metadata_trace_id__cardinality": 42,
+        },
+        {
+          period: "current",
+          group_key: "known_label",
+          "0__metadata_trace_id__cardinality": 88,
+        },
+      ];
+
+      const series: SeriesInputType[] = [
+        {
+          metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+          aggregation: "cardinality",
+        },
+      ];
+
+      const { currentPeriod } = simulateGroupedParsing(
+        simulatedRows,
+        series,
+        "evaluations.evaluation_label",
+      );
+
+      expect(currentPeriod).toHaveLength(1);
+      const groupData = currentPeriod[0]![
+        "evaluations.evaluation_label"
+      ] as Record<string, Record<string, number>>;
+
+      // Empty string group_key is treated as a valid key (String("") === "")
+      expect(groupData[""]!["0/metadata.trace_id/cardinality"]).toBe(42);
+      // Non-empty key is also preserved
+      expect(groupData["known_label"]!["0/metadata.trace_id/cardinality"]).toBe(88);
+    });
+  });
+
   describe("metric key normalization", () => {
     /**
      * This test verifies the fix for % change indicators not showing.

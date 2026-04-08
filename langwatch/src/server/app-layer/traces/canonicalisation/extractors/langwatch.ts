@@ -12,7 +12,7 @@
  * Detection: Presence of langwatch.* attributes
  *
  * Canonical attributes produced:
- * - langwatch.span.type (passthrough, upgraded to "llm" for chat_messages)
+ * - langwatch.span.type (passthrough)
  * - gen_ai.conversation.id (from langwatch.thread.id variants)
  * - langwatch.user.id (consolidated from legacy variants)
  * - langwatch.customer.id (consolidated from legacy variants)
@@ -74,7 +74,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     // Span Type (highest precedence)
     // Explicit langwatch.span.type takes priority
-    // Note: May be upgraded to "llm" later if chat_messages input is detected
     // ─────────────────────────────────────────────────────────────────────────
     const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE);
     if (
@@ -160,7 +159,8 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // metadata JSON object. Consume the blob with take() and hoist every
     // field so downstream code uses canonical keys only.
     // ─────────────────────────────────────────────────────────────────────────
-    const metadata = attrs.take("metadata") ?? attrs.take("langwatch.metadata");
+    const metadata = attrs.take("metadata") ?? attrs.take("langwatch.metadata")
+      ?? attrs.take("langwatch.trace");
     if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
         const parsedObj = metadata as Record<string, unknown>;
         // Extract labels if not already set
@@ -228,6 +228,27 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Metadata subkeys — consume langwatch.metadata.* and langwatch.trace.*
+    // subkeys and normalize to metadata.{bareKey}.
+    // Uses setAttr (not setAttrIfAbsent) so subkeys override blob fields.
+    // ─────────────────────────────────────────────────────────────────────────
+    const METADATA_SUBKEY_PREFIXES = [
+      "langwatch.metadata.",
+      "langwatch.trace.",
+    ] as const;
+    for (const prefix of METADATA_SUBKEY_PREFIXES) {
+      for (const { key, value } of attrs.takeByPrefix(prefix)) {
+        const bareKey = key.slice(prefix.length);
+        if (bareKey && value !== null && value !== undefined) {
+          ctx.setAttr(
+            `metadata.${bareKey}`,
+            typeof value === "string" ? value : safeStringify(value),
+          );
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Params (passthrough)
     // May be computed upstream
     // ─────────────────────────────────────────────────────────────────────────
@@ -278,9 +299,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             ctx.recordRule(
               `${this.id}:input.chat_messages->gen_ai.input.messages`,
             );
-
-            ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "llm");
-            ctx.recordRule(`${this.id}:type=llm`);
           }
 
           // Always preserve the raw input — even when normalization fails

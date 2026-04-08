@@ -92,6 +92,8 @@ export interface StaticPipelineDefinition<
   commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
+    /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
+    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
   }>;
 

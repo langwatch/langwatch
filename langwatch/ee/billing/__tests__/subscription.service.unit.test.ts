@@ -83,6 +83,17 @@ const createMockOrganizationRepository = (): {
   getPricingModel: vi.fn(),
   getStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
+  getOrganizationForBilling: vi.fn(),
+  createAndAssign: vi.fn(),
+  getAllForUser: vi.fn(),
+  getOrganizationWithMembers: vi.fn(),
+  getMemberById: vi.fn(),
+  getAllMembers: vi.fn(),
+  update: vi.fn(),
+  deleteMember: vi.fn(),
+  updateMemberRole: vi.fn(),
+  updateTeamMemberRole: vi.fn(),
+  getAuditLogs: vi.fn(),
 });
 
 const createMockSeatEventFns = (): {

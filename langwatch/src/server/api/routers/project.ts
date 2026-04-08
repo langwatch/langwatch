@@ -228,15 +228,6 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          featureClickHouseDataSourceSimulations: Boolean(env.IS_SAAS),
-          featureClickHouseDataSourceEvaluations: Boolean(env.IS_SAAS),
-          featureClickHouseDataSourceTraces: Boolean(env.IS_SAAS),
-          featureEventSourcingSimulationIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
-          disableElasticSearchTraceWriting: Boolean(env.IS_SAAS),
-          disableElasticSearchEvaluationWriting: Boolean(env.IS_SAAS),
-          disableElasticSearchSimulationWriting: Boolean(env.IS_SAAS),
         },
       });
 
@@ -261,6 +252,14 @@ export const projectRouter = createTRPCRouter({
       }
 
       return project;
+    }),
+  getHasFirstMessage: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => {
+      const project = await getApp().projects.getById(input.projectId);
+
+      return { firstMessage: project?.firstMessage ?? false };
     }),
   regenerateApiKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))

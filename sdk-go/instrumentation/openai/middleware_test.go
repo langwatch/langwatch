@@ -28,6 +28,20 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
+const (
+	completionModelID  = openai.ChatModelGPT4oMini
+	completionReqBody  = `{"model":"` + string(completionModelID) + `","messages":[{"role":"user","content":"ping"}],"max_tokens":5,"temperature":0.7,"top_p":0.9,"frequency_penalty":0.1,"presence_penalty":0.2}`
+	completionRespBody = `{"id":"cmpl-xyz","object":"chat.completion","created":1700000000,"model":"gpt-test-resp","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3},"system_fingerprint":"fp_test_value"}`
+	streamReqBody      = `{"model":"gpt-4o-mini","messages":[{"role":"user","content":"count"}],"stream":true}`
+	streamRespBody     = `data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"model":"gpt-stream-resp","system_fingerprint":"fp_stream_test","choices":[{"index":0,"delta":{"content":"one"},"finish_reason":null}]}
+
+data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"model":"gpt-stream-resp","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+
+`
+)
+
 // mockRoundTripper allows mocking HTTP responses.
 type mockRoundTripper struct {
 	roundTrip func(req *http.Request) (*http.Response, error)
@@ -184,17 +198,6 @@ func TestMiddlewareIntegration(t *testing.T) {
 	otel.SetTracerProvider(provider)
 	defer otel.SetTracerProvider(originalTracerProvider) // Restore original
 
-	completionModelID := openai.ChatModelGPT4oMini
-	completionReqBody := `{"model":"` + string(completionModelID) + `","messages":[{"role":"user","content":"ping"}],"max_tokens":5,"temperature":0.7,"top_p":0.9,"frequency_penalty":0.1,"presence_penalty":0.2}`
-	completionRespBody := `{"id":"cmpl-xyz","object":"chat.completion","created":1700000000,"model":"gpt-test-resp","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3},"system_fingerprint":"fp_test_value"}`
-	streamReqBody := `{"model":"gpt-4o-mini","messages":[{"role":"user","content":"count"}],"stream":true}`
-	streamRespBody := `data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"model":"gpt-stream-resp","system_fingerprint":"fp_stream_test","choices":[{"index":0,"delta":{"content":"one"},"finish_reason":null}]}
-
-data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"model":"gpt-stream-resp","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
-
-data: [DONE]
-
-`
 	errorReqBody := `{"model":"gpt-4o-mini","messages":[]}`
 
 	tests := []struct {
@@ -683,6 +686,277 @@ func TestMiddleware_NextReturnsErrorWithResponse(t *testing.T) {
 		}
 	}
 	assert.True(t, foundErrorEvent, "expected an exception event to be recorded")
+}
+
+// TestMiddleware_WithTracerProvider_NoGlobal verifies that WithTracerProvider works
+// without setting the global tracer provider. This ensures the middleware correctly
+// passes the custom provider to langwatch.TracerFromProvider instead of relying on
+// the global one.
+func TestMiddleware_WithTracerProvider_NoGlobal(t *testing.T) {
+	tests := []struct {
+		name               string
+		endpointPath       string
+		openaiOp           func(t *testing.T, client openai.Client)
+		useManualNext      bool
+		manualNext         func(provider *sdktrace.TracerProvider, exporter *tracetest.InMemoryExporter, t *testing.T)
+		mockResponseStatus int
+		mockResponseBody   string
+		requestBody        string
+		middlewareOpts     func(provider *sdktrace.TracerProvider) []Option
+		expectedAttrs      map[attribute.Key]attribute.Value
+		expectedStatusCode codes.Code
+	}{
+		{
+			name:         "Chat Completion Success No Recording",
+			endpointPath: "/v1/chat/completions",
+			openaiOp: func(t *testing.T, client openai.Client) {
+				_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+					Model: completionModelID,
+					Messages: []openai.ChatCompletionMessageParamUnion{
+						openai.UserMessage("ping"),
+					},
+					MaxTokens:        openai.Opt(int64(5)),
+					Temperature:      openai.Opt(float64(0.7)),
+					TopP:             openai.Opt(float64(0.9)),
+					FrequencyPenalty: openai.Opt(float64(0.1)),
+					PresencePenalty:  openai.Opt(float64(0.2)),
+				})
+				require.NoError(t, err)
+			},
+			mockResponseStatus: http.StatusOK,
+			mockResponseBody:   completionRespBody,
+			requestBody:        completionReqBody,
+			middlewareOpts: func(provider *sdktrace.TracerProvider) []Option {
+				return []Option{WithTracerProvider(provider)}
+			},
+			expectedAttrs: map[attribute.Key]attribute.Value{
+				semconv.HTTPRequestMethodKey:          attribute.StringValue(http.MethodPost),
+				semconv.URLPathKey:                    attribute.StringValue("/v1/chat/completions"),
+				semconv.GenAISystemKey:                semconv.GenAISystemOpenai.Value,
+				semconv.GenAIOperationNameKey:         attribute.StringValue("chat"),
+				semconv.GenAIRequestModelKey:          attribute.StringValue(string(completionModelID)),
+				semconv.HTTPResponseStatusCodeKey:     attribute.IntValue(http.StatusOK),
+				semconv.GenAIResponseModelKey:         attribute.StringValue("gpt-test-resp"),
+				semconv.GenAIResponseIDKey:            attribute.StringValue("cmpl-xyz"),
+				semconv.GenAIResponseFinishReasonsKey: attribute.StringSliceValue([]string{"stop"}),
+				semconv.GenAIUsageInputTokensKey:      attribute.IntValue(2),
+				semconv.GenAIUsageOutputTokensKey:     attribute.IntValue(1),
+			},
+			expectedStatusCode: codes.Ok,
+		},
+		{
+			name:         "Chat Completion Success With Recording",
+			endpointPath: "/v1/chat/completions",
+			openaiOp: func(t *testing.T, client openai.Client) {
+				_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+					Model:            completionModelID,
+					Messages:         []openai.ChatCompletionMessageParamUnion{openai.UserMessage("ping")},
+					MaxTokens:        openai.Opt(int64(5)),
+					Temperature:      openai.Opt(float64(0.7)),
+					TopP:             openai.Opt(float64(0.9)),
+					FrequencyPenalty: openai.Opt(float64(0.1)),
+					PresencePenalty:  openai.Opt(float64(0.2)),
+				})
+				require.NoError(t, err)
+			},
+			mockResponseStatus: http.StatusOK,
+			mockResponseBody:   completionRespBody,
+			requestBody:        completionReqBody,
+			middlewareOpts: func(provider *sdktrace.TracerProvider) []Option {
+				return []Option{WithTracerProvider(provider), WithCaptureInput(), WithCaptureOutput()}
+			},
+			expectedAttrs: map[attribute.Key]attribute.Value{
+				semconv.HTTPRequestMethodKey:                    attribute.StringValue(http.MethodPost),
+				semconv.URLPathKey:                              attribute.StringValue("/v1/chat/completions"),
+				semconv.GenAISystemKey:                          semconv.GenAISystemOpenai.Value,
+				semconv.GenAIOperationNameKey:                   attribute.StringValue("chat"),
+				semconv.GenAIRequestModelKey:                    attribute.StringValue(string(completionModelID)),
+				semconv.GenAIRequestTemperatureKey:              attribute.Float64Value(0.7),
+				semconv.GenAIRequestTopPKey:                     attribute.Float64Value(0.9),
+				semconv.GenAIRequestFrequencyPenaltyKey:         attribute.Float64Value(0.1),
+				semconv.GenAIRequestPresencePenaltyKey:          attribute.Float64Value(0.2),
+				semconv.GenAIResponseIDKey:                      attribute.StringValue("cmpl-xyz"),
+				semconv.GenAIResponseModelKey:                   attribute.StringValue("gpt-test-resp"),
+				semconv.GenAIOpenaiResponseSystemFingerprintKey: attribute.StringValue("fp_test_value"),
+				semconv.GenAIUsageInputTokensKey:                attribute.IntValue(2),
+				semconv.GenAIUsageOutputTokensKey:               attribute.IntValue(1),
+				semconv.GenAIResponseFinishReasonsKey:           attribute.StringSliceValue([]string{"stop"}),
+				semconv.HTTPResponseStatusCodeKey:               attribute.IntValue(http.StatusOK),
+			},
+			expectedStatusCode: codes.Ok,
+		},
+		{
+			name:         "Chat Completion Stream Success With Recording",
+			endpointPath: "/v1/chat/completions",
+			openaiOp: func(t *testing.T, client openai.Client) {
+				stream := client.Chat.Completions.NewStreaming(context.Background(), openai.ChatCompletionNewParams{
+					Model: completionModelID,
+					Messages: []openai.ChatCompletionMessageParamUnion{
+						openai.UserMessage("count"),
+					},
+				})
+				for stream.Next() {
+					// consume
+				}
+				require.NoError(t, stream.Err())
+			},
+			mockResponseStatus: http.StatusOK,
+			mockResponseBody:   streamRespBody,
+			requestBody:        streamReqBody,
+			middlewareOpts: func(provider *sdktrace.TracerProvider) []Option {
+				return []Option{WithTracerProvider(provider), WithCaptureInput(), WithCaptureOutput()}
+			},
+			expectedAttrs: map[attribute.Key]attribute.Value{
+				semconv.GenAISystemKey:                semconv.GenAISystemOpenai.Value,
+				semconv.GenAIOperationNameKey:         attribute.StringValue("chat"),
+				langwatch.AttributeLangWatchStreaming: attribute.BoolValue(true),
+			},
+			expectedStatusCode: codes.Ok,
+		},
+		{
+			name:         "API Error",
+			endpointPath: "/v1/chat/completions",
+			openaiOp: func(t *testing.T, client openai.Client) {
+				_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+					Model: openai.ChatModelGPT4oMini,
+				})
+				require.Error(t, err)
+			},
+			mockResponseStatus: http.StatusBadRequest,
+			mockResponseBody:   `{"error":{"message":"invalid","type":"invalid_request_error"}}`,
+			middlewareOpts: func(provider *sdktrace.TracerProvider) []Option {
+				return []Option{WithTracerProvider(provider)}
+			},
+			expectedAttrs: map[attribute.Key]attribute.Value{
+				semconv.GenAISystemKey:            semconv.GenAISystemOpenai.Value,
+				semconv.GenAIOperationNameKey:     attribute.StringValue("chat"),
+				semconv.HTTPResponseStatusCodeKey: attribute.IntValue(http.StatusBadRequest),
+			},
+			expectedStatusCode: codes.Error,
+		},
+		{
+			name:          "Next Returns Error No Response",
+			useManualNext: true,
+			manualNext: func(provider *sdktrace.TracerProvider, exporter *tracetest.InMemoryExporter, t *testing.T) {
+				expectedError := errors.New("mock next error")
+				var nextFunc option.MiddlewareNext = func(req *http.Request) (*http.Response, error) {
+					return nil, expectedError
+				}
+				middleware := Middleware("testClient", WithTracerProvider(provider))
+				req := httptest.NewRequest(http.MethodPost, "http://localhost/v1/chat/completions", nil)
+				_, err := middleware(req, nextFunc)
+				require.Error(t, err)
+				assert.Equal(t, expectedError, err)
+
+				require.NoError(t, provider.ForceFlush(context.Background()))
+				spans := exporter.GetSpans()
+				require.Len(t, spans, 1, "expected 1 span from custom provider without global TP")
+				assert.Equal(t, codes.Error, spans[0].Status.Code)
+				assert.Equal(t, expectedError.Error(), spans[0].Status.Description)
+			},
+		},
+		{
+			name:          "Next Returns Error With Response",
+			useManualNext: true,
+			manualNext: func(provider *sdktrace.TracerProvider, exporter *tracetest.InMemoryExporter, t *testing.T) {
+				expectedError := errors.New("mock next error with response")
+				mockResponse := &http.Response{
+					StatusCode: http.StatusInternalServerError,
+					Body:       http.NoBody,
+				}
+				var nextFunc option.MiddlewareNext = func(req *http.Request) (*http.Response, error) {
+					return mockResponse, expectedError
+				}
+				middleware := Middleware("testClient", WithTracerProvider(provider))
+				req := httptest.NewRequest(http.MethodPost, "http://localhost/v1/chat/completions", nil)
+				resp, err := middleware(req, nextFunc)
+				require.Error(t, err)
+				assert.Equal(t, expectedError, err)
+				assert.Equal(t, mockResponse, resp)
+
+				require.NoError(t, provider.ForceFlush(context.Background()))
+				spans := exporter.GetSpans()
+				require.Len(t, spans, 1, "expected 1 span from custom provider without global TP")
+				assert.Equal(t, codes.Error, spans[0].Status.Code)
+
+				foundStatusCodeAttr := false
+				for _, attr := range spans[0].Attributes {
+					if attr.Key == semconv.HTTPResponseStatusCodeKey {
+						foundStatusCodeAttr = true
+						assert.Equal(t, int64(http.StatusInternalServerError), attr.Value.AsInt64())
+						break
+					}
+				}
+				assert.True(t, foundStatusCodeAttr, "HTTPResponseStatusCodeKey attribute not found")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exporter := tracetest.NewInMemoryExporter()
+			sp := sdktrace.NewSimpleSpanProcessor(exporter)
+			provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sp))
+			defer func() {
+				_ = sp.Shutdown(context.Background())
+				_ = exporter.Shutdown(context.Background())
+			}()
+
+			// Intentionally do NOT set the global tracer provider.
+			// Spans should still be captured via WithTracerProvider alone.
+
+			if tt.useManualNext {
+				tt.manualNext(provider, exporter, t)
+				return
+			}
+
+			mockClient := newMockHTTPClient(func(req *http.Request) (*http.Response, error) {
+				assert.Equal(t, tt.endpointPath, req.URL.Path)
+				if tt.requestBody != "" && req.Body != nil {
+					bodyBytes, _ := io.ReadAll(req.Body)
+					req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+					assert.JSONEq(t, tt.requestBody, string(bodyBytes))
+				}
+				header := http.Header{}
+				if strings.Contains(tt.mockResponseBody, "data: [DONE]") {
+					header.Set("Content-Type", "text/event-stream")
+				} else {
+					header.Set("Content-Type", "application/json")
+				}
+				return &http.Response{
+					StatusCode: tt.mockResponseStatus,
+					Body:       io.NopCloser(strings.NewReader(tt.mockResponseBody)),
+					Header:     header,
+				}, nil
+			})
+
+			opts := tt.middlewareOpts(provider)
+			client := openai.NewClient(
+				option.WithAPIKey("dummy-key"),
+				option.WithHTTPClient(mockClient),
+				option.WithMiddleware(Middleware("testClient", opts...)),
+			)
+
+			tt.openaiOp(t, client)
+
+			require.NoError(t, provider.ForceFlush(context.Background()))
+
+			spans := exporter.GetSpans()
+			require.NotEmpty(t, spans, "expected spans from custom provider without global TP set")
+
+			span := spans[len(spans)-1]
+			assert.Equal(t, tt.expectedStatusCode, span.Status.Code)
+
+			recordedAttrs := span.Attributes
+			for key, expectedValue := range tt.expectedAttrs {
+				attrValue, found := findAttr(recordedAttrs, key)
+				assert.True(t, found, "Attribute '%s' not found", string(key))
+				if found {
+					assert.Equal(t, expectedValue, attrValue, "Attribute '%s' value mismatch", string(key))
+				}
+			}
+		})
+	}
 }
 
 // TestGetGenAIOperationFromPath tests the operation detection logic

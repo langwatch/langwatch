@@ -9,6 +9,10 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
+import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "~/server/evaluations/threadMappingResolver";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import {
   type MappingState,
@@ -20,9 +24,7 @@ import {
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
-import type { ProjectService } from "../projects/project.service";
 import {
-  CostLimitExceededError,
   EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
@@ -42,16 +44,9 @@ const INTERNAL_PROTECTIONS: Protections = {
 
 export interface EvaluationExecutionDeps {
   traceService: TraceService;
-  projectService: ProjectService;
-  costChecker: CostChecker;
   modelEnvResolver: ModelEnvResolver;
   langevalsClient: LangEvalsClient;
   workflowExecutor: WorkflowExecutor;
-}
-
-export interface CostChecker {
-  maxMonthlyUsageLimit(organizationId: string): Promise<number>;
-  getCurrentMonthCost(organizationId: string): Promise<number>;
 }
 
 export interface ModelEnvResolver {
@@ -210,6 +205,21 @@ export class EvaluationExecutionService {
       }
 
       data = mappedData as Record<string, unknown>;
+
+      // Resolve any thread-typed mappings mixed into trace-level evaluations
+      if (mappings && hasThreadMappings(mappings)) {
+        await resolveThreadMappingsIntoData({
+          data,
+          trace,
+          mappings,
+          getThreadTraces: (threadId) =>
+            this.deps.traceService.getTracesWithSpansByThreadIds(
+              projectId,
+              [threadId],
+              INTERNAL_PROTECTIONS,
+            ),
+        });
+      }
     }
 
     // Workflow/custom evaluators pass data through as-is
@@ -332,22 +342,6 @@ export class EvaluationExecutionService {
   }): Promise<SingleEvaluationResult> {
     const { projectId, evaluatorType, data, settings, trace, workflowId } = params;
 
-    // Cost limit check
-    const project = await this.deps.projectService.getWithTeam(projectId);
-    if (!project) {
-      throw new EvaluatorConfigError("Project not found");
-    }
-
-    const maxMonthlyUsage = await this.deps.costChecker.maxMonthlyUsageLimit(
-      project.team.organizationId,
-    );
-    const currentCost = await this.deps.costChecker.getCurrentMonthCost(
-      project.team.organizationId,
-    );
-    if (currentCost >= maxMonthlyUsage) {
-      throw new CostLimitExceededError(project.team.organizationId);
-    }
-
     // Custom/workflow evaluators
     if (data.type === "custom") {
       return this.runCustomEvaluation(projectId, evaluatorType, data.data, trace, workflowId);
@@ -410,15 +404,8 @@ export class EvaluationExecutionService {
 }
 
 // ---------------------------------------------------------------------------
-// Pure helper functions (moved from evaluationsWorker)
+// Pure helper functions
 // ---------------------------------------------------------------------------
-
-function hasThreadMappings(mappingState: MappingState | null): boolean {
-  if (!mappingState) return false;
-  return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread",
-  );
-}
 
 function switchMapping(
   trace: Trace,

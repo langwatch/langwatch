@@ -1,0 +1,69 @@
+---
+title: LangChain Instrumentation
+sidebarTitle: TypeScript/JS
+description: Instrument LangChain applications with the LangWatch TypeScript SDK to trace chains, RAG flows, and agent evaluation metrics.
+icon: square-js
+keywords: langchain, instrumentation, callback, langwatch, typescript, tracing
+---
+
+<Tip>
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+</Tip>
+
+LangWatch integrates with Langchain to provide detailed observability into your chains, agents, LLM calls, and tool usage.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm i langwatch @langchain/openai @langchain/core
+```
+
+```bash pnpm
+pnpm add langwatch @langchain/openai @langchain/core
+```
+
+```bash yarn
+yarn add langwatch @langchain/openai @langchain/core
+```
+
+```bash bun
+bun add langwatch @langchain/openai @langchain/core
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use `LangWatchCallbackHandler` to capture Langchain events as spans within your trace.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+import { ChatOpenAI } from "@langchain/openai";
+import { HumanMessage } from "@langchain/core/messages";
+
+setupObservability({ serviceName: "<project_name>" });
+
+async function main(message: string): Promise<string> {
+  const chatModel = new ChatOpenAI({ model: "gpt-5" }).withConfig({
+    callbacks: [new LangWatchCallbackHandler()],
+  });
+
+  const result = await chatModel.invoke([new HumanMessage(message)]);
+  return result.content as string;
+}
+
+console.log(await main("Hey, tell me a joke"));
+```
+
+The `LangWatchCallbackHandler` captures Langchain events and converts them into detailed LangWatch spans. Pass the callback handler to your Langchain components via the `callbacks` option in `withConfig()`.
+
+## Related
+
+- [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools
+- [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your LangChain applications

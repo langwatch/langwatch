@@ -1,0 +1,146 @@
+---
+title: Docker Compose
+description: "Get LangWatch running locally in minutes with Docker Compose"
+---
+
+<Warning>
+The Docker Compose setup is being updated for LangWatch v3 with ClickHouse. The current compose file uses OpenSearch (v2). For production and v3, use the [Kubernetes Helm chart](/self-hosting/deployment/kubernetes-helm).
+</Warning>
+
+Docker Compose is the quickest way to try LangWatch locally. It runs the full stack in containers on your machine.
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose v2
+- 4 CPU cores, 16 GB RAM, 50 GB disk
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/langwatch/langwatch.git
+cd langwatch
+
+# Copy the example environment file
+cp langwatch/.env.example langwatch/.env
+
+# Start all services
+docker compose up
+```
+
+LangWatch is available at **http://localhost:5560**.
+
+<Tip>
+Why port 5560? On a T9 keyboard, 5560 spells "LLM".
+</Tip>
+
+## Services
+
+Docker Compose starts the following services:
+
+| Service | Image | Port | Description |
+|---------|-------|------|-------------|
+| `app` | `langwatch/langwatch:latest` | 5560 | Main application |
+| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
+| `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
+| `postgres` | `postgres:16` | 5432 | Control plane database |
+| `redis` | `redis:alpine` | 6379 | Job queue, caching |
+| `opensearch` | `langwatch/opensearch-lite:latest` | 9200 | Trace storage |
+
+## Configuration
+
+Edit `langwatch/.env` to customize your deployment. Key variables:
+
+```bash
+# Required: generate a secret for each
+API_TOKEN_JWT_SECRET=your-jwt-secret
+CREDENTIALS_SECRET=your-encryption-key
+NEXTAUTH_SECRET=your-session-secret
+```
+
+See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+
+## Common Operations
+
+### Start in the background
+
+```bash
+docker compose up -d
+```
+
+### View logs
+
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f app
+```
+
+### Stop services
+
+```bash
+docker compose down
+```
+
+### Update to latest version
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### Reset data
+
+```bash
+docker compose down -v  # Removes volumes (all data)
+docker compose up
+```
+
+## Customization
+
+### Disable optional services
+
+If you don't need NLP or evaluators, comment them out in `compose.yml`:
+
+```yaml
+services:
+  # langwatch_nlp:
+  #   ...
+  # langevals:
+  #   ...
+```
+
+Remove the corresponding upstream URLs from the app environment to avoid connection errors.
+
+### Connect to external databases
+
+Replace the `postgres` and `redis` services with connection strings to your existing instances:
+
+```yaml
+services:
+  app:
+    environment:
+      DATABASE_URL: postgresql://user:password@your-postgres:5432/langwatch
+      REDIS_URL: redis://:password@your-redis:6379
+    depends_on: []  # Remove postgres and redis dependencies
+```
+
+## Limitations
+
+Docker Compose is suitable for evaluation and small teams but lacks:
+
+- **High availability** — single instance of each service
+- **Horizontal scaling** — cannot scale workers independently
+- **ClickHouse** — uses OpenSearch for trace storage (v3 Helm chart uses ClickHouse)
+- **Automated backups** — no built-in backup scheduling
+- **TLS** — no built-in HTTPS (use a reverse proxy like nginx or Caddy)
+
+For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/kubernetes-helm).
+
+## Next Steps
+
+- [Docker Images](/self-hosting/deployment/docker-images) — Learn about each container image
+- [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) — Production deployment
+- [Environment Variables](/self-hosting/configuration/environment-variables) — Full configuration reference

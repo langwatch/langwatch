@@ -6,6 +6,7 @@ import { Edit, Italic, Search } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
@@ -85,6 +86,7 @@ export const MessageHoverActions = ({
   trace: Trace;
 } & ReturnType<typeof useTranslationState>) => {
   const { project } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const translateAPI = api.translate.translate.useMutation();
 
   const translate = () => {
@@ -131,24 +133,26 @@ export const MessageHoverActions = ({
       right={-5}
       transform="translateY(-50%)"
     >
-      <ActionButton
-        tooltipContent="View Trace"
-        onClick={() => {
-          if (!trace) return;
-          if (drawerOpen("traceDetails")) {
-            openTraceDetailsDrawer({
-              traceId: trace.trace_id,
-              selectedTab: "traceDetails",
-            });
-          } else {
-            openTraceDetailsDrawer({
-              traceId: trace.trace_id,
-            });
-          }
-        }}
-      >
-        <Bug size={"20px"} />
-      </ActionButton>
+      {!isLiteMember && (
+        <ActionButton
+          tooltipContent="View Trace"
+          onClick={() => {
+            if (!trace) return;
+            if (drawerOpen("traceDetails")) {
+              openTraceDetailsDrawer({
+                traceId: trace.trace_id,
+                selectedTab: "traceDetails",
+              });
+            } else {
+              openTraceDetailsDrawer({
+                traceId: trace.trace_id,
+              });
+            }
+          }}
+        >
+          <Bug size={"20px"} />
+        </ActionButton>
+      )}
 
       <ActionButton
         tooltipContent="Translate message to English"

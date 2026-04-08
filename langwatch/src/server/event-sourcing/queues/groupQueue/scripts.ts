@@ -17,19 +17,29 @@ local dispatchAfter  = tonumber(ARGV[3])
 local dedupId        = ARGV[4]
 local dedupTtlMs     = tonumber(ARGV[5])
 local jobDataJson    = ARGV[6]
+local shouldExtend   = tonumber(ARGV[7])
+local shouldReplace  = tonumber(ARGV[8])
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   local existingJobId = redis.call("GET", dedupKey)
   if existingJobId then
-    redis.call("ZREM", groupJobsKey, existingJobId)
-    redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-    redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
-    redis.call("HDEL", dataKey, existingJobId)
-    redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-    redis.call("ZADD", readyKey, 1, groupId)
-    redis.call("LPUSH", signalKey, "1")
-    redis.call("LTRIM", signalKey, 0, 999)
-    return 0
+    local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
+    if rank then
+      -- Still in staging: squash in place
+      if shouldExtend == 1 then
+        redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
+      end
+      if shouldReplace == 1 then
+        redis.call("HSET", dataKey, existingJobId, jobDataJson)
+      end
+      redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
+      redis.call("ZADD", readyKey, 1, groupId)
+      redis.call("LPUSH", signalKey, "1")
+      redis.call("LTRIM", signalKey, 0, 999)
+      return 0
+    end
+    -- Already dispatched: dedup key is stale, clean it up
+    redis.call("DEL", dedupKey)
   end
 end
 
@@ -59,13 +69,15 @@ local newStagedCount = 0
 local affectedGroups = {}
 
 for i = 1, count do
-  local offset = 2 + (i - 1) * 6
+  local offset = 2 + (i - 1) * 8
   local stagedJobId   = ARGV[offset + 1]
   local groupId       = ARGV[offset + 2]
   local dispatchAfter = tonumber(ARGV[offset + 3])
   local dedupId       = ARGV[offset + 4]
   local dedupTtlMs    = tonumber(ARGV[offset + 5])
   local jobDataJson   = ARGV[offset + 6]
+  local shouldExtend  = tonumber(ARGV[offset + 7])
+  local shouldReplace = tonumber(ARGV[offset + 8])
 
   local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
   local dataKey      = keyPrefix .. "group:" .. groupId .. ":data"
@@ -75,12 +87,21 @@ for i = 1, count do
   if dedupId ~= "" and dedupTtlMs > 0 then
     local existingJobId = redis.call("GET", dedupKey)
     if existingJobId then
-      redis.call("ZREM", groupJobsKey, existingJobId)
-      redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-      redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
-      redis.call("HDEL", dataKey, existingJobId)
-      redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-      isDeduped = true
+      local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
+      if rank then
+        -- Still in staging: squash in place
+        if shouldExtend == 1 then
+          redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
+        end
+        if shouldReplace == 1 then
+          redis.call("HSET", dataKey, existingJobId, jobDataJson)
+        end
+        redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
+        isDeduped = true
+      else
+        -- Already dispatched: dedup key is stale, clean it up
+        redis.call("DEL", dedupKey)
+      end
     end
   end
 
@@ -452,6 +473,8 @@ export class GroupStagingScripts {
     dedupId,
     dedupTtlMs,
     jobDataJson,
+    shouldExtend = true,
+    shouldReplace = true,
   }: {
     stagedJobId: string;
     groupId: string;
@@ -459,6 +482,8 @@ export class GroupStagingScripts {
     dedupId: string;
     dedupTtlMs: number;
     jobDataJson: string;
+    shouldExtend?: boolean;
+    shouldReplace?: boolean;
   }): Promise<boolean> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
@@ -482,6 +507,8 @@ export class GroupStagingScripts {
       dedupId,
       String(dedupTtlMs),
       jobDataJson,
+      String(shouldExtend ? 1 : 0),
+      String(shouldReplace ? 1 : 0),
     );
 
     return result === 1;
@@ -500,6 +527,8 @@ export class GroupStagingScripts {
       dedupId: string;
       dedupTtlMs: number;
       jobDataJson: string;
+      shouldExtend?: boolean;
+      shouldReplace?: boolean;
     }>,
   ): Promise<number> {
     if (jobs.length === 0) return 0;
@@ -516,6 +545,8 @@ export class GroupStagingScripts {
         job.dedupId,
         String(job.dedupTtlMs),
         job.jobDataJson,
+        String((job.shouldExtend ?? true) ? 1 : 0),
+        String((job.shouldReplace ?? true) ? 1 : 0),
       );
     }
 

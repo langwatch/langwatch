@@ -1,0 +1,309 @@
+---
+title: Metadata and Labels
+sidebarTitle: Metadata & Labels
+description: Add custom metadata, user IDs, conversation threads, and labels to your traces for filtering, analytics, and debugging.
+icon: tags
+keywords: metadata, labels, tags, user_id, thread_id, conversation_id, custom metadata, trace metadata, langwatch
+---
+
+Metadata enriches your traces with contextual information — who made the request, which conversation it belongs to, and any custom data relevant to your application. Labels help you categorize and filter traces in the dashboard.
+
+This guide provides a unified reference for sending metadata across all integration methods. For SDK-specific details, see the tutorials linked below.
+
+## Quick Reference
+
+| Concept | OTEL Attribute | REST API | Description |
+|---------|---------------|----------|-------------|
+| **Thread/Conversation** | `gen_ai.conversation.id` | `metadata.thread_id` | Groups messages in a conversation |
+| **User ID** | `langwatch.user.id` | `metadata.user_id` | Identifies the end user |
+| **Customer ID** | `langwatch.customer.id` | `metadata.customer_id` | Your platform's customer/tenant |
+| **Labels** | `langwatch.labels` | `metadata.labels` | Categorization tags |
+| **Custom Metadata** | `metadata` attribute | `metadata.*` | Any additional context |
+
+<Note>
+  For OTEL, `gen_ai.conversation.id` follows the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). The legacy `langwatch.thread.id` attribute is also supported.
+</Note>
+
+## SDK Examples
+
+For detailed SDK-specific tutorials, see:
+- **TypeScript:** [Capturing Metadata](/integration/typescript/tutorials/capturing-metadata) · [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations) · [Full example](https://github.com/langwatch/langwatch/tree/main/typescript-sdk/examples/metadata)
+- **Python:** [Capturing Metadata](/integration/python/tutorials/capturing-metadata) · [Tracking Conversations](/integration/python/tutorials/tracking-conversations) · [Full example](https://github.com/langwatch/langwatch/blob/main/python-sdk/examples/metadata_example.py)
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+setupObservability();
+const tracer = getLangWatchTracer("my-service");
+
+async function handleUserMessage(userId: string, conversationId: string) {
+  return await tracer.withActiveSpan("HandleMessage", async (span) => {
+    // Thread/conversation ID (OTEL semconv)
+    span.setAttribute("gen_ai.conversation.id", conversationId);
+
+    // User and customer identification
+    span.setAttribute("langwatch.user.id", userId);
+    span.setAttribute("langwatch.customer.id", "tenant-123");
+
+    // Labels for filtering (JSON array)
+    span.setAttribute("langwatch.labels", JSON.stringify(["production", "premium-user"]));
+
+    // Custom metadata (JSON object)
+    span.setAttribute("metadata", JSON.stringify({
+      feature_flags: ["new-ui", "beta-model"],
+      request_source: "mobile-ios"
+    }));
+
+    // Your application logic...
+  });
+}
+```
+
+```python Python SDK
+import langwatch
+
+@langwatch.trace()
+def handle_request(user_id: str, thread_id: str):
+    langwatch.get_current_trace().update(
+        metadata={
+            "user_id": user_id,
+            "thread_id": thread_id,
+            "labels": ["production", "premium"],
+            "custom_field": "any value"
+        }
+    )
+
+    # Your logic here...
+```
+</CodeGroup>
+
+## Raw OpenTelemetry
+
+If you're using vanilla OpenTelemetry without the LangWatch SDK:
+
+<CodeGroup>
+```typescript TypeScript
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("my-service");
+
+tracer.startActiveSpan("operation", (span) => {
+  // OTEL semconv for conversation/thread
+  span.setAttribute("gen_ai.conversation.id", "conv-456");
+
+  // LangWatch-specific attributes
+  span.setAttribute("langwatch.user.id", "user-123");
+  span.setAttribute("langwatch.customer.id", "customer-789");
+  span.setAttribute("langwatch.labels", JSON.stringify(["urgent", "support"]));
+
+  // Custom metadata as JSON string
+  span.setAttribute("metadata", JSON.stringify({
+    priority: "high",
+    department: "engineering"
+  }));
+
+  // ... your code ...
+  span.end();
+});
+```
+
+```python Python
+import json
+from opentelemetry import trace
+
+tracer = trace.get_tracer("my-service")
+
+with tracer.start_as_current_span("operation") as span:
+    # OTEL semconv for conversation/thread
+    span.set_attribute("gen_ai.conversation.id", "conv-456")
+
+    # LangWatch-specific attributes
+    span.set_attribute("langwatch.user.id", "user-123")
+    span.set_attribute("langwatch.customer.id", "customer-789")
+    span.set_attribute("langwatch.labels", '["urgent", "support"]')
+
+    # Custom metadata as JSON string
+    span.set_attribute("metadata", json.dumps({
+        "priority": "high",
+        "department": "engineering"
+    }))
+
+    # ... your code ...
+```
+</CodeGroup>
+
+**Exporter configuration:**
+
+<CodeGroup>
+```typescript TypeScript
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+
+const exporter = new OTLPTraceExporter({
+  url: "https://app.langwatch.ai/api/otel/v1/traces",
+  headers: {
+    Authorization: `Bearer ${process.env.LANGWATCH_API_KEY}`,
+  },
+});
+```
+
+```python Python
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+exporter = OTLPSpanExporter(
+    endpoint="https://app.langwatch.ai/api/otel/v1/traces",
+    headers={"Authorization": f"Bearer {os.environ['LANGWATCH_API_KEY']}"},
+)
+```
+</CodeGroup>
+
+<Warning>
+  The OTEL endpoint is `/api/otel/v1/traces` (not `/v1/traces`).
+</Warning>
+
+## REST API
+
+Send traces directly via HTTP. See [REST API](/integration/rest-api) for full details.
+
+<CodeGroup>
+```bash cURL
+curl -X POST "https://app.langwatch.ai/api/collector" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trace_id": "trace-123",
+    "spans": [
+      {
+        "type": "llm",
+        "span_id": "span-456",
+        "name": "chat-completion",
+        "model": "gpt-4",
+        "input": {"type": "text", "value": "Hello"},
+        "output": {"type": "text", "value": "Hi there!"},
+        "timestamps": {
+          "started_at": 1699900000000,
+          "finished_at": 1699900001000
+        }
+      }
+    ],
+    "metadata": {
+      "user_id": "user-123",
+      "thread_id": "conversation-456",
+      "customer_id": "customer-789",
+      "labels": ["production", "premium"],
+      "any_custom_field": "any value"
+    }
+  }'
+```
+
+```python Python
+import os
+import requests
+
+requests.post(
+    "https://app.langwatch.ai/api/collector",
+    headers={
+        "X-Auth-Token": os.environ["LANGWATCH_API_KEY"],
+        "Content-Type": "application/json",
+    },
+    json={
+        "trace_id": "trace-123",
+        "spans": [
+            {
+                "type": "llm",
+                "span_id": "span-456",
+                "name": "chat-completion",
+                "model": "gpt-4",
+                "input": {"type": "text", "value": "Hello"},
+                "output": {"type": "text", "value": "Hi there!"},
+                "timestamps": {
+                    "started_at": 1699900000000,
+                    "finished_at": 1699900001000,
+                },
+            }
+        ],
+        "metadata": {
+            "user_id": "user-123",
+            "thread_id": "conversation-456",
+            "customer_id": "customer-789",
+            "labels": ["production", "premium"],
+            "any_custom_field": "any value",
+        },
+    },
+)
+```
+
+```typescript TypeScript
+const response = await fetch("https://app.langwatch.ai/api/collector", {
+  method: "POST",
+  headers: {
+    "X-Auth-Token": process.env.LANGWATCH_API_KEY!,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    trace_id: "trace-123",
+    spans: [
+      {
+        type: "llm",
+        span_id: "span-456",
+        name: "chat-completion",
+        model: "gpt-4",
+        input: { type: "text", value: "Hello" },
+        output: { type: "text", value: "Hi there!" },
+        timestamps: {
+          started_at: 1699900000000,
+          finished_at: 1699900001000,
+        },
+      },
+    ],
+    metadata: {
+      user_id: "user-123",
+      thread_id: "conversation-456",
+      customer_id: "customer-789",
+      labels: ["production", "premium"],
+      any_custom_field: "any value",
+    },
+  }),
+});
+```
+</CodeGroup>
+
+### Reserved vs Custom Fields
+
+In the REST API `metadata` object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | string | End user identifier |
+| `thread_id` | string | Conversation/session ID |
+| `customer_id` | string | Your tenant/customer ID |
+| `labels` | string[] | Categorization tags |
+| *other keys* | any | Stored as custom metadata |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always set user_id" icon="user">
+    Required for user-level analytics and filtering by specific users.
+  </Card>
+  <Card title="Use thread_id for conversations" icon="messages">
+    Groups related messages together. Essential for chatbots and multi-turn interactions.
+  </Card>
+  <Card title="Labels for categorization" icon="tags">
+    Use consistent labels like `production`, `staging`, `support` for filtering.
+  </Card>
+  <Card title="Custom metadata for context" icon="database">
+    Add any relevant context: feature flags, A/B variants, request sources.
+  </Card>
+</CardGroup>
+
+## What You Get
+
+Once traces include metadata:
+
+- **Filter by user** — Find all traces for a specific user
+- **View conversations** — See all messages in a thread grouped together
+- **Filter by labels** — Quickly filter to specific categories
+- **Search custom fields** — Find traces by any custom metadata value
+- **User analytics** — View per-user metrics and patterns

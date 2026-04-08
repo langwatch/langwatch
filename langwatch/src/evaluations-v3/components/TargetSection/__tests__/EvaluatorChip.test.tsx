@@ -12,6 +12,7 @@ import { EvaluatorChip } from "../EvaluatorChip";
 // Mock name hooks to avoid tRPC queries
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
+  useEvaluatorNames: () => new Map(),
 }));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

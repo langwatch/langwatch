@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import type { OrganizationRepository } from "../repositories/organization.repository";
 import { OrganizationService } from "../organization.service";
+import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 
 // Bypass the traced() proxy for unit tests
 vi.mock("../../tracing", () => ({
@@ -20,21 +23,28 @@ describe("OrganizationService", () => {
     getPricingModel: vi.fn(),
     getStripeCustomerId: vi.fn(),
     findNameById: vi.fn(),
+    getOrganizationForBilling: vi.fn(),
+    createAndAssign: vi.fn(),
+    getAllForUser: vi.fn(),
+    getOrganizationWithMembers: vi.fn(),
+    getMemberById: vi.fn(),
+    getAllMembers: vi.fn(),
+    update: vi.fn(),
+    deleteMember: vi.fn(),
+    updateMemberRole: vi.fn(),
+    updateTeamMemberRole: vi.fn(),
+    getAuditLogs: vi.fn(),
   };
+
+  const mockPromptTagRepo = {
+    seedForOrg: vi.fn(),
+  } as unknown as PromptTagRepository;
 
   let service: OrganizationService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Use the factory with null to get a NullOrganizationRepository,
-    // then override with our mock via prototype hack — or better,
-    // just test the service logic by constructing via reflection.
-    // Since constructor is private, we test through the static create
-    // and rely on the repo interface contract.
-
-    // For unit testing, we access the private constructor via a test helper:
-    service = Object.create(OrganizationService.prototype);
-    Object.assign(service, { repo: mockRepo });
+    service = new OrganizationService(mockRepo, mockPromptTagRepo);
   });
 
   describe("getOrganizationIdByTeamId", () => {
@@ -148,6 +158,129 @@ describe("OrganizationService", () => {
         );
 
         expect(result).toBe(false);
+      });
+    });
+  });
+
+  describe("updateMemberRole", () => {
+    const baseParams = {
+      organizationId: "org-123",
+      userId: "user-456",
+      role: OrganizationUserRole.MEMBER,
+      currentMemberships: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
+      organizationTeamIds: ["team-1", "team-2"],
+      currentUserId: "admin-789",
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockRepo.updateMemberRole).mockResolvedValue(undefined);
+    });
+
+    describe("when a team role update targets a different user", () => {
+      it("throws BAD_REQUEST", async () => {
+        await expect(
+          service.updateMemberRole({
+            ...baseParams,
+            teamRoleUpdates: [
+              { teamId: "team-1", userId: "wrong-user", role: TeamUserRole.MEMBER },
+            ],
+          }),
+        ).rejects.toThrow(TRPCError);
+
+        await expect(
+          service.updateMemberRole({
+            ...baseParams,
+            teamRoleUpdates: [
+              { teamId: "team-1", userId: "wrong-user", role: TeamUserRole.MEMBER },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+    });
+
+    describe("when a team role update references a team outside the organization", () => {
+      it("throws BAD_REQUEST", async () => {
+        await expect(
+          service.updateMemberRole({
+            ...baseParams,
+            teamRoleUpdates: [
+              { teamId: "team-outside", userId: "user-456", role: TeamUserRole.MEMBER },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+    });
+
+    describe("when inputs are valid", () => {
+      it("delegates to the repository with effective team role updates", async () => {
+        await service.updateMemberRole({
+          ...baseParams,
+          teamRoleUpdates: [
+            { teamId: "team-1", userId: "user-456", role: TeamUserRole.ADMIN },
+          ],
+        });
+
+        expect(mockRepo.updateMemberRole).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-123",
+            userId: "user-456",
+            role: OrganizationUserRole.MEMBER,
+            effectiveTeamRoleUpdates: expect.arrayContaining([
+              expect.objectContaining({ teamId: "team-1", role: TeamUserRole.ADMIN }),
+            ]),
+          }),
+        );
+      });
+    });
+  });
+
+  describe("updateTeamMemberRole", () => {
+    beforeEach(() => {
+      vi.mocked(mockRepo.updateTeamMemberRole).mockResolvedValue(undefined);
+    });
+
+    describe("when role is a custom role and customRoleId is missing", () => {
+      it("throws BAD_REQUEST", async () => {
+        await expect(
+          service.updateTeamMemberRole({
+            teamId: "team-1",
+            userId: "user-456",
+            role: "custom:some-role",
+            customRoleId: undefined,
+            currentUserId: "admin-789",
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+    });
+
+    describe("when role is a custom role and customRoleId is provided", () => {
+      it("delegates to the repository with customRoleId", async () => {
+        await service.updateTeamMemberRole({
+          teamId: "team-1",
+          userId: "user-456",
+          role: "custom:some-role",
+          customRoleId: "role-abc",
+          currentUserId: "admin-789",
+        });
+
+        expect(mockRepo.updateTeamMemberRole).toHaveBeenCalledWith(
+          expect.objectContaining({ customRoleId: "role-abc" }),
+        );
+      });
+    });
+
+    describe("when role is a built-in role", () => {
+      it("delegates to the repository without customRoleId", async () => {
+        await service.updateTeamMemberRole({
+          teamId: "team-1",
+          userId: "user-456",
+          role: TeamUserRole.ADMIN,
+          currentUserId: "admin-789",
+        });
+
+        expect(mockRepo.updateTeamMemberRole).toHaveBeenCalledWith(
+          expect.objectContaining({ customRoleId: undefined }),
+        );
       });
     });
   });

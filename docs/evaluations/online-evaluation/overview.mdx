@@ -1,0 +1,193 @@
+---
+title: Online Evaluation Overview
+sidebarTitle: Overview
+description: Continuously score and monitor your LLM's production traffic for quality and safety with online evaluation.
+---
+
+<Tip>
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+</Tip>
+
+Online evaluation lets you continuously score your LLM's production traffic. Unlike [experiments](/evaluations/experiments/overview) which test before deployment, online evaluation monitors your live application to catch quality issues, detect regressions, and ensure safety.
+
+<Info>
+In the LangWatch platform, online evaluation is implemented through **Monitors** - automated rules that score incoming traces based on evaluators you configure.
+</Info>
+
+## How It Works
+
+```
+User Request → Your LLM → Response → LangWatch Trace → Monitor → Score
+                                                          ↓
+                                              Dashboard & Alerts
+```
+
+1. Your application sends traces to LangWatch (via SDK integration)
+2. Monitors evaluate incoming traces using your configured evaluators
+3. Scores are recorded and displayed on dashboards
+4. Optionally trigger alerts when scores drop below thresholds
+
+## When to Use Online Evaluation
+
+| Use Case | Example |
+|----------|---------|
+| **Quality monitoring** | Track faithfulness, relevance, or custom quality metrics over time |
+| **Safety monitoring** | Detect PII leakage, jailbreak attempts, or policy violations |
+| **Regression detection** | Get alerts when quality metrics drop after deployments |
+| **Dataset building** | Automatically add low-scoring traces to datasets for improvement |
+
+## Monitors vs Guardrails
+
+Both use evaluators, but serve different purposes:
+
+| Monitors | Guardrails |
+|----------|------------|
+| **Measure** quality asynchronously | **Block** harmful content in real-time |
+| Run after the response is sent | Run before/during response generation |
+| Feed dashboards and alerts | Return errors or safe responses to users |
+| For observability | For enforcement |
+
+If you need to block harmful content before it reaches users, see [Guardrails](/evaluations/guardrails/overview).
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card
+    title="Set Up Monitors"
+    description="Configure monitors in the LangWatch platform to score your production traces."
+    icon="gauge"
+    href="/evaluations/online-evaluation/setup-monitors"
+  />
+  <Card
+    title="Evaluation by Thread"
+    description="Evaluate entire conversation threads instead of individual messages."
+    icon="messages"
+    href="/evaluations/online-evaluation/by-thread"
+  />
+</CardGroup>
+
+## Quick Setup
+
+### 1. Ensure traces are being sent
+
+First, make sure your application is sending traces to LangWatch:
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+@langwatch.trace()
+def my_llm_app(user_input):
+    # Your LLM logic here
+    return response
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+const trace = langwatch.getTrace();
+
+// Your LLM logic here
+trace.end();
+```
+  </Tab>
+</Tabs>
+
+### 2. Create a Monitor
+
+1. Go to [Evaluations](https://app.langwatch.ai/@project/evaluations) in LangWatch
+2. Click **New Evaluation**
+3. Select **Real-time evaluation** (this creates a Monitor)
+4. Choose "When a message arrives" as the trigger
+5. Select evaluators (e.g., PII Detection, Faithfulness)
+6. Configure any filters (optional)
+7. Enable monitoring
+
+### 3. View Results
+
+Once enabled, scores will appear on:
+- **Traces** - Individual trace scores visible in trace details
+- **Analytics** - Aggregate metrics over time
+- **Alerts** - Configure automations for low scores
+
+## Adding Scores via Code
+
+You can also add scores programmatically during request processing:
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+@langwatch.trace()
+def my_llm_app(user_input):
+    response = generate_response(user_input)
+    
+    # Add a custom score
+    langwatch.get_current_span().add_evaluation(
+        name="response_quality",
+        passed=True,
+        score=0.95,
+        details="High quality response"
+    )
+    
+    return response
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const trace = langwatch.getTrace();
+
+// After generating response
+trace.addEvaluation({
+  name: "response_quality",
+  passed: true,
+  score: 0.95,
+  details: "High quality response"
+});
+```
+  </Tab>
+</Tabs>
+
+## Available Evaluators
+
+Monitors can use any evaluator from the LangWatch library:
+
+- **Quality**: Faithfulness, Answer Relevancy, Coherence
+- **Safety**: PII Detection, Jailbreak Detection, Content Moderation
+- **RAG**: Context Precision, Context Recall, Groundedness
+- **Custom**: LLM-as-Judge with your own criteria
+
+See the full [Evaluators List](/evaluations/evaluators/list).
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Set Up Monitors"
+    description="Step-by-step guide to configuring monitors."
+    icon="play"
+    href="/evaluations/online-evaluation/setup-monitors"
+  />
+  <Card
+    title="Automations & Alerts"
+    description="Get notified when quality drops."
+    icon="bell"
+    href="/features/automations"
+  />
+  <Card
+    title="Guardrails"
+    description="Block harmful content in real-time."
+    icon="shield"
+    href="/evaluations/guardrails/overview"
+  />
+  <Card
+    title="Evaluators"
+    description="Browse available evaluators."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+</CardGroup>

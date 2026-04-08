@@ -1,9 +1,11 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import { CompleteSuiteRunItemCommand } from "./commands/completeSuiteRunItem.command";
-import { RecordSuiteRunItemStartedCommand } from "./commands/recordSuiteRunItemStarted.command";
-import { StartSuiteRunCommand } from "./commands/startSuiteRun.command";
-import { createSuiteRunStateFoldProjection, type SuiteRunStateData } from "./projections/suiteRunState.foldProjection";
+import {
+  StartSuiteRunCommand,
+  RecordSuiteRunItemStartedCommand,
+  CompleteSuiteRunItemCommand,
+} from "./commands";
+import { SuiteRunStateFoldProjection, type SuiteRunStateData } from "./projections/suiteRunState.foldProjection";
 import type { SuiteRunProcessingEvent } from "./schemas/events";
 
 export interface SuiteRunProcessingPipelineDeps {
@@ -32,7 +34,7 @@ export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelin
   return definePipeline<SuiteRunProcessingEvent>()
     .withName("suite_run_processing")
     .withAggregateType("suite_run")
-    .withFoldProjection("suiteRunState", createSuiteRunStateFoldProjection({
+    .withFoldProjection("suiteRunState", new SuiteRunStateFoldProjection({
       store: deps.suiteRunStateFoldStore,
     }))
     .withCommand("startSuiteRun", StartSuiteRunCommand)

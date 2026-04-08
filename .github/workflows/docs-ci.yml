@@ -1,0 +1,80 @@
+name: docs-ci
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "skills/**"
+      - ".github/workflows/docs-ci.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "skills/**"
+      - ".github/workflows/docs-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check_links:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for broken links
+        run: |
+          output=$(npx mintlify broken-links)
+          echo "$output"
+          if echo "$output" | grep -qi "found.*broken links in"; then
+            echo "Broken links detected!"
+            exit 1
+          else
+            echo "No broken links found"
+          fi
+
+  check_generated_files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: langwatch
+
+      - name: Install tsx for skills compiler
+        run: npm install -g tsx
+
+      - name: Regenerate prompts-data.jsx
+        run: bash docs/scripts/sync-prompts.sh
+
+      - name: Regenerate llms.txt
+        run: cd docs && node llms.txt.sh
+
+      - name: Check for stale generated files
+        run: |
+          if ! git diff --exit-code docs/snippets/prompts-data.jsx docs/llms.txt docs/llms-full.txt; then
+            echo ""
+            echo "ERROR: Generated files are stale. Please run:"
+            echo "  bash docs/scripts/sync-prompts.sh"
+            echo "  cd docs && node llms.txt.sh"
+            echo "Then commit the updated files."
+            exit 1
+          fi

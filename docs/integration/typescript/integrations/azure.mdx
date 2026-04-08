@@ -1,0 +1,155 @@
+---
+title: Azure OpenAI
+sidebarTitle: TypeScript/JS
+icon: square-js
+description: Use the LangWatch Azure OpenAI guide to instrument LLM calls, trace interactions, and support AI agent test workflows.
+keywords: azure openai, langwatch, typescript, javascript, sdk, instrumentation, opentelemetry
+---
+
+import TypeScriptIntro from "/snippets/typescript-intro.mdx";
+
+<TypeScriptIntro />
+
+## Integration
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Start by setting up observability and initializing the LangWatch tracer:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability first
+setupObservability();
+
+const tracer = getLangWatchTracer("my-service");
+```
+
+Then to capture your LLM calls, you can use the `withActiveSpan` method to create an LLM span with automatic lifecycle management:
+
+```typescript
+import { AzureOpenAI } from "openai";
+
+// Model to be used and messages that will be sent to the LLM
+const model = "gpt-5-mini";
+const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+  { role: "system", content: "You are a helpful assistant." },
+  {
+    role: "user",
+    content: "Write a tweet-size vegetarian lasagna recipe for 4 people.",
+  },
+];
+
+const openai = new AzureOpenAI({
+  apiKey: process.env.AZURE_OPENAI_API_KEY,
+  apiVersion: "2024-02-01",
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+});
+
+// Use withActiveSpan for automatic error handling and span cleanup
+const result = await tracer.withActiveSpan("llm-call", async (span) => {
+  // Set span type and input
+  span.setType("llm");
+  span.setInput("chat_messages", messages);
+  span.setRequestModel(model);
+
+  // Make the Azure OpenAI call
+  const chatCompletion = await openai.chat.completions.create({
+    messages: messages,
+    model: model,
+  });
+
+  // Set output and metrics
+  span.setOutput("chat_messages", [chatCompletion.choices[0]!.message]);
+  span.setMetrics({
+    promptTokens: chatCompletion.usage?.prompt_tokens,
+    completionTokens: chatCompletion.usage?.completion_tokens,
+  });
+
+  return chatCompletion;
+});
+```
+
+The `withActiveSpan` method automatically:
+- Creates the span with the specified name
+- Handles errors and sets appropriate span status
+- Ends the span when the function completes
+- Returns the result of your async function
+
+## Community Auto-Instrumentation
+
+For automatic instrumentation without manual span creation, you can use the [OpenInference instrumentation for OpenAI](https://github.com/Arize-ai/openinference/tree/main/js/packages/openinference-instrumentation-openai), which also works with Azure OpenAI:
+
+<Steps>
+<Step title="Install the OpenInference instrumentation">
+  ```bash
+  npm install @arizeai/openinference-instrumentation-openai
+  ```
+</Step>
+
+<Step title="Register the instrumentation">
+  ```typescript
+  import { NodeSDK } from "@opentelemetry/sdk-node";
+  import { OpenAIInstrumentation } from "@arizeai/openinference-instrumentation-openai";
+  import { setupObservability } from "langwatch/observability/node";
+
+  // Setup observability with the instrumentation
+  setupObservability({
+    instrumentations: [new OpenAIInstrumentation()],
+  });
+  ```
+</Step>
+
+<Step title="Use Azure OpenAI normally">
+  ```typescript
+  import { AzureOpenAI } from "openai";
+
+  const openai = new AzureOpenAI({
+    apiKey: process.env.AZURE_OPENAI_API_KEY,
+    apiVersion: "2024-02-01",
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+  });
+  
+  // This call will be automatically instrumented
+  const completion = await openai.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: "Hello!" }],
+  });
+  ```
+</Step>
+</Steps>
+
+<Info>
+The OpenInference instrumentation automatically captures:
+- Input messages and model configuration
+- Output responses and token usage
+- Error handling and status codes
+- Request/response timing
+- Azure-specific configuration (endpoint, API version)
+</Info>
+
+<Warning>
+When using auto-instrumentation, you may need to configure data capture settings to control what information is sent to LangWatch.
+</Warning>
+
+import TypeScriptSharedSpanExcepEval from "/snippets/typescript-shared-span-excep-eval.mdx";
+
+<TypeScriptSharedSpanExcepEval />
+
+## Related Documentation
+
+For more advanced Azure AI integration patterns and best practices:
+
+- **[Integration Guide](/integration/typescript/guide)** - Basic setup and core concepts
+- **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Advanced span management for Azure AI calls
+- **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - Azure-specific attributes and conventions
+- **[Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript)** - Debug Azure integration issues
+- **[Capturing Metadata](/integration/typescript/tutorials/capturing-metadata)** - Adding custom metadata to Azure AI calls
+
+<Tip>
+For production Azure AI applications, combine manual instrumentation with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent observability and better analytics.
+</Tip>
+

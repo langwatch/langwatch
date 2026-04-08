@@ -14,19 +14,7 @@ if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 
-START_QUICKWIT_COMMAND=""
-if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEARCH_NODE_URL" ] && [[ "$ELASTICSEARCH_NODE_URL" =~ ^quickwit:// ]]); then
-  START_QUICKWIT_COMMAND="pnpm run start:quickwit"
-  START_APP_COMMAND="./scripts/wait-for-quickwit.sh && pnpm run start:prepare:db && pnpm run start:app"
-  RUNTIME_ENV="$RUNTIME_ENV RUST_LOG=error"
-
-  if [ ! -d "quickwit" ]; then
-    echo "Quickwit was not found, installing it..."
-    pnpm run setup:quickwit
-  fi
-else
- pnpm run start:prepare:db
-fi
+pnpm run start:prepare:db
 
 COMMANDS=()
 NAMES=()
@@ -37,10 +25,6 @@ fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
   NAMES+=("app")
-fi
-if [ -n "$START_QUICKWIT_COMMAND" ]; then
-  COMMANDS+=("$RUNTIME_ENV $START_QUICKWIT_COMMAND")
-  NAMES+=("quickwit")
 fi
 
 # If only one command, exec directly to preserve JSON log format

@@ -35,18 +35,19 @@ describe("buildTraceSummariesConditions", () => {
     expect(result).toContain("TenantId = {tenantId:String}");
   });
 
-  it("returns CreatedAt start condition", () => {
+  it("returns OccurredAt conditions for partition pruning", () => {
     const result = buildTraceSummariesConditions(baseParams);
     expect(result).toContain(
-      "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+      "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+    );
+    expect(result).toContain(
+      "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
     );
   });
 
-  it("returns CreatedAt end condition", () => {
+  it("does not filter on CreatedAt (OccurredAt is the user-facing timestamp)", () => {
     const result = buildTraceSummariesConditions(baseParams);
-    expect(result).toContain(
-      "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
-    );
+    expect(result).not.toContain("CreatedAt");
   });
 
   it("joins conditions with AND", () => {

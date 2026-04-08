@@ -8,21 +8,23 @@ import {
 } from "@chakra-ui/react";
 import type { Monaco } from "@monaco-editor/react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
 import { useCallback, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useFilterParams } from "~/hooks/useFilterParams";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
 import {
   type FilterField,
-  triggerFiltersSchema,
+  sanitizeTriggerFilters,
+  triggerFiltersPermissiveSchema,
+  type TriggerFilters,
+  type TriggerFilterValue,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
-import { QueryStringFieldsFilters } from "./filters/FieldsFilters";
+import { FieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
@@ -34,12 +36,55 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ),
 });
 
+function hasNonEmptyFilterParam(value: FilterParam): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  return Object.values(value).some((nested) =>
+    Array.isArray(nested)
+      ? nested.length > 0
+      : Object.values(nested as Record<string, string[]>).some(
+          (items) => items.length > 0,
+        ),
+  );
+}
+
+type ParsedCodeFilters =
+  | {
+      success: true;
+      rawFilters: Record<string, TriggerFilterValue>;
+      sanitized: TriggerFilters;
+      unknownFields: string[];
+    }
+  | { success: false; message: string };
+
+function parseCodeFilters(value: string): ParsedCodeFilters {
+  try {
+    const parsed = JSON.parse(value);
+    const result = triggerFiltersPermissiveSchema.safeParse(parsed);
+
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.error.errors[0]?.message ?? "Invalid filter structure",
+      };
+    }
+
+    const { sanitized, unknownFields } = sanitizeTriggerFilters(result.data);
+
+    return {
+      success: true,
+      rawFilters: result.data,
+      sanitized,
+      unknownFields,
+    };
+  } catch {
+    return { success: false, message: "Invalid JSON syntax" };
+  }
+}
+
 export function EditAutomationFilterDrawer({ automationId }: { automationId?: string }) {
   const { project } = useOrganizationTeamProject();
 
   const updateTriggerFilters = api.automation.updateTriggerFilters.useMutation();
-  const { getLatestFilters, clearFilters, setFilters } = useFilterParams();
-  const router = useRouter();
 
   const queryClient = api.useContext();
   const { closeDrawer } = useDrawer();
@@ -52,6 +97,15 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
   // Keep ref in sync for submit
   codeValueRef.current = codeValue;
 
+  // Local filter state — avoids router.push during drawer animation
+  const [localFilters, setLocalFilters] = useState<
+    Partial<Record<FilterField, FilterParam>>
+  >({});
+
+  // Guard against refetches overwriting unsaved user edits (TanStack Query v4
+  // fires onSuccess on every successful fetch, including background refetches)
+  const hydratedForRef = useRef<string | undefined>(undefined);
+
   api.automation.getTriggerById.useQuery(
     {
       triggerId: automationId ?? "",
@@ -60,11 +114,17 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
     {
       enabled: !!automationId && !!project?.id,
       onSuccess: (data) => {
+        const drawerKey = `${project?.id}:${automationId}`;
+        if (hydratedForRef.current === drawerKey) return;
+
         const filters = JSON.parse(data?.filters as string) as Record<
           string,
-          string[] | Record<string, string[]>
+          FilterParam
         >;
-        const filtersToSet = Object.entries(filters).reduce(
+        const { sanitized } = sanitizeTriggerFilters(
+          filters as Record<string, TriggerFilterValue>,
+        );
+        const filtersToSet = Object.entries(sanitized).reduce(
           (acc, [key, value]) => {
             if (Array.isArray(value)) {
               if (value.length > 0) {
@@ -75,27 +135,28 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
             }
             return acc;
           },
-          {} as Record<FilterField, string[] | Record<string, string[]>>,
+          {} as Partial<Record<FilterField, FilterParam>>,
         );
 
-        setFilters(filtersToSet);
+        setLocalFilters(filtersToSet);
         setCodeValue(JSON.stringify(filters, null, 2));
+        hydratedForRef.current = drawerKey;
       },
     },
   );
 
-  const syncVisualToCode = useCallback(() => {
-    const filterParams = getLatestFilters();
-    const nonEmptyFilters = Object.fromEntries(
-      Object.entries(filterParams.filters).filter(([_, value]) =>
-        Array.isArray(value)
-          ? value.length > 0
-          : Object.keys(value as Record<string, string[]>).length > 0,
+  const getNonEmptyFilters = useCallback(() => {
+    return Object.fromEntries(
+      Object.entries(localFilters).filter(
+        ([_, value]) => value !== undefined && hasNonEmptyFilterParam(value),
       ),
     );
-    setCodeValue(JSON.stringify(nonEmptyFilters, null, 2));
+  }, [localFilters]);
+
+  const syncVisualToCode = useCallback(() => {
+    setCodeValue(JSON.stringify(getNonEmptyFilters(), null, 2));
     setCodeError(null);
-  }, [getLatestFilters]);
+  }, [getNonEmptyFilters]);
 
   // Handle switching between modes
   const handleModeToggle = (checked: boolean) => {
@@ -104,55 +165,75 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
       syncVisualToCode();
     } else if (!checked && isCodeMode) {
       // Switching FROM code mode to visual mode - validate and apply
-      try {
-        const parsed = JSON.parse(codeValueRef.current);
-        const result = triggerFiltersSchema.safeParse(parsed);
-        if (!result.success) {
-          toaster.create({
-            title: "Invalid filter structure",
-            description: result.error.errors[0]?.message ?? "Invalid JSON structure",
-            type: "error",
-            meta: { closable: true },
-          });
-          return;
-        }
-        setFilters(parsed);
-        setCodeError(null);
-      } catch {
+      const parsed = parseCodeFilters(codeValueRef.current);
+      if (!parsed.success) {
         toaster.create({
-          title: "Invalid JSON",
-          description: "Please fix the JSON syntax before switching modes",
+          title: "Invalid filter structure",
+          description: parsed.message,
           type: "error",
           meta: { closable: true },
         });
         return;
       }
+
+      if (
+        Object.keys(parsed.rawFilters).length > 0 &&
+        Object.keys(parsed.sanitized).length === 0
+      ) {
+        toaster.create({
+          title: "Unsupported filters only",
+          description:
+            "This automation only contains unsupported legacy filters. Add a supported filter before switching to visual mode.",
+          type: "error",
+          meta: { closable: true },
+        });
+        return;
+      }
+
+      if (parsed.unknownFields.length > 0) {
+        toaster.create({
+          title: "Unsupported filters hidden in visual mode",
+          description: `Visual mode does not support: ${parsed.unknownFields.join(", ")}`,
+          type: "warning",
+          meta: { closable: true },
+        });
+      }
+
+      setLocalFilters(parsed.sanitized);
+      setCodeError(null);
     }
     setIsCodeMode(checked);
   };
 
-  const validateCode = (value: string): boolean => {
-    try {
-      const parsed = JSON.parse(value);
-      const result = triggerFiltersSchema.safeParse(parsed);
-      if (!result.success) {
-        setCodeError(result.error.errors[0]?.message ?? "Invalid filter structure");
-        return false;
-      }
-      setCodeError(null);
-      return true;
-    } catch {
-      setCodeError("Invalid JSON syntax");
-      return false;
+  const validateCode = (value: string): ParsedCodeFilters => {
+    const parsed = parseCodeFilters(value);
+
+    if (!parsed.success) {
+      setCodeError(parsed.message);
+      return parsed;
     }
+
+    if (
+      Object.keys(parsed.rawFilters).length > 0 &&
+      Object.keys(parsed.sanitized).length === 0
+    ) {
+      const message =
+        "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.";
+      setCodeError(message);
+      return { success: false, message };
+    }
+
+    setCodeError(null);
+    return parsed;
   };
 
   const onSubmit = () => {
-    let filtersToSubmit: Record<string, unknown>;
+    let filtersToSubmit: Partial<Record<FilterField, FilterParam>>;
 
     if (isCodeMode) {
       // Validate code before submitting
-      if (!validateCode(codeValue)) {
+      const parsed = validateCode(codeValue);
+      if (!parsed.success) {
         toaster.create({
           title: "Error",
           description: codeError ?? "Invalid filter JSON",
@@ -161,16 +242,9 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
         });
         return;
       }
-      filtersToSubmit = JSON.parse(codeValue);
+      filtersToSubmit = parsed.sanitized;
     } else {
-      const filterParams = getLatestFilters();
-      filtersToSubmit = Object.fromEntries(
-        Object.entries(filterParams.filters).filter(([_, value]) =>
-          Array.isArray(value)
-            ? value.length > 0
-            : Object.keys(value as Record<string, string[]>).length > 0,
-        ),
-      );
+      filtersToSubmit = getNonEmptyFilters();
     }
 
     if (Object.keys(filtersToSubmit).length === 0) {
@@ -199,11 +273,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
           });
 
           void queryClient.automation.getTriggers.invalidate();
-          clearFilters();
-          void router.replace({
-            pathname: router.pathname,
-            query: { project: router.query.project },
-          });
+          closeDrawer();
         },
         onError: () => {
           toaster.create({
@@ -222,7 +292,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
       open={true}
       placement="end"
       size="lg"
-      onOpenChange={() => closeDrawer()}
+      onOpenChange={({ open }) => !open && closeDrawer()}
     >
       <Drawer.Content>
         <Drawer.Header>
@@ -296,7 +366,12 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
                 helper="Add or remove filters to the automation."
                 minWidth="calc(50% - 16px)"
               >
-                <QueryStringFieldsFilters hideTriggerButton />
+                <FieldsFilters
+                  filters={localFilters as Record<FilterField, FilterParam>}
+                  setFilters={(filters) =>
+                    setLocalFilters((prev) => ({ ...prev, ...filters }))
+                  }
+                />
               </HorizontalFormControl>
             )}
 

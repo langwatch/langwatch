@@ -55,9 +55,16 @@ type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
   maxMessagesPerMonth?: number | null;
 };
 
+type CancelledSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "cancelled";
+  subscriptionId: string;
+  cancellationDate?: Date | null;
+};
+
 export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
-  | ConfirmedSubscriptionNotification;
+  | ConfirmedSubscriptionNotification
+  | CancelledSubscriptionNotification;
 
 export type ResourceLimitNotificationContext = {
   organizationId: string;

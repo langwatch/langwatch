@@ -3,6 +3,7 @@ import {
   AgentRole,
   type ScenarioExecutionStateLike,
 } from "@langwatch/scenario";
+import { expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -50,6 +51,25 @@ export function createClaudeCodeAgent({
     fs.copyFileSync(skillPath, path.join(skillDir, "SKILL.md"));
   }
 
+  // Claude Code doesn't auto-discover .skills/ in arbitrary directories.
+  // If .skills/ exists but no CLAUDE.md points to it, create one.
+  const skillsDir = path.join(workingDirectory, ".skills");
+  const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
+  if (fs.existsSync(skillsDir) && !fs.existsSync(claudeMdPath)) {
+    const skillDirs = fs
+      .readdirSync(skillsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && fs.existsSync(path.join(skillsDir, d.name, "SKILL.md")));
+    if (skillDirs.length > 0) {
+      const instructions = skillDirs
+        .map((d) => `.skills/${d.name}/SKILL.md`)
+        .join(" and ");
+      fs.writeFileSync(
+        claudeMdPath,
+        `Read and follow the instructions in ${instructions} before doing anything else.\n`
+      );
+    }
+  }
+
   return {
     role: AgentRole.AGENT,
     call: async (state) => {
@@ -63,12 +83,12 @@ export function createClaudeCodeAgent({
         const mcpConfig = {
           mcpServers: {
             LangWatch: {
+              type: "stdio",
               command: "node",
-              args: [
-                mcpServerDistPath,
-                "--apiKey",
-                process.env.LANGWATCH_API_KEY!,
-              ],
+              args: [mcpServerDistPath],
+              env: {
+                LANGWATCH_API_KEY: process.env.LANGWATCH_API_KEY!,
+              },
             },
           },
         };
@@ -156,6 +176,35 @@ export function createClaudeCodeAgent({
       });
     },
   };
+}
+
+/**
+ * Asserts that the agent actually read the SKILL.md file during execution.
+ * Checks the conversation messages for evidence of a Read tool call on
+ * a .skills/ directory file or explicit SKILL.md content references.
+ */
+export function assertSkillWasRead(
+  state: ScenarioExecutionStateLike,
+  skillName: string
+): void {
+  const allContent = state.messages
+    .map((m) =>
+      typeof m.content === "string" ? m.content : JSON.stringify(m.content)
+    )
+    .join("\n");
+
+  const hasSkillRead =
+    allContent.includes("SKILL.md") ||
+    allContent.includes(`.skills/${skillName}`) ||
+    allContent.includes(`skills/${skillName}`);
+
+  if (!hasSkillRead) {
+    throw new Error(
+      `Expected agent to read the ${skillName} SKILL.md file, but found no evidence ` +
+        `of reading .skills/${skillName}/SKILL.md in the conversation. ` +
+        `The agent may have ignored the skill and hallucinated instructions.`
+    );
+  }
 }
 
 /**

@@ -19,7 +19,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemMetric(str, Enum):
     PERFORMANCE_TOKENS_PER_SECOND = "performance.tokens_per_second"
     PERFORMANCE_TOTAL_COST = "performance.total_cost"
     PERFORMANCE_TOTAL_TOKENS = "performance.total_tokens"
-    SENTIMENT_INPUT_SENTIMENT = "sentiment.input_sentiment"
     SENTIMENT_THUMBS_UP_DOWN = "sentiment.thumbs_up_down"
     THREADS_AVERAGE_DURATION_PER_THREAD = "threads.average_duration_per_thread"
 

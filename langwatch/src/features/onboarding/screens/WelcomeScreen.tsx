@@ -46,6 +46,9 @@ export const WelcomeScreen: React.FC = () => {
     api.onboarding.initializeOrganization.useMutation();
 
   useEffect(() => {
+    // Wait until org data has finished loading before deciding
+    if (organizationIsLoading) return;
+
     const hasAnyProject =
       organizations?.some((org) =>
         org.teams.some((t) => t.projects.length > 0),
@@ -65,7 +68,7 @@ export const WelcomeScreen: React.FC = () => {
     } else {
       setOnboardingNeeded(true);
     }
-  }, [project?.slug]);
+  }, [organizationIsLoading, organizations, project?.slug]);
 
   function handleFinalizeSubmit() {
     const form = getFormData();

@@ -1,6 +1,6 @@
 {
     "name": "langwatch",
-    "version": "0.19.0",
+    "version": "0.20.0",
     "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -120,10 +120,10 @@
     },
     "peerDependencies": {
         "@opentelemetry/api": "^1.9.0",
-        "@ai-sdk/openai": ">=2.0.0 <3.0.0",
-        "@langchain/core": ">=0.3.0 <1.0.0",
-        "@langchain/langgraph": ">=0.4.0 <1.0.0",
-        "@langchain/openai": ">=0.6.0 <1.0.0",
+        "@ai-sdk/openai": ">=2.0.0 <4.0.0",
+        "@langchain/core": ">=0.3.0 <2.0.0",
+        "@langchain/langgraph": ">=0.4.0 <2.0.0",
+        "@langchain/openai": ">=0.6.0 <2.0.0",
         "@opentelemetry/context-async-hooks": "^2.1.0",
         "@opentelemetry/context-zone": ">=1.19.0 <3.0.0",
         "@opentelemetry/sdk-node": ">=0.200.0 <1.0.0",

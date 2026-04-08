@@ -263,7 +263,7 @@ export function DatasetMappingPreview({
               transition="all 0.15s"
             >
               <HStack gap={1}>
-                <Text>Threads</Text>
+                <Text>Thread</Text>
                 {isThreadMapping && (
                   <>
                     {threadIds.length === 0 ? (
