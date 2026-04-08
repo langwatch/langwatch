@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.1.0-prerelease.3](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.3...langwatch@v3.1.0-prerelease.3) (2026-04-08)
+
+
+### Features
+
+* add evaluator CLI commands ([#2981](https://github.com/langwatch/langwatch/issues/2981)) ([57577ac](https://github.com/langwatch/langwatch/commit/57577acac70a8f907c27c66a099cd7e10ebe7941))
+
+
+### Bug Fixes
+
+* address helm chart bugbash findings ([#3034](https://github.com/langwatch/langwatch/issues/3034)) ([e08c777](https://github.com/langwatch/langwatch/commit/e08c77769f197e166862683ab287e91117df81b1))
+* default publicUrl/baseHost to localhost:5560 ([#3035](https://github.com/langwatch/langwatch/issues/3035)) ([533f204](https://github.com/langwatch/langwatch/commit/533f204215628afb42fcbaca5b16cbd3b1f7e8fa))
+* default publicUrl/baseHost to localhost:5560 instead of 30560 ([533f204](https://github.com/langwatch/langwatch/commit/533f204215628afb42fcbaca5b16cbd3b1f7e8fa))
+* increase scenario execution timeout from 5 to 15 minutes ([#3006](https://github.com/langwatch/langwatch/issues/3006)) ([5578ac5](https://github.com/langwatch/langwatch/commit/5578ac576e22f5d06ba5260724492397fe000c49))
+
 ## [3.0.0-prerelease.3](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.2...langwatch@v3.0.0-prerelease.3) (2026-04-08)
 
 
