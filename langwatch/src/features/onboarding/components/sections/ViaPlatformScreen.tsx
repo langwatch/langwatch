@@ -157,7 +157,7 @@ export function ViaPlatformScreen(): React.ReactElement {
             alignItems="center"
             gap="4px"
             fontSize="13px"
-            color={{ base: "gray.500", _dark: "gray.200" }}
+            color={{ base: "gray.400", _dark: "gray.100" }}
             textDecoration="none"
           >
             Read the docs
