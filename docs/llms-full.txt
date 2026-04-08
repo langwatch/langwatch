@@ -25782,8 +25782,10 @@ Fully managed by the LangWatch team. No infrastructure to manage — sign up and
 [Sign up at langwatch.ai](https://langwatch.ai)
 </Card>
 
-<Card title="Self-Managed" icon="server" href="/self-hosting/deployment/kubernetes-helm">
+<Card title="Self-Managed" icon="server">
 Deploy the complete LangWatch stack on your own infrastructure — AWS, Azure, GCP, or bare metal. You manage everything: compute, databases, and storage. Full data sovereignty.
+
+[Get started with Kubernetes](/self-hosting/deployment/kubernetes-helm)
 </Card>
 
 <Card title="Cloud Enterprise" icon="building">
@@ -25792,8 +25794,10 @@ LangWatch manages the application. Your data lives on exclusive, dedicated insta
 [Contact sales](https://langwatch.ai/schedule-demo)
 </Card>
 
-<Card title="Hybrid" icon="arrows-split-up-and-left" href="/hybrid-setup/overview">
+<Card title="Hybrid" icon="arrows-split-up-and-left">
 LangWatch manages the control plane (App, Workers, NLP, LangEvals). You provide the data plane — ClickHouse and S3 in your VPC. Your trace data never leaves your network.
+
+[Learn more](/hybrid-setup/overview)
 </Card>
 </CardGroup>
 
