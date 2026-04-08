@@ -5,28 +5,33 @@ description: "Run LangWatch locally on Kind for development and testing"
 
 Run the full LangWatch stack locally on a [Kind](https://kind.sigs.k8s.io/) cluster. This is useful for testing the Helm chart, evaluating LangWatch in a Kubernetes environment, or developing against a production-like setup.
 
+> **Looking for production deployment?** If you want to deploy LangWatch to a real cluster with prebuilt images (no local build required), see [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) instead. This page covers the local Kind workflow which builds images from source.
+
+> **Developing LangWatch itself?** The `make dev` commands in the repo root use docker-compose and are faster for day-to-day development. This Kind workflow is for testing the Helm chart packaging and Kubernetes-specific behavior.
+
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (running)
+- [Docker](https://docs.docker.com/get-docker/) (running, with at least **16 GB RAM** and **20 GB free disk** allocated)
 - [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) v0.20+
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Helm](https://helm.sh/docs/intro/install/) 3.12+
 - `make` (included on macOS and most Linux distributions)
 
+> **Note:** The first image build (especially the Next.js app) is memory-intensive and can take 15-30 minutes. Subsequent builds reuse Docker cache and are much faster.
+
 ## Quick Start
 
-The Helm chart includes a Makefile that automates cluster creation, image building, and installation:
-
 ```bash
-cd charts/langwatch
+git clone https://github.com/langwatch/langwatch.git
+cd langwatch/charts/langwatch
 make example-up
 ```
 
-This command will:
+This will:
 1. Create a Kind cluster named `lw-local` (if it doesn't exist)
-2. Build all Docker images locally (if not already built)
+2. Build all Docker images locally (if not already built — first build takes 15-30 min)
 3. Load images into the Kind cluster
-4. Install the Helm chart with `values-local.yaml`
+4. Install the Helm chart with `values-local.yaml` into the `lw-local` namespace
 
 Access LangWatch at **http://localhost:30560**.
 

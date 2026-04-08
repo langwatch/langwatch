@@ -1,4 +1,5 @@
 # values-local.yaml — All-in-one for local Kind development.
+# namespace: lw-local
 #
 # Same as:  -f overlays/size-dev.yaml -f overlays/access-nodeport.yaml -f overlays/local-images.yaml --set autogen.enabled=true
 #
