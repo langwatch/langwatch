@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "3.0.0-prerelease.4",
+  "version": "3.0.0",
   "private": true,
   "engines": {
     "node": "24.x",
