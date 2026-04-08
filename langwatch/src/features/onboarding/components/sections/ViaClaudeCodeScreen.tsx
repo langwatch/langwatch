@@ -20,6 +20,7 @@ import { maskApiKey } from "./shared/api-key-utils";
 import { buildMcpJson, CLOUD_ENDPOINT } from "./shared/build-mcp-config";
 import { copyToClipboard } from "./shared/copy-to-clipboard";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
+import { JsonHighlight } from "./shared/JsonHighlight";
 import { TabButton } from "./shared/TabButton";
 
 type TabKey = "prompt" | "skill" | "mcp";
@@ -103,7 +104,7 @@ function glassCard({
   return {
     borderRadius: "xl",
     border: "1px solid",
-    borderColor: highlight ? "orange.200" : "border.subtle",
+    borderColor: highlight ? { base: "orange.200", _dark: "orange.800" } : "border.subtle",
     bg: highlight ? "orange.subtle" : "bg.panel/70",
     backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: highlight
@@ -111,7 +112,7 @@ function glassCard({
       : "sm",
     transition: "all 0.17s ease",
     _hover: {
-      borderColor: highlight ? "orange.300" : "border.emphasized",
+      borderColor: highlight ? "orange.emphasized" : "border.emphasized",
       boxShadow: highlight
         ? "0 0 0 1px var(--chakra-colors-orange-200)"
         : "md",
@@ -311,27 +312,11 @@ function McpTab({
         boxShadow="0 1px 3px rgba(0,0,0,0.04)"
         transition="all 0.17s ease"
         _hover={{
-          borderColor: "orange.200",
+          borderColor: "orange.emphasized",
           boxShadow: "0 6px 28px rgba(237,137,38,0.06)",
         }}
       >
-        <Box
-          as="pre"
-          px={5}
-          py={4}
-          pr={12}
-          fontSize="12.5px"
-          fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
-          color="fg.DEFAULT"
-          lineHeight="1.8"
-          overflowX="hidden"
-          whiteSpace="pre-wrap"
-          wordBreak="break-all"
-          letterSpacing="0.01em"
-          fontWeight="500"
-        >
-          {displayConfigJson}
-        </Box>
+        <JsonHighlight code={displayConfigJson} />
         <Box position="absolute" top={2.5} right={2.5}>
           <InlineCopyButton text={mcpJson} label="Config" />
         </Box>
@@ -355,7 +340,7 @@ function McpTab({
               borderColor="border.subtle"
               cursor="pointer"
               transition="all 0.15s ease"
-              _hover={{ borderColor: "orange.200", bg: "bg.panel" }}
+              _hover={{ borderColor: "orange.emphasized", bg: "bg.panel" }}
               onClick={() => {
                 void copyToClipboard({
                   text: ep.path,
