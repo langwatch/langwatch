@@ -963,7 +963,7 @@ export const VariableMappingInput = ({
 
                 {/* "Use as value" option when user typed something (only at top level) */}
                 {searchQuery.trim() && !inProgressPath && (
-                  <div data-testid="use-as-value-option">
+                  <Box>
                     {filteredSources.length > 0 && (
                       <Box height="1px" background="border" marginY={1} />
                     )}
@@ -997,6 +997,7 @@ export const VariableMappingInput = ({
                       data-highlighted={
                         highlightedIndex === allOptions.length - 1
                       }
+                      data-testid="use-as-value-option"
                     >
                       <Type size={14} color="var(--chakra-colors-gray-500)" />
                       <Text fontSize="13px" color="fg.muted">
@@ -1007,7 +1008,7 @@ export const VariableMappingInput = ({
                         " as value
                       </Text>
                     </HStack>
-                  </div>
+                  </Box>
                 )}
               </VStack>
             )}

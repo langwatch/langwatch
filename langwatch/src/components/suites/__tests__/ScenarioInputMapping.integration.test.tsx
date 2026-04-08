@@ -178,6 +178,60 @@ describe("ScenarioInputMappingSection", () => {
   });
 
   // ============================================================================
+  // Scenario: Static value mapping emitted by section (Gap B — handleDisplayMappingChange)
+  // ============================================================================
+
+  describe("given the mapping UI with an empty mappings state", () => {
+    describe("when the child widget emits a type:value mapping for scenario_message", () => {
+      it("calls onMappingChange with the value mapping preserved", async () => {
+        const user = userEvent.setup();
+        const onMappingChange = vi.fn();
+
+        renderSection({ onMappingChange });
+
+        // Open the mapping dropdown for scenario_message
+        await user.click(screen.getByTestId("mapping-input-scenario_message"));
+
+        // Type a free-text value to trigger the "use as value" option
+        const input = screen.getByTestId("mapping-input-scenario_message");
+        await user.type(input, "hello");
+
+        // The widget should show a "use as value" option for the typed text
+        const valueOption = await screen.findByTestId("use-as-value-option");
+        await user.click(valueOption);
+
+        // onMappingChange should have been called — and NOT with undefined or a source mapping
+        // The section currently drops type:"value" mappings, so this FAILS
+        expect(onMappingChange).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({ type: "value", value: "hello" }),
+        );
+      });
+    });
+  });
+
+  // ============================================================================
+  // Scenario: Static value round-trips from stored state (Gap B — invertMappings)
+  // ============================================================================
+
+  describe("given stored mappings with a static value for 'context'", () => {
+    describe("when the section renders", () => {
+      it("displays the stored static value text in the context row", () => {
+        const mappings: Record<string, FieldMapping> = {
+          context: { type: "value", value: "Use the KB" },
+        };
+
+        renderSection({ mappings });
+
+        // The context row's mapping input should display the static text "Use the KB"
+        // invertMappings currently only handles type:"source", so stored value mappings
+        // never reach the display — this FAILS
+        expect(screen.getByText("Use the KB")).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
   // Scenario: Single-input agent shows full form
   // ============================================================================
 
