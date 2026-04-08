@@ -157,7 +157,7 @@
     "flat": "^6.0.1",
     "geoip-country": "^5.0.202602202348",
     "handlebars": "^4.7.8",
-    "hono": "^4.12.4",
+    "hono": "^4.12.12",
     "hono-openapi": "^0.4.8",
     "immer": "^10.1.3",
     "import-in-the-middle": "1.14.2",
