@@ -115,7 +115,7 @@ export function TargetSelector({
       const triggerRect = triggerRef.current?.getBoundingClientRect();
       if (triggerRect) {
         const spaceBelow = window.innerHeight - triggerRect.bottom - 8; // 8px padding from viewport edge
-        setMaxDropdownHeight(Math.min(400, Math.max(150, spaceBelow)));
+        setMaxDropdownHeight(Math.min(400, Math.max(40, spaceBelow)));
       }
       setTimeout(() => {
         inputRef.current?.focus();
