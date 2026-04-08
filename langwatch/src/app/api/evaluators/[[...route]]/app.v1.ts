@@ -157,12 +157,13 @@ app.post(
       "Creating evaluator",
     );
 
-    const evaluator = await service.create({
+    const evaluator = await service.createWithDefaults({
       id: `evaluator_${nanoid()}`,
       projectId: project.id,
       name: data.name,
       type: "evaluator",
       config: data.config as Prisma.InputJsonValue,
+      project,
     });
 
     const enriched = await service.enrichWithFields(evaluator);

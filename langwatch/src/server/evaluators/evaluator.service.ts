@@ -8,6 +8,10 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
+import {
+  getEvaluatorDefaultSettings,
+  getEvaluatorDefinitions,
+} from "~/server/evaluations/getEvaluator";
 import { EvaluatorRepository } from "./evaluator.repository";
 
 // ============================================================================
@@ -253,7 +257,32 @@ export class EvaluatorService {
   }
 
   /**
-   * Creates a new evaluator.
+   * Creates a new evaluator, populating missing settings with defaults
+   * from the evaluator definition and project configuration.
+   */
+  async createWithDefaults({
+    project,
+    ...input
+  }: Parameters<EvaluatorRepository["create"]>[0] & {
+    project: { defaultModel?: string | null; embeddingsModel?: string | null };
+  }) {
+    const config = input.config as Record<string, unknown> | null;
+    const evaluatorType = config?.evaluatorType as string | undefined;
+
+    if (evaluatorType && config) {
+      const defaults = getEvaluatorDefaultSettings(
+        getEvaluatorDefinitions(evaluatorType),
+        project,
+      );
+      const userSettings = (config.settings ?? {}) as Record<string, unknown>;
+      config.settings = { ...defaults, ...userSettings };
+    }
+
+    return this.repository.create(input);
+  }
+
+  /**
+   * Creates a new evaluator (without populating default settings).
    */
   get create() {
     return this.repository.create.bind(this.repository);
