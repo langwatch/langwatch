@@ -51,9 +51,12 @@ assert_contains() {
   fi
 }
 
-# Run the script
+# Run the script — disable errexit so a non-zero exit does not abort
+# the test before assert_exit_zero can check it.
+set +e
 bash "$EXTRACT" "$FIXTURE" "$TMP_OUT"
 EXIT_CODE=$?
+set -e
 
 assert_exit_zero "$EXIT_CODE"
 assert_non_empty "$TMP_OUT" "test-failures.txt"
