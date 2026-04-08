@@ -165,7 +165,7 @@ export function AddMembersForm({
       orgRole: data.orgRole,
       teams: normalizedTeams,
     }));
-    void onSubmit({ invites });
+    return onSubmit({ invites });
   };
 
   return (

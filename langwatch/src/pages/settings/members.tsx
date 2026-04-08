@@ -212,7 +212,11 @@ function MembersList({
     onInviteLinkClose();
   };
 
-  const { data: allBindings } = api.roleBinding.listForOrg.useQuery(
+  const {
+    data: allBindings,
+    isLoading: isBindingsLoading,
+    isError: isBindingsError,
+  } = api.roleBinding.listForOrg.useQuery(
     { organizationId: organization.id },
     { enabled: !!organization.id },
   );
@@ -331,7 +335,7 @@ function MembersList({
                           bindings={(bindingsByUser.get(member.userId) ?? []).filter(
                             (b) => b.id !== orgBinding?.id,
                           )}
-                          isLoading={allBindings === undefined}
+                          isLoading={isBindingsLoading || isBindingsError}
                         />
                       </Table.Cell>
                       <Table.Cell>

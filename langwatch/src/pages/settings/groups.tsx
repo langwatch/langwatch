@@ -844,6 +844,9 @@ function GroupsSettings() {
                       key={g.id}
                       cursor="pointer"
                       onClick={() => setSelectedGroup(g)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedGroup(g); } }}
+                      tabIndex={0}
+                      role="button"
                       _hover={{ bg: "bg.muted" }}
                     >
                       <Table.Cell fontWeight="medium">{g.name}</Table.Cell>
@@ -912,6 +915,9 @@ function GroupsSettings() {
                     <Table.Row
                       cursor="pointer"
                       onClick={() => setCreating(true)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCreating(true); } }}
+                      tabIndex={0}
+                      role="button"
                       _hover={{ bg: "bg.muted" }}
                       color="fg.muted"
                     >
