@@ -133,7 +133,12 @@ services:
   app:
     environment:
       CLICKHOUSE_URL: http://user:password@your-clickhouse:8123/langwatch
-    depends_on: []  # Remove clickhouse dependency
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Remove clickhouse from depends_on
 ```
 
 ## Limitations
