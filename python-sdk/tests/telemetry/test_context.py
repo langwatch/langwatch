@@ -46,9 +46,7 @@ class TestContext(unittest.TestCase):
         )
         mock_lw_trace_constructor.assert_called_once()
 
-    @pytest.mark.skip(
-        reason="The code is correct, but this test needs to be updated to reflect the new behavior"
-    )
+    @patch("langwatch.telemetry.context.trace_api.get_current_span")
     @patch("langwatch.telemetry.context.warnings.warn")
     @patch("langwatch.telemetry.context.ensure_setup")
     @patch("langwatch.telemetry.tracing.LangWatchTrace")
@@ -57,11 +55,15 @@ class TestContext(unittest.TestCase):
         mock_lw_trace_constructor: MagicMock,
         mock_ensure_setup: MagicMock,
         mock_warn: MagicMock,
+        mock_get_current_span: MagicMock,
     ):
         mock_trace_instance = MagicMock(spec=LangWatchTrace)
-        mock_lw_trace_constructor.return_value.__enter__.return_value = (
-            mock_trace_instance
-        )
+        mock_lw_trace_constructor.return_value = mock_trace_instance
+
+        # Mock the otel span with span_id = 0 (root level)
+        mock_otel_span = MagicMock()
+        mock_otel_span.get_span_context.return_value.span_id = 0
+        mock_get_current_span.return_value = mock_otel_span
 
         trace = telemetry_context.get_current_trace(start_if_none=True)
 
@@ -71,7 +73,8 @@ class TestContext(unittest.TestCase):
             "No trace in context when calling langwatch.get_current_trace(), perhaps you forgot to use @langwatch.trace()?",
         )
         mock_lw_trace_constructor.assert_called_once()
-        mock_lw_trace_constructor.return_value.__enter__.assert_called_once()
+        mock_trace_instance.__enter__.assert_called_once()
+        mock_trace_instance.__exit__.assert_called_once_with(None, None, None)
 
     @patch("langwatch.telemetry.context.warnings.warn")
     @patch("langwatch.telemetry.context.ensure_setup")
@@ -92,16 +95,40 @@ class TestContext(unittest.TestCase):
         mock_warn.assert_not_called()
         mock_lw_trace_constructor.assert_called_once()
 
-    @pytest.mark.skip(
-        reason="The code is correct, but this test needs to be updated to reflect the new behavior"
-    )
+    @patch("langwatch.telemetry.context.trace_api.get_current_span")
     @patch("langwatch.telemetry.context.ensure_setup")
-    def test_get_current_span_exists_in_lw_context(self, mock_ensure_setup: MagicMock):
-        mock_span = MagicMock(spec=LangWatchSpan)
-        telemetry_context.stored_langwatch_span.set(mock_span)
-        span = telemetry_context.get_current_span()
-        self.assertIs(span, mock_span)
-        mock_ensure_setup.assert_called_once()
+    @patch("langwatch.telemetry.span.LangWatchSpan.wrap_otel_span")
+    def test_get_current_span_exists_in_lw_context(
+        self,
+        mock_wrap_otel_span: MagicMock,
+        mock_ensure_setup: MagicMock,
+        mock_otel_get_current_span: MagicMock,
+    ):
+        # Set a span in LW context (should be ignored by current implementation)
+        mock_lw_span_in_context = MagicMock(spec=LangWatchSpan)
+        telemetry_context.stored_langwatch_span.set(mock_lw_span_in_context)
+
+        mock_otel_span = MagicMock()
+        mock_otel_span.get_span_context.return_value.span_id = 123
+        mock_otel_get_current_span.return_value = mock_otel_span
+        mock_wrapped_span = MagicMock(spec=LangWatchSpan)
+        mock_wrap_otel_span.return_value = mock_wrapped_span
+
+        with patch(
+            "langwatch.telemetry.context.get_current_trace"
+        ) as mock_get_current_trace:
+            mock_current_trace = MagicMock(spec=LangWatchTrace)
+            mock_get_current_trace.return_value = mock_current_trace
+
+            span = telemetry_context.get_current_span()
+
+            self.assertIs(span, mock_wrapped_span)
+            mock_ensure_setup.assert_called_once()
+            mock_otel_get_current_span.assert_called_once()
+            mock_get_current_trace.assert_called_once()
+            mock_wrap_otel_span.assert_called_once_with(
+                mock_otel_span, mock_current_trace
+            )
 
     @patch("langwatch.telemetry.context.trace_api.get_current_span")
     @patch("langwatch.telemetry.context.ensure_setup")
