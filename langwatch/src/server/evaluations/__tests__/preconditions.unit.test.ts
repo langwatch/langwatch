@@ -53,8 +53,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no origin attribute", () => {
-      // TODO(#3022): pre-existing failure unmasked by #3001 — re-enable after fix
-      it.skip("passes the precondition", () => {
+      it("passes the precondition", () => {
         const traceData = makeTraceData({ origin: undefined });
         expect(
           evaluatePreconditions({
