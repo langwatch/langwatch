@@ -74,14 +74,22 @@ The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. N
 
 Update your environment variables and pull the v3 images:
 
+Add `CLICKHOUSE_URL` to your app and workers environment in `compose.yml`:
+
+```yaml
+services:
+  app:
+    environment:
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+  workers:
+    environment:
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+```
+
+Then pull and restart:
+
 ```bash
-# Add ClickHouse URL to your .env or compose.yml
-# CLICKHOUSE_URL=http://default:langwatch@clickhouse:8123/langwatch
-
-# Pull v3 images
 docker compose pull
-
-# Restart
 docker compose up -d
 ```
 
@@ -96,6 +104,10 @@ helm upgrade langwatch langwatch/langwatch \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
+
+<Note>
+The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values — no manual env var needed for either managed or external ClickHouse.
+</Note>
 
 ### What Happens on Startup
 
@@ -117,10 +129,13 @@ The `es-migration` tool reads documents from Elasticsearch and writes them to Cl
 ```bash
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch/langwatch/packages/es-migration
+cd langwatch
 
-# Install dependencies
+# Install dependencies from the repo root (workspace monorepo)
 pnpm install
+
+# Navigate to the migration tool
+cd langwatch/packages/es-migration
 ```
 
 ### Configure
@@ -150,7 +165,7 @@ Point these at your actual Elasticsearch and ClickHouse instances. If they're ru
 **This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical data as it arrives during migration.
 </Warning>
 
-LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 30 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it will be older than 30 days — so ClickHouse would try to expire or offload it the moment it lands.
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it will be older than 49 days — so ClickHouse would try to expire or offload it the moment it lands.
 
 **Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
 
@@ -196,7 +211,7 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 10m
 ```
 
-The TTL reconciler runs on startup and updates the ClickHouse table metadata without reorganizing existing data.
+The TTL reconciler runs on startup and updates the ClickHouse table metadata without reorganizing existing data. Any data that needs to be moved to a different storage tier due to the new TTL policy, will happen asynchronously and be managed by ClickHouse.
 
 #### After Migration: Restore TTLs
 
@@ -212,8 +227,7 @@ The tool migrates data in separate targets:
 
 | Target | Description |
 |--------|-------------|
-| `traces-combined` | Traces and their evaluations (hot storage) |
-| `traces-combined-cold` | Traces and their evaluations (cold storage) |
+| `traces-combined` | Traces and their evaluations |
 | `simulations` | Simulation run events |
 | `batch-evaluations` | Batch experiment evaluation data |
 | `dspy-steps` | DSPy optimization steps |
@@ -293,13 +307,13 @@ After migration completes, verify the data in ClickHouse:
 clickhouse-client --host localhost --port 9000
 
 # Check trace counts
-SELECT COUNT(*) FROM langwatch.stored_spans;
+SELECT COUNT(*) FROM langwatch.trace_summaries;
 
 # Check event log
 SELECT AggregateType, COUNT(*) FROM langwatch.event_log GROUP BY AggregateType;
 ```
 
-Compare these counts against your Elasticsearch indices to confirm completeness.
+Compare these counts against your Elasticsearch indices to confirm completeness. Note that you may wish to run a distinct check against the `ProjectionId` column on trace summaries as if there are any MergeTree Replacements that need to happen it could cause the count operation to report duplicates in the count.
 
 ## Step 4: Remove Elasticsearch
 
