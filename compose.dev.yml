@@ -209,6 +209,7 @@ services:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
       BASE_HOST: http://app:5560
+      LANGWATCH_ENDPOINT: http://app:5560
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
