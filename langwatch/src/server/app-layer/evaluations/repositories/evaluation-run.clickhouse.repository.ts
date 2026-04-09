@@ -147,10 +147,6 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
-  async bulkUpsert(entries: Array<{ data: EvaluationRunData; tenantId: string }>): Promise<void> {
-    await this.upsertBatch(entries);
-  }
-
   async getByEvaluationId(
     tenantId: string,
     evaluationId: string,
