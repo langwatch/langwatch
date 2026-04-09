@@ -403,6 +403,10 @@ jobs:
         working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
 
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
+
       - name: Build
         working-directory: langwatch
         run: pnpm build
