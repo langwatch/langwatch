@@ -289,7 +289,7 @@ export function createCombinedTraceMigrationDefinition(
       // Evaluation projection writes — bulk insert all evaluations for this trace
       if (evalBulkEntries.length > 0) {
         projectionWrites.push(() =>
-          deps.evaluationRunStore.bulkStore(evalBulkEntries),
+          deps.evaluationRunStore.storeBatch(evalBulkEntries),
         );
       }
 
