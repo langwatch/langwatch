@@ -110,12 +110,12 @@ class TestRunExperiment:
 
             assert isinstance(result, ExperimentRunResult)
             assert result.run_id == "run-123"
-            assert result.status in ("completed", "failed", "stopped")
-            assert isinstance(result.passed, int)
-            assert isinstance(result.failed, int)
-            assert isinstance(result.pass_rate, float)
-            assert isinstance(result.duration, int)
-            assert result.run_url
+            assert result.status == "completed"
+            assert result.passed == 8
+            assert result.failed == 2
+            assert result.pass_rate == 80.0
+            assert result.duration == 5000
+            assert result.run_url == "http://localhost:3000/project/runs/run-123"
             assert result.summary is not None
             assert callable(result.print_summary)
 
@@ -157,6 +157,10 @@ class TestRunExperiment:
                     (completed, total)
                 ),
             )
+
+            assert isinstance(result, ExperimentRunResult)
+            assert result.run_id == "run-456"
+            assert result.status == "completed"
 
             # Should have received progress updates (initial 0 + each poll)
             assert len(progress_updates) > 0
