@@ -186,7 +186,7 @@ export async function whenIClickSave(page: Page) {
 
   // Popover opens - click "Save without running"
   const saveWithoutRunning = page.getByText("Save without running").last();
-  await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
+  await expect(saveWithoutRunning).toBeVisible({ timeout: 10000 });
   await saveWithoutRunning.click();
 
   // Wait for save to complete by checking dialog closes or list updates

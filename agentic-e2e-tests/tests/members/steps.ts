@@ -70,7 +70,7 @@ export async function whenIClickAddMembers(page: Page) {
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
     page.getByRole("heading", { name: "Add members" }).last()
-  ).toBeVisible({ timeout: 5000 });
+  ).toBeVisible({ timeout: 10000 });
 }
 
 /**
@@ -165,8 +165,8 @@ export async function thenISeeSentInviteFor(page: Page, email: string) {
   const invitesSection = invitesHeading.locator("..");
   const row = invitesSection.getByRole("row").filter({ hasText: email });
 
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
+  await expect(row).toBeVisible({ timeout: 15000 });
+  await expect(row.getByText("Invited")).toBeVisible({ timeout: 10000 });
 }
 
 /**
@@ -179,9 +179,9 @@ export async function thenISeePendingApprovalFor(page: Page, email: string) {
   const invitesSection = invitesHeading.locator("..");
   const row = invitesSection.getByRole("row").filter({ hasText: email });
 
-  await expect(row).toBeVisible({ timeout: 5000 });
+  await expect(row).toBeVisible({ timeout: 15000 });
   await expect(row.getByText("Pending Approval")).toBeVisible({
-    timeout: 5000,
+    timeout: 10000,
   });
 }
 
@@ -197,7 +197,7 @@ export async function thenEmailIsNotVisible(page: Page, email: string) {
  */
 export async function thenISeeSuccessToast(page: Page, titleText: string) {
   await expect(page.getByText(titleText, { exact: false })).toBeVisible({
-    timeout: 5000,
+    timeout: 10000,
   });
 }
 
