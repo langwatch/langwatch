@@ -567,14 +567,22 @@ function ListSelection({
 		overscan: 5,
 	});
 
-	// Re-measure when items are added/removed from selection (which changes
-	// nested content height). Compare by value, not reference — currentValues
-	// is a new array each render (from Object.keys), and measure() resets ALL
-	// cached sizes to estimateSize. If it fires every render, items that
-	// haven't resized won't get re-measured by ResizeObserver, causing overlap.
+	// When nested content appears/disappears (selection changes), the virtual
+	// item's height changes. measure() is wrong here — it clears the size cache
+	// back to estimateSize (36px), and React won't re-call measureElement refs
+	// (same function, same element). Instead, imperatively re-measure all visible
+	// DOM elements so the virtualizer picks up the new heights directly.
 	const currentValuesKey = currentValues.join(",");
 	useEffect(() => {
-		virtualizer.measure();
+		if (!parentRef.current) return;
+		const frameId = requestAnimationFrame(() => {
+			parentRef.current
+				?.querySelectorAll<HTMLElement>("[data-index]")
+				.forEach((el) => {
+					virtualizer.measureElement(el);
+				});
+		});
+		return () => cancelAnimationFrame(frameId);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [virtualizer, currentValuesKey]);
 
