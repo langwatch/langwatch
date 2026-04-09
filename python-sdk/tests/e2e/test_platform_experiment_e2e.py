@@ -1,13 +1,16 @@
 """
 End-to-End tests for platform experiments (Experiments Workbench) runner.
 
-These tests require:
+TestErrorHandling requires:
 - LANGWATCH_ENDPOINT set (or defaults to production)
 - LANGWATCH_API_KEY set with a valid API key
 - A saved experiment with slug (set via TEST_EXPERIMENT_SLUG env var)
+
+TestRunExperiment is fully mocked and does not require any external services.
 """
 
 import os
+from contextlib import contextmanager
 from dotenv import load_dotenv
 from unittest.mock import patch, MagicMock
 
@@ -21,6 +24,17 @@ from langwatch.experiment.platform_run import (
     ExperimentNotFoundError,
     ExperimentsApiError,
 )
+
+
+@contextmanager
+def mock_platform_run():
+    """Context manager that patches all platform_run dependencies with mocks."""
+    with patch("langwatch.experiment.platform_run._start_run") as mock_start, \
+         patch("langwatch.experiment.platform_run._get_run_status") as mock_status, \
+         patch("langwatch.experiment.platform_run.get_endpoint", return_value="http://localhost:3000"), \
+         patch("langwatch.experiment.platform_run.langwatch") as mock_lw:
+        mock_lw.ensure_setup = MagicMock()
+        yield mock_start, mock_status
 
 
 @pytest.mark.e2e
@@ -39,15 +53,9 @@ class TestErrorHandling:
         assert exc_info.value.status_code == 401
 
 
-@pytest.mark.e2e
 class TestRunExperiment:
     def test_runs_experiment_and_returns_results(self):
-        with patch("langwatch.experiment.platform_run._start_run") as mock_start, \
-             patch("langwatch.experiment.platform_run._get_run_status") as mock_status, \
-             patch("langwatch.experiment.platform_run.get_endpoint", return_value="http://localhost:3000"), \
-             patch("langwatch.experiment.platform_run.langwatch") as mock_lw:
-            mock_lw.ensure_setup = MagicMock()
-
+        with mock_platform_run() as (mock_start, mock_status):
             mock_start.return_value = {
                 "runId": "run-123",
                 "total": 10,
@@ -100,26 +108,21 @@ class TestRunExperiment:
                 on_progress=lambda completed, total: None,
             )
 
-        assert isinstance(result, ExperimentRunResult)
-        assert result.run_id == "run-123"
-        assert result.status in ("completed", "failed", "stopped")
-        assert isinstance(result.passed, int)
-        assert isinstance(result.failed, int)
-        assert isinstance(result.pass_rate, float)
-        assert isinstance(result.duration, int)
-        assert result.run_url
-        assert result.summary is not None
-        assert callable(result.print_summary)
+            assert isinstance(result, ExperimentRunResult)
+            assert result.run_id == "run-123"
+            assert result.status in ("completed", "failed", "stopped")
+            assert isinstance(result.passed, int)
+            assert isinstance(result.failed, int)
+            assert isinstance(result.pass_rate, float)
+            assert isinstance(result.duration, int)
+            assert result.run_url
+            assert result.summary is not None
+            assert callable(result.print_summary)
 
     def test_reports_progress_during_execution(self):
         progress_updates: list[tuple[int, int]] = []
 
-        with patch("langwatch.experiment.platform_run._start_run") as mock_start, \
-             patch("langwatch.experiment.platform_run._get_run_status") as mock_status, \
-             patch("langwatch.experiment.platform_run.get_endpoint", return_value="http://localhost:3000"), \
-             patch("langwatch.experiment.platform_run.langwatch") as mock_lw:
-            mock_lw.ensure_setup = MagicMock()
-
+        with mock_platform_run() as (mock_start, mock_status):
             mock_start.return_value = {
                 "runId": "run-456",
                 "total": 10,
@@ -155,9 +158,9 @@ class TestRunExperiment:
                 ),
             )
 
-        # Should have received progress updates (initial 0 + each poll)
-        assert len(progress_updates) > 0
+            # Should have received progress updates (initial 0 + each poll)
+            assert len(progress_updates) > 0
 
-        # Progress should increase (or stay same)
-        for i in range(1, len(progress_updates)):
-            assert progress_updates[i][0] >= progress_updates[i - 1][0]
+            # Progress should increase (or stay same)
+            for i in range(1, len(progress_updates)):
+                assert progress_updates[i][0] >= progress_updates[i - 1][0]
