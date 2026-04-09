@@ -2,6 +2,7 @@ packages:
   - .
   - "saas-src/*"
   - "packages/*"
+  - "../mcp-server"
 
 overrides:
   pino: ^10.3.0
@@ -25,6 +26,10 @@ overrides:
   "validator@<13.15.22": "13.15.22"
   # Security: @remix-run/router XSS via open redirects (#227) via react-admin
   "@remix-run/router@<=1.23.1": "1.23.2"
+  # Security: express-rate-limit DoS (from mcp-server)
+  "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
+  # Security: glob ReDoS (from mcp-server)
+  "glob@>=10.2.0 <10.5.0": "10.5.0"
 
 packageExtensions:
   bullmq-otel:
@@ -44,6 +49,7 @@ onlyBuiltDependencies:
   - cpu-features
   - esbuild
   - msgpackr-extract
+  - node-pty
   - prisma
   - protobufjs
   - sharp

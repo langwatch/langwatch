@@ -26,8 +26,8 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
-# Build mcp-server first — it's a file: dependency of langwatch, so dist/ must
-# exist before pnpm install copies it into the langwatch node_modules store
+# Build mcp-server first — workspace:* dependency, pnpm will symlink to it.
+# dist/ must exist before langwatch build since exports point there.
 COPY mcp-server ./mcp-server
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 RUN cd mcp-server && pnpm install --frozen-lockfile && pnpm run build
