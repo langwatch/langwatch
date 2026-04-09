@@ -101,9 +101,13 @@ jobs:
         ports:
           - 5563:5561
         env:
-          LANGWATCH_ENDPOINT: http://172.17.0.1:5570
+          LANGWATCH_ENDPOINT: http://host.docker.internal:5570
         options: >-
           --add-host host.docker.internal:host-gateway
+          --health-cmd "curl -sf http://localhost:5561/ || exit 1"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 6
 
       langevals:
         image: langwatch/langevals:latest
@@ -111,6 +115,11 @@ jobs:
           - 5564:5562
         env:
           DISABLE_EVALUATORS_PRELOAD: "true"
+        options: >-
+          --health-cmd "curl -sf http://localhost:5562/ || exit 1"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 6
 
     steps:
       - name: Checkout
@@ -177,21 +186,8 @@ jobs:
           cd langwatch && PORT=5570 pnpm start &
           APP_PID=$!
 
-          # Wait for app to be ready
+          # Wait for app to be ready (NLP/langevals services have health checks)
           sleep 5
-
-          # Wait for NLP service to be ready
-          echo "Waiting for NLP service..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:5563/ > /dev/null 2>&1; then
-              echo "NLP service is ready"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Warning: NLP service not responding, continuing anyway"
-            fi
-            sleep 2
-          done
 
           # Run tests from the self-contained e2e package
           cd agentic-e2e-tests && pnpm test
