@@ -362,8 +362,10 @@ export class EsScanner {
     const aggregateIds = [...new Set(aggregates.map((a) => a.aggregateId))];
     if (aggregateIds.length === 0) return new Map();
 
+    const tenantIds = [...new Set(aggregates.map((a) => a.tenantId))];
     const filters: Record<string, unknown>[] = [
       { terms: { [field]: aggregateIds } },
+      { terms: { [tenantIdField]: tenantIds } },
     ];
     // Time-range hint: generous ±24h buffer to help ES narrow down shards/segments
     if (timeHint) {
