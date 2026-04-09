@@ -6,6 +6,7 @@ on:
   pull_request:
     paths-ignore:
       - "langwatch/**"
+      - "python-sdk/**"
       - "agentic-e2e-tests/**"
       - ".github/workflows/e2e-ci.yml"
 
