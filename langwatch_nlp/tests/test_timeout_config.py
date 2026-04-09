@@ -1,42 +1,15 @@
 """
-Unit tests for env-configurable NLP timeouts.
+Integration tests for env-configurable NLP timeouts.
 
-Each timeout reads from an env var with os.getenv() and falls back to a default.
-Tests verify:
-  1. Without the env var set, the default value is used
-  2. With the env var set, the custom value is used
+These tests exercise actual production code paths to verify that timeout
+env vars are read and passed through to the underlying HTTP clients.
 """
 
 import os
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
-
-
-class TestStreamIdleTimeout:
-    """NLP_STREAM_IDLE_TIMEOUT_SECONDS controls idle timeout for streaming events."""
-
-    def test_defaults_to_120_seconds(self):
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("NLP_STREAM_IDLE_TIMEOUT_SECONDS", None)
-            assert int(os.getenv("NLP_STREAM_IDLE_TIMEOUT_SECONDS", "120")) == 120
-
-    def test_reads_custom_value_from_env(self):
-        with patch.dict(os.environ, {"NLP_STREAM_IDLE_TIMEOUT_SECONDS": "300"}):
-            assert int(os.getenv("NLP_STREAM_IDLE_TIMEOUT_SECONDS", "120")) == 300
-
-
-class TestOptimizationIdleTimeout:
-    """NLP_OPTIMIZATION_IDLE_TIMEOUT_SECONDS controls idle timeout for optimization events."""
-
-    def test_defaults_to_7200_seconds(self):
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("NLP_OPTIMIZATION_IDLE_TIMEOUT_SECONDS", None)
-            assert int(os.getenv("NLP_OPTIMIZATION_IDLE_TIMEOUT_SECONDS", "7200")) == 7200
-
-    def test_reads_custom_value_from_env(self):
-        with patch.dict(os.environ, {"NLP_OPTIMIZATION_IDLE_TIMEOUT_SECONDS": "3600"}):
-            assert int(os.getenv("NLP_OPTIMIZATION_IDLE_TIMEOUT_SECONDS", "7200")) == 3600
 
 
 class TestHttpNodeDefaultTimeout:
@@ -76,7 +49,7 @@ class TestHttpNodeDefaultTimeout:
 
         captured_timeout = []
 
-        original_async_client = __import__("httpx").AsyncClient
+        original_async_client = httpx.AsyncClient
 
         class CapturingAsyncClient:
             def __init__(self, **kwargs):
@@ -110,7 +83,7 @@ class TestHttpNodeDefaultTimeout:
 
         captured_timeout = []
 
-        original_async_client = __import__("httpx").AsyncClient
+        original_async_client = httpx.AsyncClient
 
         class CapturingAsyncClient:
             def __init__(self, **kwargs):
@@ -134,15 +107,6 @@ class TestHttpNodeDefaultTimeout:
 
 class TestDspyCustomNodeTimeout:
     """NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS controls timeout for DSPy custom node HTTP calls."""
-
-    def test_defaults_to_600_seconds(self):
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS", None)
-            assert int(os.getenv("NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS", "600")) == 600
-
-    def test_reads_custom_value_from_env(self):
-        with patch.dict(os.environ, {"NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS": "120"}):
-            assert int(os.getenv("NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS", "600")) == 120
 
     def test_passes_default_timeout_to_httpx_post(self):
         from langwatch_nlp.studio.dspy.custom_node import CustomNode
@@ -190,15 +154,6 @@ class TestDspyCustomNodeTimeout:
 
 class TestDspyEvalLogTimeout:
     """NLP_DSPY_EVAL_LOG_TIMEOUT_SECONDS controls timeout for evaluation batch log HTTP calls."""
-
-    def test_defaults_to_60_seconds(self):
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("NLP_DSPY_EVAL_LOG_TIMEOUT_SECONDS", None)
-            assert int(os.getenv("NLP_DSPY_EVAL_LOG_TIMEOUT_SECONDS", "60")) == 60
-
-    def test_reads_custom_value_from_env(self):
-        with patch.dict(os.environ, {"NLP_DSPY_EVAL_LOG_TIMEOUT_SECONDS": "120"}):
-            assert int(os.getenv("NLP_DSPY_EVAL_LOG_TIMEOUT_SECONDS", "60")) == 120
 
     def test_passes_default_timeout_to_httpx_post(self):
         from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
