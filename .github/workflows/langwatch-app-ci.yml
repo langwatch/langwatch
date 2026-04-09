@@ -399,13 +399,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
 
-      - name: Install dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
-
       - name: Build mcp-server
         working-directory: mcp-server
         run: pnpm install --frozen-lockfile && pnpm run build
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Build
         working-directory: langwatch

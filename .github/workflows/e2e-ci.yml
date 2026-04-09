@@ -116,6 +116,10 @@ jobs:
             agentic-e2e-tests/pnpm-lock.yaml
             mcp-server/pnpm-lock.yaml
 
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
+
       - name: Install app dependencies
         working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
@@ -152,10 +156,6 @@ jobs:
       - name: Setup Elasticsearch
         working-directory: langwatch
         run: pnpm elastic:migrate
-
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Build app
         working-directory: langwatch
