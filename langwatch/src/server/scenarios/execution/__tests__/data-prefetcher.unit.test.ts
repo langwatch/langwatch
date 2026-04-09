@@ -9,7 +9,7 @@
  * Uses dependency injection for clean, fast tests without vi.mock.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   prefetchScenarioData,
   type DataPrefetcherDependencies,
@@ -471,8 +471,10 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("returns success with complete data", async () => {
+        it("returns success with complete data", async () => {
+          // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
+          process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
+
           const deps = createMockDeps({
             promptFetcher: {
               getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),

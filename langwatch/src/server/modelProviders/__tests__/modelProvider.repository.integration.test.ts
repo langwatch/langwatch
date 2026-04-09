@@ -38,7 +38,7 @@ describe("ModelProviderRepository Integration", () => {
 
   describe("given a model provider with customKeys", () => {
     describe("when saved and read back through the repository", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires CREDENTIALS_SECRET env var set to a 32-byte hex string for AES-256-GCM encryption.
       it.skip("encrypts on save and decrypts on read preserving original values", async () => {
         const created = await repository.create({
           projectId,
@@ -121,7 +121,7 @@ describe("ModelProviderRepository Integration", () => {
     const migrationIds: string[] = [];
 
     describe("when the migration task runs", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires CREDENTIALS_SECRET env var set to a 32-byte hex string for AES-256-GCM encryption.
       it.skip("encrypts only the plaintext rows", async () => {
         // 1. Insert plaintext row directly via prisma
         const plaintextId = generate(
@@ -211,7 +211,7 @@ describe("ModelProviderRepository Integration", () => {
 
     describe("given already-migrated providers", () => {
       describe("when migration runs again", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
+        // Skipped: requires CREDENTIALS_SECRET env var set to a 32-byte hex string for AES-256-GCM encryption.
         it.skip("is idempotent -- skips encrypted rows and data remains valid", async () => {
           // Run migration again (same data from previous test)
           await main();

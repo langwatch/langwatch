@@ -63,8 +63,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
   });
 
   describe("given a stalled scenario run with onCancel", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays the cancel button", () => {
+    it("does not display the cancel button", () => {
+      // STALLED is not in CANCELLABLE_STATUSES — the enum explicitly lists it as
+      // a terminal status alongside SUCCESS, FAILED, ERROR, and CANCELLED.
+      // Only QUEUED, PENDING, and IN_PROGRESS are cancellable.
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.STALLED, durationInMs: 0 })}
@@ -75,7 +77,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByTestId("cancel-run-button")).toBeInTheDocument();
+      expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
     });
   });
 

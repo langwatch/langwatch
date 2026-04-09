@@ -10,8 +10,45 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { z } from "zod";
+import { createInnerTRPCContext } from "../../trpc";
 
-const mockCheckLimit = vi.fn();
+vi.mock("~/env.mjs", () => ({
+  env: {
+    NEXTAUTH_PROVIDER: "email",
+    DEMO_PROJECT_ID: undefined,
+  },
+}));
+
+vi.mock("~/server/auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: vi.fn(() => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn(),
+  })),
+}));
+
+const {
+  mockCheckLimit,
+  mockNotifyResourceLimitReached,
+  mockUsageLimits,
+  mockCaptureException,
+} = vi.hoisted(() => {
+  const mockNotifyResourceLimitReached = vi.fn();
+  return {
+    mockCheckLimit: vi.fn(),
+    mockNotifyResourceLimitReached,
+    mockUsageLimits: {
+      notifyResourceLimitReached: mockNotifyResourceLimitReached,
+    },
+    mockCaptureException: vi.fn(),
+  };
+});
 
 vi.mock("~/server/license-enforcement", () => {
   const limitTypes = [
@@ -41,18 +78,12 @@ vi.mock("~/server/license-enforcement", () => {
   };
 });
 
-const mockNotifyResourceLimitReached = vi.fn();
-const mockUsageLimits = {
-  notifyResourceLimitReached: mockNotifyResourceLimitReached,
-};
-
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     usageLimits: mockUsageLimits,
   }),
 }));
 
-const mockCaptureException = vi.fn();
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
 }));
@@ -82,13 +113,13 @@ async function callReportLimitBlocked({
   organizationId: string;
   limitType: string;
 }) {
-  const caller = licenseEnforcementRouter.createCaller({
-    prisma: {} as any,
+  const ctx = createInnerTRPCContext({
     session: {
       user: { id: "user-1", email: "test@example.com", name: "Test User" },
       expires: "",
     },
-  } as any);
+  });
+  const caller = licenseEnforcementRouter.createCaller(ctx);
   return caller.reportLimitBlocked({
     organizationId,
     limitType: limitType as any,
@@ -102,8 +133,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
   });
 
   describe("when limit is actually reached", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("sends notification to ops team", async () => {
+    it("sends notification to ops team", async () => {
       mockCheckLimit.mockResolvedValue({
         allowed: false,
         current: 10,
@@ -131,8 +161,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
   });
 
   describe("when limit is not reached (fabricated request)", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("does not send notification", async () => {
+    it("does not send notification", async () => {
       mockCheckLimit.mockResolvedValue({
         allowed: true,
         current: 3,
@@ -155,8 +184,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
   });
 
   describe("when notification fails", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("captures the exception for observability", async () => {
+    it("captures the exception for observability", async () => {
       const notificationError = new Error("Slack webhook unreachable");
       mockNotifyResourceLimitReached.mockRejectedValue(notificationError);
       mockCheckLimit.mockResolvedValue({
@@ -179,8 +207,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
   });
 
   describe("when called with different limit types", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("passes the correct limitType to checkLimit", async () => {
+    it("passes the correct limitType to checkLimit", async () => {
       mockCheckLimit.mockResolvedValue({
         allowed: false,
         current: 5,

@@ -684,9 +684,7 @@ export const VariableMappingInput = ({
             >
               <SourceTypeIconComponent type={sourceInfo.source.type} />
               <Tag.Label fontFamily="mono" fontSize="12px">
-                {sourceInfo.source.id !== "trace"
-                  ? `${sourceInfo.source.id}.${sourceInfo.path.join(".")}`
-                  : sourceInfo.path.join(".")}
+                {sourceInfo.path.join(".")}
               </Tag.Label>
               <Tag.EndElement>
                 <Tag.CloseTrigger

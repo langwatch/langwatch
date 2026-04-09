@@ -75,7 +75,10 @@ const LARGE_MARKDOWN = Array.from(
 
 describe("<ExpandedTextDialog/>", () => {
   describe("when content exceeds the dialog viewport height", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: jsdom limitation — window.getComputedStyle() does not process
+    // CSS rules from stylesheets, so style properties set via Chakra/CSS classes
+    // (e.g. overflow: auto, maxHeight) always return empty strings. These tests
+    // can only be verified in a real browser or with a Playwright-based test.
     it.skip("makes large JSON content accessible within the dialog body", () => {
       const { baseElement } = renderDialog({ text: LARGE_JSON });
 
@@ -87,7 +90,7 @@ describe("<ExpandedTextDialog/>", () => {
       expect(style.maxHeight).toBeTruthy();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: Same jsdom limitation — getComputedStyle does not resolve CSS class styles.
     it.skip("makes large plain text accessible within the dialog body", () => {
       const { baseElement } = renderDialog({ text: LARGE_PLAIN_TEXT });
 
@@ -98,7 +101,7 @@ describe("<ExpandedTextDialog/>", () => {
       expect(style.overflow).toBe("auto");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: Same jsdom limitation — getComputedStyle does not resolve CSS class styles.
     it.skip("makes large Markdown content accessible within the dialog body", () => {
       const { baseElement } = renderDialog({ text: LARGE_MARKDOWN });
 
@@ -111,7 +114,7 @@ describe("<ExpandedTextDialog/>", () => {
   });
 
   describe("when content fits within the dialog viewport", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: Same jsdom limitation — getComputedStyle does not resolve CSS class styles.
     it.skip("does not force scrolling for small content", () => {
       const { baseElement } = renderDialog({ text: SMALL_JSON });
 
@@ -126,7 +129,10 @@ describe("<ExpandedTextDialog/>", () => {
   });
 
   describe("when JSON content is displayed with formatted mode enabled", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: The RenderInputOutput component that renders the copy button is loaded
+    // via next/dynamic. The mock resolves synchronously, but the copy button is inside
+    // a CodeMirror/json-view subtree that does not render in jsdom. The button selector
+    // "button svg" finds no element.
     it.skip("renders the copy button within the dialog", () => {
       const { baseElement } = renderDialog({
         text: JSON.stringify({ nested: { key: "value" } }),
@@ -139,7 +145,7 @@ describe("<ExpandedTextDialog/>", () => {
   });
 
   describe("when toggling the formatted switch off", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: Same jsdom limitation — getComputedStyle does not resolve CSS class styles.
     it.skip("keeps the dialog body scrollable after toggling", () => {
       const { baseElement } = render(
         <ExpandedTextDialog

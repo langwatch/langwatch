@@ -125,7 +125,7 @@ describe("Event Sourcing", () => {
     });
 
     describe("when multiple events arrive for the same aggregate", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("accumulates fold state incrementally", async () => {
         const aggregateId = generateTestAggregateId("incremental");
 

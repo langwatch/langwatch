@@ -46,10 +46,6 @@ describe("TraceUsageService", () => {
     },
   };
 
-  const mockClickHouseClient = {
-    query: vi.fn(),
-  };
-
   let service: TraceUsageService;
 
   beforeEach(() => {
@@ -101,19 +97,18 @@ describe("TraceUsageService", () => {
       });
 
       describe("when result is cached", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("returns cached value without querying ES", async () => {
+        it("returns cached value without querying ES", async () => {
           vi.mocked(
             mockOrganizationRepository.getProjectIds,
           ).mockResolvedValue(["proj-1"]);
           mockEsClient.count.mockResolvedValue({ count: 100 });
 
           // First call populates cache
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
+          await service.getCurrentMonthCount({ organizationId: "org-es-cache-1" });
 
           // Second call uses cache
           const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
+            organizationId: "org-es-cache-1",
           });
 
           expect(result).toBe(100);
@@ -134,12 +129,11 @@ describe("TraceUsageService", () => {
         ).mockResolvedValue(["proj-1"]);
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("queries ClickHouse for trace summaries total", async () => {
+      it("queries ClickHouse for trace summaries total", async () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
 
         const result = await service.getCurrentMonthCount({
-          organizationId: "org-123",
+          organizationId: "org-ch-total-1",
         });
 
         expect(result).toBe(500);
@@ -149,12 +143,11 @@ describe("TraceUsageService", () => {
         });
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("returns 0 when queryTraceSummariesTotalUniq returns null", async () => {
+      it("returns 0 when queryTraceSummariesTotalUniq returns null", async () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
 
         const result = await service.getCurrentMonthCount({
-          organizationId: "org-123",
+          organizationId: "org-ch-null-1",
         });
 
         expect(result).toBe(0);
@@ -169,16 +162,15 @@ describe("TraceUsageService", () => {
       });
 
       describe("when result is cached", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("returns cached value without querying ClickHouse", async () => {
+        it("returns cached value without querying ClickHouse", async () => {
           mockQueryTraceSummariesTotalUniq.mockResolvedValue(300);
 
           // First call populates cache
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
+          await service.getCurrentMonthCount({ organizationId: "org-ch-cache-1" });
 
           // Second call uses cache
           const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
+            organizationId: "org-ch-cache-1",
           });
 
           expect(result).toBe(300);

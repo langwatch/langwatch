@@ -108,8 +108,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * Expected behavior: ALWAYS open the editor so user can see/edit settings
    */
   describe("Issue 1: Always open evaluator editor after selection", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("opens evaluator editor after selecting an evaluator at trace level (even without pending mappings)", async () => {
+    it("opens evaluator editor after selecting an evaluator at trace level (even without pending mappings)", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluationDrawer" };
@@ -172,8 +171,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * Expected behavior: Should open evaluator editor with back button to list
    */
   describe("Issue 2: Click selected evaluator opens editor with back to list", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("clicking on already-selected evaluator opens editor (not list)", async () => {
+    it("clicking on already-selected evaluator opens editor (not list)", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluationDrawer" };
@@ -249,8 +247,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * the OnlineEvaluationDrawer should receive the new evaluator and select it.
    */
   describe("Issue 3: Creating new evaluator returns to online drawer", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("flow callback onSelect is called when new evaluator is created from evaluator editor", async () => {
+    it("flow callback onSelect is called when new evaluator is created from evaluator editor", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluationDrawer" };
@@ -315,8 +312,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * the mapping UI with trace/thread sources.
    */
   describe("Issue 4: Mapping section shows when creating new evaluator", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("evaluator editor shows mapping section with trace sources when opened from online drawer", async () => {
+    it("evaluator editor shows mapping section with trace sources when opened from online drawer", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       // Start with online evaluation drawer open
@@ -397,8 +393,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * ACTUAL: Mappings are empty.
    */
   describe("Issue: Auto-inference of mappings for trace level", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("auto-infers input/output mappings when selecting evaluator with required fields", async () => {
+    it("auto-infers input/output mappings when selecting evaluator with required fields", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
@@ -459,8 +454,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * ACTUAL: Clicking Cancel closes all drawers.
    */
   describe("Issue: Cancel should go back, not close everything", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("clicking Cancel in evaluator editor returns to online evaluation drawer", async () => {
+    it("clicking Cancel in evaluator editor returns to online evaluation drawer", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
@@ -536,8 +530,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * ACTUAL: Only shows flat thread_id and traces options.
    */
   describe("Issue: Thread level nested fields", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("thread level shows nested fields for traces mapping", async () => {
+    it("thread level shows nested fields for traces mapping", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
@@ -611,8 +604,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * User must click on the evaluator to open the editor.
    */
   describe("Issue: Switching levels updates available sources", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("switching from trace to thread updates mapping sources in editor", async () => {
+    it("switching from trace to thread updates mapping sources in editor", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
@@ -737,8 +729,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * ACTUAL: "threads" is shown as an option.
    */
   describe("Issue: Remove threads from trace-level sources", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("trace level mapping does not show threads option", async () => {
+    it("trace level mapping does not show threads option", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
@@ -809,8 +800,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * ACTUAL: Only yellow border, easy to miss.
    */
   describe("Issue 2: Red validation message for pending mappings", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("shows red validation message when required fields are not mapped", async () => {
+    it("shows red validation message when required fields are not mapped", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
@@ -875,8 +865,7 @@ describe("OnlineEvaluationDrawer Issue Fixes", () => {
    * EXPECTED: Warning banner visible in online evaluation drawer.
    */
   describe("Issue 6: Pending warning when returning without completing", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001 (root cause: OnlineEvaluationDrawer.tsx:767)
-    it.skip("shows pending mapping warning in online drawer when returning from editor", async () => {
+    it("shows pending mapping warning in online drawer when returning from editor", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
