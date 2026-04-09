@@ -45,7 +45,7 @@ import type {
 } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
+import { ScenarioInputMappingSection, isScenarioMappingValid } from "~/components/suites/ScenarioInputMappingSection";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 const DEFAULT_CODE = `import dspy
@@ -247,7 +247,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0;
+  const isValid = name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings, outputs, outputField: scenarioOutputField });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;

@@ -12,9 +12,9 @@ import type { FieldMapping } from "./types";
  * Resolve a record of field mappings to concrete string values.
  *
  * Source resolution rules:
- * - `sourceId: "scenario"`, `path: ["scenario_message"]` — last user message content
- * - `sourceId: "scenario"`, `path: ["conversation_history"]` — full messages array as JSON string
- * - `sourceId: "scenario"`, `path: ["thread_id"]` — thread ID, empty string if absent
+ * - `sourceId: "scenario"`, `path: ["input"]` — last user message content
+ * - `sourceId: "scenario"`, `path: ["messages"]` — full messages array as JSON string
+ * - `sourceId: "scenario"`, `path: ["threadId"]` — thread ID, empty string if absent
  * - `type: "value"` — the literal value string
  *
  * @param fieldMappings - Map of input identifier → mapping definition
@@ -55,15 +55,15 @@ function resolveMapping({
 
   const [field] = mapping.path;
 
-  if (field === "scenario_message") {
+  if (field === "input") {
     return extractLastUserMessage(agentInput);
   }
 
-  if (field === "conversation_history") {
+  if (field === "messages") {
     return JSON.stringify(agentInput.messages);
   }
 
-  if (field === "thread_id") {
+  if (field === "threadId") {
     return agentInput.threadId ?? "";
   }
 
@@ -83,10 +83,10 @@ function extractLastUserMessage(agentInput: AgentInput): string {
  * Used for best-match auto-mapping of agent inputs to scenario sources.
  */
 const SCENARIO_FIELD_ALIASES: Record<string, string[]> = {
-  scenario_message: [
-    "scenario_message",
-    "message",
+  input: [
     "input",
+    "message",
+    "scenario_message",
     "query",
     "question",
     "prompt",
@@ -94,17 +94,17 @@ const SCENARIO_FIELD_ALIASES: Record<string, string[]> = {
     "user_message",
     "user_input",
   ],
-  conversation_history: [
+  messages: [
+    "messages",
     "conversation_history",
     "history",
-    "messages",
     "conversation",
     "chat_history",
     "context",
   ],
-  thread_id: [
-    "thread_id",
+  threadId: [
     "threadid",
+    "thread_id",
     "thread",
     "session_id",
     "sessionid",
@@ -119,7 +119,7 @@ const SCENARIO_FIELD_ALIASES: Record<string, string[]> = {
  *
  * Matching rules:
  * - Exact or alias match (case-insensitive) → map to that source field
- * - No match and only one input → default to scenario_message
+ * - No match and only one input → default to input
  * - No match and multiple inputs → leave unmapped
  *
  * @param inputs - Array of agent input definitions
@@ -146,12 +146,12 @@ export function computeBestMatchMappings({
     }
   }
 
-  // If only one input and nothing matched, default to scenario_message
+  // If only one input and nothing matched, default to input
   if (inputs.length === 1 && Object.keys(result).length === 0 && inputs[0]) {
     result[inputs[0].identifier] = {
       type: "source",
       sourceId: "scenario",
-      path: ["scenario_message"],
+      path: ["input"],
     };
   }
 
