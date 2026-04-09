@@ -14,6 +14,28 @@ export type FilterParam =
   | Record<string, string[]>
   | Record<string, Record<string, string[]>>;
 
+// Shared qs options — kept in one place so parse/stringify never drift.
+// allowDots: true is used for filter parsing (e.g. evaluations.passed.eval-1)
+// allowDots: false is used for parseCurrentQuery to avoid merging unrelated
+// dot-separated keys (e.g. "group_by=topics.topics") into nested objects.
+const FILTER_PARSE_OPTIONS = {
+  allowDots: true,
+  comma: true,
+  allowEmptyArrays: true,
+} as const;
+
+const CURRENT_QUERY_PARSE_OPTIONS = {
+  allowDots: false,
+  comma: true,
+  allowEmptyArrays: true,
+} as const;
+
+const QUERY_STRINGIFY_OPTIONS = {
+  allowDots: true,
+  arrayFormat: "comma" as const,
+  allowEmptyArrays: true,
+} as const;
+
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -25,11 +47,7 @@ export const useFilterParams = () => {
   const filters: Partial<Record<FilterField, FilterParam>> = {};
 
   const queryString = router.asPath.split("?")[1] ?? "";
-  const queryParams = qs.parse(queryString, {
-    allowDots: true,
-    comma: true,
-    allowEmptyArrays: true,
-  });
+  const queryParams = qs.parse(queryString, FILTER_PARSE_OPTIONS);
 
   for (const [filterKey, filter] of Object.entries(availableFilters)) {
     const param = queryParams[filter.urlKey];
@@ -127,11 +145,7 @@ export const useFilterParams = () => {
   const parseCurrentQuery = () => {
     const search =
       typeof window !== "undefined" ? window.location.search.slice(1) : "";
-    return qs.parse(search, {
-      allowDots: false,
-      comma: true,
-      allowEmptyArrays: true,
-    });
+    return qs.parse(search, CURRENT_QUERY_PARSE_OPTIONS);
   };
 
   const setFilter = (filter: FilterField, params: FilterParam) => {
@@ -150,12 +164,7 @@ export const useFilterParams = () => {
             ),
             [filterUrl]: params,
           },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
@@ -185,12 +194,7 @@ export const useFilterParams = () => {
               {},
             ),
           },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
@@ -213,12 +217,7 @@ export const useFilterParams = () => {
                 ),
             ),
           ),
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
@@ -247,12 +246,7 @@ export const useFilterParams = () => {
             ...currentQuery,
             negateFilters: negateFilters ? "true" : "false",
           },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
