@@ -6,6 +6,7 @@ import {
   AgentRepository,
   type CreateAgentInput,
 } from "./agent.repository";
+import { AgentNotFoundError } from "./errors";
 
 /**
  * Service layer for Agent business logic.
@@ -67,6 +68,89 @@ export class AgentService {
    */
   get softDelete() {
     return this.repository.softDelete.bind(this.repository);
+  }
+
+  /**
+   * Lists agents with pagination. Used by REST API.
+   */
+  async listAgents(input: {
+    projectId: string;
+    page: number;
+    limit: number;
+  }): Promise<{
+    data: Array<{
+      id: string;
+      name: string;
+      type: string;
+      config: AgentComponentConfig;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const { data, total } = await this.repository.findAllPaginated(input);
+
+    return {
+      data: data.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+        config: agent.config,
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+      })),
+      pagination: {
+        page: input.page,
+        limit: input.limit,
+        total,
+        totalPages: Math.ceil(total / input.limit),
+      },
+    };
+  }
+
+  /**
+   * Gets an agent by ID or throws AgentNotFoundError. Used by REST API.
+   */
+  async getByIdOrThrow(input: { id: string; projectId: string }) {
+    const agent = await this.repository.findById(input);
+    if (!agent) {
+      throw new AgentNotFoundError();
+    }
+    return agent;
+  }
+
+  /**
+   * Soft deletes an agent or throws AgentNotFoundError. Used by REST API.
+   */
+  async archiveAgent(input: { id: string; projectId: string }) {
+    const agent = await this.repository.findById(input);
+    if (!agent) {
+      throw new AgentNotFoundError();
+    }
+    return this.repository.softDelete(input);
+  }
+
+  /**
+   * Updates an agent or throws AgentNotFoundError. Used by REST API.
+   */
+  async updateOrThrow(input: {
+    id: string;
+    projectId: string;
+    data: Partial<{
+      name: string;
+      type: AgentType;
+      config: AgentComponentConfig;
+      workflowId: string | null;
+    }>;
+  }) {
+    const existing = await this.repository.findById({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (!existing) {
+      throw new AgentNotFoundError();
+    }
+    return this.repository.update(input);
   }
 
   /**
