@@ -1460,19 +1460,14 @@ function transformMetricForDedup(
 
   // Handle evaluation metrics that reference evaluation_runs columns (es.Passed, es.Score, etc.)
   // Replace table-qualified references with CTE column aliases so the outer SELECT is valid.
+  // Uses the same extractReferencedEvaluationColumns as the CTE projection to stay in sync.
   const es = tableAliases.evaluation_runs;
-  if (selectExpression.includes(`${es}.`)) {
+  const referencedEvalCols = extractReferencedEvaluationColumns([
+    selectExpression,
+  ]);
+  if (referencedEvalCols.size > 0) {
     let rewritten = selectExpression;
-    for (const col of [
-      "EvaluatorId",
-      "EvaluatorName",
-      "EvaluatorType",
-      "Score",
-      "Passed",
-      "Label",
-      "Status",
-      "IsGuardrail",
-    ]) {
+    for (const col of referencedEvalCols) {
       rewritten = rewritten.replaceAll(
         `${es}.${col}`,
         `eval_${col.toLowerCase()}`,
