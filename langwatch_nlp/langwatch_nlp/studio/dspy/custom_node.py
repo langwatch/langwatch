@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from typing import Any, Optional
 
@@ -34,7 +35,7 @@ class CustomNode(dspy.Module):
             url,
             headers={"X-Auth-Token": self.api_key, "Content-Type": "application/json"},
             content=json.dumps(kwargs, cls=SerializableWithPydanticAndPredictEncoder, ensure_ascii=False),
-            timeout=600,  # 10 minutes
+            timeout=int(os.getenv("NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS", "600")),
         )
 
         result = response.json()

@@ -10,6 +10,7 @@ Supports making HTTP requests with:
 - Timeout configuration
 """
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, Literal, Optional
@@ -246,7 +247,7 @@ async def execute_http_node(
     headers = build_headers(config)
 
     # Configure timeout (default 5 minutes)
-    timeout_seconds = (config.timeout_ms / 1000) if config.timeout_ms else 300.0
+    timeout_seconds = (config.timeout_ms / 1000) if config.timeout_ms else float(os.getenv("NLP_HTTP_NODE_DEFAULT_TIMEOUT_SECONDS", "300"))
 
     try:
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
