@@ -44,7 +44,7 @@ vi.mock("~/server/embeddings", () => ({
   }),
 }));
 
-vi.mock("~/server/api/routers/modelProviders", () => ({
+vi.mock("~/server/api/routers/modelProviders.utils", () => ({
   getProjectModelProviders: vi.fn().mockResolvedValue({
     openai: { enabled: true },
   }),
@@ -76,6 +76,7 @@ vi.mock("fetch-h2", () => ({
 
 import { prisma } from "~/server/db";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { fetch as mockFetchH2 } from "fetch-h2";
 import { clusterTopicsForProject } from "../topicClustering";
 
 function makeProject(overrides: Record<string, unknown> = {}) {
@@ -123,7 +124,9 @@ describe("clusterTopicsForProject", () => {
       expect(mockEsClient.search).not.toHaveBeenCalled();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: batchClusterTraces now calls getProjectTopicClusteringModelProvider
+    // which goes through ModelProviderService → ModelProviderRepository.findAll
+    // and prepareLitellmParams, requiring deeper mocking of the App singleton
     it.skip("maps CH results to TopicClusteringTrace and calls clustering", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
@@ -158,8 +161,7 @@ describe("clusterTopicsForProject", () => {
       expect(mockEsClient.search).not.toHaveBeenCalled();
       expect(mockEsClient.count).not.toHaveBeenCalled();
       // clustering service was called (via mocked fetch-h2)
-      const { fetch } = await import("fetch-h2");
-      expect(fetch).toHaveBeenCalled();
+      expect(mockFetchH2).toHaveBeenCalled();
     });
   });
 
@@ -213,7 +215,7 @@ describe("clusterTopicsForProject", () => {
   });
 
   describe("when CH search returns ComputedInput", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: same as above — batchClusterTraces requires deeper App singleton mocking
     it.skip("extracts input text from JSON-stringified ComputedInput", async () => {
       vi.mocked(prisma.project.findUnique).mockResolvedValue(
         makeProject() as any,
@@ -262,11 +264,10 @@ describe("clusterTopicsForProject", () => {
       await clusterTopicsForProject("proj-1", undefined, false);
 
       // Traces with empty/null input should be filtered, leaving 10
-      const { fetch } = await import("fetch-h2");
-      const fetchCall = vi.mocked(fetch as any).mock.calls[0];
-      const body = fetchCall?.[1]?.json;
+      const fetchCall = vi.mocked(mockFetchH2).mock.calls[0];
+      const body = fetchCall?.[1]?.json as { traces: Array<{ input: string }> } | undefined;
       expect(body?.traces).toHaveLength(10);
-      expect(body?.traces[0].input).toBe("User message 0");
+      expect(body?.traces[0]?.input).toBe("User message 0");
     });
   });
 });

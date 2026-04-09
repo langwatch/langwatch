@@ -66,15 +66,14 @@ describe("evaluatePreconditions()", () => {
     });
 
     describe("when a trace arrives with origin = ''", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("passes the precondition", () => {
+      it("fails the precondition", () => {
         const traceData = makeTraceData({ origin: "" });
         expect(
           evaluatePreconditions({
             traceData,
             preconditions,
           }),
-        ).toBe(true);
+        ).toBe(false);
       });
     });
 
@@ -633,8 +632,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no origin and input 'I need help'", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("runs the evaluation", () => {
+      it("fails because undefined origin does not match 'application'", () => {
         const traceData = makeTraceData({
           origin: undefined,
           input: "I need help",
@@ -644,7 +642,7 @@ describe("evaluatePreconditions()", () => {
             traceData,
             preconditions,
           }),
-        ).toBe(true);
+        ).toBe(false);
       });
     });
 

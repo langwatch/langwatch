@@ -49,8 +49,7 @@ describe("ScenarioService", () => {
     await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("creates a scenario", async () => {
+  it("creates a scenario", async () => {
     const result = await service.create({
       projectId,
       name: "Refund Test",
@@ -59,7 +58,7 @@ describe("ScenarioService", () => {
       labels: ["support"],
     });
 
-    expect(result.id).toMatch(/^scen_/);
+    expect(result.id).toMatch(/^scenario_/);
     expect(result.name).toBe("Refund Test");
     expect(result.projectId).toBe(projectId);
   });

@@ -259,7 +259,14 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Generate with AI", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: The test expects `initialFormData` to include `labels: ["support"]`
+    // (from mockGeneratedScenario), but `generateScenarioWithAI` validates the API
+    // response through Zod's `generatedScenarioSchema` which only includes
+    // `name`, `situation`, and `criteria`. Zod strips unknown fields (including
+    // `labels`), so `openDrawer` is called with `initialFormData` that has no
+    // `labels` property. Fix: add `labels` to `generatedScenarioSchema` and update
+    // `ScenarioFormData` / `ScenarioInitialData` accordingly, or update this test
+    // to not expect `labels` in the generated output.
     it.skip("opens drawer with generated content without creating a DB record", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
@@ -300,7 +307,11 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Skip", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: The test expects `initialFormData` to include `labels: []`, but
+    // `handleSkip` in ScenarioCreateModal calls `openEditorWithData({ name: "",
+    // situation: "", criteria: [] })` — no `labels` key is included. Fix: add
+    // `labels: []` to the object passed to `openEditorWithData` in `handleSkip`,
+    // or update this test to not assert `labels` in the skip path.
     it.skip("opens drawer with empty initial data without creating a DB record", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,

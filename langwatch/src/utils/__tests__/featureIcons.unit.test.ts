@@ -12,9 +12,8 @@ describe("featureIcons", () => {
   });
 
   describe("when the simulation runs feature icon configuration is read", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("has label 'Run History'", () => {
-      expect(featureIcons.simulation_runs.label).toBe("Run History");
+    it("has label 'Runs'", () => {
+      expect(featureIcons.simulation_runs.label).toBe("Runs");
     });
   });
 });

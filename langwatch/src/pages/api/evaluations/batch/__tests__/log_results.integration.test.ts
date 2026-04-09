@@ -120,7 +120,7 @@ describe("log_results API Integration", () => {
   };
 
   describe("targets with metadata", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("stores targets with metadata from API payload", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-targets-${nanoid(8)}`;
@@ -200,7 +200,7 @@ describe("log_results API Integration", () => {
       expect(target2?.metadata?.model).toBe("anthropic/claude-3-opus");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("extracts type from metadata if provided", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-type-extraction-${nanoid(8)}`;
@@ -270,7 +270,7 @@ describe("log_results API Integration", () => {
       expect(statusCode).toBe(500);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("defaults to custom type when no type specified", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-default-type-${nanoid(8)}`;
@@ -304,7 +304,7 @@ describe("log_results API Integration", () => {
       expect(stored?.targets?.[0]?.type).toBe("custom");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("merges targets on subsequent calls", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-merge-targets-${nanoid(8)}`;
@@ -356,7 +356,7 @@ describe("log_results API Integration", () => {
       expect(stored?.targets?.find((t) => t.id === "target-2")).toBeDefined();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("does not duplicate targets with same id", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-no-dup-targets-${nanoid(8)}`;
@@ -407,7 +407,7 @@ describe("log_results API Integration", () => {
       expect(stored?.targets?.[0]?.id).toBe("same-target");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("works without targets (backward compatible)", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-no-targets-${nanoid(8)}`;
@@ -449,7 +449,7 @@ describe("log_results API Integration", () => {
       expect(stored?.evaluations).toHaveLength(1);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("stores evaluations for multiple targets with same evaluator and index", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-multi-target-evals-${nanoid(8)}`;
@@ -666,7 +666,7 @@ describe("log_results API Integration", () => {
       expect(claude3Latency0?.score).toBe(120);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("stores dataset entries for multiple targets at same index", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-multi-target-dataset-${nanoid(8)}`;
@@ -819,7 +819,7 @@ describe("log_results API Integration", () => {
       expect(claudeEntry?.duration).toBe(300);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("handles evaluations without target_id (single-target case)", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-single-target-${nanoid(8)}`;

@@ -68,6 +68,7 @@ vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     asPath: "/test",
+    pathname: "",
     push: mockPush,
     replace: mockPush,
   }),
@@ -520,7 +521,9 @@ describe("Prompt Editor Local Changes", () => {
   });
 
   describe("saving prompt preserves newly added fields", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: After save, the PromptEditorDrawer resets form to initialLocalConfig
+    // instead of showing the server-saved data. The drawer needs to clear initialLocalConfig
+    // from its internal state when onSave fires so the form shows the new server response.
     it.skip("form does not reset to initialLocalConfig after clicking save", async () => {
       // BUG: After clicking save, the form resets to initialLocalConfig
       // instead of keeping the user's changes or showing the saved data.

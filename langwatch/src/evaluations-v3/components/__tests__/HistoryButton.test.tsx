@@ -122,7 +122,9 @@ describe("HistoryButton", () => {
     );
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
+  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
+  // aria-label="View run history". Also, <a> elements don't support the `disabled` attribute.
+  // The source component or these tests need to be updated to align on the interface.
   it.skip("shows disabled button with 'No runs yet' tooltip when no runs exist", async () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
@@ -144,7 +146,8 @@ describe("HistoryButton", () => {
     expect(historyLink).toHaveAttribute("disabled");
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
+  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
+  // aria-label="View run history". Update source or tests to align on the interface.
   it.skip("shows enabled button when runs exist", async () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
@@ -174,7 +177,8 @@ describe("HistoryButton", () => {
     expect(historyLink).not.toHaveAttribute("disabled");
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
+  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
+  // aria-label="View run history". Update source or tests to align on the interface.
   it.skip("navigates to experiment page using experimentSlug from store when clicked", async () => {
     // Update the mock to return specific values for this test
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -223,7 +227,8 @@ describe("HistoryButton", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
+  // Skipped: HistoryButton renders aria-label="View results" (text: "Results"), not
+  // aria-label="View run history". Update source or tests to align on the interface.
   it.skip("shows disabled button while loading", () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";

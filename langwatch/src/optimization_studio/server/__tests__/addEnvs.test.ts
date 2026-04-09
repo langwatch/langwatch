@@ -13,7 +13,7 @@ vi.mock("../../../utils/encryption", () => ({
   decrypt: vi.fn((v: string) => v.replace("encrypted:", "")),
 }));
 
-vi.mock("../../../server/api/routers/modelProviders", () => ({
+vi.mock("../../../server/api/routers/modelProviders.utils", () => ({
   getProjectModelProviders: vi.fn(),
   prepareLitellmParams: vi.fn(),
 }));
@@ -79,8 +79,7 @@ describe("addEnvs", () => {
       ] as any);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes decrypted secrets in the workflow", async () => {
+    it("includes decrypted secrets in the workflow", async () => {
       const event = makeExecuteComponentEvent();
 
       const result = await addEnvs(event, PROJECT_ID);
@@ -92,8 +91,7 @@ describe("addEnvs", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("decrypts each secret individually", async () => {
+    it("decrypts each secret individually", async () => {
       const event = makeExecuteComponentEvent();
 
       await addEnvs(event, PROJECT_ID);
@@ -109,8 +107,7 @@ describe("addEnvs", () => {
       vi.mocked(prisma.projectSecret.findMany).mockResolvedValue([]);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes an empty secrets object in the workflow", async () => {
+    it("includes an empty secrets object in the workflow", async () => {
       const event = makeExecuteComponentEvent();
 
       const result = await addEnvs(event, PROJECT_ID);
@@ -121,8 +118,7 @@ describe("addEnvs", () => {
   });
 
   describe("when the event has no workflow", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns the event unchanged", async () => {
+    it("returns the event unchanged", async () => {
       const event = {
         type: "is_alive",
         payload: {},
@@ -140,8 +136,7 @@ describe("addEnvs", () => {
       vi.mocked(prisma.projectSecret.findMany).mockResolvedValue([]);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("queries secrets for the correct project", async () => {
+    it("queries secrets for the correct project", async () => {
       const event = makeExecuteComponentEvent();
 
       await addEnvs(event, PROJECT_ID);

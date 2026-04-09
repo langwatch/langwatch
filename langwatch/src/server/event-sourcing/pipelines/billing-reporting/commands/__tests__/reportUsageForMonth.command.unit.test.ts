@@ -70,6 +70,15 @@ vi.mock("~/utils/logger/server", () => ({
   createLogger: vi.fn(() => createMockLogger()),
 }));
 
+// Disable the org-level TtlCache so tests don't share cached org data across runs
+vi.mock("~/server/utils/ttlCache", () => ({
+  TtlCache: class {
+    async get() { return undefined; }
+    async set() { return; }
+    async delete() { return; }
+  },
+}));
+
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
   withScope: vi.fn((cb: (scope: Record<string, unknown>) => void) => {
@@ -224,8 +233,7 @@ describe("ReportUsageForMonthCommand", () => {
   // ========================================================================
 
   describe("given org with billable events and active subscription", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("reports delta, updates checkpoint, and self-dispatches", async () => {
+    it("reports delta, updates checkpoint, and self-dispatches", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
@@ -276,8 +284,7 @@ describe("ReportUsageForMonthCommand", () => {
   });
 
   describe("given first run for new org (no checkpoint)", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("creates checkpoint at reported total", async () => {
+    it("creates checkpoint at reported total", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue(null);
       mockQueryBillableEventsTotal.mockResolvedValue(50);
@@ -312,8 +319,7 @@ describe("ReportUsageForMonthCommand", () => {
   // ========================================================================
 
   describe("given pending checkpoint (crash recovery)", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("uses pending value with same idempotency key", async () => {
+    it("uses pending value with same idempotency key", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
@@ -349,8 +355,7 @@ describe("ReportUsageForMonthCommand", () => {
   // ========================================================================
 
   describe("given permanent Stripe rejection", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("clears pending, increments failures, does NOT self-dispatch", async () => {
+    it("clears pending, increments failures, does NOT self-dispatch", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
@@ -386,8 +391,7 @@ describe("ReportUsageForMonthCommand", () => {
   });
 
   describe("given transient Stripe error", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("catches error, increments failures, and self-dispatches for retry", async () => {
+    it("catches error, increments failures, and self-dispatches for retry", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
         lastReportedTotal: 0,
@@ -420,8 +424,7 @@ describe("ReportUsageForMonthCommand", () => {
   });
 
   describe("given unexpected error in skip conditions", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("catches error and returns empty events", async () => {
+    it("catches error and returns empty events", async () => {
       mockOrganizations.getOrganizationForBilling.mockRejectedValue(
         new Error("database offline"),
       );
@@ -459,8 +462,7 @@ describe("ReportUsageForMonthCommand", () => {
   });
 
   describe("given circuit-breaker reset after successful report", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("resets consecutiveFailures to 0 on success", async () => {
+    it("resets consecutiveFailures to 0 on success", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
