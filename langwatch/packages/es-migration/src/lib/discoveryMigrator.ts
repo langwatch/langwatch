@@ -231,7 +231,7 @@ export class DiscoveryMigrator {
 
         // Bulk-insert event records
         const writeStart = Date.now();
-        if (!config.dryRun && !windowFailed && allEventRecords.length > 0 && this.deps.insertEventRecords) {
+        if (!config.dryRun && allEventRecords.length > 0 && this.deps.insertEventRecords) {
           try {
             await this.deps.insertEventRecords(allEventRecords);
           } catch (err) {
