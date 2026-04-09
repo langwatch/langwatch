@@ -119,7 +119,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       UpdatedAt: new Date(data.updatedAt),
     };
 
-    await this.clickHouseClient.insert({
+    const client = await this.resolveClient(data.tenantId);
+    await client.insert({
       table: TABLE_NAME,
       values: [record],
       format: "JSONEachRow",

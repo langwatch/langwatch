@@ -219,8 +219,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
 
     try {
+      const tenantId = spans[0]!.tenantId;
+      const client = await this.resolveClient(tenantId);
       const records = spans.map((span) => this.toClickHouseRecord(span));
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: records,
         format: "JSONEachRow",
