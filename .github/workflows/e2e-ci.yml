@@ -113,6 +113,7 @@ jobs:
           cache-dependency-path: |
             langwatch/pnpm-lock.yaml
             agentic-e2e-tests/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
 
       - name: Install app dependencies
         working-directory: langwatch
@@ -125,6 +126,10 @@ jobs:
       - name: Install Playwright browsers
         working-directory: agentic-e2e-tests
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build MCP server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm build
 
       - name: Prepare files
         working-directory: langwatch
@@ -156,6 +161,11 @@ jobs:
         run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
+        env:
+          # Migrations already ran in earlier steps; skip them during pnpm start
+          SKIP_PRISMA_MIGRATE: "true"
+          SKIP_ELASTIC_MIGRATE: "true"
+          SKIP_CLICKHOUSE_MIGRATE: "true"
         run: |
           # Start the app in background
           cd langwatch && PORT=5570 pnpm start &
