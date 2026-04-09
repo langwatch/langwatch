@@ -11,7 +11,7 @@ Feature: Scenario Input Mapping
   @unit
   Scenario: Suite target schema accepts fieldMappings
     Given a suite target with type "code" and a referenceId
-    When fieldMappings maps "query" to source "scenario" path ["scenario_message"]
+    When fieldMappings maps "query" to source "scenario" path ["input"]
     And fieldMappings maps "context" to value "Use the KB"
     Then the suite target schema validates successfully
 
@@ -29,7 +29,7 @@ Feature: Scenario Input Mapping
   @unit
   Scenario: Simulation target schema accepts fieldMappings
     Given a simulation target with type "http" and a referenceId
-    When fieldMappings maps "input" to source "scenario" path ["scenario_message"]
+    When fieldMappings maps "input" to source "scenario" path ["input"]
     Then the simulation target schema validates successfully
 
   # --- Pipeline Threading ---
@@ -50,21 +50,21 @@ Feature: Scenario Input Mapping
 
   @unit
   Scenario: resolveFieldMappings resolves source mappings from agent input
-    Given fieldMappings maps "query" to source "scenario" path ["scenario_message"]
+    Given fieldMappings maps "query" to source "scenario" path ["input"]
     And an agent input with messages containing "Hello world"
     When resolveFieldMappings is called
     Then "query" resolves to "Hello world"
 
   @unit
-  Scenario: resolveFieldMappings resolves conversation_history as JSON string
-    Given fieldMappings maps "history" to source "scenario" path ["conversation_history"]
+  Scenario: resolveFieldMappings resolves messages as JSON string
+    Given fieldMappings maps "history" to source "scenario" path ["messages"]
     And an agent input with multiple messages
     When resolveFieldMappings is called
     Then "history" resolves to a JSON string of the messages array
 
   @unit
-  Scenario: resolveFieldMappings resolves thread_id
-    Given fieldMappings maps "tid" to source "scenario" path ["thread_id"]
+  Scenario: resolveFieldMappings resolves threadId
+    Given fieldMappings maps "tid" to source "scenario" path ["threadId"]
     And an agent input with threadId "abc-123"
     When resolveFieldMappings is called
     Then "tid" resolves to "abc-123"
@@ -80,7 +80,7 @@ Feature: Scenario Input Mapping
   @unit
   Scenario: Code agent adapter uses resolved fieldMappings for input assignment
     Given a code agent with inputs "query" and "context"
-    And fieldMappings maps "query" to source "scenario" path ["scenario_message"]
+    And fieldMappings maps "query" to source "scenario" path ["input"]
     And fieldMappings maps "context" to value "Search the knowledge base"
     When the adapter builds the input record from an agent input
     Then "query" receives the scenario message content
@@ -97,7 +97,7 @@ Feature: Scenario Input Mapping
   @unit
   Scenario: Code agent adapter ignores mappings for nonexistent inputs
     Given a code agent with inputs "query"
-    And fieldMappings maps "query" to source "scenario" path ["scenario_message"]
+    And fieldMappings maps "query" to source "scenario" path ["input"]
     And fieldMappings maps "deleted_field" to value "stale mapping"
     When the adapter builds the input record from an agent input
     Then "query" receives the scenario message content
@@ -108,8 +108,8 @@ Feature: Scenario Input Mapping
   @unit
   Scenario: HTTP agent adapter uses resolved fieldMappings for template variables
     Given an HTTP agent with body template containing "{{query}}" and "{{context}}"
-    And fieldMappings maps "query" to source "scenario" path ["scenario_message"]
-    And fieldMappings maps "context" to source "scenario" path ["conversation_history"]
+    And fieldMappings maps "query" to source "scenario" path ["input"]
+    And fieldMappings maps "context" to source "scenario" path ["messages"]
     When the adapter builds the request body from an agent input
     Then "query" is resolved to the scenario message content
     And "context" is resolved to the conversation history JSON
@@ -137,7 +137,7 @@ Feature: Scenario Input Mapping
   Scenario: Single-input agent generates default fieldMappings
     Given an agent with a single input "query"
     When computing default mappings
-    Then "query" is auto-mapped to source "scenario" path ["scenario_message"]
+    Then "query" is mapped to source "scenario" path ["input"]
 
   @unit
   Scenario: Multi-input agent has no default fieldMappings
@@ -155,19 +155,12 @@ Feature: Scenario Input Mapping
     And each input field shows a mapping dropdown
 
   @integration
-  Scenario: Target picker shows auto-mapped label for single-input agent
-    Given a suite with a code agent target that has a single input "query"
-    When the target picker renders
-    Then the target shows an "(auto-mapped)" indicator
-    And no explicit mapping form is shown
-
-  @integration
   Scenario: Mapping dropdown offers scenario sources
     Given the mapping UI is rendered for a code agent input
     When the user opens the mapping dropdown
-    Then "Scenario message" is available as a source
-    And "Conversation history" is available as a source
-    And "Thread ID" is available as a source
+    Then "input" is available as a source
+    And "messages" is available as a source
+    And "threadId" is available as a source
 
   @integration
   Scenario: User can set a static value mapping
@@ -193,7 +186,7 @@ Feature: Scenario Input Mapping
   @integration
   Scenario: Mapping changes update form state on suite target
     Given a suite with a code agent target
-    When the user maps "query" to "Scenario message"
+    When the user maps "query" to "input"
     Then the form state for that target's fieldMappings reflects the mapping
 
   # --- Ad-hoc Run Path ---
