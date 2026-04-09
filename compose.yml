@@ -1,6 +1,6 @@
 services:
   app:
-    image: langwatch/langwatch:3.0.0
+    image: langwatch/langwatch:latest
     environment:
       SKIP_ENV_VALIDATION: true
       DISABLE_PII_REDACTION: true
@@ -26,7 +26,7 @@ services:
         condition: service_healthy
 
   workers:
-    image: langwatch/langwatch:3.0.0
+    image: langwatch/langwatch:latest
     command: ["pnpm", "run", "start:workers"]
     working_dir: /app/langwatch
     environment:
@@ -52,7 +52,7 @@ services:
     restart: always
 
   langwatch_nlp:
-    image: langwatch/langwatch_nlp:3.0.0
+    image: langwatch/langwatch_nlp:latest
     env_file:
       - langwatch/.env
     ports:
@@ -63,7 +63,7 @@ services:
       - LANGWATCH_ENDPOINT=http://app:5560
 
   langevals:
-    image: langwatch/langevals:3.0.0
+    image: langwatch/langevals:latest
     ports:
       - "5562:5562"
     restart: always

@@ -24571,10 +24571,10 @@ Docker Compose starts the following services:
 
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
-| `app` | `langwatch/langwatch:3.0.0` | 5560 | Main application |
-| `workers` | `langwatch/langwatch:3.0.0` | — | Background job processing |
-| `langwatch_nlp` | `langwatch/langwatch_nlp:3.0.0` | 5561 | NLP processing, workflows |
-| `langevals` | `langwatch/langevals:3.0.0` | 5562 | Evaluators, guardrails |
+| `app` | `langwatch/langwatch:latest` | 5560 | Main application |
+| `workers` | `langwatch/langwatch:latest` | — | Background job processing |
+| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
+| `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
 | `redis` | `redis:alpine` | — | Job queue, caching |
 | `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
