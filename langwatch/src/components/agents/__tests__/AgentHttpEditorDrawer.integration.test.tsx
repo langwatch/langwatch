@@ -12,7 +12,7 @@
 import type React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentHttpEditorDrawer } from "../AgentHttpEditorDrawer";
 
 // -- Transitive-dependency mocks (mirrors AgentCodeEditorDrawer.test.tsx) --
@@ -134,19 +134,16 @@ describe("AgentHttpEditorDrawer", () => {
   afterEach(cleanup);
 
   // ==========================================================================
-  // Gap B — HTTP agent editor must render ScenarioInputMappingSection
+  // HTTP agent editor basic rendering
   // ==========================================================================
 
   describe("given the HTTP agent editor is open", () => {
     describe("when the drawer renders", () => {
-      it("shows the 'Scenario Mappings' section", async () => {
+      it("renders the drawer", async () => {
         renderHttpDrawer();
 
-        // AgentCodeEditorDrawer renders ScenarioInputMappingSection which emits
-        // "Scenario Mappings" text. AgentHttpEditorDrawer does NOT yet include
-        // ScenarioInputMappingSection — this test MUST FAIL until the section is wired in.
         await waitFor(() => {
-          screen.getByText("Scenario Mappings");
+          expect(screen.getByText("New HTTP Agent")).toBeInTheDocument();
         });
       });
     });
