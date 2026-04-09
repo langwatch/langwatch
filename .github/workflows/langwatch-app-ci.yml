@@ -99,7 +99,7 @@ jobs:
         id: unit-tests
         working-directory: langwatch
         run: |
-          pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text \
+          pnpm test:unit --run --coverage --coverage.reporter=lcov --coverage.reporter=text \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract test failures
