@@ -16,6 +16,7 @@ import {
   extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
 } from "./field-mappings";
+import { snakeCase } from "../../../utils/stringCasing";
 import {
   type MetricTranslation,
   translateMetric,
@@ -717,7 +718,7 @@ function buildArrayJoinTimeseriesQuery(
   const referencedEvalCols = extractReferencedEvaluationColumns(metricExprs);
   for (const col of referencedEvalCols) {
     cteSelectExprs.push(
-      `${es}.${col} AS eval_${col.toLowerCase()}`,
+      `${es}.${col} AS eval_${snakeCase(col)}`,
     );
   }
 
@@ -1470,7 +1471,7 @@ function transformMetricForDedup(
     for (const col of referencedEvalCols) {
       rewritten = rewritten.replaceAll(
         `${es}.${col}`,
-        `eval_${col.toLowerCase()}`,
+        `eval_${snakeCase(col)}`,
       );
     }
     return rewritten;
