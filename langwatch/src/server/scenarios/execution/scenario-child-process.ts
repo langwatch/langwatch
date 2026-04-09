@@ -144,7 +144,6 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       ],
       verbose,
       metadata: {
-        labels: ["scenario-runner", target.type],
         langwatch: {
           targetReferenceId: target.referenceId,
           targetType: target.type,
@@ -153,6 +152,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
     {
       batchRunId: context.batchRunId,
+      runId: jobData.scenarioRunId,
       langwatch: {
         endpoint: langwatchEndpoint,
         apiKey: langwatchApiKey,

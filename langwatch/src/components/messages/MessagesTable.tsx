@@ -2,14 +2,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   CloseButton,
-  Container,
   Heading,
   HStack,
   Icon,
   Portal,
-  Progress,
   Skeleton,
   Spacer,
   Spinner,
@@ -21,14 +18,16 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
 import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
@@ -38,6 +37,7 @@ import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
+import { getOriginColor, getOriginLabel } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
@@ -54,13 +54,15 @@ import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { RedactedField } from "../ui/RedactedField";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { ExportConfigDialog } from "./ExportConfigDialog";
+import { ExportProgress } from "./ExportProgress";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
+import { useExportTraces } from "./useExportTraces";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -78,6 +80,11 @@ export function MessagesTable({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
+  const { isLiteMember } = useLiteMemberGuard();
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (s) => s.openLiteMemberRestriction,
+  );
   const queryClient = api.useContext();
 
   const { filterParams, queryOpts } = useFilterParams();
@@ -91,6 +98,29 @@ export function MessagesTable({
   } = usePeriodSelector();
 
   const navigationFooter = useNavigationFooter();
+
+  const {
+    isDialogOpen: isExportDialogOpen,
+    openExportDialog: openExportDialogRaw,
+    closeExportDialog,
+    isExporting,
+    progress: exportProgress,
+    startExport,
+    cancelExport,
+  } = useExportTraces({
+    projectId: project?.id,
+    filters: filterParams.filters,
+    startDate: filterParams.startDate,
+    endDate: filterParams.endDate,
+    query: getSingleQueryParam(router.query.query),
+  });
+
+  // Track whether the export dialog was opened for selected traces or all
+  const isSelectedExportRef = useRef(false);
+  const openExportDialog = (options: { selectedTraceIds?: string[] }) => {
+    isSelectedExportRef.current = (options.selectedTraceIds ?? []).length > 0;
+    openExportDialogRaw(options);
+  };
 
   // Live endDate that gets bumped to "now" on SSE events so the query
   // window extends to include newly-arrived traces.
@@ -220,8 +250,6 @@ export function MessagesTable({
     },
   );
 
-  const downloadTraces = api.traces.getAllForDownload.useMutation();
-
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
     Record<string, ElasticSearchEvaluation[]>
   >(traceGroups.data?.traceChecks ?? {});
@@ -255,9 +283,8 @@ export function MessagesTable({
             paddingLeft={2}
             marginRight={1}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId,
-                selectedTab: "messages",
               })
             }
           >
@@ -332,7 +359,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -418,7 +445,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -437,7 +464,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -460,7 +487,7 @@ export function MessagesTable({
             key={index}
             maxWidth="300px"
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -494,7 +521,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -507,7 +534,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -548,6 +575,50 @@ export function MessagesTable({
 
       value: (trace: Trace) => getSafeRenderOutputValueFromTrace(trace),
     },
+    "traces.origin": {
+      name: "Origin",
+      sortable: false,
+      width: 120,
+      render: (trace: TraceWithGuardrail, index: number) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        const displayOrigin =
+          typeof rawOrigin === "string" && rawOrigin !== ""
+            ? rawOrigin
+            : null;
+
+        return (
+          <Table.Cell
+            key={index}
+            onClick={() =>
+              openTraceDetailsDrawer({
+                traceId: trace.trace_id,
+              })
+            }
+          >
+            {displayOrigin && (() => {
+              const colors = getOriginColor(displayOrigin);
+              return (
+                <Badge
+                  size="sm"
+                  paddingX={2}
+                  background={colors.background}
+                  color={colors.color}
+                  fontSize="12px"
+                >
+                  {getOriginLabel(displayOrigin)}
+                </Badge>
+              );
+            })()}
+          </Table.Cell>
+        );
+      },
+      value: (trace: Trace) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        return typeof rawOrigin === "string" && rawOrigin !== ""
+          ? rawOrigin
+          : "";
+      },
+    } satisfies HeaderColumn,
     "metadata.labels": {
       name: "Labels",
       sortable: true,
@@ -578,7 +649,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -606,7 +677,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -634,7 +705,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -651,7 +722,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -668,7 +739,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -688,7 +759,7 @@ export function MessagesTable({
           minWidth="300px"
           maxWidth="300px"
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -707,7 +778,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -731,7 +802,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -776,19 +847,46 @@ export function MessagesTable({
 
   const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
     Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
-  >(
-    localStorageHeaderColumns
-      ? localStorageHeaderColumns
-      : Object.fromEntries(
-          Object.entries(headerColumns).map(([key, column]) => [
-            key,
-            {
-              enabled: key !== "trace.trace_id",
-              name: column.name,
-            },
-          ]),
-        ),
-  );
+  >(() => {
+    if (!localStorageHeaderColumns) {
+      return Object.fromEntries(
+        Object.entries(headerColumns).map(([key, column]) => [
+          key,
+          {
+            enabled: key !== "trace.trace_id",
+            name: column.name,
+          },
+        ]),
+      );
+    }
+
+    // Re-order columns to match canonical headerColumns order,
+    // preserving enabled/name from localStorage. This ensures that
+    // column order changes in source code are respected for existing users.
+    const ordered: Record<string, { enabled: boolean; name: string }> = {};
+
+    // First: canonical columns in source order
+    for (const key of Object.keys(headerColumns)) {
+      if (key in localStorageHeaderColumns) {
+        ordered[key] = localStorageHeaderColumns[key]!;
+      } else {
+        // New column added in source — enable by default
+        ordered[key] = {
+          enabled: key !== "trace.trace_id",
+          name: headerColumns[key]!.name,
+        };
+      }
+    }
+
+    // Then: extra columns only in localStorage (e.g. dynamic evaluation columns)
+    for (const [key, value] of Object.entries(localStorageHeaderColumns)) {
+      if (!(key in ordered)) {
+        ordered[key] = value;
+      }
+    }
+
+    return ordered;
+  });
 
   const isFirstRender = useRef(true);
 
@@ -875,83 +973,6 @@ export function MessagesTable({
     selectedHeaderColumns,
   ).filter(([_, { enabled }]) => enabled);
 
-  const [downloadProgress, setDownloadProgress] = useState(0);
-
-  const fetchAllTraces = async () => {
-    const allGroups = [];
-    const allChecks = {};
-    let currentOffset = 0;
-    const batchSize = 5000;
-
-    setDownloadProgress(10);
-
-    const initialBatch = await downloadTraces.mutateAsync({
-      ...filterParams,
-      query: getSingleQueryParam(router.query.query),
-      groupBy: "none",
-      pageOffset: navigationFooter.pageOffset,
-      pageSize: navigationFooter.pageSize,
-      sortBy: getSingleQueryParam(router.query.sortBy),
-      sortDirection: getSingleQueryParam(router.query.orderBy),
-      includeSpans: true,
-    });
-
-    let scrollId = initialBatch.scrollId;
-    allGroups.push(...initialBatch.groups);
-    Object.assign(allChecks, initialBatch.traceChecks);
-
-    const totalHits = initialBatch.totalHits;
-    let processedItems = initialBatch.groups.length;
-    setDownloadProgress((processedItems / totalHits) * 100);
-
-    while (scrollId) {
-      const batch = await downloadTraces.mutateAsync({
-        ...filterParams,
-        query: getSingleQueryParam(router.query.query),
-        groupBy: "none",
-        pageOffset: currentOffset,
-        pageSize: batchSize,
-        sortBy: getSingleQueryParam(router.query.sortBy),
-        sortDirection: getSingleQueryParam(router.query.orderBy),
-        includeSpans: true,
-        scrollId: scrollId,
-      });
-      processedItems += batch.groups.length;
-
-      setDownloadProgress((processedItems / totalHits) * 100);
-
-      scrollId = batch.scrollId;
-
-      if (!batch.groups.length) break;
-
-      allGroups.push(...batch.groups);
-      Object.assign(allChecks, batch.traceChecks);
-      currentOffset += batchSize;
-    }
-
-    setDownloadProgress(0);
-
-    return {
-      groups: allGroups,
-      traceChecks: allChecks,
-    };
-  };
-
-  const downloadCSV = async (selection = false) => {
-    try {
-      await downloadCSV_(selection);
-    } catch (error) {
-      toaster.create({
-        title: "Error Downloading CSV",
-        description: (error as any).toString(),
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
-      console.error(error);
-    }
-  };
   const queueItem = api.annotation.createQueueItem.useMutation();
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
     [],
@@ -992,87 +1013,6 @@ export function MessagesTable({
         },
       },
     );
-  };
-
-  const downloadCSV_ = async (selection = false) => {
-    const traceGroups_ = selection
-      ? (displayData ?? {
-          groups: [],
-          traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
-        })
-      : await fetchAllTraces();
-
-    const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
-      ([column, _]) => column !== "checked",
-    );
-
-    const evaluations: Record<string, ElasticSearchEvaluation[]> =
-      traceGroups_.traceChecks;
-
-    const getValueForColumn = (
-      trace: TraceWithGuardrail,
-      column: string,
-      name: string,
-    ) => {
-      return (
-        headerColumns[column]?.value?.(
-          trace,
-          evaluations[trace.trace_id] ?? [],
-        ) ??
-        headerColumnForEvaluation({
-          columnKey: column,
-          checkName: name,
-        }).value(trace, evaluations[trace.trace_id] ?? [])
-      );
-    };
-
-    let csv;
-    if (selection) {
-      csv = traceGroups_.groups
-        .flatMap((traceGroup) =>
-          traceGroup
-            .filter((trace) => selectedTraceIds.includes(trace.trace_id))
-            .map((trace) =>
-              checkedHeaderColumnsEntries_.map(([column, { name }]) =>
-                getValueForColumn(trace, column, name),
-              ),
-            ),
-        )
-        .filter((row) => row.some((cell) => cell !== ""));
-    } else {
-      csv = traceGroups_.groups.flatMap((traceGroup) =>
-        traceGroup.map((trace) =>
-          checkedHeaderColumnsEntries_
-            .filter(([column, _]) => column !== "checked")
-            .map(([column, { name }]) =>
-              getValueForColumn(trace, column, name),
-            ),
-        ),
-      );
-    }
-
-    const fields = checkedHeaderColumnsEntries_
-      .map(([_, { name }]) => {
-        return name;
-      })
-      .filter((field) => field !== undefined);
-
-    const csvBlob = Parse.unparse({
-      fields: fields,
-      data: csv ?? [],
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csvBlob]));
-
-    const link = document.createElement("a");
-    link.href = url;
-    const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Traces - ${formattedDate}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   };
 
   const toggleAllTraces = () => {
@@ -1117,18 +1057,16 @@ export function MessagesTable({
           </Button>
         )}
         <Spacer />
-        {!hideExport && (
+        {!hideExport && !isLiteMember && (
           <Tooltip
             disabled={navigationFooter.totalHits < 10_000}
             content={
-              navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
+              navigationFooter.totalHits >= 10_000 ? "Up to 10,000 traces" : ""
             }
           >
             <PageLayout.HeaderButton
-              variant={downloadTraces.isPending ? "ghost" : "outline"}
-              onClick={() => void downloadCSV()}
-              loading={downloadTraces.isPending}
-              loadingText="Downloading..."
+              variant="outline"
+              onClick={() => openExportDialog({})}
             >
               <Download size={16} />
               Export all
@@ -1224,19 +1162,6 @@ export function MessagesTable({
               showFilters ? "calc(100vw - 550px)" : "calc(100vw - 200px)"
             }
           >
-            {downloadProgress > 0 && (
-              <Progress.Root
-                colorPalette="orange"
-                value={downloadProgress}
-                size="xs"
-                width="full"
-                boxShadow="none"
-              >
-                <Progress.Track boxShadow="none" background="none">
-                  <Progress.Range />
-                </Progress.Track>
-              </Progress.Root>
-            )}
             {checkedHeaderColumnsEntries.length === 0 && (
               <Text>No columns selected</Text>
             )}
@@ -1360,6 +1285,8 @@ export function MessagesTable({
               {...navigationFooter}
               scrollId={traceGroups.data?.scrollId}
             />
+            {/* Spacer for fixed SavedViewsBar */}
+            <Box height="32px" flexShrink={0} />
           </VStack>
         </Box>
 
@@ -1372,14 +1299,16 @@ export function MessagesTable({
       {selectedTraceIds.length > 0 && (
         <Box
           position="fixed"
-          bottom={10}
+          bottom={16}
           left="50%"
           transform="translateX(-50%)"
-          backgroundColor="#ffffff"
+          zIndex={20}
+          backgroundColor="bg.emphasized"
           padding="8px"
           paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+          border="1px solid"
+          borderColor="border.muted"
+          boxShadow="lg"
           borderRadius="md"
         >
           <HStack gap={3}>
@@ -1393,7 +1322,13 @@ export function MessagesTable({
                   colorPalette="black"
                   minWidth="fit-content"
                   variant="outline"
-                  onClick={() => void downloadCSV(true)}
+                  onClick={() => {
+                    if (isLiteMember) {
+                      openLiteMemberRestriction({ resource: "traces" });
+                      return;
+                    }
+                    openExportDialog({ selectedTraceIds });
+                  }}
                 >
                   Export <Download size={16} style={{ marginLeft: 8 }} />
                 </Button>
@@ -1407,6 +1342,10 @@ export function MessagesTable({
               variant="outline"
               minWidth="fit-content"
               onClick={() => {
+                if (isLiteMember) {
+                  openLiteMemberRestriction({ resource: "datasets" });
+                  return;
+                }
                 openDrawer("addDatasetRecord", {
                   selectedTraceIds,
                 });
@@ -1417,16 +1356,16 @@ export function MessagesTable({
             {!hideAddToQueue && (
               <Dialog.Root
                 open={dialog.open}
-                onOpenChange={(e) =>
-                  e.open ? dialog.onOpen() : dialog.onClose()
-                }
+                onOpenChange={(e) => {
+                  if (e.open && isLiteMember) {
+                    openLiteMemberRestriction({ resource: "annotations" });
+                    return;
+                  }
+                  e.open ? dialog.onOpen() : dialog.onClose();
+                }}
               >
                 <Dialog.Trigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => dialog.onOpen()}
-                  >
+                  <Button variant="outline" size="sm">
                     Add to Queue
                   </Button>
                 </Dialog.Trigger>
@@ -1462,6 +1401,25 @@ export function MessagesTable({
           </HStack>
         </Box>
       )}
+      <ExportConfigDialog
+        isOpen={isExportDialogOpen}
+        onClose={closeExportDialog}
+        onExport={startExport}
+        traceCount={
+          isSelectedExportRef.current
+            ? selectedTraceIds.length
+            : Math.min(navigationFooter.totalHits, 10_000)
+        }
+        isSelectedExport={isSelectedExportRef.current}
+      />
+      <Box position="fixed" bottom={4} right={4} zIndex={30}>
+        <ExportProgress
+          exported={exportProgress.exported}
+          total={exportProgress.total}
+          isExporting={isExporting}
+          onCancel={cancelExport}
+        />
+      </Box>
     </>
   );
 }

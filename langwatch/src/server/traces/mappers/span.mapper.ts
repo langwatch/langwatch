@@ -3,7 +3,9 @@ import type {
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   BaseSpan,
   ChatMessage,
@@ -24,18 +26,6 @@ type JsonSerializable =
   | Record<string, unknown>
   | unknown[];
 
-/**
- * Coerces a value to a number or returns null.
- * Handles historical data where numbers may be stored as strings.
- */
-function asNumberOrNull(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string" && v.trim() !== "") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -59,6 +49,56 @@ function toJsonSerializable(value: unknown): JsonSerializable {
   return value as JsonSerializable;
 }
 
+const KNOWN_WRAPPER_TYPES = new Set([
+  "text",
+  "chat_messages",
+  "json",
+  "raw",
+  "list",
+  "evaluation_result",
+  "guardrail_result",
+]);
+
+/**
+ * Detects the legacy {type, value} wrapper format from the REST collector
+ * or preserved by canonicalization for chat_messages.
+ * After ClickHouse deserialization, these appear as objects with `type` and `value`.
+ */
+function isLegacyWrapper(
+  v: unknown,
+): v is { type: string; value: unknown } {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    "type" in v &&
+    "value" in v &&
+    typeof (v as Record<string, unknown>).type === "string" &&
+    KNOWN_WRAPPER_TYPES.has((v as Record<string, unknown>).type as string)
+  );
+}
+
+/**
+ * Unwraps a {type, value} wrapper into a proper SpanInputOutput.
+ */
+function unwrapLegacyWrapper(
+  wrapper: { type: string; value: unknown },
+  spanAttributes: NormalizedAttributes,
+  attrKey: string,
+): SpanInputOutput {
+  const { type, value } = wrapper;
+  if (type === "chat_messages" && Array.isArray(value)) {
+    return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
+  }
+  if (type === "text") {
+    return { type: "text", value: typeof value === "string" ? value : JSON.stringify(value) };
+  }
+  if (type === "evaluation_result" || type === "guardrail_result") {
+    return { type, value: toJsonSerializable(value) } as unknown as SpanInputOutput;
+  }
+  return { type: "json", value: toJsonSerializable(value) };
+}
+
 /**
  * Reads the annotated value type for a canonical key from
  * langwatch.reserved.value_types (e.g. ["langwatch.input=chat_messages"]).
@@ -67,7 +107,17 @@ function getAnnotatedType(
   spanAttributes: NormalizedAttributes,
   attrKey: string,
 ): string | null {
-  const raw = spanAttributes["langwatch.reserved.value_types"];
+  let raw = spanAttributes["langwatch.reserved.value_types"];
+
+  // ClickHouse Map(String, String) stores arrays as JSON strings
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
   if (!Array.isArray(raw)) return null;
 
   const prefix = `${attrKey}=`;
@@ -98,8 +148,23 @@ function extractInput(
   }
 
   // Priority 2: langwatch.input → use annotated type or infer
-  const lwInput = spanAttributes["langwatch.input"];
+  let lwInput = spanAttributes["langwatch.input"];
   if (lwInput !== undefined) {
+    // ClickHouse Map(String, String) stores objects as JSON strings
+    if (typeof lwInput === "string") {
+      try {
+        const parsed = JSON.parse(lwInput);
+        if (typeof parsed === "object" && parsed !== null) {
+          lwInput = parsed;
+        }
+      } catch {
+        // Not JSON — keep as string
+      }
+    }
+    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+    if (isLegacyWrapper(lwInput)) {
+      return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
+    }
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
     if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
       return {
@@ -108,7 +173,12 @@ function extractInput(
       };
     }
     if (annotatedType === "text" || typeof lwInput === "string") {
-      return { type: "text", value: String(lwInput) };
+      // ClickHouse deserializeAttributes() may parse JSON-like strings back to
+      // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
+      // String([object Object]).
+      const textValue =
+        typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
+      return { type: "text", value: textValue };
     }
     return {
       type: "json",
@@ -138,8 +208,23 @@ function extractOutput(
   }
 
   // Priority 2: langwatch.output → use annotated type or infer
-  const lwOutput = spanAttributes["langwatch.output"];
+  let lwOutput = spanAttributes["langwatch.output"];
   if (lwOutput !== undefined) {
+    // ClickHouse Map(String, String) stores objects as JSON strings
+    if (typeof lwOutput === "string") {
+      try {
+        const parsed = JSON.parse(lwOutput);
+        if (typeof parsed === "object" && parsed !== null) {
+          lwOutput = parsed;
+        }
+      } catch {
+        // Not JSON — keep as string
+      }
+    }
+    // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
+    if (isLegacyWrapper(lwOutput)) {
+      return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
+    }
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
     if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
       return {
@@ -147,8 +232,19 @@ function extractOutput(
         value: toJsonSerializable(lwOutput) as ChatMessage[],
       };
     }
+    if (
+      annotatedType === "evaluation_result" ||
+      annotatedType === "guardrail_result"
+    ) {
+      return {
+        type: annotatedType,
+        value: toJsonSerializable(lwOutput),
+      } as unknown as SpanInputOutput;
+    }
     if (annotatedType === "text" || typeof lwOutput === "string") {
-      return { type: "text", value: String(lwOutput) };
+      const textValue =
+        typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
+      return { type: "text", value: textValue };
     }
     return {
       type: "json",
@@ -159,6 +255,7 @@ function extractOutput(
   return null;
 }
 
+
 /**
  * Extracts metrics from canonical span attributes only.
  * After canonicalization, tokens are at gen_ai.usage.input_tokens/output_tokens.
@@ -167,30 +264,32 @@ function extractOutput(
 function extractMetrics(
   spanAttributes: NormalizedAttributes,
 ): SpanMetrics | null {
-  const promptTokens = asNumberOrNull(
+  const promptTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.input_tokens"] ??
       spanAttributes["gen_ai.usage.prompt_tokens"],
   );
 
-  const completionTokens = asNumberOrNull(
+  const completionTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.output_tokens"] ??
       spanAttributes["gen_ai.usage.completion_tokens"],
   );
 
-  const reasoningTokens = asNumberOrNull(
+  const reasoningTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.reasoning_tokens"],
   );
-  const cost = asNumberOrNull(spanAttributes["langwatch.span.cost"]);
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
-  const cacheReadInputTokens = asNumberOrNull(
+  const cacheReadInputTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
       spanAttributes["gen_ai.usage.cached_input_tokens"],
   );
-  const cacheCreationInputTokens = asNumberOrNull(
+  const cacheCreationInputTokens = coerceToNumber(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
+
+  const rawCost = computeSpanCost({ attrs: spanAttributes, promptTokens, completionTokens });
+  const cost = rawCost > 0 ? rawCost : null;
 
   if (
     promptTokens === null &&

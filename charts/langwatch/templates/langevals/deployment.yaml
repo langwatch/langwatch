@@ -7,21 +7,21 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}-langevals
     app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
-    {{- if .Values.langevals.labels }}
-    {{- toYaml .Values.langevals.labels | nindent 4 }}
+    {{- with .Values.langevals.deployment.labels }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- with .Values.langevals.deployment.annotations }}
   annotations:
-    {{- if .Values.langwatch_nlp.deployment.annotations }}
-    {{- toYaml .Values.langwatch_nlp.deployment.annotations | nindent 4 }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.langevals.replicaCount }}
   {{- if .Values.langevals.deployment.strategy }}
   strategy: 
-    {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
+    {{- toYaml .Values.langevals.deployment.strategy | nindent 8 }}
   {{- end }}
-  {{- if .Values.langevals.deployment.revisionHistoryLimit }}
-  revisionHistoryLimit: {{ .Values.deployment.revisionHistoryLimit }}
+  {{- if hasKey (default (dict) .Values.langevals.deployment) "revisionHistoryLimit" }}
+  revisionHistoryLimit: {{ .Values.langevals.deployment.revisionHistoryLimit }}
   {{- end }}
   selector:
     matchLabels:
@@ -33,13 +33,11 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-langevals
         app.kubernetes.io/instance: {{ .Release.Name }}
         {{- if .Values.langevals.pod.labels }}
-        {{- toYaml .Values.langevals.labels | nindent 8 }}
+        {{- toYaml .Values.langevals.pod.labels | nindent 8 }}
         {{- end }}
       annotations:
-        {{- if .Values.langevals.podAnnotations }}
-        {{- toYaml .Values.langevals.podAnnotations | nindent 8 }}
-        {{- else if .Values.global.podAnnotations }}
-        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
+        {{- with (coalesce .Values.langevals.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
@@ -63,6 +61,12 @@ spec:
       # Affinity - https://kubespec.dev/v1/Pod#spec.affinity
       {{- with (coalesce .Values.langevals.affinity .Values.global.scheduling.affinity)}}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Topology spread constraints - https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+      {{- with (coalesce .Values.langevals.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
+      topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
@@ -91,23 +95,45 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- if .Values.langevals.extraLangevalsLifecycle}}
+          {{- if .Values.langevals.extraLifecycle}}
           lifecycle:
-            {{- with .Values.langevals.extraLangevalsLifecycle}}
+            {{- with .Values.langevals.extraLifecycle}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.langevals.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            failureThreshold: 18
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
           volumeMounts:
-            {{- with .Values.langevals.extraLangevalsVolumeMounts}}
+            {{- with .Values.langevals.extraVolumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
+            - name: cache-dir
+              mountPath: /.cache
       volumes:
       {{- with .Values.langevals.extraVolumes}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
+          emptyDir: {}
+        - name: cache-dir
           emptyDir: {}

@@ -31,6 +31,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
         <Box
           as="button"
           width={showLabel ? "full" : "auto"}
+          textAlign="left"
           cursor="pointer"
           aria-label="Chat"
           onClick={(e) => {
@@ -65,6 +66,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
           <Box
             as="button"
             width={showLabel ? "full" : "auto"}
+            textAlign="left"
             cursor="pointer"
             aria-label="Support"
             onMouseEnter={() => setIsOpen(true)}

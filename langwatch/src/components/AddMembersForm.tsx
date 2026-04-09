@@ -59,6 +59,8 @@ interface AddMembersFormProps {
   hasEmailProvider?: boolean;
   onClose?: () => void;
   onCloseText?: string;
+  /** Whether the user submitting this form is an org admin. Controls which team roles are selectable. */
+  isInviterAdmin?: boolean;
 }
 
 /**
@@ -74,6 +76,7 @@ export function AddMembersForm({
   hasEmailProvider = false,
   onClose,
   onCloseText = "Cancel",
+  isInviterAdmin = true,
 }: AddMembersFormProps) {
   const {
     register,
@@ -142,6 +145,7 @@ export function AddMembersForm({
             organizationId={organizationId}
             setValue={setValue}
             onRemove={() => remove(index)}
+            isInviterAdmin={isInviterAdmin}
           />
         ))}
         <Button type="button" onClick={onAddField} marginTop={2}>
@@ -188,6 +192,7 @@ function MemberRow({
   organizationId,
   setValue,
   onRemove,
+  isInviterAdmin,
 }: {
   index: number;
   control: Control<MembersForm>;
@@ -198,6 +203,7 @@ function MemberRow({
   organizationId: string;
   setValue: UseFormSetValue<MembersForm>;
   onRemove: () => void;
+  isInviterAdmin: boolean;
 }) {
   const {
     fields: teamFields,
@@ -328,7 +334,7 @@ function MemberRow({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select role" />
                 </Select.Trigger>
-                <Select.Content paddingY={2} zIndex="popover" width="320px">
+                <Select.Content paddingY={2} width="320px">
                   {orgRoleOptions.map((option) => (
                     <Select.Item key={option.value} item={option}>
                       <VStack align="start" gap={0} flex={1}>
@@ -420,6 +426,7 @@ function MemberRow({
                         organizationId={organizationId}
                         orgRole={orgRole}
                         setValue={setValue}
+                        isInviterAdmin={isInviterAdmin}
                       />
                     </Table.Cell>
                     <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
@@ -497,7 +504,7 @@ function TeamSelect({
           <Select.Trigger background="bg" width="full">
             <Select.ValueText placeholder="Select team" />
           </Select.Trigger>
-          <Select.Content paddingY={2} zIndex="popover">
+          <Select.Content paddingY={2}>
             {availableOptions.map((option) => (
               <Select.Item key={option.value} item={option}>
                 {option.label}
@@ -511,14 +518,16 @@ function TeamSelect({
 }
 
 /**
- * Get the appropriate team role options based on org role
+ * Get the appropriate team role options based on org role and whether the inviter is an admin.
  * - EXTERNAL (Viewer): only Viewer
- * - MEMBER: all except Viewer (+ custom roles)
- * - ADMIN: all roles (+ custom roles)
+ * - MEMBER invitee role + non-admin inviter: only Member (no Admin, no Viewer)
+ * - MEMBER invitee role + admin inviter: all except Viewer (+ custom roles)
+ * - ADMIN invitee role (only selectable by org admins): all roles (+ custom roles)
  */
 function getFilteredTeamRoles(
   orgRole: OrganizationUserRole,
   customRoles: Array<{ id: string; name: string; description?: string | null }>,
+  isInviterAdmin: boolean,
 ): RoleOption[] {
   const baseRoles = Object.values(teamRolesOptions);
 
@@ -536,14 +545,18 @@ function getFilteredTeamRoles(
   }
 
   if (orgRole === OrganizationUserRole.MEMBER) {
-    // Member: all except Viewer, plus custom roles
+    if (!isInviterAdmin) {
+      // Non-admin inviter: can only assign Member role, not Admin
+      return [teamRolesOptions.MEMBER];
+    }
+    // Admin inviter: all except Viewer, plus custom roles
     return [
       ...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER),
       ...customRoleOptions,
     ];
   }
 
-  // Admin: all roles plus custom roles
+  // Admin invitee org role (only reachable by org admins): all roles plus custom roles
   return [...baseRoles, ...customRoleOptions];
 }
 
@@ -571,6 +584,7 @@ function TeamRoleSelect({
   organizationId,
   orgRole,
   setValue,
+  isInviterAdmin,
 }: {
   index: number;
   teamIndex: number;
@@ -578,13 +592,14 @@ function TeamRoleSelect({
   organizationId: string;
   orgRole: OrganizationUserRole;
   setValue: UseFormSetValue<MembersForm>;
+  isInviterAdmin: boolean;
 }) {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  // Build role options filtered by org role
+  // Build role options filtered by org role and whether the inviter is an admin
   const roleOptions = useMemo(
-    () => getFilteredTeamRoles(orgRole, customRoles.data ?? []),
-    [orgRole, customRoles.data],
+    () => getFilteredTeamRoles(orgRole, customRoles.data ?? [], isInviterAdmin),
+    [orgRole, customRoles.data, isInviterAdmin],
   );
 
   const roleCollection = useMemo(
@@ -629,7 +644,7 @@ function TeamRoleSelect({
             <Select.Trigger background="bg" width="full">
               <Select.ValueText placeholder="Select role" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover" width="320px">
+            <Select.Content paddingY={2} width="320px">
               {roleOptions.map((option) => (
                 <Select.Item key={option.value} item={option}>
                   <TeamRoleSelectItemContent option={option} />

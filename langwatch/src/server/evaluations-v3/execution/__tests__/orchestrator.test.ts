@@ -212,6 +212,138 @@ describe("orchestrator", () => {
     });
   });
 
+  describe("generateCells with evaluator-all-rows scope", () => {
+      it("creates one cell per row that has a pre-computed target output", () => {
+        const state = createTestState(1, 2);
+        const datasetRows = createTestDataset(4);
+        const scope: ExecutionScope = {
+          type: "evaluator-all-rows",
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          precomputedTargetOutputs: {
+            0: { output: "result-0" },
+            1: { output: "result-1" },
+            3: { output: "result-3" },
+          },
+          traceIds: {
+            0: "trace-0",
+            1: "trace-1",
+            3: "trace-3",
+          },
+        };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        // Only rows 0, 1, 3 have outputs - row 2 is skipped
+        expect(cells).toHaveLength(3);
+        expect(cells.map((c) => c.rowIndex)).toEqual([0, 1, 3]);
+      });
+
+      it("skips target execution for each cell", () => {
+        const state = createTestState(1, 1);
+        const datasetRows = createTestDataset(2);
+        const scope: ExecutionScope = {
+          type: "evaluator-all-rows",
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          precomputedTargetOutputs: {
+            0: { output: "result-0" },
+            1: { output: "result-1" },
+          },
+          traceIds: {},
+        };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        for (const cell of cells) {
+          expect(cell.skipTarget).toBe(true);
+        }
+      });
+
+      it("includes only the specified evaluator in each cell", () => {
+        const state = createTestState(1, 3);
+        const datasetRows = createTestDataset(2);
+        const scope: ExecutionScope = {
+          type: "evaluator-all-rows",
+          targetId: "target-1",
+          evaluatorId: "eval-2",
+          precomputedTargetOutputs: {
+            0: { output: "result-0" },
+            1: { output: "result-1" },
+          },
+          traceIds: {},
+        };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        for (const cell of cells) {
+          expect(cell.evaluatorConfigs).toHaveLength(1);
+          expect(cell.evaluatorConfigs[0]?.id).toBe("eval-2");
+        }
+      });
+
+      it("assigns precomputed target output to each cell", () => {
+        const state = createTestState(1, 1);
+        const datasetRows = createTestDataset(3);
+        const scope: ExecutionScope = {
+          type: "evaluator-all-rows",
+          targetId: "target-1",
+          evaluatorId: "eval-1",
+          precomputedTargetOutputs: {
+            0: { output: "result-0" },
+            2: { output: "result-2" },
+          },
+          traceIds: {
+            0: "trace-0",
+            2: "trace-2",
+          },
+        };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        expect(cells[0]?.precomputedTargetOutput).toEqual({ output: "result-0" });
+        expect(cells[0]?.traceId).toBe("trace-0");
+        expect(cells[1]?.precomputedTargetOutput).toEqual({ output: "result-2" });
+        expect(cells[1]?.traceId).toBe("trace-2");
+      });
+
+      it("returns empty array when evaluator is not found", () => {
+        const state = createTestState(1, 1);
+        const datasetRows = createTestDataset(2);
+        const scope: ExecutionScope = {
+          type: "evaluator-all-rows",
+          targetId: "target-1",
+          evaluatorId: "non-existent",
+          precomputedTargetOutputs: {
+            0: { output: "result-0" },
+          },
+          traceIds: {},
+        };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        expect(cells).toHaveLength(0);
+      });
+
+      it("returns empty array when target is not found", () => {
+        const state = createTestState(1, 1);
+        const datasetRows = createTestDataset(2);
+        const scope: ExecutionScope = {
+          type: "evaluator-all-rows",
+          targetId: "non-existent",
+          evaluatorId: "eval-1",
+          precomputedTargetOutputs: {
+            0: { output: "result-0" },
+          },
+          traceIds: {},
+        };
+
+        const cells = generateCells(state, datasetRows, scope);
+
+        expect(cells).toHaveLength(0);
+      });
+    });
+
   describe("cell ordering", () => {
     it("orders cells by row first, then target", () => {
       const state = createTestState(2, 0);

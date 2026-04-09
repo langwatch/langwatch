@@ -45,6 +45,7 @@ export type UpsertResultsParams = {
   dataset?: DatasetEntry[];
   evaluations?: EvaluationEntry[];
   progress?: number;
+  targets?: ESBatchEvaluationTarget[];
 };
 
 /**

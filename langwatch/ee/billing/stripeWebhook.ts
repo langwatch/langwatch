@@ -6,6 +6,8 @@ import { env } from "../../src/env.mjs";
 import { prisma } from "../../src/server/db";
 import { createLogger } from "../../src/utils/logger";
 import type { WebhookService } from "./services/webhookService";
+import { handleLicensePurchase } from "./services/licensePurchaseHandler";
+import { getPostHogInstance } from "../../src/server/posthog";
 
 const VALID_CURRENCIES = new Set<string>(Object.values(Currency));
 
@@ -55,6 +57,40 @@ export const createStripeWebhookHandlerFactory = ({
     }
 
     try {
+      // License purchase routing — must happen before subscription flow
+      // because self-hosted buyers have no organization in the SaaS database
+      if (event.type === "checkout.session.completed") {
+        const checkoutSession = event.data
+          .object as Stripe.Checkout.Session;
+        const paymentLinkId =
+          typeof checkoutSession.payment_link === "string"
+            ? checkoutSession.payment_link
+            : checkoutSession.payment_link?.id;
+
+        if (
+          env.STRIPE_LICENSE_PAYMENT_LINK_ID &&
+          paymentLinkId === env.STRIPE_LICENSE_PAYMENT_LINK_ID
+        ) {
+          const privateKey = env.LANGWATCH_LICENSE_PRIVATE_KEY;
+          if (!privateKey) {
+            logger.error(
+              "[stripeWebhook] LANGWATCH_LICENSE_PRIVATE_KEY is not configured",
+            );
+            return res
+              .status(500)
+              .send("License generation error: missing private key");
+          }
+
+          await handleLicensePurchase({
+            checkoutSession,
+            stripe,
+            privateKey,
+          });
+
+          return res.json({ received: true });
+        }
+      }
+
       if (
         event.type === "checkout.session.completed" ||
         event.type === "invoice.payment_succeeded" ||
@@ -116,6 +152,28 @@ export const createStripeWebhookHandlerFactory = ({
                 "[stripeWebhook] No client_reference_id in checkout session",
               );
               return res.json({ received: true });
+            }
+
+            const posthogServer = getPostHogInstance();
+            if (posthogServer) {
+              posthogServer.capture({
+                distinctId: organization.id,
+                event: "subscription_created",
+                properties: {
+                  subscriptionId,
+                  $groups: { organization: organization.id },
+                },
+              });
+              posthogServer.groupIdentify({
+                groupType: "organization",
+                groupKey: organization.id,
+                properties: {
+                  subscriptionCreatedAt: new Date(
+                    checkoutSession.created * 1000,
+                  ).toISOString(),
+                  hasActiveSubscription: true,
+                },
+              });
             }
             break;
           }

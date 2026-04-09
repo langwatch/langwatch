@@ -82,10 +82,26 @@ export interface PromptStudioSpanResult {
     temperature: number | null;
     maxTokens: number | null;
     topP: number | null;
+    frequencyPenalty: number | null;
+    presencePenalty: number | null;
+    seed: number | null;
+    topK: number | null;
+    minP: number | null;
+    repetitionPenalty: number | null;
+    reasoning: string | null;
+    verbosity: string | null;
     litellmParams: Record<string, unknown>;
   };
   vendor: string | null;
   error: Span["error"] | null;
   timestamps: SpanTimestamps | undefined;
   metrics: LLMSpan["metrics"] | null;
+  /** Prompt handle from span attributes (new combined or old format) */
+  promptHandle: string | null;
+  /** Prompt version number from span attributes (new combined or old format) */
+  promptVersionNumber: number | null;
+  /** Prompt tag from span attributes (e.g., "production", "staging") */
+  promptTag: string | null;
+  /** Prompt variables extracted from span attributes */
+  promptVariables: Record<string, string> | null;
 }

@@ -25,6 +25,9 @@ export {
 // Monitors
 export { MonitorService } from "./monitors/monitor.service";
 
+// DSPy Steps
+export { DspyStepService } from "./dspy-steps/dspy-step.service";
+
 // App (composition root)
 export {
   App, getApp, initializeApp, resetApp

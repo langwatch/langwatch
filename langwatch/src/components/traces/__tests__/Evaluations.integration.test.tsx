@@ -310,6 +310,65 @@ describe("<Evaluations/>", () => {
     });
   });
 
+  describe("when list keys would otherwise collide", () => {
+    it("renders grouped and ungrouped entries without duplicate key warnings", () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+
+      const evaluations: ElasticSearchEvaluation[] = [
+        makeEvaluation({
+          evaluation_id: "eval_x",
+          evaluator_id: undefined as unknown as string,
+          name: "Ungrouped A",
+          timestamps: { finished_at: 4000 },
+        }),
+        makeEvaluation({
+          evaluation_id: "eval_y",
+          evaluator_id: undefined as unknown as string,
+          name: "Ungrouped B",
+          timestamps: { finished_at: 3000 },
+        }),
+        makeEvaluation({
+          evaluation_id: "c",
+          evaluator_id: "a-b",
+          name: "Grouped A-B",
+          timestamps: { finished_at: 2000 },
+        }),
+        makeEvaluation({
+          evaluation_id: "b-c",
+          evaluator_id: "a",
+          name: "Grouped A",
+          timestamps: { finished_at: 1000 },
+        }),
+      ];
+
+      render(
+        <Evaluations
+          {...traceBase}
+          evaluations={evaluations}
+          anyGuardrails={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("Ungrouped A")).toBeInTheDocument();
+      expect(screen.getByText("Ungrouped B")).toBeInTheDocument();
+      expect(screen.getByText("Grouped A-B")).toBeInTheDocument();
+      expect(screen.getByText("Grouped A")).toBeInTheDocument();
+
+      const hasDuplicateKeyWarning = consoleErrorSpy.mock.calls.some(
+        ([message]) =>
+          typeof message === "string" &&
+          message.includes("Encountered two children with the same key"),
+      );
+
+      expect(hasDuplicateKeyWarning).toBe(false);
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe("when expanding history", () => {
     const evaluations: ElasticSearchEvaluation[] = [
       makeEvaluation({

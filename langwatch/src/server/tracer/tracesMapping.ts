@@ -646,6 +646,7 @@ export const mappingStateSchema = z.object({
           ]),
           key: z.string().optional(),
           subkey: z.string().optional(),
+          selectedFields: z.array(z.string()).optional(),
         })
         .extend({
           type: z.literal("trace").optional(),
@@ -1005,6 +1006,9 @@ export function getTraceAvailableSources(
       type: "dataset",
       fields: traceFields,
     },
+    // Include thread sources at trace level so evaluators can access
+    // full conversation context even when triggered per-trace
+    ...getThreadAvailableSources(),
   ];
 }
 

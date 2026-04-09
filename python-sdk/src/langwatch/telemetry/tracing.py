@@ -244,6 +244,11 @@ class LangWatchTrace:
 
             self.root_span = LangWatchSpan(trace=self, **root_span_params)
             self.root_span.__enter__()
+
+            # Default origin to "application" for regular traces.
+            # Experiments/evaluations override this after creation.
+            self.root_span.set_attributes({"langwatch.origin": "application"})
+
             context = self.root_span.get_span_context()
             if context is not None:
                 self._trace_id = context.trace_id

@@ -45,14 +45,35 @@ const pullCommand = async (): Promise<void> => {
   return pullCommandImpl();
 };
 
-const pushCommand = async (): Promise<void> => {
+const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
   const { pushCommand: pushCommandImpl } = await import("./commands/push.js");
-  return pushCommandImpl();
+  return pushCommandImpl(options);
 };
 
 const createCommand = async (name: string, options: Record<string, unknown>): Promise<void> => {
   const { createCommand: createCommandImpl } = await import("./commands/create.js");
   return createCommandImpl(name, options);
+};
+
+// Evaluator commands
+const listEvaluatorsCommand = async (): Promise<void> => {
+  const { listEvaluatorsCommand: impl } = await import("./commands/evaluators/list.js");
+  return impl();
+};
+
+const getEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+  const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
+  return impl(idOrSlug);
+};
+
+const createEvaluatorCommand = async (name: string, options: { type: string }): Promise<void> => {
+  const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
+  return impl(name, options);
+};
+
+const deleteEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+  const { deleteEvaluatorCommand: impl } = await import("./commands/evaluators/delete.js");
+  return impl(idOrSlug);
 };
 
 const program = new Command();
@@ -177,9 +198,65 @@ promptCmd
 promptCmd
   .command("push")
   .description("Push local prompts to the server")
+  .option("--force-local", "Auto-resolve conflicts by keeping local version")
+  .option("--force-remote", "Auto-resolve conflicts by keeping remote version")
+  .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
+    try {
+      await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+// Add evaluator command group
+const evaluatorCmd = program
+  .command("evaluator")
+  .description("Manage evaluator definitions");
+
+evaluatorCmd
+  .command("list")
+  .description("List all evaluators in the project")
   .action(async () => {
     try {
-      await pushCommand();
+      await listEvaluatorsCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("get <idOrSlug>")
+  .description("Get evaluator details by ID or slug")
+  .action(async (idOrSlug: string) => {
+    try {
+      await getEvaluatorCommand(idOrSlug);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("create <name>")
+  .description("Create a new evaluator")
+  .requiredOption("--type <evaluatorType>", "Evaluator type (e.g. langevals/llm_judge)")
+  .action(async (name: string, options: { type: string }) => {
+    try {
+      await createEvaluatorCommand(name, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("delete <idOrSlug>")
+  .description("Archive (soft-delete) an evaluator")
+  .action(async (idOrSlug: string) => {
+    try {
+      await deleteEvaluatorCommand(idOrSlug);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);

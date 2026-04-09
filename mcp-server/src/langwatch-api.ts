@@ -78,7 +78,6 @@ export interface PromptSummary {
   id?: string;
   handle?: string;
   name?: string;
-  description?: string | null;
   latestVersionNumber?: number;
   version?: number;
 }
@@ -87,14 +86,12 @@ export interface PromptVersion {
   version?: number;
   commitMessage?: string;
   model?: string;
-  modelProvider?: string;
   messages?: Array<{ role: string; content: string }>;
 }
 
 export interface PromptDetailResponse extends PromptSummary {
   versions?: PromptVersion[];
   model?: string;
-  modelProvider?: string;
   messages?: Array<{ role: string; content: string }>;
   prompt?: Array<{ role: string; content: string }>;
 }
@@ -143,6 +140,9 @@ export async function makeRequest(
     );
   }
 
+  if (response.status === 204 || response.headers?.get("content-length") === "0") {
+    return null;
+  }
   return response.json();
 }
 
@@ -205,9 +205,12 @@ export async function listPrompts(): Promise<PromptSummary[]> {
 /** Retrieves a single prompt by ID or handle. */
 export async function getPrompt(
   idOrHandle: string,
-  version?: number
+  options?: { version?: number; tag?: string }
 ): Promise<PromptDetailResponse> {
-  const query = version != null ? `?version=${version}` : "";
+  const params = new URLSearchParams();
+  if (options?.version != null) params.set("version", String(options.version));
+  if (options?.tag) params.set("tag", options.tag);
+  const query = params.toString() ? `?${params}` : "";
   return makeRequest(
     "GET",
     `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`
@@ -216,12 +219,10 @@ export async function getPrompt(
 
 /** Creates a new prompt. */
 export async function createPrompt(data: {
-  name: string;
-  handle?: string;
+  handle: string;
   messages: Array<{ role: string; content: string }>;
   model: string;
-  modelProvider: string;
-  description?: string;
+  tags?: string[];
 }): Promise<PromptMutationResponse> {
   return makeRequest(
     "POST",
@@ -236,31 +237,63 @@ export async function updatePrompt(
   data: {
     messages?: Array<{ role: string; content: string }>;
     model?: string;
-    modelProvider?: string;
-    commitMessage?: string;
+    commitMessage: string;
+    tags?: string[];
   }
 ): Promise<PromptMutationResponse> {
   return makeRequest(
-    "POST",
+    "PUT",
     `/api/prompts/${encodeURIComponent(idOrHandle)}`,
     data
   ) as Promise<PromptMutationResponse>;
 }
 
-/** Creates a new version of an existing prompt. */
-export async function createPromptVersion(
-  idOrHandle: string,
-  data: {
-    messages?: Array<{ role: string; content: string }>;
-    model?: string;
-    modelProvider?: string;
-    commitMessage?: string;
-  }
-): Promise<PromptMutationResponse> {
+/** Assigns a tag to a specific prompt version. */
+export async function assignPromptTag({
+  idOrHandle,
+  tag,
+  versionId,
+}: {
+  idOrHandle: string;
+  tag: string;
+  versionId: string;
+}): Promise<unknown> {
   return makeRequest(
-    "POST",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`,
-    data
-  ) as Promise<PromptMutationResponse>;
+    "PUT",
+    `/api/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
+    { versionId }
+  );
 }
 
+/** Lists all prompt tag definitions for the organization. */
+export async function listPromptTags(): Promise<unknown> {
+  return makeRequest("GET", "/api/prompts/tags");
+}
+
+/** Creates a custom prompt tag definition. */
+export async function createPromptTag(name: string): Promise<unknown> {
+  return makeRequest("POST", "/api/prompts/tags", { name });
+}
+
+/** Renames an existing prompt tag. */
+export async function renamePromptTag({
+  tag,
+  name,
+}: {
+  tag: string;
+  name: string;
+}): Promise<unknown> {
+  return makeRequest(
+    "PUT",
+    `/api/prompts/tags/${encodeURIComponent(tag)}`,
+    { name }
+  );
+}
+
+/** Deletes a prompt tag and all its assignments. */
+export async function deletePromptTag(tag: string): Promise<unknown> {
+  return makeRequest(
+    "DELETE",
+    `/api/prompts/tags/${encodeURIComponent(tag)}`
+  );
+}

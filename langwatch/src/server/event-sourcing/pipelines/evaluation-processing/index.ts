@@ -2,10 +2,9 @@
 export { createEvaluationProcessingPipeline } from "./pipeline";
 export type { EvaluationProcessingPipelineDeps } from "./pipeline";
 // Command handlers
-export { createExecuteEvaluationCommandClass } from "./commands/executeEvaluation.command";
+export { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
 export type { ExecuteEvaluationCommandDeps } from "./commands/executeEvaluation.command";
-export { StartEvaluationCommand } from "./commands/startEvaluation.command";
-export { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
+export { StartEvaluationCommand, CompleteEvaluationCommand, ReportEvaluationCommand } from "./commands";
 // Projections
 export * from "./projections";
 // Repositories

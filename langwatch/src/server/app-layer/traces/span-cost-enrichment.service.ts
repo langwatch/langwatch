@@ -1,4 +1,4 @@
-import { matchingLLMModelCost } from "~/server/background/workers/collector/cost";
+import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import type { PrismaClient } from "@prisma/client";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
@@ -18,7 +18,6 @@ const MODEL_ATTRIBUTE_KEYS = [
  */
 export interface OtlpSpanCostEnrichmentServiceDependencies {
   getCustomModelCosts: (projectId: string) => Promise<MaybeStoredLLMModelCost[]>;
-  matchModelCost: typeof matchingLLMModelCost;
 }
 
 /**
@@ -43,7 +42,6 @@ export function createCostEnrichmentDeps(
         createdAt: r.createdAt,
       }));
     },
-    matchModelCost: matchingLLMModelCost,
   };
 }
 
@@ -64,10 +62,6 @@ export class OtlpSpanCostEnrichmentService {
     this.deps = deps;
   }
 
-  static create(deps: OtlpSpanCostEnrichmentServiceDependencies): OtlpSpanCostEnrichmentService {
-    return new OtlpSpanCostEnrichmentService(deps);
-  }
-
   /**
    * Enriches span with custom cost rates if a matching custom model cost exists.
    * Mutates the span in place (pushes new attributes).
@@ -82,7 +76,7 @@ export class OtlpSpanCostEnrichmentService {
     const customCosts = await this.deps.getCustomModelCosts(tenantId);
     if (customCosts.length === 0) return;
 
-    const matched = this.deps.matchModelCost(modelName, customCosts);
+    const matched = matchModelCostWithFallbacks(modelName, customCosts);
     if (!matched) return;
 
     span.attributes.push(

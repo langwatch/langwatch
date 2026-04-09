@@ -11,8 +11,13 @@ import {
 import type { Project } from "@prisma/client";
 import numeral from "numeral";
 import { useMemo } from "react";
-import { Clock, Play, Settings } from "react-feather";
+import { ChevronDown, Clock, Play, Settings } from "react-feather";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import {
+  findPromptReferenceInAncestors,
+  flattenParamsToPromptAttributes,
+  type PromptLookupSpan,
+} from "../../server/traces/findPromptReferenceInAncestors";
 import type {
   ErrorCapture,
   EvaluationResult,
@@ -26,6 +31,7 @@ import {
 } from "../checks/EvaluationStatus";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Link } from "../ui/link";
+import { Menu } from "../ui/menu";
 import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
@@ -38,7 +44,15 @@ import { RenderInputOutput } from "./RenderInputOutput";
  * @param props.span - The span object containing trace data
  * @param props.project - The project context (maintained for API compatibility)
  */
-export function SpanDetails({ span }: { project: Project; span: Span }) {
+export function SpanDetails({
+  span,
+  allSpans,
+}: {
+  project: Project;
+  span: Span;
+  /** All spans in the trace, used to walk up parent chain for prompt reference lookup */
+  allSpans?: Span[];
+}) {
   const estimatedCost = (
     <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
       <Text as="span" color="fg.subtle" borderBottom="1px dotted">
@@ -50,12 +64,43 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
   const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
 
   const canOpenSpanInPromptStudio = useMemo(() => {
-    return (
-      span.type === "llm" &&
-      span.span_id &&
-      span.input?.type === "chat_messages"
-    );
+    return span.type === "llm" && !!span.span_id;
   }, [span]);
+
+  /** Extract prompt reference from span params, searching siblings and ancestors */
+  const promptRef = useMemo(() => {
+    // Check the span's own params first
+    const ownAttrs = flattenParamsToPromptAttributes(
+      span.params as Record<string, unknown> | null,
+    );
+    const promptId = ownAttrs["langwatch.prompt.id"];
+    if (typeof promptId === "string" && promptId.includes(":")) {
+      return promptId;
+    }
+
+    // Search ancestors, siblings, and cousins using the shared function
+    if (allSpans) {
+      const lookupSpans: PromptLookupSpan[] = allSpans.map((s) => ({
+        spanId: s.span_id,
+        parentSpanId: s.parent_id ?? null,
+        startTime: s.timestamps.started_at,
+        attributes: flattenParamsToPromptAttributes(
+          s.params as Record<string, unknown> | null,
+        ),
+      }));
+
+      const ref = findPromptReferenceInAncestors({
+        targetSpanId: span.span_id,
+        spans: lookupSpans,
+      });
+
+      if (ref?.promptHandle && ref.promptVersionNumber != null) {
+        return `${ref.promptHandle}:${ref.promptVersionNumber}`;
+      }
+    }
+
+    return null;
+  }, [span.params, span.span_id, span.parent_id, allSpans]);
 
   return (
     <VStack flexGrow={1} gap={3} align="start">
@@ -73,18 +118,23 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
           <Text>
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
-          {canOpenSpanInPromptStudio && (
+          {canOpenSpanInPromptStudio && promptRef ? (
+            <OpenInPromptsMenu
+              spanId={span.span_id}
+              promptRef={promptRef}
+              buildUrl={buildUrl}
+            />
+          ) : canOpenSpanInPromptStudio ? (
             <Link
-              // Potential nullability here is due to the buildUrl function returning null if the project slug is missing.
               href={buildUrl(span.span_id)?.toString() ?? ""}
               isExternal
             >
-              <Button size="xs" colorPalette="orange">
+              <Button size="sm" colorPalette="orange">
                 <Play size={16} />
                 Open in Prompts
               </Button>
             </Link>
-          )}
+          ) : null}
         </HStack>
         <HStack>
           <Text>
@@ -322,6 +372,53 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
         )
       )}
     </VStack>
+  );
+}
+
+/**
+ * Dropdown menu for "Open in Prompts" when the span has a prompt reference.
+ * Shows options to open the existing prompt or create a new one.
+ */
+function OpenInPromptsMenu({
+  spanId,
+  promptRef,
+  buildUrl,
+}: {
+  spanId: string;
+  promptRef: string;
+  buildUrl: (
+    spanId: string,
+    action?: "open-existing" | "create-new",
+  ) => URL | null;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button size="sm" colorPalette="orange">
+          <Play size={16} />
+          Open in Prompts
+          <ChevronDown size={14} />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        <Menu.Item value="open-existing" asChild>
+          <Link
+            href={buildUrl(spanId, "open-existing")?.toString() ?? ""}
+            isExternal
+          >
+            Open {promptRef}
+          </Link>
+        </Menu.Item>
+        <Menu.Item value="create-new" asChild>
+          <Link
+            href={buildUrl(spanId, "create-new")?.toString() ?? ""}
+            isExternal
+          >
+            Create new prompt
+          </Link>
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
   );
 }
 

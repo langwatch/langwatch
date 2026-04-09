@@ -16,25 +16,19 @@ class Input:
     """
     Attributes:
         value (str | Unset):
-        satisfaction_score (float | Unset):
     """
 
     value: str | Unset = UNSET
-    satisfaction_score: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         value = self.value
-
-        satisfaction_score = self.satisfaction_score
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
         if value is not UNSET:
             field_dict["value"] = value
-        if satisfaction_score is not UNSET:
-            field_dict["satisfaction_score"] = satisfaction_score
 
         return field_dict
 
@@ -43,11 +37,8 @@ class Input:
         d = dict(src_dict)
         value = d.pop("value", UNSET)
 
-        satisfaction_score = d.pop("satisfaction_score", UNSET)
-
         input_ = cls(
             value=value,
-            satisfaction_score=satisfaction_score,
         )
 
         input_.additional_properties = d

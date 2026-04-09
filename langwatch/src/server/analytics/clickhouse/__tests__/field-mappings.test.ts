@@ -183,16 +183,20 @@ describe("field-mappings", () => {
       expect(buildJoinClause("trace_summaries")).toBe("");
     });
 
-    it("builds correct JOIN for stored_spans", () => {
+    it("builds correct JOIN for stored_spans with column pruning", () => {
       const join = buildJoinClause("stored_spans");
-      expect(join).toContain("JOIN stored_spans ss");
+      expect(join).toContain("FROM stored_spans");
+      expect(join).toContain("TenantId = {tenantId:String}");
       expect(join).toContain("ts.TenantId = ss.TenantId");
       expect(join).toContain("ts.TraceId = ss.TraceId");
+      // Should not use SELECT *
+      expect(join).not.toContain("SELECT *");
     });
 
     it("builds correct JOIN for evaluation_runs", () => {
       const join = buildJoinClause("evaluation_runs");
-      expect(join).toContain("JOIN evaluation_runs es");
+      expect(join).toContain("FROM evaluation_runs");
+      expect(join).toContain("GROUP BY TenantId, EvaluationId");
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
     });

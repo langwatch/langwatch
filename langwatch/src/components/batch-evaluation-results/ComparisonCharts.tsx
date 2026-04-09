@@ -320,11 +320,16 @@ export const ComparisonCharts = ({
     }
   };
 
-  // Default X-axis: "runs" if multiple runs, "target" if single run with multiple targets
+  // Default X-axis: "runs" if multiple runs, "target" if single run with multiple real targets.
+  // When all targets are evaluators (simple evaluations without a prompt/agent target),
+  // each evaluator gets its own column but grouping by "target" is not useful — default to "runs".
   const defaultXAxis = useMemo((): XAxisOption => {
     if (comparisonData.length >= 2) return "runs";
-    const targetCount = comparisonData[0]?.data?.targetColumns.length ?? 0;
-    if (targetCount >= 2) return "target";
+    const targets = comparisonData[0]?.data?.targetColumns ?? [];
+    const hasRealTarget = targets.some(
+      (t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"),
+    );
+    if (targets.length >= 2 && hasRealTarget) return "target";
     return "runs";
   }, [comparisonData]);
 
@@ -833,7 +838,7 @@ export const ComparisonCharts = ({
                     top="100%"
                     left={0}
                     marginTop={1}
-                    bg="white"
+                    bg="bg.panel"
                     border="1px solid"
                     borderColor="border"
                     borderRadius="md"
@@ -852,14 +857,14 @@ export const ComparisonCharts = ({
                           cursor="pointer"
                           bg={
                             xAxisOption === opt.value
-                              ? "blue.50"
+                              ? "blue.subtle"
                               : "transparent"
                           }
                           _hover={{
                             bg:
                               xAxisOption === opt.value
-                                ? "blue.100"
-                                : "gray.50",
+                                ? "blue.muted"
+                                : "bg.subtle",
                           }}
                           onClick={() => {
                             setXAxisOption(opt.value);
@@ -873,7 +878,7 @@ export const ComparisonCharts = ({
                               xAxisOption === opt.value ? "medium" : "normal"
                             }
                             color={
-                              xAxisOption === opt.value ? "blue.600" : "inherit"
+                              xAxisOption === opt.value ? "blue.fg" : "inherit"
                             }
                           >
                             {opt.label}
@@ -902,7 +907,7 @@ export const ComparisonCharts = ({
                   top="100%"
                   right={0}
                   marginTop={1}
-                  bg="white"
+                  bg="bg.panel"
                   border="1px solid"
                   borderColor="border"
                   borderRadius="md"
@@ -919,7 +924,7 @@ export const ComparisonCharts = ({
                         padding={1}
                         borderRadius="sm"
                         cursor="pointer"
-                        _hover={{ bg: "gray.50" }}
+                        _hover={{ bg: "bg.subtle" }}
                         onClick={() => toggleMetric(metric.id)}
                       >
                         <Box
@@ -992,7 +997,7 @@ export const ComparisonCharts = ({
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
-                      stroke="#EDF2F7"
+                      stroke="var(--chakra-colors-border)"
                       strokeDasharray="0"
                     />
                     <XAxis
@@ -1064,7 +1069,7 @@ export const ComparisonCharts = ({
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
-                      stroke="#EDF2F7"
+                      stroke="var(--chakra-colors-border)"
                       strokeDasharray="0"
                     />
                     <XAxis
@@ -1142,7 +1147,7 @@ export const ComparisonCharts = ({
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
-                          stroke="#EDF2F7"
+                          stroke="var(--chakra-colors-border)"
                           strokeDasharray="0"
                         />
                         <XAxis
@@ -1221,7 +1226,7 @@ export const ComparisonCharts = ({
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
-                          stroke="#EDF2F7"
+                          stroke="var(--chakra-colors-border)"
                           strokeDasharray="0"
                         />
                         <XAxis

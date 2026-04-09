@@ -1,0 +1,63 @@
+---
+name: debug-instrumentation
+description: Debug and improve your LangWatch traces. Inspects production traces for missing input/output, disconnected spans, unlabeled traces, and missing metadata. Use when traces look broken or incomplete.
+license: MIT
+compatibility: Requires LangWatch MCP with API key. Works with any coding agent.
+metadata:
+  category: recipe
+---
+
+# Debug Your LangWatch Instrumentation
+
+This recipe uses the LangWatch MCP to inspect your production traces and identify instrumentation issues.
+
+## Prerequisites
+
+The LangWatch MCP must be installed with a valid API key. See [MCP Setup](../../_shared/mcp-setup.md).
+
+## Step 1: Fetch Recent Traces
+
+Call `search_traces` with a recent time range (last 24h or 7d) to get an overview:
+
+- How many traces are there?
+- Do they have inputs and outputs populated, or are they `<empty>`?
+- Are there labels and metadata (user_id, thread_id)?
+
+## Step 2: Inspect Individual Traces
+
+For traces that look problematic, call `get_trace` with the trace ID to see the full span hierarchy:
+
+- **Empty input/output**: The most common issue. Check if `autotrack_openai_calls(client)` (Python) or `experimental_telemetry` (TypeScript/Vercel AI) is configured.
+- **Disconnected spans**: Spans that don't connect to a parent trace. Usually means `@langwatch.trace()` decorator is missing on the entry function.
+- **Missing labels**: No way to filter traces by feature/version. Add labels via `langwatch.get_current_trace().update(metadata={"labels": ["feature_name"]})`.
+- **Missing user_id/thread_id**: Can't correlate traces to users or conversations. Add via trace metadata.
+- **Slow spans**: Unusually long completion times may indicate API timeouts or inefficient prompts.
+
+## Step 3: Read the Integration Docs
+
+Use `fetch_langwatch_docs` to read the integration guide for the project's framework. Compare the recommended setup with what's in the code.
+
+## Step 4: Apply Fixes
+
+For each issue found:
+1. Identify the root cause in the code
+2. Apply the fix following the framework-specific docs
+3. Run the application to generate new traces
+4. Re-inspect with `search_traces` to verify the fix
+
+## Step 5: Verify Improvement
+
+After fixes, compare before/after:
+- Are inputs/outputs now populated?
+- Are spans properly nested?
+- Are labels and metadata present?
+
+## Common Issues and Fixes
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| All traces show `<empty>` input/output | Missing autotrack or telemetry config | Add `autotrack_openai_calls(client)` or `experimental_telemetry: { isEnabled: true }` |
+| Spans not connected to traces | Missing `@langwatch.trace()` on entry function | Add trace decorator to the main function |
+| No labels on traces | Labels not set in trace metadata | Add `metadata={"labels": ["feature"]}` to trace update |
+| Missing user_id | User ID not passed to trace | Add `user_id` to trace metadata |
+| Traces from different calls merged | Missing `langwatch.setup()` or trace context not propagated | Ensure `langwatch.setup()` called at startup |

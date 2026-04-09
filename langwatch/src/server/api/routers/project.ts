@@ -19,6 +19,11 @@ import { getApp } from "~/server/app-layer/app";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
+import {
+  createLicenseEnforcementService,
+  LimitExceededError,
+} from "../../license-enforcement";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -28,7 +33,6 @@ import {
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
-import { getOrganizationProjectsCount } from "./limits";
 import { revokeAllTraceShares } from "./share";
 
 export const projectRouter = createTRPCRouter({
@@ -126,22 +130,35 @@ export const projectRouter = createTRPCRouter({
         });
       }
 
-      const projectCount = await getOrganizationProjectsCount(
-        input.organizationId,
-      );
-      const activePlan = await getApp().planProvider.getActivePlan({
-        organizationId: input.organizationId,
-        user: ctx.session.user,
-      });
-
-      if (
-        projectCount >= activePlan.maxProjects &&
-        !activePlan.overrideAddingLimitations
-      ) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You have reached the maximum number of projects",
+      const enforcement = createLicenseEnforcementService(prisma);
+      try {
+        await enforcement.enforceLimitByOrganization({
+          organizationId: input.organizationId,
+          limitType: "projects",
+          user: ctx.session.user,
         });
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: error.message,
+            cause: {
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            },
+          });
+        }
+        throw error;
       }
 
       const projectNanoId = nanoid();
@@ -211,12 +228,6 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          featureClickHouseDataSourceSimulations: Boolean(env.IS_SAAS),
-          featureClickHouseDataSourceEvaluations: Boolean(env.IS_SAAS),
-          featureClickHouseDataSourceTraces: Boolean(env.IS_SAAS),
-          featureEventSourcingSimulationIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
         },
       });
 
@@ -241,6 +252,14 @@ export const projectRouter = createTRPCRouter({
       }
 
       return project;
+    }),
+  getHasFirstMessage: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => {
+      const project = await getApp().projects.getById(input.projectId);
+
+      return { firstMessage: project?.firstMessage ?? false };
     }),
   regenerateApiKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))

@@ -5,7 +5,7 @@ import { TraceRequestUtils } from "../traceRequest.utils";
 describe("traceRequest.utils", () => {
   describe("normalizeOtlpAttributes", () => {
     describe("when attributes contain flattened array patterns", () => {
-      it("reconstructs consecutive indexed arrays into JSON strings", () => {
+      it("reconstructs consecutive indexed arrays into objects", () => {
         const attributes = [
           {
             key: "llm.input_messages.0.message.content",
@@ -28,8 +28,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("llm.input_messages");
-        const parsed = JSON.parse(result["llm.input_messages"] as string);
-        expect(parsed).toEqual([
+        expect(result["llm.input_messages"]).toEqual([
           {
             message: {
               content: "You are a helpful web agent.",
@@ -55,8 +54,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("messages");
-        const parsed = JSON.parse(result.messages as string);
-        expect(parsed).toEqual([{ content: "Hello", role: "user" }]);
+        expect(result.messages).toEqual([{ content: "Hello", role: "user" }]);
       });
 
       it("handles deeply nested structures", () => {
@@ -82,8 +80,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("data");
-        const parsed = JSON.parse(result.data as string);
-        expect(parsed).toEqual([
+        expect(result.data).toEqual([
           { a: { b: { c: "value1", d: "value2" } } },
           { a: { b: { c: "value3", d: "value4" } } },
         ]);
@@ -114,8 +111,7 @@ describe("traceRequest.utils", () => {
         expect(result["llm.model"]).toBe("gpt-4");
         expect(result["other.key"]).toBe(69);
         expect(result).toHaveProperty("llm.messages");
-        const parsed = JSON.parse(result["llm.messages"] as string);
-        expect(parsed).toEqual([{ content: "Hello", role: "user" }]);
+        expect(result["llm.messages"]).toEqual([{ content: "Hello", role: "user" }]);
       });
     });
 
@@ -235,8 +231,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("metrics");
-        const parsed = JSON.parse(result.metrics as string);
-        expect(parsed).toEqual([
+        expect(result.metrics).toEqual([
           { name: "latency", value: 123.45 },
           { name: "count", value: 69 },
         ]);
@@ -268,8 +263,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("flags");
-        const parsed = JSON.parse(result.flags as string);
-        expect(parsed).toEqual([
+        expect(result.flags).toEqual([
           { name: "enabled", active: true },
           { name: "also_enabled", active: true },
         ]);
@@ -308,9 +302,7 @@ describe("traceRequest.utils", () => {
 
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
-        expect(result["langwatch.labels"]).toBe('["label1","label2"]');
-        const parsed = JSON.parse(result["langwatch.labels"] as string);
-        expect(parsed).toEqual(["label1", "label2"]);
+        expect(result["langwatch.labels"]).toEqual(["label1", "label2"]);
       });
 
       it("unwraps mixed scalar types inside arrayValue", () => {
@@ -331,8 +323,7 @@ describe("traceRequest.utils", () => {
 
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
-        const parsed = JSON.parse(result["mixed.values"] as string);
-        expect(parsed).toEqual(["hello", 69, true]);
+        expect(result["mixed.values"]).toEqual(["hello", 69, true]);
       });
     });
 
@@ -362,11 +353,8 @@ describe("traceRequest.utils", () => {
         expect(result).toHaveProperty("input");
         expect(result).toHaveProperty("output");
 
-        const parsedInput = JSON.parse(result.input as string);
-        const parsedOutput = JSON.parse(result.output as string);
-
-        expect(parsedInput).toEqual([{ text: "hello" }, { text: "world" }]);
-        expect(parsedOutput).toEqual([{ text: "foo" }, { text: "bar" }]);
+        expect(result.input).toEqual([{ text: "hello" }, { text: "world" }]);
+        expect(result.output).toEqual([{ text: "foo" }, { text: "bar" }]);
       });
 
       it("handles flat scalar value at array index (single field per item)", () => {
@@ -384,8 +372,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("tags");
-        const parsed = JSON.parse(result.tags as string);
-        expect(parsed).toEqual([{ value: "tag1" }, { value: "tag2" }]);
+        expect(result.tags).toEqual([{ value: "tag1" }, { value: "tag2" }]);
       });
     });
   });
@@ -820,8 +807,7 @@ describe("traceRequest.utils", () => {
         // "0" / "1" as index, and "tool_calls.0.name" / "tool_calls.0.args" as remainder.
         // unflattenObject then splits the remainder by "." and creates nested objects.
         expect(result).toHaveProperty("choices");
-        const parsed = JSON.parse(result["choices"] as string);
-        expect(parsed).toEqual([
+        expect(result["choices"]).toEqual([
           { tool_calls: { "0": { name: "get_weather", args: '{"city":"NYC"}' } } },
           { tool_calls: { "0": { name: "get_time", args: '{"tz":"EST"}' } } },
         ]);
@@ -863,8 +849,7 @@ describe("traceRequest.utils", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
         expect(result).toHaveProperty("llm.input_messages");
-        const parsed = JSON.parse(result["llm.input_messages"] as string);
-        expect(parsed).toEqual([
+        expect(result["llm.input_messages"]).toEqual([
           { message: { role: "system", content: "You are helpful." } },
           { message: { role: "user", content: "Summarize this." } },
           { message: { role: "assistant", content: "Sure, here is..." } },
@@ -908,8 +893,8 @@ describe("traceRequest.utils", () => {
         expect(result["llm.output_messages.0.message.content"]).toBe(
           "Let me check.",
         );
-        expect(result["llm.output_messages.0.message.tool_calls"]).toBe(
-          '[{"function":{"name":"search"}}]',
+        expect(result["llm.output_messages.0.message.tool_calls"]).toEqual(
+          [{ function: { name: "search" } }],
         );
         expect(result["llm.output_messages.1.message.role"]).toBe("tool");
         expect(result["llm.output_messages.1.message.content"]).toBe(
@@ -972,8 +957,8 @@ describe("traceRequest.utils", () => {
 
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
-        expect(result["langwatch.labels"]).toBe(
-          '["production","v2","critical"]',
+        expect(result["langwatch.labels"]).toEqual(
+          ["production", "v2", "critical"],
         );
       });
     });
@@ -1008,11 +993,17 @@ describe("traceRequest.utils", () => {
 
         const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
 
-        // The value is a JSON string containing the raw kvlistValue structure
-        const parsed = JSON.parse(result["llm.messages"] as string);
-        expect(parsed).toHaveLength(1);
-        expect(parsed[0]).toHaveProperty("kvlistValue");
-        expect(parsed[0].kvlistValue.values).toHaveLength(2);
+        // arrayValue of kvlistValue items: stored as array of raw OTLP structures
+        expect(result["llm.messages"]).toEqual([
+          {
+            kvlistValue: {
+              values: [
+                { key: "role", value: { stringValue: "user" } },
+                { key: "content", value: { stringValue: "Hello" } },
+              ],
+            },
+          },
+        ]);
       });
     });
   });

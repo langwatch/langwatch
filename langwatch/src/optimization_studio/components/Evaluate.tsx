@@ -3,7 +3,6 @@ import {
   createListCollection,
   HStack,
   Input,
-  Skeleton,
   Spacer,
   Text,
   useDisclosure,
@@ -15,14 +14,17 @@ import { CheckSquare } from "react-feather";
 import {
   Controller,
   type ControllerRenderProps,
+  FormProvider,
   type UseFormReturn,
   useForm,
+  useWatch,
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
 import { Select } from "../../components/ui/select";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
@@ -33,7 +35,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { trainTestSplit } from "../utils/datasetUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 
 export function Evaluate() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -62,6 +64,7 @@ export function Evaluate() {
           size="sm"
           onClick={() => {
             trackEvent("evaluate_click", { project_id: project?.id });
+            form.reset({ version: "", commitMessage: "", evaluateOn: undefined });
             onToggle();
           }}
           disabled={isRunning}
@@ -97,12 +100,17 @@ export function EvaluateModalContent({
   onClose: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
+  const { checkAndProceed } = useLicenseEnforcement("experiments");
   const {
     workflowId,
     getWorkflow,
     evaluationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+    checkCanCommitNewVersion,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -110,12 +118,20 @@ export function EvaluateModalContent({
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }) => ({
       workflowId,
       getWorkflow,
       evaluationState: state.evaluation,
       deselectAllNodes: deselectAllNodes,
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -128,13 +144,13 @@ export function EvaluateModalContent({
     | Node<Entry>
     | undefined;
 
-  const { total } = useGetDatasetData({
+  const { total, query: datasetQuery } = useGetDatasetData({
     dataset: entryNode?.data.dataset,
     preview: true,
   });
 
-  const evaluateOn = form.watch("evaluateOn");
-  const commitMessage = form.watch("commitMessage");
+  const evaluateOn = useWatch({ control: form.control, name: "evaluateOn" });
+  const commitMessage = useWatch({ control: form.control, name: "commitMessage" });
 
   useEffect(() => {
     if (!evaluateOn) {
@@ -200,15 +216,8 @@ export function EvaluateModalContent({
     return 0;
   }, [evaluateOn, total, train.length, test.length]);
 
-  const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
-    useVersionState({
-      project,
-      form: form as unknown as UseFormReturn<{
-        version: string;
-        commitMessage: string;
-      }>,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const canSave = checkCanCommitNewVersion();
+  const trpc = api.useContext();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
@@ -233,8 +242,6 @@ export function EvaluateModalContent({
     async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
-
       if (!estimatedTotal) {
         return;
       }
@@ -257,58 +264,69 @@ export function EvaluateModalContent({
         return;
       }
 
-      if (canSaveNewVersion) {
-        try {
-          const versionResponse = await commitVersion.mutateAsync({
-            projectId: project.id,
-            workflowId,
-            commitMessage,
-            dsl: {
-              ...getWorkflow(),
-              version,
-            },
-          });
-          versionId = versionResponse.id;
-        } catch (error) {
+      await checkAndProceed(async () => {
+        let versionId: string | undefined;
+
+        if (canSave) {
+          try {
+            const versionResponse = await commitVersion.mutateAsync({
+              projectId: project.id,
+              workflowId,
+              commitMessage,
+              dsl: {
+                ...getWorkflow(),
+                version,
+              },
+            });
+            versionId = versionResponse.id;
+            setLastCommittedWorkflow(getWorkflow());
+            setCurrentVersionId(versionId);
+          } catch (error) {
+            toaster.create({
+              title: "Error saving version",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+            throw error;
+          }
+        } else {
+          versionId = currentVersionId;
+        }
+
+        if (!versionId) {
           toaster.create({
-            title: "Error saving version",
+            title: "Version ID not found for evaluation",
             type: "error",
             duration: 5000,
             meta: { closable: true },
           });
-          throw error;
+          return;
         }
-      }
 
-      if (!versionId) {
-        toaster.create({
-          title: "Version ID not found for evaluation",
-          type: "error",
-          duration: 5000,
-          meta: { closable: true },
+        void trpc.workflow.getVersions.invalidate();
+
+        startEvaluationExecution({
+          workflow_version_id: versionId,
+          evaluate_on: evaluateOn.value,
+          dataset_entry:
+            evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
         });
-        return;
-      }
-
-      void versions.refetch();
-
-      startEvaluationExecution({
-        workflow_version_id: versionId,
-        evaluate_on: evaluateOn.value,
-        dataset_entry:
-          evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+        setHasStarted(true);
       });
-      setHasStarted(true);
     },
     [
-      canSaveNewVersion,
+      canSave,
+      checkAndProceed,
       commitVersion,
+      currentVersionId,
       estimatedTotal,
       getWorkflow,
       project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       startEvaluationExecution,
-      versionToBeEvaluated.id,
-      versions,
+      trpc.workflow.getVersions,
       workflowId,
     ],
   );
@@ -319,35 +337,22 @@ export function EvaluateModalContent({
     return null;
   }
 
-  if (!versions.data) {
-    return (
-      <Dialog.Content borderTop="5px solid" borderTopColor="green.400">
-        <Dialog.Header>
-          <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="start" width="full">
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer />
-      </Dialog.Content>
-    );
-  }
+  const needsACommitMessage = canSave && !commitMessage;
 
-  const needsACommitMessage = canSaveNewVersion && !commitMessage;
+  const isDatasetLoading = total === undefined && datasetQuery.isFetching;
 
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
-    : !estimatedTotal || estimatedTotal < 1
-      ? "You need at least 1 dataset entry to run evaluations"
-      : needsACommitMessage
-        ? "You need to provide a version description"
-        : false;
+    : isDatasetLoading
+      ? false
+      : !estimatedTotal || estimatedTotal < 1
+        ? "You need at least 1 dataset entry to run evaluations"
+        : needsACommitMessage
+          ? "You need to provide a version description"
+          : false;
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -362,17 +367,7 @@ export function EvaluateModalContent({
       <Dialog.Body>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
-            <VersionToBeUsed
-              form={
-                form as unknown as UseFormReturn<{
-                  version: string;
-                  commitMessage: string;
-                }>
-              }
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
+            <VersionToBeUsed />
           </VStack>
           <VStack align="start" width="full" gap={2}>
             <SmallLabel>Evaluate on</SmallLabel>
@@ -400,7 +395,9 @@ export function EvaluateModalContent({
             />
           )}
           <HStack width="full">
-            <Text fontWeight={500}>{estimatedTotal} entries</Text>
+            <Text fontWeight={500}>
+              {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal ?? 0} entries`}
+            </Text>
             <Spacer />
             <Tooltip content={isDisabled}>
               <Button
@@ -408,18 +405,20 @@ export function EvaluateModalContent({
                 type="submit"
                 disabled={!!isDisabled}
                 loading={
+                  isDatasetLoading ||
                   commitVersion.isLoading ||
                   evaluationState?.status === "waiting"
                 }
               >
                 <CheckSquare size={16} />
-                {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
+                {canSave ? "Save & Run Evaluation" : "Run Evaluation"}
               </Button>
             </Tooltip>
           </HStack>
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 
@@ -459,7 +458,7 @@ const DatasetSplitSelect = ({
         <Select.Trigger>
           <Select.ValueText placeholder="Select dataset split" />
         </Select.Trigger>
-        <Select.Content zIndex="popover">
+        <Select.Content>
           {options.map((option) => (
             <Select.Item item={option} key={option.value}>
               <VStack align="start" width="full">

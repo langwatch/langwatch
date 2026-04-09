@@ -1,0 +1,95 @@
+---
+title: Tracking Conversations
+sidebarTitle: TypeScript/JS
+description: Group related traces into conversations using thread_id so you can view and evaluate entire chat sessions in LangWatch.
+icon: square-js
+keywords: langwatch, typescript, javascript, thread_id, conversation, chat, session, multi-turn
+---
+
+When building chatbots or multi-turn agents, each user message creates a separate trace. To group these traces into a single conversation, set the `langwatch.thread.id` attribute on the root span.
+
+## Setting the thread_id
+
+Inside any traced operation, use `setAttributes()` on the span:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+setupObservability();
+
+const tracer = getLangWatchTracer("my-chatbot");
+
+async function handleMessage(threadId: string, userId: string, message: string) {
+  return await tracer.withActiveSpan("HandleMessage", async (span) => {
+    span.setAttributes({
+      "langwatch.thread.id": threadId,
+      "langwatch.user.id": userId,
+    });
+
+    // your LLM pipeline logic here...
+  });
+}
+```
+
+All traces that share the same `langwatch.thread.id` will be grouped into a single conversation thread in the LangWatch dashboard.
+
+You can also use the typed attribute constants:
+
+```typescript
+import { attributes } from "langwatch";
+
+span.setAttributes({
+  [attributes.ATTR_LANGWATCH_THREAD_ID]: threadId,
+  [attributes.ATTR_LANGWATCH_USER_ID]: userId,
+});
+```
+
+## Example: Express Chatbot
+
+```typescript
+import express from "express";
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+import OpenAI from "openai";
+
+setupObservability();
+
+const app = express();
+const tracer = getLangWatchTracer("my-chatbot");
+const openai = new OpenAI();
+
+app.post("/chat", async (req, res) => {
+  const { threadId, userId, message } = req.body;
+
+  const reply = await tracer.withActiveSpan("HandleMessage", async (span) => {
+    span.setAttributes({
+      "langwatch.thread.id": threadId,
+      "langwatch.user.id": userId,
+    });
+
+    // Fetch conversation history from your database using threadId
+    const history = await getConversationHistory(threadId);
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      messages: [...history, { role: "user", content: message }],
+    });
+
+    return response.choices[0]?.message?.content;
+  });
+
+  res.json({ reply });
+});
+```
+
+The `threadId` is typically the conversation or session ID from your application. It can be any string, as long as it's consistent across all messages in the same conversation.
+
+## What You Get
+
+Once traces share a `thread_id`, you can:
+
+- **View the full conversation** in the LangWatch dashboard by clicking on any trace in the thread
+- **Run evaluations by thread** to assess conversation-level quality (see [Evaluation by Thread](/evaluations/online-evaluation/by-thread))
+- **Build datasets from threads** for testing multi-turn scenarios (see [Dataset Threads](/datasets/dataset-threads))
+- **Filter and search** traces by conversation in the messages view

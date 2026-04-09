@@ -19,6 +19,7 @@ import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
+  type Resolver,
   useFieldArray,
   useForm,
 } from "react-hook-form";
@@ -42,8 +43,7 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
-import type { CheckPreconditions } from "../../server/evaluations/types";
-import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
+import { checkPreconditionsSchema, type CheckPreconditions } from "../../server/evaluations/types";
 import {
   type MappingState,
   mappingStateSchema,
@@ -100,27 +100,33 @@ export default function CheckConfigForm({
 
   const form = useForm<CheckConfigFormData>({
     defaultValues,
-    resolver: (data, ...args) => {
-      return zodResolver(
-        z.object({
-          name: z.string().min(1).max(255).refine(validateNameUniqueness),
-          checkType: evaluatorTypesSchema,
-          sample: z.number().min(0.01).max(1),
-          preconditions: checkPreconditionsSchema,
-          settings: data.checkType?.startsWith("custom/")
-            ? z.object({}).optional()
-            : evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
-                .settings,
-          executionMode: z
-            .enum([
-              EvaluationExecutionMode.ON_MESSAGE,
-              EvaluationExecutionMode.AS_GUARDRAIL,
-              EvaluationExecutionMode.MANUALLY,
-            ])
-            .optional(),
-          mappings: mappingStateSchema,
-        }),
-      )({ ...data, settings: data.settings || {} }, ...args);
+    resolver: (data, context, options) => {
+      const schema = z.object({
+        name: z.string().min(1).max(255).refine(validateNameUniqueness),
+        checkType: evaluatorTypesSchema,
+        sample: z.number().min(0.01).max(1),
+        preconditions: checkPreconditionsSchema,
+        settings: data.checkType?.startsWith("custom/")
+          ? z.object({}).optional()
+          : evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
+              .settings,
+        executionMode: z
+          .enum([
+            EvaluationExecutionMode.ON_MESSAGE,
+            EvaluationExecutionMode.AS_GUARDRAIL,
+            EvaluationExecutionMode.MANUALLY,
+          ])
+          .optional(),
+        mappings: mappingStateSchema,
+      });
+
+      // settings is selected dynamically at runtime from data.checkType, so
+      // TypeScript cannot prove the schema output matches CheckConfigFormData.
+      return (zodResolver(schema) as unknown as Resolver<CheckConfigFormData>)(
+        { ...data, settings: data.settings || {} },
+        context,
+        options,
+      );
     },
   });
 

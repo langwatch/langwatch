@@ -1,0 +1,159 @@
+{{- if .Values.backup.enabled }}
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+---
+# Full backup — scripts are baked into the Docker image at /scripts/
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-backup-full
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.full.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 28800
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "clickhouse-serverless.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup-full
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            fsGroup: 101
+          containers:
+            - name: full-backup
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["/scripts/backup-data.sh"]
+              securityContext:
+                runAsUser: 101
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: CLICKHOUSE_HOST
+                  value: "{{ $fullname }}-0.{{ $fullname }}-headless"
+                - name: CLICKHOUSE_USER
+                  value: {{ .Values.backup.user | quote }}
+                - name: CLICKHOUSE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "clickhouse-serverless.secretName" . }}
+                      key: {{ include "clickhouse-serverless.secretKey" . }}
+                - name: BACKUP_MODE
+                  value: "full"
+                - name: BACKUP_DATABASE
+                  value: {{ .Values.backup.database | quote }}
+---
+# Incremental backup
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-backup-incremental
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.incremental.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 3600
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "clickhouse-serverless.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup-incremental
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            fsGroup: 101
+          containers:
+            - name: incremental-backup
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["/scripts/backup-data.sh"]
+              securityContext:
+                runAsUser: 101
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: CLICKHOUSE_HOST
+                  value: "{{ $fullname }}-0.{{ $fullname }}-headless"
+                - name: CLICKHOUSE_USER
+                  value: {{ .Values.backup.user | quote }}
+                - name: CLICKHOUSE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "clickhouse-serverless.secretName" . }}
+                      key: {{ include "clickhouse-serverless.secretKey" . }}
+                - name: BACKUP_MODE
+                  value: "incremental"
+                - name: BACKUP_DATABASE
+                  value: {{ .Values.backup.database | quote }}
+---
+# Restore template (suspended — manual trigger only)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-restore-template
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  schedule: "0 0 30 2 *"
+  suspend: true
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 28800
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "clickhouse-serverless.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: restore-data
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            fsGroup: 101
+          containers:
+            - name: restore-data
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["/scripts/restore-data.sh"]
+              securityContext:
+                runAsUser: 101
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: CLICKHOUSE_HOST
+                  value: "{{ $fullname }}-0.{{ $fullname }}-headless"
+                - name: CLICKHOUSE_USER
+                  value: {{ .Values.backup.user | quote }}
+                - name: CLICKHOUSE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "clickhouse-serverless.secretName" . }}
+                      key: {{ include "clickhouse-serverless.secretKey" . }}
+                - name: BACKUP_DATABASE
+                  value: {{ .Values.backup.database | quote }}
+                - name: BACKUP_NAME
+                  value: ""
+                - name: CONFIRM_RESTORE
+                  value: "no"
+{{- end }}

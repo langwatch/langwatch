@@ -34,6 +34,12 @@ Feature: Internal Set ID Namespace
     Then it returns false
 
   @unit
+  Scenario: Reject user-created set ending in on-platform suffix
+    Given a set ID "user-set__on-platform-scenarios"
+    When isOnPlatformSet is called
+    Then it returns false
+
+  @unit
   Scenario: Generate on-platform set ID for project
     Given a project ID "proj_abc123"
     When getOnPlatformSetId is called

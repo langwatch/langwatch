@@ -7,9 +7,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
+import { SimulationFacade } from "~/server/simulations/simulation.facade";
+import { extractSuiteId } from "~/server/suites/suite-set-id";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
@@ -18,7 +22,7 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.create(input);
     }),
 
@@ -26,7 +30,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.getAll(input);
     }),
 
@@ -34,7 +38,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -50,7 +54,7 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId, ...data } = input;
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.update({ id, projectId, data });
     }),
 
@@ -58,7 +62,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       try {
         return await service.duplicate(input);
       } catch (error) {
@@ -76,7 +80,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       const result = await service.archive(input);
       if (!result) {
         throw new TRPCError({
@@ -85,25 +89,6 @@ export const suiteRouter = createTRPCRouter({
         });
       }
       return result;
-    }),
-
-  getQueueStatus: protectedProcedure
-    .input(projectSchema.extend({ suiteId: z.string() }))
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ ctx, input }) => {
-      // Verify suite belongs to the authorized project
-      const service = SuiteService.create(ctx.prisma);
-      const suite = await service.getById({
-        id: input.suiteId,
-        projectId: input.projectId,
-      });
-      if (!suite) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suite not found",
-        });
-      }
-      return SuiteService.getQueueStatus({ suiteId: input.suiteId });
     }),
 
   resolveArchivedNames: protectedProcedure
@@ -126,7 +111,7 @@ export const suiteRouter = createTRPCRouter({
           message: "Organization not found for project",
         });
       }
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.resolveArchivedNames({
         ...input,
         organizationId,
@@ -134,10 +119,15 @@ export const suiteRouter = createTRPCRouter({
     }),
 
   run: protectedProcedure
-    .input(projectSchema.extend({ id: z.string() }))
+    .input(projectSchema.extend({
+      id: z.string(),
+      idempotencyKey: z.string(),
+      /** Optional client-generated batch run ID for immediate placeholder feedback */
+      batchRunId: z.string().optional(),
+    }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -162,6 +152,8 @@ export const suiteRouter = createTRPCRouter({
           suite,
           projectId: input.projectId,
           organizationId,
+          idempotencyKey: input.idempotencyKey,
+          batchRunId: input.batchRunId,
         });
 
         return {
@@ -182,5 +174,39 @@ export const suiteRouter = createTRPCRouter({
           message,
         });
       }
+    }),
+
+  getSummaries: protectedProcedure
+    .input(
+      projectSchema.extend({
+        startDate: z.number().int().nonnegative().optional(),
+        endDate: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input }) => {
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const startDate = input.startDate ?? Date.now() - THIRTY_DAYS_MS;
+      const endDate = input.endDate ?? Date.now();
+
+      const facade = SimulationFacade.create();
+      const summaries = await facade.getInternalSuiteSummaries({
+        projectId: input.projectId,
+        startDate,
+        endDate,
+      });
+
+      const result: Record<string, SuiteRunSummary> = {};
+      for (const summary of summaries) {
+        const suiteId = extractSuiteId(summary.scenarioSetId);
+        if (!suiteId) continue;
+        result[suiteId] = {
+          passedCount: summary.passedCount,
+          failedCount: summary.failedCount,
+          totalCount: summary.totalCount,
+          lastRunTimestamp: summary.lastRunTimestamp,
+        };
+      }
+      return result;
     }),
 });

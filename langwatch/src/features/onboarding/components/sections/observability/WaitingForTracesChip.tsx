@@ -118,21 +118,11 @@ export function WaitingForTracesChip(): React.ReactElement {
       <Box position="relative" display="inline-block">
         <HStack
           position="relative"
-          bg="transparent"
-          _before={{
-            content: '""',
-            position: "absolute",
-            inset: 0,
-            borderRadius: "full",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02))",
-            pointerEvents: "none",
-          }}
-          backdropFilter="blur(10px)"
-          style={{ WebkitBackdropFilter: "blur(10px)" }}
+          bg="bg.panel/50"
+          backdropFilter="blur(24px) saturate(1.4)"
           borderWidth="1px"
-          borderColor="whiteAlpha.200"
-          boxShadow="0 4px 18px rgba(2, 1, 1, 0.14), inset 0 1px 0 rgba(255,255,255,0.18)"
+          borderColor="gray.200"
+          boxShadow="0 4px 30px rgba(0,0,0,0.08)"
           borderRadius="full"
           px={4}
           py={2}
@@ -147,7 +137,7 @@ export function WaitingForTracesChip(): React.ReactElement {
                 <CheckCircle size={16} />
               </Box>
               <Text fontWeight="medium" fontSize="sm">
-                Traces detected —
+                Traces detected.
                 {secondsLeft !== null &&
                   secondsLeft > 0 &&
                   ` redirecting in ${secondsLeft}..`}

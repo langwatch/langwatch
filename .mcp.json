@@ -2,9 +2,18 @@
   "mcpServers": {
     "playwright": {
       "type": "stdio",
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "@playwright/mcp@latest"
+        "scripts/playwright-mcp.sh"
+      ],
+      "env": {}
+    },
+    "playwright-headed": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "scripts/playwright-mcp.sh",
+        "--headed"
       ],
       "env": {}
     }

@@ -9,6 +9,7 @@ export const clearDsl = (
   return {
     ...dsl,
     version: undefined,
+    workflow_id: undefined,
     edges: dsl.edges.map((edge) => {
       const edge_ = { ...edge };
       delete edge_.selected;

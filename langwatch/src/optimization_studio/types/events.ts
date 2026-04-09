@@ -12,6 +12,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       workflow: workflowJsonSchema,
       node_id: z.string(),
       inputs: z.record(z.string(), z.any()),
+      origin: z.string().optional(),
     }),
   }),
   z.object({
@@ -31,6 +32,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       manual_execution_mode: z.boolean().optional(),
       do_not_trace: z.boolean().optional(),
       run_evaluations: z.boolean().optional(),
+      origin: z.string().optional(),
     }),
   }),
   z.object({
@@ -92,6 +94,12 @@ export type StudioServerEvent =
       type: "evaluation_run_change";
       payload: {
         evaluation_run: Workflow["state"]["evaluation"];
+      };
+    }
+  | {
+      type: "evaluation_state_change";
+      payload: {
+        evaluation_state: Workflow["state"]["evaluation"];
       };
     }
   | {

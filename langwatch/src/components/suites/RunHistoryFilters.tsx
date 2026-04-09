@@ -7,8 +7,15 @@
 
 import { HStack, IconButton, NativeSelect, Text } from "@chakra-ui/react";
 import { LayoutGrid, List } from "lucide-react";
-import type { RunGroupType } from "./run-history-transforms";
+import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms";
 import type { ViewMode } from "./useRunHistoryStore";
+
+/** Display labels for each group-by option. */
+const GROUP_BY_LABELS: Record<RunGroupType, string> = {
+  none: "None",
+  scenario: "Scenario",
+  target: "Target",
+};
 
 export type RunHistoryFilterValues = {
   scenarioId: string;
@@ -21,6 +28,8 @@ type RunHistoryFiltersProps = {
   onFiltersChange: (filters: RunHistoryFilterValues) => void;
   groupBy?: RunGroupType;
   onGroupByChange?: (value: RunGroupType) => void;
+  /** Which group-by options to render. Defaults to all options when omitted. */
+  groupByOptions?: RunGroupType[];
   viewMode?: ViewMode;
   onViewModeChange?: (value: ViewMode) => void;
 };
@@ -31,6 +40,7 @@ export function RunHistoryFilters({
   onFiltersChange,
   groupBy,
   onGroupByChange,
+  groupByOptions = [...RUN_GROUP_TYPES],
   viewMode,
   onViewModeChange,
 }: RunHistoryFiltersProps) {
@@ -110,9 +120,11 @@ export function RunHistoryFilters({
                 }
                 aria-label="Group by"
               >
-                <option value="none">None</option>
-                <option value="scenario">Scenario</option>
-                <option value="target">Target</option>
+                {groupByOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {GROUP_BY_LABELS[opt]}
+                  </option>
+                ))}
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>

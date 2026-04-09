@@ -16,6 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
+import { NowProvider } from "../NowProvider";
 import { ALL_RUNS_ID } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -43,6 +44,7 @@ function makeSuite(
 }
 
 const defaultProps = {
+  projectSlug: "my-project",
   suites: [] as SimulationSuite[],
   selectedSuiteSlug: null,
   onSelectSuite: vi.fn(),
@@ -63,7 +65,7 @@ describe("<SuiteSidebar/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("No suites yet")).toBeInTheDocument();
+      expect(screen.getByText("No run plans yet")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
@@ -211,8 +213,29 @@ describe("<SuiteSidebar/>", () => {
         const searchInput = screen.getByPlaceholderText("Search...");
         await user.type(searchInput, "nonexistent");
 
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given suites with labels", () => {
+    const suitesWithLabels = [
+      makeSuite({
+        id: "suite_1",
+        name: "Nightly Suite",
+        slug: "nightly-suite",
+        labels: ["nightly", "regression"],
+      }),
+    ];
+
+    it("does not display suite labels as tag pills", () => {
+      render(
+        <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByText("nightly")).not.toBeInTheDocument();
+      expect(screen.queryByText("regression")).not.toBeInTheDocument();
     });
   });
 
@@ -224,18 +247,20 @@ describe("<SuiteSidebar/>", () => {
     ];
 
     describe("when a suite has all passing results", () => {
+      const FIXED_NOW = new Date("2026-01-15T12:00:00Z").getTime();
       const runSummaries = new Map([
         [
           "suite_1",
           {
             passedCount: 8,
+            failedCount: 0,
             totalCount: 8,
-            lastRunTimestamp: Date.now() - 2 * 60 * 60 * 1000,
+            lastRunTimestamp: FIXED_NOW - 2 * 60 * 60 * 1000,
           },
         ],
       ]);
 
-      it("displays pass count and total", () => {
+      it("displays pass count", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -245,10 +270,10 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
-      it("displays a checkmark status icon", () => {
+      it("displays pass rate with circle", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -258,20 +283,34 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByTestId("status-icon-pass")).toBeInTheDocument();
+        expect(screen.getByText("100%")).toBeInTheDocument();
       });
 
       it("displays compact recency text", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={runSummaries}
-          />,
-          { wrapper: Wrapper },
+        const NowWrapper = ({ children }: { children: React.ReactNode }) => (
+          <ChakraProvider value={defaultSystem}>
+            <NowProvider intervalMs={999999}>{children}</NowProvider>
+          </ChakraProvider>
         );
+        // Override the NowProvider with FIXED_NOW so time is deterministic
+        vi.useFakeTimers();
+        vi.setSystemTime(FIXED_NOW);
+        try {
+          render(
+            <SuiteSidebar
+              {...defaultProps}
+              suites={suites}
+              runSummaries={runSummaries}
+            />,
+            { wrapper: NowWrapper },
+          );
 
-        expect(screen.getByText(/2h ago/)).toBeInTheDocument();
+          const suiteItems = screen.getAllByTestId("suite-list-item");
+          const texts = suiteItems.map((el) => el.textContent).join(" ");
+          expect(texts).toMatch(/2h ago/);
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
 
@@ -281,13 +320,14 @@ describe("<SuiteSidebar/>", () => {
           "suite_2",
           {
             passedCount: 9,
+            failedCount: 3,
             totalCount: 12,
             lastRunTimestamp: Date.now() - 3 * 60 * 60 * 1000,
           },
         ],
       ]);
 
-      it("displays pass count and total showing the gap", () => {
+      it("displays pass count", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -297,10 +337,10 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/9\/12 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
-      it("displays an error status icon", () => {
+      it("displays pass rate reflecting failures", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -310,7 +350,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByTestId("status-icon-fail")).toBeInTheDocument();
+        expect(screen.getByText("75%")).toBeInTheDocument();
       });
     });
 
@@ -348,6 +388,7 @@ describe("<SuiteSidebar/>", () => {
             "suite_1",
             {
               passedCount: 7,
+              failedCount: 1,
               totalCount: 8,
               lastRunTimestamp: Date.now() - 60 * 60 * 1000,
             },
@@ -363,13 +404,14 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/7\/8 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/7 passed/)).toBeInTheDocument();
 
         const updatedSummaries = new Map([
           [
             "suite_1",
             {
               passedCount: 8,
+              failedCount: 0,
               totalCount: 8,
               lastRunTimestamp: Date.now(),
             },
@@ -386,8 +428,8 @@ describe("<SuiteSidebar/>", () => {
           </Wrapper>,
         );
 
-        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
-        expect(screen.queryByText(/7\/8 passed/)).not.toBeInTheDocument();
+        expect(screen.getByText(/8 passed/)).toBeInTheDocument();
+        expect(screen.queryByText(/7 passed/)).not.toBeInTheDocument();
       });
     });
   });
@@ -413,6 +455,7 @@ describe("<SuiteSidebar/>", () => {
           "suite_1",
           {
             passedCount: 8,
+            failedCount: 0,
             totalCount: 8,
             lastRunTimestamp: Date.now() - 60 * 60 * 1000,
           },
@@ -692,6 +735,33 @@ describe("<SuiteSidebar/>", () => {
           screen.getByRole("button", { name: "Expand sidebar" }),
         ).toBeInTheDocument();
         expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given external sets with different timestamps", () => {
+    const externalSets = [
+      { scenarioSetId: "oldest-set", passedCount: 3, failedCount: 2, totalCount: 5, lastRunTimestamp: 1000 },
+      { scenarioSetId: "newest-set", passedCount: 5, failedCount: 0, totalCount: 5, lastRunTimestamp: 3000 },
+      { scenarioSetId: "middle-set", passedCount: 4, failedCount: 1, totalCount: 5, lastRunTimestamp: 2000 },
+    ];
+
+    describe("when rendered in the expanded sidebar", () => {
+      it("sorts external sets by most recent run first", () => {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={externalSets}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const items = screen.getAllByTestId("external-set-list-item");
+        const labels = items.map((el) => el.textContent);
+
+        expect(labels[0]).toContain("newest-set");
+        expect(labels[1]).toContain("middle-set");
+        expect(labels[2]).toContain("oldest-set");
       });
     });
   });

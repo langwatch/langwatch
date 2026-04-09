@@ -20,8 +20,8 @@ describe("PLAN_LIMITS", () => {
       expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxProjects).toBe(9999);
     });
 
-    it("sets FREE maxProjects to 1", () => {
-      expect(PLAN_LIMITS[PlanTypes.FREE].maxProjects).toBe(1);
+    it("sets FREE maxProjects to 2", () => {
+      expect(PLAN_LIMITS[PlanTypes.FREE].maxProjects).toBe(2);
     });
   });
 });

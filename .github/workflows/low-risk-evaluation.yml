@@ -1,4 +1,4 @@
-name: Low-Risk PR Evaluation
+name: low-risk-evaluation
 
 on:
   pull_request:
@@ -15,6 +15,10 @@ permissions:
   contents: read
   checks: write
 
+concurrency:
+  group: low-risk-eval-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
 jobs:
   evaluate:
     # Skip fork PRs — secrets and write permissions are unavailable
@@ -23,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Fetch PR metadata and diff
         id: pr-data
@@ -82,7 +86,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
         run: |
-          POLICY=$(cat docs/LOW_RISK_PULL_REQUESTS.md)
+          POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
           PR_TITLE=$(cat /tmp/pr_title.txt)
           PR_BODY=$(cat /tmp/pr_body.txt)
           PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
@@ -161,7 +165,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Apply label and comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           QUALIFIES: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.evaluate.outputs.qualifies }}
@@ -173,6 +177,26 @@ jobs:
             const qualifies = process.env.QUALIFIES === 'true';
             const scope = process.env.SCOPE;
             const reasoning = process.env.REASONING;
+
+            // Delete previous bot assessment comments to avoid clutter
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            for (const comment of comments) {
+              if (
+                comment.user?.login === "github-actions[bot]" &&
+                comment.body?.startsWith("**Automated low-risk assessment**")
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
 
             if (qualifies) {
               await github.rest.issues.addLabels({
@@ -189,7 +213,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](docs/LOW_RISK_PULL_REQUESTS.md) procedure.`,
+                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.`,
                   `- **Scope:** ${scope}`,
                   `- **Exclusions confirmed:** no changes to auth, security settings, database schema, business-critical logic, or external integrations.`,
                   `- **Classification:** \`low-risk-change\` under the documented policy.`,
@@ -242,7 +266,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.`,
+                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.`,
                   "",
                   `> ${reasoning}`,
                   "",
@@ -251,4 +275,64 @@ jobs:
               });
 
               core.info(`PR #${prNumber} does not qualify as low-risk.`);
+            }
+
+      - name: Refresh approval check for firefighting or approvals
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            const labelNames = labels.map(l => l.name);
+
+            // firefighting label → pass the check regardless of evaluation
+            if (labelNames.includes("firefighting")) {
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pr.data.head.sha,
+                name: "check-approval-or-label",
+                status: "completed",
+                conclusion: "success",
+                output: { title: "Approved", summary: "PR has firefighting label." },
+              });
+              core.info("Refreshed approval check for firefighting label.");
+              return;
+            }
+
+            // Existing approval → pass the check
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const approvedUsers = new Set();
+            for (const review of reviews.data) {
+              if (review.state === "APPROVED") {
+                approvedUsers.add(review.user.login);
+              }
+            }
+            if (approvedUsers.size >= 1) {
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pr.data.head.sha,
+                name: "check-approval-or-label",
+                status: "completed",
+                conclusion: "success",
+                output: { title: "Approved", summary: `PR has ${approvedUsers.size} approval(s).` },
+              });
+              core.info("Refreshed approval check for existing approval.");
             }

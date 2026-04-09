@@ -1,10 +1,10 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
-import type { Span } from "~/server/tracer/types";
+import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import type { SpanInsertData } from "../types";
 import type { SpanStorageRepository } from "./span-storage.repository";
@@ -130,7 +130,7 @@ export function serializeAttributes(
           result[key] = serialized;
         }
       } catch {
-        logger.debug(`Skipping unserializable attribute "${key}"`);
+        // skip unserializable attribute
       }
     }
   }
@@ -177,7 +177,7 @@ interface ClickHouseSpanRecord {
 }
 
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertSpan(span: SpanInsertData): Promise<void> {
     EventUtils.validateTenantId(
@@ -186,8 +186,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
+      const client = await this.resolveClient(span.tenantId);
       const record = this.toClickHouseRecord(span);
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -214,7 +215,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             SpanId,
@@ -241,14 +243,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             \`Links.TraceId\` AS Links_TraceId,
             \`Links.SpanId\` AS Links_SpanId,
             \`Links.Attributes\` AS Links_Attributes
-          FROM (
-            SELECT *
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-            ORDER BY SpanId ASC, StartTime DESC
-            LIMIT 1 BY TenantId, TraceId, SpanId
-          )
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND (TenantId, TraceId, SpanId, StartTime) IN (
+              SELECT TenantId, TraceId, SpanId, max(StartTime)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId, SpanId
+            )
           ORDER BY StartTime ASC
         `,
         query_params: { tenantId, traceId },
@@ -330,6 +334,101 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to get spans by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async getEventsByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getEventsByTraceId",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            SpanId AS event_id,
+            TraceId AS trace_id,
+            TenantId AS project_id,
+            toUnixTimestamp64Milli(event_timestamp) AS started_at,
+            event_name AS event_type,
+            event_attrs AS attributes
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND (TenantId, TraceId, SpanId, StartTime) IN (
+              SELECT TenantId, TraceId, SpanId, max(StartTime)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId, SpanId
+            )
+          ARRAY JOIN
+            "Events.Timestamp" AS event_timestamp,
+            "Events.Name" AS event_name,
+            "Events.Attributes" AS event_attrs
+          WHERE event_name != 'exception'
+          ORDER BY event_timestamp DESC
+        `,
+        query_params: { tenantId, traceId },
+        format: "JSONEachRow",
+      });
+
+      const rows = (await result.json()) as Array<{
+        event_id: string;
+        trace_id: string;
+        project_id: string;
+        started_at: string | number;
+        event_type: string;
+        attributes: Record<string, string>;
+      }>;
+
+      return rows.map((row) => {
+        const startedAt =
+          typeof row.started_at === "string"
+            ? parseInt(row.started_at, 10)
+            : row.started_at;
+
+        const metrics: Array<{ key: string; value: number }> = [];
+        const eventDetails: Array<{ key: string; value: string }> = [];
+
+        for (const [key, value] of Object.entries(row.attributes)) {
+          const isMetricKey =
+            key === "vote" || key === "score" ||
+            key.startsWith("metrics.") || key.startsWith("event.metrics.");
+          if (isMetricKey) {
+            const metricKey = key.replace(/^(event\.)?metrics\./, "");
+            metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
+          } else {
+            eventDetails.push({ key, value });
+          }
+        }
+
+        return {
+          event_id: row.event_id,
+          event_type: row.event_type,
+          project_id: row.project_id,
+          trace_id: row.trace_id,
+          timestamps: {
+            started_at: startedAt,
+            inserted_at: startedAt,
+            updated_at: startedAt,
+          },
+          metrics,
+          event_details: eventDetails,
+        };
+      });
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get events by trace ID from ClickHouse",
       );
       throw error;
     }

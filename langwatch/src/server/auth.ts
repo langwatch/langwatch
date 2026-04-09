@@ -22,10 +22,12 @@ import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
-import { dependencies } from "../injection/dependencies.server";
+import { handleAdminImpersonationSession } from "../../ee/admin/sessionHandler";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
-import { captureException } from "../utils/posthogErrorCapture";
+import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
+import { ensureUserSyncedToCio } from "../../ee/billing/nurturing/hooks/userSync";
+import { getApp } from "./app-layer/app";
 
 const logger = createLogger("langwatch:auth");
 
@@ -57,14 +59,12 @@ export const authOptions = (
   },
   callbacks: {
     session: async ({ session, user }) => {
-      if (dependencies.sessionHandler) {
-        const newSession = await dependencies.sessionHandler({
-          req,
-          session,
-          user,
-        });
-        if (newSession) return newSession;
-      }
+      const impersonatedSession = await handleAdminImpersonationSession({
+        req,
+        session,
+        user,
+      });
+      if (impersonatedSession) return impersonatedSession;
 
       if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({
@@ -77,6 +77,18 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
+        // Fire-and-forget: skip the DB query entirely when nurturing is off
+        if (getApp().nurturing) {
+          void prisma.organizationUser
+            .count({ where: { userId: user_.id } })
+            .then((orgCount_) => {
+              const hasOrg_ = orgCount_ > 0;
+              fireActivityTrackingNurturing({ userId: user_.id, hasOrganization: hasOrg_ });
+              ensureUserSyncedToCio({ userId: user_.id, hasOrganization: hasOrg_ });
+            })
+            .catch(() => {});
+        }
+
         return {
           ...session,
           user: {
@@ -85,6 +97,18 @@ export const authOptions = (
             email: user_.email,
           },
         };
+      }
+
+      // Fire-and-forget: skip the DB query entirely when nurturing is off
+      if (getApp().nurturing) {
+        void prisma.organizationUser
+          .count({ where: { userId: user.id } })
+          .then((orgCount) => {
+            const hasOrg = orgCount > 0;
+            fireActivityTrackingNurturing({ userId: user.id, hasOrganization: hasOrg });
+            ensureUserSyncedToCio({ userId: user.id, hasOrganization: hasOrg });
+          })
+          .catch(() => {});
       }
 
       return {
@@ -106,23 +130,47 @@ export const authOptions = (
         where: { email: user.email },
       });
 
+      if (existingUser?.deactivatedAt) {
+        return false;
+      }
+
       const domain = user.email.split("@")[1];
-      const orgWithSsoDomain = await prisma.organization.findFirst({
+      const orgWithSsoDomain = await prisma.organization.findUnique({
         where: {
           ssoDomain: domain,
         },
       });
 
-      if (existingUser?.pendingSsoSetup && account?.provider) {
-        await linkExistingUserToOAuthProvider(existingUser, account);
-
+      // SSO flow for orgs with ssoDomain+ssoProvider configured:
+      // - Existing user + correct SSO provider → auto-link account (clears pendingSsoSetup)
+      // - Existing user + wrong provider → set pendingSsoSetup and let them in to show the
+      //   "link your SSO account" banner (avoids hard-blocking existing users during migration)
+      if (existingUser && account && orgWithSsoDomain) {
+        if (isSsoProviderMatch(orgWithSsoDomain, account)) {
+          await linkExistingUserToOAuthProvider(existingUser, account);
+          return true;
+        }
+        if (!existingUser.pendingSsoSetup) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: { pendingSsoSetup: true },
+          });
+        }
         return true;
       }
-      // If the user is trying to sign in without their SSO provider, throw an error
+
+      // Fallback: user is already marked pendingSsoSetup but org lookup returned nothing
+      // (e.g. credentials provider login, or domain no longer has an SSO org) — let them in
+      if (existingUser?.pendingSsoSetup) {
+        return true;
+      }
+
+      // Block non-SSO sign-in attempts for new users whose domain has SSO enforced
       if (orgWithSsoDomain && account) {
         await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
       }
 
+      // New user with matching SSO domain → auto-create and add to org
       if (domain && account && orgWithSsoDomain && !existingUser) {
         await createUserAndAddToOrganization(
           user,
@@ -341,68 +389,82 @@ const createUserAndAddToOrganization = async (
   return newUser;
 };
 
+/**
+ * Links (or re-links) an existing user to their SSO OAuth account.
+ * Uses upsert so it's idempotent: first login creates the link,
+ * subsequent logins just refresh tokens. Old auth methods for the
+ * same provider are removed in the same transaction.
+ */
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
   account: NextAuthAccount,
 ) => {
-  // Wrap operations in a transaction
-  try {
-    await prisma.$transaction([
-      // Create the account link first
-      prisma.account.create({
-        data: {
-          userId: existingUser.id,
-          type: account.type ?? "oauth",
+  const accountData = {
+    userId: existingUser.id,
+    type: account.type ?? "oauth",
+    provider: account.provider,
+    providerAccountId: account.providerAccountId,
+    access_token: account.access_token,
+    refresh_token: account.refresh_token,
+    expires_at: account.expires_at,
+    token_type: account.token_type,
+    scope: account.scope,
+    id_token: account.id_token,
+  };
+
+  await prisma.$transaction([
+    prisma.account.upsert({
+      where: {
+        provider_providerAccountId: {
           provider: account.provider,
           providerAccountId: account.providerAccountId,
-          access_token: account.access_token,
-          refresh_token: account.refresh_token,
-          expires_at: account.expires_at,
-          token_type: account.token_type,
-          scope: account.scope,
-          id_token: account.id_token,
         },
-      }),
+      },
+      create: accountData,
+      update: {
+        access_token: account.access_token,
+        refresh_token: account.refresh_token,
+        expires_at: account.expires_at,
+        token_type: account.token_type,
+        scope: account.scope,
+        id_token: account.id_token,
+      },
+    }),
+    prisma.account.deleteMany({
+      where: {
+        userId: existingUser.id,
+        provider: account.provider,
+        providerAccountId: { not: account.providerAccountId },
+      },
+    }),
+    prisma.user.update({
+      where: { id: existingUser.id },
+      data: { pendingSsoSetup: false },
+    }),
+  ]);
+};
 
-      // Delete old accounts with the same provider (except the one we just created)
-      prisma.account.deleteMany({
-        where: {
-          userId: existingUser.id,
-          provider: account.provider,
-          providerAccountId: { not: account.providerAccountId },
-        },
-      }),
-      prisma.user.update({
-        where: { id: existingUser.id },
-        data: { pendingSsoSetup: false },
-      }),
-    ]);
-  } catch (error: any) {
-    // Tying to link an account that already exists will throw a P2002 error, let's ignore it
-    if (error.code === "P2002") {
-      captureException(error);
-      return;
-    } else {
-      throw error;
-    }
-  }
+/**
+ * Checks if the incoming account matches the org's configured SSO provider.
+ * For Auth0: matches via providerAccountId prefix (e.g. "waad|connection-name")
+ * For direct NextAuth providers: matches via provider name (e.g. "google", "okta")
+ */
+const isSsoProviderMatch = (
+  org: Organization,
+  account: NextAuthAccount,
+): boolean => {
+  if (!org.ssoProvider) return false;
+  return (
+    account.providerAccountId.startsWith(org.ssoProvider) ||
+    account.provider === org.ssoProvider
+  );
 };
 
 const checkIfSsoProviderIsAllowed = async (
   org: Organization,
   provider: NextAuthAccount,
 ) => {
-  if (
-    org?.ssoProvider &&
-    !(
-      // Auth0
-      (
-        provider.providerAccountId.startsWith(org.ssoProvider) ||
-        // NextAuth
-        provider.provider === org.ssoProvider
-      )
-    )
-  ) {
+  if (org?.ssoProvider && !isSsoProviderMatch(org, provider)) {
     throw new Error("SSO_PROVIDER_NOT_ALLOWED");
   }
 

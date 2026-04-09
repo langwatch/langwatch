@@ -17,21 +17,29 @@ local dispatchAfter  = tonumber(ARGV[3])
 local dedupId        = ARGV[4]
 local dedupTtlMs     = tonumber(ARGV[5])
 local jobDataJson    = ARGV[6]
+local shouldExtend   = tonumber(ARGV[7])
+local shouldReplace  = tonumber(ARGV[8])
 
 if dedupId ~= "" and dedupTtlMs > 0 then
   local existingJobId = redis.call("GET", dedupKey)
   if existingJobId then
-    redis.call("ZREM", groupJobsKey, existingJobId)
-    redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-    redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
-    redis.call("HDEL", dataKey, existingJobId)
-    redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-    local pendingCount = redis.call("ZCARD", groupJobsKey)
-    local score = math.sqrt(pendingCount)
-    redis.call("ZADD", readyKey, score, groupId)
-    redis.call("LPUSH", signalKey, "1")
-    redis.call("LTRIM", signalKey, 0, 999)
-    return 0
+    local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
+    if rank then
+      -- Still in staging: squash in place
+      if shouldExtend == 1 then
+        redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
+      end
+      if shouldReplace == 1 then
+        redis.call("HSET", dataKey, existingJobId, jobDataJson)
+      end
+      redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
+      redis.call("ZADD", readyKey, 1, groupId)
+      redis.call("LPUSH", signalKey, "1")
+      redis.call("LTRIM", signalKey, 0, 999)
+      return 0
+    end
+    -- Already dispatched: dedup key is stale, clean it up
+    redis.call("DEL", dedupKey)
   end
 end
 
@@ -42,9 +50,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
   redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
 end
 
-local pendingCount = redis.call("ZCARD", groupJobsKey)
-local score = math.sqrt(pendingCount)
-redis.call("ZADD", readyKey, score, groupId)
+redis.call("ZADD", readyKey, 1, groupId)
 
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
@@ -63,13 +69,15 @@ local newStagedCount = 0
 local affectedGroups = {}
 
 for i = 1, count do
-  local offset = 2 + (i - 1) * 6
+  local offset = 2 + (i - 1) * 8
   local stagedJobId   = ARGV[offset + 1]
   local groupId       = ARGV[offset + 2]
   local dispatchAfter = tonumber(ARGV[offset + 3])
   local dedupId       = ARGV[offset + 4]
   local dedupTtlMs    = tonumber(ARGV[offset + 5])
   local jobDataJson   = ARGV[offset + 6]
+  local shouldExtend  = tonumber(ARGV[offset + 7])
+  local shouldReplace = tonumber(ARGV[offset + 8])
 
   local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
   local dataKey      = keyPrefix .. "group:" .. groupId .. ":data"
@@ -79,12 +87,21 @@ for i = 1, count do
   if dedupId ~= "" and dedupTtlMs > 0 then
     local existingJobId = redis.call("GET", dedupKey)
     if existingJobId then
-      redis.call("ZREM", groupJobsKey, existingJobId)
-      redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-      redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
-      redis.call("HDEL", dataKey, existingJobId)
-      redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-      isDeduped = true
+      local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
+      if rank then
+        -- Still in staging: squash in place
+        if shouldExtend == 1 then
+          redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
+        end
+        if shouldReplace == 1 then
+          redis.call("HSET", dataKey, existingJobId, jobDataJson)
+        end
+        redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
+        isDeduped = true
+      else
+        -- Already dispatched: dedup key is stale, clean it up
+        redis.call("DEL", dedupKey)
+      end
     end
   end
 
@@ -101,10 +118,7 @@ for i = 1, count do
 end
 
 for groupId, _ in pairs(affectedGroups) do
-  local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-  local pendingCount = redis.call("ZCARD", groupJobsKey)
-  local score = math.sqrt(pendingCount)
-  redis.call("ZADD", readyKey, score, groupId)
+  redis.call("ZADD", readyKey, 1, groupId)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -125,7 +139,7 @@ local activeTtlSec = tonumber(ARGV[3])
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local scanStart = 0
 local scanEnd = 99
-local maxPasses = hasPauses and 5 or 1
+local maxPasses = hasPauses and 5 or 3
 
 for pass = 1, maxPasses do
   local groups = redis.call("ZREVRANGE", readyKey, scanStart, scanEnd)
@@ -174,8 +188,7 @@ for pass = 1, maxPasses do
 
             local pendingCount = redis.call("ZCARD", jobsKey)
             if pendingCount > 0 then
-              local score = math.sqrt(pendingCount)
-              redis.call("ZADD", readyKey, score, groupId)
+              redis.call("ZADD", readyKey, 1, groupId)
             else
               redis.call("ZREM", readyKey, groupId)
             end
@@ -203,17 +216,19 @@ local readyKey     = KEYS[1]
 local blockedKey   = KEYS[2]
 local pausedJobKey = KEYS[3]
 
-local keyPrefix    = ARGV[1]
-local nowMs        = tonumber(ARGV[2])
-local activeTtlSec = tonumber(ARGV[3])
-local maxJobs      = tonumber(ARGV[4])
+local keyPrefix      = ARGV[1]
+local nowMs          = tonumber(ARGV[2])
+local activeTtlSec   = tonumber(ARGV[3])
+local maxJobs        = tonumber(ARGV[4])
+local randomOffset   = tonumber(ARGV[5]) or 0
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local scanWindow = maxJobs * 3
-local maxPasses = hasPauses and 5 or 1
+local maxPasses = hasPauses and 5 or 3
 local results = {}
 local dispatched = 0
-local scanStart = 0
+local readySize = redis.call("ZCARD", readyKey)
+local scanStart = (readySize > 0) and (randomOffset % readySize) or 0
 
 for pass = 1, maxPasses do
   if dispatched >= maxJobs then break end
@@ -221,6 +236,8 @@ for pass = 1, maxPasses do
   local scanEnd = scanStart + scanWindow - 1
   local groups = redis.call("ZREVRANGE", readyKey, scanStart, scanEnd)
   if #groups == 0 then break end
+
+  local passDispatched = 0
 
   for _, groupId in ipairs(groups) do
     if dispatched >= maxJobs then break end
@@ -267,8 +284,7 @@ for pass = 1, maxPasses do
 
             local pendingCount = redis.call("ZCARD", jobsKey)
             if pendingCount > 0 then
-              local score = math.sqrt(pendingCount)
-              redis.call("ZADD", readyKey, score, groupId)
+              redis.call("ZADD", readyKey, 1, groupId)
             else
               redis.call("ZREM", readyKey, groupId)
             end
@@ -282,12 +298,14 @@ for pass = 1, maxPasses do
             results[#results + 1] = jobDataJson or ""
             results[#results + 1] = tostring(originalScore)
             dispatched = dispatched + 1
+            passDispatched = passDispatched + 1
           end
         end
       end
     end
   end
 
+  if passDispatched == 0 then break end
   scanStart = scanStart + scanWindow
 end
 
@@ -313,8 +331,7 @@ redis.call("DEL", activeKey)
 
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
-  local score = math.sqrt(pendingCount)
-  redis.call("ZADD", readyKey, score, groupId)
+  redis.call("ZADD", readyKey, 1, groupId)
 else
   redis.call("ZREM", readyKey, groupId)
 end
@@ -405,9 +422,7 @@ redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 
 -- 3. Update ready set score
 local readyKey = keyPrefix .. "ready"
-local pendingCount = redis.call("ZCARD", groupJobsKey)
-local score = math.sqrt(pendingCount)
-redis.call("ZADD", readyKey, score, groupId)
+redis.call("ZADD", readyKey, 1, groupId)
 
 -- 4. Set active key TTL to match backoff period.
 --    While the key exists the group is locked (preserves FIFO ordering).
@@ -458,6 +473,8 @@ export class GroupStagingScripts {
     dedupId,
     dedupTtlMs,
     jobDataJson,
+    shouldExtend = true,
+    shouldReplace = true,
   }: {
     stagedJobId: string;
     groupId: string;
@@ -465,6 +482,8 @@ export class GroupStagingScripts {
     dedupId: string;
     dedupTtlMs: number;
     jobDataJson: string;
+    shouldExtend?: boolean;
+    shouldReplace?: boolean;
   }): Promise<boolean> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
@@ -488,6 +507,8 @@ export class GroupStagingScripts {
       dedupId,
       String(dedupTtlMs),
       jobDataJson,
+      String(shouldExtend ? 1 : 0),
+      String(shouldReplace ? 1 : 0),
     );
 
     return result === 1;
@@ -506,6 +527,8 @@ export class GroupStagingScripts {
       dedupId: string;
       dedupTtlMs: number;
       jobDataJson: string;
+      shouldExtend?: boolean;
+      shouldReplace?: boolean;
     }>,
   ): Promise<number> {
     if (jobs.length === 0) return 0;
@@ -522,6 +545,8 @@ export class GroupStagingScripts {
         job.dedupId,
         String(job.dedupTtlMs),
         job.jobDataJson,
+        String((job.shouldExtend ?? true) ? 1 : 0),
+        String((job.shouldReplace ?? true) ? 1 : 0),
       );
     }
 
@@ -577,10 +602,12 @@ export class GroupStagingScripts {
     nowMs,
     activeTtlSec,
     maxJobs,
+    randomOffset,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
+    randomOffset?: number;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -596,6 +623,7 @@ export class GroupStagingScripts {
       String(nowMs),
       String(activeTtlSec),
       String(maxJobs),
+      String(randomOffset ?? 0),
     );
 
     if (!result || !Array.isArray(result) || result.length < 4) {
@@ -720,7 +748,7 @@ export class GroupStagingScripts {
    * slot is freed immediately.
    *
    * The active key TTL is set to match the backoff period so the key expires
-   * naturally. On the next dispatcher poll (≤1s) the retry job is dispatched.
+   * naturally. On the next dispatcher poll (≤5s) the retry job is dispatched.
    * This is fully Redis-driven — no Node.js timers, survives restarts.
    *
    * @returns true if re-staged, false if stale (active key doesn't match)
@@ -810,6 +838,13 @@ export class GroupStagingScripts {
    */
   getSignalKey(): string {
     return `${this.keyPrefix}signal`;
+  }
+
+  /**
+   * Get the number of groups in the ready set. O(1) via ZCARD.
+   */
+  async getReadySize(): Promise<number> {
+    return this.redis.zcard(`${this.keyPrefix}ready`);
   }
 
   /**

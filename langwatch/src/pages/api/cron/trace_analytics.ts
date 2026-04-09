@@ -3,7 +3,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { UsageLimitService } from "~/server/notifications/usage-limit.service";
 import { getApp } from "~/server/app-layer/app";
 import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger/server";
@@ -189,10 +188,20 @@ export default async function handler(
             );
             continue;
           }
-          const currentMonthMessagesCount =
+          const currentMonthCount =
             await usageService.getCurrentMonthCount({
               organizationId: org.id,
             });
+
+          // Unlimited plans don't need usage tracking or limit warnings
+          if (currentMonthCount === "unlimited") {
+            logger.debug(
+              { organizationId: org.id },
+              "organization has unlimited plan, skipping usage check",
+            );
+            continue;
+          }
+
           const activePlan =
             await getApp().planProvider.getActivePlan({ organizationId: org.id });
 
@@ -213,14 +222,14 @@ export default async function handler(
 
           const usagePercentage =
             maxMessagesPerMonth > 0
-              ? (currentMonthMessagesCount / maxMessagesPerMonth) * 100
+              ? (currentMonthCount / maxMessagesPerMonth) * 100
               : 0;
 
-          if (currentMonthMessagesCount > 1) {
+          if (currentMonthCount > 1) {
             logger.info(
               {
                 organizationId: org.id,
-                currentMonthMessagesCount,
+                currentMonthMessagesCount: currentMonthCount,
                 maxMessagesPerMonth,
                 usagePercentage: Number(usagePercentage.toFixed(1)),
                 projectCount: projectIds.length,
@@ -229,10 +238,9 @@ export default async function handler(
             );
           }
 
-          const service = UsageLimitService.create(prisma);
-          await service.checkAndSendWarning({
+          await getApp().usageLimits.checkAndSendWarning({
             organizationId: org.id,
-            currentMonthMessagesCount,
+            currentMonthMessagesCount: currentMonthCount,
             maxMonthlyUsageLimit: maxMessagesPerMonth,
           });
         } catch (error) {

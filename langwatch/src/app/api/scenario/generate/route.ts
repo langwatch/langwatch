@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
 
     const result = await generateObject({
       model,
+      mode: "tool",
       schema: scenarioSchema,
       system: SYSTEM_PROMPT,
       prompt: userPrompt,

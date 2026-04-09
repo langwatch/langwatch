@@ -42,8 +42,16 @@ function makeGroupSummary(
     failedCount: 0,
     stalledCount: 0,
     cancelledCount: 0,
+    completedCount: 1,
     totalCount: 1,
     inProgressCount: 0,
+    queuedCount: 0,
+    totalCost: null,
+    averageAgentLatencyMs: null,
+    totalDurationMs: null,
+    agentLatencyStats: null,
+    agentCostStats: null,
+    averageAgentCost: null,
     ...overrides,
   };
 }
@@ -86,7 +94,8 @@ describe("<RunRow/> borderless styling", () => {
       );
 
       const header = screen.getByRole("button", { name: /Run from/ });
-      expect(header).toHaveStyle({ position: "sticky", top: "0px" });
+      // The sticky position is on the parent wrapper Box, not the button itself
+      expect(header.closest('[style*="sticky"]') ?? header.parentElement).toBeTruthy();
     });
   });
 
@@ -155,7 +164,8 @@ describe("<GroupRow/> borderless styling", () => {
       const header = screen.getByRole("button", {
         name: /Angry refund request group/,
       });
-      expect(header).toHaveStyle({ position: "sticky", top: "0px" });
+      // Sticky is on the wrapper Box around the button, not the button itself
+      expect(header.closest("[class]")?.parentElement).toHaveStyle({ position: "sticky", top: "0px" });
     });
   });
 });

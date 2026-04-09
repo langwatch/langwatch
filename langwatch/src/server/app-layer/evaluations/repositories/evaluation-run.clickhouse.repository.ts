@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
@@ -28,7 +28,9 @@ interface ClickHouseEvaluationRunRecord {
   Passed: number | null;
   Label: string | null;
   Details: string | null;
+  Inputs: string | null;
   Error: string | null;
+  ErrorDetails: string | null;
   CreatedAt: number;
   UpdatedAt: number;
   ArchivedAt: number | null;
@@ -37,17 +39,18 @@ interface ClickHouseEvaluationRunRecord {
   CompletedAt: number | null;
   CostId: string | null;
   LastProcessedEventId: string;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
   implements EvaluationRunRepository
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async upsert(data: EvaluationRunData, tenantId: string): Promise<void> {
     EventUtils.validateTenantId(
@@ -64,6 +67,7 @@ export class EvaluationRunClickHouseRepository
       : data.evaluationId;
 
     try {
+      const client = await this.resolveClient(tenantId);
       const record = this.toClickHouseRecord(
         data,
         tenantId,
@@ -71,23 +75,73 @@ export class EvaluationRunClickHouseRepository
         EVALUATION_PROJECTION_VERSIONS.STATE,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug(
-        { tenantId, evaluationId: data.evaluationId, projectionId },
-        "Stored evaluation run to ClickHouse",
-      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       logger.error(
         { tenantId, evaluationId: data.evaluationId, error: errorMessage },
         "Failed to store evaluation run in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async upsertBatch(
+    entries: Array<{ data: EvaluationRunData; tenantId: string }>,
+  ): Promise<void> {
+    if (entries.length === 0) return;
+
+    const tenantId = entries[0]!.tenantId;
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.upsertBatch",
+    );
+
+    const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
+    if (mixedTenant) {
+      throw new Error(
+        `Mixed tenants in upsertBatch: expected ${tenantId}, got ${mixedTenant.tenantId}. ` +
+        `Each batch must contain a single tenant to ensure correct DB routing.`,
+      );
+    }
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const records = entries.map(({ data, tenantId: tid }) => {
+        const projectionId = data.scheduledAt
+          ? IdUtils.generateDeterministicEvaluationRunId(
+              tid,
+              data.evaluationId,
+              data.scheduledAt,
+            )
+          : data.evaluationId;
+        return this.toClickHouseRecord(
+          data,
+          tid,
+          projectionId,
+          EVALUATION_PROJECTION_VERSIONS.STATE,
+        );
+      });
+
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, count: entries.length, error: errorMessage },
+        "Failed to batch store evaluation runs in ClickHouse",
       );
       throw error;
     }
@@ -103,7 +157,8 @@ export class EvaluationRunClickHouseRepository
     );
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId,
@@ -120,7 +175,9 @@ export class EvaluationRunClickHouseRepository
             Passed,
             Label,
             Details,
+            Inputs,
             Error,
+            ErrorDetails,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
@@ -164,15 +221,20 @@ export class EvaluationRunClickHouseRepository
       evaluatorType: record.EvaluatorType,
       evaluatorName: record.EvaluatorName,
       traceId: record.TraceId,
-      isGuardrail: record.IsGuardrail === 1,
+      isGuardrail: !!record.IsGuardrail,
       status: record.Status as EvaluationRunData["status"],
       score: record.Score,
-      passed: record.Passed === null ? null : record.Passed === 1,
+      passed: record.Passed === null ? null : !!record.Passed,
       label: record.Label,
       details: record.Details,
+      inputs: record.Inputs
+        ? (JSON.parse(record.Inputs) as Record<string, unknown>)
+        : null,
       error: record.Error,
+      errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
+      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
@@ -204,9 +266,12 @@ export class EvaluationRunClickHouseRepository
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
       Details: data.details,
+      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
       Error: data.error,
+      ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
+      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,

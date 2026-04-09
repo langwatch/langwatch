@@ -4,7 +4,7 @@
  * Integration tests for RunRow component.
  *
  * Tests the collapsible run row behavior: expand/collapse,
- * display of pass rate, timestamp, and scenario x target rows.
+ * display of status counts, timestamp, and scenario x target rows.
  *
  * @see specs/suites/suite-workflow.feature - "Run History List"
  */
@@ -25,7 +25,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when collapsed", () => {
-    it("displays passed/failed status with scenario count", () => {
+    it("displays pass rate in metrics summary pill", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -38,8 +38,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("passed (2/2)")).toBeInTheDocument();
-      expect(screen.queryByText("100%")).not.toBeInTheDocument();
+      expect(screen.getByText("Pass")).toBeInTheDocument();
+      expect(screen.getByText("100%")).toBeInTheDocument();
     });
 
     it("does not display scenario x target rows", () => {
@@ -169,11 +169,11 @@ describe("<RunRow/>", () => {
   });
 
   describe("when summary shows failures", () => {
-    it("displays 'failed' with scenario count", () => {
+    it("displays pass rate reflecting failures", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 2, failedCount: 1 })}
+          summary={makeSummary({ passedCount: 2, failedCount: 1, passRate: 67 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -182,13 +182,13 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
+      expect(screen.getByText("67%")).toBeInTheDocument();
     });
   });
 
   describe("when expectedJobCount is provided", () => {
     describe("when not all jobs are done", () => {
-      it("displays progress indicator next to pass rate", () => {
+      it("displays progress indicator next to status counts", () => {
         render(
           <RunRow
             batchRun={makeBatchRun()}
@@ -245,85 +245,97 @@ describe("<RunRow/>", () => {
   });
 
   describe("when suiteName is provided (All Runs view)", () => {
-    describe("when collapsed with multiple scenarios", () => {
-      it("displays scenario names after suite name", () => {
-        const batchRun = makeBatchRun({
-          scenarioRuns: [
-            makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
-            makeScenarioRunData({ name: "Checkout Flow", scenarioRunId: "r2" }),
-          ],
-        });
+    it("displays suite name in header", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => null}
+          onScenarioRunClick={vi.fn()}
+          suiteName="My Suite"
+        />,
+        { wrapper: Wrapper },
+      );
 
-        render(
-          <RunRow
-            batchRun={batchRun}
-            summary={makeSummary()}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            resolveTargetName={() => null}
-            onScenarioRunClick={vi.fn()}
-            suiteName="My Suite"
-          />,
-          { wrapper: Wrapper },
-        );
+      expect(screen.getByText("My Suite")).toBeInTheDocument();
+    });
+  });
 
-        expect(screen.getByText("My Suite")).toBeInTheDocument();
-        expect(screen.getByText("Checkout Flow, Login Flow")).toBeInTheDocument();
-      });
+  describe("when viewing summary metrics in header", () => {
+    it("displays pass rate pill in header", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("Pass")).toBeInTheDocument();
+      expect(screen.getByText("80%")).toBeInTheDocument();
     });
 
-    describe("when collapsed with a single scenario", () => {
-      it("displays the single scenario name", () => {
-        const batchRun = makeBatchRun({
-          scenarioRuns: [
-            makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
-          ],
-        });
+    it("renders RunMetricsSummary inside the header", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
 
-        render(
-          <RunRow
-            batchRun={batchRun}
-            summary={makeSummary({ totalCount: 1, passedCount: 1 })}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            resolveTargetName={() => null}
-            onScenarioRunClick={vi.fn()}
-            suiteName="My Suite"
-          />,
-          { wrapper: Wrapper },
-        );
+      const header = container.querySelector('[data-testid="run-row-header"]');
+      expect(header).toBeInTheDocument();
+      const metrics = header?.querySelector('[data-testid="run-metrics-summary"]');
+      expect(metrics).toBeInTheDocument();
+    });
+  });
 
-        expect(screen.getByText("Login Flow")).toBeInTheDocument();
-      });
+  describe("when checking for footer removal", () => {
+    it("does not render a RunSummaryFooter when expanded", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={true}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        container.querySelector('[data-testid="run-summary-footer"]'),
+      ).not.toBeInTheDocument();
     });
 
-    describe("when collapsed with more than 3 scenarios", () => {
-      it("truncates with +N more", () => {
-        const batchRun = makeBatchRun({
-          scenarioRuns: [
-            makeScenarioRunData({ name: "Alpha", scenarioRunId: "r1" }),
-            makeScenarioRunData({ name: "Beta", scenarioRunId: "r2" }),
-            makeScenarioRunData({ name: "Gamma", scenarioRunId: "r3" }),
-            makeScenarioRunData({ name: "Delta", scenarioRunId: "r4" }),
-            makeScenarioRunData({ name: "Epsilon", scenarioRunId: "r5" }),
-          ],
-        });
+    it("does not render a RunSummaryFooter when collapsed", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
 
-        render(
-          <RunRow
-            batchRun={batchRun}
-            summary={makeSummary({ totalCount: 5, passedCount: 5 })}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            resolveTargetName={() => null}
-            onScenarioRunClick={vi.fn()}
-            suiteName="My Suite"
-          />,
-          { wrapper: Wrapper },
-        );
-
-        expect(screen.getByText("Alpha, Beta, Delta +2 more")).toBeInTheDocument();
-      });
+      expect(
+        container.querySelector('[data-testid="run-summary-footer"]'),
+      ).not.toBeInTheDocument();
     });
   });
 

@@ -23,6 +23,7 @@ export interface KillSwitchOptions {
  */
 export interface CommandHandlerOptions<Payload = any> {
   getAggregateId?: (payload: Payload) => string;
+  getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
@@ -91,6 +92,8 @@ export interface StaticPipelineDefinition<
   commands: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
+    /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
+    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
   }>;
 

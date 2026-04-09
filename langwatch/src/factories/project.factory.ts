@@ -31,10 +31,4 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   s3SecretAccessKey: null,
   s3Bucket: null,
   archivedAt: null,
-  featureClickHouseDataSourceEvaluations: false,
-  featureClickHouseDataSourceSimulations: false,
-  featureClickHouseDataSourceTraces: false,
-  featureEventSourcingTraceIngestion: false,
-  featureEventSourcingSimulationIngestion: false,
-  featureEventSourcingEvaluationIngestion: false,
 }));

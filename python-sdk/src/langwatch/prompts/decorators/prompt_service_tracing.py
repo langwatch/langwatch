@@ -1,6 +1,6 @@
 from functools import wraps
 from opentelemetry import trace
-from typing import TYPE_CHECKING, Optional, TypeVar, Callable, Any
+from typing import TYPE_CHECKING, Optional, TypeVar, Callable
 import json
 
 from langwatch.attributes import AttributeKey
@@ -10,30 +10,33 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
-# Type alias for the get method with named parameters
-PromptGetMethod = Callable[[T, str, Optional[int]], "Prompt"]
-
 
 class PromptServiceTracing:
     """Namespace for PromptService method tracing decorators"""
 
     @staticmethod
-    def get(func: PromptGetMethod[T]) -> PromptGetMethod[T]:
+    def get(func: Callable[..., "Prompt"]) -> Callable[..., "Prompt"]:
         """
         Type-safe decorator for PromptService.get method with OpenTelemetry tracing
 
         Expected function signature:
-        def get(self: T, *, prompt_id: str, version_number: Optional[int] = None) -> Prompt
+        def get(self: T, prompt_id: str, version_number: Optional[int] = None,
+                tag: Optional[str] = None) -> PromptData
         """
 
         @wraps(func)
         def wrapper(
-            self: T, prompt_id: str, version_number: Optional[int] = None
+            self: T,
+            prompt_id: str,
+            version_number: Optional[int] = None,
+            tag: Optional[str] = None,
         ) -> "Prompt":
             with trace.get_tracer(__name__).start_as_current_span(
                 PromptServiceTracing._create_span_name("get")
             ) as span:
-                variables_dict: dict[str, Any] = {"prompt_id": prompt_id}
+                variables_dict: dict[str, str] = {"prompt_id": prompt_id}
+                if tag is not None:
+                    variables_dict["tag"] = tag
                 span.set_attribute(
                     AttributeKey.LangWatchPromptVariables,
                     json.dumps(
@@ -44,15 +47,14 @@ class PromptServiceTracing:
                     ),
                 )
                 try:
-                    result = func(self, prompt_id, version_number)
+                    result = func(self, prompt_id, version_number, tag=tag)
 
-                    span.set_attributes(
-                        {
-                            AttributeKey.LangWatchPromptId: result.id,
-                            AttributeKey.LangWatchPromptVersionId: result.version_id,
-                            AttributeKey.LangWatchPromptHandle: result.handle,
-                        }
-                    )
+                    # Only emit combined format when both handle and version are available
+                    if result.handle is not None and result.version is not None:
+                        span.set_attribute(
+                            AttributeKey.LangWatchPromptId,
+                            f"{result.handle}:{result.version}",
+                        )
                     return result
                 except Exception as ex:
                     span.record_exception(ex)

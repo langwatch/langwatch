@@ -13,7 +13,7 @@ import type {
 	TargetResultEvent,
 } from "../../schemas/events";
 import {
-	createExperimentRunStateFoldProjection,
+	ExperimentRunStateFoldProjection,
 	type ExperimentRunStateData,
 } from "../experimentRunState.foldProjection";
 
@@ -22,7 +22,7 @@ const noopStore: FoldProjectionStore<ExperimentRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const experimentRunStateFoldProjection = createExperimentRunStateFoldProjection({ store: noopStore });
+const experimentRunStateFoldProjection = new ExperimentRunStateFoldProjection({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

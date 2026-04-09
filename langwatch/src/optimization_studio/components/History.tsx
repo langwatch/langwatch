@@ -3,9 +3,7 @@ import {
   Box,
   type BoxProps,
   Button,
-  Field,
   HStack,
-  Input,
   Separator,
   Tag,
   Text,
@@ -14,26 +12,18 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
-import { type UseFormReturn, useForm } from "react-hook-form";
-import { useDebounceCallback } from "usehooks-ts";
+import { type UseFormReturn, FormProvider, useForm } from "react-hook-form";
 
-import { AISparklesLoader } from "../../components/icons/AISparklesLoader";
 import { HistoryIcon } from "../../components/icons/History";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "../../components/ModelSelector";
-import { SmallLabel } from "../../components/SmallLabel";
-import { InputGroup } from "../../components/ui/input-group";
 import { Popover } from "../../components/ui/popover";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { DEFAULT_MODEL } from "../../utils/constants";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore, serializeWorkflow } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
+import { NewVersionFields } from "./VersionToBeUsed";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -46,7 +36,7 @@ export function History() {
       // modal
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" color="gray.500" size="xs" onClick={onToggle}>
+        <Button variant="ghost" color="fg.subtle" size="xs" onClick={onToggle}>
           <HistoryIcon size={16} />
         </Button>
       </Popover.Trigger>
@@ -57,20 +47,30 @@ export function History() {
 
 export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
-  const { workflowId, getWorkflow, setWorkflow, setPreviousWorkflow } =
-    useWorkflowStore(
-      ({
-        workflow_id: workflowId,
-        getWorkflow,
-        setWorkflow,
-        setPreviousWorkflow,
-      }) => ({
-        workflowId,
-        getWorkflow,
-        setWorkflow,
-        setPreviousWorkflow,
-      }),
-    );
+  const {
+    workflowId,
+    getWorkflow,
+    setWorkflow,
+    setAutosavedWorkflow,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }) => ({
+      workflowId,
+      getWorkflow,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }),
+  );
   const form = useForm<{ version: string; commitMessage: string }>({
     defaultValues: {
       version: "",
@@ -103,10 +103,10 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         projectId: project.id,
         workflowId,
         commitMessage,
-        dsl: {
+        dsl: serializeWorkflow({
           ...getWorkflow(),
           version,
-        },
+        }),
       },
       {
         onSuccess: () => {
@@ -119,6 +119,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           setWorkflow({
             version,
           });
+          setLastCommittedWorkflow(getWorkflow());
           void versions.refetch();
         },
         onError: () => {
@@ -153,8 +154,17 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       });
 
       // Prevent autosave from triggering after restore
-      setPreviousWorkflow(undefined);
-      setWorkflow(version.dsl as unknown as Workflow);
+      setAutosavedWorkflow(undefined);
+      const dsl = version.dsl as unknown as Workflow;
+      setLastCommittedWorkflow(dsl);
+      setCurrentVersionId(version.id);
+      setWorkflow({
+        ...dsl,
+        nodes: (dsl.nodes ?? []).map((node) => ({
+          ...node,
+          selected: false,
+        })),
+      });
       onClose();
     },
     [
@@ -164,7 +174,9 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       hasChanges,
       restoreVersion,
       setWorkflow,
-      setPreviousWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
       onClose,
     ],
   );
@@ -175,34 +187,32 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       <Popover.Header fontWeight={600}>Workflow Versions</Popover.Header>
       <Popover.CloseTrigger />
       <Popover.Body padding={0}>
-        <form
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
-          onSubmit={form.handleSubmit(onSubmit)}
-          style={{ width: "100%", padding: "20px" }}
-        >
-          <VStack align="start" width="full">
-            <NewVersionFields
-              form={form}
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-            />
-            <Tooltip
-              content={!canSaveNewVersion ? "No changes to save" : ""}
-              positioning={{ placement: "top" }}
-            >
-              <Button
-                type="submit"
-                alignSelf="end"
-                colorPalette="orange"
-                size="sm"
-                loading={commitVersion.isLoading}
-                disabled={!canSaveNewVersion}
+        <FormProvider {...form}>
+          <form
+            // eslint-disable-next-line @typescript-eslint/no-misused-promises
+            onSubmit={form.handleSubmit(onSubmit)}
+            style={{ width: "100%", padding: "20px" }}
+          >
+            <VStack align="start" width="full">
+              <NewVersionFields canSaveOverride={canSaveNewVersion} />
+              <Tooltip
+                content={!canSaveNewVersion ? "No changes to save" : ""}
+                positioning={{ placement: "top" }}
               >
-                Save new version
-              </Button>
-            </Tooltip>
-          </VStack>
-        </form>
+                <Button
+                  type="submit"
+                  alignSelf="end"
+                  colorPalette="orange"
+                  size="sm"
+                  loading={commitVersion.isLoading}
+                  disabled={!canSaveNewVersion}
+                >
+                  Save new version
+                </Button>
+              </Tooltip>
+            </VStack>
+          </form>
+        </FormProvider>
         <Separator />
         <VStack
           align="start"
@@ -297,7 +307,7 @@ export const VersionBox = ({
       borderRadius={4}
       fontWeight={600}
       fontSize="13px"
-      color="gray.600"
+      color="fg.muted"
       whiteSpace="nowrap"
       textAlign="center"
       minWidth="0px"
@@ -319,12 +329,12 @@ export const useVersionState = ({
   form?: UseFormReturn<{ version: string; commitMessage: string }>;
   allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
 }) => {
-  const { workflowId, getWorkflow, previousWorkflow } = useWorkflowStore(
-    ({ workflow_id: workflowId, version, getWorkflow, previousWorkflow }) => ({
+  const { workflowId, getWorkflow, autosavedWorkflow } = useWorkflowStore(
+    ({ workflow_id: workflowId, version, getWorkflow, autosavedWorkflow }) => ({
       workflowId,
       version,
       getWorkflow,
-      previousWorkflow,
+      autosavedWorkflow,
     }),
   );
 
@@ -345,8 +355,8 @@ export const useVersionState = ({
   const latestVersion = versions.data?.find(
     (version) => version.isLatestVersion,
   );
-  const hasChanges = previousWorkflow
-    ? hasDSLChanged(getWorkflow(), previousWorkflow, false)
+  const hasChanges = autosavedWorkflow
+    ? hasDSLChanged(getWorkflow(), autosavedWorkflow, false)
     : false;
 
   const canSaveNewVersion =
@@ -405,176 +415,3 @@ export const useVersionState = ({
   };
 };
 
-export function NewVersionFields({
-  form,
-  nextVersion,
-  canSaveNewVersion,
-}: {
-  form: UseFormReturn<{ version: string; commitMessage: string }>;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-}) {
-  const { project } = useOrganizationTeamProject();
-  const { previousVersion } = useVersionState({
-    project,
-    form,
-  });
-  const { getWorkflow } = useWorkflowStore(({ getWorkflow }) => ({
-    getWorkflow,
-  }));
-
-  // Check if the default model is enabled
-  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
-  const { modelOption } = useModelSelectionOptions(
-    allModelOptions,
-    defaultModel,
-    "chat",
-  );
-  const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
-
-  const generateCommitMessage =
-    api.workflow.generateCommitMessage.useMutation();
-
-  const generateCommitMessageCallback = useCallback(
-    (prevDsl: Workflow, newDsl: Workflow) => {
-      // Skip generation if model is not available
-      if (isDefaultModelDisabled) {
-        return;
-      }
-
-      generateCommitMessage.mutate(
-        {
-          projectId: project?.id ?? "",
-          prevDsl,
-          newDsl,
-        },
-        {
-          onSuccess: (data) => {
-            if (data) {
-              form.setValue("commitMessage", data as string);
-            }
-          },
-          onError: (e) => {
-            toaster.create({
-              title: "Error auto-generating version description",
-              description: e.message,
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
-            });
-          },
-        },
-      );
-    },
-    [form, generateCommitMessage, project?.id, isDefaultModelDisabled],
-  );
-
-  const debouncedGenerateCommitMessage = useDebounceCallback(
-    (prevDsl: Workflow, newDsl: Workflow) => {
-      generateCommitMessageCallback(prevDsl, newDsl);
-    },
-    500,
-    { leading: true, trailing: false },
-  );
-
-  useEffect(() => {
-    if (canSaveNewVersion && previousVersion?.dsl) {
-      form.setValue("commitMessage", "");
-      setTimeout(() => {
-        debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
-
-        // Seems like the mutation onSuccess does not work unless we send this call to the end of the callstack for some reason
-      }, 0);
-    } else if (canSaveNewVersion && !previousVersion) {
-      form.setValue("commitMessage", "First version");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSaveNewVersion]);
-
-  return (
-    <HStack width="full">
-      <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
-        <VStack align="start">
-          <Field.Label as={SmallLabel} color="gray.600">
-            Version
-          </Field.Label>
-          <Input
-            {...form.register("version", {
-              required: true,
-              pattern: /^\d+(\.\d+)?$/,
-            })}
-            placeholder={nextVersion}
-            maxWidth="60px"
-            pattern="\d+(\.\d+)?"
-            readOnly
-          />
-        </VStack>
-      </Field.Root>
-      <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
-        <VStack align="start" width="full">
-          <Field.Label as={SmallLabel} color="gray.600">
-            Description
-          </Field.Label>
-          <InputGroup
-            width="full"
-            endElement={
-              generateCommitMessage.isLoading ? <AISparklesLoader /> : undefined
-            }
-          >
-            <Input
-              {...form.register("commitMessage", {
-                required: true,
-              })}
-              placeholder={
-                generateCommitMessage.isLoading
-                  ? "Generating..."
-                  : "What changes have you made?"
-              }
-              width="full"
-              disabled={!canSaveNewVersion}
-            />
-          </InputGroup>
-        </VStack>
-      </Field.Root>
-    </HStack>
-  );
-}
-
-export const VersionToBeUsed = ({
-  form,
-  nextVersion,
-  canSaveNewVersion,
-  versionToBeEvaluated,
-}: {
-  form: UseFormReturn<{ version: string; commitMessage: string }>;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-  versionToBeEvaluated: {
-    id: string | undefined;
-    version: string | undefined;
-    commitMessage: string | undefined;
-  };
-}) => {
-  if (canSaveNewVersion) {
-    return (
-      <NewVersionFields
-        form={form}
-        nextVersion={nextVersion}
-        canSaveNewVersion={canSaveNewVersion}
-      />
-    );
-  }
-
-  return (
-    <HStack width="full">
-      <VStack align="start">
-        <SmallLabel color="gray.600">Version</SmallLabel>
-        <Text width="74px">{versionToBeEvaluated.version}</Text>
-      </VStack>
-      <VStack align="start" width="full">
-        <SmallLabel color="gray.600">Description</SmallLabel>
-        <Text>{versionToBeEvaluated.commitMessage}</Text>
-      </VStack>
-    </HStack>
-  );
-};

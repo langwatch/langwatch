@@ -8,6 +8,12 @@ from ...client import AuthenticatedClient, Client
 from ...models.post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from ...models.post_api_scenario_events_body_type_1 import PostApiScenarioEventsBodyType1
 from ...models.post_api_scenario_events_body_type_2 import PostApiScenarioEventsBodyType2
+from ...models.post_api_scenario_events_body_type_3 import PostApiScenarioEventsBodyType3
+from ...models.post_api_scenario_events_body_type_4 import PostApiScenarioEventsBodyType4
+from ...models.post_api_scenario_events_body_type_5 import PostApiScenarioEventsBodyType5
+from ...models.post_api_scenario_events_body_type_6 import PostApiScenarioEventsBodyType6
+from ...models.post_api_scenario_events_body_type_7 import PostApiScenarioEventsBodyType7
+from ...models.post_api_scenario_events_body_type_8 import PostApiScenarioEventsBodyType8
 from ...models.post_api_scenario_events_response_201 import PostApiScenarioEventsResponse201
 from ...models.post_api_scenario_events_response_400 import PostApiScenarioEventsResponse400
 from ...models.post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
@@ -21,6 +27,12 @@ def _get_kwargs(
     body: PostApiScenarioEventsBodyType0
     | PostApiScenarioEventsBodyType1
     | PostApiScenarioEventsBodyType2
+    | PostApiScenarioEventsBodyType3
+    | PostApiScenarioEventsBodyType4
+    | PostApiScenarioEventsBodyType5
+    | PostApiScenarioEventsBodyType6
+    | PostApiScenarioEventsBodyType7
+    | PostApiScenarioEventsBodyType8
     | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
@@ -33,6 +45,18 @@ def _get_kwargs(
     if isinstance(body, PostApiScenarioEventsBodyType0):
         _kwargs["json"] = body.to_dict()
     elif isinstance(body, PostApiScenarioEventsBodyType1):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiScenarioEventsBodyType2):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiScenarioEventsBodyType3):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiScenarioEventsBodyType4):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiScenarioEventsBodyType5):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiScenarioEventsBodyType6):
+        _kwargs["json"] = body.to_dict()
+    elif isinstance(body, PostApiScenarioEventsBodyType7):
         _kwargs["json"] = body.to_dict()
     else:
         _kwargs["json"] = body.to_dict()
@@ -107,6 +131,12 @@ def sync_detailed(
     body: PostApiScenarioEventsBodyType0
     | PostApiScenarioEventsBodyType1
     | PostApiScenarioEventsBodyType2
+    | PostApiScenarioEventsBodyType3
+    | PostApiScenarioEventsBodyType4
+    | PostApiScenarioEventsBodyType5
+    | PostApiScenarioEventsBodyType6
+    | PostApiScenarioEventsBodyType7
+    | PostApiScenarioEventsBodyType8
     | Unset = UNSET,
 ) -> Response[
     PostApiScenarioEventsResponse201
@@ -119,7 +149,10 @@ def sync_detailed(
 
     Args:
         body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
-            PostApiScenarioEventsBodyType2 | Unset):
+            PostApiScenarioEventsBodyType2 | PostApiScenarioEventsBodyType3 |
+            PostApiScenarioEventsBodyType4 | PostApiScenarioEventsBodyType5 |
+            PostApiScenarioEventsBodyType6 | PostApiScenarioEventsBodyType7 |
+            PostApiScenarioEventsBodyType8 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -146,6 +179,12 @@ def sync(
     body: PostApiScenarioEventsBodyType0
     | PostApiScenarioEventsBodyType1
     | PostApiScenarioEventsBodyType2
+    | PostApiScenarioEventsBodyType3
+    | PostApiScenarioEventsBodyType4
+    | PostApiScenarioEventsBodyType5
+    | PostApiScenarioEventsBodyType6
+    | PostApiScenarioEventsBodyType7
+    | PostApiScenarioEventsBodyType8
     | Unset = UNSET,
 ) -> (
     PostApiScenarioEventsResponse201
@@ -159,7 +198,10 @@ def sync(
 
     Args:
         body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
-            PostApiScenarioEventsBodyType2 | Unset):
+            PostApiScenarioEventsBodyType2 | PostApiScenarioEventsBodyType3 |
+            PostApiScenarioEventsBodyType4 | PostApiScenarioEventsBodyType5 |
+            PostApiScenarioEventsBodyType6 | PostApiScenarioEventsBodyType7 |
+            PostApiScenarioEventsBodyType8 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -181,6 +223,12 @@ async def asyncio_detailed(
     body: PostApiScenarioEventsBodyType0
     | PostApiScenarioEventsBodyType1
     | PostApiScenarioEventsBodyType2
+    | PostApiScenarioEventsBodyType3
+    | PostApiScenarioEventsBodyType4
+    | PostApiScenarioEventsBodyType5
+    | PostApiScenarioEventsBodyType6
+    | PostApiScenarioEventsBodyType7
+    | PostApiScenarioEventsBodyType8
     | Unset = UNSET,
 ) -> Response[
     PostApiScenarioEventsResponse201
@@ -193,7 +241,10 @@ async def asyncio_detailed(
 
     Args:
         body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
-            PostApiScenarioEventsBodyType2 | Unset):
+            PostApiScenarioEventsBodyType2 | PostApiScenarioEventsBodyType3 |
+            PostApiScenarioEventsBodyType4 | PostApiScenarioEventsBodyType5 |
+            PostApiScenarioEventsBodyType6 | PostApiScenarioEventsBodyType7 |
+            PostApiScenarioEventsBodyType8 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,6 +269,12 @@ async def asyncio(
     body: PostApiScenarioEventsBodyType0
     | PostApiScenarioEventsBodyType1
     | PostApiScenarioEventsBodyType2
+    | PostApiScenarioEventsBodyType3
+    | PostApiScenarioEventsBodyType4
+    | PostApiScenarioEventsBodyType5
+    | PostApiScenarioEventsBodyType6
+    | PostApiScenarioEventsBodyType7
+    | PostApiScenarioEventsBodyType8
     | Unset = UNSET,
 ) -> (
     PostApiScenarioEventsResponse201
@@ -231,7 +288,10 @@ async def asyncio(
 
     Args:
         body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
-            PostApiScenarioEventsBodyType2 | Unset):
+            PostApiScenarioEventsBodyType2 | PostApiScenarioEventsBodyType3 |
+            PostApiScenarioEventsBodyType4 | PostApiScenarioEventsBodyType5 |
+            PostApiScenarioEventsBodyType6 | PostApiScenarioEventsBodyType7 |
+            PostApiScenarioEventsBodyType8 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

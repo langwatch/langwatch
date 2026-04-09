@@ -15,6 +15,7 @@ import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
+import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
@@ -31,6 +32,7 @@ import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
+import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
@@ -72,10 +74,12 @@ export const drawers = {
   promptList: PromptListDrawer,
   promptEditor: PromptEditorDrawer,
   agentList: AgentListDrawer,
+  agentHistory: AgentHistoryDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawer,
   agentHttpEditor: AgentHttpEditorDrawer,
   workflowSelector: WorkflowSelectorDrawer,
+  evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,

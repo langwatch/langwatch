@@ -546,18 +546,34 @@ def optional_langwatch_trace(
     name,
     type,
     do_not_trace=False,
-    metadata=None
+    metadata=None,
+    origin=None,
 ):
     with langwatch.trace(
         name=name,
         type=type,
-        metadata=metadata,
+        metadata=metadata if metadata is not None else {},
         disable_sending=do_not_trace,
     ) as trace:
-        if do_not_trace:
-            yield None
-        else:
-            yield trace
+        # Set langwatch.origin and langwatch.origin.source as direct span attributes
+        if trace and trace.root_span:
+            attrs: dict[str, str] = {"langwatch.origin.source": "platform"}
+            if origin:
+                attrs["langwatch.origin"] = origin
+            trace.root_span.set_attributes(attrs)
+        try:
+            if do_not_trace:
+                yield None
+            else:
+                yield trace
+        finally:
+            # Flush spans immediately so they are exported before the process
+            # freezes (e.g. Lambda cold-storage between invocations).  Without
+            # this, the BatchSpanProcessor background thread may not get a
+            # chance to run and spans arrive only when the next invocation
+            # thaws the process — causing ~180 s ingestion lag.
+            if not do_not_trace and trace:
+                trace.send_spans()
 
 
 def normalize_name_to_class_name(node_name: str) -> str:

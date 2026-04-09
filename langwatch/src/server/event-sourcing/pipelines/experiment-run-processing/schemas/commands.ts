@@ -27,6 +27,7 @@ export const recordTargetResultCommandDataSchema = z.object({
   duration: z.number().nullable().optional(),
   error: z.string().nullable().optional(),
   traceId: z.string().nullable().optional(),
+  targets: z.array(targetSchema).optional(),
   occurredAt: z.number(),
 });
 

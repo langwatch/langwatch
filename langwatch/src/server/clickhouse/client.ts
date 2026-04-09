@@ -1,34 +1,52 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createResilientClickHouseClient } from "~/server/app-layer/clients/clickhouse.resilient";
 import { createLogger } from "~/utils/logger/server";
+import { wrapWithDefaultSettings } from "./safeClickhouseClient";
 
 const logger = createLogger("langwatch:clickhouse:client");
 
 let clickHouseClient: ClickHouseClient | null = null;
 
 /**
- * Checks if ClickHouse should be skipped.
- * Uses process.env directly to avoid triggering @t3-oss/env validation at module load.
- * This prevents false "client-side access" errors during vitest execution.
+ * Get or create the shared ClickHouse client instance (from env vars).
+ *
+ * Throws if CLICKHOUSE_URL is not set (ClickHouse is now required).
+ * Skipped only during build time (vitest / next build).
+ *
+ * NOT exported — all external code must use the org-aware functions
+ * in clickhouseClient.ts to prevent data leaks between tenants.
  */
-function shouldSkipClickHouse(): boolean {
-  // During unit/integration tests (set in vitest.config.ts)
-  if (process.env.BUILD_TIME) return true;
+function getClickHouseClient(): ClickHouseClient | null {
+  // During unit/integration tests or next build (set in vitest.config.ts)
+  if (process.env.BUILD_TIME) return null;
 
-  // ClickHouse not enabled or URL not provided
-  if (!process.env.ENABLE_CLICKHOUSE || !process.env.CLICKHOUSE_URL)
-    return true;
+  if (!clickHouseClient) {
+    const clickHouseUrl = process.env.CLICKHOUSE_URL;
+    if (!clickHouseUrl) {
+      const banner = [
+        "",
+        "╔══════════════════════════════════════════════════════════════╗",
+        "║                                                            ║",
+        "║   CLICKHOUSE_URL is not set                                ║",
+        "║                                                            ║",
+        "║   ClickHouse is the primary data store for LangWatch.      ║",
+        "║   The application cannot start without it.                 ║",
+        "║                                                            ║",
+        "║   Quick start:                                             ║",
+        "║     docker run -d -p 8123:8123 clickhouse/clickhouse-server║",
+        "║     export CLICKHOUSE_URL=http://localhost:8123/langwatch  ║",
+        "║                                                            ║",
+        "║   Full guide:                                              ║",
+        "║     dev/docs/adr/004-docker-dev-environment.md             ║",
+        "║                                                            ║",
+        "╚══════════════════════════════════════════════════════════════╝",
+        "",
+      ].join("\n");
+      console.error(banner);
+      throw new Error("CLICKHOUSE_URL environment variable is required.");
+    }
 
-  return false;
-}
-
-/**
- * Get or create a ClickHouse client instance
- */
-export function getClickHouseClient(): ClickHouseClient | null {
-  if (!clickHouseClient && !shouldSkipClickHouse()) {
-    const clickHouseUrl = process.env.CLICKHOUSE_URL!;
     let url: URL | string = clickHouseUrl;
-
     try {
       url = new URL(clickHouseUrl);
     } catch (error) {
@@ -38,12 +56,21 @@ export function getClickHouseClient(): ClickHouseClient | null {
       );
     }
 
-    clickHouseClient = createClient({
+    const raw = createClient({
       url,
       clickhouse_settings: {
         date_time_input_format: "best_effort",
       },
+      max_open_connections: 25,
+      keep_alive: {
+        enabled: true,
+        idle_socket_ttl: 1500,
+      },
     });
+
+    clickHouseClient = wrapWithDefaultSettings(
+      createResilientClickHouseClient({ client: raw }),
+    );
   }
 
   return clickHouseClient;
@@ -55,3 +82,6 @@ export async function closeClickHouseClient(): Promise<void> {
     clickHouseClient = null;
   }
 }
+
+// Internal access for clickhouseClient.ts — the only allowed consumer
+export { getClickHouseClient as _getSharedClickHouseClient };

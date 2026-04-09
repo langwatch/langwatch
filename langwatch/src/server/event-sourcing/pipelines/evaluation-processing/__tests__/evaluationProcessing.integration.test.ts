@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { createLogger } from "~/utils/logger/server";
 import type {
   CompleteEvaluationCommandData,
@@ -20,10 +21,12 @@ import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
-import { CompleteEvaluationCommand } from "../commands/completeEvaluation.command";
-import { StartEvaluationCommand } from "../commands/startEvaluation.command";
+import {
+  StartEvaluationCommand,
+  CompleteEvaluationCommand,
+} from "../commands";
 import type { EvaluationRun } from "../projections";
-import { createEvaluationRunFoldProjection } from "../projections";
+import { EvaluationRunFoldProjection } from "../projections";
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import { EvaluationRunStore } from "../projections/evaluationRun.store";
 
@@ -145,18 +148,19 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
 
   // Create stores
   const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(clickHouseClient),
+    new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   // Build pipeline using static definition with definePipeline + register
   const evalRunStore = new EvaluationRunStore(
-    EvaluationRunService.create(clickHouseClient).repository,
+    new EvaluationRunService(new EvaluationRunClickHouseRepository(async () => clickHouseClient)).repository,
   );
 
   const pipelineDefinition = definePipeline<EvaluationProcessingEvent>()
@@ -166,7 +170,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     .withCommand("completeEvaluation", CompleteEvaluationCommand as any)
     .withFoldProjection(
       "evaluationRun",
-      createEvaluationRunFoldProjection({ store: evalRunStore }) as any,
+      new EvaluationRunFoldProjection({ store: evalRunStore }) as any,
     )
     .build();
 
@@ -175,6 +179,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
@@ -186,6 +191,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
     }
   > & {
     eventStore: EventStoreClickHouse;
+    eventSourcing: EventSourcing;
     pipelineName: string;
     ready: () => Promise<void>;
   };
@@ -264,6 +270,7 @@ async function waitForEvaluationRun(
       await new Promise((resolve) => setTimeout(resolve, 500));
       return;
     }
+
   } catch {
     /* ignore */
   }
@@ -294,8 +301,8 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      // Gracefully close pipeline to ensure all BullMQ workers finish
-      await pipeline.service.close();
+      // Gracefully close EventSourcing (including global queue dispatcher)
+      await pipeline.eventSourcing.close();
       // Wait for BullMQ workers to fully shut down and release Redis connections
       // Using 1000ms to ensure all async operations complete
       await new Promise((resolve) => setTimeout(resolve, 1000));

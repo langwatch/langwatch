@@ -145,14 +145,6 @@ export const analyticsMetrics = {
     },
   },
   sentiment: {
-    input_sentiment: {
-      ...numericFieldAnalyticsWithPercentiles("input.satisfaction_score"),
-      label: "Input Sentiment Score",
-      colorSet: "yellowTones",
-      format: "0.00%",
-      increaseIs: "good",
-      quickwitSupport: false,
-    },
     thumbs_up_down: {
       label: "Thumbs Up/Down Score",
       colorSet: "purpleTones",
@@ -511,7 +503,7 @@ export const analyticsMetrics = {
           );
 
         return {
-          [`${index}__event_score_${aggregation}_${key}_${subkey}`]: {
+          [`${index}__event_details_${aggregation}_${key}_${subkey}`]: {
             nested: {
               path: "events",
             },
@@ -558,7 +550,7 @@ export const analyticsMetrics = {
         key,
         subkey,
       ) => {
-        return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
+        return `${index}__event_details_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
       quickwitSupport: false,
     },
@@ -608,7 +600,7 @@ export const analyticsMetrics = {
     evaluation_pass_rate: {
       label: "Evaluation Pass Rate",
       colorSet: "tealTones",
-      format: "0.00a",
+      format: "0%",
       increaseIs: "good",
       allowedAggregations: allAggregationTypes.filter(
         (agg) => agg != "cardinality" && agg != "terms",
@@ -917,47 +909,6 @@ export const analyticsGroups = {
     },
   },
   sentiment: {
-    input_sentiment: {
-      label: "Input Sentiment",
-      aggregation: (aggToGroup) => ({
-        input_sentiment_group: {
-          filters: {
-            filters: {
-              positive: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value >= 0.1",
-                    lang: "painless",
-                  },
-                },
-              },
-              negative: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value <= -0.1",
-                    lang: "painless",
-                  },
-                },
-              },
-              neutral: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : (doc['input.satisfaction_score'].value < 0.1 && doc['input.satisfaction_score'].value > -0.1)",
-                    lang: "painless",
-                  },
-                },
-              },
-            },
-          },
-          aggs: aggToGroup,
-        },
-      }),
-      extractionPath: () => "input_sentiment_group>buckets",
-      quickwitSupport: false,
-    },
     thumbs_up_down: {
       label: "Thumbs Up/Down",
       aggregation: (aggToGroup) => {

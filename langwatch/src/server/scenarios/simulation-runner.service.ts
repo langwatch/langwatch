@@ -1,6 +1,5 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
-import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
@@ -13,11 +12,6 @@ import { bridgeTraceIdFromAdapterToJudge } from "./execution/bridge-trace-id";
 import { RemoteSpanJudgeAgent } from "./execution/remote-span-judge-agent";
 import { createTraceApiSpanQuery } from "./execution/trace-api-span-query";
 import { ScenarioService } from "./scenario.service";
-
-/** Generates a unique batch run ID for grouping scenario executions */
-export function generateBatchRunId(): string {
-  return `scenariobatch_${nanoid()}`;
-}
 
 const logger = createLogger("SimulationRunnerService");
 
@@ -181,8 +175,11 @@ export class SimulationRunnerService {
   }
 
   private getLangWatchEndpoint(): string {
-    // Use BASE_HOST if available (self-referencing), otherwise default
-    return env.BASE_HOST ?? "https://app.langwatch.ai";
+    const endpoint = process.env.LANGWATCH_ENDPOINT;
+    if (!endpoint) {
+      throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
+    }
+    return endpoint;
   }
 
   private resolveAdapter(

@@ -1,0 +1,108 @@
+---
+title: REST API
+sidebarTitle: HTTP API
+icon: globe
+description: Use the LangWatch REST API to send traces, evaluations, and interactions from any stack, enabling unified agent testing data flows.
+keywords: LangWatch, REST API, HTTP API, curl, integration, observability, evaluation, prompts, datasets, workflows, automation
+---
+
+If your preferred programming language or platform is not directly supported by the existing LangWatch libraries, you can use the REST API with `curl` to send trace data. This guide will walk you through how to integrate LangWatch with any system that allows HTTP requests.
+
+import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
+
+<LLMsTxtProtip />
+
+**Prerequisites:**
+
+- Ensure you have `curl` installed on your system.
+
+**Configuration:**
+
+Set the `LANGWATCH_API_KEY` environment variable in your environment:
+
+```bash
+export LANGWATCH_API_KEY='your_api_key_here'
+```
+
+**Usage:**
+
+You will need to prepare your span data in accordance with the Span type definitions provided by LangWatch. Below is an example of how to send span data using curl:
+
+    1. Prepare your JSON data. Make sure it's properly formatted as expected by LangWatch.
+    2. Use the curl command to send your trace data. Here is a basic template:
+
+```bash
+# Set your API key and endpoint URL
+LANGWATCH_API_KEY="your_langwatch_api_key"
+LANGWATCH_ENDPOINT="https://app.langwatch.ai"
+
+# Use curl to send the POST request, e.g.:
+curl -X POST "$LANGWATCH_ENDPOINT/api/collector" \
+     -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d @- <<EOF
+{
+  "trace_id": "trace-123",
+  "spans": [
+    {
+      "type": "llm",
+      "span_id": "span-456",
+      "vendor": "openai",
+      "model": "gpt-5",
+      "input": {
+        "type": "chat_messages",
+        "value": [
+          {
+            "role": "user",
+            "content": "Input to the LLM"
+          }
+        ]
+      },
+      "output": {
+        "type": "chat_messages",
+        "value": [
+            {
+                "role": "assistant",
+                "content": "Output from the LLM",
+                "function_call": null,
+                "tool_calls": []
+            }
+        ]
+      },
+      "params": {
+        "temperature": 0.7,
+        "stream": false
+      },
+      "metrics": {
+        "prompt_tokens": 100,
+        "completion_tokens": 150
+      },
+      "timestamps": {
+        "started_at": $(($(date +%s) * 1000)),
+        "finished_at": $((($(date +%s) + 1) * 1000))
+      }
+    }
+  ],
+  "metadata": {
+    "user_id": "optional_end_user_identifier",
+    "thread_id": "optional_thread_identifier",
+    "customer_id": "optional_platform_customer_identifier",
+    "labels": ["optional_label_1", "optional_label_2"]
+  }
+}
+EOF
+```
+
+Replace the placeholders with your actual data. The `@-` tells `curl` to read the JSON data from the standard input, which we provide via the `EOF`-delimited here-document.
+
+For the type reference of how a `span` should look like, check out our [types definitions](https://github.com/langwatch/langwatch/blob/main/python-sdk/src/langwatch/types.py).
+
+It's optional but highly recommended to pass the `user_id` on the metadata if you want to leverage user-specific analytics and the `thread_id` to group related traces together. To connect it to an event later on. Read more about those and other concepts [here](../concepts).
+
+3.  Execute the `curl` command. If successful, LangWatch will process your trace data.
+
+This method of integration offers a flexible approach for sending traces from any system capable of making HTTP requests. Whether you're using a less common programming language or a custom-built platform, this RESTful approach ensures you can benefit from LangWatch's capabilities.
+
+Remember to handle errors and retries as needed. You might need to script additional logic around the `curl` command to handle these cases.
+
+After following the above guide, your interactions with LLMs should now be captured by LangWatch. Once integrated, you can visit your LangWatch dashboard to view and analyze the traces collected from your applications.

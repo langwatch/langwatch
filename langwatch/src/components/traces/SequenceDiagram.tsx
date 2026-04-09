@@ -7,10 +7,10 @@ import {
 } from "@chakra-ui/react";
 import { intervalToDuration } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Span, SpanTypes } from "../../server/tracer/types";
-import { api } from "../../utils/api";
+
 import { useColorMode } from "../ui/color-mode";
 import { Select } from "../ui/select";
 
@@ -609,29 +609,21 @@ const countParticipants = (
  * Single Responsibility: Manage data fetching and state for the sequence diagram
  */
 export function SequenceDiagramContainer(props: SequenceDiagramProps) {
-  const { traceId, trace } = useTraceDetailsState(props.traceId);
-  const { project } = useOrganizationTeamProject();
+  const { trace } = useTraceDetailsState(props.traceId);
   const [selectedSpanTypes, setSelectedSpanTypes] = useState<SpanTypes[]>(
     defaultSelectedSpanTypes,
   );
 
-  const [keepRefetching, setKeepRefetching] = useState(false);
-  const spans = api.spans.getAllForTrace.useQuery(
-    { projectId: project?.id ?? "", traceId: traceId ?? "" },
-    {
-      enabled: !!project && !!traceId,
-      refetchOnWindowFocus: false,
-      refetchInterval: keepRefetching ? 1_000 : undefined,
-    },
-  );
+  // Use spans from trace.data directly — avoids a duplicate ClickHouse query.
+  const spans = trace.data?.spans;
 
   // Auto-include "span" types if there are too few participants
   useEffect(() => {
-    if (!spans.data || spans.data.length === 0) return;
+    if (!spans || spans.length === 0) return;
 
     // Count participants with default selection (without "span")
     const participantCount = countParticipants(
-      spans.data,
+      spans,
       defaultSelectedSpanTypes,
     );
 
@@ -639,21 +631,9 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
     if (participantCount <= 2 && !selectedSpanTypes.includes("span")) {
       setSelectedSpanTypes([...defaultSelectedSpanTypes, "span"]);
     }
-  }, [spans.data]);
+  }, [spans]);
 
-  useEffect(() => {
-    if ((trace.data?.timestamps.inserted_at ?? 0) < Date.now() - 10 * 1000) {
-      return;
-    }
-
-    setKeepRefetching(true);
-    const timeout = setTimeout(() => {
-      setKeepRefetching(false);
-    }, 10_000);
-    return () => clearTimeout(timeout);
-  }, [trace.data?.timestamps.inserted_at]);
-
-  if (!trace.data || !spans.data) {
+  if (!trace.data || !spans) {
     return null;
   }
 
@@ -680,7 +660,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
               <Select.Indicator />
             </Select.IndicatorGroup>
           </Select.Control>
-          <Select.Content zIndex="popover">
+          <Select.Content>
             {spanTypesCollection.items.map((spanType) => (
               <Select.Item item={spanType} key={spanType.value}>
                 {spanType.label}
@@ -691,7 +671,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
       </Select.Root>
 
       <SequenceDiagram
-        spans={spans.data}
+        spans={spans}
         selectedSpanTypes={selectedSpanTypes}
       />
     </VStack>

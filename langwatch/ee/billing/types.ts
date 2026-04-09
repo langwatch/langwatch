@@ -1,5 +1,8 @@
+import type { z } from "zod";
 import type { PlanInfo } from "../licensing/planInfo";
+import type { LimitType } from "../../src/server/license-enforcement/types";
 import type { PlanTypes } from "./planTypes";
+import type { signUpDataSchema } from "../../src/server/api/routers/onboarding/schemas/sign-up-data.schema";
 
 export type BillingPlanProvider = {
   getActivePlan(
@@ -28,15 +31,6 @@ export type PlanLimitNotificationContext = {
   planName: string;
 };
 
-export type PlanLimitNotificationHandlers = {
-  sendSlackNotification?: (
-    context: PlanLimitNotificationContext,
-  ) => Promise<void> | void;
-  sendHubspotNotification?: (
-    context: PlanLimitNotificationContext,
-  ) => Promise<void> | void;
-};
-
 type SubscriptionPlan = PlanTypes | (string & {});
 
 type SubscriptionNotificationBase = {
@@ -61,12 +55,48 @@ type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
   maxMessagesPerMonth?: number | null;
 };
 
+type CancelledSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "cancelled";
+  subscriptionId: string;
+  cancellationDate?: Date | null;
+};
+
 export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
-  | ConfirmedSubscriptionNotification;
+  | ConfirmedSubscriptionNotification
+  | CancelledSubscriptionNotification;
 
-export type BillingNotificationHandlers = PlanLimitNotificationHandlers & {
-  sendSubscriptionNotification?: (
-    payload: SubscriptionNotificationPayload,
-  ) => Promise<void> | void;
+export type ResourceLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+  limitType: string;
+  current: number;
+  max: number;
+};
+
+export type ResourceLimitNotifierInput = {
+  organizationId: string;
+  limitType: LimitType;
+  current: number;
+  max: number;
+};
+
+export type LicensePurchaseNotificationPayload = {
+  buyerEmail: string;
+  planType: string;
+  seats: number;
+  amountPaid: number;
+  currency: string;
+};
+
+export type SignupNotificationPayload = {
+  userName?: string | null;
+  userEmail?: string | null;
+  organizationName?: string | null;
+  phoneNumber?: string | null;
+  utmCampaign?: string | null;
+  signUpData?: z.infer<typeof signUpDataSchema> | null;
 };

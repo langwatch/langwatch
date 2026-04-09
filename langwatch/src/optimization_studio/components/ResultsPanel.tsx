@@ -45,6 +45,7 @@ import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
+import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OptimizationProgressBar } from "./ProgressToast";
 
 export function ResultsPanel({
@@ -73,7 +74,7 @@ export function ResultsPanel({
   return (
     <HStack
       display={isCollapsed ? "none" : undefined}
-      background="white"
+      background="bg"
       borderTop="2px solid"
       borderColor="border"
       width="full"
@@ -158,7 +159,10 @@ export function EvaluationResults({
       experimentSlug: experimentId ? undefined : slugify(workflowId ?? ""),
     },
     {
-      enabled: !!project && !!workflowId,
+      enabled: isExperimentQueryEnabled({
+        hasProject: !!project,
+        workflowId,
+      }),
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
     },

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import type { Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
@@ -15,6 +15,99 @@ import {
   buildAvailableSources,
   buildInputMappings,
 } from "../../utils/edgeMappingUtils";
+
+/** Check whether two sets of fields have identical identifiers (order-independent). */
+function identifiersMatch(a: Field[], b: { identifier: string }[]): boolean {
+  if (a.length !== b.length) return false;
+  const ids = new Set(a.map((f) => f.identifier));
+  return b.every((f) => ids.has(f.identifier));
+}
+
+/**
+ * Merge new fields from the prompt config with the node's existing fields,
+ * preserving `field.value` for inputs that already exist and keeping any
+ * old fields that still have connected edges (prevents edge disconnection).
+ */
+function mergeFields({
+  oldFields,
+  newFields,
+  connectedEdges,
+  handlePrefix,
+}: {
+  oldFields: Field[];
+  newFields: { identifier: string; type: string }[];
+  connectedEdges: Edge[];
+  handlePrefix: string;
+}): Field[] {
+  const newIds = new Set(newFields.map((f) => f.identifier));
+
+  const mapped = newFields.map((f) => {
+    const existing = oldFields.find((e) => e.identifier === f.identifier);
+    return {
+      identifier: f.identifier,
+      type: f.type as Field["type"],
+      ...(existing?.value != null ? { value: existing.value } : {}),
+    };
+  });
+
+  // Keep old fields that have connected edges but were removed from the config
+  const preserved = oldFields.filter(
+    (f) =>
+      !newIds.has(f.identifier) &&
+      connectedEdges.some(
+        (e) =>
+          e.targetHandle === `${handlePrefix}.${f.identifier}` ||
+          e.sourceHandle === `${handlePrefix}.${f.identifier}`,
+      ),
+  );
+
+  return [...mapped, ...preserved];
+}
+
+/**
+ * When input identifiers change positionally (e.g. prompt renamed "question"
+ * to "input"), remap edges to point at the new identifier. Only remaps when
+ * the old identifier has an edge and the new identifier is genuinely new
+ * (not a reordered existing identifier).
+ */
+function remapEdges({
+  nodeId,
+  oldFields,
+  newFields,
+  edges,
+  connectedEdges,
+}: {
+  nodeId: string;
+  oldFields: Field[];
+  newFields: { identifier: string }[];
+  edges: Edge[];
+  connectedEdges: Edge[];
+}): Edge[] | null {
+  let updated = edges;
+  let changed = false;
+
+  for (let i = 0; i < Math.min(oldFields.length, newFields.length); i++) {
+    const oldId = oldFields[i]?.identifier;
+    const newId = newFields[i]?.identifier;
+    if (!oldId || !newId || oldId === newId) continue;
+
+    const oldHasEdge = connectedEdges.some(
+      (e) => e.targetHandle === `inputs.${oldId}`,
+    );
+    const newExistsInOld = oldFields.some((f) => f.identifier === newId);
+
+    if (oldHasEdge && !newExistsInOld) {
+      changed = true;
+      updated = updated.map((edge) =>
+        edge.target === nodeId && edge.targetHandle === `inputs.${oldId}`
+          ? { ...edge, targetHandle: `inputs.${newId}` }
+          : edge,
+      );
+    }
+  }
+
+  return changed ? updated : null;
+}
 
 /**
  * Bridge component that connects the PromptEditorDrawer (headless) to the
@@ -110,7 +203,6 @@ export function SignaturePromptEditorBridge({
   const handleLocalConfigChange = useCallback(
     (config: LocalPromptConfig | undefined) => {
       if (!config) {
-        // Clearing local config — just store undefined, don't touch inputs/outputs
         setNode({ id: node.id, data: { localPromptConfig: undefined } });
         return;
       }
@@ -119,60 +211,56 @@ export function SignaturePromptEditorBridge({
         localPromptConfig: config,
       };
 
-      if (config.inputs) {
-        const oldInputs = signatureNode.data.inputs ?? [];
-        const newInputs = config.inputs;
-
-        data.inputs = newInputs.map((i) => {
-          // Preserve field.value from existing input (hardcoded value mappings)
-          const existing = oldInputs.find(
-            (e) => e.identifier === i.identifier,
-          );
-          return {
-            identifier: i.identifier,
-            type: i.type as Field["type"],
-            ...(existing?.value != null ? { value: existing.value } : {}),
-          };
-        });
-
-        // When input identifiers change (e.g. prompt loads with "input" but
-        // node had "question"), update existing edge targetHandles to match
-        // the new identifiers so edges stay connected.
-        if (oldInputs.length > 0 && newInputs.length > 0) {
-          const currentEdges = getWorkflow().edges;
-          let updatedEdges = currentEdges;
-
-          for (
-            let idx = 0;
-            idx < Math.min(oldInputs.length, newInputs.length);
-            idx++
-          ) {
-            const oldId = oldInputs[idx]?.identifier;
-            const newId = newInputs[idx]?.identifier;
-            if (oldId && newId && oldId !== newId) {
-              updatedEdges = updatedEdges.map((edge) => {
-                if (
-                  edge.target === node.id &&
-                  edge.targetHandle === `inputs.${oldId}`
-                ) {
-                  return { ...edge, targetHandle: `inputs.${newId}` };
-                }
-                return edge;
-              });
-            }
-          }
-
-          if (updatedEdges !== currentEdges) {
-            setEdges(updatedEdges);
-          }
-        }
+      // Mirror LLM config into parameters so the canvas node display stays in sync.
+      // The canvas reads model from parameters[identifier="llm"].value (Nodes.tsx:384).
+      const oldParameters = signatureNode.data.parameters ?? [];
+      const updatedParameters = oldParameters.map((p) =>
+        p.identifier === "llm" ? { ...p, value: config.llm } : p,
+      );
+      if (updatedParameters.some((p) => p.identifier === "llm")) {
+        data.parameters = updatedParameters;
       }
 
-      if (config.outputs) {
-        data.outputs = config.outputs.map((o) => ({
-          identifier: o.identifier,
-          type: o.type as Field["type"],
-        }));
+      const oldInputs = signatureNode.data.inputs ?? [];
+      const oldOutputs = signatureNode.data.outputs ?? [];
+
+      // Only update inputs when the set of identifiers actually changed.
+      // Skipping avoids triggering removeInvalidEdges on drawer open.
+      if (config.inputs && !identifiersMatch(oldInputs, config.inputs)) {
+        const currentEdges = getWorkflow().edges;
+        const incomingEdges = currentEdges.filter(
+          (e) => e.target === node.id && e.targetHandle?.startsWith("inputs."),
+        );
+
+        data.inputs = mergeFields({
+          oldFields: oldInputs,
+          newFields: config.inputs,
+          connectedEdges: incomingEdges,
+          handlePrefix: "inputs",
+        });
+
+        const remapped = remapEdges({
+          nodeId: node.id,
+          oldFields: oldInputs,
+          newFields: config.inputs,
+          edges: currentEdges,
+          connectedEdges: incomingEdges,
+        });
+        if (remapped) setEdges(remapped);
+      }
+
+      if (config.outputs && !identifiersMatch(oldOutputs, config.outputs)) {
+        const currentEdges = getWorkflow().edges;
+        const outgoingEdges = currentEdges.filter(
+          (e) => e.source === node.id && e.sourceHandle?.startsWith("outputs."),
+        );
+
+        data.outputs = mergeFields({
+          oldFields: oldOutputs,
+          newFields: config.outputs,
+          connectedEdges: outgoingEdges,
+          handlePrefix: "outputs",
+        });
       }
 
       setNode({ id: node.id, data });
@@ -181,6 +269,8 @@ export function SignaturePromptEditorBridge({
     [
       node.id,
       signatureNode.data.inputs,
+      signatureNode.data.outputs,
+      signatureNode.data.parameters,
       setNode,
       updateNodeInternals,
       getWorkflow,

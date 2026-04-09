@@ -163,7 +163,7 @@ export function LLMConfigPopover({
   };
 
   return (
-    <Popover.Content minWidth="260px" maxWidth="100%" zIndex={1401}>
+    <Popover.Content minWidth="260px" maxWidth="100%">
       <VStack paddingY={2} paddingX={2} width="full" align="start" gap={3}>
         {/* Model Selector */}
         <Box width="full">

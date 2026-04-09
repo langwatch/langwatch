@@ -1,7 +1,6 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { isClickHouseEnabled, getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   esClient as defaultEsClient,
@@ -23,13 +22,8 @@ const BATCH_SIZE = 10;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** Module-level cache for getCurrentMonthCount */
-const monthCountCache = new TtlCache<number>(CACHE_TTL_MS);
+const monthCountCache = new TtlCache<number>(CACHE_TTL_MS, "ttlcache:traceUsage:monthCount:");
 
-
-/** Clear cache (for testing) */
-export const clearMonthCountCache = (): void => {
-  monthCountCache.clear();
-};
 
 /**
  * Service for trace usage tracking and limit enforcement
@@ -39,7 +33,7 @@ export class TraceUsageService {
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
     private readonly prisma: PrismaClient,
-    private readonly clickHouseClient: ClickHouseClient | null,
+    private readonly clickHouseAvailable: boolean,
   ) {}
 
   /**
@@ -50,7 +44,7 @@ export class TraceUsageService {
       new OrganizationRepository(db),
       defaultEsClient,
       db,
-      getClickHouseClient(),
+      isClickHouseEnabled(),
     );
   }
 
@@ -66,7 +60,7 @@ export class TraceUsageService {
     const billingMonth = getBillingMonth();
     const cacheKey = `${organizationId}:traces:${billingMonth}`;
 
-    const cached = monthCountCache.get(cacheKey);
+    const cached = await monthCountCache.get(cacheKey);
     if (cached !== undefined) {
       logger.info({ organizationId, cached, billingMonth }, "getCurrentMonthCount: cache hit");
       return cached;
@@ -78,7 +72,7 @@ export class TraceUsageService {
 
     if (clickHouseTotal !== null) {
       logger.info({ organizationId, clickHouseTotal, billingMonth }, "getCurrentMonthCount: ClickHouse result");
-      monthCountCache.set(cacheKey, clickHouseTotal);
+      await monthCountCache.set(cacheKey, clickHouseTotal);
       return clickHouseTotal;
     }
 
@@ -96,7 +90,7 @@ export class TraceUsageService {
     });
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
-    monthCountCache.set(cacheKey, total);
+    await monthCountCache.set(cacheKey, total);
     return total;
   }
 
@@ -147,38 +141,20 @@ export class TraceUsageService {
   private async splitProjectsByFlag(
     projectIds: string[],
   ): Promise<{ chProjectIds: string[]; esProjectIds: string[] }> {
-    if (!this.clickHouseClient) {
+    if (!this.clickHouseAvailable) {
       return { chProjectIds: [], esProjectIds: projectIds };
     }
 
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, featureClickHouseDataSourceTraces: true },
-    });
-
-    const flagMap = new Map(
-      projects.map((p) => [p.id, p.featureClickHouseDataSourceTraces]),
-    );
-
-    const chProjectIds: string[] = [];
-    const esProjectIds: string[] = [];
-
-    for (const id of projectIds) {
-      if (flagMap.get(id)) {
-        chProjectIds.push(id);
-      } else {
-        esProjectIds.push(id);
-      }
-    }
-
-    return { chProjectIds, esProjectIds };
+    return { chProjectIds: projectIds, esProjectIds: [] };
   }
 
   private async getCountsFromClickHouse(
     projectIds: string[],
     monthStart: number,
   ): Promise<Array<{ projectId: string; count: number }>> {
-    const result = await this.clickHouseClient!.query({
+    const client = await getClickHouseClientForProject(projectIds[0]!);
+    if (!client) return [];
+    const result = await client.query({
       query: `
         SELECT TenantId, toString(count(DISTINCT TraceId)) AS Total
         FROM trace_summaries
@@ -257,9 +233,9 @@ export class TraceUsageService {
   }: {
     organizationId: string;
   }): Promise<number | null> {
-    if (!getClickHouseClient()) return null;
+    if (!isClickHouseEnabled()) return null;
 
-    
+
     const projectIds =
       await this.organizationRepository.getProjectIds(organizationId);
     const billingMonth = getBillingMonth();
@@ -277,7 +253,7 @@ export class TraceUsageService {
   }: {
     projectIds: string[];
   }): Promise<Array<{ projectId: string; count: number }> | null> {
-    if (!getClickHouseClient()) return null;
+    if (!isClickHouseEnabled()) return null;
 
     const billingMonth = getBillingMonth();
     return Promise.all(

@@ -35,7 +35,7 @@ import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { WizardProvider } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import { useColorRawValue } from "../../components/ui/color-mode";
+import { useColorMode, useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
 import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -98,6 +98,7 @@ export default function OptimizationStudio() {
     onNodesDelete,
     onEdgesChange,
     onConnect,
+    setIsDraggingNode,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
@@ -115,6 +116,7 @@ export default function OptimizationStudio() {
         onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
+        setIsDraggingNode: state.setIsDraggingNode,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
@@ -200,7 +202,7 @@ export default function OptimizationStudio() {
               <VStack width="full" height="full" gap={0}>
                 <HStack
                   width="full"
-                  background="white"
+                  background="bg"
                   padding={2}
                   borderBottom="1px solid"
                   borderColor="border.emphasized"
@@ -273,7 +275,7 @@ export default function OptimizationStudio() {
                           <Button
                             size="sm"
                             display={isResultsPanelCollapsed ? "block" : "none"}
-                            background="white"
+                            background="bg"
                             borderRadius={4}
                             borderColor="border.emphasized"
                             variant="outline"
@@ -308,6 +310,13 @@ export default function OptimizationStudio() {
                                   },
                                 });
                               }
+                            }}
+                            selectNodesOnDrag={false}
+                            onNodeDragStart={() => {
+                              setIsDraggingNode(true);
+                            }}
+                            onNodeDragStop={() => {
+                              setIsDraggingNode(false);
                             }}
                             onPaneClick={() => {
                               if (currentDrawer) closeDrawer();
@@ -353,7 +362,7 @@ export default function OptimizationStudio() {
                             width="30px"
                             height="3px"
                             borderRadius="full"
-                            background="gray.400"
+                            background="bg.emphasized"
                           />
                         </Center>
                       </PanelResizeHandle>
@@ -387,16 +396,22 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const gray100 = useColorRawValue("gray.100");
-  const gray300 = useColorRawValue("gray.300");
+  const bgColor = useColorModeValue(
+    useColorRawValue("gray.100"),
+    useColorRawValue("gray.900"),
+  );
+  const dotColor = useColorModeValue(
+    useColorRawValue("gray.300"),
+    useColorRawValue("gray.700"),
+  );
 
   return (
     <Background
       variant={BackgroundVariant.Dots}
       gap={12}
       size={2}
-      bgColor={gray100}
-      color={gray300}
+      bgColor={bgColor}
+      color={dotColor}
     />
   );
 }
@@ -448,11 +463,13 @@ export function OptimizationStudioCanvas({
 } & ReactFlowProps) {
   const nodeTypes = useMemo(() => NodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
+  const { colorMode } = useColorMode();
 
   return (
     <ReactFlow
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      colorMode={colorMode}
       defaultViewport={{
         zoom: defaultZoom,
         x: 100,

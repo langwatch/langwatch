@@ -27,7 +27,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamProjectsList } from "../../pages/settings/projects";
-import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
@@ -181,7 +181,7 @@ export const TeamForm = ({
                                   <Select.Trigger width="full" background="bg">
                                     <Select.ValueText placeholder="Select..." />
                                   </Select.Trigger>
-                                  <Select.Content paddingY={2} zIndex="popover">
+                                  <Select.Content paddingY={2}>
                                     {userOptions.map((option) => (
                                       <Select.Item key={option.value} item={option}>
                                         {option.label}

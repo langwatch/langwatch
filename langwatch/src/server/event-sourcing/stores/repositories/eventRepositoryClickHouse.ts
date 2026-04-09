@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "../../../../utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
@@ -59,7 +60,11 @@ export class EventRepositoryClickHouse implements EventRepository {
     "langwatch:trace-processing:event-repository:clickhouse",
   );
 
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  private async getClient(tenantId: string): Promise<ClickHouseClient> {
+    return this.resolveClient(tenantId);
+  }
 
   async getEventRecords(
     tenantId: string,
@@ -67,7 +72,8 @@ export class EventRepositoryClickHouse implements EventRepository {
     aggregateId: string,
   ): Promise<EventRecord[]> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.getClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             EventId,
@@ -141,7 +147,8 @@ export class EventRepositoryClickHouse implements EventRepository {
     upToEventId: string,
   ): Promise<EventRecord[]> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.getClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             EventId,
@@ -227,7 +234,8 @@ export class EventRepositoryClickHouse implements EventRepository {
     beforeEventId: string,
   ): Promise<number> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.getClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT COUNT(DISTINCT EventId) as count
           FROM event_log
@@ -253,19 +261,6 @@ export class EventRepositoryClickHouse implements EventRepository {
       const rows = await result.json<{ count: string }>();
       const count = Number(rows[0]?.count ?? 0);
 
-      // Log for debugging sequence number issues
-      this.logger.debug(
-        {
-          tenantId,
-          aggregateType,
-          aggregateId: String(aggregateId),
-          beforeTimestamp,
-          beforeEventId,
-          count,
-        },
-        "countEventRecords result",
-      );
-
       return count;
     } catch (error) {
       this.logger.error(
@@ -289,21 +284,15 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
 
     try {
-      await this.clickHouseClient.insert({
+      const tenantId = records[0]!.TenantId;
+      const client = await this.getClient(tenantId);
+      await client.insert({
         table: "event_log",
         values: records,
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      this.logger.info(
-        {
-          recordCount: records.length,
-          tenantIds: [...new Set(records.map((r) => r.TenantId))],
-          aggregateIds: [...new Set(records.map((r) => String(r.AggregateId)))],
-        },
-        "Inserted event records to ClickHouse",
-      );
     } catch (error) {
       this.logger.debug(
         {

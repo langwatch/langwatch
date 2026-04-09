@@ -20,7 +20,6 @@ function createTestPipelineDefinition() {
 describe("EventSourcing", () => {
   beforeEach(() => {
     vi.stubEnv("BUILD_TIME", "");
-    vi.stubEnv("ENABLE_EVENT_SOURCING", "true");
     vi.stubEnv("NODE_ENV", "test");
   });
 

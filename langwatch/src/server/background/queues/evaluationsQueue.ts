@@ -1,14 +1,9 @@
 import type { ConnectionOptions, Job } from "bullmq";
 import {
   type EvaluationJob,
-  getEvaluationId,
-  getEvaluatorId,
 } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
-import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger/server";
-import { safeTruncate } from "../../../utils/truncate";
-import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { EVALUATIONS_QUEUE } from "./constants";
@@ -219,20 +214,11 @@ export const scheduleEvaluation = async ({
   );
 };
 
-export const updateEvaluationStatusInES = async ({
-  check,
-  trace,
-  status,
-  score,
-  passed,
-  label,
-  error,
-  details,
-  retries,
-  is_guardrail,
-  evaluation_thread_id,
-  inputs,
-}: {
+/**
+ * No-op: ES evaluation writes are globally disabled — ClickHouse is the primary store.
+ * Signature preserved for callers.
+ */
+export const updateEvaluationStatusInES = async (_params: {
   check: EvaluationJob["check"];
   trace: EvaluationJob["trace"];
   status: ElasticSearchEvaluation["status"];
@@ -246,85 +232,5 @@ export const updateEvaluationStatusInES = async ({
   evaluation_thread_id?: string;
   inputs?: Record<string, any>;
 }) => {
-  const evaluation: ElasticSearchEvaluation = {
-    evaluation_id: getEvaluationId(check),
-    evaluator_id: getEvaluatorId(check),
-    thread_id: trace.thread_id,
-    user_id: trace.user_id,
-    customer_id: trace.customer_id,
-    labels: trace.labels,
-    type: check.type,
-    status,
-    ...(check.name && { name: check.name }),
-    ...(is_guardrail !== undefined && { is_guardrail }),
-    ...(evaluation_thread_id && { evaluation_thread_id }),
-    ...(typeof score === "number" && { score }),
-    ...(passed !== undefined && { passed }),
-    ...(label !== undefined && { label }),
-    ...(error && { error: captureError(error) }),
-    ...(details !== undefined && { details }),
-    ...(retries && { retries }),
-    ...(inputs && { inputs: safeTruncate(inputs, 32 * 1024) }),
-    timestamps: {
-      ...(status == "in_progress" && { started_at: Date.now() }),
-      ...((status == "skipped" || status == "processed") && {
-        finished_at: Date.now(),
-      }),
-      updated_at: Date.now(),
-    },
-  };
-
-  // Random delay to avoid elasticsearch update collisions
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000));
-
-  const client = await esClient({ projectId: trace.project_id });
-  await client.update({
-    index: TRACE_INDEX.alias,
-    id: traceIndexId({
-      traceId: trace.trace_id,
-      projectId: trace.project_id,
-    }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
-          if (ctx._source.evaluations == null) {
-            ctx._source.evaluations = [];
-          }
-          def newEvaluation = params.newEvaluation;
-          def found = false;
-          for (int i = 0; i < ctx._source.evaluations.size(); i++) {
-            if (ctx._source.evaluations[i].evaluation_id == newEvaluation.evaluation_id) {
-              ctx._source.evaluations[i] = newEvaluation;
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            if (newEvaluation.timestamps == null) {
-              newEvaluation.timestamps = new HashMap();
-            }
-            newEvaluation.timestamps.inserted_at = System.currentTimeMillis();
-            ctx._source.evaluations.add(newEvaluation);
-          }
-        `,
-        lang: "painless",
-        params: {
-          newEvaluation: evaluation,
-        },
-      },
-      upsert: {
-        trace_id: trace.trace_id,
-        project_id: trace.project_id,
-        timestamps: {
-          inserted_at: Date.now(),
-          started_at: Date.now(),
-          updated_at: Date.now(),
-        },
-        evaluations: [evaluation],
-      },
-    },
-    refresh: true,
-  });
-
+  return;
 };

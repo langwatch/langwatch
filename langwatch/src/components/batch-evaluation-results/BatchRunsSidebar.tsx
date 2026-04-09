@@ -21,10 +21,12 @@ import {
 import type { WorkflowVersion } from "@prisma/client";
 import { GitCompare, X } from "lucide-react";
 
+import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { FormatMoney } from "~/optimization_studio/components/FormatMoney";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
+import { getRunDisplayName } from "./getRunDisplayName";
 import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
 
 /**
@@ -149,6 +151,20 @@ export function BatchRunsSidebar({
 }: BatchRunsSidebarProps) {
   const canCompare = runs.length >= 2;
 
+  // Sort runs newest-first for display, and build a chronological index map
+  // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
+  const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
+    const sorted = [...runs].sort(
+      (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
+    );
+    const chronological = [...runs].sort(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
+    const indexMap = new Map<string, number>();
+    chronological.forEach((run, i) => indexMap.set(run.runId, i));
+    return { sortedRuns: sorted, chronologicalIndexMap: indexMap };
+  }, [runs]);
+
   // Handle click with shift key for compare mode
   const handleRunClick = (runId: string, event: React.MouseEvent) => {
     // Prevent text selection on shift+click
@@ -270,17 +286,19 @@ export function BatchRunsSidebar({
       <VStack gap={0.5} align="stretch" paddingX={2}>
         {!isLoading &&
           !error &&
-          runs.map((run) => {
+          sortedRuns.map((run) => {
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
             const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
 
-            // Build the name - prefer commit message, then just run ID
-            const runName = run.workflowVersion?.commitMessage
-              ? run.workflowVersion.commitMessage
-              : run.runId;
+            const chronologicalIndex =
+              chronologicalIndexMap.get(run.runId) ?? 0;
+            const runName = getRunDisplayName({
+              commitMessage: run.workflowVersion?.commitMessage,
+              index: chronologicalIndex,
+            });
 
             // Build summary line: evaluator scores + cost (filter out "-" values)
             const summaryParts: string[] = [];
@@ -314,26 +332,26 @@ export function BatchRunsSidebar({
                 role="button"
                 bg={
                   compareMode && isSelectedForComparison
-                    ? "blue.50"
+                    ? "blue.subtle"
                     : isSelected
-                      ? "blue.50"
+                      ? "blue.subtle"
                       : "transparent"
                 }
                 color={
                   compareMode && isSelectedForComparison
-                    ? "blue.700"
+                    ? "blue.fg"
                     : isSelected
-                      ? "blue.700"
-                      : "gray.700"
+                      ? "blue.fg"
+                      : "fg"
                 }
                 borderRadius="md"
                 _hover={{
                   bg:
                     compareMode && isSelectedForComparison
-                      ? "blue.100"
+                      ? "blue.muted"
                       : isSelected
-                        ? "blue.100"
-                        : "gray.100",
+                        ? "blue.muted"
+                        : "bg.muted",
                 }}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 gap={2}

@@ -4,6 +4,16 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  assertEnterprisePlan,
+  isCustomRole,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "../enterprise";
+import {
+  createLicenseEnforcementService,
+  LimitExceededError,
+} from "../../license-enforcement";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 
@@ -23,9 +33,9 @@ const teamMemberRoleSchema = z
     customRoleId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const isCustomRole = data.role.startsWith("custom:");
+    const hasCustom = isCustomRole(data.role);
 
-    if (isCustomRole) {
+    if (hasCustom) {
       if (!data.customRoleId || data.customRoleId.trim() === "") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -133,6 +143,27 @@ export const teamRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
+      const hasCustomRoleMember = input.members.some((m) =>
+        isCustomRole(m.role),
+      );
+      if (hasCustomRoleMember) {
+        const team = await ctx.prisma.team.findUnique({
+          where: { id: input.teamId },
+          select: { organizationId: true },
+        });
+        if (!team) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Team not found",
+          });
+        }
+        await assertEnterprisePlan({
+          organizationId: team.organizationId,
+          user: ctx.session.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      }
+
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
@@ -193,9 +224,7 @@ export const teamRouter = createTRPCRouter({
 
           if (membersToAdd.length > 0) {
             for (const member of membersToAdd) {
-              const isCustomRole = member.role.startsWith("custom:");
-
-              if (isCustomRole) {
+              if (isCustomRole(member.role)) {
                 // Validate custom role requirements
                 if (!member.customRoleId) {
                   throw new TRPCError({
@@ -260,9 +289,7 @@ export const teamRouter = createTRPCRouter({
           }
 
           for (const member of membersToUpdate) {
-            const isCustomRole = member.role.startsWith("custom:");
-
-            if (isCustomRole) {
+            if (isCustomRole(member.role)) {
               // Validate custom role requirements
               if (!member.customRoleId) {
                 throw new TRPCError({
@@ -348,26 +375,49 @@ export const teamRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      // Check teams license limit
-      const subscriptionLimits =
-        await getApp().planProvider.getActivePlan({
+      const hasCustomRoleMember = input.members.some((m) =>
+        isCustomRole(m.role),
+      );
+      if (hasCustomRoleMember) {
+        await assertEnterprisePlan({
           organizationId: input.organizationId,
           user: ctx.session.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
+      }
 
-      if (!subscriptionLimits.overrideAddingLimitations) {
-        const currentTeamCount = await prisma.team.count({
-          where: { organizationId: input.organizationId },
+      const prisma = ctx.prisma;
+
+      // Check teams license limit via LicenseEnforcementService
+      const enforcement = createLicenseEnforcementService(prisma);
+      try {
+        await enforcement.enforceLimitByOrganization({
+          organizationId: input.organizationId,
+          limitType: "teams",
+          user: ctx.session.user,
         });
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
 
-        if (currentTeamCount >= subscriptionLimits.maxTeams) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Over the limit of teams allowed",
+            message: error.message,
+            cause: {
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            },
           });
         }
+        throw error;
       }
 
       const teamNanoId = nanoid();
@@ -388,9 +438,9 @@ export const teamRouter = createTRPCRouter({
         });
 
         for (const member of input.members) {
-          const isCustomRole = member.role.startsWith("custom:");
+          const memberIsCustomRole = isCustomRole(member.role);
 
-          if (isCustomRole && !member.customRoleId) {
+          if (memberIsCustomRole && !member.customRoleId) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: `customRoleId is required when role is a custom role for user ${member.userId}`,
@@ -401,14 +451,14 @@ export const teamRouter = createTRPCRouter({
             data: {
               userId: member.userId,
               teamId: team.id,
-              role: isCustomRole
+              role: memberIsCustomRole
                 ? TeamUserRole.CUSTOM
                 : (member.role as TeamUserRole),
-              assignedRoleId: isCustomRole ? member.customRoleId : null,
+              assignedRoleId: memberIsCustomRole ? member.customRoleId : null,
             },
           });
 
-          if (isCustomRole) {
+          if (memberIsCustomRole) {
             // Verify the custom role belongs to the same organization
             const customRole = await tx.customRole.findUnique({
               where: { id: member.customRoleId! },

@@ -21,7 +21,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type {
   FullyLoadedOrganization,
   TeamWithProjectsAndMembers,
-} from "../../server/api/routers/organization";
+} from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 
 function Projects() {

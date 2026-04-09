@@ -1,18 +1,13 @@
-import superjson from "superjson";
-import crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
-import {
-  fetchExistingMD5s,
-  scheduleTraceCollectionWithFallback,
-} from "~/server/background/workers/collectorWorker";
-import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { readBody } from "../../decompressBody";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
+import { getApp } from "../../../../../server/app-layer/app";
 import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger/server";
 
@@ -79,9 +74,52 @@ async function handleLogsRequest(req: NextRequest) {
         );
       }
 
+      try {
+        const limitResult = await getApp().usage.checkLimit({
+          teamId: project.teamId,
+        });
+
+        if (limitResult.exceeded) {
+          try {
+            const activePlan = await getApp().planProvider.getActivePlan({
+              organizationId: project.team.organizationId,
+            });
+            await getApp().usageLimits.notifyPlanLimitReached({
+              organizationId: project.team.organizationId,
+              planName: activePlan.name ?? "free",
+            });
+          } catch (error) {
+            logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
+          }
+
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Plan limit reached.",
+          });
+
+          return NextResponse.json(
+            {
+              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
+            },
+            { status: 429 },
+          );
+        }
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error checking trace limit",
+        );
+        captureException(error as Error, {
+          extra: { projectId: project.id },
+        });
+      }
+
       span.setAttribute("langwatch.project.id", project.id);
 
-      const body = await req.arrayBuffer();
+      const body = await readBody(req);
       let logRequest: IExportLogsServiceRequest;
       try {
         if (contentType === "application/json") {
@@ -128,70 +166,14 @@ async function handleLogsRequest(req: NextRequest) {
           );
         }
       }
-      const tracesGeneratedFromLogs =
-        await openTelemetryLogsRequestToTracesForCollection(logRequest);
+      // Ingest logs via event sourcing into ClickHouse
+      await getApp().traces.logCollection.handleOtlpLogRequest({
+        tenantId: project.id,
+        logRequest,
+        piiRedactionLevel: project.piiRedactionLevel,
+      });
 
-      const promises = await tracer.withActiveSpan(
-        "check which traces have already been collected",
-        { kind: SpanKind.INTERNAL },
-        async () => {
-          const promises: Promise<void>[] = [];
-          for (const traceForCollection of tracesGeneratedFromLogs) {
-            const paramsMD5 = crypto
-              .createHash("md5")
-              .update(superjson.stringify({ ...traceForCollection }))
-              .digest("hex");
-            const existingTrace = await fetchExistingMD5s(
-              traceForCollection.traceId,
-              project.id,
-            );
-            if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
-              continue;
-            }
-
-            logger.info(
-              {
-                traceId: traceForCollection.traceId,
-                logRequestSizeMb: parseFloat(
-                  (body.byteLength / (1024 * 1024)).toFixed(3),
-                ),
-              },
-              "collecting traces from logs",
-            );
-
-            promises.push(
-              scheduleTraceCollectionWithFallback(
-                {
-                  ...traceForCollection,
-                  projectId: project.id,
-                  existingTrace,
-                  paramsMD5,
-                  expectedOutput: void 0,
-                  evaluations: void 0,
-                  collectedAt: Date.now(),
-                },
-                false,
-                body.byteLength,
-              ),
-            );
-          }
-          return promises;
-        },
-      );
-
-      if (promises.length === 0) {
-        return NextResponse.json({ message: "No changes" });
-      }
-
-      await tracer.withActiveSpan(
-        "push pending traces to collector queue",
-        { kind: SpanKind.PRODUCER },
-        async () => {
-          await Promise.all(promises);
-        },
-      );
-
-      return NextResponse.json({ message: "OK" }, { status: 200 });
+      return NextResponse.json({ message: "OK" });
     },
   );
 }

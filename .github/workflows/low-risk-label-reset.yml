@@ -1,4 +1,4 @@
-name: Remove low-risk-change label on new commits
+name: low-risk-label-reset
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Remove low-risk-change label if present
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const prNumber = context.payload.pull_request.number;

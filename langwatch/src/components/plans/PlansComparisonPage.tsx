@@ -20,7 +20,7 @@ import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
-import { CONTACT_SALES_URL } from "./constants";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
   type Currency,
   type BillingInterval,
@@ -28,7 +28,7 @@ import {
   formatPrice,
   currencySymbol,
   FREE_PLAN_FEATURES,
-  GROWTH_PLAN_FEATURES,
+  getGrowthPlanFeatures,
   ENTERPRISE_PLAN_FEATURES,
 } from "../subscription/billing-plans";
 
@@ -42,7 +42,7 @@ type PlanColumn = {
   features: string[];
 };
 
-const PLAN_COLUMNS: PlanColumn[] = [
+const getPlanColumns = (currency: Currency): PlanColumn[] => [
   {
     id: "free",
     name: "Free",
@@ -59,7 +59,7 @@ const PLAN_COLUMNS: PlanColumn[] = [
     actionLabel: "Get Started",
     actionHref: "/settings/subscription",
     actionColor: "orange",
-    features: GROWTH_PLAN_FEATURES,
+    features: getGrowthPlanFeatures(currency),
   },
   {
     id: "enterprise",
@@ -218,7 +218,7 @@ export function PlansComparisonPage({
   pricingModel,
 }: PlansComparisonPageProps) {
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
-  const showTieredNotice = pricingModel === "TIERED";
+  const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
 
   const detectedCurrency = api.currency.detectCurrency.useQuery({});
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
@@ -344,7 +344,7 @@ export function PlansComparisonPage({
       )}
 
       <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-        {PLAN_COLUMNS.map((plan) => (
+        {getPlanColumns(currency).map((plan) => (
           <PlanCard
             key={plan.id}
             plan={plan}

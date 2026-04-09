@@ -1,6 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
-.PHONY: setup-hooks
+.PHONY: dev-up dev-down dev-logs setup-hooks
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -12,30 +12,30 @@ COMPOSE = docker compose -f compose.dev.yml
 
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
-	@cp .githooks/post-checkout .git/hooks/post-checkout 2>/dev/null || true
+	@git config core.hooksPath .githooks 2>/dev/null || true
 
 # Minimal: postgres + redis + app (no opensearch)
-dev: setup-hooks
+dev:
 	$(COMPOSE) up
 
 # + opensearch (for traces/search features)
-dev-search: setup-hooks
+dev-search:
 	$(COMPOSE) --profile search up
 
 # + NLP service + langevals (for evaluations)
-dev-nlp: setup-hooks
+dev-nlp:
 	$(COMPOSE) --profile nlp up
 
 # + scenario worker + bullboard + NLP (no opensearch needed)
-dev-scenarios: setup-hooks
+dev-scenarios:
 	$(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
-dev-test: setup-hooks
+dev-test:
 	$(COMPOSE) --profile test up
 
 # Everything
-dev-full: setup-hooks
+dev-full:
 	$(COMPOSE) --profile full up
 
 # Stop all services
@@ -81,6 +81,25 @@ tsc-watch:
 # Interactive profile chooser
 quickstart:
 	@./scripts/dev.sh
+
+# =============================================================================
+# ISOLATED DEV INSTANCES (for AI agents / parallel worktrees)
+# =============================================================================
+# Each worktree gets its own containers, volumes, and ports.
+# Port info saved to .dev-port for agent/skill discovery.
+
+# Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
+dev-up:
+	@./scripts/dev-up.sh $(PROFILE)
+
+# Stop isolated instance
+dev-down:
+	@./scripts/dev-down.sh
+
+# Tail logs for isolated instance
+dev-logs:
+	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f compose.dev.yml --profile full logs -f; \
+	else echo "No .dev-port found. Is the instance running?"; fi
 
 # Create a git worktree from issue number or feature name
 # Usage: make worktree 1663  or  make worktree add-dark-mode

@@ -15,8 +15,9 @@ vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
 
-vi.mock("../../../clickhouse/client", () => ({
-  getClickHouseClient: () => null,
+vi.mock("../../../clickhouse/clickhouseClient", () => ({
+  isClickHouseEnabled: () => false,
+  getClickHouseClientForProject: () => Promise.resolve(null),
 }));
 
 const PAID_TIERED_PLAN: PlanInfo = {
@@ -66,8 +67,8 @@ describe("UsageService.getResolvedUsageUnit", () => {
       eventUsageService: mockEventUsageService,
       planResolver: mockPlanResolver,
       organizationRepository: mockOrgRepo,
-      cache: new TtlCache<number>(30_000),
-      decisionCache: new TtlCache<unknown>(30_000),
+      cache: new TtlCache<number>(30_000, "test:"),
+      decisionCache: new TtlCache<unknown>(30_000, "test:"),
     });
   });
 

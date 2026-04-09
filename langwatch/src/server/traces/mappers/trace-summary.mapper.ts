@@ -5,6 +5,7 @@ import {
 } from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
 import type {
   ErrorCapture,
+  Event,
   Span,
   Trace,
   TraceInput,
@@ -117,10 +118,10 @@ export function mapAttributesToMetadata(
   ]);
 
   for (const [key, value] of Object.entries(attributes)) {
-    if (!knownKeys.has(key)) {
-      // Store as custom metadata
-      metadata[key] = value;
-    }
+    if (knownKeys.has(key)) continue;
+    // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
+    const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
+    if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
   }
 
   return metadata;
@@ -386,6 +387,73 @@ function createError(
 }
 
 /**
+ * Extracts Event objects from spans that have event.type in their attributes.
+ * Events are stored in ClickHouse as spans with event.* span attributes.
+ * After unflattening, these appear as params.event.type, params.event.metrics.*, etc.
+ */
+export function extractEventsFromSpans({
+  spans,
+  projectId,
+  traceId,
+}: {
+  spans: Span[];
+  projectId: string;
+  traceId: string;
+}): Event[] {
+  const events: Event[] = [];
+
+  for (const span of spans) {
+    const eventObj = span.params?.event;
+    if (typeof eventObj !== "object" || eventObj === null) continue;
+
+    const eventRecord = eventObj as Record<string, unknown>;
+    const eventType = eventRecord.type;
+    if (typeof eventType !== "string" || !eventType) continue;
+
+    const metrics: Record<string, number> = {};
+    const rawMetrics = eventRecord.metrics;
+    if (typeof rawMetrics === "object" && rawMetrics !== null) {
+      for (const [key, value] of Object.entries(
+        rawMetrics as Record<string, unknown>,
+      )) {
+        const num = Number(value);
+        if (Number.isFinite(num)) {
+          metrics[key] = num;
+        }
+      }
+    }
+
+    const eventDetails: Record<string, string> = {};
+    const rawDetails = eventRecord.details;
+    if (typeof rawDetails === "object" && rawDetails !== null) {
+      for (const [key, value] of Object.entries(
+        rawDetails as Record<string, unknown>,
+      )) {
+        if (typeof value === "string") {
+          eventDetails[key] = value;
+        }
+      }
+    }
+
+    events.push({
+      event_id: span.span_id,
+      event_type: eventType,
+      project_id: projectId,
+      metrics,
+      event_details: eventDetails,
+      trace_id: traceId,
+      timestamps: {
+        started_at: span.timestamps.started_at,
+        inserted_at: span.timestamps.started_at,
+        updated_at: span.timestamps.finished_at,
+      },
+    });
+  }
+
+  return events;
+}
+
+/**
  * Maps a TraceSummaryData (from ClickHouse trace_summaries) and its associated spans
  * to the legacy Trace type used by the Elasticsearch-based system.
  */
@@ -400,12 +468,18 @@ export function mapTraceSummaryToTrace(
     summary.subTopicId,
   );
 
+  const events = extractEventsFromSpans({
+    spans,
+    projectId,
+    traceId: summary.traceId,
+  });
+
   const trace: Trace = {
     trace_id: summary.traceId,
     project_id: projectId,
     metadata,
     timestamps: {
-      started_at: summary.createdAt,
+      started_at: summary.occurredAt,
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },
@@ -420,6 +494,7 @@ export function mapTraceSummaryToTrace(
       tokens_estimated: summary.tokensEstimated,
     },
     error: createError(summary.containsErrorStatus, summary.errorMessage),
+    events: events.length > 0 ? events : undefined,
     spans,
   };
 

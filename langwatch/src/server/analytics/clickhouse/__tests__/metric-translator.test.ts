@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildMetricAlias,
   isPercentileAggregation,
@@ -85,6 +85,24 @@ describe("metric-translator", () => {
           "Attributes['gen_ai.conversation.id']"
         );
       });
+
+      describe("metadata.span_type", () => {
+        // @regression: metadata.span_type with cardinality aggregation translates to
+        // uniq(ts.TraceId) which only uses trace_summaries. The stored_spans JOIN was
+        // incorrectly required, causing fan-out that inflated trace-level SUM metrics
+        // (TotalCost, TotalTokens) when combined in the same query.
+        it("does not require stored_spans JOIN for cardinality aggregation", () => {
+          const result = translateMetric("metadata.span_type", "cardinality", 0);
+          expect(result.selectExpression).toContain("uniq(");
+          expect(result.selectExpression).toContain("ts.TraceId");
+          expect(result.requiredJoins).not.toContain("stored_spans");
+        });
+
+        it("requires stored_spans JOIN for non-cardinality aggregations", () => {
+          const result = translateMetric("metadata.span_type", "terms", 0);
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
     });
 
     describe("performance metrics", () => {
@@ -107,18 +125,30 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("TimeToFirstTokenMs");
       });
 
-      it("translates performance.tokens_per_second using span-level calculation", () => {
+      it("translates performance.tokens_per_second using pre-aggregated trace-level column", () => {
         const result = translateMetric(
           "performance.tokens_per_second",
           "avg",
           0
         );
-        // Calculates TPS at span level to match ES behavior
-        // Uses canonical OTel attribute: gen_ai.usage.output_tokens
-        expect(result.selectExpression).toContain("avgIf(");
-        expect(result.selectExpression).toContain("gen_ai.usage.output_tokens");
-        expect(result.selectExpression).toContain("DurationMs");
-        expect(result.requiredJoins).toContain("stored_spans");
+        // Uses pre-aggregated TokensPerSecond from trace_summaries to avoid
+        // reading SpanAttributes (Map column with large LLM text), which causes OOM.
+        expect(result.selectExpression).toContain("TokensPerSecond");
+        expect(result.selectExpression).not.toContain("stored_spans");
+        expect(result.selectExpression).not.toContain("SpanAttributes");
+        expect(result.selectExpression).not.toContain("gen_ai.usage.output_tokens");
+        expect(result.requiredJoins).not.toContain("stored_spans");
+      });
+
+      it("translates performance.tokens_per_second with percentile aggregation", () => {
+        const result = translateMetric(
+          "performance.tokens_per_second",
+          "p95",
+          0
+        );
+        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        expect(result.selectExpression).toContain("TokensPerSecond");
+        expect(result.requiredJoins).not.toContain("stored_spans");
       });
 
       it("translates performance.total_tokens", () => {
@@ -208,17 +238,112 @@ describe("metric-translator", () => {
     });
 
     describe("sentiment metrics", () => {
-      it("translates sentiment.input_sentiment", () => {
-        const result = translateMetric("sentiment.input_sentiment", "avg", 0);
-        expect(result.selectExpression).toContain(
-          "langwatch.input.satisfaction_score"
-        );
+      describe("when aggregation is cardinality", () => {
+        it("counts traces with thumbs_up_down events using countIf", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "cardinality",
+            0
+          );
+          expect(result.selectExpression).toContain("countIf");
+          expect(result.selectExpression).toMatch(
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+          );
+          const eventTypeParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentEventType_")
+          );
+          expect(eventTypeParam).toBeDefined();
+          expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
       });
 
-      it("translates sentiment.thumbs_up_down", () => {
-        const result = translateMetric("sentiment.thumbs_up_down", "sum", 0);
-        expect(result.selectExpression).toContain("thumbs_up_down");
-        expect(result.requiredJoins).toContain("stored_spans");
+      describe("when aggregation is sum", () => {
+        let result: ReturnType<typeof translateMetric>;
+
+        beforeEach(() => {
+          result = translateMetric("sentiment.thumbs_up_down", "sum", 0);
+        });
+
+        it("extracts vote values and applies sumArray", () => {
+          expect(result.selectExpression).toContain("sumArray");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+
+        it("filters to thumbs_up_down events using parameterized query", () => {
+          expect(result.selectExpression).toMatch(
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+          );
+          const eventTypeParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentEventType_")
+          );
+          expect(eventTypeParam).toBeDefined();
+          expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
+        });
+
+        it("extracts event.metrics.vote using parameterized query", () => {
+          const voteKeyParam = Object.keys(result.params).find((k) =>
+            k.startsWith("m_sentimentVoteKey_")
+          );
+          expect(voteKeyParam).toBeDefined();
+          expect(result.params[voteKeyParam!]).toBe("event.metrics.vote");
+        });
+
+        it("excludes zero values from the extraction", () => {
+          expect(result.selectExpression).toContain("x != 0");
+        });
+      });
+
+      describe("when aggregation is avg", () => {
+        it("extracts vote values and applies avgArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "avg",
+            0
+          );
+          expect(result.selectExpression).toContain("avgArray");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is min", () => {
+        it("extracts vote values and applies minArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "min",
+            0
+          );
+          expect(result.selectExpression).toContain("minArray");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is max", () => {
+        it("extracts vote values and applies maxArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "max",
+            0
+          );
+          expect(result.selectExpression).toContain("maxArray");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
+      });
+
+      describe("when aggregation is a percentile", () => {
+        it("extracts vote values and applies quantileExactArray", () => {
+          const result = translateMetric(
+            "sentiment.thumbs_up_down",
+            "p95",
+            0
+          );
+          expect(result.selectExpression).toContain("quantileExactArray(0.95)");
+          expect(result.selectExpression).toContain("x != 0");
+          expect(result.requiredJoins).toContain("stored_spans");
+        });
       });
     });
 

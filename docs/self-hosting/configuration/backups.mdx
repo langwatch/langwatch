@@ -1,0 +1,187 @@
+---
+title: Backups
+description: "Backup and restore strategies for LangWatch data stores"
+---
+
+LangWatch stores data across three systems. Each requires its own backup strategy:
+
+| Data Store | What It Stores | Backup Priority |
+|------------|---------------|-----------------|
+| **PostgreSQL** | Users, teams, projects, configurations, prompt versions | Critical |
+| **ClickHouse** | Traces, spans, evaluations, experiments, analytics | High |
+| **S3** | Datasets, ClickHouse cold data | Medium |
+
+## PostgreSQL Backups
+
+PostgreSQL holds your control plane data — losing it means losing user accounts, project configurations, and monitor definitions.
+
+### Chart-Managed PostgreSQL
+
+If you're using the chart-managed PostgreSQL (development/small deployments), use `pg_dump`:
+
+```bash
+# Create a backup
+kubectl exec -n langwatch deploy/langwatch-postgresql -- \
+  pg_dump -U postgres langwatch > backup-$(date +%Y%m%d).sql
+
+# Restore from backup
+kubectl exec -i -n langwatch deploy/langwatch-postgresql -- \
+  psql -U postgres langwatch < backup-20260407.sql
+```
+
+### External PostgreSQL (RDS, Cloud SQL, etc.)
+
+For production, use your cloud provider's built-in backup features:
+
+- **AWS RDS**: Enable automated snapshots (recommended: 30-day retention) and point-in-time recovery
+- **GCP Cloud SQL**: Enable automated backups with point-in-time recovery
+- **Azure Database**: Enable geo-redundant backups
+
+<Tip>
+Always test your restore procedure before you need it. Schedule a quarterly restore drill to validate your backups.
+</Tip>
+
+## ClickHouse Backups
+
+ClickHouse holds all your trace and evaluation data. The `clickhouse-serverless` subchart supports native ClickHouse `BACKUP`/`RESTORE` to S3-compatible storage.
+
+### Enable Backups
+
+Backups require an S3-compatible bucket. Configure in your Helm values:
+
+```yaml
+clickhouse:
+  # S3 bucket for backups (shared with cold storage if both enabled)
+  objectStorage:
+    bucket: "my-langwatch-backups"
+    region: "us-east-1"
+    useEnvironmentCredentials: true  # IRSA / workload identity
+
+  backup:
+    enabled: true
+    database: "langwatch"
+    user: "default"
+    full:
+      schedule: "0 */12 * * *"     # Full backup every 12 hours
+    incremental:
+      schedule: "0 * * * *"        # Incremental every hour
+```
+
+Or use the `cold-storage-s3.yaml` overlay which enables both cold storage and backups:
+
+```bash
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/cold-storage-s3.yaml
+```
+
+### S3 Authentication
+
+**IRSA / Workload Identity (recommended):**
+
+```yaml
+clickhouse:
+  objectStorage:
+    useEnvironmentCredentials: true
+  serviceAccount:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/clickhouse-s3-role
+```
+
+**Static credentials:**
+
+```yaml
+clickhouse:
+  objectStorage:
+    useEnvironmentCredentials: false
+    credentials:
+      secretKeyRef:
+        name: clickhouse-s3-creds    # K8s secret name
+        accessKeyKey: "accessKey"
+        secretKeyKey: "secretKey"
+```
+
+### Backup Schedule
+
+| Backup Type | Default Schedule | Description |
+|-------------|-----------------|-------------|
+| Full | `0 */12 * * *` (every 12h) | Complete database backup |
+| Incremental | `0 * * * *` (every 1h) | Only changes since last full backup |
+
+Both are implemented as Kubernetes CronJobs that run `clickhouse-client` commands inside the ClickHouse pod.
+
+### Restore from Backup
+
+To restore, you need to identify the backup name and run the restore command:
+
+```bash
+# List available backups
+kubectl exec -n langwatch langwatch-clickhouse-0 -- \
+  clickhouse-client --query "SELECT * FROM system.backups ORDER BY start_time DESC"
+
+# Restore a specific backup
+kubectl exec -n langwatch langwatch-clickhouse-0 -- \
+  clickhouse-client --query "RESTORE DATABASE langwatch FROM S3('https://s3.us-east-1.amazonaws.com/my-langwatch-backups/backup-name', 'access_key', 'secret_key')"
+```
+
+<Warning>
+Restoring a backup will overwrite existing data in the target database. Always verify you're restoring to the correct environment.
+</Warning>
+
+## ClickHouse Cold Storage
+
+Cold storage is separate from backups — it's a tiered storage strategy that automatically moves older data from local SSD to S3 for cost savings.
+
+### How It Works
+
+1. New data is written to **hot storage** (local SSD on the ClickHouse pod)
+2. After the TTL period, data is moved to **cold storage** (S3)
+3. Queries transparently read from both hot and cold storage
+4. Cold data is cached locally for repeated reads
+
+### Enable Cold Storage
+
+```yaml
+clickhouse:
+  objectStorage:
+    bucket: "my-langwatch-data"
+    region: "us-east-1"
+    useEnvironmentCredentials: true
+
+  cold:
+    enabled: true
+    defaultTtlDays: 49  # Data older than 49 days moves to S3
+```
+
+<Note>
+The TTL must be divisible by 7 (ClickHouse partitions data weekly). The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
+</Note>
+
+### Cost Savings
+
+Cold storage can reduce storage costs significantly:
+
+| Storage Type | Approximate Cost | Speed |
+|-------------|-----------------|-------|
+| gp3 SSD (hot) | ~$0.08/GB/month | Fast |
+| S3 Standard (cold) | ~$0.023/GB/month | Slower (cached) |
+| S3 Infrequent Access | ~$0.0125/GB/month | Slower |
+
+For a deployment with 150 GB/month of trace data, cold storage can save ~$500/year.
+
+## S3 Dataset Backups
+
+If you're using S3 for dataset storage (`app.datasetObjectStorage.enabled: true`), protect this data with:
+
+- **S3 Versioning**: Enable versioning on the bucket to recover from accidental deletes
+- **Cross-region replication**: For disaster recovery, replicate to another region
+- **Lifecycle policies**: Move old versions to Glacier after 30 days
+
+## Disaster Recovery Checklist
+
+- [ ] PostgreSQL automated backups enabled (30-day retention)
+- [ ] ClickHouse backup CronJobs running (check `kubectl get cronjobs`)
+- [ ] S3 bucket versioning enabled
+- [ ] Backup S3 bucket is in a different region or account from primary
+- [ ] Restore procedure documented and tested
+- [ ] Quarterly restore drills scheduled

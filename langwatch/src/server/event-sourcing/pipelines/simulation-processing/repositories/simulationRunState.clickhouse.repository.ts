@@ -1,7 +1,7 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
-  ErrorCategory,
+  classifyClickHouseError,
   SecurityError,
   StoreError,
   ValidationError,
@@ -36,6 +36,7 @@ interface ClickHouseSimulationRunRecord {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   "Messages.Id": string[];
   "Messages.Role": string[];
   "Messages.Content": string[];
@@ -48,24 +49,31 @@ interface ClickHouseSimulationRunRecord {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: string | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
+  TraceMetricsJson: string;
   StartedAt: number | null;
+  QueuedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
   ArchivedAt: number | null;
+  CancellationRequestedAt: number | null;
   LastSnapshotOccurredAt: number;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "StartedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt"
+  "StartedAt" | "QueuedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "CancellationRequestedAt" | "LastSnapshotOccurredAt" | "LastEventOccurredAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements SimulationRunStateRepository<ProjectionType>
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseSimulationRunRecord,
@@ -79,6 +87,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Status: record.Status,
       Name: record.Name,
       Description: record.Description,
+      Metadata: record.Metadata,
       Messages: ids.map((Id, i) => ({
         Id,
         Role: record["Messages.Role"]?.[i] ?? "",
@@ -93,12 +102,19 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: record.UnmetCriteria ?? [],
       Error: record.Error,
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
+      TotalCost: record.TotalCost ?? null,
+      RoleCosts: record.RoleCosts ?? {},
+      RoleLatencies: record.RoleLatencies ?? {},
+      TraceMetrics: record.TraceMetricsJson ? JSON.parse(record.TraceMetricsJson) : {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
+      QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
       ArchivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
+      CancellationRequestedAt: record.CancellationRequestedAt === null || record.CancellationRequestedAt === undefined ? null : Number(record.CancellationRequestedAt),
       LastSnapshotOccurredAt: Number(record.LastSnapshotOccurredAt ?? 0),
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -120,6 +136,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Status: data.Status,
       Name: data.Name,
       Description: data.Description,
+      Metadata: data.Metadata,
       "Messages.Id": data.Messages.map((m) => m.Id),
       "Messages.Role": data.Messages.map((m) => m.Role),
       "Messages.Content": data.Messages.map((m) => m.Content),
@@ -132,12 +149,19 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: data.UnmetCriteria,
       Error: data.Error,
       DurationMs: data.DurationMs?.toString() ?? null,
+      TotalCost: data.TotalCost,
+      RoleCosts: data.RoleCosts,
+      RoleLatencies: data.RoleLatencies,
+      TraceMetricsJson: Object.keys(data.TraceMetrics).length > 0 ? JSON.stringify(data.TraceMetrics) : "",
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
+      QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
+      CancellationRequestedAt: data.CancellationRequestedAt != null ? new Date(data.CancellationRequestedAt) : null,
       LastSnapshotOccurredAt: data.LastSnapshotOccurredAt ? new Date(data.LastSnapshotOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
     };
   }
 
@@ -153,22 +177,27 @@ export class SimulationRunStateRepositoryClickHouse<
     const scenarioRunId = String(aggregateId);
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(context.tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-            Version, Status, Name, Description,
+            Version, Status, Name, Description, Metadata,
             \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
             \`Messages.TraceId\`, \`Messages.Rest\`,
             TraceIds,
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
+            TotalCost, RoleCosts, RoleLatencies, TraceMetricsJson,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
-            toUnixTimestamp64Milli(LastSnapshotOccurredAt) AS LastSnapshotOccurredAt
+            if(CancellationRequestedAt IS NOT NULL, toUnixTimestamp64Milli(CancellationRequestedAt), NULL) AS CancellationRequestedAt,
+            toUnixTimestamp64Milli(LastSnapshotOccurredAt) AS LastSnapshotOccurredAt,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
           ORDER BY UpdatedAt DESC
@@ -200,7 +229,7 @@ export class SimulationRunStateRepositoryClickHouse<
         "getProjection",
         "SimulationRunStateRepositoryClickHouse",
         `Failed to get projection for scenario run ${scenarioRunId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { scenarioRunId },
         error,
       );
@@ -243,15 +272,17 @@ export class SimulationRunStateRepositoryClickHouse<
         scenarioRunId,
       );
 
-      await this.clickHouseClient.insert({
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: {
+          async_insert: 1,
+          wait_for_async_insert: 0,
+        },
       });
 
-      logger.debug({ tenantId: context.tenantId, scenarioRunId, projectionId: projection.id },
-        "Stored simulation run state projection to ClickHouse");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -265,8 +296,68 @@ export class SimulationRunStateRepositoryClickHouse<
         "storeProjection",
         "SimulationRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for scenario run ${projection.aggregateId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { projectionId: projection.id, scenarioRunId: String(projection.aggregateId) },
+        error,
+      );
+    }
+  }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (projections.length === 0) return;
+
+    EventUtils.validateTenantId(
+      context,
+      "SimulationRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
+
+    for (const projection of projections) {
+      if (projection.tenantId !== context.tenantId) {
+        throw new SecurityError(
+          "storeProjectionBatch",
+          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          projection.tenantId,
+          { contextTenantId: context.tenantId },
+        );
+      }
+    }
+
+    try {
+      const records = projections.map((projection) => {
+        const scenarioRunId = String(projection.aggregateId);
+        return this.mapProjectionDataToClickHouseRecord(
+          projection.data as SimulationRunStateData,
+          String(context.tenantId),
+          projection.id,
+          projection.version,
+          scenarioRunId,
+        );
+      });
+
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({
+        tenantId: context.tenantId,
+        count: projections.length,
+        error: errorMessage,
+      }, "Failed to batch store simulation projections in ClickHouse");
+      throw new StoreError(
+        "storeProjectionBatch",
+        "SimulationRunStateRepositoryClickHouse",
+        `Failed to batch store ${projections.length} projections: ${errorMessage}`,
+        classifyClickHouseError(error),
+        { count: projections.length },
         error,
       );
     }

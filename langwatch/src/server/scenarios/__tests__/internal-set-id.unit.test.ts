@@ -15,6 +15,7 @@ import {
   isInternalSetId,
   isOnPlatformSet,
   getOnPlatformSetId,
+  expandSetIdFilter,
   INTERNAL_SET_PREFIX,
   ON_PLATFORM_SET_SUFFIX,
 } from "../internal-set-id";
@@ -88,13 +89,21 @@ describe("internal-set-id utilities", () => {
       });
     });
 
+    describe("given a user-created set ending in on-platform suffix", () => {
+      describe("when isOnPlatformSet is called", () => {
+        it("returns false because it lacks the internal prefix", () => {
+          expect(isOnPlatformSet("user-set__on-platform-scenarios")).toBe(false);
+        });
+      });
+    });
+
     describe("given edge cases", () => {
       it("returns false for empty string", () => {
         expect(isOnPlatformSet("")).toBe(false);
       });
 
-      it("returns true for suffix only", () => {
-        expect(isOnPlatformSet(ON_PLATFORM_SET_SUFFIX)).toBe(true);
+      it("returns false for suffix only (missing internal prefix)", () => {
+        expect(isOnPlatformSet(ON_PLATFORM_SET_SUFFIX)).toBe(false);
       });
     });
   });
@@ -131,6 +140,32 @@ describe("internal-set-id utilities", () => {
         const projectId = "proj_special_123";
         const result = getOnPlatformSetId(projectId);
         expect(result).toContain(projectId);
+      });
+    });
+  });
+
+  describe("expandSetIdFilter()", () => {
+    describe("when scenarioSetId is 'default'", () => {
+      it("returns both 'default' and empty string for backwards compatibility", () => {
+        expect(expandSetIdFilter("default")).toEqual(["default", ""]);
+      });
+    });
+
+    describe("when scenarioSetId is a non-default value", () => {
+      it("returns only that value", () => {
+        expect(expandSetIdFilter("my-set")).toEqual(["my-set"]);
+      });
+
+      it("returns only that value for internal sets", () => {
+        expect(expandSetIdFilter("__internal__proj_1__on-platform-scenarios")).toEqual([
+          "__internal__proj_1__on-platform-scenarios",
+        ]);
+      });
+    });
+
+    describe("when scenarioSetId is empty string", () => {
+      it("returns both 'default' and empty string for backwards compatibility", () => {
+        expect(expandSetIdFilter("")).toEqual(["default", ""]);
       });
     });
   });

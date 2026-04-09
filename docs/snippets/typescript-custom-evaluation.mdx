@@ -1,0 +1,19 @@
+```typescript
+import { type LangWatchTrace } from "langwatch";
+
+async function llmStep({ message, trace }: { message: string, trace: LangWatchTrace }): Promise<string> {
+    const span = trace.startLLMSpan({ name: "llmStep" });
+
+    // ... your existing code
+
+    span.addEvaluation({
+        name: "custom evaluation",
+        passed: true,
+        score: 0.5,
+        label: "category_detected",
+        details: "explanation of the evaluation results",
+    });
+}
+```
+
+The evaluation `name` is required and must be a string. The other fields are optional, but at least one of `passed`, `score` or `label` must be provided.

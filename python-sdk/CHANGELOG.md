@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.17.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.16.0...python-sdk@v0.17.0) (2026-03-18)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2346](https://github.com/langwatch/langwatch/issues/2346)) ([348874e](https://github.com/langwatch/langwatch/commit/348874e48ce79537596d28887c6ed9c719200b29))
+
+
+### Bug Fixes
+
+* **python-sdk:** make langchain-core an optional dependency ([#2464](https://github.com/langwatch/langwatch/issues/2464)) ([cde8406](https://github.com/langwatch/langwatch/commit/cde8406990f5e19af98048a43a0d7d9782553a48))
+* skip litellm_bot test on RateLimitError from Cerebras ([#2355](https://github.com/langwatch/langwatch/issues/2355)) ([76bf87f](https://github.com/langwatch/langwatch/commit/76bf87f1db51b0fab681c593cd5515c66d0908f1))
+
+## [0.16.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.15.0...python-sdk@v0.16.0) (2026-03-13)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2325](https://github.com/langwatch/langwatch/issues/2325)) ([b11b499](https://github.com/langwatch/langwatch/commit/b11b49990bdb1ccf1bf302b9a54b442d3b6f3be3))
+
+
+### Bug Fixes
+
+* custom SDK evaluations - gray badges, stuck Processing, precondition crash ([#2234](https://github.com/langwatch/langwatch/issues/2234)) ([77cba68](https://github.com/langwatch/langwatch/commit/77cba6844de4e58a14bac4348254ef93213d4079))
+* **mcp:** align prompt tool schemas with backend API ([#2326](https://github.com/langwatch/langwatch/issues/2326)) ([65279f3](https://github.com/langwatch/langwatch/commit/65279f38687bae5c7dc7a13db33dcb2f7d135397))
+* **security:** bump critical Dependabot vulnerabilities (unstructured + nltk) ([#2275](https://github.com/langwatch/langwatch/issues/2275)) ([cc1f004](https://github.com/langwatch/langwatch/commit/cc1f004d2ec710c9eaaa762e336516d447338090))
+* **security:** bump moderate/low severity vulnerabilities in python-sdk ([#2299](https://github.com/langwatch/langwatch/issues/2299)) ([da288b2](https://github.com/langwatch/langwatch/commit/da288b2559e01e0af6046c19eec39eb3d4678d77))
+
+## [0.15.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.14.0...python-sdk@v0.15.0) (2026-03-11)
+
+
+### Features
+
+* **prompts:** open existing prompt from trace when prompt handle is present ([#2223](https://github.com/langwatch/langwatch/issues/2223)) ([428f8ff](https://github.com/langwatch/langwatch/commit/428f8ff22b8cb5a4be5942d5b26bf2d62f44d7be))
+
+## [0.14.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.13.0...python-sdk@v0.14.0) (2026-03-08)
+
+
+### Features
+
+* **examples:** add metadata and labels examples for TypeScript and Python SDKs ([#1585](https://github.com/langwatch/langwatch/issues/1585)) ([7d09ab8](https://github.com/langwatch/langwatch/commit/7d09ab805146542921e8b1f1258d5e6e59462bfe))
+* **traces:** add langwatch.origin attribute for trace origin classification ([#2066](https://github.com/langwatch/langwatch/issues/2066)) ([1d94865](https://github.com/langwatch/langwatch/commit/1d9486548e994d8d2f933a7f530196df8d255e43))
+
+
+### Miscellaneous
+
+* **deps:** bump Python (uv) dependencies across langwatch_nlp, python-sdk, langevals ([#1940](https://github.com/langwatch/langwatch/issues/1940)) ([d103f89](https://github.com/langwatch/langwatch/commit/d103f89fc1936dc8dae73f2b90885a28b97e2775))
+* **deps:** bump Python uv lockfile packages (v2) ([#1954](https://github.com/langwatch/langwatch/issues/1954)) ([23b3a5c](https://github.com/langwatch/langwatch/commit/23b3a5ce9f16d6a722690cbdd86cb095f01dba08))
+
 ## [0.13.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.12.0...python-sdk@v0.13.0) (2026-02-15)
 
 

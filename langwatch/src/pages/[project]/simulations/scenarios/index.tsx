@@ -13,10 +13,12 @@ import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal"
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "~/components/scenarios/ScenarioWelcomeScreen";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useLabelFilter } from "~/hooks/scenarios/useLabelFilter";
+import { useNewScenarioFlow } from "~/hooks/scenarios/useNewScenarioFlow";
 import { useScenarioSelection } from "~/hooks/scenarios/useScenarioSelection";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -25,7 +27,6 @@ import { api } from "~/utils/api";
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const {
     rowSelection,
     onRowSelectionChange,
@@ -100,12 +101,18 @@ function ScenarioLibraryPage() {
     handleLabelToggle,
   } = useLabelFilter(scenarios);
 
+  const {
+    showInlineWelcome,
+    showWelcomeModal,
+    showCreateModal,
+    handleNewScenario,
+    handleWelcomeProceed,
+    handleWelcomeModalOpenChange,
+    handleCloseCreateModal,
+  } = useNewScenarioFlow({ scenarioCount: scenarios?.length ?? 0, isLoading });
+
   const handleRowClick = (scenarioId: string) => {
     openDrawer("scenarioEditor", { urlParams: { scenarioId } });
-  };
-
-  const handleNewScenario = () => {
-    setIsCreateModalOpen(true);
   };
 
   const handleArchiveSingle = useCallback((scenario: Scenario) => {
@@ -185,7 +192,11 @@ function ScenarioLibraryPage() {
           </VStack>
         )}
 
-        {!isLoading && !error && scenarios?.length === 0 && (
+        {!isLoading && !error && scenarios?.length === 0 && showInlineWelcome && (
+          <ScenarioWelcomeScreen onProceed={handleWelcomeProceed} />
+        )}
+
+        {!isLoading && !error && scenarios?.length === 0 && !showInlineWelcome && (
           <ScenarioEmptyState onCreateClick={handleNewScenario} />
         )}
 
@@ -209,9 +220,14 @@ function ScenarioLibraryPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
+      <ScenarioWelcomeModal
+        open={showWelcomeModal}
+        onOpenChange={handleWelcomeModalOpenChange}
+        onProceed={handleWelcomeProceed}
+      />
       <ScenarioCreateModal
-        open={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        open={showCreateModal}
+        onClose={handleCloseCreateModal}
       />
       <ScenarioArchiveDialog
         open={archiveTarget !== null}

@@ -16,26 +16,28 @@ if (!fs.existsSync(AUTH_DIR)) {
  * Creates a test user and authenticates before all tests run.
  * Session state is saved to .auth/user.json and reused by all test projects.
  *
- * Test user credentials:
- * - Email: e2e-test@langwatch.ai
- * - Password: TestPassword123!
+ * Test user credentials (shared with /browser-test and verify-browser-test.js):
+ * - Email: browser-test@langwatch.ai
+ * - Password: BrowserTest123!
  */
 
 const TEST_USER = {
-  name: "E2E Test User",
-  email: "e2e-test@langwatch.ai",
-  password: "TestPassword123!",
+  name: "Browser Test Agent",
+  email: "browser-test@langwatch.ai",
+  password: "BrowserTest123!",
 };
 
 setup("authenticate", async ({ page, request }) => {
   // Step 1: Try to register the test user (may already exist)
   try {
-    const registerResponse = await request.post("/api/trpc/user.register", {
+    const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
       data: {
-        json: {
-          name: TEST_USER.name,
-          email: TEST_USER.email,
-          password: TEST_USER.password,
+        "0": {
+          json: {
+            name: TEST_USER.name,
+            email: TEST_USER.email,
+            password: TEST_USER.password,
+          },
         },
       },
     });
@@ -56,8 +58,8 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Registration skipped (user may already exist):", error);
   }
 
-  // Step 2: Sign in through the UI
-  await page.goto("/auth/signin");
+  // Step 2: Sign in through the UI (callbackUrl ensures redirect to app root after sign-in)
+  await page.goto("/auth/signin?callbackUrl=%2F");
 
   // Wait for the sign in form to be ready
   await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
@@ -97,8 +99,8 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Completing onboarding flow...");
 
     // Fill in organization/company name
-    const companyInput = page.getByPlaceholder("Company Name");
-    await companyInput.fill("E2E Test Organization");
+    const companyInput = page.getByPlaceholder("Company or your name");
+    await companyInput.fill("Browser Test Org");
     console.log("  - Filled company name");
 
     // Accept terms of service (click the label since Chakra checkbox control intercepts pointer events)
@@ -185,7 +187,7 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Creating test project...");
     const projectNameInput = page.getByRole("textbox", { name: /name/i });
     if (await projectNameInput.isVisible()) {
-      await projectNameInput.fill("E2E Test Project");
+      await projectNameInput.fill("Browser Test Project");
       await page.getByRole("button", { name: /create/i }).click();
       await page.waitForTimeout(3000);
     }

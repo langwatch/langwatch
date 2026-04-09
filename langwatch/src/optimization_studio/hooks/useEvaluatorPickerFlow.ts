@@ -51,7 +51,6 @@ function computeFieldsFromEvaluatorType(evaluatorType: string): {
   if (def.result.score) outputs.push({ identifier: "score", type: "float" });
   if (def.result.passed) outputs.push({ identifier: "passed", type: "bool" });
   if (def.result.label) outputs.push({ identifier: "label", type: "str" });
-  outputs.push({ identifier: "details", type: "str" });
 
   return { inputs, outputs };
 }
@@ -122,15 +121,18 @@ export function useEvaluatorPickerFlow() {
             if (pendingEvaluatorRef.current) {
               const { inputs, outputs } = saved.evaluatorType
                 ? computeFieldsFromEvaluatorType(saved.evaluatorType)
-                : { inputs: undefined, outputs: undefined };
+                : {
+                    inputs: [] as Field[],
+                    outputs: [{ identifier: "passed", type: "bool" as const }] as Field[],
+                  };
 
               setNode({
                 id: pendingEvaluatorRef.current,
                 data: {
                   name: saved.name,
                   evaluator: `evaluators/${saved.id}`,
-                  ...(inputs ? { inputs } : {}),
-                  ...(outputs ? { outputs } : {}),
+                  inputs,
+                  outputs,
                 } as Partial<Component>,
               });
               const nodeId = pendingEvaluatorRef.current;

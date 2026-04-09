@@ -19,8 +19,9 @@ import {
 } from "../../../components/settings/TeamUserRoleField";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../../utils/api";
+import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 
 // Type guards for safe access to custom role data
 function isValidCustomRole(role: unknown): role is {
@@ -210,6 +211,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
             void apiContext.organization.getAll.refetch();
           },
           onError: (error) => {
+            if (isHandledByGlobalHandler(error)) return;
             if (
               error instanceof TRPCClientError &&
               error.data?.code === "UNAUTHORIZED"

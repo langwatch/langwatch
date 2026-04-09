@@ -229,7 +229,7 @@ function TeamSelectWithCreateButton({
               }
             </Select.ValueText>
           </Select.Trigger>
-          <Select.Content paddingY={2} zIndex="popover">
+          <Select.Content paddingY={2}>
             {teamOptions.map((option) => (
               <Select.Item key={option.value} item={option}>
                 {option.label}

@@ -25,6 +25,8 @@ COPY langwatch_nlp .
 RUN PYTHONPATH=. uv run --no-editable python langwatch_nlp/main.py
 
 ENV RUNNING_IN_DOCKER=true
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPYCACHEPREFIX=/tmp/pycache
 
 EXPOSE 5561
 

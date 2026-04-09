@@ -1,3 +1,4 @@
+import type { ProcessRole } from "../../app-layer/config";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
@@ -10,6 +11,7 @@ import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { CommandHandlerOptions } from "../services/commands/commandDispatcher";
 import type { EventSourcingService } from "../services/eventSourcingService";
 import type { JobRegistryEntry } from "../services/queues/queueManager";
+import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { EventStore } from "../stores/eventStore.types";
 
 /**
@@ -53,7 +55,8 @@ export interface EventSourcingPipelineDefinition<
     options?: CommandHandlerOptions<unknown>;
   }>;
   globalRegistry?: ProjectionRegistry<Event>;
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
+  replayMarkerChecker?: ReplayMarkerChecker;
 }
 
 export interface RegisteredPipeline<

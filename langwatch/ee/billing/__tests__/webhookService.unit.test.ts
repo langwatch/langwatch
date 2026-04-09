@@ -1,24 +1,47 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../notifications/notificationHandlers", () => ({
-  notifySubscriptionEvent: vi.fn().mockResolvedValue(undefined),
+const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+    },
+  }),
 }));
 
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
-import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { SubscriptionStatus } from "../planTypes";
-import { createWebhookService } from "../services/webhookService";
+import { EEWebhookService } from "../services/webhookService";
+import type { SubscriptionRepository, SubscriptionWithOrg } from "../../../src/server/app-layer/subscription/subscription.repository";
+import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 
-const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
-  typeof vi.fn
->;
+const createMockSubscriptionRepository = () => ({
+  findLastNonCancelled: vi.fn(),
+  createPending: vi.fn(),
+  updateStatus: vi.fn(),
+  updatePlan: vi.fn(),
+  findByStripeId: vi.fn(),
+  linkStripeId: vi.fn(),
+  activate: vi.fn(),
+  recordPaymentFailure: vi.fn(),
+  cancel: vi.fn(),
+  cancelTrialSubscriptions: vi.fn(),
+  migrateToSeatEvent: vi.fn(),
+  updateQuantities: vi.fn(),
+});
 
-const createMockDb = () => ({
-  subscription: {
-    findUnique: vi.fn(),
-    update: vi.fn(),
-    updateMany: vi.fn(),
-  },
+const createMockOrganizationRepository = () => ({
+  getOrganizationIdByTeamId: vi.fn(),
+  getProjectIds: vi.fn(),
+  getFeature: vi.fn(),
+  findWithAdmins: vi.fn(),
+  updateSentPlanLimitAlert: vi.fn(),
+  findProjectsWithName: vi.fn(),
+  clearTrialLicense: vi.fn(),
+  updateCurrency: vi.fn(),
+  getPricingModel: vi.fn(),
+  getStripeCustomerId: vi.fn(),
+  findNameById: vi.fn(),
 });
 
 const createMockItemCalculator = () => ({
@@ -46,24 +69,67 @@ const createMockItemCalculator = () => ({
     GROWTH_EVENTS_EUR_ANNUAL: "price_growth_events_eur_annual",
     GROWTH_EVENTS_USD_MONTHLY: "price_growth_events_usd_monthly",
     GROWTH_EVENTS_USD_ANNUAL: "price_growth_events_usd_annual",
+    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026: "price_growth_events_eur_monthly_until_mar_2026",
+    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_growth_events_eur_annual_until_mar_2026",
+    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_growth_events_usd_monthly_until_mar_2026",
+    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_growth_events_usd_annual_until_mar_2026",
   },
 });
 
+const makeSubscription = (overrides: Record<string, unknown> = {}) => ({
+  id: "sub_db_1",
+  organizationId: "org_123",
+  status: SubscriptionStatus.PENDING,
+  plan: "LAUNCH",
+  stripeSubscriptionId: "sub_stripe_1",
+  startDate: new Date(),
+  endDate: null,
+  lastPaymentFailedDate: null,
+  maxMembers: null,
+  maxMessagesPerMonth: null,
+  ...overrides,
+});
+
+const makeSubscriptionWithOrg = (overrides: Record<string, unknown> = {}): SubscriptionWithOrg => {
+  const { organization, ...subscriptionOverrides } = overrides;
+  return {
+    ...makeSubscription(subscriptionOverrides),
+    organization: { name: "Acme", license: null, ...(organization as Record<string, unknown>) },
+  } as unknown as SubscriptionWithOrg;
+};
+
+const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
+  subscriptions: {
+    retrieve: vi.fn().mockResolvedValue({ id: "sub_stripe_1", status: "active" }),
+    cancel: vi.fn().mockResolvedValue({}),
+  },
+  ...overrides,
+});
+
 describe("webhookService", () => {
-  let db: ReturnType<typeof createMockDb>;
+  let subRepo: ReturnType<typeof createMockSubscriptionRepository>;
+  let orgRepo: ReturnType<typeof createMockOrganizationRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
-  let service: ReturnType<typeof createWebhookService>;
+  let mockStripeInstance: ReturnType<typeof createMockStripe>;
+  let service: EEWebhookService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    db = createMockDb();
+    subRepo = createMockSubscriptionRepository();
+    orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
-    service = createWebhookService({
-      db: db as any,
-      stripe: {} as any,
+    mockStripeInstance = createMockStripe();
+    service = new EEWebhookService({
+      subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+      organizationRepository: orgRepo as unknown as OrganizationRepository,
+      stripe: mockStripeInstance as any,
       itemCalculator,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("handleCheckoutCompleted()", () => {
@@ -75,27 +141,19 @@ describe("webhookService", () => {
         });
 
         expect(result.earlyReturn).toBe(true);
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        expect(subRepo.linkStripeId).not.toHaveBeenCalled();
       });
     });
 
     describe("when client reference ID exists", () => {
-      it("links Stripe subscription and activates", async () => {
-        db.subscription.updateMany.mockResolvedValue({ count: 1 });
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.PENDING,
-        });
-        db.subscription.update.mockResolvedValue({
-          id: "sub_db_1",
-          organizationId: "org_123",
-          organization: { name: "Acme" },
-          plan: "LAUNCH",
-          startDate: new Date(),
-          maxMembers: null,
-          maxMessagesPerMonth: null,
-          status: SubscriptionStatus.ACTIVE,
-        });
+      it("strips subscription_setup_ prefix and links Stripe subscription", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -106,10 +164,400 @@ describe("webhookService", () => {
         const result = await promise;
 
         expect(result.earlyReturn).toBe(false);
-        expect(db.subscription.updateMany).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: { stripeSubscriptionId: "sub_stripe_1" },
+        expect(subRepo.linkStripeId).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          stripeSubscriptionId: "sub_stripe_1",
         });
+      });
+
+      it("activates subscription and cancels trial subscriptions", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.PENDING,
+        });
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
+      });
+
+      it("throws SubscriptionRecordNotFoundError when no subscription matches", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 0 });
+
+        await expect(
+          service.handleCheckoutCompleted({
+            subscriptionId: "sub_stripe_1",
+            clientReferenceId: "subscription_setup_sub_db_1",
+          }),
+        ).rejects.toThrow("No subscription record found");
+      });
+
+      it("continues when currency update fails", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+        orgRepo.updateCurrency.mockRejectedValue(new Error("DB error"));
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+          selectedCurrency: "EUR",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalled();
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
+      });
+
+      it("continues when invite approval fails", async () => {
+        const mockInviteApprover = {
+          approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
+        };
+        service = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: mockStripeInstance as any,
+          itemCalculator,
+          inviteApprover: mockInviteApprover,
+        });
+
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalled();
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
+      });
+
+      it("completes without invite approver", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        // No invite approver configured — should not throw
+        expect(subRepo.activate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("handleInvoicePaymentSucceeded()", () => {
+    describe("when no subscription found", () => {
+      it("skips without error", async () => {
+        subRepo.findByStripeId.mockResolvedValue(null);
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_missing",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when subscription is not previously active", () => {
+      it("activates and clears trial license", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: { name: "Acme", license: "trial-license-key" },
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.PENDING,
+        });
+        expect(orgRepo.clearTrialLicense).toHaveBeenCalledWith("org_123");
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "confirmed",
+            organizationId: "org_123",
+          }),
+        );
+      });
+    });
+
+    describe("when subscription is already active", () => {
+      it("does not set startDate and does not notify", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.ACTIVE,
+        });
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when subscription is a growth seat-event plan", () => {
+      it("migrates tiered subscriptions and cancels old Stripe subs", async () => {
+        const localStripe = createMockStripe();
+        service = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: localStripe as any,
+          itemCalculator,
+        });
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.migrateToSeatEvent.mockResolvedValue([
+          { stripeSubscriptionId: "sub_old_1" },
+          { stripeSubscriptionId: "sub_old_2" },
+        ]);
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.migrateToSeatEvent).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          excludeSubscriptionId: "sub_db_1",
+        });
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_1", { prorate: true });
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_2", { prorate: true });
+      });
+
+      it("logs but does not fail when Stripe cancellation fails", async () => {
+        const localStripe = createMockStripe();
+        localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
+        service = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: localStripe as any,
+          itemCalculator,
+        });
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.migrateToSeatEvent.mockResolvedValue([
+          { stripeSubscriptionId: "sub_old_1" },
+        ]);
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        // Should not throw
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe("when subscription is already CANCELLED in DB and Stripe subscription is canceled", () => {
+      it("does not reactivate a cancelled subscription", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
+          id: "sub_stripe_1",
+          status: "canceled",
+        });
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.CANCELLED,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when subscription is ACTIVE in DB but Stripe subscription is canceled", () => {
+      it("does not reactivate when Stripe status is canceled", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
+          id: "sub_stripe_1",
+          status: "canceled",
+        });
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Stripe subscription status check fails", () => {
+      it("proceeds with activation (fail-open)", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockRejectedValue(
+          new Error("Stripe API unreachable"),
+        );
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.PENDING,
+        });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "confirmed",
+            organizationId: "org_123",
+          }),
+        );
+      });
+
+      it("skips activation when DB status is CANCELLED", async () => {
+        mockStripeInstance.subscriptions.retrieve.mockRejectedValue(
+          new Error("Stripe API unreachable"),
+        );
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.CANCELLED,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Stripe subscription is active (normal renewal)", () => {
+      it("activates the subscription as usual", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.activate).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          previousStatus: SubscriptionStatus.PENDING,
+        });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "confirmed",
+            organizationId: "org_123",
+          }),
+        );
       });
     });
   });
@@ -117,7 +565,7 @@ describe("webhookService", () => {
   describe("handleInvoicePaymentFailed()", () => {
     describe("when no subscription found", () => {
       it("skips without error", async () => {
-        db.subscription.findUnique.mockResolvedValue(null);
+        subRepo.findByStripeId.mockResolvedValue(null);
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_missing",
@@ -126,17 +574,15 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        expect(subRepo.recordPaymentFailure).not.toHaveBeenCalled();
       });
     });
 
     describe("when subscription is ACTIVE", () => {
       it("keeps status as ACTIVE with failed payment date", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
-        db.subscription.update.mockResolvedValue({});
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_1",
@@ -145,23 +591,18 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(db.subscription.update).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: {
-            status: SubscriptionStatus.ACTIVE,
-            lastPaymentFailedDate: expect.any(Date),
-          },
+        expect(subRepo.recordPaymentFailure).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          currentStatus: SubscriptionStatus.ACTIVE,
         });
       });
     });
 
     describe("when subscription is PENDING", () => {
       it("sets status to FAILED", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.PENDING,
-        });
-        db.subscription.update.mockResolvedValue({});
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_1",
@@ -170,53 +611,163 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(db.subscription.update).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: {
-            status: SubscriptionStatus.FAILED,
-            lastPaymentFailedDate: expect.any(Date),
-          },
+        expect(subRepo.recordPaymentFailure).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          currentStatus: SubscriptionStatus.PENDING,
         });
       });
     });
   });
 
   describe("handleSubscriptionDeleted()", () => {
+    it("waits for Stripe eventual consistency before looking up the subscription", async () => {
+      subRepo.findByStripeId.mockResolvedValue(null);
+
+      const promise = service.handleSubscriptionDeleted({
+        stripeSubscriptionId: "sub_stripe_1",
+      });
+
+      // Repository should not have been called yet — still waiting
+      expect(subRepo.findByStripeId).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(2000);
+      await promise;
+
+      expect(subRepo.findByStripeId).toHaveBeenCalledWith("sub_stripe_1");
+    });
+
     describe("when no subscription found", () => {
       it("skips without error", async () => {
-        db.subscription.findUnique.mockResolvedValue(null);
+        subRepo.findByStripeId.mockResolvedValue(null);
 
-        await service.handleSubscriptionDeleted({
+        const promise = service.handleSubscriptionDeleted({
           stripeSubscriptionId: "sub_missing",
         });
 
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).not.toHaveBeenCalled();
       });
     });
 
     describe("when subscription exists", () => {
-      it("cancels and nullifies all override fields", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-        });
-        db.subscription.update.mockResolvedValue({});
+      it("cancels and nullifies overrides", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
 
-        await service.handleSubscriptionDeleted({
+        const promise = service.handleSubscriptionDeleted({
           stripeSubscriptionId: "sub_stripe_1",
         });
 
-        const expectedNulledFields = Object.fromEntries(
-          NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+      });
+    });
+
+    describe("when subscription is already cancelled", () => {
+      it("is idempotent — skips redundant update", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.CANCELLED }),
         );
 
-        expect(db.subscription.update).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: {
-            status: SubscriptionStatus.CANCELLED,
-            endDate: expect.any(Date),
-            ...expectedNulledFields,
-          },
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
         });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when subscription is active and gets cancelled", () => {
+      it("sends a cancelled Slack notification", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "cancelled",
+            organizationId: "org_123",
+            organizationName: "Acme",
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+            subscriptionId: "sub_db_1",
+          }),
+        );
+      });
+
+      it("sends notification with cancellation date", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "cancelled",
+            cancellationDate: expect.any(Date),
+          }),
+        );
+      });
+
+      it("still cancels and notifies even when org name lookup fails", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockResolvedValue(null);
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "cancelled",
+            organizationName: "Unknown",
+          }),
+        );
+      });
+
+      it("completes cancellation even when notification throws", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        orgRepo.findNameById.mockRejectedValue(new Error("DB connection lost"));
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        // Should not throw — notification error is caught
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
       });
     });
   });
@@ -224,7 +775,7 @@ describe("webhookService", () => {
   describe("handleSubscriptionUpdated()", () => {
     describe("when no subscription found", () => {
       it("skips without error", async () => {
-        db.subscription.findUnique.mockResolvedValue(null);
+        subRepo.findByStripeId.mockResolvedValue(null);
 
         const promise = service.handleSubscriptionUpdated({
           subscription: { id: "sub_missing", items: { data: [] } } as any,
@@ -233,17 +784,16 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(db.subscription.update).not.toHaveBeenCalled();
+        expect(subRepo.cancel).not.toHaveBeenCalled();
+        expect(subRepo.updateQuantities).not.toHaveBeenCalled();
       });
     });
 
-    describe("when subscription is cancelled", () => {
-      it("sets cancelled status and nullifies limits", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.ACTIVE,
-        });
-        db.subscription.update.mockResolvedValue({});
+    describe("when Stripe status is not active", () => {
+      it("cancels with nullified overrides", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -257,34 +807,74 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(db.subscription.update).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: expect.objectContaining({
-            status: SubscriptionStatus.CANCELLED,
-          }),
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+      });
+    });
+
+    describe("when Stripe reports ended", () => {
+      it("cancels with nullified overrides", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            ended_at: 1234567890,
+            items: { data: [] },
+          } as any,
         });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+      });
+    });
+
+    describe("when only canceled_at is set (scheduled cancellation)", () => {
+      it("does NOT cancel — updates quantities as normal", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+
+        const promise = service.handleSubscriptionUpdated({
+          subscription: {
+            id: "sub_stripe_1",
+            status: "active",
+            canceled_at: 1234567890,
+            ended_at: null,
+            items: { data: [] },
+          } as any,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(subRepo.cancel).not.toHaveBeenCalled();
+        expect(subRepo.updateQuantities).toHaveBeenCalled();
       });
     });
 
     describe("when subscription is active", () => {
-      it("recalculates quantities and updates DB", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.ACTIVE,
-          plan: "LAUNCH",
-        });
+      it("recalculates quantities and updates", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+        );
         itemCalculator.calculateQuantityForPrice
           .mockReturnValueOnce(5) // users
           .mockReturnValueOnce(30_000); // traces
-        db.subscription.update.mockResolvedValue({
-          id: "sub_db_1",
-          organizationId: "org_123",
-          organization: { name: "Acme" },
-          plan: "LAUNCH",
-          startDate: new Date(),
-          maxMembers: 5,
-          maxMessagesPerMonth: 30_000,
-        });
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            maxMembers: 5,
+            maxMessagesPerMonth: 30_000,
+          }),
+        );
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -304,33 +894,20 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(db.subscription.update).toHaveBeenCalledWith({
-          where: { id: "sub_db_1" },
-          data: {
-            status: SubscriptionStatus.ACTIVE,
-            lastPaymentFailedDate: null,
-            maxMembers: 5,
-            maxMessagesPerMonth: 30_000,
-          },
-          include: { organization: true },
+        expect(subRepo.updateQuantities).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          maxMembers: 5,
+          maxMessagesPerMonth: 30_000,
         });
       });
 
       it("notifies when transitioning from non-active to active", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.PENDING,
-          plan: "LAUNCH",
-        });
-        db.subscription.update.mockResolvedValue({
-          id: "sub_db_1",
-          organizationId: "org_123",
-          organization: { name: "Acme" },
-          plan: "LAUNCH",
-          startDate: new Date(),
-          maxMembers: null,
-          maxMessagesPerMonth: null,
-        });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "LAUNCH" }),
+        );
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -345,7 +922,7 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockNotifySubscriptionEvent).toHaveBeenCalledWith(
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             type: "confirmed",
             organizationId: "org_123",
@@ -354,20 +931,12 @@ describe("webhookService", () => {
       });
 
       it("skips notification when already active", async () => {
-        db.subscription.findUnique.mockResolvedValue({
-          id: "sub_db_1",
-          status: SubscriptionStatus.ACTIVE,
-          plan: "LAUNCH",
-        });
-        db.subscription.update.mockResolvedValue({
-          id: "sub_db_1",
-          organizationId: "org_123",
-          organization: { name: "Acme" },
-          plan: "LAUNCH",
-          startDate: new Date(),
-          maxMembers: null,
-          maxMessagesPerMonth: null,
-        });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+        );
+        subRepo.updateQuantities.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -382,7 +951,7 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockNotifySubscriptionEvent).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
     });
   });

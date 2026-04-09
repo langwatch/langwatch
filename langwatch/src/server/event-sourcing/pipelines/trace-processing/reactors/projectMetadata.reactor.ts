@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
+import type { ProjectService } from "~/server/app-layer/projects/project.service";
+
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
@@ -9,7 +10,7 @@ const logger = createLogger(
 );
 
 export interface ProjectMetadataReactorDeps {
-  prisma: PrismaClient;
+  projects: ProjectService;
 }
 
 /**
@@ -18,7 +19,7 @@ export interface ProjectMetadataReactorDeps {
  * Sets project.firstMessage = true, project.integrated (unless optimization_studio),
  * and detects the SDK language from span resource attributes.
  *
- * Uses a long dedup TTL so we only hit Prisma once per project in a given window.
+ * Uses a long dedup TTL so we only hit the database once per project in a given window.
  */
 export function createProjectMetadataReactor(
   deps: ProjectMetadataReactorDeps,
@@ -26,6 +27,7 @@ export function createProjectMetadataReactor(
   return {
     name: "projectMetadata",
     options: {
+      runIn: ["worker"],
       makeJobId: (payload) =>
         `project-meta:${payload.event.tenantId}`,
       ttl: 60_000, // 60s dedup — avoid repeated writes for the same project
@@ -39,10 +41,7 @@ export function createProjectMetadataReactor(
       const attrs = foldState.attributes ?? {};
 
       try {
-        const project = await deps.prisma.project.findUnique({
-          where: { id: tenantId },
-          select: { id: true, firstMessage: true, integrated: true },
-        });
+        const project = await deps.projects.getById(tenantId);
 
         if (!project) {
           logger.warn({ tenantId }, "Project not found — skipping metadata update");
@@ -67,8 +66,8 @@ export function createProjectMetadataReactor(
                 ? "typescript"
                 : "other";
 
-        await deps.prisma.project.update({
-          where: { id: tenantId },
+        await deps.projects.updateMetadata({
+          id: tenantId,
           data: {
             firstMessage: true,
             integrated: isOptimizationStudio ? project.integrated : true,
@@ -76,10 +75,6 @@ export function createProjectMetadataReactor(
           },
         });
 
-        logger.info(
-          { tenantId, language, isOptimizationStudio },
-          "Marked project first message",
-        );
       } catch (error) {
         logger.error(
           {

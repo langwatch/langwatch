@@ -4,7 +4,7 @@ import { prisma } from "~/server/db";
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 /** Cache: projectId -> organizationId. Avoids repeated DB lookups. */
-const orgCache = new TtlCache<string>(TEN_MINUTES_MS);
+const orgCache = new TtlCache<string>(TEN_MINUTES_MS, "ttlcache:org:resolve:");
 
 /**
  * Resolves the organizationId for a given projectId.
@@ -15,7 +15,7 @@ const orgCache = new TtlCache<string>(TEN_MINUTES_MS);
 export async function resolveOrganizationId(
   projectId: string,
 ): Promise<string | undefined> {
-  const cached = orgCache.get(projectId);
+  const cached = await orgCache.get(projectId);
   if (cached) {
     return cached;
   }
@@ -27,13 +27,9 @@ export async function resolveOrganizationId(
 
   const organizationId = project?.team?.organizationId;
   if (organizationId) {
-    orgCache.set(projectId, organizationId);
+    await orgCache.set(projectId, organizationId);
   }
 
   return organizationId ?? undefined;
 }
 
-/** Exposed for testing: clears the org cache. */
-export function clearOrgCache(): void {
-  orgCache.clear();
-}

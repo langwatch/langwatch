@@ -9,8 +9,9 @@ import { getPrompt as apiGetPrompt } from "../langwatch-api.js";
 export async function handleGetPrompt(params: {
   idOrHandle: string;
   version?: number;
+  tag?: string;
 }): Promise<string> {
-  const prompt = await apiGetPrompt(params.idOrHandle, params.version);
+  const prompt = await apiGetPrompt(params.idOrHandle, { version: params.version, tag: params.tag });
 
   const lines: string[] = [];
   lines.push(
@@ -19,15 +20,12 @@ export async function handleGetPrompt(params: {
 
   if (prompt.handle) lines.push(`**Handle**: ${prompt.handle}`);
   if (prompt.id) lines.push(`**ID**: ${prompt.id}`);
-  if (prompt.description) lines.push(`**Description**: ${prompt.description}`);
   if (prompt.latestVersionNumber != null)
     lines.push(`**Latest Version**: v${prompt.latestVersionNumber}`);
 
   // Show model config
   const version = prompt.versions?.[0] ?? prompt;
   if (version.model) lines.push(`**Model**: ${version.model}`);
-  if (version.modelProvider)
-    lines.push(`**Provider**: ${version.modelProvider}`);
 
   // Show messages
   const messages = version.messages || prompt.prompt || [];

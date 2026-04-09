@@ -41,7 +41,7 @@ export function ExpandedTextDialog({
           </HStack>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body paddingY={6} paddingX={8}>
+        <Dialog.Body paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
           {open && textExpanded && isFormatted ? (
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
@@ -49,7 +49,6 @@ export function ExpandedTextDialog({
               <Markdown className="markdown">
                 {typeof textExpanded === "string"
                   ? textExpanded
-                      .replace(/\n(?![\n\-])/g, "\n")
                       .replace(/(\n+)\\(\n+)/g, "$1$2")
                   : JSON.stringify(textExpanded, null, 2)}
               </Markdown>

@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { context as otelContext, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
 import fastq from "fastq";
 import type IORedis from "ioredis";
@@ -18,7 +19,7 @@ import type {
   EventSourcedQueueProcessor,
   QueueSendOptions,
 } from "../../queues";
-import { ConfigurationError, QueueError } from "../../services/errorHandling";
+import { categorizeError, ConfigurationError, ErrorCategory, QueueError } from "../../services/errorHandling";
 import { JOB_RETRY_CONFIG, getBackoffMs } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import {
@@ -27,7 +28,13 @@ import {
   gqJobsDedupedTotal,
   gqJobsExhaustedTotal,
   gqJobsRetriedTotal,
+  gqJobsNonRetryableTotal,
   gqJobsStagedTotal,
+  gqJobsDelayedTotal,
+  gqJobDelayMilliseconds,
+  gqRetryAttempt,
+  gqRetryBackoffMilliseconds,
+  gqJobDurationMilliseconds,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import { type DispatchResult, GroupStagingScripts } from "./scripts";
@@ -42,7 +49,7 @@ const GROUP_QUEUE_CONFIG = {
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
-  signalTimeoutSec: 1,
+  signalTimeoutSec: 5,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
   /** Maximum time to wait for graceful shutdown in milliseconds */
@@ -227,9 +234,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Get dedup config
     let dedupId = "";
     let dedupTtlMs = 0;
+    let shouldExtend = true;
+    let shouldReplace = true;
     if (dedup) {
       dedupId = dedup.makeId(payload).replaceAll(":", ".");
       dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
+      shouldExtend = dedup.extend !== false;
+      shouldReplace = dedup.replace !== false;
     }
 
     // Attach context metadata to the payload
@@ -255,10 +266,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       dedupId,
       dedupTtlMs,
       jobDataJson: JSON.stringify(payloadWithContext),
+      shouldExtend,
+      shouldReplace,
     });
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
+      if (delay && delay > 0) {
+        gqJobsDelayedTotal.inc({ queue_name: this.queueName });
+        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, delay);
+      }
     } else {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName });
     }
@@ -296,6 +313,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const contextMetadata = getJobContextMetadata();
     const now = Date.now();
 
+    const shouldExtend = dedup ? dedup.extend !== false : true;
+    const shouldReplace = dedup ? dedup.replace !== false : true;
+
     const jobsToStage = payloads.map((payload, index) => {
       const groupId = this.groupKey(payload);
       const stagedJobId = this.generateStagedJobId(payload);
@@ -322,6 +342,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         dedupId,
         dedupTtlMs,
         jobDataJson: JSON.stringify(payloadWithContext),
+        shouldExtend,
+        shouldReplace,
       };
     });
 
@@ -330,6 +352,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName }, newStagedCount);
+      const effectiveDelay = options?.delay ?? this.delay;
+      if (effectiveDelay && effectiveDelay > 0) {
+        gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
+        for (let i = 0; i < newStagedCount; i++) {
+          gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
+        }
+      }
     }
     if (dedupedCount > 0) {
       gqJobsDedupedTotal.inc({ queue_name: this.queueName }, dedupedCount);
@@ -369,8 +398,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
     const attempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
+    const pipelineName = (jobData.__pipelineName as string) ?? "unknown";
+    const jobType = (jobData.__jobType as string) ?? "unknown";
+    const jobName = (jobData.__jobName as string) ?? "unknown";
+    const routingLabels = { queue_name: this.queueName, pipeline_name: pipelineName, job_type: jobType, job_name: jobName };
     const payload = this.stripInternalFields(jobData);
 
+    const jobStartTime = performance.now();
     const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
     this.activeJobCount++;
 
@@ -438,7 +472,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
               // Success — complete the group slot
               await this.scripts.complete({ groupId, stagedJobId });
-              gqJobsCompletedTotal.inc({ queue_name: this.queueName });
+              gqJobsCompletedTotal.inc(routingLabels);
 
               this.logger.debug(
                 {
@@ -451,12 +485,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               );
             } catch (err) {
               const error = err instanceof Error ? err : new Error(String(err));
+              const category = categorizeError(err);
+              const isRetryable = category !== ErrorCategory.CRITICAL;
 
-              if (attempt < JOB_RETRY_CONFIG.maxAttempts) {
+              if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts) {
                 // Re-stage with backoff — frees the worker slot immediately
-                gqJobsRetriedTotal.inc({ queue_name: this.queueName });
+                gqJobsRetriedTotal.inc(routingLabels);
 
                 const backoffMs = getBackoffMs(attempt);
+                gqRetryAttempt.observe(routingLabels, attempt);
+                gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
                 const retryJobData = JSON.stringify({
                   ...(payload as Record<string, unknown>),
@@ -486,9 +524,24 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   "Job attempt failed, re-staged with backoff",
                 );
               } else {
-                // All retries exhausted
                 span.setAttribute("error", true);
                 span.setAttribute("error.message", error.message);
+
+                if (!isRetryable) {
+                  gqJobsNonRetryableTotal.inc(routingLabels);
+                  this.logger.error(
+                    {
+                      queueName: this.queueName,
+                      groupId,
+                      stagedJobId,
+                      attempt,
+                      errorCategory: category,
+                      error: error.message,
+                    },
+                    "Job failed with non-retryable error, skipping retries",
+                  );
+                }
+
                 await this.handleExhaustedRetries({
                   groupId,
                   stagedJobId,
@@ -496,6 +549,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   originalScore,
                   lastError: error,
                   contextMetadata,
+                  routingLabels,
                 });
               }
             }
@@ -518,6 +572,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     } finally {
       clearInterval(heartbeat);
       this.activeJobCount--;
+      const jobDurationMs = performance.now() - jobStartTime;
+      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
     }
   }
 
@@ -577,6 +633,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore,
     lastError,
     contextMetadata,
+    routingLabels,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -584,6 +641,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     originalScore: number;
     lastError: Error | undefined;
     contextMetadata: JobContextMetadata | undefined;
+    routingLabels: Record<string, string>;
   }): Promise<void> {
     const score =
       typeof originalScore === "number"
@@ -607,8 +665,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       errorStack: lastError?.stack,
     });
 
-    gqGroupsBlockedTotal.inc({ queue_name: this.queueName });
-    gqJobsExhaustedTotal.inc({ queue_name: this.queueName });
+    gqGroupsBlockedTotal.inc(routingLabels);
+    gqJobsExhaustedTotal.inc(routingLabels);
 
     this.logger.error(
       {
@@ -655,7 +713,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.shutdownRequested = true;
     this.metricsCollector?.stop();
     this.dispatcher?.requestShutdown();
-    this.logger.info(
+    // Wake the BRPOP so the dispatcher exits immediately
+    await this.redisConnection
+      .lpush(this.scripts.getSignalKey(), "1")
+      .catch(() => {});
+    this.logger.debug(
       { queueName: this.queueName },
       "Closing group queue processor",
     );
@@ -679,7 +741,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         }),
       ]);
 
-      this.logger.info(
+      this.logger.debug(
         { queueName: this.queueName },
         "Group queue processor closed successfully",
       );

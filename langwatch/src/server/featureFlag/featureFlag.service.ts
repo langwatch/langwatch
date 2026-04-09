@@ -39,7 +39,7 @@ import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
  * );
  * ```
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FeatureFlagServicePostHog for PostHog implementation details
  */
 export class FeatureFlagService implements FeatureFlagServiceInterface {

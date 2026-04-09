@@ -1,10 +1,10 @@
-name: Approval or Exception Required
+name: approval-or-hotfix
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+  pull_request_target:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, dismissed]
 
 concurrency:
   group: approval-check-${{ github.event.pull_request.number }}
@@ -12,13 +12,19 @@ concurrency:
 
 jobs:
   check-approval-or-label:
+    # Skip pull_request_review for fork PRs — the read-only token would 403
+    # and the concurrency group could cancel a passing pull_request_target run.
+    if: >-
+      github.event_name != 'pull_request_review' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
+      checks: write
 
     steps:
       - name: Check for approval or exception labels
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -35,8 +41,23 @@ jobs:
             const labelNames = labels.map(l => l.name);
 
             // "firefighting" can be added by anyone (human override for urgent fixes)
+            // Helper: write a passing check run so the result sticks
+            // regardless of which event type triggered this workflow.
+            async function passCheck(reason) {
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pr.head.sha,
+                name: "check-approval-or-label",
+                status: "completed",
+                conclusion: "success",
+                output: { title: "Approved", summary: reason },
+              });
+              core.info(reason);
+            }
+
             if (labelNames.includes("firefighting")) {
-              core.info(`PR has firefighting label. Passing check.`);
+              await passCheck("PR has firefighting label. Passing check.");
               return;
             }
 
@@ -59,7 +80,7 @@ jobs:
               const latest = labelEvents[labelEvents.length - 1];
 
               if (latest?.event === "labeled" && latest?.actor?.login === "github-actions[bot]") {
-                core.info("PR has low-risk-change label applied by automation. Passing check.");
+                await passCheck("PR has low-risk-change label applied by automation. Passing check.");
                 return;
               }
 
@@ -84,8 +105,18 @@ jobs:
             const approvalCount = approvedUsers.size;
 
             if (approvalCount >= 1) {
-              core.info(`PR has ${approvalCount} approval(s). Passing check.`);
+              await passCheck(`PR has ${approvalCount} approval(s). Passing check.`);
               return;
             }
 
-            core.setFailed("PR requires at least 1 approval, or a label: firefighting (manual) / low-risk-change (automation only).");
+            const failReason = "PR requires at least 1 approval, or a label: firefighting (manual) / low-risk-change (automation only).";
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: pr.head.sha,
+              name: "check-approval-or-label",
+              status: "completed",
+              conclusion: "failure",
+              output: { title: "Review required", summary: failReason },
+            });
+            core.setFailed(failReason);

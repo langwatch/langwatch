@@ -11,6 +11,161 @@ import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 
 import type { FilterDefinition, FilterField } from "./types";
 
+/** Label values that represent pass/fail status rather than classification labels. */
+const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
+
+/**
+ * Shared label builder for evaluator_id extract functions.
+ * Shows the evaluator TYPE name in brackets, then the instance name.
+ */
+function buildEvaluatorLabel(bucket: any): {
+  type: string;
+  name: string;
+  label: string;
+} {
+  const type: string = bucket.labels.type.buckets?.[0]?.key;
+  const name: string = bucket.labels.name.buckets?.[0]?.key;
+  const checkDefinition = AVAILABLE_EVALUATORS[type as EvaluatorTypes];
+
+  return {
+    type,
+    name,
+    label: `[${checkDefinition?.name ?? type ?? "custom"}] ${name}`,
+  };
+}
+
+/**
+ * Factory for evaluator_id filter variants in the ES registry.
+ *
+ * All 5 variants share the same `query` function and nearly identical
+ * `aggregation`/`extract`. They differ only in:
+ * - name/urlKey
+ * - An optional ES filter clause wrapping the terms aggregation
+ *   (e.g. exists on "evaluations.passed", bool for label exclusion)
+ * - An optional post-filter in extract (guardrails checks isGuardrail)
+ * - The aggregation key name used for the intermediate bucket path
+ */
+function buildEvaluatorIdFilter({
+  name,
+  urlKey,
+  esFilter,
+  filterKey,
+  extractPostFilter,
+}: {
+  name: string;
+  urlKey: string;
+  /** ES filter clause inserted between nested path and the terms agg. null = no extra filter. */
+  esFilter: QueryDslQueryContainer | null;
+  /** Key name for the intermediate aggregation bucket (e.g. "has_passed", "child"). */
+  filterKey: string;
+  /** Optional post-filter applied to extracted buckets (e.g. guardrails isGuardrail check). */
+  extractPostFilter?: (bucket: any, type: string) => boolean;
+}): FilterDefinition {
+  const labelsAgg = (query: string | undefined) => ({
+    labels: {
+      filter: query
+        ? {
+            prefix: {
+              "evaluations.name": {
+                value: query,
+                case_insensitive: true,
+              },
+            },
+          }
+        : {
+            match_all: {},
+          },
+      aggs: {
+        name: {
+          terms: {
+            field: "evaluations.name",
+            size: 1,
+          },
+        },
+        type: {
+          terms: {
+            field: "evaluations.type",
+            size: 1,
+          },
+        },
+      },
+    },
+  });
+
+  const termsAgg = (query: string | undefined) => ({
+    terms: {
+      field: "evaluations.evaluator_id",
+      size: 10_000,
+      order: { _key: "asc" as const },
+    },
+    aggs: labelsAgg(query),
+  });
+
+  return {
+    name,
+    urlKey,
+    query: (values) => ({
+      nested: {
+        path: "evaluations",
+        query: {
+          terms: { "evaluations.evaluator_id": values },
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query) => {
+        // When esFilter is set, wrap the terms agg inside a filter agg.
+        // When null, the terms agg is placed directly under the filterKey.
+        const innerAgg = esFilter
+          ? {
+              filter: esFilter,
+              aggs: {
+                child: termsAgg(query),
+              },
+            }
+          : termsAgg(query);
+
+        return {
+          unique_evaluator_ids: {
+            nested: { path: "evaluations" },
+            aggs: {
+              [filterKey]: innerAgg,
+            },
+          },
+        };
+      },
+      extract: (result: Record<string, any>) => {
+        // When esFilter is set, buckets are nested under filterKey.child;
+        // when null, buckets are directly under filterKey.
+        const buckets = esFilter
+          ? result.unique_evaluator_ids?.[filterKey]?.child?.buckets
+          : result.unique_evaluator_ids?.[filterKey]?.buckets;
+
+        return (
+          buckets
+            ?.map((bucket: any) => {
+              const { type, label } = buildEvaluatorLabel(bucket);
+
+              if (extractPostFilter && !extractPostFilter(bucket, type)) {
+                return undefined;
+              }
+
+              return {
+                field: bucket.key,
+                label,
+                count: bucket.doc_count,
+              };
+            })
+            .filter(
+              (option: any) =>
+                option?.label !== undefined && option?.label !== null,
+            ) ?? []
+        );
+      },
+    },
+  };
+}
+
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "topics.topics": {
     name: "Topic",
@@ -438,6 +593,65 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "traces.origin": {
+    name: "Origin",
+    urlKey: "origin",
+    query: (values) => {
+      // Origin data only exists in ClickHouse; ES fallback uses metadata field
+      const conditions: QueryDslQueryContainer[] = [];
+
+      const nonApplicationValues = values.filter((v) => v !== "application");
+      const hasApplication = values.includes("application");
+
+      if (nonApplicationValues.length > 0) {
+        conditions.push({
+          terms: { "metadata.langwatch_origin": nonApplicationValues },
+        });
+      }
+
+      if (hasApplication) {
+        conditions.push({
+          bool: {
+            must_not: {
+              exists: { field: "metadata.langwatch_origin" },
+            },
+          } as QueryDslBoolQuery,
+        });
+      }
+
+      if (conditions.length === 1) {
+        return conditions[0]!;
+      }
+
+      return {
+        bool: {
+          should: conditions,
+          minimum_should_match: 1,
+        } as QueryDslBoolQuery,
+      };
+    },
+    listMatch: {
+      aggregation: (_query) => ({
+        unique_values: {
+          terms: {
+            field: "metadata.langwatch_origin",
+            size: 100,
+            order: { _key: "asc" },
+            missing: "application",
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.buckets?.map((bucket: any) => ({
+            field: bucket.key_as_string ?? bucket.key ?? "application",
+            label: bucket.key_as_string ?? bucket.key ?? "application",
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
   "traces.error": {
     name: "Contains Error",
     urlKey: "has_error",
@@ -592,171 +806,62 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
-  "evaluations.evaluator_id": {
+  "evaluations.evaluator_id": buildEvaluatorIdFilter({
     name: "Contains Evaluation",
     urlKey: "evaluator_id",
-    query: (values) => ({
-      nested: {
-        path: "evaluations",
-        query: {
-          terms: { "evaluations.evaluator_id": values },
-        },
-      },
-    }),
-    listMatch: {
-      aggregation: (query) => ({
-        unique_evaluator_ids: {
-          nested: { path: "evaluations" },
-          aggs: {
-            child: {
-              terms: {
-                field: "evaluations.evaluator_id",
-                size: 10_000,
-                order: { _key: "asc" },
-              },
-              aggs: {
-                labels: {
-                  filter: query
-                    ? {
-                        prefix: {
-                          "evaluations.name": {
-                            value: query,
-                            case_insensitive: true,
-                          },
-                        },
-                      }
-                    : {
-                        match_all: {},
-                      },
-                  aggs: {
-                    name: {
-                      terms: {
-                        field: "evaluations.name",
-                        size: 1,
-                      },
-                    },
-                    type: {
-                      terms: {
-                        field: "evaluations.type",
-                        size: 1,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-      extract: (result: Record<string, any>) => {
-        return (
-          result.unique_evaluator_ids?.child?.buckets?.map((bucket: any) => {
-            const type: string = bucket.labels.type.buckets?.[0]?.key;
-            const name: string = bucket.labels.name.buckets?.[0]?.key;
-            const checkDefinition =
-              AVAILABLE_EVALUATORS[type as EvaluatorTypes];
-
-            return {
-              field: bucket.key,
-              label: `[${
-                name ?? checkDefinition?.name ?? type ?? "custom"
-              }] ${name}`,
-              count: bucket.doc_count,
-            };
-          }) ?? []
-        );
-      },
-    },
-  },
-  "evaluations.evaluator_id.guardrails_only": {
+    esFilter: null,
+    filterKey: "child",
+  }),
+  "evaluations.evaluator_id.guardrails_only": buildEvaluatorIdFilter({
     name: "Contains Evaluation (guardrails only)",
     urlKey: "guardrail_evaluator_id",
-    query: (values) => ({
-      nested: {
-        path: "evaluations",
-        query: {
-          terms: { "evaluations.evaluator_id": values },
-        },
-      },
-    }),
-    listMatch: {
-      aggregation: (query) => ({
-        unique_evaluator_ids: {
-          nested: { path: "evaluations" },
-          aggs: {
-            child: {
-              terms: {
-                field: "evaluations.evaluator_id",
-                size: 10_000,
-                order: { _key: "asc" },
-              },
-              aggs: {
-                labels: {
-                  filter: query
-                    ? {
-                        prefix: {
-                          "evaluations.name": {
-                            value: query,
-                            case_insensitive: true,
-                          },
-                        },
-                      }
-                    : {
-                        match_all: {},
-                      },
-                  aggs: {
-                    name: {
-                      terms: {
-                        field: "evaluations.name",
-                        size: 1,
-                      },
-                    },
-                    type: {
-                      terms: {
-                        field: "evaluations.type",
-                        size: 1,
-                      },
-                    },
-                  },
-                },
-              },
+    esFilter: null,
+    filterKey: "child",
+    extractPostFilter: (_bucket, type) => {
+      const checkDefinition = AVAILABLE_EVALUATORS[type as EvaluatorTypes];
+      return !!checkDefinition?.isGuardrail;
+    },
+  }),
+  "evaluations.evaluator_id.has_passed": buildEvaluatorIdFilter({
+    name: "Evaluators with Passed results",
+    urlKey: "evaluator_id_has_passed",
+    esFilter: { exists: { field: "evaluations.passed" } },
+    filterKey: "has_passed",
+  }),
+  "evaluations.evaluator_id.has_score": buildEvaluatorIdFilter({
+    name: "Evaluators with Score results",
+    urlKey: "evaluator_id_has_score",
+    esFilter: { exists: { field: "evaluations.score" } },
+    filterKey: "has_score",
+  }),
+  "evaluations.evaluator_id.has_label": buildEvaluatorIdFilter({
+    name: "Evaluators with Label results",
+    urlKey: "evaluator_id_has_label",
+    esFilter: {
+      bool: {
+        must: [{ exists: { field: "evaluations.label" } }],
+        must_not: [
+          {
+            term: {
+              "evaluations.label": "",
             },
           },
-        },
-      }),
-      extract: (result: Record<string, any>) => {
-        return (
-          result.unique_evaluator_ids?.child?.buckets
-            ?.map((bucket: any) => {
-              const type: string = bucket.labels.type.buckets?.[0]?.key;
-              const name: string = bucket.labels.name.buckets?.[0]?.key;
-              const checkDefinition =
-                AVAILABLE_EVALUATORS[type as EvaluatorTypes];
-
-              if (!checkDefinition?.isGuardrail) {
-                return;
-              }
-
-              return {
-                field: bucket.key,
-                label: `[${checkDefinition?.name ?? type ?? "custom"}] ${name}`,
-                count: bucket.doc_count,
-              };
-            })
-            .filter(
-              (option: any) =>
-                option?.label !== undefined && option?.label !== null,
-            ) ?? []
-        );
-      },
+          {
+            terms: {
+              "evaluations.label": [...STATUS_LABEL_VALUES],
+            },
+          },
+        ],
+      } as QueryDslBoolQuery,
     },
-  },
+    filterKey: "has_label",
+  }),
   "evaluations.passed": {
     name: "Evaluation Passed",
     urlKey: "evaluation_passed",
     single: true,
     requiresKey: {
-      filter: "evaluations.evaluator_id.guardrails_only",
+      filter: "evaluations.evaluator_id.has_passed",
     },
     query: (values, key) => ({
       nested: {
@@ -831,7 +936,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     type: "numeric",
     single: true,
     requiresKey: {
-      filter: "evaluations.evaluator_id",
+      filter: "evaluations.evaluator_id.has_score",
     },
     query: (values, key) => ({
       nested: {
@@ -897,7 +1002,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     name: "Evaluation Label",
     urlKey: "evaluation_label",
     requiresKey: {
-      filter: "evaluations.evaluator_id",
+      filter: "evaluations.evaluator_id.has_label",
     },
     query: (values, key) => ({
       nested: {
@@ -957,7 +1062,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.child?.child?.buckets
             ?.filter(
-              (bucket: any) => !["succeeded", "failed"].includes(bucket.key),
+              (bucket: any) => !(STATUS_LABEL_VALUES as readonly string[]).includes(bucket.key),
             )
             .map((bucket: any) => ({
               field: bucket.key,
@@ -1032,7 +1137,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.child?.child?.buckets
             ?.filter(
-              (bucket: any) => !["succeeded", "failed"].includes(bucket.key),
+              (bucket: any) => !(STATUS_LABEL_VALUES as readonly string[]).includes(bucket.key),
             )
             .map((bucket: any) => ({
               field: bucket.key,
@@ -1469,108 +1574,6 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             count: bucket.doc_count,
           })) ?? []
         );
-      },
-    },
-  },
-  "sentiment.input_sentiment": {
-    name: "Input Sentiment",
-    urlKey: "sentiment",
-    query: (values) => {
-      const rangeQueries: QueryDslQueryContainer[] = [];
-      for (const value of values) {
-        if (value === "positive") {
-          rangeQueries.push({
-            range: {
-              "input.satisfaction_score": {
-                gte: 0.1,
-              },
-            },
-          });
-        } else if (value === "negative") {
-          rangeQueries.push({
-            range: {
-              "input.satisfaction_score": {
-                lte: -0.1,
-              },
-            },
-          });
-        } else if (value === "neutral") {
-          rangeQueries.push({
-            range: {
-              "input.satisfaction_score": {
-                gt: -0.1,
-                lt: 0.1,
-              },
-            },
-          });
-        }
-      }
-      // Guard against empty or all-invalid values: return match_all as safe no-op filter
-      if (rangeQueries.length === 0) {
-        return { match_all: {} };
-      }
-      return {
-        bool: {
-          should: rangeQueries,
-          minimum_should_match: 1,
-        } as QueryDslBoolQuery,
-      };
-    },
-    listMatch: {
-      aggregation: () => ({
-        sentiment_categories: {
-          filters: {
-            filters: {
-              positive: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value >= 0.1",
-                    lang: "painless",
-                  },
-                },
-              },
-              negative: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value <= -0.1",
-                    lang: "painless",
-                  },
-                },
-              },
-              neutral: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : (doc['input.satisfaction_score'].value < 0.1 && doc['input.satisfaction_score'].value > -0.1)",
-                    lang: "painless",
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-      extract: (result: Record<string, any>) => {
-        const buckets = result.sentiment_categories?.buckets ?? {};
-        return [
-          {
-            field: "positive",
-            label: "Positive",
-            count: buckets.positive?.doc_count ?? 0,
-          },
-          {
-            field: "negative",
-            label: "Negative",
-            count: buckets.negative?.doc_count ?? 0,
-          },
-          {
-            field: "neutral",
-            label: "Neutral",
-            count: buckets.neutral?.doc_count ?? 0,
-          },
-        ];
       },
     },
   },

@@ -24,7 +24,7 @@ import { api } from "~/utils/api";
 import { ColorModeProvider, colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
 import { usePostHog } from "../hooks/usePostHog";
-import { dependencies } from "../injection/dependencies.client";
+import { ExtraFooterComponents } from "../../ee/saas/ExtraFooterComponents";
 import { CommandBarProvider } from "../features/command-bar";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -177,10 +177,10 @@ export const system = createSystem(defaultConfig, {
         },
         blue: {
           solid: {
-            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.400}" },
+            value: { _light: "{colors.blue.500}", _dark: "{colors.blue.500}" },
           },
           hover: {
-            value: { _light: "{colors.blue.600}", _dark: "{colors.blue.500}" },
+            value: { _light: "{colors.blue.600}", _dark: "{colors.blue.400}" },
           },
           subtle: {
             value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" },
@@ -189,10 +189,10 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.blue.100}", _dark: "{colors.blue.800}" },
           },
           emphasized: {
-            value: { _light: "{colors.blue.400}", _dark: "{colors.blue.700}" },
+            value: { _light: "{colors.blue.400}", _dark: "{colors.blue.600}" },
           },
           fg: {
-            value: { _light: "{colors.blue.700}", _dark: "{colors.blue.200}" },
+            value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
@@ -390,16 +390,16 @@ export const system = createSystem(defaultConfig, {
         // Navigation semantic tokens - for sidebar menu items
         nav: {
           fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
+            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
           },
           fgMuted: {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           bgActive: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
           },
           bgHover: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
           },
         },
 
@@ -415,27 +415,27 @@ export const system = createSystem(defaultConfig, {
 
         // Background semantic tokens - custom light theme, dark theme with inverted hierarchy
         bg: {
-          // Page/sidebar background - lighter gray in dark mode
+          // Page/sidebar background
           page: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
           },
-          // Main content area - darkest in dark mode
+          // Main content area - deepest in dark mode
           surface: { value: { _light: "white", _dark: "{colors.gray.950}" } },
-          // Cards and panels - same as surface (darkest)
-          panel: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Cards and panels - float above surface
+          panel: { value: { _light: "white", _dark: "{colors.gray.900}" } },
           // Muted background for hover states, selections
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
           },
           // Emphasized background for active states
           emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.600}" },
           },
-          // Subtle background for table headers, etc.
+          // Subtle background for table headers, zebra rows
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.800}" },
           },
-          // Form inputs
+          // Form inputs - blend into container
           input: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
           },
@@ -453,15 +453,15 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
-          inverted: { value: { _light: "white", _dark: "{colors.gray.900}" } },
+          inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
 
-        // Border semantic tokens - subtle borders in dark mode
+        // Border semantic tokens - visible in dark mode
         border: {
           DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
           },
           muted: {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
@@ -470,22 +470,8 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
           },
-        },
-      },
-      shadows: {
-        "2xs": {
-          value:
-            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
-        },
-        sm: {
-          value:
-            "1px 1px 2px color-mix(in srgb, var(--chakra-colors-gray-900) 15%, transparent),0px 0px 1px color-mix(in srgb, var(--chakra-colors-gray-900) 30%, transparent)",
-        },
-        xs: {
-          value:
-            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
         },
       },
     },
@@ -970,8 +956,8 @@ export const system = createSystem(defaultConfig, {
             fontWeight: "500",
           },
           content: {
-            background: "bg.surface/75",
-            backdropFilter: "blur(8px)",
+            background: "bg.surface/60",
+            backdropFilter: "blur(12px)",
             "& button:not([data-variant=ghost]):not([data-part])": {
               boxShadow: "md",
             },
@@ -1093,12 +1079,66 @@ export const system = createSystem(defaultConfig, {
         slots: ["root"],
         base: {
           root: {
-            borderRadius: "lg",
+            borderRadius: "xl",
+            backdropFilter: "blur(12px)",
+            border: "1px solid",
+            boxShadow: "lg",
             "&[data-type=info]": {
-              bg: "blue.solid",
-              color: "blue.contrast",
+              bg: {
+                _light: "blue.solid/85",
+                _dark: "rgba(37, 99, 235, 0.8)",
+              },
+              borderColor: {
+                _light: "blue.solid/30",
+                _dark: "rgba(96, 165, 250, 0.25)",
+              },
+              color: "white",
               "--toast-trigger-bg": "{white/10}",
               "--toast-border-color": "{white/40}",
+            },
+            "&[data-type=success]": {
+              bg: {
+                _light: "green.solid/85",
+                _dark: "rgba(22, 163, 74, 0.8)",
+              },
+              borderColor: {
+                _light: "green.solid/30",
+                _dark: "rgba(74, 222, 128, 0.25)",
+              },
+              color: "white",
+            },
+            "&[data-type=error]": {
+              bg: {
+                _light: "red.solid/88",
+                _dark: "rgba(220, 38, 38, 0.8)",
+              },
+              borderColor: {
+                _light: "red.solid/30",
+                _dark: "rgba(248, 113, 113, 0.25)",
+              },
+              color: "white",
+            },
+            "&[data-type=warning]": {
+              bg: {
+                _light: "yellow.solid/88",
+                _dark: "rgba(217, 119, 6, 0.8)",
+              },
+              borderColor: {
+                _light: "yellow.solid/30",
+                _dark: "rgba(251, 191, 36, 0.25)",
+              },
+              color: "white",
+            },
+            "&[data-type=loading]": {
+              bg: {
+                _light: "white/80",
+                _dark: "rgba(30, 30, 36, 0.8)",
+              },
+              borderColor: {
+                _light: "black/8",
+                _dark: "rgba(255, 255, 255, 0.1)",
+              },
+              color: { _light: "gray.800", _dark: "gray.100" },
             },
           },
         },
@@ -1242,9 +1282,7 @@ const LangWatch: AppType<{
             <Toaster />
           </CommandBarProvider>
 
-          {dependencies.ExtraFooterComponents && (
-            <dependencies.ExtraFooterComponents />
-          )}
+          <ExtraFooterComponents />
         </ColorModeProvider>
       </ChakraProvider>
     </SessionProvider>

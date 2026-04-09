@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -32,6 +32,7 @@ class PutApiPromptsByIdBody:
         inputs (list[PutApiPromptsByIdBodyInputsItem] | Unset):
         outputs (list[PutApiPromptsByIdBodyOutputsItem] | Unset):
         schema_version (PutApiPromptsByIdBodySchemaVersion | Unset):
+        tags (list[str] | Unset):
         scope (PutApiPromptsByIdBodyScope | Unset):
         handle (str | Unset):
     """
@@ -46,6 +47,7 @@ class PutApiPromptsByIdBody:
     inputs: list[PutApiPromptsByIdBodyInputsItem] | Unset = UNSET
     outputs: list[PutApiPromptsByIdBodyOutputsItem] | Unset = UNSET
     schema_version: PutApiPromptsByIdBodySchemaVersion | Unset = UNSET
+    tags: list[str] | Unset = UNSET
     scope: PutApiPromptsByIdBodyScope | Unset = UNSET
     handle: str | Unset = UNSET
 
@@ -87,6 +89,10 @@ class PutApiPromptsByIdBody:
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
+        tags: list[str] | Unset = UNSET
+        if not isinstance(self.tags, Unset):
+            tags = self.tags
+
         scope: str | Unset = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
@@ -118,6 +124,8 @@ class PutApiPromptsByIdBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
+        if tags is not UNSET:
+            field_dict["tags"] = tags
         if scope is not UNSET:
             field_dict["scope"] = scope
         if handle is not UNSET:
@@ -178,6 +186,8 @@ class PutApiPromptsByIdBody:
         else:
             schema_version = PutApiPromptsByIdBodySchemaVersion(_schema_version)
 
+        tags = cast(list[str], d.pop("tags", UNSET))
+
         _scope = d.pop("scope", UNSET)
         scope: PutApiPromptsByIdBodyScope | Unset
         if isinstance(_scope, Unset):
@@ -198,6 +208,7 @@ class PutApiPromptsByIdBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
+            tags=tags,
             scope=scope,
             handle=handle,
         )

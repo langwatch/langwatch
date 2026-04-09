@@ -34,6 +34,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 import { useWizardContext } from "../../../components/evaluations/wizard/hooks/useWizardContext";
 import { LLMModelDisplay } from "../../../components/llmPromptConfigs/LLMModelDisplay";
+import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
@@ -73,7 +74,7 @@ function NodeInputs({
           gap={1}
           paddingX={2}
           paddingY={1}
-          background="gray.100"
+          background="bg.muted"
           borderRadius="8px"
           width="full"
           position="relative"
@@ -86,7 +87,7 @@ function NodeInputs({
               marginLeft: "-10px",
               width: "8px",
               height: "8px",
-              background: "white",
+              background: "var(--chakra-colors-bg)",
               borderRadius: "100%",
               border: `1px solid #FF8309`,
               boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #FF8309`,
@@ -128,7 +129,7 @@ function NodeOutputs({
           gap={1}
           paddingX={2}
           paddingY={1}
-          background="gray.100"
+          background="bg.muted"
           borderRadius="8px"
           width="full"
           position="relative"
@@ -142,7 +143,7 @@ function NodeOutputs({
                 marginRight: "-10px",
                 width: "8px",
                 height: "8px",
-                background: "white",
+                background: "var(--chakra-colors-bg)",
                 borderRadius: "100%",
                 border: `1px solid #2B6CB0`,
                 boxShadow: `0px 0px ${selected ? "4px" : "2px"} 0px #2B6CB0`,
@@ -160,7 +161,7 @@ function NodeOutputs({
 
 export function TypeLabel({ type }: { type: string }) {
   return (
-    <Text color="cyan.600" fontStyle="italic">
+    <Text color="cyan.fg" fontStyle="italic">
       {type}
     </Text>
   );
@@ -261,6 +262,11 @@ export const ComponentNode = forwardRef(function ComponentNode(
 
   const { isInsideWizard } = useWizardContext();
 
+  const nodeShadow = useColorModeValue(
+    `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`,
+    `0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.5" : "0.3"})`,
+  );
+
   return (
     <VStack
       className="js-component-node"
@@ -268,7 +274,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       opacity={isNotDroppable ? 0.4 : 1}
       ref={ref}
       borderRadius="12px"
-      backgroundColor={props.backgroundColor ?? "white"}
+      backgroundColor={props.backgroundColor ?? "bg.panel"}
       padding="10px"
       gap={2}
       align="start"
@@ -277,11 +283,12 @@ export const ComponentNode = forwardRef(function ComponentNode(
       minWidth={
         140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
       }
-      boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
-      border="none"
+      boxShadow={nodeShadow}
+      border="1px solid"
+      borderColor="border"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
       outlineColor={
-        props.selected ? selectionColor : isHovered ? "gray.300" : "none"
+        props.selected ? selectionColor : isHovered ? "gray.emphasized" : "none"
       }
       onMouseEnter={() => setHoveredNodeId(props.id)}
       onMouseLeave={() => setHoveredNodeId(undefined)}
@@ -298,7 +305,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <Menu.Root positioning={{ placement: "top-start" }}>
             <Menu.Trigger asChild>
               <Button
-                background="white"
+                background="bg"
                 position="absolute"
                 top="-28px"
                 right={1}
@@ -359,7 +366,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             node={node}
             marginRight="-6px"
             marginLeft="-4px"
-            isInsideNode={true}
+
           />
         ) : (
           <Box width="54px" />
@@ -411,13 +418,11 @@ export function ComponentExecutionButton({
   node,
   iconSize = 14,
   componentOnly = false,
-  isInsideNode = false,
   ...props
 }: {
   node: Node<Component>;
   iconSize?: number;
   componentOnly?: boolean;
-  isInsideNode?: boolean;
 } & ButtonProps) {
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
@@ -440,8 +445,6 @@ export function ComponentExecutionButton({
 
   const shouldOpenExecutionResults =
     node?.data.execution_state && !propertiesExpanded;
-
-  const Wrapper = isInsideNode ? NodeToolbar : React.Fragment;
 
   return (
     <>
@@ -533,30 +536,35 @@ export function ComponentExecutionButton({
       ) : (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
-            <Button variant="ghost" size="xs" paddingX={2} {...props}>
+            <Button
+              variant="ghost"
+              size="xs"
+              paddingX={2}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              {...props}
+            >
               <Play size={iconSize} />
             </Button>
           </Menu.Trigger>
-          <Wrapper>
-            <Menu.Content zIndex="popover">
-              <Menu.Item
-                value="run-manual"
-                onClick={() => node && startComponentExecution({ node })}
-              >
-                <Play size={14} />
-                Run with manual input
-              </Menu.Item>
-              <Menu.Item
-                value="run-workflow"
-                onClick={() =>
-                  node && startWorkflowExecution({ untilNodeId: node.id })
-                }
-              >
-                <Play size={14} />
-                Run workflow until here
-              </Menu.Item>
-            </Menu.Content>
-          </Wrapper>
+          <Menu.Content>
+            <Menu.Item
+              value="run-manual"
+              onClick={() => node && startComponentExecution({ node })}
+            >
+              <Play size={14} />
+              Run with manual input
+            </Menu.Item>
+            <Menu.Item
+              value="run-workflow"
+              onClick={() =>
+                node && startWorkflowExecution({ untilNodeId: node.id })
+              }
+            >
+              <Play size={14} />
+              Run workflow until here
+            </Menu.Item>
+          </Menu.Content>
         </Menu.Root>
       )}
     </>

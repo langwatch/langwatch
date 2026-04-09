@@ -28,7 +28,7 @@ class DisabledQueueProcessor<
         command: this.commandName,
         payloadKeys: Object.keys(payload as object),
       },
-      "Command DROPPED: event sourcing is disabled. Check ENABLE_EVENT_SOURCING env var and Redis/ClickHouse availability.",
+      "Command DROPPED: event sourcing is disabled. Check Redis/ClickHouse availability.",
     );
   }
 
@@ -39,7 +39,7 @@ class DisabledQueueProcessor<
         command: this.commandName,
         count: payloads.length,
       },
-      "Batch of commands DROPPED: event sourcing is disabled. Check ENABLE_EVENT_SOURCING env var and Redis/ClickHouse availability.",
+      "Batch of commands DROPPED: event sourcing is disabled. Check Redis/ClickHouse availability.",
     );
   }
 
@@ -68,11 +68,15 @@ class DisabledEventSourcingService {
   getCommandQueues() {
     return new Map();
   }
+
+  registerJob(): null {
+    return null;
+  }
 }
 
 /**
  * A disabled pipeline that logs warnings but doesn't throw errors.
- * Used when ENABLE_EVENT_SOURCING=false.
+ * Used when event sourcing is disabled (e.g. no ClickHouse available in production).
  */
 export class DisabledPipeline<
   EventType extends Event = Event,

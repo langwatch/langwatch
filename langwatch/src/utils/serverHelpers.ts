@@ -13,6 +13,7 @@ async function createInnerTRPCContext(context: GetServerSidePropsContext) {
     res: undefined,
     permissionChecked: false,
     publiclyShared: false,
+    organizationRole: undefined,
   };
 }
 

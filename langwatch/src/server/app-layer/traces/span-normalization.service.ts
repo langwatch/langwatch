@@ -30,12 +30,6 @@ export class SpanNormalizationPipelineService {
     private readonly canonicalizeSpanAttributesService: CanonicalizeSpanAttributesService,
   ) {}
 
-  static create(): SpanNormalizationPipelineService {
-    return new SpanNormalizationPipelineService(
-      new CanonicalizeSpanAttributesService(),
-    );
-  }
-
   normalizeSpanReceived(
     tenantId: string,
     otlpSpan: OtlpSpan,
@@ -68,7 +62,7 @@ export class SpanNormalizationPipelineService {
         span.setAttributes({
           "span.record_id": normalizedSpan.id,
         });
-        this.logger.info(
+        this.logger.debug(
           {
             tenantId,
             traceId: normalizedSpan.traceId,
@@ -108,7 +102,7 @@ export class SpanNormalizationPipelineService {
       TraceRequestUtils.convertUnixNanoToUnixMs(startTimeUnixNano);
     const endTimeUnixMs =
       TraceRequestUtils.convertUnixNanoToUnixMs(endTimeUnixNano);
-    const durationMs = endTimeUnixMs - startTimeUnixMs;
+    const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
     const parentAndTraceContext =
       TraceRequestUtils.normalizeOtlpParentAndTraceContext(
         otlpSpan.parentSpanId,
@@ -166,16 +160,6 @@ export class SpanNormalizationPipelineService {
             event.attributes,
           );
 
-          // Debug: log event attributes
-          this.logger.debug(
-            {
-              eventName: event.name,
-              rawAttributes: JSON.stringify(event.attributes),
-              normalizedAttributes: JSON.stringify(attributes),
-            },
-            "Normalized event attributes",
-          );
-
           return {
             name: event.name,
             timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
@@ -223,7 +207,7 @@ export class SpanNormalizationPipelineService {
         span.setAttributes({
           applied_rules: result.appliedRules,
         });
-        this.logger.info(
+        this.logger.debug(
           {
             appliedRules: result.appliedRules,
           },

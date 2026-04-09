@@ -7,6 +7,94 @@
  */
 
 /**
+ * Identity columns always included in trace_summaries dedup subqueries.
+ * These are required for deduplication (TraceId, UpdatedAt),
+ * tenant isolation (TenantId), and time filtering (OccurredAt).
+ */
+export const TRACE_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "OccurredAt",
+  "UpdatedAt",
+] as const;
+
+/**
+ * All trace_summaries columns that analytics queries may reference.
+ * Excludes wide payload columns (ComputedInput, ComputedOutput) that
+ * are never needed by analytics aggregations.
+ */
+export const TRACE_ANALYTICS_COLUMNS = [
+  ...TRACE_IDENTITY_COLUMNS,
+  "CreatedAt",
+  "TotalCost",
+  "TotalDurationMs",
+  "TimeToFirstTokenMs",
+  "TotalPromptTokenCount",
+  "TotalCompletionTokenCount",
+  "TokensPerSecond",
+  "ContainsErrorStatus",
+  "ErrorMessage",
+  "TopicId",
+  "SubTopicId",
+  "AnnotationIds",
+  "HasAnnotation",
+  "Models",
+  "Attributes",
+] as const;
+
+/**
+ * Identity columns always included in evaluation_runs subqueries.
+ * Required for deduplication, tenant isolation, and JOIN keys.
+ */
+export const EVALUATION_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "EvaluationId",
+  "UpdatedAt",
+] as const;
+
+/**
+ * All evaluation_runs columns that analytics queries may reference.
+ */
+export const EVALUATION_ANALYTICS_COLUMNS = [
+  ...EVALUATION_IDENTITY_COLUMNS,
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluatorType",
+  "Score",
+  "Passed",
+  "Label",
+  "Status",
+  "IsGuardrail",
+] as const;
+
+/**
+ * Identity columns always included in stored_spans subqueries.
+ */
+export const SPAN_IDENTITY_COLUMNS = [
+  "TenantId",
+  "TraceId",
+  "SpanId",
+] as const;
+
+/**
+ * All stored_spans columns that analytics queries may reference.
+ * Excludes wide columns like Input, Output, and the full SpanAttributes map
+ * when only specific attribute keys are needed.
+ */
+export const SPAN_ANALYTICS_COLUMNS = [
+  ...SPAN_IDENTITY_COLUMNS,
+  "SpanAttributes",
+  "StartTime",
+  "EndTime",
+  "DurationMs",
+  "StatusCode",
+  `"Events.Name"`,
+  `"Events.Timestamp"`,
+  `"Events.Attributes"`,
+] as const;
+
+/**
  * The ClickHouse table that contains the data for a field
  */
 export type CHTable =
@@ -308,19 +396,11 @@ export const fieldMappings: Record<string, FieldMapping> = {
     isArray: true,
   },
 
-  // ===== Input/Output Sentiment =====
-  "input.satisfaction_score": {
-    table: "trace_summaries",
-    column: "Attributes['langwatch.input.satisfaction_score']",
-    description: "Input sentiment satisfaction score",
-    mapValueType: "number",
-  },
-
   // ===== Annotation Fields =====
   annotations: {
     table: "trace_summaries",
-    column: "HasAnnotation",
-    description: "Whether trace has annotations",
+    column: "AnnotationIds",
+    description: "Annotation IDs on trace",
   },
 
   // ===== Model Fields (for grouping) =====
@@ -394,20 +474,155 @@ export function getTableAlias(table: CHTable): string {
 }
 
 /**
- * Build JOIN clause for a table
+ * Build JOIN clause for a table, selecting only the columns needed.
+ *
+ * @param table - The table to JOIN
+ * @param requiredColumns - Optional set of columns needed by the query.
+ *   When provided, only these columns (plus identity columns) are selected.
+ *   When omitted, all analytics columns for the table are selected.
  */
-export function buildJoinClause(table: CHTable): string {
+export function buildJoinClause(
+  table: CHTable,
+  requiredColumns?: ReadonlySet<string>,
+): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
 
   switch (table) {
-    case "stored_spans":
-      return `JOIN stored_spans ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
-    case "evaluation_runs":
-      return `JOIN evaluation_runs ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    case "stored_spans": {
+      const columns = requiredColumns
+        ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
+        : SPAN_ANALYTICS_COLUMNS;
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    }
+    case "evaluation_runs": {
+      const columns = requiredColumns
+        ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
+        : EVALUATION_ANALYTICS_COLUMNS;
+      return `JOIN (
+        SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
+        WHERE TenantId = {tenantId:String}
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM evaluation_runs
+            WHERE TenantId = {tenantId:String}
+            GROUP BY TenantId, EvaluationId
+          )
+      ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    }
     default:
       return "";
   }
+}
+
+/**
+ * Merge required columns with identity columns, ensuring identity columns
+ * are always present.
+ */
+function mergeWithIdentity(
+  required: ReadonlySet<string>,
+  identity: readonly string[],
+): string[] {
+  const merged = new Set<string>(identity);
+  for (const col of required) {
+    merged.add(col);
+  }
+  return Array.from(merged);
+}
+
+/**
+ * Non-identity columns from stored_spans that may appear in SQL expressions.
+ * Used by `extractReferencedSpanColumns` to detect which columns a query needs.
+ */
+const SPAN_SELECTABLE_COLUMNS = [
+  "SpanAttributes",
+  "StartTime",
+  "EndTime",
+  "DurationMs",
+  "StatusCode",
+  `"Events.Name"`,
+  `"Events.Timestamp"`,
+  `"Events.Attributes"`,
+] as const;
+
+/**
+ * Non-identity columns from evaluation_runs that may appear in SQL expressions.
+ */
+const EVALUATION_SELECTABLE_COLUMNS = [
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluatorType",
+  "Score",
+  "Passed",
+  "Label",
+  "Status",
+  "IsGuardrail",
+] as const;
+
+/**
+ * Characters that can appear immediately after a column name in SQL.
+ * Used to prevent false-positive substring matches (e.g. "Status" matching "StatusCode").
+ */
+const COLUMN_BOUNDARY = /(?=[\s,)=<>!\[\.'"]|$)/;
+
+/**
+ * Build a regex that matches a column name at a word boundary in SQL context.
+ * Handles both quoted ("Events.Name") and unqualified column names,
+ * optionally prefixed with a table alias (e.g. `ss.SpanAttributes`).
+ */
+function buildColumnPattern(col: string, alias: string): RegExp {
+  const rawCol = col.replace(/"/g, "");
+  // Escape special regex chars in the column name (e.g. dots in "Events.Name")
+  const escaped = rawCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Match alias.Column or unqualified Column, followed by a boundary
+  const pattern = `(?:${alias}\\.)?(?:"?${escaped}"?)${COLUMN_BOUNDARY.source}`;
+  return new RegExp(pattern);
+}
+
+/**
+ * Extract which stored_spans columns are referenced in a set of SQL expressions.
+ *
+ * Scans the expressions for references to known span column names (including
+ * through the table alias `ss.`). Returns the set of column names suitable for
+ * passing to `buildJoinClause` as `requiredColumns`.
+ *
+ * WHY: The full SpanAttributes Map column can be kilobytes per span.
+ * Selecting only the columns actually referenced avoids reading unused data
+ * and prevents ClickHouse OOM on large result sets.
+ */
+export function extractReferencedSpanColumns(
+  expressions: string[],
+): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.stored_spans;
+
+  for (const col of SPAN_SELECTABLE_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Extract which evaluation_runs columns are referenced in a set of SQL expressions.
+ */
+export function extractReferencedEvaluationColumns(
+  expressions: string[],
+): ReadonlySet<string> {
+  const joined = expressions.join(" ");
+  const columns = new Set<string>();
+  const alias = tableAliases.evaluation_runs;
+
+  for (const col of EVALUATION_SELECTABLE_COLUMNS) {
+    if (buildColumnPattern(col, alias).test(joined)) {
+      columns.add(col);
+    }
+  }
+
+  return columns;
 }
 
 /**

@@ -1,7 +1,7 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
-	ErrorCategory,
+	classifyClickHouseError,
 	SecurityError,
 	StoreError,
 	ValidationError,
@@ -52,18 +52,19 @@ interface ClickHouseExperimentRunRecord {
   ScoreCount: number;
   PassedCount: number;
   GradedCount: number;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
   ClickHouseExperimentRunRecord,
-  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt"
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
 >;
 
 export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
 > implements ExperimentRunStateRepository<ProjectionType>
 {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseExperimentRunRecord,
@@ -92,6 +93,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
       GradedCount: record.GradedCount ?? 0,
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -129,6 +131,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
       GradedCount: data.GradedCount,
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
     };
   }
 
@@ -145,7 +148,8 @@ export class ExperimentRunStateRepositoryClickHouse<
     const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
 
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(context.tenantId);
+      const result = await client.query({
         query: `
           SELECT
             ProjectionId, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
@@ -158,7 +162,8 @@ export class ExperimentRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
             LastProcessedEventId,
-            TotalScoreSum, ScoreCount, PassedCount, GradedCount
+            TotalScoreSum, ScoreCount, PassedCount, GradedCount,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND RunId = {runId:String}
@@ -192,7 +197,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         "getProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to get projection for run ${runId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { runId },
         error,
       );
@@ -226,6 +231,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
+      const client = await this.resolveClient(context.tenantId);
       const { runId } = parseExperimentRunKey(String(projection.aggregateId));
       const projectionRecord = this.mapProjectionDataToClickHouseRecord(
         projection.data as ExperimentRunStateData,
@@ -236,15 +242,13 @@ export class ExperimentRunStateRepositoryClickHouse<
         runId,
       );
 
-      await this.clickHouseClient.insert({
+      await client.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug({ tenantId: context.tenantId, runId, projectionId: projection.id },
-        "Stored experiment run state projection to ClickHouse");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -258,8 +262,69 @@ export class ExperimentRunStateRepositoryClickHouse<
         "storeProjection",
         "ExperimentRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for run ${projection.aggregateId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { projectionId: projection.id, runId: String(projection.aggregateId) },
+        error,
+      );
+    }
+  }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (projections.length === 0) return;
+
+    EventUtils.validateTenantId(
+      context,
+      "ExperimentRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
+
+    for (const projection of projections) {
+      if (projection.tenantId !== context.tenantId) {
+        throw new SecurityError(
+          "storeProjectionBatch",
+          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          projection.tenantId,
+          { contextTenantId: context.tenantId },
+        );
+      }
+    }
+
+    try {
+      const records = projections.map((projection) => {
+        const { runId } = parseExperimentRunKey(String(projection.aggregateId));
+        return this.mapProjectionDataToClickHouseRecord(
+          projection.data as ExperimentRunStateData,
+          String(context.tenantId),
+          projection.id,
+          projection.version,
+          projection.id,
+          runId,
+        );
+      });
+
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({
+        tenantId: context.tenantId,
+        count: projections.length,
+        error: errorMessage,
+      }, "Failed to batch store projections in ClickHouse");
+      throw new StoreError(
+        "storeProjectionBatch",
+        "ExperimentRunStateRepositoryClickHouse",
+        `Failed to batch store ${projections.length} projections: ${errorMessage}`,
+        classifyClickHouseError(error),
+        { count: projections.length },
         error,
       );
     }

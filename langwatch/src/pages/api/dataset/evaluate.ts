@@ -9,7 +9,6 @@ import { fromZodError, type ZodError } from "zod-validation-error";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
-import { createCostChecker } from "../../../server/license-enforcement/license-enforcement.repository";
 import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 import {
   type DataForEvaluation,
@@ -104,21 +103,6 @@ export default async function handler(
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
-  }
-
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return res.status(200).json({
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    });
   }
 
   const { datasetSlug } = params;

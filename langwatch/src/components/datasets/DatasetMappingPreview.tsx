@@ -228,7 +228,7 @@ export function DatasetMappingPreview({
           >
             <Box
               as="button"
-              onClick={() => setIsThreadMapping(false)}
+              onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsThreadMapping(false); }}
               bg={!isThreadMapping ? "white" : "transparent"}
               _dark={{
                 bg: !isThreadMapping ? "gray.700" : "transparent",
@@ -247,7 +247,7 @@ export function DatasetMappingPreview({
             </Box>
             <Box
               as="button"
-              onClick={() => setIsThreadMapping(true)}
+              onClick={(e: React.MouseEvent) => { e.preventDefault(); setIsThreadMapping(true); }}
               bg={isThreadMapping ? "white" : "transparent"}
               _dark={{
                 bg: isThreadMapping ? "gray.700" : "transparent",
@@ -263,7 +263,7 @@ export function DatasetMappingPreview({
               transition="all 0.15s"
             >
               <HStack gap={1}>
-                <Text>Threads</Text>
+                <Text>Thread</Text>
                 {isThreadMapping && (
                   <>
                     {threadIds.length === 0 ? (

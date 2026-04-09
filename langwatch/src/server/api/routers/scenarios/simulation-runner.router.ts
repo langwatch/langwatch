@@ -3,17 +3,17 @@
  */
 
 import { TRPCError } from "@trpc/server";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-} from "~/server/scenarios/scenario.queue";
+import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -36,6 +36,8 @@ const runScenarioSchema = projectSchema.extend({
   target: simulationTargetSchema,
   /** Optional set ID - defaults to internal on-platform set ID for ad-hoc runs */
   setId: z.string().optional(),
+  /** Optional client-generated batch run ID for immediate placeholder feedback */
+  batchRunId: z.string().optional(),
 });
 
 /**
@@ -54,7 +56,7 @@ export const simulationRunnerRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       const setId = input.setId ?? getOnPlatformSetId(input.projectId);
-      const batchRunId = generateBatchRunId();
+      const batchRunId = input.batchRunId ?? generateBatchRunId();
 
       // Validate early - prefetch data to catch configuration errors before scheduling
       const deps = createDataPrefetcherDependencies();
@@ -84,32 +86,52 @@ export const simulationRunnerRouter = createTRPCRouter({
         });
       }
 
+      const scenarioRunId = generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
+
       logger.info(
         {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
           batchRunId,
+          scenarioRunId,
         },
         "Scheduling scenario execution",
       );
 
-      const job = await scheduleScenarioRun({
-        projectId: input.projectId,
-        scenarioId: input.scenarioId,
-        target: input.target,
-        setId,
-        batchRunId,
-        index: 0,
-      });
+      // Dispatch queueRun command first so QUEUED state is written to ClickHouse
+      // before the BullMQ job is scheduled — same pattern as SuiteRunService.startRun()
+      try {
+        await getApp().simulations.queueRun({
+          tenantId: input.projectId,
+          scenarioRunId,
+          scenarioId: input.scenarioId,
+          batchRunId,
+          scenarioSetId: setId,
+          name: prefetchResult.data.scenario.name,
+          target: { type: input.target.type, referenceId: input.target.referenceId },
+          occurredAt: Date.now(),
+        });
+      } catch (error) {
+        logger.error(
+          { error, projectId: input.projectId, scenarioRunId, batchRunId },
+          "Failed to queue scenario run",
+        );
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to queue scenario run",
+          cause: error,
+        });
+      }
 
-      logger.info({ jobId: job.id, batchRunId }, "Scenario scheduled");
+      // No explicit job scheduling — the execution reactor picks up the queued
+      // event via the GroupQueue and spawns the child process.
+      logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
 
-      // Return honest response: job was scheduled, not executed
       return {
         scheduled: true,
-        jobId: job.id,
         setId,
         batchRunId,
+        scenarioRunId,
       };
     }),
 });

@@ -5,6 +5,7 @@ import { env } from "../../../env.mjs";
 
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { UserService } from "~/server/users/user.service";
 
 export const userRouter = createTRPCRouter({
   register: publicProcedure
@@ -56,6 +57,9 @@ export const userRouter = createTRPCRouter({
     .input(z.object({}))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx }) => {
+      // Don't update lastLoginAt for impersonated sessions
+      if ((ctx.session.user as any).impersonator) return;
+
       await ctx.prisma.user.update({
         where: {
           id: ctx.session.user.id,
@@ -64,6 +68,12 @@ export const userRouter = createTRPCRouter({
           lastLoginAt: new Date(),
         },
       });
+    }),
+  getSsoStatus: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      return UserService.create(ctx.prisma).getSsoStatus({ id: ctx.session.user.id });
     }),
   getLinkedAccounts: protectedProcedure
     .input(z.object({}))
@@ -186,6 +196,20 @@ export const userRouter = createTRPCRouter({
         },
       });
 
+      return { success: true };
+    }),
+  deactivate: protectedProcedure
+    .input(z.object({ userId: z.string() }))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      await UserService.create(ctx.prisma).deactivate({ id: input.userId });
+      return { success: true };
+    }),
+  reactivate: protectedProcedure
+    .input(z.object({ userId: z.string() }))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      await UserService.create(ctx.prisma).reactivate({ id: input.userId });
       return { success: true };
     }),
 });

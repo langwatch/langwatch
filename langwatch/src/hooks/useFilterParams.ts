@@ -73,6 +73,50 @@ export const useFilterParams = () => {
     }
   }
 
+  // Saved view fallback: when the URL has no filter/date/query params and a
+  // saved view is stored in localStorage, use the view's filters so the first
+  // query already has the correct filters. Layout params like project, view,
+  // group_by are fine — only filter keys, dates, and search prevent fallback.
+  const hasUrlFilterOrDateParams =
+    Object.values(availableFilters).some(
+      (f) => queryParams[f.urlKey] !== undefined,
+    ) ||
+    !!queryParams.query ||
+    !!queryParams.startDate ||
+    !!queryParams.endDate;
+
+  if (!hasUrlFilterOrDateParams && project?.id) {
+    try {
+      const viewId =
+        localStorage.getItem(
+          `langwatch-saved-views-selected-${project.id}`,
+        ) ??
+        localStorage.getItem(`langwatch-selected-view-${project.id}`);
+
+      if (viewId && viewId !== "all-traces") {
+        const raw = localStorage.getItem(
+          `langwatch-saved-views-cache-${project.id}`,
+        );
+        if (raw) {
+          const cached = JSON.parse(raw) as Array<{
+            id: string;
+            filters?: Record<string, FilterParam>;
+          }>;
+          const view = cached.find((v) => v.id === viewId);
+          if (view?.filters) {
+            for (const [key, value] of Object.entries(view.filters)) {
+              if (key in availableFilters) {
+                filters[key as FilterField] = value;
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // localStorage unavailable or corrupt — ignore
+    }
+  }
+
   const setFilter = (filter: FilterField, params: FilterParam) => {
     const filterUrl = availableFilters[filter].urlKey;
     void router.push(
@@ -81,7 +125,10 @@ export const useFilterParams = () => {
           {
             ...Object.fromEntries(
               Object.entries(router.query).filter(
-                ([key]) => !key.startsWith(filterUrl),
+                ([key]) =>
+                  key !== "project" &&
+                  key !== filterUrl &&
+                  !key.startsWith(filterUrl + "."),
               ),
             ),
             [filterUrl]: params,
@@ -106,8 +153,9 @@ export const useFilterParams = () => {
             ...Object.fromEntries(
               Object.entries(router.query).filter(
                 ([key]) =>
-                  !Object.values(availableFilters).some((f) =>
-                    key.startsWith(f.urlKey),
+                  key !== "project" &&
+                  !Object.values(availableFilters).some(
+                    (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
                   ),
               ),
             ),
@@ -135,11 +183,14 @@ export const useFilterParams = () => {
   const clearFilters = () => {
     void router.push(
       {
+        pathname: router.pathname,
         query: Object.fromEntries(
           Object.entries(router.query).filter(
             ([key]) =>
-              !Object.values(availableFilters).some((filter) =>
-                key.startsWith(filter.urlKey),
+              key !== "query" &&
+              !Object.values(availableFilters).some(
+                (filter) =>
+                  key === filter.urlKey || key.startsWith(filter.urlKey + "."),
               ),
           ),
         ),
@@ -163,12 +214,21 @@ export const useFilterParams = () => {
   };
 
   const setNegateFilters = (negateFilters: boolean) => {
+    const { project: _project, ...rest } = router.query;
     void router.push(
       "?" +
-        qs.stringify({
-          ...router.query,
-          negateFilters: negateFilters ? "true" : "false",
-        }),
+        qs.stringify(
+          {
+            ...rest,
+            negateFilters: negateFilters ? "true" : "false",
+          },
+          {
+            allowDots: true,
+            arrayFormat: "comma",
+            // @ts-ignore of course it exists
+            allowEmptyArrays: true,
+          },
+        ),
       undefined,
       { shallow: true, scroll: false },
     );
@@ -189,7 +249,12 @@ export const useFilterParams = () => {
     filterCount,
     hasAnyFilters,
     queryOpts: {
-      enabled: !!project && !!startDate && !!endDate,
+      enabled:
+        !!project &&
+        !!startDate &&
+        !isNaN(startDate.getTime()) &&
+        !!endDate &&
+        !isNaN(endDate.getTime()),
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       trpc: {

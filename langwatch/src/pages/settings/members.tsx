@@ -35,7 +35,7 @@ import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
-} from "../../server/api/routers/organization";
+} from "../../server/app-layer/organizations/repositories/organization.repository";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 
@@ -51,6 +51,7 @@ function Members() {
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       {
         organizationId: organization?.id ?? "",
+        includeDeactivated: true,
       },
       { enabled: !!organization },
     );
@@ -248,10 +249,12 @@ function MembersList({
         <HStack width="full">
           <Heading>Organization Members</Heading>
           <Spacer />
-          <PageLayout.HeaderButton onClick={onAddMembersOpen}>
-            <Plus size={20} />
-            Add members
-          </PageLayout.HeaderButton>
+          {hasOrganizationManagePermission && (
+            <PageLayout.HeaderButton onClick={onAddMembersOpen}>
+              <Plus size={20} />
+              Add members
+            </PageLayout.HeaderButton>
+          )}
         </HStack>
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>
@@ -279,9 +282,16 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        <Link href={`/settings/members/${member.userId}`}>
-                          {member.user.name}
-                        </Link>
+                        <HStack>
+                          <Link href={`/settings/members/${member.userId}`}>
+                            {member.user.name}
+                          </Link>
+                          {member.user.deactivatedAt && (
+                            <Badge colorPalette="red" size="sm">
+                              Deactivated
+                            </Badge>
+                          )}
+                        </HStack>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>{roleLabel}</Table.Cell>
@@ -409,6 +419,7 @@ function MembersList({
               isLoading={isSubmitting}
               hasEmailProvider={hasEmailProvider ?? false}
               onClose={onAddMembersClose}
+              isInviterAdmin={hasOrganizationManagePermission}
             />
           </Dialog.Body>
         </Dialog.Content>

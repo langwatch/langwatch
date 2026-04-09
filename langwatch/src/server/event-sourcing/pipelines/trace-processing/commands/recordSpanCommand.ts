@@ -19,9 +19,12 @@ import {
 	SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpSpan } from "../schemas/otlp";
+import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
 import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
+import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
+import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
@@ -32,12 +35,20 @@ export interface RecordSpanCommandDependencies {
   piiRedactionService: {
     redactSpan: (
       span: OtlpSpan,
+      resource: OtlpResource | null,
       piiRedactionLevel: PIIRedactionLevel,
     ) => Promise<void>;
   };
   /** Service for enriching spans with custom LLM cost rates. */
   costEnrichmentService: {
     enrichSpan: (span: OtlpSpan, tenantId: string) => Promise<void>;
+  };
+  /** Service for estimating token counts from input/output text. */
+  tokenEstimationService: {
+    estimateSpanTokens: (args: {
+      span: OtlpSpan;
+      tenantId?: string;
+    }) => Promise<void>;
   };
 }
 
@@ -46,10 +57,14 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { prisma } = require("~/server/db") as { prisma: import("@prisma/client").PrismaClient };
   return {
-    piiRedactionService: OtlpSpanPiiRedactionService.create(),
-    costEnrichmentService: OtlpSpanCostEnrichmentService.create(
+    piiRedactionService: new OtlpSpanPiiRedactionService(),
+    costEnrichmentService: new OtlpSpanCostEnrichmentService(
       createCostEnrichmentDeps(prisma),
     ),
+    tokenEstimationService: new OtlpSpanTokenEstimationService({
+      tokenizer: new TiktokenClient(),
+      featureFlagService,
+    }),
   };
 }
 
@@ -98,7 +113,7 @@ export class RecordSpanCommand implements CommandHandler<
           commandData.span,
         );
 
-        this.logger.info(
+        this.logger.debug(
           {
             tenantId,
             traceId,
@@ -107,30 +122,39 @@ export class RecordSpanCommand implements CommandHandler<
           "Handling record span command",
         );
 
-        // Clone span before mutation to preserve command immutability
+        // Clone span and resource before mutation to preserve command immutability
         const spanToProcess = structuredClone(commandData.span);
+        const resourceToProcess = commandData.resource
+          ? structuredClone(commandData.resource)
+          : null;
 
         // Strip any user-submitted langwatch.reserved.* attributes — this domain
         // is reserved for system-generated attributes only.
         RecordSpanCommand.stripReservedAttributes(
           spanToProcess,
+          resourceToProcess,
           this.logger,
         );
 
         const piiRedactionLevel =
           commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
 
-        // Run PII redaction and cost enrichment in parallel.
-        // Safe: PII modifies existing attr values; cost pushes new entries.
-        const [piiResult, costResult] = await Promise.allSettled([
+        // Run PII redaction, cost enrichment, and token estimation in parallel.
+        // Safe: PII modifies existing attr values; cost and tokens push new entries.
+        const [piiResult, costResult, tokenResult] = await Promise.allSettled([
           this.deps.piiRedactionService.redactSpan(
             spanToProcess,
+            resourceToProcess,
             piiRedactionLevel,
           ),
           this.deps.costEnrichmentService.enrichSpan(
             spanToProcess,
             tenantIdStr,
           ),
+          this.deps.tokenEstimationService.estimateSpanTokens({
+            span: spanToProcess,
+            tenantId: tenantIdStr,
+          }),
         ]);
 
         // Cost enrichment is non-critical — log and continue
@@ -138,6 +162,14 @@ export class RecordSpanCommand implements CommandHandler<
           this.logger.warn(
             { error: costResult.reason },
             "Cost enrichment failed, continuing without cost data",
+          );
+        }
+
+        // Token estimation is non-critical — log and continue
+        if (tokenResult.status === "rejected") {
+          this.logger.warn(
+            { error: tokenResult.reason },
+            "Token estimation failed, continuing without estimated tokens",
           );
         }
 
@@ -160,7 +192,7 @@ export class RecordSpanCommand implements CommandHandler<
           version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
           data: {
             span: spanToProcess,
-            resource: commandData.resource,
+            resource: resourceToProcess,
             instrumentationScope: commandData.instrumentationScope,
             piiRedactionLevel,
           },
@@ -207,6 +239,7 @@ export class RecordSpanCommand implements CommandHandler<
    */
   private static stripReservedAttributes(
     span: OtlpSpan,
+    resource: OtlpResource | null,
     logger: ReturnType<typeof createLogger>,
   ): void {
     const RESERVED_PREFIX = "langwatch.reserved.";
@@ -231,6 +264,9 @@ export class RecordSpanCommand implements CommandHandler<
     }
     for (const link of span.links) {
       link.attributes = strip(link.attributes);
+    }
+    if (resource) {
+      resource.attributes = strip(resource.attributes);
     }
   }
 

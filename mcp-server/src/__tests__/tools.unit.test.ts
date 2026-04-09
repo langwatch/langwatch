@@ -8,7 +8,11 @@ vi.mock("../langwatch-api.js", () => ({
   getPrompt: vi.fn(),
   createPrompt: vi.fn(),
   updatePrompt: vi.fn(),
-  createPromptVersion: vi.fn(),
+  assignPromptTag: vi.fn(),
+  listPromptTags: vi.fn(),
+  createPromptTag: vi.fn(),
+  renamePromptTag: vi.fn(),
+  deletePromptTag: vi.fn(),
 }));
 
 import {
@@ -19,7 +23,11 @@ import {
   getPrompt,
   createPrompt,
   updatePrompt,
-  createPromptVersion,
+  assignPromptTag,
+  listPromptTags,
+  createPromptTag,
+  renamePromptTag,
+  deletePromptTag,
   type PromptSummary,
 } from "../langwatch-api.js";
 
@@ -30,6 +38,11 @@ import { handleListPrompts } from "../tools/list-prompts.js";
 import { handleGetPrompt } from "../tools/get-prompt.js";
 import { handleCreatePrompt } from "../tools/create-prompt.js";
 import { handleUpdatePrompt } from "../tools/update-prompt.js";
+import { handleAssignPromptTag } from "../tools/assign-prompt-tag.js";
+import { handleListPromptTags } from "../tools/list-prompt-tags.js";
+import { handleCreatePromptTag } from "../tools/create-prompt-tag.js";
+import { handleRenamePromptTag } from "../tools/rename-prompt-tag.js";
+import { handleDeletePromptTag } from "../tools/delete-prompt-tag.js";
 
 const mockSearchTraces = vi.mocked(searchTraces);
 const mockGetTraceById = vi.mocked(getTraceById);
@@ -38,7 +51,11 @@ const mockListPrompts = vi.mocked(listPrompts);
 const mockGetPrompt = vi.mocked(getPrompt);
 const mockCreatePrompt = vi.mocked(createPrompt);
 const mockUpdatePrompt = vi.mocked(updatePrompt);
-const mockCreatePromptVersion = vi.mocked(createPromptVersion);
+const mockAssignPromptTag = vi.mocked(assignPromptTag);
+const mockListPromptTags = vi.mocked(listPromptTags);
+const mockCreatePromptTag = vi.mocked(createPromptTag);
+const mockRenamePromptTag = vi.mocked(renamePromptTag);
+const mockDeletePromptTag = vi.mocked(deletePromptTag);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -393,6 +410,31 @@ describe("handleGetAnalytics()", () => {
       expect(result).toContain("Grouped by: metadata.model");
     });
 
+    it("formats grouped data with group column", async () => {
+      mockGetAnalytics.mockResolvedValue({
+        currentPeriod: [
+          {
+            date: "2024-01-01",
+            "sentiment.thumbs_up_down": {
+              "Thumbs Up": { "0/metadata.trace_id/cardinality": 10 },
+              "Thumbs Down": { "0/metadata.trace_id/cardinality": 5 },
+            },
+          },
+        ],
+        previousPeriod: [],
+      });
+
+      const result = await handleGetAnalytics({
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+        groupBy: "sentiment.thumbs_up_down",
+      });
+
+      expect(result).toContain("| Date | Group | Value |");
+      expect(result).toContain("| 2024-01-01 | Thumbs Up | 10 |");
+      expect(result).toContain("| 2024-01-01 | Thumbs Down | 5 |");
+    });
+
     it("uses the specified aggregation", async () => {
       mockGetAnalytics.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
@@ -449,22 +491,20 @@ describe("handleListPrompts()", () => {
           handle: "greeting",
           name: "Greeting Prompt",
           latestVersionNumber: 3,
-          description: "A friendly greeting prompt",
         },
         {
           id: "p2",
           name: "Summary",
           version: 1,
-          description: "",
         },
       ]);
 
       const result = await handleListPrompts();
 
       expect(result).toContain("# Prompts (2 total)");
-      expect(result).toContain("| Handle | Name | Latest Version | Description |");
-      expect(result).toContain("| greeting | Greeting Prompt | v3 | A friendly greeting prompt |");
-      expect(result).toContain("| p2 | Summary | v1 |  |");
+      expect(result).toContain("| Handle | Name | Latest Version |");
+      expect(result).toContain("| greeting | Greeting Prompt | v3 |");
+      expect(result).toContain("| p2 | Summary | v1 |");
     });
   });
 
@@ -506,13 +546,11 @@ describe("handleGetPrompt()", () => {
         id: "p1",
         handle: "greeting",
         name: "Greeting Prompt",
-        description: "A greeting",
         latestVersionNumber: 2,
         versions: [
           {
             version: 2,
-            model: "gpt-4o",
-            modelProvider: "openai",
+            model: "openai/gpt-4o",
             messages: [
               { role: "system", content: "You are a greeter." },
               { role: "user", content: "Hello!" },
@@ -531,10 +569,9 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("# Prompt: Greeting Prompt");
       expect(result).toContain("**Handle**: greeting");
       expect(result).toContain("**ID**: p1");
-      expect(result).toContain("**Description**: A greeting");
       expect(result).toContain("**Latest Version**: v2");
-      expect(result).toContain("**Model**: gpt-4o");
-      expect(result).toContain("**Provider**: openai");
+      expect(result).toContain("**Model**: openai/gpt-4o");
+      expect(result).not.toContain("**Provider**");
     });
 
     it("formats messages", async () => {
@@ -598,15 +635,14 @@ describe("handleGetPrompt()", () => {
     it("uses prompt-level model config", async () => {
       mockGetPrompt.mockResolvedValue({
         name: "Simple",
-        model: "gpt-3.5-turbo",
-        modelProvider: "openai",
+        model: "openai/gpt-3.5-turbo",
         messages: [{ role: "system", content: "Be brief." }],
       });
 
       const result = await handleGetPrompt({ idOrHandle: "simple" });
 
-      expect(result).toContain("**Model**: gpt-3.5-turbo");
-      expect(result).toContain("**Provider**: openai");
+      expect(result).toContain("**Model**: openai/gpt-3.5-turbo");
+      expect(result).not.toContain("**Provider**");
       expect(result).toContain("### system\nBe brief.");
     });
   });
@@ -626,16 +662,54 @@ describe("handleCreatePrompt()", () => {
         name: "My Prompt",
         handle: "my-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "gpt-4o",
-        modelProvider: "openai",
+        model: "openai/gpt-4o",
       });
 
       expect(result).toContain("Prompt created successfully!");
       expect(result).toContain("**ID**: new-id-123");
       expect(result).toContain("**Handle**: my-prompt");
       expect(result).toContain("**Name**: My Prompt");
-      expect(result).toContain("**Model**: gpt-4o (openai)");
+      expect(result).toContain("**Model**: openai/gpt-4o");
       expect(result).toContain("**Version**: v1");
+    });
+
+    it("generates handle from name when handle is not provided", async () => {
+      mockCreatePrompt.mockResolvedValue({
+        id: "new-id",
+        handle: "my-prompt",
+      });
+
+      await handleCreatePrompt({
+        name: "My Prompt!",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
+
+      expect(mockCreatePrompt).toHaveBeenCalledWith({
+        handle: "my-prompt",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
+    });
+
+    it("uses provided handle instead of generating one", async () => {
+      mockCreatePrompt.mockResolvedValue({
+        id: "new-id",
+        handle: "custom-handle",
+      });
+
+      await handleCreatePrompt({
+        name: "My Prompt",
+        handle: "custom-handle",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
+
+      expect(mockCreatePrompt).toHaveBeenCalledWith({
+        handle: "custom-handle",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
     });
   });
 
@@ -646,8 +720,7 @@ describe("handleCreatePrompt()", () => {
       const result = await handleCreatePrompt({
         name: "Fallback Name",
         messages: [{ role: "system", content: "test" }],
-        model: "gpt-4o",
-        modelProvider: "openai",
+        model: "openai/gpt-4o",
       });
 
       expect(result).toContain("**Name**: Fallback Name");
@@ -656,7 +729,7 @@ describe("handleCreatePrompt()", () => {
 });
 
 describe("handleUpdatePrompt()", () => {
-  describe("when updating in place", () => {
+  describe("when updating a prompt", () => {
     it("formats an update success message", async () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "p1",
@@ -677,53 +750,151 @@ describe("handleUpdatePrompt()", () => {
       expect(result).toContain("**Commit**: Update system prompt");
     });
 
-    it("calls updatePrompt API", async () => {
+    it("calls updatePrompt API with correct params", async () => {
       mockUpdatePrompt.mockResolvedValue({});
 
       await handleUpdatePrompt({
         idOrHandle: "greeting",
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
+        commitMessage: "Switch model",
       });
 
       expect(mockUpdatePrompt).toHaveBeenCalledWith("greeting", {
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
+        commitMessage: "Switch model",
       });
-      expect(mockCreatePromptVersion).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("handleGetPrompt() with tag options", () => {
+  describe("when called with a tag", () => {
+    it("passes tag option to the API", async () => {
+      mockGetPrompt.mockResolvedValue({ name: "Test" });
+
+      await handleGetPrompt({ idOrHandle: "pizza-prompt", tag: "production" });
+
+      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", { version: undefined, tag: "production" });
+    });
+  });
+});
+
+describe("handleCreatePrompt() with tags", () => {
+  describe("when called with tags", () => {
+    it("includes tags in the output", async () => {
+      mockCreatePrompt.mockResolvedValue({ id: "p1", handle: "test" });
+
+      const result = await handleCreatePrompt({
+        name: "Test",
+        messages: [{ role: "system", content: "hi" }],
+        model: "openai/gpt-5-mini",
+        tags: ["production"],
+      });
+
+      expect(result).toContain("**Tags**: production");
+    });
+  });
+});
+
+describe("handleUpdatePrompt() with tags", () => {
+  describe("when called with tags", () => {
+    it("includes tags in the output", async () => {
+      mockUpdatePrompt.mockResolvedValue({ id: "p1", handle: "test", latestVersionNumber: 2 });
+
+      const result = await handleUpdatePrompt({
+        idOrHandle: "test",
+        commitMessage: "add tags",
+        tags: ["staging"],
+      });
+
+      expect(result).toContain("**Tags**: staging");
+    });
+  });
+});
+
+describe("handleAssignPromptTag()", () => {
+  describe("when tag is assigned successfully", () => {
+    it("returns a confirmation with prompt, tag, and version", async () => {
+      mockAssignPromptTag.mockResolvedValue({ success: true });
+
+      const result = await handleAssignPromptTag({
+        idOrHandle: "pizza-prompt",
+        tag: "production",
+        versionId: "v123",
+      });
+
+      expect(result).toContain("Tag assigned successfully!");
+      expect(result).toContain("**Prompt**: pizza-prompt");
+      expect(result).toContain("**Tag**: production");
+      expect(result).toContain("**Version ID**: v123");
+    });
+  });
+});
+
+describe("handleListPromptTags()", () => {
+  describe("when tags exist", () => {
+    it("formats tags as a markdown list", async () => {
+      mockListPromptTags.mockResolvedValue([
+        { id: "1", name: "production", createdAt: "2024-01-01" },
+        { id: "2", name: "staging" },
+      ]);
+
+      const result = await handleListPromptTags();
+
+      expect(result).toContain("# Prompt Tags");
+      expect(result).toContain("**production**");
+      expect(result).toContain("**staging**");
     });
   });
 
-  describe("when creating a new version", () => {
-    it("formats a version creation success message", async () => {
-      mockCreatePromptVersion.mockResolvedValue({
-        id: "p1",
-        latestVersionNumber: 3,
-      });
+  describe("when no tags exist", () => {
+    it("returns an empty-state message mentioning latest", async () => {
+      mockListPromptTags.mockResolvedValue([]);
 
-      const result = await handleUpdatePrompt({
-        idOrHandle: "greeting",
-        messages: [{ role: "system", content: "New version" }],
-        createVersion: true,
-        commitMessage: "v3",
-      });
+      const result = await handleListPromptTags();
 
-      expect(result).toContain("New version created successfully!");
-      expect(result).toContain("**Version**: v3");
-      expect(result).toContain("**Commit**: v3");
+      expect(result).toContain("No prompt tags found");
+      expect(result).toContain("`latest`");
     });
+  });
+});
 
-    it("calls createPromptVersion API", async () => {
-      mockCreatePromptVersion.mockResolvedValue({});
+describe("handleCreatePromptTag()", () => {
+  describe("when tag is created successfully", () => {
+    it("returns a confirmation with the tag name", async () => {
+      mockCreatePromptTag.mockResolvedValue({ id: "t1", name: "canary" });
 
-      await handleUpdatePrompt({
-        idOrHandle: "greeting",
-        messages: [{ role: "system", content: "New" }],
-        createVersion: true,
-      });
+      const result = await handleCreatePromptTag({ name: "canary" });
 
-      expect(mockCreatePromptVersion).toHaveBeenCalledWith("greeting", {
-        messages: [{ role: "system", content: "New" }],
-      });
-      expect(mockUpdatePrompt).not.toHaveBeenCalled();
+      expect(result).toContain("Tag created successfully!");
+      expect(result).toContain("**Name**: canary");
+    });
+  });
+});
+
+describe("handleRenamePromptTag()", () => {
+  describe("when tag is renamed successfully", () => {
+    it("returns a confirmation with old and new names", async () => {
+      mockRenamePromptTag.mockResolvedValue({ id: "t1", name: "preview" });
+
+      const result = await handleRenamePromptTag({ tag: "canary", name: "preview" });
+
+      expect(result).toContain("Tag renamed successfully!");
+      expect(result).toContain("**Old name**: canary");
+      expect(result).toContain("**New name**: preview");
+    });
+  });
+});
+
+describe("handleDeletePromptTag()", () => {
+  describe("when tag is deleted successfully", () => {
+    it("returns a confirmation with the tag name", async () => {
+      mockDeletePromptTag.mockResolvedValue(null);
+
+      const result = await handleDeletePromptTag({ tag: "canary" });
+
+      expect(result).toContain("Tag deleted successfully!");
+      expect(result).toContain("**Tag**: canary");
     });
   });
 });

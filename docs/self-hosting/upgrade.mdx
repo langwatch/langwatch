@@ -1,0 +1,145 @@
+---
+title: Upgrade Guide
+description: "How to upgrade LangWatch to the latest version"
+---
+
+## Before You Upgrade
+
+1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
+2. **Back up your databases** — see [Backups](/self-hosting/configuration/backups)
+3. **Test in a staging environment** before upgrading production
+
+## Docker Compose
+
+```bash
+# Pull latest images
+docker compose pull
+
+# Restart with new images
+docker compose up -d
+```
+
+Database migrations run automatically on startup.
+
+## Helm Chart
+
+```bash
+# Update the Helm repository
+helm repo update
+
+# Upgrade the release
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+### Pin a Specific Version
+
+```bash
+# List available versions
+helm search repo langwatch/langwatch --versions
+
+# Install a specific chart version
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  --version 3.0.0 \
+  -f values-production.yaml
+```
+
+## Database Migrations
+
+### PostgreSQL
+
+Prisma migrations run automatically when the app pod starts. To disable this (e.g., if you run migrations separately):
+
+```yaml
+app:
+  features:
+    skipEnvValidation: false
+  extraEnvs:
+    - name: SKIP_PRISMA_MIGRATE
+      value: "true"
+```
+
+### ClickHouse
+
+Schema migrations are handled by the application on startup. No manual intervention is required.
+
+## Rollback
+
+### Helm
+
+```bash
+# List release history
+helm history langwatch --namespace langwatch
+
+# Rollback to a previous revision
+helm rollback langwatch <revision> --namespace langwatch
+```
+
+### Docker Compose
+
+Pin image tags to a specific version instead of `latest`:
+
+```yaml
+services:
+  app:
+    image: langwatch/langwatch:2.6.0  # Pin to previous version
+```
+
+Then restart:
+
+```bash
+docker compose up -d
+```
+
+## Breaking Changes
+
+### v2 to v3: ClickHouse Migration
+
+LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a significant architectural change.
+
+**What changes:**
+- Trace, span, and evaluation data is stored in ClickHouse instead of Elasticsearch
+- New event-sourcing architecture for data processing
+- New Helm chart structure with composable overlays
+- `clickhouse-serverless` subchart for auto-tuned ClickHouse
+
+**Migration path:**
+- New deployments: Use the v3 Helm chart directly
+- Existing v2 deployments: Contact the [LangWatch team](https://langwatch.ai/schedule-demo) for migration assistance
+
+### Helm Chart Pre-1.0.0 to 1.0.0+
+
+If upgrading from a Helm chart version before 1.0.0, the PostgreSQL PVC naming changed. To preserve your data:
+
+```yaml
+postgresql:
+  primary:
+    persistence:
+      existingClaim: "data-langwatch-postgresql-0"  # Your existing PVC name
+```
+
+Check your existing PVC name:
+
+```bash
+kubectl -n langwatch get pvc
+```
+
+## Version Compatibility
+
+| Chart Version | App Version | Kubernetes | Helm | Data Store |
+|--------------|-------------|------------|------|------------|
+| 3.x | 3.x | 1.28+ | 3.12+ | ClickHouse |
+| 2.x | 2.x | 1.25+ | 3.10+ | Elasticsearch / OpenSearch |
+| 1.x | 1.x | 1.25+ | 3.10+ | Elasticsearch / OpenSearch |
+
+## Getting Help
+
+If you encounter issues during an upgrade:
+
+- Check pod logs: `kubectl -n langwatch logs deploy/langwatch-app --tail=100`
+- Check the [Troubleshooting guide](/self-hosting/troubleshooting)
+- Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
+- Contact [support](https://langwatch.ai/support)

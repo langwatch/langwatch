@@ -99,7 +99,7 @@ export function SaveAndRunMenu({
           }, 0);
         }
       }}
-      positioning={{ placement: "top-end" }}
+      positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
         <Button colorPalette="blue" size="sm" loading={isLoading}>

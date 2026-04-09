@@ -40,7 +40,7 @@ export function NodeSelectionPanelButton({
     <Button
       size="sm"
       display={isOpen ? "none" : "block"}
-      background="white"
+      background="bg"
       borderRadius={4}
       borderColor="border.emphasized"
       variant="outline"
@@ -116,7 +116,7 @@ export const NodeSelectionPanel = ({
       }
       top={0}
       left={0}
-      background="white"
+      background="bg"
       borderRight="1px solid"
       borderColor="border"
       zIndex={100}
@@ -178,7 +178,7 @@ export const NodeSelectionPanel = ({
           padding={3}
           paddingLeft={5}
           gap={4}
-          background="white"
+          background="bg"
         >
           <Tooltip showArrow content="Star us on GitHub">
             <Link href="https://github.com/langwatch/langwatch" target="_blank">

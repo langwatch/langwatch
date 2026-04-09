@@ -2,12 +2,14 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { CompleteExperimentRunCommand } from "./commands/completeExperimentRun.command";
-import { RecordEvaluatorResultCommand } from "./commands/recordEvaluatorResult.command";
-import { RecordTargetResultCommand } from "./commands/recordTargetResult.command";
-import { StartExperimentRunCommand } from "./commands/startExperimentRun.command";
-import { createExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
-import { createExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
+import {
+  StartExperimentRunCommand,
+  RecordTargetResultCommand,
+  RecordEvaluatorResultCommand,
+  CompleteExperimentRunCommand,
+} from "./commands";
+import { ExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
+import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
 export interface ExperimentRunProcessingPipelineDeps {
@@ -41,10 +43,10 @@ export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcess
   const builder = definePipeline<ExperimentRunProcessingEvent>()
     .withName("experiment_run_processing")
     .withAggregateType("experiment_run")
-    .withFoldProjection("experimentRunState", createExperimentRunStateFoldProjection({
+    .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
       store: deps.experimentRunStateFoldStore,
     }))
-    .withMapProjection("experimentRunResultStorage", createExperimentRunResultStorageMapProjection({
+    .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
       store: deps.experimentRunItemAppendStore,
     }));
 

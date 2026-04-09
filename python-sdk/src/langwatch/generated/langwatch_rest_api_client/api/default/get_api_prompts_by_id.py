@@ -19,11 +19,14 @@ def _get_kwargs(
     id: str,
     *,
     version: int | Unset = UNSET,
+    tag: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
 
     params["version"] = version
+
+    params["tag"] = tag
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -108,6 +111,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient | Client,
     version: int | Unset = UNSET,
+    tag: str | Unset = UNSET,
 ) -> Response[
     GetApiPromptsByIdResponse200
     | GetApiPromptsByIdResponse400
@@ -116,11 +120,15 @@ def sync_detailed(
     | GetApiPromptsByIdResponse422
     | GetApiPromptsByIdResponse500
 ]:
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
         version (int | Unset):
+        tag (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -133,6 +141,7 @@ def sync_detailed(
     kwargs = _get_kwargs(
         id=id,
         version=version,
+        tag=tag,
     )
 
     response = client.get_httpx_client().request(
@@ -147,6 +156,7 @@ def sync(
     *,
     client: AuthenticatedClient | Client,
     version: int | Unset = UNSET,
+    tag: str | Unset = UNSET,
 ) -> (
     GetApiPromptsByIdResponse200
     | GetApiPromptsByIdResponse400
@@ -156,11 +166,15 @@ def sync(
     | GetApiPromptsByIdResponse500
     | None
 ):
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
         version (int | Unset):
+        tag (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -174,6 +188,7 @@ def sync(
         id=id,
         client=client,
         version=version,
+        tag=tag,
     ).parsed
 
 
@@ -182,6 +197,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient | Client,
     version: int | Unset = UNSET,
+    tag: str | Unset = UNSET,
 ) -> Response[
     GetApiPromptsByIdResponse200
     | GetApiPromptsByIdResponse400
@@ -190,11 +206,15 @@ async def asyncio_detailed(
     | GetApiPromptsByIdResponse422
     | GetApiPromptsByIdResponse500
 ]:
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
         version (int | Unset):
+        tag (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -207,6 +227,7 @@ async def asyncio_detailed(
     kwargs = _get_kwargs(
         id=id,
         version=version,
+        tag=tag,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -219,6 +240,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient | Client,
     version: int | Unset = UNSET,
+    tag: str | Unset = UNSET,
 ) -> (
     GetApiPromptsByIdResponse200
     | GetApiPromptsByIdResponse400
@@ -228,11 +250,15 @@ async def asyncio(
     | GetApiPromptsByIdResponse500
     | None
 ):
-    """Get a specific prompt
+    r"""Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare
+    slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a
+    tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version
+    query parameters with a bare slug.
 
     Args:
         id (str):
         version (int | Unset):
+        tag (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -247,5 +273,6 @@ async def asyncio(
             id=id,
             client=client,
             version=version,
+            tag=tag,
         )
     ).parsed

@@ -12,7 +12,7 @@ import { toaster } from "../../../components/ui/toaster";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
-import type { FullyLoadedOrganization } from "../../../server/api/routers/organization";
+import type { FullyLoadedOrganization } from "../../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../../utils/api";
 
 export default function NewTeamPage() {

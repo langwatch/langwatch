@@ -36,7 +36,6 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
     },
   );
 
-  // Split rendering logic into separate functions
   if (traceQuery.isLoading || traceQuery.isError || !traceQuery.data) {
     return null;
   }

@@ -1,24 +1,22 @@
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-const bundleAnalyser = process.env.ANALYZE === "true"
-  ? (await import("@next/bundle-analyzer")).default
-  : null;
-import fs from "fs";
 import path from "path";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const bundleAnalyser =
+  process.env.ANALYZE === "true"
+    ? (await import("@next/bundle-analyzer")).default
+    : null;
 
-const aliasPath =
-  process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const isProduction =
   process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test";
 
 const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
+    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
     style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev;
-    img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://www.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev;
+    img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev;
     font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev;
     object-src 'none';
     base-uri 'self';
@@ -26,14 +24,10 @@ const cspHeader = `
     frame-ancestors 'none';
     ${isProduction ? "upgrade-insecure-requests;" : ""}
     worker-src 'self' blob:;
-    connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
-    frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://www.googletagmanager.com https://www.google.com https://*.reo.dev;
+    connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
+    frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev;
 
 `;
-
-const existingNodeModules = new Set(
-  fs.readdirSync(path.join(__dirname, "node_modules")),
-);
 
 /**
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
@@ -60,29 +54,6 @@ const config = {
       "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
       "*.snippet.yaml": { loaders: ["raw-loader"], as: "*.js" },
     },
-    resolveAlias: {
-      "@injected-dependencies.client": path.join(
-        aliasPath,
-        "injection.client.ts",
-      ),
-      "@injected-dependencies.server": path.join(
-        aliasPath,
-        "injection.server.ts",
-      ),
-
-      // read all folders from ./saas-src/node_modules and create a map like the above
-      ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
-        ? Object.fromEntries(
-            fs
-              .readdirSync(path.join(__dirname, "saas-src", "node_modules"))
-              .filter((key) => !existingNodeModules.has(key))
-              .flatMap((key) => [
-                [key, `./saas-src/node_modules/${key}`],
-                [`${key}/*`, `./saas-src/node_modules/${key}/*`],
-              ]),
-          )
-        : {}),
-    },
   },
 
   serverExternalPackages: [
@@ -96,9 +67,13 @@ const config = {
     "@aws-sdk/client-cloudwatch-logs",
     "@aws-sdk/client-s3",
     "@aws-sdk/client-ses",
+    "@aws-sdk/client-sts",
+    "tiktoken",
+    "bcrypt",
   ],
 
   experimental: {
+    reactCompiler: true,
     scrollRestoration: true,
     optimizePackageImports: [
       "@chakra-ui/react",
@@ -142,15 +117,6 @@ const config = {
   },
 
   webpack: (config) => {
-    config.resolve.alias["@injected-dependencies.client"] = path.join(
-      aliasPath,
-      "injection.client.ts",
-    );
-    config.resolve.alias["@injected-dependencies.server"] = path.join(
-      aliasPath,
-      "injection.server.ts",
-    );
-
     // Ensures that only a single version of those are ever loaded
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys below
     config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
@@ -175,28 +141,6 @@ const config = {
         "node:async_hooks": false,
       };
     }
-
-    config.module.rules.push({
-      test: /\.(js|jsx|ts|tsx)$/,
-      use: [
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/node_modules\//g,
-            replace: "",
-            flags: "g",
-          },
-        },
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/src\//g,
-            replace: "~/",
-            flags: "g",
-          },
-        },
-      ],
-    });
 
     // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
     config.module.rules.push({

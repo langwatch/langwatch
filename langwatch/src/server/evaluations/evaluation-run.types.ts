@@ -18,6 +18,7 @@ export interface TraceEvaluation {
   label: string | null;
   details: string | null;
   error: string | null;
+  inputs?: Record<string, any> | null;
   timestamps: {
     scheduledAt: number | null;
     startedAt: number | null;

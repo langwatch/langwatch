@@ -10,8 +10,7 @@ import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
 import { getApp } from "../../../../../server/app-layer/app";
-import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
-import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
+import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluationNameAutoslug";
 import {
   type DataForEvaluation,
   runEvaluation,
@@ -354,37 +353,6 @@ export async function handleEvaluatorCall(
       settings,
     });
 
-  // Emit evaluation started event
-  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
-  // should proceed even if event tracking fails. Errors are captured for monitoring.
-  if (project.featureEventSourcingEvaluationIngestion) {
-    try {
-      await getApp().evaluations.startEvaluation({
-        tenantId: project.id,
-        evaluationId,
-        evaluatorId,
-        evaluatorType: checkType,
-        evaluatorName:
-          evaluatorName ?? monitor?.name ?? params.name ?? undefined,
-        traceId: params.trace_id ?? undefined,
-        isGuardrail: isGuardrail ?? undefined,
-        occurredAt: Date.now(),
-      });
-    } catch (eventError) {
-      captureException(eventError, {
-        extra: { projectId: project.id, evaluationId, event: "started" },
-      });
-      logger.error(
-        {
-          err: eventError,
-          projectId: project.id,
-          evaluationId,
-        },
-        "Failed to emit evaluation started event",
-      );
-    }
-  }
-
   try {
     result = await runEval();
 
@@ -435,14 +403,20 @@ export async function handleEvaluatorCall(
       traceback: [],
     };
   } finally {
-    // Emit evaluation completed event — always fires even if cost creation threw
+    // Emit evaluation reported event — single atomic event for the fold projection
     // Note: Event sourcing errors are logged but not re-thrown because the evaluation
     // result should be returned even if event tracking fails. Errors are captured for monitoring.
-    if (project.featureEventSourcingEvaluationIngestion) {
+    {
       await getApp()
-        .evaluations.completeEvaluation({
+        .evaluations.reportEvaluation({
           tenantId: project.id,
           evaluationId,
+          evaluatorId,
+          evaluatorType: checkType,
+          evaluatorName:
+            evaluatorName ?? monitor?.name ?? params.name ?? undefined,
+          traceId: params.trace_id ?? undefined,
+          isGuardrail: isGuardrail ?? undefined,
           status: result!.status,
           score: "score" in result! ? result!.score : undefined,
           passed: "passed" in result! ? result!.passed : undefined,
@@ -459,7 +433,7 @@ export async function handleEvaluatorCall(
         })
         .catch((eventError: unknown) => {
           captureException(eventError, {
-            extra: { projectId: project.id, evaluationId, event: "completed" },
+            extra: { projectId: project.id, evaluationId, event: "reported" },
           });
           logger.error(
             {
@@ -467,7 +441,7 @@ export async function handleEvaluatorCall(
               projectId: project.id,
               evaluationId,
             },
-            "Failed to emit evaluation completed event",
+            "Failed to emit evaluation reported event",
           );
         });
     }
@@ -491,39 +465,6 @@ export async function handleEvaluatorCall(
             ...result!,
             ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
-
-  if (params.trace_id && !project.featureEventSourcingEvaluationIngestion) {
-    await updateEvaluationStatusInES({
-      check: {
-        evaluation_id: evaluationId,
-        evaluator_id: evaluatorId,
-        type: checkType as EvaluatorTypes,
-        name: evaluatorName ?? monitor?.name ?? params.name ?? checkType,
-      },
-      trace: {
-        trace_id: params.trace_id,
-        project_id: project.id,
-      },
-      status: result!.status,
-      is_guardrail: isGuardrail ?? undefined,
-      ...(result!.status === "error"
-        ? {
-            error: {
-              details: result!.details,
-              stack: result!.traceback,
-            },
-          }
-        : {}),
-      ...(result!.status === "processed"
-        ? {
-            score: result!.score,
-            passed: result!.passed,
-            label: result!.label,
-          }
-        : {}),
-      details: "details" in result! ? (result!.details ?? "") : "",
-    });
-  }
 
   return res.status(200).json(resultWithoutTraceback);
 }

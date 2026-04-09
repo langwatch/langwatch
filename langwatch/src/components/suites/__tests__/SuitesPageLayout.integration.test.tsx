@@ -13,12 +13,26 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "connected",
+    isConnected: true,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: false,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  }),
+}));
+
 // Mock tRPC api
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: vi.fn() },
       },
     }),
     suites: {
@@ -29,6 +43,7 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -36,7 +51,7 @@ vi.mock("~/utils/api", () => ({
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     scenarios: {
-      getAllSuiteRunData: {
+      getSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
           isLoading: false,
@@ -48,6 +63,12 @@ vi.mock("~/utils/api", () => ({
       },
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
       },
     },
   },
@@ -74,9 +95,12 @@ vi.mock("~/hooks/useDrawer", () => ({
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    asPath: "/my-project/simulations/suites",
+    pathname: "/[project]/simulations/[[...path]]",
+    asPath: "/my-project/simulations",
     push: vi.fn(),
+    replace: vi.fn(),
     isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   }),
 }));
 
@@ -89,9 +113,9 @@ vi.mock("~/components/DashboardLayout", () => ({
   },
 }));
 
-// Mock AllRunsPanel to avoid deep dependency tree (now renders by default)
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+// Mock RunHistoryPanel to avoid deep dependency tree (now renders by default)
+vi.mock("~/components/suites/RunHistoryPanel", () => ({
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
 // We import after mocks are set up
@@ -129,35 +153,37 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the suites page", () => {
-    it("renders PageLayout.Header with a 'Suites' heading", async () => {
+    it("renders PageLayout.Header with a 'Simulations' heading", async () => {
       // Dynamic import to ensure mocks are applied
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+      const { default: SimulationsPage } = await import(
+        "~/components/suites/SimulationsPage"
       );
 
-      render(<SuitesPage />, { wrapper: Wrapper });
+      render(<SimulationsPage />, { wrapper: Wrapper });
 
-      const heading = screen.getByRole("heading", { name: "Suites" });
+      const heading = screen.getByRole("heading", { name: "Simulations" });
       expect(heading).toBeInTheDocument();
     });
 
     it("does not render DashboardLayout twice", async () => {
       dashboardLayoutRenderCount = 0;
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+      const { default: SimulationsPage } = await import(
+        "~/components/suites/SimulationsPage"
       );
 
-      render(<SuitesPage />, { wrapper: Wrapper });
+      render(<SimulationsPage />, { wrapper: Wrapper });
 
       expect(dashboardLayoutRenderCount).toBe(1);
     });
-  });
+
+});
 
   describe("when rendering the SuiteSidebar", () => {
     it("does not render a 'SUITES' section header in the sidebar", () => {
       const suites = [makeSuite()];
       render(
         <SuiteSidebar
+          projectSlug="my-project"
           suites={suites}
           selectedSuiteSlug={null}
           onSelectSuite={vi.fn()}

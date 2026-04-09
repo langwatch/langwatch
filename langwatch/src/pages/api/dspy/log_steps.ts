@@ -6,22 +6,15 @@ import { fromZodError, type ZodError } from "zod-validation-error";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
 } from "../../../server/background/workers/collector/cost";
 import { prisma } from "../../../server/db";
-import {
-  DSPY_STEPS_INDEX,
-  dspyStepIndexId,
-  esClient,
-} from "../../../server/elasticsearch";
 import type {
   DSPyLLMCall,
-  DSPyStep,
   DSPyStepRESTParams,
 } from "../../../server/experiments/types";
 import {
   dSPyStepRESTParamsSchema,
-  dSPyStepSchema,
 } from "../../../server/experiments/types.generated";
 import { getPayloadSizeHistogram } from "../../../server/metrics";
 import {
@@ -29,8 +22,9 @@ import {
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
 import { createLogger } from "../../../utils/logger/server";
-import { safeTruncate } from "../../../utils/truncate";
 import { findOrCreateExperiment } from "../experiment/init";
+import { getApp } from "../../../server/app-layer/app";
+import type { DspyStepData } from "../../../server/app-layer/dspy-steps/types";
 
 const logger = createLogger("langwatch:dspy_log_steps");
 
@@ -172,160 +166,74 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
     experiment_type: ExperimentType.DSPY,
   });
 
-  const id = dspyStepIndexId({
-    projectId: project.id,
-    runId: run_id,
-    index,
-  });
-
   const llmModelCosts = await getLLMModelCosts({ projectId: project.id });
 
+  const now = Date.now();
+
   let totalSize = 0;
-  const dspyStep: DSPyStep = {
-    ...param,
-    experiment_id: experiment.id,
-    project_id: project.id,
-    timestamps: {
-      created_at: param.timestamps.created_at,
-      inserted_at: new Date().getTime(),
-      updated_at: new Date().getTime(),
-    },
-    examples: param.examples.map((example) => {
-      const processedExample = {
-        ...{
-          ...example,
-          trace: example.trace?.map((t) => {
-            if (t.input?.contexts && typeof t.input.contexts !== "string") {
-              t.input.contexts = JSON.stringify(t.input.contexts);
-            }
-            return t;
-          }),
-        },
-        hash: generateHash(example),
-      };
-      // Apply aggressive truncation for ES field limits
-      return safeTruncate(processedExample, 16 * 1024, [
-        8 * 1024,
-        4 * 1024,
-        2 * 1024,
-        1024,
-      ]);
-    }),
-    llm_calls: param.llm_calls
-      .map((call) => ({
-        ...call,
-        hash: generateHash(call),
-      }))
-      .map(extractLLMCallInfo(llmModelCosts))
-      .map((llmCall) => {
-        if (llmCall.response?.output) {
-          delete llmCall.response.choices;
-        }
-
-        if (llmCall.response) {
-          // More aggressive truncation for ES field limits
-          llmCall.response = safeTruncate(llmCall.response, 16 * 1024, [
-            8 * 1024,
-            4 * 1024,
-            2 * 1024,
-            1024,
-          ]);
-          totalSize = JSON.stringify(llmCall).length;
-
-          if (totalSize >= 256_000) {
-            llmCall.response.output = "[truncated]";
-            llmCall.response.messages = [];
+  const examples = param.examples.map((example) => {
+    const processedExample = {
+      ...{
+        ...example,
+        trace: example.trace?.map((t) => {
+          if (t.input?.contexts && typeof t.input.contexts !== "string") {
+            t.input.contexts = JSON.stringify(t.input.contexts);
           }
-        }
-
-        return llmCall;
-      }),
-  };
-
-  // To guarantee no extra keys
-  const validatedDspyStep = dSPyStepSchema.parse(dspyStep);
-
-  const script = {
-    source: `
-      if (ctx._source.examples == null) {
-        ctx._source.examples = [];
-      }
-      for (newExample in params.new_examples) {
-        boolean exists = false;
-        for (e in ctx._source.examples) {
-          if (e.hash == newExample.hash) {
-            exists = true;
-            break;
-          }
-        }
-        if (!exists) {
-          ctx._source.examples.add(newExample);
-        }
-      }
-
-      if (ctx._source.llm_calls == null) {
-        ctx._source.llm_calls = [];
-      }
-      for (newLLMCall in params.new_llm_calls) {
-        boolean exists = false;
-        for (call in ctx._source.llm_calls) {
-          if (call.hash == newLLMCall.hash) {
-            exists = true;
-            break;
-          }
-        }
-        if (!exists) {
-          ctx._source.llm_calls.add(newLLMCall);
-        }
-      }
-
-      ctx._source.score = params.new_score;
-      ctx._source.timestamps.updated_at = params.updated_at;
-    `,
-    params: {
-      new_examples: validatedDspyStep.examples,
-      new_llm_calls: validatedDspyStep.llm_calls,
-      new_score: validatedDspyStep.score,
-      updated_at: new Date().getTime(),
-    },
-  };
-
-  const esPayloadSize = JSON.stringify({
-    script,
-    upsert: validatedDspyStep,
-  }).length;
-  const esPayloadSizeMB = esPayloadSize / (1024 * 1024);
-
-  const client = await esClient({ projectId: project.id });
-  try {
-    await client.update({
-      index: DSPY_STEPS_INDEX.alias,
-      id,
-      body: {
-        script,
-        upsert: validatedDspyStep,
+          return t;
+        }),
       },
-      retry_on_conflict: 5,
+      hash: generateHash(example),
+    };
+    return processedExample;
+  });
+
+  const llmCalls = param.llm_calls
+    .map((call) => ({
+      ...call,
+      hash: generateHash(call),
+    }))
+    .map(extractLLMCallInfo(llmModelCosts))
+    .map((llmCall) => {
+      if (llmCall.response?.output) {
+        delete llmCall.response.choices;
+      }
+
+      if (llmCall.response) {
+        totalSize = JSON.stringify(llmCall).length;
+
+        if (totalSize >= 256_000) {
+          llmCall.response.output = "[truncated]";
+          llmCall.response.messages = [];
+        }
+      }
+
+      return llmCall;
     });
 
-    logger.info(
-      { stepId: param.index, runId: param.run_id, projectId: project.id },
-      "Successfully stored DSPy step in Elasticsearch",
-    );
-  } catch (error) {
-    logger.error(
-      {
-        error,
-        stepId: param.index,
-        runId: param.run_id,
-        esPayloadSize,
-        esPayloadSizeMB: esPayloadSizeMB.toFixed(2),
-        projectId: project.id,
-      },
-      "Failed to store DSPy step in Elasticsearch",
-    );
-    throw error;
-  }
+  const stepData: DspyStepData = {
+    tenantId: project.id,
+    experimentId: experiment.id,
+    runId: run_id,
+    stepIndex: index,
+    workflowVersionId: param.workflow_version_id,
+    score: param.score,
+    label: param.label,
+    optimizerName: param.optimizer.name,
+    optimizerParameters: param.optimizer.parameters,
+    predictors: param.predictors,
+    examples,
+    llmCalls,
+    createdAt: param.timestamps.created_at,
+    insertedAt: now,
+    updatedAt: now,
+  };
+
+  await getApp().dspySteps.steps.upsertStep(stepData);
+
+  logger.info(
+    { stepId: param.index, runId: param.run_id, projectId: project.id },
+    "Successfully stored DSPy step",
+  );
 };
 
 const generateHash = (data: object) => {
@@ -341,7 +249,7 @@ const extractLLMCallInfo =
     ) {
       const model = call.response?.model;
       const llmModelCost =
-        model && matchingLLMModelCost(call.response.model, llmModelCosts);
+        model && matchModelCostWithFallbacks(call.response.model, llmModelCosts);
       const promptTokens = call.response?.usage?.prompt_tokens;
       const completionTokens = call.response?.usage?.completion_tokens;
 

@@ -12,6 +12,7 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import {
   type EvaluatorServiceMiddlewareVariables,
@@ -130,6 +131,7 @@ app.get(
 // Create evaluator
 app.post(
   "/",
+  resourceLimitMiddleware("evaluators"),
   describeRoute({
     description: "Create a new evaluator",
     responses: {
@@ -155,12 +157,13 @@ app.post(
       "Creating evaluator",
     );
 
-    const evaluator = await service.create({
+    const evaluator = await service.createWithDefaults({
       id: `evaluator_${nanoid()}`,
       projectId: project.id,
       name: data.name,
       type: "evaluator",
       config: data.config as Prisma.InputJsonValue,
+      project,
     });
 
     const enriched = await service.enrichWithFields(evaluator);

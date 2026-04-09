@@ -1,20 +1,29 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
+import type { ProcessRole } from "~/server/app-layer/config";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
-import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
-import type { NoCommands, RegisteredCommand, StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import type {
-    PipelineWithCommandHandlers,
-    RegisteredPipeline,
+  NoCommands,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "./pipeline/staticBuilder.types";
+import type {
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
 } from "./pipeline/types";
+import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
+import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
+import type { ReactorDefinition } from "./reactors/reactor.types";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
+import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
@@ -23,9 +32,9 @@ import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
+import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
-import type { EventStore } from "./stores/eventStore.types";
 import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
 import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 
@@ -35,11 +44,11 @@ const logger = createLogger("langwatch:event-sourcing");
  * Options for constructing an EventSourcing instance.
  */
 export interface EventSourcingOptions {
-  clickhouse?: ClickHouseClient;
+  clickhouse?: ClickHouseClientResolver;
   redis?: IORedis | Cluster | null;
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
 }
 
 /**
@@ -54,7 +63,9 @@ interface RuntimeStores {
  * Type helper to convert registered commands union to a record of queue processors.
  */
 type CommandsToProcessors<Commands extends RegisteredCommand> = {
-  [K in Commands as K["name"]]: EventSourcedQueueProcessor<K["payload"] & Record<string, unknown>>;
+  [K in Commands as K["name"]]: EventSourcedQueueProcessor<
+    K["payload"] & Record<string, unknown>
+  >;
 };
 
 /**
@@ -74,7 +85,10 @@ export class EventSourcing {
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.runtime",
   );
-  private readonly pipelines = new Map<string, PipelineWithCommandHandlers<any, any>>();
+  private readonly pipelines = new Map<
+    string,
+    PipelineWithCommandHandlers<any, any>
+  >();
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
   // Infrastructure — lazily initialized
@@ -86,9 +100,9 @@ export class EventSourcing {
 
   // Options
   private readonly _enabled: boolean;
-  private readonly _clickhouse?: ClickHouseClient | null;
+  private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
-  private readonly _processRole?: "web" | "worker";
+  private readonly _processRole?: ProcessRole;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
@@ -121,13 +135,42 @@ export class EventSourcing {
     return this._enabled;
   }
 
+  /**
+   * Register a reactor on a global fold projection.
+   *
+   * Must be called before the projection registry is initialized
+   * (i.e., before the first pipeline is registered).
+   *
+   * Silently skips registration when the fold projection does not exist
+   * (e.g. `projectDailySdkUsage` is only registered in SaaS mode).
+   */
+  registerGlobalFoldReactor(
+    foldName: string,
+    reactor: ReactorDefinition<Event>,
+  ): void {
+    try {
+      this.projectionRegistry.registerReactor(foldName, reactor);
+    } catch (error) {
+      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
+      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+        logger.debug(
+          { foldName, reactorName: reactor.name },
+          "Skipping global fold reactor — fold not registered",
+        );
+        return;
+      }
+      throw error;
+    }
+  }
 
   get eventStore(): EventStore | undefined {
     this.ensureInitialized();
     return this._eventStore;
   }
 
-  get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {
+  get globalQueue():
+    | EventSourcedQueueProcessor<Record<string, unknown>>
+    | undefined {
     this.ensureInitialized();
     return this._globalQueue;
   }
@@ -192,10 +235,7 @@ export class EventSourcing {
             : CommandsToProcessors<Commands>
         >;
 
-        if (
-          !this._enabled ||
-          !this.eventStore
-        ) {
+        if (!this._enabled || !this.eventStore) {
           logger.warn(
             {
               pipeline: definition.metadata.name,
@@ -245,6 +285,9 @@ export class EventSourcing {
           featureFlagService: definition.featureFlagService,
           globalRegistry: this.projectionRegistry,
           processRole: this._processRole,
+          replayMarkerChecker: this._redis
+            ? new RedisReplayMarkerChecker(this._redis)
+            : undefined,
         });
 
         // Get command dispatchers
@@ -290,9 +333,7 @@ export class EventSourcing {
     this._initialized = true;
 
     if (!this._enabled) {
-      logger.info(
-        "Event sourcing is disabled via ENABLE_EVENT_SOURCING=false",
-      );
+      logger.info("Event sourcing is disabled (enabled=false)");
       return;
     }
 
@@ -304,7 +345,9 @@ export class EventSourcing {
    * Returns null when the job type is not (yet) registered — e.g. stale Redis
    * jobs from a previous deployment picked up before all pipelines register.
    */
-  private lookupEntry(payload: Record<string, unknown>): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
+  private lookupEntry(
+    payload: Record<string, unknown>,
+  ): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
     const pipelineName = payload.__pipelineName as string;
     const jobType = payload.__jobType as string;
     const jobName = payload.__jobName as string;
@@ -326,7 +369,12 @@ export class EventSourcing {
       );
       return null;
     }
-    const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+    const {
+      __pipelineName: _p,
+      __jobType: _t,
+      __jobName: _n,
+      ...clean
+    } = payload;
     return { entry, clean };
   }
 
@@ -346,6 +394,8 @@ export class EventSourcing {
       logger.debug("Using in-memory event store (non-production)");
     } else {
       // In production without ClickHouse, leave stores undefined
+      // TODO: if you're hitting this, see the ClickHouse migration and setup guide:
+      // https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/004-docker-dev-environment.md
       logger.warn(
         "ClickHouse not available in production - event sourcing will be disabled. " +
           "Set CLICKHOUSE_URL to enable event sourcing.",
@@ -359,7 +409,11 @@ export class EventSourcing {
     logger.info(
       {
         eventStore: this._eventStore?.constructor.name ?? "none",
-        queueProcessor: this._globalQueue ? (this._redis ? "GroupQueue" : "Memory") : "none",
+        queueProcessor: this._globalQueue
+          ? this._redis
+            ? "GroupQueue"
+            : "Memory"
+          : "none",
       },
       "Event sourcing runtime initialized",
     );
@@ -398,21 +452,22 @@ export class EventSourcing {
 
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
-      this._globalQueue = new GroupQueueProcessor(
-        definition,
-        effectiveRedis,
-        { consumerEnabled: this._processRole !== "web" },
-      );
+      this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
+        consumerEnabled: this._processRole === "worker",
+      });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
     }
   }
 
-  private logDisabledWarning(context: { pipeline?: string; command?: string }): void {
+  private logDisabledWarning(context: {
+    pipeline?: string;
+    command?: string;
+  }): void {
     if (!this._loggedDisabledWarning) {
       logger.warn(
         context,
-        "Event sourcing is disabled via ENABLE_EVENT_SOURCING=false. Operations will be no-ops.",
+        "Event sourcing is disabled. Operations will be no-ops.",
       );
       this._loggedDisabledWarning = true;
     } else {
@@ -428,9 +483,7 @@ export class EventSourcing {
    * Creates an EventSourcing instance for testing with injected stores.
    * Bypasses lazy initialization and env var detection.
    */
-  static createForTesting(
-    stores: Partial<RuntimeStores>,
-  ): EventSourcing {
+  static createForTesting(stores: Partial<RuntimeStores>): EventSourcing {
     const es = new EventSourcing({ enabled: true });
 
     // Mark as initialized and inject stores directly
@@ -447,13 +500,15 @@ export class EventSourcing {
   static createWithStores(options: {
     eventStore: EventStore;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
-    clickhouse?: ClickHouseClient;
+    clickhouse?: ClickHouseClientResolver;
     redis?: IORedis | Cluster;
+    processRole?: ProcessRole;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       clickhouse: options.clickhouse,
       redis: options.redis,
+      processRole: options.processRole,
     });
 
     es._initialized = true;
@@ -476,18 +531,14 @@ function buildServiceOptions<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
 >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, any>) {
+  // Pass class instances directly — do NOT spread.
+  // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
   const foldProjections = Array.from(definition.foldProjections.values()).map(
-    ({ definition: fold, options }) => ({
-      ...fold,
-      options: options ?? fold.options,
-    }),
+    ({ definition: fold }) => fold,
   );
 
   const mapProjections = Array.from(definition.mapProjections.values()).map(
-    ({ definition: mapProj, options }) => ({
-      ...mapProj,
-      options: options ?? mapProj.options,
-    }),
+    ({ definition: mapProj }) => mapProj,
   );
 
   const commandRegistrations =
@@ -495,6 +546,7 @@ function buildServiceOptions<
       ? definition.commands.map((cmd) => ({
           name: cmd.name,
           handlerClass: cmd.handlerClass,
+          handlerInstance: cmd.handlerInstance,
           options: cmd.options,
         }))
       : undefined;

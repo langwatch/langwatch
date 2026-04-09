@@ -1,6 +1,24 @@
 import { z } from "zod";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 
+export const queueRunCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  batchRunId: z.string(),
+  scenarioSetId: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+  /** Target for execution. Used by the execution reactor to spawn the right adapter. */
+  target: z.object({
+    type: z.enum(["prompt", "http", "code"]),
+    referenceId: z.string(),
+  }).optional(),
+  occurredAt: z.number(),
+});
+export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
+
 export const startRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
@@ -9,6 +27,7 @@ export const startRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
@@ -32,6 +51,44 @@ export const finishRunCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 export type FinishRunCommandData = z.infer<typeof finishRunCommandDataSchema>;
+
+export const textMessageStartCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  role: z.string(),
+  messageIndex: z.number().optional(),
+  occurredAt: z.number(),
+});
+export type TextMessageStartCommandData = z.infer<typeof textMessageStartCommandDataSchema>;
+
+export const textMessageEndCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  role: z.string(),
+  content: z.string(),
+  message: z.record(z.unknown()).optional(),
+  traceId: z.string().optional(),
+  messageIndex: z.number().optional(),
+  occurredAt: z.number(),
+});
+export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
+
+export const computeRunMetricsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  traceId: z.string(),
+  /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
+  metrics: z.object({
+    totalCost: z.number(),
+    roleCosts: z.record(z.string(), z.number()),
+    roleLatencies: z.record(z.string(), z.number()),
+  }).optional(),
+  retryCount: z.number().default(0),
+  occurredAt: z.number(),
+});
+export type ComputeRunMetricsCommandData = z.infer<typeof computeRunMetricsCommandDataSchema>;
 
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),

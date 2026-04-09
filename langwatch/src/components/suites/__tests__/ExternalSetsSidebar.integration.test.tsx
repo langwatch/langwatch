@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
 import { SuiteSidebar } from "../SuiteSidebar";
+import { NowProvider } from "../NowProvider";
 import { ALL_RUNS_ID, toExternalSetSelection } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -44,6 +45,7 @@ function makeExternalSet(
   return {
     scenarioSetId: "nightly-regression",
     passedCount: 10,
+    failedCount: 0,
     totalCount: 10,
     lastRunTimestamp: Date.now() - 30 * 60 * 1000,
     ...overrides,
@@ -51,6 +53,7 @@ function makeExternalSet(
 }
 
 const defaultProps = {
+  projectSlug: "my-project",
   suites: [] as SimulationSuite[],
   selectedSuiteSlug: null,
   onSelectSuite: vi.fn(),
@@ -126,7 +129,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(/15\/20 passed/)).toBeInTheDocument();
+      expect(screen.getByText(/15 passed/)).toBeInTheDocument();
     });
 
     it("does not display a Run button on external set items", () => {
@@ -145,7 +148,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     });
 
     describe("when all runs pass in an external set", () => {
-      it("displays checkmark status icon", () => {
+      it("displays 100% pass rate", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -158,13 +161,13 @@ describe("<SuiteSidebar/> External Sets", () => {
 
         const items = screen.getAllByTestId("external-set-list-item");
         expect(
-          within(items[0]!).getByTestId("status-icon-pass"),
+          within(items[0]!).getByText("100%"),
         ).toBeInTheDocument();
       });
     });
 
     describe("when some runs fail in an external set", () => {
-      it("displays error status icon", () => {
+      it("displays pass rate reflecting failures", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -177,7 +180,7 @@ describe("<SuiteSidebar/> External Sets", () => {
 
         const items = screen.getAllByTestId("external-set-list-item");
         expect(
-          within(items[0]!).getByTestId("status-icon-fail"),
+          within(items[0]!).getByText("70%"),
         ).toBeInTheDocument();
       });
     });
@@ -306,8 +309,87 @@ describe("<SuiteSidebar/> External Sets", () => {
         expect(
           screen.queryByTestId("external-sets-header"),
         ).not.toBeInTheDocument();
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given an external set with no runs", () => {
+    it("displays only the name with no summary line", () => {
+      render(
+        <SuiteSidebar
+          {...defaultProps}
+          externalSets={[
+            makeExternalSet({
+              scenarioSetId: "New Set",
+              passedCount: 0,
+              totalCount: 0,
+              lastRunTimestamp: 0,
+            }),
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("New Set")).toBeInTheDocument();
+      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("status-icon-pass")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("status-icon-fail")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given an external set with runs", () => {
+    it("displays recency indicator alongside pass count", () => {
+      vi.useFakeTimers();
+      const now = new Date("2025-01-15T12:00:00Z").getTime();
+      vi.setSystemTime(now);
+
+      const NowWrapper = ({ children }: { children: React.ReactNode }) => (
+        <ChakraProvider value={defaultSystem}>
+          <NowProvider intervalMs={999999}>{children}</NowProvider>
+        </ChakraProvider>
+      );
+
+      try {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={[
+              makeExternalSet({
+                scenarioSetId: "ci-smoke-tests",
+                passedCount: 15,
+                totalCount: 20,
+                lastRunTimestamp: now - 30 * 60 * 1000,
+              }),
+            ]}
+          />,
+          { wrapper: NowWrapper },
+        );
+
+        expect(screen.getByText(/15 passed/)).toBeInTheDocument();
+        const extSetItems = screen.getAllByTestId("external-set-list-item");
+        const texts = extSetItems.map((el) => el.textContent).join(" ");
+        expect(texts).toMatch(/30m ago/);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not show a three-dot menu button", () => {
+      render(
+        <SuiteSidebar
+          {...defaultProps}
+          externalSets={[
+            makeExternalSet({ scenarioSetId: "ci-smoke-tests" }),
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const items = screen.getAllByTestId("external-set-list-item");
+      expect(
+        within(items[0]!).queryByTestId("suite-menu-button"),
+      ).not.toBeInTheDocument();
     });
   });
 

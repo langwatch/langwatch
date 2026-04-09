@@ -4,6 +4,8 @@ import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-even
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { trackServerEvent } from "~/server/posthog";
+
 import { createLogger } from "~/utils/logger/server";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
@@ -74,41 +76,39 @@ export const evaluationsRouter = createTRPCRouter({
       });
 
       // Dispatch to evaluation processing pipeline when flag is ON
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { featureEventSourcingEvaluationIngestion: true },
-      });
-      if (project?.featureEventSourcingEvaluationIngestion && result) {
+      if (result) {
+        trackServerEvent({
+          userId: ctx.session.user.id,
+          event: "evaluation_ran",
+          projectId: input.projectId,
+        });
+      }
+
+      // Dispatch to evaluation processing pipeline
+      if (result) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-        void (async () => {
-          try {
-            const app = getApp();
-            await app.evaluations.startEvaluation({
-              tenantId: input.projectId,
-              evaluationId,
-              evaluatorId: input.evaluatorType,
-              evaluatorType: input.evaluatorType,
-              traceId: input.traceId,
-              occurredAt: Date.now(),
-            });
-            await app.evaluations.completeEvaluation({
-              tenantId: input.projectId,
-              evaluationId,
-              status: result.status,
-              score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
-              passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
-              label: result.status === "processed" ? (result.label ?? undefined) : undefined,
-              details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
-              error: result.status === "error" ? result.details : undefined,
-              occurredAt: Date.now(),
-            });
-          } catch (error) {
-            logger.warn(
-              { error, evaluationId, evaluatorType: input.evaluatorType },
-              "Failed to dispatch single re-eval to evaluation processing pipeline",
-            );
-          }
-        })();
+        try {
+          const app = getApp();
+          await app.evaluations.reportEvaluation({
+            tenantId: input.projectId,
+            evaluationId,
+            evaluatorId: input.evaluatorType,
+            evaluatorType: input.evaluatorType,
+            traceId: input.traceId,
+            status: result.status,
+            score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
+            passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
+            label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+            details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
+            error: result.status === "error" ? result.details : undefined,
+            occurredAt: Date.now(),
+          });
+        } catch (error) {
+          logger.warn(
+            { error, evaluationId, evaluatorType: input.evaluatorType },
+            "Failed to dispatch single re-eval to evaluation processing pipeline",
+          );
+        }
       }
 
       return result;

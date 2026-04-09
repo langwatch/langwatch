@@ -24,7 +24,9 @@ import { Search } from "lucide-react";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+	useOrganizationTeamProject,
+} from "~/hooks/useOrganizationTeamProject";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
@@ -38,6 +40,7 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
+import { SaveAsViewButton } from "./SaveAsViewButton";
 
 export function QueryStringFieldsFilters({
 	hideTriggerButton = false,
@@ -47,7 +50,7 @@ export function QueryStringFieldsFilters({
 	const { nonEmptyFilters, setFilters } = useFilterParams();
 
 	const { openDrawer } = useDrawer();
-	const { hasPermission } = useOrganizationTeamProject();
+	const { project, hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
@@ -56,18 +59,24 @@ export function QueryStringFieldsFilters({
 			filters={nonEmptyFilters}
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
 			actionButton={
-				hasPermission("triggers:manage") && !hideTriggerButton ? (
-					<Tooltip content="Create a filter to add an automation.">
-						<Button
-							colorPalette="gray"
-							onClick={() => openDrawer("automation", undefined)}
-							disabled={!hasAnyFilters}
-						>
-							<LuZap />
-							Add Automation
-						</Button>
-					</Tooltip>
-				) : undefined
+				<HStack gap={1}>
+					{hasAnyFilters && (
+						<SaveAsViewButton />
+					)}
+					{hasPermission("triggers:manage") && !hideTriggerButton && (
+						<Tooltip content="Create a filter to add an automation.">
+							<Button
+								size="xs"
+								variant="outline"
+								onClick={() => openDrawer("automation", undefined)}
+								disabled={!hasAnyFilters}
+							>
+								<LuZap />
+								Add Automation
+							</Button>
+						</Tooltip>
+					)}
+				</HStack>
 			}
 		/>
 	);
@@ -83,6 +92,7 @@ export function FieldsFilters({
 	actionButton?: React.ReactNode;
 }) {
 	const filterKeys: FilterField[] = [
+		"traces.origin",
 		"metadata.prompt_ids",
 		"spans.model",
 		"metadata.labels",
@@ -131,6 +141,7 @@ export function FieldsFilters({
 // Filter types that should NOT allow custom values
 const BOOLEAN_FILTER_IDS: FilterField[] = [
 	"evaluations.passed",
+	"traces.origin",
 	"traces.error",
 	"annotations.hasAnnotation",
 	"evaluations.state",
@@ -170,12 +181,18 @@ function FieldsFilter({
 	// Ref for selecting the highlighted option from keyboard
 	const selectHighlightedRef = React.useRef<(() => void) | null>(null);
 
-	// Reset keyboard nav state when popover closes
+	// Reset state when popover closes
 	useEffect(() => {
 		if (!open) {
 			setHighlightedIndex(-1);
 			setIsKeyboardNav(false);
+			setQuery("");
+			setImmediateQuery("");
+			if (searchRef.current) {
+				searchRef.current.value = "";
+			}
 		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open]);
 
 	const currentStringList = Array.isArray(current)
@@ -408,7 +425,7 @@ function NestedListSelection({
 					current_[lastKey] = values;
 				} else {
 					for (const key of Object.keys(current_)) {
-						if (!(key in values)) {
+						if (!values.includes(key)) {
 							delete current_[key];
 						}
 					}
@@ -846,12 +863,17 @@ function RangeFilter({
 		min = 0;
 	}
 
+	const initializedRef = React.useRef(false);
+
 	useEffect(() => {
-		if (filterData.data) {
-			onChange([min.toString(), max.toString()]);
-		}
+		if (!filterData.data || initializedRef.current) return;
+		initializedRef.current = true;
+		// Skip initialization if the user already has a selected range
+		// (e.g. from a saved view or popover re-open)
+		if (currentValues.length === 2) return;
+		onChange([min.toString(), max.toString()]);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [min, max, !!filterData.data]);
+	}, [!!filterData.data]);
 
 	return (
 		<HStack width="full" gap={3} paddingX={3} paddingY={2}>
@@ -948,16 +970,13 @@ function ThumbsUpDownVoteFilter({
 									]);
 								} else {
 									const other = field === -1 ? 1 : -1;
-									onChange([
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-										((min ?? 0) === field && (max ?? 0) === field
-											? undefined
-											: other
-										)?.toString() ?? "",
-									]);
+									const isLast =
+										(min ?? 0) === field && (max ?? 0) === field;
+									if (isLast) {
+										onChange([]);
+									} else {
+										onChange([other.toString(), other.toString()]);
+									}
 								}
 							}}
 						>

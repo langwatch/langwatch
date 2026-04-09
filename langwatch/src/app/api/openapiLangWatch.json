@@ -803,6 +803,262 @@
         }
       }
     },
+    "/api/prompts/tags": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "createdAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiPromptsTags",
+        "parameters": [],
+        "description": "List all prompt tag definitions for the organization"
+      },
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Tag created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiPromptsTags",
+        "parameters": [],
+        "description": "Create a custom prompt tag definition for the organization",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/prompts/{id}": {
       "get": {
         "responses": {
@@ -905,11 +1161,13 @@
                               "float",
                               "bool",
                               "image",
+                              "list",
                               "list[str]",
                               "list[float]",
                               "list[int]",
                               "list[bool]",
-                              "dict"
+                              "dict",
+                              "chat_messages"
                             ]
                           }
                         },
@@ -1198,7 +1456,8 @@
                               "type": "string"
                             },
                             "schema": {
-                              "type": "object"
+                              "type": "object",
+                              "additionalProperties": true
                             }
                           },
                           "required": [
@@ -1343,9 +1602,18 @@
         "operationId": "getApiPromptsById",
         "parameters": [
           {
+            "name": "id",
+            "in": "path",
+            "description": "Prompt slug or shorthand. Supports three formats: (1) bare slug — \"pizza-prompt\" returns the latest version; (2) slug:tag — \"pizza-prompt:production\" returns the version pointed to by that tag; (3) slug:version — \"pizza-prompt:2\" returns that specific version number. \"slug:latest\" is equivalent to the bare slug. Cannot be combined with the tag or version query parameters.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "version",
             "in": "query",
-            "description": "Specific version number to retrieve",
+            "description": "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
             "required": false,
             "schema": {
               "type": "integer",
@@ -1353,15 +1621,16 @@
             }
           },
           {
+            "name": "tag",
+            "in": "query",
+            "description": "Fetch the version pointed to by this tag (e.g., \"production\", \"staging\"). Cannot be used when the id path already contains a shorthand suffix.",
+            "required": false,
             "schema": {
               "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
+            }
           }
         ],
-        "description": "Get a specific prompt"
+        "description": "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug."
       },
       "put": {
         "responses": {
@@ -1464,11 +1733,13 @@
                               "float",
                               "bool",
                               "image",
+                              "list",
                               "list[str]",
                               "list[float]",
                               "list[int]",
                               "list[bool]",
-                              "dict"
+                              "dict",
+                              "chat_messages"
                             ]
                           }
                         },
@@ -1757,7 +2028,8 @@
                               "type": "string"
                             },
                             "schema": {
-                              "type": "object"
+                              "type": "object",
+                              "additionalProperties": true
                             }
                           },
                           "required": [
@@ -1996,11 +2268,13 @@
                             "float",
                             "bool",
                             "image",
+                            "list",
                             "list[str]",
                             "list[float]",
                             "list[int]",
                             "list[bool]",
-                            "dict"
+                            "dict",
+                            "chat_messages"
                           ]
                         }
                       },
@@ -2053,6 +2327,13 @@
                     "enum": [
                       "1.0"
                     ]
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "scope": {
                     "type": "string",
@@ -2319,11 +2600,13 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "list",
                                 "list[str]",
                                 "list[float]",
                                 "list[int]",
                                 "list[bool]",
-                                "dict"
+                                "dict",
+                                "chat_messages"
                               ]
                             }
                           },
@@ -2612,7 +2895,8 @@
                                 "type": "string"
                               },
                               "schema": {
-                                "type": "object"
+                                "type": "object",
+                                "additionalProperties": true
                               }
                             },
                             "required": [
@@ -2883,11 +3167,13 @@
                                   "float",
                                   "bool",
                                   "image",
+                                  "list",
                                   "list[str]",
                                   "list[float]",
                                   "list[int]",
                                   "list[bool]",
-                                  "dict"
+                                  "dict",
+                                  "chat_messages"
                                 ]
                               }
                             },
@@ -3176,7 +3462,8 @@
                                   "type": "string"
                                 },
                                 "schema": {
-                                  "type": "object"
+                                  "type": "object",
+                                  "additionalProperties": true
                                 }
                               },
                               "required": [
@@ -3270,11 +3557,13 @@
                                       "float",
                                       "bool",
                                       "image",
+                                      "list",
                                       "list[str]",
                                       "list[float]",
                                       "list[int]",
                                       "list[bool]",
-                                      "dict"
+                                      "dict",
+                                      "chat_messages"
                                     ]
                                   }
                                 },
@@ -3599,7 +3888,8 @@
                                       "type": "string"
                                     },
                                     "schema": {
-                                      "type": "object"
+                                      "type": "object",
+                                      "additionalProperties": true
                                     }
                                   },
                                   "required": [
@@ -3787,11 +4077,13 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "list",
                                 "list[str]",
                                 "list[float]",
                                 "list[int]",
                                 "list[bool]",
-                                "dict"
+                                "dict",
+                                "chat_messages"
                               ]
                             }
                           },
@@ -4116,7 +4408,8 @@
                                 "type": "string"
                               },
                               "schema": {
-                                "type": "object"
+                                "type": "object",
+                                "additionalProperties": true
                               }
                             },
                             "required": [
@@ -4351,6 +4644,118 @@
           }
         ],
         "description": "Get a dataset by its slug or id."
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiDatasetBySlugOrId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Update a dataset by its slug or id",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "columnTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "string"
+                            },
+                            {
+                              "type": "string",
+                              "const": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "const": "number"
+                            },
+                            {
+                              "type": "string",
+                              "const": "date"
+                            },
+                            {
+                              "type": "string",
+                              "const": "list"
+                            },
+                            {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            {
+                              "type": "string",
+                              "const": "spans"
+                            },
+                            {
+                              "type": "string",
+                              "const": "rag_contexts"
+                            },
+                            {
+                              "type": "string",
+                              "const": "chat_messages"
+                            },
+                            {
+                              "type": "string",
+                              "const": "annotations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "evaluations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "image"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "type"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiDatasetBySlugOrId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Archive a dataset (soft-delete)"
       }
     },
     "/api/prompts": {
@@ -4457,11 +4862,13 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "list",
                                 "list[str]",
                                 "list[float]",
                                 "list[int]",
                                 "list[bool]",
-                                "dict"
+                                "dict",
+                                "chat_messages"
                               ]
                             }
                           },
@@ -4750,7 +5157,8 @@
                                 "type": "string"
                               },
                               "schema": {
-                                "type": "object"
+                                "type": "object",
+                                "additionalProperties": true
                               }
                             },
                             "required": [
@@ -4977,11 +5385,13 @@
                               "float",
                               "bool",
                               "image",
+                              "list",
                               "list[str]",
                               "list[float]",
                               "list[int]",
                               "list[bool]",
-                              "dict"
+                              "dict",
+                              "chat_messages"
                             ]
                           }
                         },
@@ -5270,7 +5680,8 @@
                               "type": "string"
                             },
                             "schema": {
-                              "type": "object"
+                              "type": "object",
+                              "additionalProperties": true
                             }
                           },
                           "required": [
@@ -5491,11 +5902,13 @@
                             "float",
                             "bool",
                             "image",
+                            "list",
                             "list[str]",
                             "list[float]",
                             "list[int]",
                             "list[bool]",
-                            "dict"
+                            "dict",
+                            "chat_messages"
                           ]
                         }
                       },
@@ -5548,6 +5961,13 @@
                     "enum": [
                       "1.0"
                     ]
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 },
                 "required": [
@@ -5709,8 +6129,32 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "langwatch": {
+                            "type": "object",
+                            "properties": {
+                              "targetReferenceId": {
+                                "type": "string"
+                              },
+                              "targetType": {
+                                "type": "string",
+                                "enum": [
+                                  "prompt",
+                                  "http",
+                                  "code"
+                                ]
+                              },
+                              "simulationSuiteId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "targetReferenceId",
+                              "targetType"
+                            ]
                           }
-                        }
+                        },
+                        "additionalProperties": true
                       }
                     },
                     "required": [
@@ -5754,7 +6198,10 @@
                           "CANCELLED",
                           "IN_PROGRESS",
                           "PENDING",
-                          "FAILED"
+                          "FAILED",
+                          "STALLED",
+                          "QUEUED",
+                          "RUNNING"
                         ]
                       },
                       "results": {
@@ -6379,6 +6826,267 @@
                       "batchRunId",
                       "scenarioId",
                       "scenarioRunId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TEXT_MESSAGE_START"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "messageIndex": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "messageId",
+                      "role"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TEXT_MESSAGE_END"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "traceId": {
+                        "type": "string"
+                      },
+                      "messageIndex": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "messageId",
+                      "role"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TEXT_MESSAGE_CONTENT"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "messageId": {
+                        "type": "string"
+                      },
+                      "delta": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "messageId",
+                      "delta"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TOOL_CALL_START"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "toolCallName": {
+                        "type": "string"
+                      },
+                      "parentMessageId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "toolCallId",
+                      "toolCallName"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TOOL_CALL_ARGS"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "delta": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "toolCallId",
+                      "delta"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_TOOL_CALL_END"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "toolCallId"
                     ]
                   }
                 ]
@@ -7674,6 +8382,37 @@
                           }
                         ]
                       },
+                      "traces.origin": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
                       "traces.error": {
                         "anyOf": [
                           {
@@ -7799,6 +8538,99 @@
                         ]
                       },
                       "evaluations.evaluator_id.guardrails_only": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "evaluations.evaluator_id.has_passed": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "evaluations.evaluator_id.has_score": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "evaluations.evaluator_id.has_label": {
                         "anyOf": [
                           {
                             "type": "array",
@@ -8107,37 +8939,6 @@
                             }
                           }
                         ]
-                      },
-                      "sentiment.input_sentiment": {
-                        "anyOf": [
-                          {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "object",
-                              "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        ]
                       }
                     },
                     "additionalProperties": false,
@@ -8164,7 +8965,6 @@
                             "metadata.user_id",
                             "metadata.thread_id",
                             "metadata.span_type",
-                            "sentiment.input_sentiment",
                             "sentiment.thumbs_up_down",
                             "performance.completion_time",
                             "performance.first_token",
@@ -8512,6 +9312,37 @@
                                 }
                               ]
                             },
+                            "traces.origin": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
                             "traces.error": {
                               "anyOf": [
                                 {
@@ -8637,6 +9468,99 @@
                               ]
                             },
                             "evaluations.evaluator_id.guardrails_only": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "evaluations.evaluator_id.has_passed": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "evaluations.evaluator_id.has_score": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            },
+                            "evaluations.evaluator_id.has_label": {
                               "anyOf": [
                                 {
                                   "type": "array",
@@ -8945,37 +9869,6 @@
                                   }
                                 }
                               ]
-                            },
-                            "sentiment.input_sentiment": {
-                              "anyOf": [
-                                {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string"
-                                    }
-                                  }
-                                },
-                                {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "string"
-                                      }
-                                    }
-                                  }
-                                }
-                              ]
                             }
                           },
                           "additionalProperties": false
@@ -9000,7 +9893,6 @@
                       "metadata.labels",
                       "metadata.model",
                       "metadata.span_type",
-                      "sentiment.input_sentiment",
                       "sentiment.thumbs_up_down",
                       "events.event_type",
                       "evaluations.evaluation_passed",
@@ -10140,6 +11032,37 @@
                           }
                         ]
                       },
+                      "traces.origin": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
                       "traces.error": {
                         "anyOf": [
                           {
@@ -10265,6 +11188,99 @@
                         ]
                       },
                       "evaluations.evaluator_id.guardrails_only": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "evaluations.evaluator_id.has_passed": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "evaluations.evaluator_id.has_score": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "evaluations.evaluator_id.has_label": {
                         "anyOf": [
                           {
                             "type": "array",
@@ -10573,37 +11589,6 @@
                             }
                           }
                         ]
-                      },
-                      "sentiment.input_sentiment": {
-                        "anyOf": [
-                          {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "object",
-                              "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        ]
                       }
                     },
                     "additionalProperties": false,
@@ -10669,6 +11654,10 @@
                       "json"
                     ],
                     "description": "Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)"
+                  },
+                  "includeSpans": {
+                    "type": "boolean",
+                    "description": "When true, fetches full span data for each trace. Useful for bulk export. Default false."
                   },
                   "llmMode": {
                     "type": "boolean"
@@ -10842,6 +11831,1220 @@
           }
         ],
         "description": "Get a single trace by ID. Defaults to AI-readable digest format."
+      }
+    },
+    "/api/evaluators/{id}": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "config": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": {}
+                    },
+                    "workflowId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "copiedFromEvaluatorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "identifier": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "identifier",
+                          "type"
+                        ]
+                      }
+                    },
+                    "outputFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "identifier": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "identifier",
+                          "type"
+                        ]
+                      }
+                    },
+                    "workflowName": {
+                      "type": "string"
+                    },
+                    "workflowIcon": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "projectId",
+                    "name",
+                    "slug",
+                    "type",
+                    "config",
+                    "workflowId",
+                    "copiedFromEvaluatorId",
+                    "createdAt",
+                    "updatedAt",
+                    "fields",
+                    "outputFields"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (e.g. attempting to change evaluatorType)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Evaluator not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putApiEvaluatorsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update an existing evaluator",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Evaluator not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteApiEvaluatorsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Archive (soft-delete) an evaluator"
+      }
+    },
+    "/api/scenarios": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiScenarios",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "situation": {
+                    "type": "string"
+                  },
+                  "criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "name",
+                  "situation"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios/{id}": {
+      "put": {
+        "responses": {},
+        "operationId": "putApiScenariosById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "situation": {
+                    "type": "string"
+                  },
+                  "criteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiDataset",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all non-archived datasets for the project (paginated)"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiDataset",
+        "parameters": [],
+        "description": "Create a new dataset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "columnTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "string"
+                            },
+                            {
+                              "type": "string",
+                              "const": "boolean"
+                            },
+                            {
+                              "type": "string",
+                              "const": "number"
+                            },
+                            {
+                              "type": "string",
+                              "const": "date"
+                            },
+                            {
+                              "type": "string",
+                              "const": "list"
+                            },
+                            {
+                              "type": "string",
+                              "const": "json"
+                            },
+                            {
+                              "type": "string",
+                              "const": "spans"
+                            },
+                            {
+                              "type": "string",
+                              "const": "rag_contexts"
+                            },
+                            {
+                              "type": "string",
+                              "const": "chat_messages"
+                            },
+                            {
+                              "type": "string",
+                              "const": "annotations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "evaluations"
+                            },
+                            {
+                              "type": "string",
+                              "const": "image"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "type"
+                      ]
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset/upload": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiDatasetUpload",
+        "parameters": [],
+        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)"
+      }
+    },
+    "/api/dataset/{slugOrId}/upload": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiDatasetBySlugOrIdUpload",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset"
+      }
+    },
+    "/api/dataset/{slugOrId}/records": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiDatasetBySlugOrIdRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Create records in a dataset in batch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entries": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  }
+                },
+                "required": [
+                  "entries"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "responses": {},
+        "operationId": "getApiDatasetBySlugOrIdRecords",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "List records for a dataset (paginated)"
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiDatasetBySlugOrIdRecords",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Delete records from a dataset by IDs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recordIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 1000
+                  }
+                },
+                "required": [
+                  "recordIds"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dataset/{slugOrId}/records/{recordId}": {
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiDatasetBySlugOrIdRecordsByRecordId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "recordId",
+            "required": true
+          }
+        ],
+        "description": "Update or create a record in a dataset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entry": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "entry"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prompts/{id}/tags/{tag}": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configId": {
+                      "type": "string"
+                    },
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "tag": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "configId",
+                    "versionId",
+                    "tag",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid tag or version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putApiPromptsByIdTagsByTag",
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "path",
+            "description": "The tag to assign (e.g., \"production\", \"staging\", or a custom tag)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Assign a tag (e.g. \"production\", \"staging\") to a specific prompt version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "versionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "versionId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prompts/tags/{tag}": {
+      "put": {
+        "responses": {
+          "200": {
+            "description": "Tag renamed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "putApiPromptsTagsByTag",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tag",
+            "required": true
+          }
+        ],
+        "description": "Rename a prompt tag definition",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "Tag deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteApiPromptsTagsByTag",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "tag",
+            "required": true
+          }
+        ],
+        "description": "Delete a prompt tag definition and cascade to assignments"
       }
     }
   },
@@ -11019,9 +13222,6 @@
         "properties": {
           "value": {
             "type": "string"
-          },
-          "satisfaction_score": {
-            "type": "number"
           }
         }
       },

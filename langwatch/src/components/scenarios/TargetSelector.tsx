@@ -43,6 +43,7 @@ export function TargetSelector({
 
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
+  const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -110,6 +111,12 @@ export function TargetSelector({
     const next = !open;
     setOpen(next);
     if (next) {
+      // Cap dropdown height to available space below the trigger
+      const triggerRect = triggerRef.current?.getBoundingClientRect();
+      if (triggerRect) {
+        const spaceBelow = window.innerHeight - triggerRect.bottom - 8; // 8px padding from viewport edge
+        setMaxDropdownHeight(Math.min(400, Math.max(40, spaceBelow)));
+      }
       setTimeout(() => {
         inputRef.current?.focus();
         scrollContainerRef.current?.scrollTo(0, 0);
@@ -128,6 +135,7 @@ export function TargetSelector({
         minWidth="240px"
         justifyContent="space-between"
         onClick={handleToggle}
+        data-testid="target-selector-trigger"
       >
         <HStack gap={2}>
           {value?.type === "prompt" && <BookText size={14} />}
@@ -141,10 +149,11 @@ export function TargetSelector({
       {open && (
         <Box
           position="absolute"
-          bottom="100%"
+          top="100%"
           left={0}
           width="300px"
-          marginBottom={1}
+          maxHeight={`${maxDropdownHeight}px`}
+          marginTop={1}
           borderRadius="lg"
           borderWidth="1px"
           borderColor="border"
@@ -152,6 +161,10 @@ export function TargetSelector({
           boxShadow="lg"
           zIndex={10}
           overflow="hidden"
+          display="flex"
+          flexDirection="column"
+          onPointerDown={(e) => e.stopPropagation()}
+          data-testid="target-selector-dropdown"
         >
           {/* Search Input */}
           <Box
@@ -159,6 +172,7 @@ export function TargetSelector({
             borderBottomWidth="1px"
             borderColor="border"
             bg="bg"
+            flexShrink={0}
           >
             <Input
               ref={inputRef}
@@ -170,7 +184,7 @@ export function TargetSelector({
           </Box>
 
           {/* Scrollable Content */}
-          <Box ref={scrollContainerRef} maxHeight="400px" overflowY="auto">
+          <Box ref={scrollContainerRef} flex={1} minHeight={0} overflowY="auto">
             {/* Agents Section */}
             <Box>
               <Text

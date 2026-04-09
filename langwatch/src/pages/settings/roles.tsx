@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import SettingsLayout from "../../components/SettingsLayout";
+import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { PermissionViewer } from "../../components/settings/PermissionViewer";
 import { RoleCard } from "../../components/settings/RoleCard";
 import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
@@ -30,6 +31,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
 /**
  * Role Management Settings Page
@@ -65,6 +67,9 @@ function RolesSettings() {
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
+          <Box width="full">
+            <ContactSalesBlock />
+          </Box>
         </VStack>
       </SettingsLayout>
     );
@@ -145,6 +150,7 @@ function RolesManagement({
       onClose();
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to create role",
         description: error.message,
@@ -162,6 +168,7 @@ function RolesManagement({
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to delete role",
         description: error.message,
@@ -181,6 +188,7 @@ function RolesManagement({
       setEditingRole(null);
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to update role",
         description: error.message,

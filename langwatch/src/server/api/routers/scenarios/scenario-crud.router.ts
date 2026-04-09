@@ -4,6 +4,9 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import { trackServerEvent } from "~/server/posthog";
+import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -43,6 +46,22 @@ export const scenarioCrudRouter = createTRPCRouter({
         ...input,
         lastUpdatedById: ctx.session.user.id,
       });
+
+      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId });
+
+      void ctx.prisma.scenario
+        .count({
+          where: { projectId: input.projectId, archivedAt: null },
+        })
+        .then((count) => {
+          fireScenarioCreatedNurturing({
+            userId: ctx.session.user.id,
+            scenarioCount: count,
+            scenarioId: result.id,
+            projectId: input.projectId,
+          });
+        })
+        .catch(captureException);
 
       logger.info({ projectId: input.projectId, scenarioId: result.id }, "Scenario created");
       return result;

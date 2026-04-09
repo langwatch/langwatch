@@ -14,11 +14,15 @@ export const filterFieldsEnum = z.enum([
   "metadata.key",
   "metadata.value",
   "metadata.prompt_ids",
+  "traces.origin",
   "traces.error",
   "spans.type",
   "spans.model",
   "evaluations.evaluator_id",
   "evaluations.evaluator_id.guardrails_only",
+  "evaluations.evaluator_id.has_passed",
+  "evaluations.evaluator_id.has_score",
+  "evaluations.evaluator_id.has_label",
   "evaluations.passed",
   "evaluations.score",
   "evaluations.state",
@@ -28,7 +32,6 @@ export const filterFieldsEnum = z.enum([
   "events.metrics.value",
   "events.event_details.key",
   "annotations.hasAnnotation",
-  "sentiment.input_sentiment",
 ]);
 
 export type FilterField = z.infer<typeof filterFieldsEnum>;
@@ -44,8 +47,39 @@ const filterValueSchema: z.ZodType<
   ]),
 );
 
-// Schema for validating trigger filter JSON structure
+export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
+export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
+
+// Schema for validating trigger filter JSON structure — rejects unknown fields
 export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
+
+/** Validates filter value structure without restricting field names. */
+export const triggerFiltersPermissiveSchema = z.record(
+  z.string(),
+  filterValueSchema,
+);
+
+const validFilterFields = new Set<string>(filterFieldsEnum.options);
+
+const isTriggerFilterField = (field: string): field is FilterField =>
+  validFilterFields.has(field);
+
+export const sanitizeTriggerFilters = (
+  filters: Record<string, TriggerFilterValue>,
+) => {
+  const sanitized: TriggerFilters = {};
+  const unknownFields: string[] = [];
+
+  for (const [key, value] of Object.entries(filters)) {
+    if (isTriggerFilterField(key)) {
+      sanitized[key] = value;
+    } else {
+      unknownFields.push(key);
+    }
+  }
+
+  return { sanitized, unknownFields };
+};
 
 export type FilterDefinition = {
   name: string;

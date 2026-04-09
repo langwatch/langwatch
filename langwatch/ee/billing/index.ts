@@ -1,18 +1,12 @@
 import { prisma } from "../../src/server/db";
-import { createPlanLimitNotifier } from "./notifications/planLimitNotifier";
-import {
-  clearBillingNotificationHandlers,
-  notifySubscriptionEvent,
-  setBillingNotificationHandlers,
-} from "./notifications/notificationHandlers";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
 import { InviteService } from "../../src/server/invites/invite.service";
 import { createSeatSyncService } from "./services/seatSyncService";
-import { createSubscriptionService } from "./services/subscriptionService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
-import { createWebhookService } from "./services/webhookService";
+import { EESubscriptionService } from "./services/subscription.service";
+import { EEWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
 import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
@@ -23,18 +17,13 @@ export { PLAN_LIMITS } from "./planLimits";
 export { prices } from "./services/subscriptionItemCalculator";
 export type { UsageReportingService, MeterEventResult, UsageSummary } from "./services/usageReportingService";
 export type {
-  BillingNotificationHandlers,
   BillingPlanProvider,
   PlanLimitNotificationContext,
-  PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
+  ResourceLimitNotificationContext,
+  ResourceLimitNotifierInput,
   SubscriptionNotificationPayload,
 } from "./types";
-export {
-  clearBillingNotificationHandlers,
-  notifySubscriptionEvent,
-  setBillingNotificationHandlers,
-};
 
 // Lazy Stripe singleton
 let stripe: ReturnType<typeof createStripeClient> | null = null;
@@ -49,7 +38,7 @@ export const createSubscriptionRouter = () => {
   const s = getStripe();
   const customerService = createCustomerService({ stripe: s, db: prisma });
   const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
-  const subscriptionService = createSubscriptionService({
+  const subscriptionService = EESubscriptionService.create({
     stripe: s,
     db: prisma,
     itemCalculator: subscriptionItemCalculator,
@@ -72,12 +61,13 @@ export const getSeatSyncService = () => {
 export const createStripeWebhookHandler = () => {
   const s = getStripe();
   const inviteApprover = InviteService.create(prisma);
-  const webhookService = createWebhookService({
+  const webhookService = EEWebhookService.create({
     db: prisma,
     stripe: s,
     itemCalculator: subscriptionItemCalculator,
     inviteApprover,
   });
+
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
 };
 
@@ -91,15 +81,3 @@ export const getSaaSPlanProvider = () => {
   return saasPlanProvider;
 };
 
-let planLimitNotifier: ReturnType<typeof createPlanLimitNotifier> | null = null;
-
-export const notifyPlanLimitReached = async (input: {
-  organizationId: string;
-  planName: string;
-}) => {
-  if (!planLimitNotifier) {
-    planLimitNotifier = createPlanLimitNotifier(prisma);
-  }
-
-  return await planLimitNotifier(input);
-};

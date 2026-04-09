@@ -1,9 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
-
-import { dependencies } from "../../../../injection/dependencies.server";
+import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import {
+  fireIntegrationMethodNurturing,
+  mapProductSelectionToIntegrationMethod,
+} from "~/../ee/billing/nurturing/hooks/productInterest";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
@@ -70,24 +74,34 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
-        // Execute post-registration callback if defined
-        if (dependencies.postRegistrationCallback) {
-          try {
-            await dependencies.postRegistrationCallback(
-              {
-                name: ctx.session.user.name,
-                email: ctx.session.user.email,
-              },
-              {
-                orgName: orgResult.organization.name,
-                phoneNumber: input.phoneNumber,
-                signUpData: input.signUpData,
-              },
-            );
-          } catch (err) {
-            captureException(err);
-          }
+        try {
+          const signupPayload = {
+            userName: ctx.session.user.name,
+            userEmail: ctx.session.user.email,
+            organizationName: orgResult.organization.name,
+            phoneNumber: input.phoneNumber,
+            signUpData: input.signUpData,
+          };
+
+          await Promise.all([
+            getApp().notifications.sendSlackSignupEvent({
+              ...signupPayload,
+              utmCampaign: input.signUpData?.utmCampaign,
+            }),
+            getApp().notifications.sendHubspotSignupForm(signupPayload),
+          ]);
+        } catch (error) {
+          captureException(error);
         }
+
+        fireSignupNurturingCalls({
+          userId: ctx.session.user.id,
+          email: ctx.session.user.email,
+          name: ctx.session.user.name,
+          organizationId: orgResult.organization.id,
+          organizationName: orgResult.organization.name,
+          signUpData: input.signUpData,
+        });
 
         // Return success response with team and project slugs
         return {
@@ -102,5 +116,35 @@ export const onboardingRouter = createTRPCRouter({
         captureException(error);
         throw error;
       }
+    }),
+
+  /**
+   * Sets the integration_method trait in Customer.io after the user
+   * picks their flavour on the onboarding screen.
+   *
+   * Separate from initializeOrganization because the org is created
+   * BEFORE the flavour selection screen.
+   */
+  setIntegrationMethod: protectedProcedure
+    .input(
+      z.object({
+        integrationMethod: z.enum([
+          "via-claude-code",
+          "via-platform",
+          "via-claude-desktop",
+          "manually",
+        ]),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
+
+      fireIntegrationMethodNurturing({
+        userId: ctx.session.user.id,
+        integrationMethod: traitValue,
+      });
+
+      return { success: true };
     }),
 });

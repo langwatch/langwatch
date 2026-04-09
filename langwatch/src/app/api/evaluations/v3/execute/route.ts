@@ -21,6 +21,8 @@ import {
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
 import { createLogger } from "~/utils/logger/server";
+import { trackServerEvent } from "~/server/posthog";
+import { fireExperimentRanNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:execute");
@@ -105,18 +107,10 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
     ui: createInitialUIState(),
   };
 
-  // Fetch project feature flag for event sourcing routing
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { featureEventSourcingEvaluationIngestion: true },
-  });
-
   // Stream SSE events
   return streamSSE(c, async (stream) => {
     try {
-      // Only save to Elasticsearch for full runs (not single cell/row/target executions)
       const isFullRun = request.scope.type === "full";
-      const shouldSaveToEs = !!request.experimentId && isFullRun;
 
       const orchestrator = runOrchestrator({
         projectId,
@@ -128,9 +122,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         loadedPrompts,
         loadedAgents,
         loadedEvaluators,
-        saveToEs: shouldSaveToEs,
         concurrency: request.concurrency,
-        featureEventSourcingEvaluationIngestion: project?.featureEventSourcingEvaluationIngestion ?? false,
       });
 
       for await (const event of orchestrator) {
@@ -140,6 +132,20 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
 
         // End stream on done or stopped
         if (event.type === "done" || event.type === "stopped") {
+          if (session?.user?.id) {
+            trackServerEvent({
+              userId: session.user.id,
+              event: "evaluation_ran",
+              projectId,
+            });
+            if (request.experimentId && isFullRun) {
+              fireExperimentRanNurturing({
+                userId: session.user.id,
+                experimentId: request.experimentId,
+                projectId,
+              });
+            }
+          }
           break;
         }
       }

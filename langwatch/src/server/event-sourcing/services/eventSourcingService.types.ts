@@ -1,3 +1,4 @@
+import type { ProcessRole } from "../../app-layer/config";
 import type { createLogger } from "../../../utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
@@ -8,6 +9,7 @@ import type { MapProjectionDefinition } from "../projections/mapProjection.types
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { EventStore } from "../stores/eventStore.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 import type { JobRegistryEntry } from "./queues/queueManager";
@@ -97,5 +99,11 @@ export interface EventSourcingServiceOptions<
    * "web": skip BullMQ workers (only dispatch to queues)
    * "worker" | undefined: start all consumers
    */
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
+  /**
+   * Optional replay marker checker for coordinating with projection-replay.
+   * When provided, fold projections check for active replay markers before
+   * processing events, deferring or skipping as needed.
+   */
+  replayMarkerChecker?: ReplayMarkerChecker;
 }

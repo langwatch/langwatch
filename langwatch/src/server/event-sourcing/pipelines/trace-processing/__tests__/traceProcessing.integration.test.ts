@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { AggregateType } from "../../../";
 import { definePipeline } from "../../../";
 import {
@@ -18,9 +20,9 @@ import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
 import { RecordSpanCommand } from "../commands/recordSpanCommand";
-import { createSpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
+import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import { createTraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
+import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 import { SpanAppendStore } from "../projections/spanStorage.store";
@@ -94,6 +96,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   { recordSpan: any; assignTopic: any }
 > & {
   eventStore: EventStoreClickHouse;
+  eventSourcing: EventSourcing;
   pipelineName: string;
   ready: () => Promise<void>;
 } {
@@ -109,23 +112,24 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   }
 
   const eventStore = new EventStoreClickHouse(
-    new EventRepositoryClickHouse(clickHouseClient),
+    new EventRepositoryClickHouse(async () => clickHouseClient),
   );
 
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    clickhouse: clickHouseClient,
+    clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
-  const spanAppendStore = new SpanAppendStore(SpanStorageService.create(clickHouseClient).repository);
-  const traceSummaryStore = new TraceSummaryStore(TraceSummaryService.create(clickHouseClient).repository);
+  const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository);
+  const traceSummaryStore = new TraceSummaryStore(new TraceSummaryService(new TraceSummaryClickHouseRepository(async () => clickHouseClient)).repository);
 
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("trace" as AggregateType)
-    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
-    .withMapProjection("spanStorage", createSpanStorageMapProjection({ store: spanAppendStore }) as any)
+    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
+    .withMapProjection("spanStorage", new SpanStorageMapProjection({ store: spanAppendStore }) as any)
     .withCommand("recordSpan", RecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)
     .build();
@@ -135,6 +139,7 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     ready: () => pipeline.service.waitUntilReady(),
   } as any;
@@ -324,7 +329,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
-      await pipeline.service.close();
+      await pipeline.eventSourcing.close();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await cleanupTestDataForTenant(tenantIdString);
     });
@@ -348,6 +353,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -376,6 +382,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         const count = await waitForStoredSpans(traceId, tenantIdString, 1);
@@ -401,6 +408,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
         await waitForClickHouseConsistency();
 
@@ -418,6 +426,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 2);
@@ -450,6 +459,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -485,6 +495,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -519,6 +530,7 @@ describe.skipIf(!hasTestcontainers)(
           resource: null,
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
 
@@ -531,6 +543,7 @@ describe.skipIf(!hasTestcontainers)(
           subtopicId,
           subtopicName: "Billing Questions",
           isIncremental: false,
+          occurredAt: Date.now(),
         });
 
         await waitForTopicAssignment(pipeline, traceId, tenantId, topicId);
@@ -568,6 +581,7 @@ describe.skipIf(!hasTestcontainers)(
           },
           instrumentationScope: null,
           piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
         });
 
         await waitForTraceSummary(pipeline, traceId, tenantId, 1);
@@ -582,6 +596,39 @@ describe.skipIf(!hasTestcontainers)(
         expect(data.attributes["sdk.name"]).toBe("opentelemetry");
         expect(data.attributes["sdk.language"]).toBe("python");
         expect(data.attributes["service.name"]).toBe("my-agent");
+      });
+    });
+
+    describe("given a span with langwatch.origin attribute", () => {
+      it("persists langwatch.origin in trace summary attributes", async () => {
+        const traceId = generateTestTraceId();
+
+        await pipeline.commands.recordSpan.send({
+          tenantId: tenantIdString,
+          span: buildTestSpan({
+            traceId,
+            spanId: generateTestSpanId(),
+            name: "evaluation-span",
+            attributes: [
+              { key: "langwatch.origin", value: { stringValue: "evaluation" } },
+            ],
+          }),
+          resource: null,
+          instrumentationScope: null,
+          piiRedactionLevel: "DISABLED",
+          occurredAt: Date.now(),
+        });
+
+        await waitForTraceSummary(pipeline, traceId, tenantId, 1);
+
+        const projection = await pipeline.service.getProjectionByName(
+          "traceSummary",
+          traceId,
+          { tenantId },
+        );
+        const data = projection?.data as TraceSummaryData;
+
+        expect(data.attributes["langwatch.origin"]).toBe("evaluation");
       });
     });
   },

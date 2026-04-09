@@ -7,20 +7,20 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
     app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
-    {{- if .Values.langwatch_nlp.labels }}
-    {{- toYaml .Values.langwatch_nlp.labels | nindent 4 }}
+    {{- with .Values.langwatch_nlp.deployment.labels }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- with .Values.langwatch_nlp.deployment.annotations }}
   annotations:
-    {{- if .Values.langwatch_nlp.deployment.annotations }}
-    {{- toYaml .Values.langwatch_nlp.deployment.annotations | nindent 4 }}
-    {{- end }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.langwatch_nlp.replicaCount }}
   {{- if .Values.langwatch_nlp.deployment.strategy }}
   strategy: 
     {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
   {{- end }}
-  {{- if .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
+  {{- if hasKey (default (dict) .Values.langwatch_nlp.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
   {{- end }}
   selector:
@@ -36,10 +36,8 @@ spec:
         {{- toYaml .Values.langwatch_nlp.pod.labels | nindent 8 }}
         {{- end }}
       annotations:
-        {{- if .Values.langwatch_nlp.podAnnotations }}
-        {{- toYaml .Values.langwatch_nlp.podAnnotations | nindent 8 }}
-        {{- else if .Values.global.podAnnotations }}
-        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
+        {{- with (coalesce .Values.langwatch_nlp.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
@@ -66,6 +64,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # Topology spread constraints - https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+      {{- with (coalesce .Values.langwatch_nlp.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
       initContainers:
         {{- with .Values.langwatch_nlp.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
@@ -75,7 +79,7 @@ spec:
         {{- with .Values.langwatch_nlp.extraContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        - name: {{ .Release.Name }}-app
+        - name: {{ .Release.Name }}-langwatch-nlp
           securityContext:
             {{- toYaml (coalesce .Values.langwatch_nlp.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
           image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
@@ -94,16 +98,30 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- if .Values.langwatch_nlp.extraNlpLifecycle}}
+          {{- if .Values.langwatch_nlp.extraLifecycle}}
           lifecycle:
-            {{- with .Values.langwatch_nlp.extraNlpLifecycle}}
+            {{- with .Values.langwatch_nlp.extraLifecycle}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
           resources:
             {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
           volumeMounts:
-            {{- with .Values.langwatch_nlp.extraNlpVolumeMounts}}
+            {{- with .Values.langwatch_nlp.extraVolumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: tmp-dir

@@ -1,4 +1,4 @@
-name: Publish LangEvals to PyPI
+name: langevals-publish-pypi
 
 on:
   release:
@@ -18,10 +18,10 @@ jobs:
         working-directory: langevals
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
         with:
           version: "latest"
 

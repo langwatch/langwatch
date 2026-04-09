@@ -12,7 +12,8 @@ import {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import type { SpanDedupService } from "./span-dedupe.service";
-import { traced } from "../tracing";
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const SPAN_MAX_PAST_MS = 31 * ONE_DAY_MS;
 
 /** An OtlpSpan whose ID fields have been normalized to hex strings. */
 type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
@@ -38,6 +39,11 @@ function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {
   };
 }
 
+export interface TraceRequestCollectionResult {
+  rejectedSpans: number;
+  errorMessage: string;
+}
+
 export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
@@ -59,10 +65,6 @@ export class TraceRequestCollectionService {
 
   constructor(private readonly deps: TraceRequestCollectionDeps) {}
 
-  static create(deps: TraceRequestCollectionDeps): TraceRequestCollectionService {
-    return traced(new TraceRequestCollectionService(deps), "TraceRequestCollectionService");
-  }
-
   /**
    * Deserializes the OTLP request (JSON or protobuf), iterates through all spans,
    * normalizing the data into a more stable data structure, and sends each span to the
@@ -72,7 +74,7 @@ export class TraceRequestCollectionService {
     tenantId: string,
     traceRequest: IExportTraceServiceRequest,
     piiRedactionLevel: PIIRedactionLevel,
-  ): Promise<void> {
+  ): Promise<TraceRequestCollectionResult> {
     return await this.tracer.withActiveSpan(
       "TraceRequestCollectionService.handleOtlpTraceRequest",
       {
@@ -87,6 +89,7 @@ export class TraceRequestCollectionService {
         let droppedSpanCount = 0;
         let dedupedSpanCount = 0;
         let ingestionFailureCount = 0;
+        const errors: string[] = [];
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
@@ -119,11 +122,14 @@ export class TraceRequestCollectionService {
                 otelSpanRef: span,
               });
 
-              switch (result) {
+              switch (result.status) {
                 case "collected": collectedSpanCount++; break;
                 case "dropped":   droppedSpanCount++;   break;
                 case "deduped":   dedupedSpanCount++;   break;
                 case "failed":    ingestionFailureCount++; break;
+              }
+              if (result.error) {
+                errors.push(result.error);
               }
             }
           }
@@ -133,6 +139,12 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
         span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
+
+        const rejectedSpans = droppedSpanCount + ingestionFailureCount;
+        return {
+          rejectedSpans,
+          errorMessage: errors.join("; "),
+        };
       },
     );
   }
@@ -151,7 +163,7 @@ export class TraceRequestCollectionService {
     scope: import("../../event-sourcing/pipelines/trace-processing/schemas/otlp").OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: import("@opentelemetry/api").Span;
-  }): Promise<"collected" | "dropped" | "deduped" | "failed"> {
+  }): Promise<{ status: "collected" | "dropped" | "deduped" | "failed"; error?: string }> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
     if (!spanParseResult.success) {
       this.logger.warn(
@@ -160,7 +172,19 @@ export class TraceRequestCollectionService {
       );
     }
     if (!spanParseResult.data) {
-      return "dropped";
+      return {
+        status: "dropped",
+        error: `span validation failed: ${spanParseResult.error?.message ?? "unknown"}`,
+      };
+    }
+
+    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+      TraceRequestUtils.normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
+    );
+    const now = Date.now();
+
+    if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
+      return { status: "dropped", error: "span start time is more than 31 days in the past" };
     }
 
     const normalizedSpan = normalizeSpanIds(spanParseResult.data);
@@ -173,7 +197,7 @@ export class TraceRequestCollectionService {
         normalizedSpan.spanId,
       );
       if (lockResult === false) {
-        return "deduped";
+        return { status: "deduped" };
       }
       lockAcquired = lockResult === true;
 
@@ -192,7 +216,7 @@ export class TraceRequestCollectionService {
         normalizedSpan.spanId,
       );
 
-      return "collected";
+      return { status: "collected" };
     } catch (error) {
       if (lockAcquired) {
         await this.deps.dedup.tryReleaseOnFailure(
@@ -216,7 +240,10 @@ export class TraceRequestCollectionService {
         },
         "Error converting raw OTEL span",
       );
-      return "failed";
+      return {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 }

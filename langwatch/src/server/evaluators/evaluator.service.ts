@@ -9,9 +9,10 @@ import {
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
 import {
-  type CreateEvaluatorInput,
-  EvaluatorRepository,
-} from "./evaluator.repository";
+  getEvaluatorDefaultSettings,
+  getEvaluatorDefinitions,
+} from "~/server/evaluations/getEvaluator";
+import { EvaluatorRepository } from "./evaluator.repository";
 
 // ============================================================================
 // Types
@@ -172,7 +173,9 @@ export class EvaluatorService {
   /**
    * Computes output fields for a built-in evaluator from its result definition.
    * Only includes score/passed/label when the evaluator actually produces them.
-   * Always includes details since all evaluators can produce a freeform explanation.
+   * Does NOT unconditionally add `details` -- it is included as a default when
+   * creating NEW evaluator nodes (see useEvaluatorPickerFlow), but users can
+   * remove it. Respecting the declared outputFields prevents "sticky" fields.
    */
   private computeBuiltInOutputFields(evaluatorType: string): EvaluatorField[] {
     const def = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
@@ -182,10 +185,8 @@ export class EvaluatorService {
     if (def.result.score) fields.push({ identifier: "score", type: "float" });
     if (def.result.passed) fields.push({ identifier: "passed", type: "bool" });
     if (def.result.label) fields.push({ identifier: "label", type: "str" });
-    // details is always available on EvaluationResult
-    fields.push({ identifier: "details", type: "str" });
 
-    return fields.length > 1 ? fields : STANDARD_EVALUATOR_OUTPUT_FIELDS;
+    return fields.length > 0 ? fields : STANDARD_EVALUATOR_OUTPUT_FIELDS;
   }
 
   /**
@@ -256,7 +257,32 @@ export class EvaluatorService {
   }
 
   /**
-   * Creates a new evaluator.
+   * Creates a new evaluator, populating missing settings with defaults
+   * from the evaluator definition and project configuration.
+   */
+  async createWithDefaults({
+    project,
+    ...input
+  }: Parameters<EvaluatorRepository["create"]>[0] & {
+    project: { defaultModel?: string | null; embeddingsModel?: string | null };
+  }) {
+    const config = input.config as Record<string, unknown> | null;
+    const evaluatorType = config?.evaluatorType as string | undefined;
+
+    if (evaluatorType && config) {
+      const defaults = getEvaluatorDefaultSettings(
+        getEvaluatorDefinitions(evaluatorType),
+        project,
+      );
+      const userSettings = (config.settings ?? {}) as Record<string, unknown>;
+      config.settings = { ...defaults, ...userSettings };
+    }
+
+    return this.repository.create(input);
+  }
+
+  /**
+   * Creates a new evaluator (without populating default settings).
    */
   get create() {
     return this.repository.create.bind(this.repository);
@@ -274,5 +300,40 @@ export class EvaluatorService {
    */
   get softDelete() {
     return this.repository.softDelete.bind(this.repository);
+  }
+
+  /**
+   * Returns recent audit log history for a specific evaluator, enriched with user info.
+   * Capped at the 100 most recent entries.
+   */
+  async getHistory(
+    evaluatorId: string,
+    projectId: string,
+  ): Promise<
+    {
+      id: string;
+      action: string;
+      createdAt: Date;
+      args: unknown;
+      user: { id: string; name: string | null; email: string | null } | null;
+    }[]
+  > {
+    const logs = await this.repository.findAuditLogs({
+      evaluatorId,
+      projectId,
+      limit: 100,
+    });
+
+    const userIds = [...new Set(logs.map((l) => l.userId))];
+    const users = await this.repository.findUsersByIds(userIds);
+    const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      createdAt: log.createdAt,
+      args: log.args,
+      user: usersById[log.userId] ?? null,
+    }));
   }
 }

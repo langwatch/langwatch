@@ -1,54 +1,113 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { PrismaClient } from "@prisma/client";
-import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
-import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
-import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
-import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
-import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
-import type { ProjectService } from "../app-layer/projects/project.service";
-import type { MonitorService } from "../app-layer/monitors/monitor.service";
-import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import type { Redis, Cluster } from "ioredis";
+import { createLogger } from "~/utils/logger/server";
+import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
+import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
+import type { OrganizationService } from "../app-layer/organizations/organization.service";
+
+import type { TraceSummaryData } from "../app-layer/traces/types";
+import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { FoldProjectionStore } from "./projections/foldProjection.types";
+import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
+import type { MonitorService } from "../app-layer/monitors/monitor.service";
+import type { ProjectService } from "../app-layer/projects/project.service";
+import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
+import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
+import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
+import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
+
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
-import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "./pipelines/simulation-processing/repositories";
-import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
+import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
+import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
+import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
-import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
-import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
-import { createExecuteEvaluationCommandClass } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
-import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
-import { createSatisfactionScoreReactor } from "./pipelines/trace-processing/reactors/satisfactionScore.reactor";
-import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
+import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
+import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
+import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
 import {
-  ExperimentRunStateRepositoryClickHouse,
-  ExperimentRunStateRepositoryMemory,
-} from "./pipelines/experiment-run-processing/repositories";
-import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
-import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+  ComputeRunMetricsCommand,
+  COMPUTE_METRICS_RETRY_DELAY_MS,
+} from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
+import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
+import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
+import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
+import { SuiteRunStateFoldProjection, type SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
+import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
+import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
+import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
+
+import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
-import { createBillingReportingPipeline, BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
-import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
-import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
-import { createLogger } from "~/utils/logger/server";
+import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
+import {
+  BILLING_REPORTING_PIPELINE_NAME,
+  createBillingReportingPipeline,
+} from "./pipelines/billing-reporting/pipeline";
+import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { EvaluationRunFoldProjection } from "./pipelines/evaluation-processing/projections/evaluationRun.foldProjection";
+import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
+import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
+import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
+import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
+import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
+import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
+import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import { TraceSummaryFoldProjection } from "./pipelines/trace-processing/projections/traceSummary.foldProjection";
+import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
+import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
+import {
+  createEvaluationTriggerReactor,
+  createDeferredEvaluationHandler,
+  makeDeferredJobId,
+  DEFERRED_CHECK_DELAY_MS,
+  type DeferredEvaluationPayload,
+} from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
+import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
+import type { AppendStore } from "./projections/mapProjection.types";
+import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
+import type { RegisteredFoldProjection } from "./replay/types";
+import type { EvaluationRunRepository } from "../app-layer/evaluations/repositories/evaluation-run.repository";
+import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
+/**
+ * Pre-constructed repositories, resolved at the composition root (presets.ts).
+ * The registry consumes these directly — no ClickHouse client resolution here.
+ */
+export interface PipelineRepositories {
+  suiteRunState: SuiteRunStateRepository;
+  /** Primary replica for read-after-write consistency. */
+  simulationRunState: SimulationRunStateRepository;
+  /** Primary replica for read-after-write consistency. */
+  experimentRunState: ExperimentRunStateRepository;
+  /** Primary replica for read-after-write consistency. */
+  traceSummaryFold: TraceSummaryRepository;
+  logRecordStorage: LogRecordStorageRepository;
+  metricRecordStorage: MetricRecordStorageRepository;
+  experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+}
+
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
-  prisma: PrismaClient;
-  clickhouse: ClickHouseClient | null;
+  repositories: PipelineRepositories;
+  redis: Redis | Cluster;
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
@@ -60,7 +119,10 @@ export interface PipelineRegistryDeps {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
   };
+  organizations: OrganizationService;
   esSync: EvaluationEsSyncReactorDeps;
+  costRecorder: EvaluationCostRecorder;
+  billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
 }
 
@@ -69,16 +131,33 @@ export interface PipelineRegistryDeps {
  *
  * Creates store adapters, builds reactors and command classes, then registers
  * all pipelines with the EventSourcing runtime. Pipelines receive only
- * store interfaces and pre-built artifacts — never raw deps like prisma.
+ * store interfaces and pre-built artifacts — never raw deps like prisma or ClickHouse clients.
  */
 export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
+  private cached<State>(
+    inner: FoldProjectionStore<State>,
+    keyPrefix: string,
+  ): FoldProjectionStore<State> {
+    return new RedisCachedFoldStore<State>(inner, this.deps.redis as Redis, {
+      keyPrefix,
+    });
+  }
+
   registerAll() {
+    // TODO: Customer.io reactors are implemented but not yet registered.
+    // Counting strategy needs to be finalised (extend R5 daily sync pattern
+    // vs per-event ClickHouse queries) before enabling.
+    // See: customerIoDailyUsageSyncReactor, customerIoTraceSyncReactor,
+    //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
+
     const evalPipeline = this.registerEvaluationPipeline();
-    const tracePipeline = this.registerTracePipeline(evalPipeline);
+    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps } = this.registerTracePipeline(evalPipeline);
+    const suiteRunPipeline = this.registerSuiteRunPipeline();
+    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
+
     const experimentRunPipeline = this.registerExperimentRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -88,32 +167,76 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
+      suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
+      /** Late-bind the execution pool for scenario execution reactor. */
+      scenarioExecutionHandle,
     };
   }
 
   private registerEvaluationPipeline() {
-    const ExecuteEvaluationCommand = createExecuteEvaluationCommandClass({
-      prisma: this.deps.prisma,
+    const executeEvaluationCommand = new ExecuteEvaluationCommand({
+      monitors: this.deps.monitors,
       spanStorage: this.deps.traces.spans,
+      traceEvents: this.deps.traces.spans,
       evaluationExecution: this.deps.evaluations.execution,
+      costRecorder: this.deps.costRecorder,
     });
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(this.deps.evaluations.runs.repository),
-        ExecuteEvaluationCommand,
+        evalRunStore: new EvaluationRunStore(
+          this.deps.evaluations.runs.repository,
+        ),
+        executeEvaluationCommand,
         esSyncReactor,
       }),
     );
   }
 
-  private registerTracePipeline(evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>) {
-    const evaluationTriggerReactor = createEvaluationTriggerReactor({
+  private registerTracePipeline(
+    evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>,
+  ) {
+    const evalCommands = mapCommands(evalPipeline.commands);
+
+    const traceSummaryStore = this.cached<TraceSummaryData>(
+      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      "trace_summaries",
+    );
+
+    // Late-bound reference to the trace pipeline's resolveOrigin command.
+    // The reactor deps closure captures this; the actual dispatcher is set
+    // after pipeline registration (same pattern as billing self-dispatch).
+    let resolveOriginDispatcher: ((data: any) => Promise<void>) | null = null;
+
+    // Late-bound reference to the deferred evaluation queue.
+    // Set after pipeline registration, same pattern as resolveOriginDispatcher.
+    let scheduleDeferredDispatcher: ((payload: DeferredEvaluationPayload) => Promise<void>) | null = null;
+
+    const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
-      evaluation: mapCommands(evalPipeline.commands).executeEvaluation,
+      evaluation: evalCommands.executeEvaluation,
+      resolveOrigin: async (data: any) => {
+        if (!resolveOriginDispatcher) {
+          throw new Error("resolveOrigin dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return resolveOriginDispatcher(data);
+      },
+      traceSummaryStore,
+      scheduleDeferred: async (payload: DeferredEvaluationPayload) => {
+        if (!scheduleDeferredDispatcher) {
+          throw new Error("scheduleDeferred dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return scheduleDeferredDispatcher(payload);
+      },
+    };
+
+    const evaluationTriggerReactor = createEvaluationTriggerReactor(evaluationTriggerReactorDeps);
+
+    const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
+      reportEvaluation: evalCommands.reportEvaluation,
     });
 
     const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
@@ -126,87 +249,275 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    // Mutable ref: the reactor closure captures this, we fill it after registration
-    const satisfactionCommandRef: {
-      dispatch: AppCommands["traces"]["assignSatisfactionScore"] | null;
-    } = { dispatch: null };
+    const projectMetadataReactor = createProjectMetadataReactor({
+      projects: this.deps.projects,
+    });
 
-    const satisfactionScoreReactor = createSatisfactionScoreReactor({
-      assignSatisfactionScore: (data) => {
-        if (!satisfactionCommandRef.dispatch) {
-          throw new Error(
-            "assignSatisfactionScore command not yet wired — pipeline not registered",
-          );
+    // Late-bound reference for simulation metrics sync reactor.
+    // The simulation pipeline is registered after the trace pipeline,
+    // so computeRunMetrics is wired after simulation pipeline registration.
+    let simComputeRunMetrics: ((data: any) => Promise<void>) | null = null;
+
+    const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
+      computeRunMetrics: async (data) => {
+        if (!simComputeRunMetrics) {
+          logger.warn("simulation computeRunMetrics not yet initialized, skipping");
+          return;
         }
-        return satisfactionCommandRef.dispatch(data);
+        return simComputeRunMetrics(data);
       },
-      nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
     });
 
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
-        traceSummaryStore: new TraceSummaryStore(this.deps.traces.summary.repository),
+        logRecordAppendStore: new LogRecordAppendStore(this.deps.repositories.logRecordStorage),
+        metricRecordAppendStore: new MetricRecordAppendStore(this.deps.repositories.metricRecordStorage),
+        traceSummaryStore,
         evaluationTriggerReactor,
+        customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
-        satisfactionScoreReactor,
+        projectMetadataReactor,
+        simulationMetricsSyncReactor,
         spanStorageBroadcastReactor,
       }),
     );
 
-    // Complete the wiring now that the pipeline is registered
-    satisfactionCommandRef.dispatch =
-      mapCommands(tracePipeline.commands).assignSatisfactionScore;
+    // Wire the late-bound resolveOrigin dispatcher now that the pipeline is registered
+    const traceCommands = mapCommands(tracePipeline.commands);
+    resolveOriginDispatcher = traceCommands.resolveOrigin;
 
-    return tracePipeline;
-  }
-
-  private registerSimulationPipeline() {
-    const repository = this.deps.clickhouse
-      ? new SimulationRunStateRepositoryClickHouse(this.deps.clickhouse)
-      : new SimulationRunStateRepositoryMemory();
-    const simulationRunStore = createSimulationRunStateFoldStore(repository);
-    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor({
-      broadcast: this.deps.broadcast,
-      hasRedis: !!this.deps.eventSourcing.redisConnection,
+    // Wire the deferred evaluation queue (BullMQ-backed, survives process restart)
+    const deferredHandler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+    const deferredEvalQueue = tracePipeline.service.registerJob<DeferredEvaluationPayload>({
+      name: "deferredEvaluation",
+      process: deferredHandler,
+      delay: DEFERRED_CHECK_DELAY_MS,
+      deduplication: {
+        makeId: makeDeferredJobId,
+        extend: false,  // Don't reset the 5-min timer on new spans
+        replace: false,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.trace_id": payload.traceId,
+      }),
     });
 
+    if (deferredEvalQueue) {
+      scheduleDeferredDispatcher = (payload) => deferredEvalQueue.send(payload);
+    } else {
+      // Fallback: event sourcing disabled, use in-memory setTimeout (best-effort)
+      const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
+      scheduleDeferredDispatcher = async (payload: DeferredEvaluationPayload) => {
+        const dedupKey = makeDeferredJobId(payload);
+        if (pendingDeferredChecks.has(dedupKey)) return;
+        const handler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+        const timer = setTimeout(async () => {
+          pendingDeferredChecks.delete(dedupKey);
+          try {
+            await handler(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, traceId: payload.traceId, error },
+              "Deferred evaluation check failed",
+            );
+          }
+        }, DEFERRED_CHECK_DELAY_MS);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+        pendingDeferredChecks.set(dedupKey, timer);
+      };
+    }
+
+    return {
+      pipeline: tracePipeline,
+      traceSummaryStore,
+      /**
+       * Wires late-bound simulation computeRunMetrics into the trace-side
+       * simulationMetricsSync reactor. Called after the simulation
+       * pipeline is registered.
+       */
+      wireSimulationDeps: (deps: {
+        computeRunMetrics: (data: any) => Promise<void>;
+      }) => {
+        simComputeRunMetrics = deps.computeRunMetrics;
+      },
+    };
+  }
+
+  private registerSuiteRunPipeline() {
     return this.deps.eventSourcing.register(
-      createSimulationProcessingPipeline({
-        simulationRunStore,
-        snapshotUpdateBroadcastReactor,
+      createSuiteRunProcessingPipeline({
+        suiteRunStateFoldStore: this.cached<SuiteRunStateData>(
+          new RepositoryFoldStore<SuiteRunStateData>(
+            this.deps.repositories.suiteRunState,
+            SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+          ),
+          "suite_runs",
+        ),
       }),
     );
   }
 
+  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps }: {
+    suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+    wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
+  }) {
+    const simulationRunStore = this.cached<SimulationRunStateData>(
+      new RepositoryFoldStore<SimulationRunStateData>(
+        this.deps.repositories.simulationRunState,
+        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+      "simulation_runs",
+    );
+    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
+      {
+        broadcast: this.deps.broadcast,
+        hasRedis: !!this.deps.eventSourcing.redisConnection,
+      },
+    );
+
+    const cancellationBroadcastReactor = createCancellationBroadcastReactor({
+      publisher: this.deps.eventSourcing.redisConnection ?? null,
+    });
+
+    const scenarioExecutionHandle = createScenarioExecutionReactor();
+
+    const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
+    const suiteRunSyncReactor = createSuiteRunSyncReactor({
+      recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
+      completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+    });
+
+    // Late-bound: computeRunMetrics dispatches back to self (same pipeline)
+    let selfComputeRunMetrics: ((data: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
+
+    // Late-bound: deferred retry dispatcher
+    let scheduleRetryDispatcher: ((payload: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
+
+    const computeRunMetricsCommand = new ComputeRunMetricsCommand({
+      traceSummaryStore,
+      scheduleRetry: async (payload) => {
+        if (!scheduleRetryDispatcher) {
+          logger.warn("scheduleRetry dispatcher not yet initialized, skipping");
+          return;
+        }
+        return scheduleRetryDispatcher(payload);
+      },
+    });
+
+    const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
+      computeRunMetrics: async (data: any) => {
+        if (!selfComputeRunMetrics) {
+          logger.warn("computeRunMetrics self-dispatcher not yet initialized, skipping");
+          return;
+        }
+        return selfComputeRunMetrics(data);
+      },
+    });
+
+    const simulationPipeline = this.deps.eventSourcing.register(
+      createSimulationProcessingPipeline({
+        simulationRunStore,
+        snapshotUpdateBroadcastReactor,
+        cancellationBroadcastReactor,
+        scenarioExecutionReactor: scenarioExecutionHandle.reactor,
+        suiteRunSyncReactor,
+        traceMetricsSyncReactor,
+        computeRunMetricsCommand,
+      }),
+    );
+
+    // Wire late-bound self-dispatcher
+    const simCommands = mapCommands(simulationPipeline.commands);
+    selfComputeRunMetrics = simCommands.computeRunMetrics;
+
+    // Wire deferred retry job
+    const retryJobId = (payload: ComputeRunMetricsCommandData) =>
+      `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
+
+    const retryQueue = simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
+      name: "deferredComputeRunMetrics",
+      process: async (payload) => {
+        await simCommands.computeRunMetrics(payload);
+      },
+      delay: COMPUTE_METRICS_RETRY_DELAY_MS,
+      deduplication: {
+        makeId: retryJobId,
+        extend: false,
+        replace: true,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.scenario_run_id": payload.scenarioRunId,
+        "deferred.trace_id": payload.traceId,
+        "deferred.retry_count": payload.retryCount,
+      }),
+    });
+
+    if (retryQueue) {
+      scheduleRetryDispatcher = (payload) => retryQueue.send(payload);
+    } else {
+      // Fallback: event sourcing disabled, use in-memory setTimeout
+      scheduleRetryDispatcher = async (payload: ComputeRunMetricsCommandData) => {
+        const timer = setTimeout(async () => {
+          try {
+            await simCommands.computeRunMetrics(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, scenarioRunId: payload.scenarioRunId, traceId: payload.traceId, error },
+              "Deferred compute metrics retry failed",
+            );
+          }
+        }, COMPUTE_METRICS_RETRY_DELAY_MS);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+      };
+    }
+
+    // Wire the trace-side simulationMetricsSync reactor's late-bound deps
+    wireSimulationDeps({
+      computeRunMetrics: simCommands.computeRunMetrics,
+    });
+
+    return { pipeline: simulationPipeline, scenarioExecutionHandle };
+  }
+
   private registerBillingReportingPipeline() {
-    const ReportUsageForMonthCommand =
-      createReportUsageForMonthCommandClass({
-        prisma: this.deps.prisma,
-        getUsageReportingService: () => this.deps.usageReportingService,
-        queryBillableEventsTotal,
-        selfDispatch: (data) => {
-          const pipeline = this.deps.eventSourcing.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
-          return pipeline.commands.reportUsageForMonth.send(data);
-        },
-      });
+    const reportUsageForMonthCommand = new ReportUsageForMonthCommand({
+      organizations: this.deps.organizations,
+      billingCheckpoints: this.deps.billingCheckpoints,
+      getUsageReportingService: () => this.deps.usageReportingService,
+      queryBillableEventsTotal,
+      selfDispatch: (data) => {
+        const pipeline = this.deps.eventSourcing.getPipeline(
+          BILLING_REPORTING_PIPELINE_NAME,
+        );
+        return pipeline.commands.reportUsageForMonth.send(data);
+      },
+    });
 
     return this.deps.eventSourcing.register(
       createBillingReportingPipeline({
-        ReportUsageForMonthCommand,
+        reportUsageForMonthCommand,
       }),
     );
   }
 
   private registerExperimentRunPipeline() {
-    const repository = this.deps.clickhouse
-      ? new ExperimentRunStateRepositoryClickHouse(this.deps.clickhouse)
-      : new ExperimentRunStateRepositoryMemory();
+    const experimentRunStore = this.cached<ExperimentRunStateData>(
+      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+      "experiment_runs",
+    );
 
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
-        experimentRunStateFoldStore: createExperimentRunStateFoldStore(repository),
-        experimentRunItemAppendStore: createExperimentRunItemAppendStore(this.deps.clickhouse),
+        experimentRunStateFoldStore: experimentRunStore,
+        experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,
           repository: createElasticsearchBatchEvaluationRepository(),
@@ -214,6 +525,112 @@ export class PipelineRegistry {
       }),
     );
   }
+}
+
+/**
+ * Repositories needed exclusively for fold projection construction.
+ * Used by `buildFoldProjections()` for replay — no Redis, no queues.
+ */
+export interface FoldProjectionRepositories {
+  traceSummaryFold: TraceSummaryRepository;
+  evaluationRun: EvaluationRunRepository;
+  experimentRunState: ExperimentRunStateRepository;
+  simulationRunState: SimulationRunStateRepository;
+  suiteRunState: SuiteRunStateRepository;
+}
+
+/**
+ * Constructs fold projections with raw CH stores (no Redis cache).
+ *
+ * This is the **single source of truth** for which fold projections exist.
+ * When adding a new fold projection to registerAll(), add it here too.
+ */
+export function buildFoldProjections(
+  repos: FoldProjectionRepositories,
+): RegisteredFoldProjection[] {
+  const results: RegisteredFoldProjection[] = [];
+
+  // traceSummary
+  const traceSummaryDef = new TraceSummaryFoldProjection({
+    store: new TraceSummaryStore(repos.traceSummaryFold),
+  });
+  results.push({
+    projectionName: traceSummaryDef.name,
+    pipelineName: "trace_processing",
+    aggregateType: "trace",
+    source: "pipeline",
+    definition: traceSummaryDef,
+    pauseKey: `trace_processing/projection/${traceSummaryDef.name}`,
+    targetTable: "trace_summaries",
+  });
+
+  // evaluationRun
+  const evalRunDef = new EvaluationRunFoldProjection({
+    store: new EvaluationRunStore(repos.evaluationRun),
+  });
+  results.push({
+    projectionName: evalRunDef.name,
+    pipelineName: "evaluation_processing",
+    aggregateType: "evaluation",
+    source: "pipeline",
+    definition: evalRunDef,
+    pauseKey: `evaluation_processing/projection/${evalRunDef.name}`,
+    targetTable: "evaluation_runs",
+  });
+
+  // experimentRunState
+  const expRunDef = new ExperimentRunStateFoldProjection({
+    store: createExperimentRunStateFoldStore(repos.experimentRunState),
+  });
+  results.push({
+    projectionName: expRunDef.name,
+    pipelineName: "experiment_run_processing",
+    aggregateType: "experiment_run",
+    source: "pipeline",
+    definition: expRunDef,
+    pauseKey: `experiment_run_processing/projection/${expRunDef.name}`,
+    targetTable: "experiment_runs",
+  });
+
+  // simulationRunState
+  const simRunDef = new SimulationRunStateFoldProjection({
+    store: new RepositoryFoldStore(repos.simulationRunState, SIMULATION_PROJECTION_VERSIONS.RUN_STATE),
+  });
+  results.push({
+    projectionName: simRunDef.name,
+    pipelineName: "simulation_processing",
+    aggregateType: "simulation_run",
+    source: "pipeline",
+    definition: simRunDef,
+    pauseKey: `simulation_processing/projection/${simRunDef.name}`,
+    targetTable: "simulation_runs",
+  });
+
+  // suiteRunState
+  const suiteRunDef = new SuiteRunStateFoldProjection({
+    store: new RepositoryFoldStore(repos.suiteRunState, SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE),
+  });
+  results.push({
+    projectionName: suiteRunDef.name,
+    pipelineName: "suite_run_processing",
+    aggregateType: "suite_run",
+    source: "pipeline",
+    definition: suiteRunDef,
+    pauseKey: `suite_run_processing/projection/${suiteRunDef.name}`,
+    targetTable: "suite_runs",
+  });
+
+  // projectDailySdkUsage (global — store baked in, Prisma-backed)
+  results.push({
+    projectionName: projectDailySdkUsageProjection.name,
+    pipelineName: "global_projections",
+    aggregateType: "global",
+    source: "global",
+    definition: projectDailySdkUsageProjection,
+    pauseKey: `global_projections/projection/${projectDailySdkUsageProjection.name}`,
+  });
+
+  return results;
 }
 
 export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;

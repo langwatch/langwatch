@@ -41,6 +41,11 @@ export class GroupQueueDispatcher {
           do {
             dispatched = await this.dispatchBatch();
           } while (dispatched > 0 && !this.shutdownRequested);
+
+          // Drain signals that arrived during dispatch to prevent
+          // immediate re-wake from stale notifications
+          const signalKey = this.params.scripts.getSignalKey();
+          await this.params.blockingConnection.del(signalKey);
         } catch (error) {
           if (this.shutdownRequested) break;
 
@@ -48,7 +53,7 @@ export class GroupQueueDispatcher {
             error instanceof Error ? error.message : String(error);
 
           if (errorMessage.includes("Connection is closed")) {
-            this.params.logger.info(
+            this.params.logger.debug(
               { queueName: this.params.queueName },
               "Redis connection closed, stopping dispatcher",
             );
@@ -98,20 +103,29 @@ export class GroupQueueDispatcher {
       signalKey,
       this.params.signalTimeoutSec,
     );
+    // Drain remaining buffered signals — the upcoming dispatchBatch
+    // handles multiple jobs in one Lua call, so N signals = 1 cycle.
+    await this.params.blockingConnection.del(signalKey);
   }
 
   private async dispatchBatch(): Promise<number> {
     const availableSlots =
-      this.params.globalConcurrency - this.params.processingQueue.length();
+      this.params.globalConcurrency -
+      this.params.processingQueue.length() -
+      this.params.processingQueue.running();
     if (availableSlots <= 0) {
       return 0;
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
+    const readySize = await this.params.scripts.getReadySize();
+    const randomOffset =
+      readySize > 0 ? Math.floor(Math.random() * readySize) : 0;
     const results = await this.params.scripts.dispatchBatch({
       nowMs: Date.now(),
       activeTtlSec: this.params.activeTtlSec,
       maxJobs,
+      randomOffset,
     });
 
     for (const result of results) {

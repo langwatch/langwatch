@@ -72,14 +72,19 @@ export const traceSummaryDataSchema = z.object({
   outputFromRootSpan: z.boolean(),
   outputSpanEndTimeMs: z.number(),
   blockedByGuardrail: z.boolean(),
-  satisfactionScore: z.number().nullable(),
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
-  hasAnnotation: z.boolean().nullable(),
+  annotationIds: z.array(z.string()),
   attributes: z.record(z.string()),
+  scenarioRoleCosts: z.record(z.string(), z.number()).optional(),
+  scenarioRoleLatencies: z.record(z.string(), z.number()).optional(),
+  scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
+  /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
+  spanCosts: z.record(z.string(), z.number()).optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  lastEventOccurredAt: z.number(),
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;

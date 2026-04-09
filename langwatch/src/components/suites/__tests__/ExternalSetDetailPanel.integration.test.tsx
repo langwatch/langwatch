@@ -49,8 +49,11 @@ vi.mock("next/router", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
-      getAllScenarioSetRunData: {
+      getSuiteRunData: {
         useQuery: mockRunDataQuery,
+      },
+      getAll: {
+        useQuery: () => ({ data: undefined, isLoading: false, error: null }),
       },
     },
   },
@@ -80,18 +83,14 @@ describe("<ExternalSetDetailPanel/>", () => {
       ];
 
       mockRunDataQuery.mockReturnValue({
-        data: runs,
+        data: { runs, scenarioSetIds: {}, hasMore: false },
         isLoading: false,
         error: null,
       });
 
-      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" />, { wrapper: Wrapper });
+      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, { wrapper: Wrapper });
 
-      // Expand the batch run row first
-      const runRowHeader = screen.getByTestId("run-row-header");
-      fireEvent.click(runRowHeader);
-
-      // Click the scenario run card inside the expanded row
+      // Row is auto-expanded, so click the scenario run card directly
       const scenarioCard = screen.getByLabelText(/View details for/);
       fireEvent.click(scenarioCard);
 
@@ -110,7 +109,7 @@ describe("<ExternalSetDetailPanel/>", () => {
         error: null,
       });
 
-      const { container } = render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" />, {
+      const { container } = render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, {
         wrapper: Wrapper,
       });
 

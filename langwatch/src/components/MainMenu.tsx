@@ -2,7 +2,6 @@ import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -26,18 +25,13 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute, organization } =
+  const { project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
-  );
-
-  const { enabled: showSuites } = useFeatureFlag(
-    "release_ui_suites_enabled",
-    { projectId: project?.id, organizationId: organization?.id },
   );
 
   // In compact mode, show expanded view on hover
@@ -159,24 +153,8 @@ export const MainMenu = React.memo(function MainMenu({
                     : "/auth/signin",
                   isActive:
                     router.pathname.includes("/simulations") &&
-                    !router.pathname.includes("/simulations/scenarios") &&
-                    !router.pathname.includes("/simulations/suites"),
+                    !router.pathname.includes("/simulations/scenarios"),
                 },
-                ...(showSuites
-                  ? [
-                      {
-                        icon: featureIcons.suites.icon,
-                        label: projectRoutes.suites.title,
-                        href: project
-                          ? projectRoutes.suites.path.replace(
-                              "[project]",
-                              project.slug,
-                            )
-                          : "/auth/signin",
-                        isActive: router.pathname.includes("/simulations/suites"),
-                      },
-                    ]
-                  : []),
               ]}
             />
 

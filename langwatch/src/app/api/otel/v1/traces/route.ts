@@ -1,19 +1,13 @@
-import * as crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
-import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { readBody } from "../../decompressBody";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
-import {
-  fetchExistingMD5s,
-  scheduleTraceCollectionWithFallback,
-} from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
-import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { getApp } from "../../../../../server/app-layer/app";
 import { createLogger } from "../../../../../utils/logger/server";
 
@@ -90,14 +84,20 @@ async function handleTracesRequest(req: NextRequest) {
             const activePlan = await getApp().planProvider.getActivePlan({
               organizationId: project.team.organizationId,
             });
-            await notifyPlanLimitReached({
+
+            getApp().usageLimits.notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
+            }).catch(error => {
+              logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
             });
           } catch (error) {
             logger.error(
               { error, projectId: project.id },
-              "Error sending plan limit notification",
+              "Error getting active plan information",
             );
           }
           logger.info(
@@ -134,13 +134,18 @@ async function handleTracesRequest(req: NextRequest) {
 
       span.setAttribute("langwatch.project.id", project.id);
 
-      const body = await req.arrayBuffer();
+      const body = await readBody(req);
+
+      const emptyPartialSuccess = { rejectedSpans: 0, errorMessage: "" };
 
       // Handle empty body gracefully - protobuf decode throws on empty input.
       // OTEL SDKs may send empty requests during shutdown/flush cycles.
       if (body.byteLength === 0) {
         logger.debug("Received empty trace request, ignoring");
-        return NextResponse.json({ message: "No traces to process" });
+        return NextResponse.json({
+          message: "No traces to process",
+          partialSuccess: emptyPartialSuccess,
+        });
       }
 
       let traceRequest: IExportTraceServiceRequest;
@@ -185,113 +190,21 @@ async function handleTracesRequest(req: NextRequest) {
         }
       }
 
-      // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
-      let clickHouseTask: Promise<void> | null = null;
-      if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = getApp().traces.collection.handleOtlpTraceRequest(
+      // Ingest raw OTEL spans directly via event sourcing into ClickHouse
+      const collectionResult =
+        await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
           project.piiRedactionLevel,
         );
-      }
 
-      const tracesForCollection =
-        await openTelemetryTraceRequestToTracesForCollection(traceRequest);
-
-      const promises = await tracer.withActiveSpan(
-        "TracesV1.duplicateTracesCheck",
-        { kind: SpanKind.INTERNAL },
-        async () => {
-          const promises: Promise<void>[] = [];
-          for (const traceForCollection of tracesForCollection) {
-            if (traceForCollection.spans.length === 0) continue;
-
-            // Fingerprint for deduplication: traceId + span count + first/last span timestamps
-            // Much faster than stringifying thousands of spans
-            const fingerprint = {
-              traceId: traceForCollection.traceId,
-              spanCount: traceForCollection.spans.length,
-              firstSpanStart: traceForCollection.spans[0]?.timestamps?.started_at,
-              lastSpanEnd: traceForCollection.spans[traceForCollection.spans.length - 1]?.timestamps?.finished_at,
-            };
-            
-            const paramsMD5 = crypto
-              .createHash("md5")
-              .update(JSON.stringify(fingerprint))
-              .digest("hex");
-            const existingTrace = await fetchExistingMD5s(
-              traceForCollection.traceId,
-              project.id,
-            );
-            if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
-              continue;
-            }
-
-            logger.info(
-              {
-                traceId: traceForCollection.traceId,
-                traceRequestSizeMb: parseFloat(
-                  (body.byteLength / (1024 * 1024)).toFixed(3),
-                ),
-                traceRequestSpansCount:
-                  traceRequest.resourceSpans?.reduce(
-                    (acc, resourceSpan) =>
-                      acc + (resourceSpan?.scopeSpans?.length ?? 0),
-                    0,
-                  ) ?? 0,
-              },
-              "collecting traces",
-            );
-
-            promises.push(
-              scheduleTraceCollectionWithFallback(
-                {
-                  ...traceForCollection,
-                  projectId: project.id,
-                  existingTrace,
-                  paramsMD5,
-                  expectedOutput: void 0,
-                  evaluations: void 0,
-                  collectedAt: Date.now(),
-                },
-                false,
-                body.byteLength,
-              ),
-            );
-          }
-
-          return promises;
+      return NextResponse.json({
+        message: "Trace received successfully.",
+        partialSuccess: {
+          rejectedSpans: collectionResult?.rejectedSpans ?? 0,
+          errorMessage: collectionResult?.errorMessage ?? "",
         },
-      );
-
-      if (promises.length === 0) {
-        if (clickHouseTask) {
-          try {
-            await clickHouseTask;
-          } catch {
-            /* ignore, errors non-blocking and caught by tracing layer */
-          }
-        }
-        return NextResponse.json({ message: "No changes" });
-      }
-
-      await tracer.withActiveSpan(
-        "TracesV1.enqueueTraces",
-        { kind: SpanKind.PRODUCER },
-        async () => {
-          await Promise.all(promises);
-        },
-      );
-
-      if (clickHouseTask) {
-        try {
-          await clickHouseTask;
-        } catch {
-          /* ignore, errors non-blocking and caught by tracing layer */
-        }
-      }
-
-      return NextResponse.json({ message: "Trace received successfully." });
+      });
     },
   );
 }

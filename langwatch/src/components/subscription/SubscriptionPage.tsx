@@ -26,6 +26,7 @@ import { Select } from "~/components/ui/select";
 import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import {
   type Currency,
   type BillingInterval,
@@ -34,7 +35,7 @@ import {
   parseGrowthSeatPlanType,
   isAnnualTieredPlan,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  GROWTH_FEATURES,
+  getGrowthFeatures,
   ENTERPRISE_PLAN_FEATURES,
   buildTieredCapabilities,
 } from "./billing-plans";
@@ -59,8 +60,9 @@ import { CurrentPlanBlock } from "./CurrentPlanBlock";
 import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
 import { ContactSalesBlock } from "./ContactSalesBlock";
+import { InvoicesBlock } from "./InvoicesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
-import { CONTACT_SALES_URL } from "../plans/constants";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },
@@ -238,6 +240,7 @@ export function SubscriptionPage() {
           void organizationWithMembers.refetch();
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({ title: "Failed to send invites", description: error.message, type: "error" });
         },
       });
@@ -316,7 +319,7 @@ export function SubscriptionPage() {
           perSeatPrice: monthlyEquivalent,
         };
   const currentPlanFeatures = isLicenseOverride
-    ? GROWTH_FEATURES
+    ? getGrowthFeatures(effectiveCurrency)
     : isTieredLegacyPaidPlan
     ? buildTieredCapabilities({
       maxMembers: plan?.maxMembers ?? 0,
@@ -329,7 +332,7 @@ export function SubscriptionPage() {
       ? ENTERPRISE_PLAN_FEATURES
       : isDeveloperPlan
         ? DEVELOPER_FEATURES
-        : GROWTH_FEATURES;
+        : getGrowthFeatures(effectiveCurrency);
 
 
   const isUpgradeSeatsRequired =
@@ -402,7 +405,7 @@ export function SubscriptionPage() {
                   <Select.Trigger>
                     <Select.ValueText />
                   </Select.Trigger>
-                  <Select.Content paddingY={2} zIndex="popover">
+                  <Select.Content paddingY={2}>
                     {currencyOptions.map((option) => (
                       <Select.Item key={option.value} item={option}>
                         {option.label}
@@ -466,6 +469,9 @@ export function SubscriptionPage() {
           }
         />
 
+        {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}
+        <InvoicesBlock organizationId={organization.id} onViewAllInStripe={handleManageSubscription} />
+
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
         {(isUpgradePlanRequired) && (
           <UpgradePlanBlock
@@ -481,7 +487,7 @@ export function SubscriptionPage() {
             }
             totalPrice={upgradeBillingPriceFormatted}
             coreMembers={upgradeBillingSeats}
-            features={GROWTH_FEATURES}
+            features={getGrowthFeatures(effectiveCurrency)}
             monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}

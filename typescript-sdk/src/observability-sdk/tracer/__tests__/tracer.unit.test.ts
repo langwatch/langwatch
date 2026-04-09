@@ -837,4 +837,89 @@ describe("tracer.ts", () => {
       expect(true).toBe(true);
     });
   });
+
+  describe("default langwatch.origin attribute", () => {
+    describe("when no origin is provided", () => {
+      it("injects langwatch.origin = application on startSpan", () => {
+        langwatchTracer.startSpan("my-span");
+
+        const callArgs = mockTracer.startSpan.mock.calls[0];
+        expect(callArgs?.[1]?.attributes?.["langwatch.origin"]).toBe("application");
+      });
+
+      it("injects langwatch.origin = application on startActiveSpan", () => {
+        langwatchTracer.startActiveSpan("my-span", (span) => {
+          span.end();
+        });
+
+        const callArgs = mockTracer.startActiveSpan.mock.calls[0];
+        // The options are the second argument
+        const options = callArgs?.[1];
+        expect(options?.attributes?.["langwatch.origin"]).toBe("application");
+      });
+
+      it("injects langwatch.origin = application on withActiveSpan", () => {
+        langwatchTracer.withActiveSpan("my-span", () => {
+          return "result";
+        });
+
+        // withActiveSpan delegates to target.startActiveSpan
+        const callArgs = mockTracer.startActiveSpan.mock.calls[0];
+        const options = callArgs?.[1];
+        expect(options?.attributes?.["langwatch.origin"]).toBe("application");
+      });
+
+      it("preserves other options when injecting origin on startSpan", () => {
+        langwatchTracer.startSpan("my-span", {
+          kind: SpanKind.CLIENT,
+          attributes: { "custom.attr": "value" },
+        });
+
+        const callArgs = mockTracer.startSpan.mock.calls[0];
+        const options = callArgs?.[1];
+        expect(options?.kind).toBe(SpanKind.CLIENT);
+        expect(options?.attributes?.["custom.attr"]).toBe("value");
+        expect(options?.attributes?.["langwatch.origin"]).toBe("application");
+      });
+    });
+
+    describe("when origin is already provided", () => {
+      it("does not override existing origin on startSpan", () => {
+        langwatchTracer.startSpan("my-span", {
+          attributes: { "langwatch.origin": "evaluation" },
+        });
+
+        const callArgs = mockTracer.startSpan.mock.calls[0];
+        expect(callArgs?.[1]?.attributes?.["langwatch.origin"]).toBe("evaluation");
+      });
+
+      it("does not override existing origin on startActiveSpan", () => {
+        langwatchTracer.startActiveSpan(
+          "my-span",
+          { attributes: { "langwatch.origin": "simulation" } },
+          (span) => {
+            span.end();
+          },
+        );
+
+        const callArgs = mockTracer.startActiveSpan.mock.calls[0];
+        const options = callArgs?.[1];
+        expect(options?.attributes?.["langwatch.origin"]).toBe("simulation");
+      });
+
+      it("does not override existing origin on withActiveSpan", () => {
+        langwatchTracer.withActiveSpan(
+          "my-span",
+          { attributes: { "langwatch.origin": "evaluation" } },
+          () => {
+            return "result";
+          },
+        );
+
+        const callArgs = mockTracer.startActiveSpan.mock.calls[0];
+        const options = callArgs?.[1];
+        expect(options?.attributes?.["langwatch.origin"]).toBe("evaluation");
+      });
+    });
+  });
 });

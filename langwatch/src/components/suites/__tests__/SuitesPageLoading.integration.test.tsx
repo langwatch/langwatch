@@ -4,7 +4,7 @@
  * Integration tests for single loading indicator on suites page (Issue #1904).
  *
  * Verifies skeleton placeholders replace the double spinner, main panel is
- * suppressed during sidebar load, and AllRunsPanel spinner works independently.
+ * suppressed during sidebar load, and RunHistoryPanel spinner works independently.
  *
  * @see specs/features/suites/single-loading-indicator.feature
  */
@@ -18,16 +18,17 @@ let allRunsPanelLoading = false;
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      suites: { getAll: { invalidate: vi.fn() } },
+      suites: { getAll: { invalidate: vi.fn() }, getSummaries: { invalidate: vi.fn() } },
     }),
     suites: {
       getAll: { useQuery: (...args: unknown[]) => mockSuitesQuery(...args) },
+      getSummaries: { useQuery: () => ({ data: {}, isLoading: false }) },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     scenarios: {
-      getAllSuiteRunData: {
+      getSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false },
           isLoading: false,
@@ -39,6 +40,12 @@ vi.mock("~/utils/api", () => ({
       },
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
       },
     },
   },
@@ -62,10 +69,17 @@ vi.mock("~/hooks/useDrawer", () => ({
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    asPath: "/my-project/simulations/suites",
+    pathname: "/[project]/simulations/[[...path]]",
+    asPath: "/my-project/simulations",
     push: vi.fn(),
+    replace: vi.fn(),
     isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   }),
+}));
+
+vi.mock("~/hooks/useSimulationUpdateListener", () => ({
+  useSimulationUpdateListener: () => {},
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
@@ -74,8 +88,8 @@ vi.mock("~/components/DashboardLayout", () => ({
   ),
 }));
 
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => {
+vi.mock("~/components/suites/RunHistoryPanel", () => ({
+  RunHistoryPanel: () => {
     if (allRunsPanelLoading) {
       return (
         <div data-testid="all-runs-panel">
@@ -92,7 +106,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 async function importSuitesPage(): Promise<React.ComponentType> {
-  const mod = await import("~/pages/[project]/simulations/suites/index");
+  const mod = await import("~/components/suites/SimulationsPage");
   return mod.default;
 }
 
@@ -131,10 +145,11 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
       expect(screen.queryAllByRole("status")).toHaveLength(0);
     });
 
-    it("does not render the main panel", () => {
+    it("renders the All Runs panel while sidebar loads", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      expect(screen.queryByTestId("all-runs-panel")).not.toBeInTheDocument();
+      // The All Runs panel shows immediately — it fetches data independently
+      expect(screen.queryByTestId("all-runs-panel")).toBeInTheDocument();
     });
   });
 

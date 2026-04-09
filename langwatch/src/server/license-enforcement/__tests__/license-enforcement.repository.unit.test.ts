@@ -57,6 +57,9 @@ const createMockPrisma = () => ({
   agent: {
     count: vi.fn().mockResolvedValue(0),
   },
+  experiment: {
+    count: vi.fn().mockResolvedValue(0),
+  },
   batchEvaluation: {
     count: vi.fn().mockResolvedValue(0),
   },
@@ -610,6 +613,44 @@ describe("LicenseEnforcementRepository", () => {
 
       const result = await repository.getAgentCount(organizationId);
 
+      expect(result).toBe(0);
+    });
+  });
+
+  describe("getExperimentCount", () => {
+    it("excludes real_time experiments from count", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "proj-1" },
+        { id: "proj-2" },
+      ]);
+      mockPrisma.experiment.count.mockResolvedValue(3);
+
+      const result = await repository.getExperimentCount(organizationId);
+
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      expect(mockPrisma.experiment.count).toHaveBeenCalledWith({
+        where: {
+          projectId: { in: ["proj-1", "proj-2"] },
+          NOT: {
+            workbenchState: {
+              path: ["task"],
+              equals: "real_time",
+            },
+          },
+        },
+      });
+      expect(result).toBe(3);
+    });
+
+    it("returns zero when no projects exist (skips experiment query)", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
+
+      const result = await repository.getExperimentCount(organizationId);
+
+      expect(mockPrisma.experiment.count).not.toHaveBeenCalled();
       expect(result).toBe(0);
     });
   });

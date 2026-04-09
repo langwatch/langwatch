@@ -42,8 +42,9 @@ export function createEnvConfig() {
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
-      ELASTICSEARCH_NODE_URL: optionalIfBuildTime(z.string().min(1)),
+      ELASTICSEARCH_NODE_URL: z.string().optional(),
       ELASTICSEARCH_API_KEY: z.string().optional(),
+      ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
@@ -105,19 +106,33 @@ export function createEnvConfig() {
       // Observability
       OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
 
-      // Event Sourcing
-      ENABLE_EVENT_SOURCING: z.boolean().optional(),
-      ENABLE_CLICKHOUSE: z.boolean().optional(),
-
       // ClickHouse Migration Configuration
       CLICKHOUSE_CLUSTER: z.string().optional(),
 
       LANGWATCH_LICENSE_PUBLIC_KEY: z.string().optional(),
+      LANGWATCH_LICENSE_PRIVATE_KEY: z.string().optional(),
 
       // Stripe
       STRIPE_SECRET_KEY: z.string().optional(),
       STRIPE_WEBHOOK_SECRET: z.string().optional(),
+      STRIPE_LICENSE_PAYMENT_LINK_ID: z.string().optional(),
+      STRIPE_LICENSE_PAYMENT_LINK_URL: z.string().optional(),
       ADMIN_EMAILS: z.string().optional(),
+      HUBSPOT_PORTAL_ID: z.string().optional(),
+      HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),
+      HUBSPOT_FORM_ID: z.string().optional(),
+
+      // Customer.io Nurturing
+      CUSTOMER_IO_API_KEY: z.string().optional(),
+      CUSTOMER_IO_REGION: z.enum(["us", "eu"]).optional(),
+
+      // Notifications
+      SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
+      SLACK_CHANNEL_SIGNUPS: z.string().optional(),
+      SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
+
+      // SCIM
+      AUTH0_SCIM_WEBHOOK_SECRET: z.string().optional(),
     },
 
     /**
@@ -148,6 +163,7 @@ export function createEnvConfig() {
       API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
       ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
       ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,
+      ELASTICSEARCH_CONFIGURED: !!(process.env.ELASTICSEARCH_NODE_URL),
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -211,17 +227,23 @@ export function createEnvConfig() {
       OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
       OKTA_ISSUER: process.env.OKTA_ISSUER,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      ENABLE_EVENT_SOURCING:
-        process.env.ENABLE_EVENT_SOURCING === "true" ||
-        process.env.ENABLE_EVENT_SOURCING?.toLowerCase() === "true",
-      ENABLE_CLICKHOUSE:
-        process.env.ENABLE_CLICKHOUSE === "true" ||
-        process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
+      LANGWATCH_LICENSE_PRIVATE_KEY: process.env.LANGWATCH_LICENSE_PRIVATE_KEY,
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+      STRIPE_LICENSE_PAYMENT_LINK_ID: process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      STRIPE_LICENSE_PAYMENT_LINK_URL: process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
+      HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
+      HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,
+      HUBSPOT_FORM_ID: process.env.HUBSPOT_FORM_ID,
+      CUSTOMER_IO_API_KEY: process.env.CUSTOMER_IO_API_KEY,
+      CUSTOMER_IO_REGION: process.env.CUSTOMER_IO_REGION,
+      SLACK_PLAN_LIMIT_CHANNEL: process.env.SLACK_PLAN_LIMIT_CHANNEL,
+      SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
+      SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
+      AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -1,4 +1,5 @@
 import type { Evaluation } from "~/server/tracer/types";
+import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
@@ -20,6 +21,7 @@ export interface ClickHouseEvaluationRunRow {
   Label: string | null;
   Details: string | null;
   Error: string | null;
+  Inputs: string | null;
   ScheduledAt: string | null; // DateTime64(3) as string
   StartedAt: string | null;
   CompletedAt: string | null;
@@ -49,6 +51,7 @@ export function mapClickHouseEvaluationToTraceEvaluation(
     label: record.Label,
     details: record.Details,
     error: record.Error,
+    inputs: safeJsonParse(record.Inputs),
     timestamps: {
       // CH DateTime64(3) returns UTC strings without timezone suffix; append "Z" only when missing
       scheduledAt: record.ScheduledAt
@@ -123,7 +126,10 @@ export function mapTraceEvaluationsToLegacyEvaluations(
       score: te.score,
       label: te.label,
       details: te.details,
-      error: te.error ? { has_error: true as const, message: te.error, stacktrace: [] } : null,
+      error: te.error
+        ? { has_error: true as const, message: te.error, stacktrace: [] }
+        : null,
+      inputs: te.inputs,
       timestamps: {
         inserted_at: te.timestamps.scheduledAt,
         started_at: te.timestamps.startedAt,

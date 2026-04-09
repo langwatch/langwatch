@@ -1,0 +1,438 @@
+---
+title: Kubernetes (Helm)
+description: "Production Kubernetes deployment with the LangWatch Helm chart"
+---
+
+Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The chart supports everything from single-node development to highly-available production with replicated ClickHouse.
+
+## Prerequisites
+
+- Kubernetes 1.28+
+- Helm 3.12+
+- `kubectl` configured for your cluster
+- A StorageClass that supports dynamic provisioning (for persistent volumes)
+- A domain name (for Ingress with TLS)
+- **Default resource requirements:** ~6 CPU and ~18 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+
+## Quick Start
+
+Deploy LangWatch with all dependencies managed by the chart:
+
+```bash
+# Add the Helm repository
+helm repo add langwatch https://langwatch.github.io/langwatch
+helm repo update
+
+# Install with auto-generated secrets (development only)
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch --create-namespace \
+  --set autogen.enabled=true \
+  --wait --timeout 10m
+```
+
+Verify the installation:
+
+```bash
+kubectl -n langwatch get pods
+```
+
+Port-forward to access the UI:
+
+```bash
+kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
+# Open http://localhost:5560
+```
+
+<Warning>
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production — secrets will change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+</Warning>
+
+## Low-Resources Deployment
+
+The default install requests ~6 CPU and ~18 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2 CPU and ~4 Gi RAM**:
+
+```bash
+curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
+
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch --create-namespace \
+  --set autogen.enabled=true \
+  -f size-dev.yaml \
+  --wait --timeout 10m
+```
+
+This configures smaller resource limits, single replicas, and disables evaluator preloading to reduce memory usage. Suitable for development, demos, and small teams.
+
+## Production Deployment
+
+For production, you should:
+1. Use external managed databases (PostgreSQL, Redis)
+2. Create Kubernetes Secrets manually
+3. Expose via Ingress with TLS
+4. Disable auto-generation
+
+### 1. Create Secrets
+
+Create a Kubernetes Secret with your application secrets:
+
+```bash
+kubectl create namespace langwatch
+
+kubectl create secret generic langwatch-secrets \
+  --namespace langwatch \
+  --from-literal=credentialsEncryptionKey=$(openssl rand -hex 32) \
+  --from-literal=nextAuthSecret=$(openssl rand -hex 32) \
+  --from-literal=cronApiKey=$(openssl rand -hex 32)
+```
+
+For external databases, create additional secrets:
+
+```bash
+# PostgreSQL (RDS, Cloud SQL, etc.)
+kubectl create secret generic langwatch-db \
+  --namespace langwatch \
+  --from-literal=connectionString="postgresql://user:password@host:5432/langwatch"
+
+# Redis (ElastiCache, Memorystore, etc.)
+kubectl create secret generic langwatch-redis \
+  --namespace langwatch \
+  --from-literal=connectionString="redis://:password@host:6379"
+```
+
+### 2. Create a Values File
+
+Start from the production example and customize. This configuration requests approximately **~8.5 CPU and ~28 Gi RAM** across all pods:
+
+```yaml
+# values-production.yaml
+
+autogen:
+  enabled: false
+
+secrets:
+  existingSecret: langwatch-secrets
+
+app:
+  replicaCount: 2
+  http:
+    baseHost: "https://langwatch.example.com"
+    publicUrl: "https://langwatch.example.com"
+  resources:
+    requests: { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 1
+
+workers:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests: { cpu: 500m, memory: 4Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
+  podDisruptionBudget:
+    minAvailable: 1
+
+# External PostgreSQL
+postgresql:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-db
+        key: connectionString
+
+# External Redis
+redis:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-redis
+        key: connectionString
+
+# Chart-managed ClickHouse (production sizing)
+clickhouse:
+  cpu: 4
+  memory: "8Gi"
+  storage:
+    size: 100Gi
+
+# Ingress with TLS
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: langwatch.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.example.com
+
+# Prometheus monitoring
+prometheus:
+  chartManaged: true
+  server:
+    retention: 30d
+    persistentVolume:
+      size: 20Gi
+```
+
+### 3. Install
+
+```bash
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+### 4. Verify
+
+```bash
+# Check all pods are running
+kubectl -n langwatch get pods
+
+# Check ingress
+kubectl -n langwatch get ingress
+
+# Check logs
+kubectl -n langwatch logs deploy/langwatch-app --tail=50
+```
+
+## High-Availability Deployment
+
+For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~36 CPU and ~84 Gi RAM** across all pods:
+
+```yaml
+# values-ha.yaml (extends production values above)
+
+app:
+  replicaCount: 3
+  podDisruptionBudget:
+    minAvailable: 2
+
+workers:
+  replicaCount: 3
+  podDisruptionBudget:
+    minAvailable: 2
+
+langwatch_nlp:
+  replicaCount: 2
+  podDisruptionBudget:
+    minAvailable: 1
+
+langevals:
+  replicaCount: 2
+  podDisruptionBudget:
+    minAvailable: 1
+
+# 3-node replicated ClickHouse with Keeper
+clickhouse:
+  replicas: 3
+  cpu: 8
+  memory: "16Gi"
+  storage:
+    size: 300Gi
+    storageClass: gp3
+
+  # Cold storage and backups
+  objectStorage:
+    bucket: "langwatch-data"
+    region: "us-east-1"
+    useEnvironmentCredentials: true
+  cold:
+    enabled: true
+    defaultTtlDays: 49
+  backup:
+    enabled: true
+
+postgresql:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-db
+        key: connectionString
+
+redis:
+  chartManaged: false
+  external:
+    connectionString:
+      secretKeyRef:
+        name: langwatch-redis
+        key: connectionString
+```
+
+```bash
+helm install langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-ha.yaml \
+  --wait --timeout 15m
+```
+
+<Note>
+Replicated ClickHouse requires an odd number of replicas (3, 5, 7) for Keeper consensus. 3 replicas is recommended for most deployments.
+</Note>
+
+## Overlay System
+
+The chart ships with composable overlay files in `examples/overlays/`. Combine them to build your deployment configuration:
+
+### Size Overlays
+
+| Overlay | Use Case | Approx Resources (requests) |
+|---------|----------|-----------------|
+| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
+| `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
+| `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
+
+### Access Overlays
+
+| Overlay | Description |
+|---------|-------------|
+| `access-nodeport.yaml` | NodePort on 30560 (Kind, bare-metal) |
+| `access-ingress.yaml` | Nginx Ingress with TLS template |
+
+### Infrastructure Overlays
+
+| Overlay | Description |
+|---------|-------------|
+| `postgres-external.yaml` | External PostgreSQL (RDS, Cloud SQL) |
+| `redis-external.yaml` | External Redis (ElastiCache, Memorystore) |
+| `clickhouse-external.yaml` | External ClickHouse instance |
+| `clickhouse-replicated.yaml` | 3-node replicated ClickHouse |
+| `cold-storage-s3.yaml` | S3 cold storage + backups |
+| `local-images.yaml` | Local images with `pullPolicy: Never` |
+
+### Composing Overlays
+
+Overlays are composable — later files override earlier ones:
+
+```bash
+# Production with external DBs and S3 cold storage
+helm install langwatch langwatch/langwatch \
+  -f examples/overlays/size-prod.yaml \
+  -f examples/overlays/access-ingress.yaml \
+  -f examples/overlays/postgres-external.yaml \
+  -f examples/overlays/redis-external.yaml \
+  -f examples/overlays/cold-storage-s3.yaml \
+  --set autogen.enabled=true
+```
+
+## ClickHouse Configuration
+
+### Standalone vs Replicated
+
+| Mode | Replicas | Engine | When to Use |
+|------|----------|--------|-------------|
+| Standalone | 1 | MergeTree | Development, small production |
+| Replicated | 3+ (odd) | ReplicatedMergeTree + Keeper | HA production |
+
+Switch to replicated mode:
+
+```yaml
+clickhouse:
+  replicas: 3  # Automatically uses ReplicatedMergeTree + Keeper
+```
+
+### External ClickHouse
+
+To use an existing ClickHouse instance:
+
+```yaml
+clickhouse:
+  chartManaged: false
+  external:
+    url:
+      value: "http://user:password@clickhouse-host:8123/langwatch"
+    # For replicated instances:
+    clusterName: "my_cluster"
+```
+
+### Auto-Tuning
+
+The `clickhouse-serverless` subchart automatically tunes ClickHouse parameters based on the CPU and memory you allocate:
+
+```yaml
+clickhouse:
+  cpu: 4        # Tunes thread pools, merge concurrency
+  memory: "8Gi" # Tunes memory limits, cache sizes, per-query limits
+```
+
+You only need to set these two values — the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
+
+## Upgrade
+
+```bash
+helm repo update
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+Database migrations run automatically on startup. Set `SKIP_PRISMA_MIGRATE=true` to disable PostgreSQL migrations if needed.
+
+See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
+
+## Uninstall
+
+```bash
+helm uninstall langwatch --namespace langwatch
+```
+
+<Warning>
+This does not delete PersistentVolumeClaims. Your data in PostgreSQL, ClickHouse, and Redis PVCs is preserved. Delete them manually if you want a clean removal:
+
+```bash
+kubectl -n langwatch delete pvc --all
+```
+</Warning>
+
+## FAQ
+
+### Istio / Service Mesh
+
+If you're using Istio or another service mesh with automatic sidecar injection, the CronJob pods may fail because the sidecar keeps the pod alive after the job completes.
+
+Disable sidecar injection for CronJobs:
+
+```yaml
+cronjobs:
+  pod:
+    annotations:
+      sidecar.istio.io/inject: "false"
+```
+
+### Custom StorageClass
+
+Set a StorageClass for all persistent volumes:
+
+```yaml
+clickhouse:
+  storage:
+    storageClass: "gp3"
+postgresql:
+  primary:
+    persistence:
+      storageClass: "gp3"
+redis:
+  master:
+    persistence:
+      storageClass: "gp3"
+```
+
+### Air-Gapped Environments
+
+For clusters without internet access:
+1. Push LangWatch images to your private registry
+2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
+3. Set `imagePullSecrets` if your registry requires authentication

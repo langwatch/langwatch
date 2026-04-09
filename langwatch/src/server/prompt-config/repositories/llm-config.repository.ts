@@ -23,6 +23,22 @@ import {
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
 /**
+ * Recursively sort all object keys for deterministic JSON serialization.
+ * Arrays preserve element order but their object elements get sorted keys.
+ */
+function sortKeysDeep(obj: unknown): unknown {
+  if (Array.isArray(obj)) return obj.map(sortKeysDeep);
+  if (obj && typeof obj === "object" && obj !== null) {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => [k, sortKeysDeep(v)]),
+    );
+  }
+  return obj;
+}
+
+/**
  * Interface for LLM Config data transfer objects
  */
 export type CreateLlmConfigParams = Omit<
@@ -667,17 +683,18 @@ export class LlmConfigRepository {
       const normalized1 = parseResult1.data;
       const normalized2 = parseResult2.data;
 
+      // Strip response_format before comparison — it is derived from outputs
+      // at read time and never stored in new data. Older CLIs may still send it
+      // alongside outputs, causing a false diff against the server's
+      // remoteConfigData which never includes it.
+      delete normalized1.response_format;
+      delete normalized2.response_format;
+
       // Compare normalized configs using deterministic JSON serialization
-      const json1 = JSON.stringify(
-        normalized1,
-        Object.keys(normalized1).sort(),
-        2,
-      );
-      const json2 = JSON.stringify(
-        normalized2,
-        Object.keys(normalized2).sort(),
-        2,
-      );
+      // Deep-sort all keys so nested objects (messages, inputs, outputs)
+      // are compared correctly regardless of property order.
+      const json1 = JSON.stringify(sortKeysDeep(normalized1));
+      const json2 = JSON.stringify(sortKeysDeep(normalized2));
 
       const isEqual = json1 === json2;
 
@@ -823,11 +840,10 @@ export class LlmConfigRepository {
    * Build a default version base for a config
    */
   private buildDefaultVersionConfigData(
-    params: Record<string, unknown>,
+    params: { model: string } & Record<string, unknown>,
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",
-      model: "openai/gpt-5.2",
       messages: [
         {
           role: "user",

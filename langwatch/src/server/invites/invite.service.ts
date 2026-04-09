@@ -8,9 +8,9 @@ import {
 import {
   DuplicateInviteError,
   InviteNotFoundError,
-  LicenseLimitError,
   OrganizationNotFoundError,
 } from "./errors";
+import { LimitExceededError } from "../license-enforcement/errors";
 import { nanoid } from "nanoid";
 import type { JsonArray } from "@prisma/client/runtime/library";
 
@@ -33,7 +33,6 @@ import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "../license-enforcement/license-enforcement.repository";
-import { LICENSE_LIMIT_ERRORS } from "../license-enforcement/license-limit-guard";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
@@ -250,13 +249,21 @@ export class InviteService {
         currentFullMembers + newFullMembers >
         subscriptionLimits.maxMembers
       ) {
-        throw new LicenseLimitError(LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT);
+        throw new LimitExceededError(
+          "members",
+          currentFullMembers,
+          subscriptionLimits.maxMembers
+        );
       }
       if (
         currentMembersLite + newLiteMembers >
         subscriptionLimits.maxMembersLite
       ) {
-        throw new LicenseLimitError(LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT);
+        throw new LimitExceededError(
+          "membersLite",
+          currentMembersLite,
+          subscriptionLimits.maxMembersLite
+        );
       }
     }
   }
@@ -427,6 +434,47 @@ export class InviteService {
         subscriptionId: input.subscriptionId,
       },
     });
+  }
+
+  /**
+   * Finds the best project slug to redirect to after accepting an invite.
+   * Tries the first assigned team first, then falls back to any non-archived
+   * project in the org so the client can land directly in the app rather than
+   * hitting the onboarding flow.
+   */
+  async findLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
+    // Collect all invited team IDs from either format
+    const invitedTeamIds = (() => {
+      if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+        const assignments = invite.teamAssignments as Array<{ teamId: string }>;
+        return assignments.map((a) => a.teamId).filter(Boolean);
+      }
+      return invite.teamIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    })();
+
+    // Look for a project in any of the invited teams
+    const project =
+      (invitedTeamIds.length > 0
+        ? await this.prisma.project.findFirst({
+            where: { teamId: { in: invitedTeamIds }, archivedAt: null },
+            select: { slug: true },
+          })
+        : null) ??
+      // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
+      (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER
+        ? await this.prisma.project.findFirst({
+            where: {
+              team: { organizationId: invite.organizationId, archivedAt: null },
+              archivedAt: null,
+            },
+            select: { slug: true },
+          })
+        : null);
+
+    return project?.slug ?? null;
   }
 
   /**

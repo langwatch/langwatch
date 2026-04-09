@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.19.0...typescript-sdk@v0.20.0) (2026-03-29)
+
+
+### Features
+
+* **skills:** agent skills-based onboarding with feature map and scenario tests ([#2377](https://github.com/langwatch/langwatch/issues/2377)) ([6f6abdb](https://github.com/langwatch/langwatch/commit/6f6abdb67b97fcb7c2958dbc193dcde37d4c82a8))
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2346](https://github.com/langwatch/langwatch/issues/2346)) ([348874e](https://github.com/langwatch/langwatch/commit/348874e48ce79537596d28887c6ed9c719200b29))
+
+
+### Bug Fixes
+
+* **sdk+skills:** widen peer deps, fix scenario config, strengthen skill tests ([#2485](https://github.com/langwatch/langwatch/issues/2485)) ([c77237c](https://github.com/langwatch/langwatch/commit/c77237c8f5690f4eafcc96ed3334e3c6d61a7249))
+* **sdk:** throw PromptsError instead of Error in fetch-policy branches ([#2691](https://github.com/langwatch/langwatch/issues/2691)) ([9388ab6](https://github.com/langwatch/langwatch/commit/9388ab63a77f32f8888b204f462f8ec3cc88abcc)), closes [#976](https://github.com/langwatch/langwatch/issues/976)
+* **typescript-sdk:** handle Zod-first evaluations.ts and filter types import ([#2352](https://github.com/langwatch/langwatch/issues/2352)) ([516d4e8](https://github.com/langwatch/langwatch/commit/516d4e839388ae954b42ba5f742ef6b96c0beacf))
+
+## [0.19.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.18.0...typescript-sdk@v0.19.0) (2026-03-13)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2325](https://github.com/langwatch/langwatch/issues/2325)) ([b11b499](https://github.com/langwatch/langwatch/commit/b11b49990bdb1ccf1bf302b9a54b442d3b6f3be3))
+
+## [0.18.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.17.0...typescript-sdk@v0.18.0) (2026-03-11)
+
+
+### Features
+
+* **prompts:** open existing prompt from trace when prompt handle is present ([#2223](https://github.com/langwatch/langwatch/issues/2223)) ([428f8ff](https://github.com/langwatch/langwatch/commit/428f8ff22b8cb5a4be5942d5b26bf2d62f44d7be))
+
+
+### Bug Fixes
+
+* **deps:** pin transitive npm deps for Dependabot high-severity alerts ([#2220](https://github.com/langwatch/langwatch/issues/2220)) ([a179da1](https://github.com/langwatch/langwatch/commit/a179da1d55859b8c9a476a6443dbfaf6bf632af3))
+
+## [0.17.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.16.1...typescript-sdk@v0.17.0) (2026-03-08)
+
+
+### Features
+
+* **examples:** add metadata and labels examples for TypeScript and Python SDKs ([#1585](https://github.com/langwatch/langwatch/issues/1585)) ([7d09ab8](https://github.com/langwatch/langwatch/commit/7d09ab805146542921e8b1f1258d5e6e59462bfe))
+* **traces:** add langwatch.origin attribute for trace origin classification ([#2066](https://github.com/langwatch/langwatch/issues/2066)) ([1d94865](https://github.com/langwatch/langwatch/commit/1d9486548e994d8d2f933a7f530196df8d255e43))
+* updated mastra example in typescript sdk to use 1.0 api ([#1872](https://github.com/langwatch/langwatch/issues/1872)) ([f738633](https://github.com/langwatch/langwatch/commit/f738633951c6f2d0db3372f9be913e9f0c7d5d51))
+
+
+### Bug Fixes
+
+* get SDK e2e CI tests passing ([#1648](https://github.com/langwatch/langwatch/issues/1648)) ([2a4583e](https://github.com/langwatch/langwatch/commit/2a4583e4fb7ccb4674e64f0154f62fd990a2d8aa))
+* typescript sdk uses correct attributes now sdk metadata ([#1651](https://github.com/langwatch/langwatch/issues/1651)) ([c499e26](https://github.com/langwatch/langwatch/commit/c499e26924a87cffe6abb37be8bdc739094a4568))
+* **typescript-sdk:** improve auto-shutdown signals and default to batch processor ([#1851](https://github.com/langwatch/langwatch/issues/1851)) ([fcf6bb7](https://github.com/langwatch/langwatch/commit/fcf6bb751eaa895c874d3ed96b455966fd8d462a))
+* **typescript-sdk:** move @opentelemetry/api to peerDependencies ([#2072](https://github.com/langwatch/langwatch/issues/2072)) ([c93fc98](https://github.com/langwatch/langwatch/commit/c93fc98ba06d1a90ee615e367e327f88554ced68))
+
+
+### Miscellaneous
+
+* **deps:** bump Node.js dependencies - batch 3 ([#1957](https://github.com/langwatch/langwatch/issues/1957)) ([e500557](https://github.com/langwatch/langwatch/commit/e500557ac7514ffc52ce26738d74e292e5428d2d)), closes [#1518](https://github.com/langwatch/langwatch/issues/1518)
+* **deps:** bump safe npm dependencies (19 dependabot PRs) ([#1931](https://github.com/langwatch/langwatch/issues/1931)) ([4d7607e](https://github.com/langwatch/langwatch/commit/4d7607e5d467749e2e47fc3b0b2b58c212bc8721))
+* **deps:** bump the npm_and_yarn group across 1 directory with 9 updates ([#1965](https://github.com/langwatch/langwatch/issues/1965)) ([3674bcc](https://github.com/langwatch/langwatch/commit/3674bccb17d52d6436dc75518aeaefe75942a318))
+
+
+### Code Refactoring
+
+* derive response_format from outputs, eliminate duality ([#1647](https://github.com/langwatch/langwatch/issues/1647)) ([856e4e7](https://github.com/langwatch/langwatch/commit/856e4e7350b26f25a44da919e4e7e7ffb5a0a0bd))
+* derive response_format from outputs, eliminate stored duality ([856e4e7](https://github.com/langwatch/langwatch/commit/856e4e7350b26f25a44da919e4e7e7ffb5a0a0bd))
+
 ## [0.16.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.16.0...typescript-sdk@v0.16.1) (2026-02-16)
 
 

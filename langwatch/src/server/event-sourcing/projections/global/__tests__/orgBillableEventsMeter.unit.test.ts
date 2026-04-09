@@ -14,14 +14,14 @@ import type { ProjectionStoreContext } from "../../projectionStoreContext";
 
 const {
   mockClickHouseInsert,
-  mockGetClickHouseClient,
+  mockGetClickHouseClientForOrganization,
   mockPrisma,
   mockLoggerWarn,
   mockLoggerDebug,
   createMockLogger,
 } = vi.hoisted(() => {
   const mockClickHouseInsert = vi.fn();
-  const mockGetClickHouseClient = vi.fn();
+  const mockGetClickHouseClientForOrganization = vi.fn();
   const mockLoggerWarn = vi.fn();
   const mockLoggerDebug = vi.fn();
 
@@ -39,7 +39,7 @@ const {
 
   return {
     mockClickHouseInsert,
-    mockGetClickHouseClient,
+    mockGetClickHouseClientForOrganization,
     mockPrisma,
     mockLoggerWarn,
     mockLoggerDebug,
@@ -51,8 +51,8 @@ const {
 // Module mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: mockGetClickHouseClient,
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  getClickHouseClientForOrganization: mockGetClickHouseClientForOrganization,
 }));
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
@@ -70,56 +70,63 @@ const dummyContext = {
   tenantId: "test-tenant",
 } as ProjectionStoreContext;
 
-function makeSpanEvent(overrides: Partial<Event> = {}): Event {
+function makeEvent(overrides: Partial<Event> = {}): Event {
   return {
     id: "evt-1",
-    aggregateId: "trace-1",
+    aggregateId: "agg-1",
     aggregateType: "trace",
     tenantId: "proj-1",
-    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0), // 2026-02-15
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
     occurredAt: Date.now(),
     type: "lw.obs.trace.span_received",
     version: "2025-12-14",
     data: {},
-    metadata: { traceId: "trace-abc", spanId: "span-123" },
-    ...overrides,
-  } as Event;
-}
-
-function makeEvaluationEvent(overrides: Partial<Event> = {}): Event {
-  return {
-    id: "evt-2",
-    aggregateId: "eval-1",
-    aggregateType: "evaluation",
-    tenantId: "proj-1",
-    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
-    occurredAt: Date.now(),
-    type: "lw.evaluation.started",
-    version: "2025-01-14",
-    data: { evaluationId: "eval-xyz" },
-    metadata: {},
-    ...overrides,
-  } as Event;
-}
-
-function makeExperimentRunEvent(overrides: Partial<Event> = {}): Event {
-  return {
-    id: "evt-3",
-    aggregateId: "run-1",
-    aggregateType: "experiment_run",
-    tenantId: "proj-1",
-    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
-    occurredAt: Date.now(),
-    type: "lw.experiment_run.started",
-    version: "2025-02-01",
-    data: { runId: "run-456" },
     metadata: {},
     ...overrides,
   } as Event;
 }
 
 // ---------------------------------------------------------------------------
-// Tests: MapProjection (pure map function)
+// Tests: extractDeduplicationKey
+// ---------------------------------------------------------------------------
+
+describe("extractDeduplicationKey", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  describe("when event has idempotencyKey", () => {
+    it("uses idempotencyKey", async () => {
+      const { extractDeduplicationKey } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = extractDeduplicationKey(
+        makeEvent({ id: "evt-1", idempotencyKey: "business-key-123" }),
+      );
+
+      expect(result).toBe("business-key-123");
+    });
+  });
+
+  describe("when event has no idempotencyKey", () => {
+    it("falls back to event.id", async () => {
+      const { extractDeduplicationKey } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = extractDeduplicationKey(
+        makeEvent({ id: "evt-42" }),
+      );
+
+      expect(result).toBe("evt-42");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: MapProjection (map function)
 // ---------------------------------------------------------------------------
 
 describe("orgBillableEventsMeterProjection.map", () => {
@@ -128,17 +135,19 @@ describe("orgBillableEventsMeterProjection.map", () => {
     vi.resetModules();
   });
 
-  describe("given span_received event", () => {
-    it("extracts traceId:spanId as dedup key", async () => {
+  describe("given any billable event", () => {
+    it("produces a record with event.id as dedup key", async () => {
       const { orgBillableEventsMeterProjection } = await import(
         "../orgBillableEventsMeter.mapProjection"
       );
 
-      const result = orgBillableEventsMeterProjection.map(makeSpanEvent());
+      const result = orgBillableEventsMeterProjection.map(
+        makeEvent({ id: "evt-1", type: "lw.obs.trace.span_received" }),
+      );
 
       expect(result).toEqual(
         expect.objectContaining({
-          deduplicationKey: "trace-abc:span-123",
+          deduplicationKey: "evt-1",
           eventType: "lw.obs.trace.span_received",
           tenantId: "proj-1",
           eventId: "evt-1",
@@ -147,69 +156,26 @@ describe("orgBillableEventsMeterProjection.map", () => {
     });
   });
 
-  describe("given evaluation.started event", () => {
-    it("extracts evaluationId as dedup key", async () => {
+  describe("given event with idempotencyKey", () => {
+    it("uses idempotencyKey as dedup key", async () => {
       const { orgBillableEventsMeterProjection } = await import(
         "../orgBillableEventsMeter.mapProjection"
       );
 
       const result = orgBillableEventsMeterProjection.map(
-        makeEvaluationEvent(),
+        makeEvent({
+          id: "evt-1",
+          idempotencyKey: "idem-key-abc",
+          type: "lw.evaluation.started",
+        }),
       );
 
       expect(result).toEqual(
         expect.objectContaining({
-          deduplicationKey: "eval-xyz",
+          deduplicationKey: "idem-key-abc",
           eventType: "lw.evaluation.started",
         }),
       );
-    });
-  });
-
-  describe("given experiment_run.started event", () => {
-    it("extracts runId as dedup key", async () => {
-      const { orgBillableEventsMeterProjection } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
-
-      const result = orgBillableEventsMeterProjection.map(
-        makeExperimentRunEvent(),
-      );
-
-      expect(result).toEqual(
-        expect.objectContaining({
-          deduplicationKey: "run-456",
-          eventType: "lw.experiment_run.started",
-        }),
-      );
-    });
-  });
-
-  describe("given span event without metadata traceId/spanId", () => {
-    it("returns null", async () => {
-      const { orgBillableEventsMeterProjection } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
-
-      const result = orgBillableEventsMeterProjection.map(
-        makeSpanEvent({ metadata: {} }),
-      );
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe("given unknown event type", () => {
-    it("returns null", async () => {
-      const { orgBillableEventsMeterProjection } = await import(
-        "../orgBillableEventsMeter.mapProjection"
-      );
-
-      const result = orgBillableEventsMeterProjection.map(
-        makeSpanEvent({ type: "lw.unknown.event" as never }),
-      );
-
-      expect(result).toBeNull();
     });
   });
 });
@@ -226,7 +192,7 @@ describe("orgBillableEventsMeterStore", () => {
 
   describe("given ClickHouse client is configured and org exists", () => {
     it("resolves organizationId and inserts into ClickHouse", async () => {
-      mockGetClickHouseClient.mockReturnValue({
+      mockGetClickHouseClientForOrganization.mockResolvedValue({
         insert: mockClickHouseInsert,
       });
       mockClickHouseInsert.mockResolvedValue(undefined);
@@ -237,9 +203,7 @@ describe("orgBillableEventsMeterStore", () => {
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
-      // Clear org cache to ensure fresh lookup
-      const { clearOrgCache } = await import("~/server/organizations/resolveOrganizationId");
-      clearOrgCache();
+
 
       await orgBillableEventsMeterStore.append(
         {
@@ -273,11 +237,15 @@ describe("orgBillableEventsMeterStore", () => {
 
   describe("given ClickHouse client is null (not configured)", () => {
     it("skips gracefully", async () => {
-      mockGetClickHouseClient.mockReturnValue(null);
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: { organizationId: "org-1" },
+      });
+      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
 
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
+
 
       await orgBillableEventsMeterStore.append(
         {
@@ -293,7 +261,6 @@ describe("orgBillableEventsMeterStore", () => {
       );
 
       expect(mockClickHouseInsert).not.toHaveBeenCalled();
-      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
       expect(mockLoggerDebug).toHaveBeenCalledWith(
         "ClickHouse not configured, skipping billable event insert",
       );
@@ -303,7 +270,7 @@ describe("orgBillableEventsMeterStore", () => {
   describe("given ClickHouse insert fails (transient error)", () => {
     it("throws for BullMQ retry", async () => {
       const insertError = new Error("ClickHouse connection timeout");
-      mockGetClickHouseClient.mockReturnValue({
+      mockGetClickHouseClientForOrganization.mockResolvedValue({
         insert: mockClickHouseInsert,
       });
       mockClickHouseInsert.mockRejectedValue(insertError);
@@ -314,9 +281,6 @@ describe("orgBillableEventsMeterStore", () => {
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
-      const { clearOrgCache } = await import("~/server/organizations/resolveOrganizationId");
-      clearOrgCache();
-
       await expect(
         orgBillableEventsMeterStore.append(
           {
@@ -336,9 +300,6 @@ describe("orgBillableEventsMeterStore", () => {
 
   describe("given orphan project (org not found)", () => {
     it("skips gracefully with warn log", async () => {
-      mockGetClickHouseClient.mockReturnValue({
-        insert: mockClickHouseInsert,
-      });
       mockPrisma.project.findUnique.mockResolvedValue({
         team: null,
       });
@@ -346,9 +307,6 @@ describe("orgBillableEventsMeterStore", () => {
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
-      const { clearOrgCache } = await import("~/server/organizations/resolveOrganizationId");
-      clearOrgCache();
-
       await orgBillableEventsMeterStore.append(
         {
           organizationId: "",

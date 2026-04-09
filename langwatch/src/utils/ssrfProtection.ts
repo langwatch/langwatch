@@ -390,6 +390,12 @@ export function createSSRFValidator(config: SSRFConfig) {
       throw new Error("Invalid URL format");
     }
 
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      throw new Error(
+        `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
+      );
+    }
+
     const hostname = parsedUrl.hostname.toLowerCase();
     const port = parsedUrl.port
       ? parseInt(parsedUrl.port, 10)
@@ -467,7 +473,7 @@ export function createSSRFValidator(config: SSRFConfig) {
         "DNS resolution failed during SSRF check - blocking request",
       );
       throw new Error(
-        "Unable to resolve hostname. Please verify the URL is correct and the server is reachable.",
+        `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
       );
     }
 
@@ -484,7 +490,7 @@ export function createSSRFValidator(config: SSRFConfig) {
         "No DNS records found - blocking request",
       );
       throw new Error(
-        "Unable to resolve hostname. Please verify the URL is correct.",
+        `Unable to resolve hostname "${hostname}". Please verify the URL is correct.`,
       );
     }
 
