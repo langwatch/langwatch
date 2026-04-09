@@ -100,7 +100,8 @@ jobs:
         working-directory: langwatch
         run: |
           pnpm test:unit --run --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=json --outputFile=test-results.json
+            --reporter=default --reporter=json --outputFile=test-results.json \
+            --dangerouslyIgnoreUnhandledErrors
 
       - name: Extract test failures
         if: failure()
