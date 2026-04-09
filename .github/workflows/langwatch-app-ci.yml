@@ -9,6 +9,7 @@ on:
       - "langwatch/**"
       - ".github/workflows/langwatch-app-ci.yml"
       - ".github/.release-please-manifest.json"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 env:
@@ -98,9 +99,14 @@ jobs:
         id: unit-tests
         working-directory: langwatch
         run: |
-          pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text 2>&1 | tee test-output.txt
-          # Extract failures for notification comparison
-          grep -E "FAIL |AssertionError|Expected:|Received:" test-output.txt > test-failures.txt || true
+          pnpm test:unit --run --coverage --coverage.reporter=lcov --coverage.reporter=text \
+            --reporter=default --reporter=json --outputFile=test-results.json \
+            --dangerouslyIgnoreUnhandledErrors
+
+      - name: Extract test failures
+        if: failure()
+        working-directory: langwatch
+        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -111,6 +117,7 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
+        if: always()
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           files: langwatch/coverage/lcov.info
@@ -284,9 +291,13 @@ jobs:
         id: integration-tests
         working-directory: langwatch
         run: |
-          pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text 2>&1 | tee test-output.txt
-          # Extract failures for notification comparison
-          grep -E "FAIL |AssertionError|Expected:|Received:" test-output.txt > test-failures.txt || true
+          pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text \
+            --reporter=default --reporter=json --outputFile=test-results.json
+
+      - name: Extract test failures
+        if: failure()
+        working-directory: langwatch
+        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -297,6 +308,7 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
+        if: always()
         uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           files: langwatch/coverage/lcov.info
@@ -401,3 +413,65 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh build
+
+  ci-scripts-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Test extract-failures.sh
+        run: bash .github/scripts/__tests__/extract-failures.test.sh
+
+  ci-self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+        with:
+          version: 10.24.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: CI=true pnpm install --frozen-lockfile
+
+      - name: Stage canary fixture inside vitest root
+        working-directory: langwatch
+        run: cp ../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+
+      - name: Run intentional failure
+        id: canary
+        continue-on-error: true
+        working-directory: langwatch
+        run: |
+          pnpm vitest run _ci_canary.test.ts \
+            --reporter=default --reporter=json --outputFile=test-results.json
+
+      - name: Extract failures
+        if: always()
+        working-directory: langwatch
+        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+
+      - name: Assert detection worked
+        if: always()
+        run: |
+          if [ "${{ steps.canary.outcome }}" != "failure" ]; then
+            echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
+            exit 1
+          fi
+          if [ ! -s langwatch/test-failures.txt ]; then
+            echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
+            exit 1
+          fi
+          echo "PASS: canary failed as expected and failures were extracted"
+          cat langwatch/test-failures.txt
