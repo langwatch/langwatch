@@ -567,6 +567,10 @@ function ListSelection({
 		overscan: 5,
 	});
 
+	useEffect(() => {
+		virtualizer.measure();
+	}, [virtualizer, currentValues]);
+
 	const isEmpty = options && options.length === 0 && !showCustomValue;
 
 	// Handle selecting custom value
