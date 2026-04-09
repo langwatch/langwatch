@@ -8,6 +8,13 @@
 import type { AgentInput } from "@langwatch/scenario";
 import type { FieldMapping } from "./types";
 
+/** Maps pre-rename field names to current names for backwards compatibility. */
+const LEGACY_FIELD_NAMES: Record<string, string> = {
+  scenario_message: "input",
+  conversation_history: "messages",
+  thread_id: "threadId",
+};
+
 /**
  * Resolve a record of field mappings to concrete string values.
  *
@@ -53,7 +60,8 @@ function resolveMapping({
     return "";
   }
 
-  const [field] = mapping.path;
+  const [rawField] = mapping.path;
+  const field = LEGACY_FIELD_NAMES[rawField ?? ""] ?? rawField;
 
   if (field === "input") {
     return extractLastUserMessage(agentInput);
