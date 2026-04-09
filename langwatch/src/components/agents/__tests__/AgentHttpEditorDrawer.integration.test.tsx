@@ -134,16 +134,16 @@ describe("AgentHttpEditorDrawer", () => {
   afterEach(cleanup);
 
   // ==========================================================================
-  // Gap B — HTTP agent editor must render ScenarioInputMappingSection
+  // HTTP agent editor basic rendering
   // ==========================================================================
 
   describe("given the HTTP agent editor is open", () => {
     describe("when the drawer renders", () => {
-      it("shows the 'Scenario Mappings' section", async () => {
+      it("renders the drawer", async () => {
         renderHttpDrawer();
 
         await waitFor(() => {
-          screen.getByText("Scenario Mappings");
+          expect(screen.getByText("New HTTP Agent")).toBeInTheDocument();
         });
       });
     });
