@@ -32,6 +32,7 @@ import {
 } from "../../utils/fieldMappingConverters";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
+import { copyToClipboard } from "~/utils/clipboard";
 
 // Max characters to display for performance reasons
 const MAX_DISPLAY_CHARS = 10000;
@@ -455,7 +456,7 @@ export function TargetCellContent({
   // Copy output to clipboard with feedback
   const handleCopyOutput = useCallback(() => {
     if (rawOutput) {
-      navigator.clipboard.writeText(rawOutput);
+      void copyToClipboard(rawOutput);
       setHasCopied(true);
       setTimeout(() => setHasCopied(false), 2000);
     }

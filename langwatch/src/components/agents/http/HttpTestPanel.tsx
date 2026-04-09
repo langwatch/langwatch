@@ -30,6 +30,7 @@ import {
   type TestMessage,
   TestMessagesBuilder,
 } from "./TestMessagesBuilder";
+import { copyToClipboard } from "~/utils/clipboard";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
 const DEFAULT_MESSAGES: TestMessage[] = [{ role: "user", content: "Hello" }];
@@ -105,7 +106,7 @@ function CopyButton({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

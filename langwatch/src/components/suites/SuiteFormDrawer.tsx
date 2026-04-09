@@ -26,6 +26,7 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
+import { generateUUID } from "~/utils/generateUUID";
 import { useCallback, useRef, useState } from "react";
 import {
   useDrawer,
@@ -68,7 +69,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => generateUUID());
   /** Tracks whether the current save is a "save and run" flow.
    *  When true, the mutation-level onSuccess skips its normal
    *  close/toast behavior — the per-call onSuccess handles it. */

@@ -14,6 +14,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { generateUUID } from "~/utils/generateUUID";
 import { toaster } from "../ui/toaster";
 
 interface UseRunSuiteOptions {
@@ -120,7 +121,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     runMutation.mutate({
       projectId: project.id,
       id: pendingSuite.id,
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: generateUUID(),
       batchRunId,
     });
   }, [project, pendingSuite, runMutation]);

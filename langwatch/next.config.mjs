@@ -9,26 +9,6 @@ const bundleAnalyser =
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const isProduction =
-  process.env.NODE_ENV !== "development" && process.env.NODE_ENV !== "test";
-
-const cspHeader = `
-    default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
-    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev;
-    img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev;
-    font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev;
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    frame-ancestors 'none';
-    ${isProduction ? "upgrade-insecure-requests;" : ""}
-    worker-src 'self' blob:;
-    connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;
-    frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev;
-
-`;
-
 /**
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
  * for Docker builds.
@@ -83,38 +63,8 @@ const config = {
     ],
   },
 
-  async headers() {
-    // Only enable HSTS in production to avoid Safari caching issues in development
-    const securityHeaders = [
-      {
-        key: "Referrer-Policy",
-        value: "no-referrer",
-      },
-      {
-        key: "Content-Security-Policy",
-        value: cspHeader.replace(/\n/g, ""),
-      },
-      {
-        key: "X-Content-Type-Options",
-        value: "nosniff",
-      },
-      ...(isProduction
-        ? [
-            {
-              key: "Strict-Transport-Security",
-              value: "max-age=31536000; includeSubDomains",
-            },
-          ]
-        : []),
-    ];
-
-    return [
-      {
-        source: "/(.*)",
-        headers: securityHeaders,
-      },
-    ];
-  },
+  // Security headers are handled by src/middleware.ts at runtime
+  // so that DISABLE_HTTPS_HEADERS env var works with pre-built Docker images.
 
   webpack: (config) => {
     // Ensures that only a single version of those are ever loaded

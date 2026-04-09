@@ -11,6 +11,7 @@ import { LuCheck, LuCopy } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import { copyToClipboard } from "~/utils/clipboard";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
@@ -90,7 +91,7 @@ export function ExpandableDatasetCell({
 
   // Copy to clipboard
   const handleCopy = useCallback(() => {
-    void navigator.clipboard.writeText(rawContent);
+    void copyToClipboard(rawContent);
     setHasCopied(true);
     setTimeout(() => setHasCopied(false), 2000);
   }, [rawContent]);

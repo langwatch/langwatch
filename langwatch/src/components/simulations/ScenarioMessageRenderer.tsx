@@ -7,6 +7,7 @@ import { TraceMessage } from "../copilot-kit/TraceMessage";
 import { Markdown } from "../Markdown";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { safeJsonParseOrStringFallback } from "./utils/safe-json-parse-or-string-fallback";
+import { generateUUID } from "~/utils/generateUUID";
 
 type RawMessage = ScenarioMessageSnapshotEvent["messages"][number];
 
@@ -203,7 +204,7 @@ function flattenMessages(
     } else if (msg.role === "tool") {
       items.push({
         kind: "tool_result",
-        id: msg.id ?? crypto.randomUUID(),
+        id: msg.id ?? generateUUID(),
         result: safeJsonParseOrStringFallback(
           typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? {}),
         ),
@@ -235,7 +236,7 @@ function flattenContent(msg: RawMessage): DisplayItem[] {
   if (Array.isArray(parsed)) return flattenMixed(parsed, msg);
 
   if (msg.content && msg.content !== "None") {
-    return [{ kind: "text", id: msg.id ?? crypto.randomUUID(), role: msg.role ?? "assistant", content: raw, traceId: msg.trace_id }];
+    return [{ kind: "text", id: msg.id ?? generateUUID(), role: msg.role ?? "assistant", content: raw, traceId: msg.trace_id }];
   }
   return [];
 }
