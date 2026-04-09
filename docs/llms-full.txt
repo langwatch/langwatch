@@ -24538,16 +24538,12 @@ title: Docker Compose
 description: "Get LangWatch running locally in minutes with Docker Compose"
 ---
 
-<Warning>
-The Docker Compose setup is being updated for LangWatch v3 with ClickHouse. The current compose file uses OpenSearch (v2). For production and v3, use the [Kubernetes Helm chart](/self-hosting/deployment/kubernetes-helm).
-</Warning>
-
 Docker Compose is the quickest way to try LangWatch locally. It runs the full stack in containers on your machine.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) with Docker Compose v2
-- 4 CPU cores, 16 GB RAM, 50 GB disk
+- 4 CPU cores, 8 GB RAM, 20 GB disk
 
 ## Quick Start
 
@@ -24575,12 +24571,13 @@ Docker Compose starts the following services:
 
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
-| `app` | `langwatch/langwatch:latest` | 5560 | Main application |
-| `langwatch_nlp` | `langwatch/langwatch_nlp:latest` | 5561 | NLP processing, workflows |
-| `langevals` | `langwatch/langevals:latest` | 5562 | Evaluators, guardrails |
+| `app` | `langwatch/langwatch:3.0.0` | 5560 | Main application |
+| `workers` | `langwatch/langwatch:3.0.0` | — | Background job processing |
+| `langwatch_nlp` | `langwatch/langwatch_nlp:3.0.0` | 5561 | NLP processing, workflows |
+| `langevals` | `langwatch/langevals:3.0.0` | 5562 | Evaluators, guardrails |
 | `postgres` | `postgres:16` | 5432 | Control plane database |
-| `redis` | `redis:alpine` | 6379 | Job queue, caching |
-| `opensearch` | `langwatch/opensearch-lite:latest` | 9200 | Trace storage |
+| `redis` | `redis:alpine` | — | Job queue, caching |
+| `clickhouse` | `langwatch/clickhouse-serverless:0.2.0` | 8123 | Trace and analytics storage |
 
 ## Configuration
 
@@ -24662,13 +24659,24 @@ services:
     depends_on: []  # Remove postgres and redis dependencies
 ```
 
+### Connect to external ClickHouse
+
+Replace the `clickhouse` service with a connection string to your existing instance:
+
+```yaml
+services:
+  app:
+    environment:
+      CLICKHOUSE_URL: http://user:password@your-clickhouse:8123/langwatch
+    depends_on: []  # Remove clickhouse dependency
+```
+
 ## Limitations
 
 Docker Compose is suitable for evaluation and small teams but lacks:
 
 - **High availability** — single instance of each service
 - **Horizontal scaling** — cannot scale workers independently
-- **ClickHouse** — uses OpenSearch for trace storage (v3 Helm chart uses ClickHouse)
 - **Automated backups** — no built-in backup scheduling
 - **TLS** — no built-in HTTPS (use a reverse proxy like nginx or Caddy)
 
@@ -27211,15 +27219,6 @@ openapi: post /langevals/valid_format/evaluate
 ---
 ---
 
-# FILE: ./api-reference/prompts/create-prompt-version.mdx
-
----
-title: "Create prompt version"
-openapi: "POST /api/prompts/{id}/versions"
----
-
----
-
 # FILE: ./api-reference/prompts/create-prompt.mdx
 
 ---
@@ -27229,20 +27228,20 @@ openapi: "POST /api/prompts"
 
 ---
 
+# FILE: ./api-reference/prompts/create-prompt-version.mdx
+
+---
+title: "Create prompt version"
+openapi: "POST /api/prompts/{id}/versions"
+---
+
+---
+
 # FILE: ./api-reference/prompts/delete-prompt.mdx
 
 ---
 title: "Delete prompt"
 openapi: "DELETE /api/prompts/{id}"
----
-
----
-
-# FILE: ./api-reference/prompts/get-prompt-versions.mdx
-
----
-title: "Get prompt versions"
-openapi: "GET /api/prompts/{id}/versions"
 ---
 
 ---
@@ -27261,6 +27260,15 @@ openapi: "GET /api/prompts/{id}"
 ---
 title: "Get prompts"
 openapi: "GET /api/prompts"
+---
+
+---
+
+# FILE: ./api-reference/prompts/get-prompt-versions.mdx
+
+---
+title: "Get prompt versions"
+openapi: "GET /api/prompts/{id}/versions"
 ---
 
 ---
