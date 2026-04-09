@@ -96,19 +96,11 @@ docker compose up -d
 
 ## Breaking Changes
 
-### v2 to v3: ClickHouse Migration
+### v1.x / v2.x to v3: ClickHouse Migration
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a significant architectural change.
+LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a zero-downtime migration — Elasticsearch and ClickHouse run side-by-side while you migrate historical data.
 
-**What changes:**
-- Trace, span, and evaluation data is stored in ClickHouse instead of Elasticsearch
-- New event-sourcing architecture for data processing
-- New Helm chart structure with composable overlays
-- `clickhouse-serverless` subchart for auto-tuned ClickHouse
-
-**Migration path:**
-- New deployments: Use the v3 Helm chart directly
-- Existing v2 deployments: Contact the [LangWatch team](https://langwatch.ai/schedule-demo) for migration assistance
+See the **[full migration guide](/self-hosting/upgrade-v3)** for step-by-step instructions covering infrastructure setup, data migration, and cleanup.
 
 ### Helm Chart Pre-1.0.0 to 1.0.0+
 
