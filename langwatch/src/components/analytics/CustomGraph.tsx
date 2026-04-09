@@ -13,6 +13,7 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
+import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
 import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
@@ -519,20 +520,8 @@ const CustomGraph_ = React.memo(
     const getColor = useGetRotatingColorForCharts();
     const gray400 = useColorRawValue("gray.400");
 
-    const formatDate = (date: string) => {
-      if (!date) return "";
-
-      // If timeScale is in minutes (10, 30, or 60), show hours
-      if (typeof timeScale === "number" && timeScale < 1440) {
-        // If more than one day difference, include the date
-        if (daysDifference > 1) {
-          return format(new Date(date), "MMM d HH:mm");
-        }
-        return format(new Date(date), "HH:mm");
-      }
-
-      return format(new Date(date), "MMM d");
-    };
+    const formatDate = (date: string) =>
+      formatChartDate({ date, timeScale, daysDifference });
     const tooltipValueFormatter = (
       value: number | string,
       _: string,
