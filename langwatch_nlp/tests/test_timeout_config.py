@@ -65,7 +65,7 @@ class TestHttpNodeDefaultTimeout:
 
         with patch.dict(os.environ, {"NLP_HTTP_NODE_DEFAULT_TIMEOUT_SECONDS": "45"}):
             with patch("langwatch_nlp.studio.execute.http_node.httpx.AsyncClient", CapturingAsyncClient):
-                result = await execute_http_node(config=config, inputs={})
+                await execute_http_node(config=config, inputs={})
 
         assert captured_timeout == [45.0]
 
@@ -99,7 +99,7 @@ class TestHttpNodeDefaultTimeout:
 
         with patch.dict(os.environ, {"NLP_HTTP_NODE_DEFAULT_TIMEOUT_SECONDS": "999"}):
             with patch("langwatch_nlp.studio.execute.http_node.httpx.AsyncClient", CapturingAsyncClient):
-                result = await execute_http_node(config=config, inputs={})
+                await execute_http_node(config=config, inputs={})
 
         # 5000ms / 1000 = 5.0 seconds — env var is ignored when timeout_ms is set
         assert captured_timeout == [5.0]
