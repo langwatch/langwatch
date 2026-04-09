@@ -35,7 +35,7 @@ function mergeFields({
   handlePrefix,
 }: {
   oldFields: Field[];
-  newFields: { identifier: string; type: string; json_schema?: object }[];
+  newFields: { identifier: string; type: string; json_schema?: unknown }[];
   connectedEdges: Edge[];
   handlePrefix: string;
 }): Field[] {
