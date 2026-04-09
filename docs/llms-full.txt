@@ -26660,9 +26660,13 @@ MAX_EVENTS=5000 pnpm tsx src/index.ts traces-combined
 pnpm tsx src/index.ts all
 ```
 
+<Tip>
+For large history systems, we recommend running one target at a time instead of `all`, so you can apply the tuning profiles below for each target individually.
+</Tip>
+
 ### Recommended Tuning
 
-For large datasets, tuning the batch size and concurrency improves throughput.
+Each target has different document sizes and volumes, so tuning per-target improves throughput.
 
 **Traces and evaluations** (large volume):
 
