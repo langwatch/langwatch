@@ -20,9 +20,14 @@ export class FileCursorStore implements CursorStore {
 
   constructor(private readonly filePath: string = "./cursor.json") {
     const envRewind = process.env.CURSOR_REWIND_MS;
-    this.rewindMs = envRewind !== undefined
-      ? parseInt(envRewind, 10)
-      : DEFAULT_CURSOR_REWIND_MS;
+    if (envRewind !== undefined) {
+      const parsed = parseInt(envRewind, 10);
+      this.rewindMs = Number.isNaN(parsed)
+        ? DEFAULT_CURSOR_REWIND_MS
+        : parsed;
+    } else {
+      this.rewindMs = DEFAULT_CURSOR_REWIND_MS;
+    }
   }
 
   async load(): Promise<Cursor | null> {

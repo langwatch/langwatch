@@ -8,7 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clickhouse/client": "^1.13.0",
     "@elastic/elasticsearch": "^8.17.0",
+    "@opentelemetry/otlp-transformer-next": "npm:@opentelemetry/otlp-transformer@0.208.0",
     "dotenv": "^16.4.0"
   },
   "devDependencies": {

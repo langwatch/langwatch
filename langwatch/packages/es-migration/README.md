@@ -20,11 +20,11 @@ export CLICKHOUSE_URL="http://localhost:8123"
 # Optional ES auth
 export ELASTICSEARCH_API_KEY="your-api-key"
 
-# Safest first test — dry run a single batch, outputs to ./dry-run-simulations.jsonl
+# Safest first test — dry run a single batch, outputs to ./dry-run-simulations.json
 pnpm tsx src/index.ts simulations --dry-run --single-batch
 
 # Review the output
-cat dry-run-simulations.jsonl | jq .
+cat dry-run-simulations.json | jq .
 
 # Run a single live batch
 pnpm tsx src/index.ts simulations --single-batch
@@ -39,13 +39,20 @@ pnpm tsx src/index.ts all
 es-migration [target] [options]
 
 Targets:
-  simulations         Migrate simulation events only
-  batch-evaluations   Migrate batch evaluation data only
-  all                 Migrate both (default)
+  simulations              Migrate simulation events only
+  batch-evaluations        Migrate batch evaluation data only
+  dspy-steps               Migrate DSpy step data only
+  traces                   Migrate trace spans only
+  trace-evaluations        Migrate trace evaluation data only
+  traces-cold              Migrate cold-storage trace spans
+  trace-evaluations-cold   Migrate cold-storage trace evaluations
+  traces-combined          Migrate traces + evaluations together
+  traces-combined-cold     Migrate cold traces + evaluations together
+  all                      Migrate everything (default)
 
 Options:
   --dry-run, -n       Read ES and check CH, but don't write anything.
-                      Outputs JSONL with ES input + generated commands.
+                      Outputs JSON array with ES input + generated commands.
   --single-batch, -1  Process one batch then stop (good for testing)
   --help, -h          Show help
 ```
@@ -62,7 +69,7 @@ Options:
 | `MAX_EVENTS` | No | unlimited | Stop after N events |
 | `MAX_BATCHES` | No | unlimited | Stop after N batches |
 | `DRY_RUN` | No | false | Same as `--dry-run` flag |
-| `DRY_RUN_OUTPUT` | No | `./dry-run-{target}.jsonl` | Custom dry-run output path |
+| `DRY_RUN_OUTPUT` | No | `./dry-run-{target}.json` | Custom dry-run output path |
 | `BATCH_DELAY_MS` | No | 0 | Delay between batches (ms) |
 | `CURSOR_FILE` | No | `./cursor-{target}.json` | Custom cursor file path |
 | `LOG_LEVEL` | No | info | `debug\|info\|warn\|error` |
@@ -132,14 +139,14 @@ Delete the cursor file to start from the beginning.
 
 ## ClickHouse backpressure
 
-The migrator monitors ClickHouse parts-per-partition and pauses automatically when the merge load is too high (>50 parts). It resumes when merges catch up (<20 parts).
+The migrator monitors ClickHouse parts-per-partition and pauses automatically when a partition exceeds `CH_MAX_PARTS_PER_PARTITION` (1500). It resumes when the parts count drops back below that threshold.
 
 ## Testing workflow
 
 1. **Dry-run single batch** — verify the mapping is correct:
    ```bash
    pnpm tsx src/index.ts simulations --dry-run --single-batch
-   cat dry-run-simulations.jsonl | jq .
+   cat dry-run-simulations.json | jq .
    ```
 
 2. **Live single batch** — process one batch and verify in ClickHouse:
