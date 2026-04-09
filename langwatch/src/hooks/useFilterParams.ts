@@ -120,12 +120,14 @@ export const useFilterParams = () => {
     }
   }
 
-  // Parse query from router.asPath (reflects latest pushed URL) instead of
-  // router.query (React state, stale between renders) to avoid race conditions
-  // when multiple filter changes happen before React re-renders.
+  // Read the query from window.location.search (always current after
+  // history.pushState) instead of router.query/router.asPath (React state,
+  // stale between renders) to avoid race conditions when multiple filter
+  // changes happen before React re-renders.
   const parseCurrentQuery = () => {
-    const currentQueryString = router.asPath.split("?")[1] ?? "";
-    return qs.parse(currentQueryString, { allowDots: false });
+    const search =
+      typeof window !== "undefined" ? window.location.search.slice(1) : "";
+    return qs.parse(search, { allowDots: false });
   };
 
   const setFilter = (filter: FilterField, params: FilterParam) => {

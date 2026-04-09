@@ -11,13 +11,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-let mockRouterQuery: Record<string, string | string[] | undefined> = {};
 let mockRouterAsPath = "/test-project/messages";
 const mockPush = vi.fn().mockResolvedValue(true);
 
 vi.mock("next/router", () => ({
   useRouter: () => ({
-    query: mockRouterQuery,
+    query: {},
     push: mockPush,
     pathname: "/[project]/messages",
     asPath: mockRouterAsPath,
@@ -67,17 +66,7 @@ import { useFilterParams } from "../useFilterParams";
 function lastPushUrl(): string {
   const lastCall = mockPush.mock.lastCall;
   if (!lastCall) throw new Error("router.push was not called");
-  // First arg can be a string (URL) or an object ({ pathname, query })
   return typeof lastCall[0] === "string" ? lastCall[0] : "";
-}
-
-function lastPushQuery(): Record<string, unknown> {
-  const lastCall = mockPush.mock.lastCall;
-  if (!lastCall) throw new Error("router.push was not called");
-  if (typeof lastCall[0] === "object" && lastCall[0].query) {
-    return lastCall[0].query as Record<string, unknown>;
-  }
-  return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -87,15 +76,19 @@ function lastPushQuery(): Record<string, unknown> {
 describe("useFilterParams() write operations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRouterQuery = {};
     mockRouterAsPath = "/test-project/messages";
+    window.history.pushState({}, "", "/test-project/messages");
   });
 
   describe("setFilter()", () => {
     describe("when setting metadata.value filter", () => {
       it("does not strip metadata_key from URL", () => {
-        mockRouterQuery = { metadata_key: "env" };
         mockRouterAsPath = "/test-project/messages?metadata_key=env";
+        window.history.pushState(
+          {},
+          "",
+          "/test-project/messages?metadata_key=env",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setFilter("metadata.value", { env: ["prod"] });
@@ -108,9 +101,13 @@ describe("useFilterParams() write operations", () => {
 
     describe("when setting event_metric filter", () => {
       it("does not strip event_metric_value from URL", () => {
-        mockRouterQuery = { "event_metric_value.click.count": "0,100" };
         mockRouterAsPath =
           "/test-project/messages?event_metric_value.click.count=0,100";
+        window.history.pushState(
+          {},
+          "",
+          "/test-project/messages?event_metric_value.click.count=0,100",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setFilter("events.metrics.key", ["count"]);
@@ -124,22 +121,23 @@ describe("useFilterParams() write operations", () => {
   describe("clearFilters()", () => {
     describe("when URL has filters and a search query", () => {
       it("clears both filter params and query param", () => {
-        mockRouterQuery = {
-          origin: "application",
-          model: "gpt-5-mini",
-          query: "hello world",
-          view: "table",
-        };
+        mockRouterAsPath =
+          "/test-project/messages?origin=application&model=gpt-5-mini&query=hello+world&view=table";
+        window.history.pushState(
+          {},
+          "",
+          "/test-project/messages?origin=application&model=gpt-5-mini&query=hello+world&view=table",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.clearFilters();
 
-        const query = lastPushQuery();
-        expect(query).not.toHaveProperty("origin");
-        expect(query).not.toHaveProperty("model");
-        expect(query).not.toHaveProperty("query");
+        const url = lastPushUrl();
+        expect(url).not.toContain("origin=");
+        expect(url).not.toContain("model=");
+        expect(url).not.toContain("query=");
         // Layout params preserved
-        expect(query).toHaveProperty("view", "table");
+        expect(url).toContain("view=table");
       });
     });
   });
@@ -147,10 +145,13 @@ describe("useFilterParams() write operations", () => {
   describe("setNegateFilters()", () => {
     describe("when URL has nested filter params", () => {
       it("preserves params using correct qs options", () => {
-        mockRouterQuery = {
-          "metadata.env": "prod",
-          origin: "application",
-        };
+        mockRouterAsPath =
+          "/test-project/messages?metadata.env=prod&origin=application";
+        window.history.pushState(
+          {},
+          "",
+          "/test-project/messages?metadata.env=prod&origin=application",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setNegateFilters(true);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterOutEmptyFilters } from "../utils";
+import { countActiveFilters, filterOutEmptyFilters } from "../utils";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 
@@ -88,6 +88,58 @@ describe("filterOutEmptyFilters()", () => {
       } as unknown as Partial<Record<FilterField, FilterParam>>;
 
       expect(filterOutEmptyFilters(filters)).toEqual({});
+    });
+  });
+});
+
+describe("countActiveFilters()", () => {
+  describe("when filters is undefined", () => {
+    it("returns 0", () => {
+      expect(countActiveFilters(undefined)).toBe(0);
+    });
+  });
+
+  describe("when filter has non-empty leaf arrays", () => {
+    it("counts each filter with active conditions", () => {
+      const filters = {
+        "spans.model": ["gpt-4"],
+        "traces.origin": ["application"],
+      } as Partial<Record<FilterField, FilterParam>>;
+
+      expect(countActiveFilters(filters)).toBe(2);
+    });
+  });
+
+  describe("when filter is a nested object with empty leaf arrays", () => {
+    it("does not count filters without active conditions", () => {
+      const filters = {
+        "evaluations.passed": { "eval-1": [] },
+      } as Partial<Record<FilterField, FilterParam>>;
+
+      expect(countActiveFilters(filters)).toBe(0);
+    });
+  });
+
+  describe("when filter is a nested object with non-empty leaf arrays", () => {
+    it("counts the filter", () => {
+      const filters = {
+        "evaluations.passed": { "eval-1": ["true"] },
+      } as Partial<Record<FilterField, FilterParam>>;
+
+      expect(countActiveFilters(filters)).toBe(1);
+    });
+  });
+
+  describe("when filters have a mix of active and pending", () => {
+    it("only counts filters with active conditions", () => {
+      const filters = {
+        "spans.model": ["gpt-4"],
+        "evaluations.passed": { "eval-1": [] },
+        "evaluations.score": {},
+        "traces.origin": [],
+      } as Partial<Record<FilterField, FilterParam>>;
+
+      expect(countActiveFilters(filters)).toBe(1);
     });
   });
 });
