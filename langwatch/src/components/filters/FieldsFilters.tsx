@@ -567,9 +567,16 @@ function ListSelection({
 		overscan: 5,
 	});
 
+	// Re-measure when items are added/removed from selection (which changes
+	// nested content height). Compare by value, not reference — currentValues
+	// is a new array each render (from Object.keys), and measure() resets ALL
+	// cached sizes to estimateSize. If it fires every render, items that
+	// haven't resized won't get re-measured by ResizeObserver, causing overlap.
+	const currentValuesKey = currentValues.join(",");
 	useEffect(() => {
 		virtualizer.measure();
-	}, [virtualizer, currentValues]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [virtualizer, currentValuesKey]);
 
 	const isEmpty = options && options.length === 0 && !showCustomValue;
 
