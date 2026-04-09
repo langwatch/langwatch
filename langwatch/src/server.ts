@@ -10,7 +10,5 @@ if (process.env.NODE_ENV === "production") {
   events.EventEmitter.defaultMaxListeners = 128;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { startApp } = require("./start.js");
-
+const { startApp } = await import("./start");
 void startApp();

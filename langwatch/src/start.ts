@@ -60,7 +60,7 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
   );
 };
 
-module.exports.startApp = async (dir = path.dirname(__dirname)) => {
+export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
 
   const hostname = "0.0.0.0";
