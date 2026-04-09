@@ -127,7 +127,11 @@ export const useFilterParams = () => {
   const parseCurrentQuery = () => {
     const search =
       typeof window !== "undefined" ? window.location.search.slice(1) : "";
-    return qs.parse(search, { allowDots: false });
+    return qs.parse(search, {
+      allowDots: false,
+      comma: true,
+      allowEmptyArrays: true,
+    });
   };
 
   const setFilter = (filter: FilterField, params: FilterParam) => {
