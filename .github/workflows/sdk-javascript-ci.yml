@@ -162,7 +162,9 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          cache-dependency-path: |
+            langwatch/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
 
       - name: Install LangWatch app dependencies
         working-directory: langwatch
@@ -192,6 +194,10 @@ jobs:
       - name: Setup ClickHouse
         working-directory: langwatch
         run: pnpm clickhouse:migrate
+
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under

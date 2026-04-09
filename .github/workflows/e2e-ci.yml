@@ -113,6 +113,7 @@ jobs:
           cache-dependency-path: |
             langwatch/pnpm-lock.yaml
             agentic-e2e-tests/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
 
       - name: Install app dependencies
         working-directory: langwatch
@@ -150,6 +151,10 @@ jobs:
       - name: Setup Elasticsearch
         working-directory: langwatch
         run: pnpm elastic:migrate
+
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Build app
         working-directory: langwatch
