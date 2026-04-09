@@ -53,6 +53,16 @@ const labelsMapping: Partial<
   },
 };
 
+/**
+ * ES range aggregation buckets use the user-defined key (e.g. "previous"/"current")
+ * as `key_as_string`, not a date. This swaps it with `from_as_string` so downstream
+ * code that expects a date string in `key_as_string` works correctly.
+ */
+export const rangeBucketWithDate = (bucket: any): any => ({
+  ...bucket,
+  key_as_string: bucket?.from_as_string,
+});
+
 export const timeseries = async (input: TimeseriesInputType) => {
   if (env.IS_QUICKWIT) {
     // TODO: Remove this once Quickwit v0.9 is released as it supports cardinality
@@ -365,8 +375,12 @@ export const timeseries = async (input: TimeseriesInputType) => {
       );
 
     return {
-      previousPeriod: parseAggregations([previous]),
-      currentPeriod: parseAggregations([current]),
+      previousPeriod: parseAggregations([
+        rangeBucketWithDate(previous),
+      ]),
+      currentPeriod: parseAggregations([
+        rangeBucketWithDate(current),
+      ]),
     };
   }
 
