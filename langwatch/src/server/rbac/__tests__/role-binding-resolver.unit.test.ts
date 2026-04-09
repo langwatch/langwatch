@@ -2,7 +2,6 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
   checkRoleBindingPermission,
-  resolveEffectiveRole,
   type ScopeRef,
 } from "../role-binding-resolver";
 
@@ -45,7 +44,7 @@ function makePrisma({
           : null,
       ),
     },
-  } as unknown as Parameters<typeof resolveEffectiveRole>[0]["prisma"];
+  } as unknown as Parameters<typeof checkRoleBindingPermission>[0]["prisma"];
 }
 
 const ORG_ID = "org1";
@@ -59,267 +58,6 @@ const projectScope: ScopeRef = {
   id: PROJECT_ID,
   teamId: TEAM_ID,
 };
-
-// ============================================================================
-// resolveEffectiveRole — scope resolution
-// ============================================================================
-
-describe("resolveEffectiveRole()", () => {
-  describe("when resolving scope hierarchy", () => {
-    it("returns team-level role for a project when only team binding exists", async () => {
-      const prisma = makePrisma({
-        directBindings: [
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      expect(result).toEqual({
-        role: TeamUserRole.MEMBER,
-        customRoleId: null,
-        fromFallback: false,
-      });
-    });
-
-    it("returns highest role across all matching ancestor bindings (permissions are unioned)", async () => {
-      const prisma = makePrisma({
-        directBindings: [
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-          {
-            role: TeamUserRole.VIEWER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.PROJECT,
-            scopeId: PROJECT_ID,
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      // All ancestor-scope bindings are unioned — MEMBER > VIEWER
-      expect(result?.role).toBe(TeamUserRole.MEMBER);
-    });
-
-    it("returns ADMIN for org-level ADMIN binding regardless of scope", async () => {
-      const prisma = makePrisma({
-        directBindings: [
-          {
-            role: TeamUserRole.ADMIN,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: ORG_ID,
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      expect(result?.role).toBe(TeamUserRole.ADMIN);
-    });
-
-    it("returns null when no binding matches the target team", async () => {
-      const prisma = makePrisma({
-        directBindings: [
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: "other-team",
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      expect(result).toBeNull();
-    });
-
-    it("returns null when user has no bindings and no TeamUser fallback", async () => {
-      const prisma = makePrisma({ directBindings: [], teamUser: null });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe("when resolving multiple bindings at the same scope", () => {
-    it("picks the highest role when multiple group bindings exist at the same scope", async () => {
-      const prisma = makePrisma({
-        groupBindings: [
-          {
-            role: TeamUserRole.VIEWER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: teamScope,
-      });
-
-      expect(result?.role).toBe(TeamUserRole.MEMBER);
-    });
-
-    it("picks the highest role across direct and group bindings at the same scope", async () => {
-      const prisma = makePrisma({
-        directBindings: [
-          {
-            role: TeamUserRole.VIEWER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-        ],
-        groupBindings: [
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: teamScope,
-      });
-
-      expect(result?.role).toBe(TeamUserRole.MEMBER);
-    });
-  });
-
-  describe("when a group binding at project scope overrides a team-level binding", () => {
-    it("returns highest role across all ancestor-scope group bindings (permissions are unioned)", async () => {
-      const prisma = makePrisma({
-        groupBindings: [
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: TEAM_ID,
-          },
-          {
-            role: TeamUserRole.VIEWER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.PROJECT,
-            scopeId: PROJECT_ID,
-          },
-        ],
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      // All ancestor-scope bindings are unioned — MEMBER > VIEWER
-      expect(result?.role).toBe(TeamUserRole.MEMBER);
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Legacy fallback
-  // ──────────────────────────────────────────────────────────────────────────
-
-  describe("when falling back to TeamUser", () => {
-    it("uses TeamUser record when no RoleBindings exist", async () => {
-      const prisma = makePrisma({
-        directBindings: [],
-        groupBindings: [],
-        teamUser: { role: TeamUserRole.MEMBER, assignedRoleId: null },
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      expect(result).toEqual({
-        role: TeamUserRole.MEMBER,
-        customRoleId: null,
-        fromFallback: true,
-      });
-    });
-
-    it("does not fall back when RoleBindings exist (even if none match the scope)", async () => {
-      const prisma = makePrisma({
-        directBindings: [
-          {
-            role: TeamUserRole.MEMBER,
-            customRoleId: null,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: "other-team",
-          },
-        ],
-        teamUser: { role: TeamUserRole.ADMIN, assignedRoleId: null },
-      });
-
-      const result = await resolveEffectiveRole({
-        prisma,
-        userId: USER_ID,
-        organizationId: ORG_ID,
-        scope: projectScope,
-      });
-
-      expect(result).toBeNull();
-    });
-  });
-});
 
 // ============================================================================
 // checkRoleBindingPermission — permission mapping
@@ -483,6 +221,129 @@ describe("checkRoleBindingPermission()", () => {
       });
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe("when resolving ancestor scopes", () => {
+    it("grants access via team-level binding when checking a project scope", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: projectScope,
+        permission: "analytics:view",
+      });
+
+      expect(result).toBe(true);
+    });
+
+    it("unions permissions from all ancestor-scope bindings — higher scope grants access", async () => {
+      // VIEWER at project + MEMBER at team → MEMBER permissions apply (union)
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.VIEWER,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.PROJECT,
+            scopeId: PROJECT_ID,
+          },
+          {
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: TEAM_ID,
+          },
+        ],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: projectScope,
+        permission: "datasets:manage",
+      });
+
+      // datasets:manage is granted by MEMBER but not VIEWER
+      expect(result).toBe(true);
+    });
+
+    it("does not grant access from a binding on a different team", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.ADMIN,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: "other-team",
+          },
+        ],
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: projectScope,
+        permission: "team:manage",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("does not fall back to TeamUser when RoleBindings exist (even if none match the scope)", async () => {
+      const prisma = makePrisma({
+        directBindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: "other-team",
+          },
+        ],
+        teamUser: { role: TeamUserRole.ADMIN, assignedRoleId: null },
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: projectScope,
+        permission: "team:manage",
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("when falling back to TeamUser", () => {
+    it("uses TeamUser record when no RoleBindings exist", async () => {
+      const prisma = makePrisma({
+        directBindings: [],
+        groupBindings: [],
+        teamUser: { role: TeamUserRole.ADMIN, assignedRoleId: null },
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        scope: projectScope,
+        permission: "team:manage",
+      });
+
+      expect(result).toBe(true);
     });
   });
 });

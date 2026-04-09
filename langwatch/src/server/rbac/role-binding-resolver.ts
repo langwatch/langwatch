@@ -8,8 +8,6 @@ import {
   teamRoleHasPermission,
   type Permission,
 } from "../api/rbac";
-import { resolveHighestRole } from "../scim/scim-role-resolver";
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -18,13 +16,6 @@ export type ScopeRef =
   | { type: "org"; id: string }
   | { type: "team"; id: string }
   | { type: "project"; id: string; teamId: string };
-
-export type ResolvedRole = {
-  role: TeamUserRole;
-  customRoleId: string | null;
-  /** true when the result came from the legacy TeamUser fallback */
-  fromFallback: boolean;
-};
 
 // ============================================================================
 // Scope resolution helpers
@@ -112,36 +103,6 @@ async function collectBindingsForScope({
   );
 
   return matching.map((b) => ({ role: b.role, customRoleId: b.customRoleId, fromFallback: false }));
-}
-
-/**
- * @deprecated Prefer checkRoleBindingPermission — there is no single
- * "effective role" when a user holds multiple bindings. This function
- * returns the highest built-in role across all matching bindings as a
- * best-effort approximation (used by migration tooling only).
- */
-export async function resolveEffectiveRole({
-  prisma,
-  userId,
-  organizationId,
-  scope,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  organizationId: string;
-  scope: ScopeRef;
-}): Promise<ResolvedRole | null> {
-  const bindings = await collectBindingsForScope({ prisma, userId, organizationId, scope });
-  if (bindings.length === 0) return null;
-
-  const fromFallback = bindings.some((b) => b.fromFallback);
-  const highest = resolveHighestRole(bindings.map((b) => b.role));
-  const customRoleId =
-    highest === TeamUserRole.CUSTOM
-      ? (bindings.find((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)?.customRoleId ?? null)
-      : null;
-
-  return { role: highest, customRoleId, fromFallback };
 }
 
 // ============================================================================
