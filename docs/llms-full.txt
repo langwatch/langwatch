@@ -23906,7 +23906,7 @@ clickhouse:
 ```
 
 <Note>
-The TTL must be divisible by 7 (ClickHouse partitions data weekly). The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
+We recommend setting the TTL to a multiple of 7 (e.g., 7, 14, 28, 49) to align with ClickHouse's weekly partition boundaries for more efficient data management. The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
 </Note>
 
 ### Cost Savings
@@ -24497,7 +24497,7 @@ spec:
 ### ClickHouse cold storage (S3)
 
 - Enable with `clickhouse.cold.enabled: true`
-- Default TTL: 49 days (data older than this moves to S3)
+- Default TTL: 49 days (data older than this moves to S3). We recommend multiples of 7 to align with ClickHouse's weekly partition boundaries
 - S3 cost is typically 10-20x cheaper than SSD storage
 
 ### PostgreSQL
@@ -25447,7 +25447,7 @@ clickhouse:
     useEnvironmentCredentials: true
   cold:
     enabled: true
-    defaultTtlDays: 49
+    defaultTtlDays: 49  # Recommend multiples of 7 to align with weekly partition boundaries
   backup:
     enabled: true
 
@@ -26746,6 +26746,397 @@ kubectl -n langwatch get pods -o jsonpath='{.items[*].spec.containers[*].image}'
 
 ---
 
+# FILE: ./self-hosting/upgrade-v3.mdx
+
+---
+title: Migrate to v3
+description: "Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0"
+---
+
+LangWatch v3 replaces Elasticsearch/OpenSearch with **ClickHouse** as the primary data store. This guide walks you through the full migration — the process is the same whether you're coming from v1.x or v2.x.
+
+<Tip>
+This is a **zero-downtime migration**. Elasticsearch and ClickHouse run side-by-side during the transition. New data flows to ClickHouse immediately, and you migrate historical data at your own pace.
+</Tip>
+
+## What Changed
+
+- **Data store**: Trace, span, and evaluation data is now stored in ClickHouse instead of Elasticsearch/OpenSearch
+- **Architecture**: New event-sourcing system for data processing
+- **Helm charts**: New composable overlay structure with `clickhouse-serverless` subchart
+- **Environment**: `ELASTICSEARCH_*` variables replaced by `CLICKHOUSE_URL`
+
+## Migration Steps Overview
+
+1. Back up your databases
+2. Deploy ClickHouse alongside your existing Elasticsearch
+3. Upgrade LangWatch to v3
+4. Migrate historical data from Elasticsearch to ClickHouse
+5. Remove Elasticsearch
+
+## Prerequisites
+
+- **Back up your databases** — see [Backups](/self-hosting/configuration/backups)
+- **Check release notes** at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
+- **Test in staging** before upgrading production
+- Verify your Elasticsearch cluster is healthy (all shards green)
+- Ensure you have enough disk space on the ClickHouse host for the migrated data
+
+## Step 1: Deploy ClickHouse
+
+Add ClickHouse to your existing infrastructure. Your Elasticsearch instance stays running — both will operate in parallel during migration.
+
+### Docker Compose
+
+Add the ClickHouse service to your `compose.yml`:
+
+```yaml
+services:
+  clickhouse:
+    image: langwatch/clickhouse-serverless:0.2.0
+    environment:
+      CLICKHOUSE_PASSWORD: langwatch
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clickhouse-data:
+```
+
+### Kubernetes (Helm)
+
+The v3 Helm chart includes the `clickhouse-serverless` subchart automatically. No additional setup is needed — ClickHouse will be deployed when you upgrade the chart in Step 2.
+
+## Step 2: Upgrade LangWatch to v3
+
+### Docker Compose
+
+Update your environment variables and pull the v3 images:
+
+Add `CLICKHOUSE_URL` to your app and workers environment in `compose.yml`:
+
+```yaml
+services:
+  app:
+    environment:
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+  workers:
+    environment:
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+```
+
+Then pull and restart:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### Helm Chart
+
+```bash
+helm repo update
+
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  --version 3.0.0 \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+<Note>
+The Helm chart configures `CLICKHOUSE_URL` automatically from the ClickHouse values — no manual env var needed for either managed or external ClickHouse.
+</Note>
+
+### What Happens on Startup
+
+- **PostgreSQL**: Prisma migrations run automatically, including removing the old Elasticsearch feature flags
+- **ClickHouse**: Schema migrations create all required tables (`event_log`, `stored_spans`, `trace_summaries`, etc.)
+- **New data** starts flowing to ClickHouse immediately
+- **Historical data** in Elasticsearch remains readable until you migrate it
+
+<Note>
+Keep your `ELASTICSEARCH_NODE_URL` configured during this phase. LangWatch v3 can still read from Elasticsearch for data that hasn't been migrated yet.
+</Note>
+
+## Step 3: Migrate Historical Data
+
+The `es-migration` tool reads documents from Elasticsearch and writes them to ClickHouse via the event-sourcing system. It runs outside of your LangWatch deployment — no Redis or BullMQ needed.
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/langwatch/langwatch.git
+
+# Navigate to the langwatch workspace
+cd langwatch
+
+# Install dependencies from the langwatch pnpm workspace
+pnpm install
+
+# Navigate to the migration tool
+cd packages/es-migration
+```
+
+### Configure
+
+Set the required environment variables:
+
+```bash
+export ELASTICSEARCH_NODE_URL="http://localhost:9200"
+export CLICKHOUSE_URL="http://default:langwatch@localhost:8123/langwatch"
+
+# If your Elasticsearch requires authentication
+export ELASTICSEARCH_API_KEY="your-api-key"
+```
+
+<Warning>
+Point these at your actual Elasticsearch and ClickHouse instances. If they're running in Docker or Kubernetes, you may need to set up port forwarding or use the internal network addresses.
+</Warning>
+
+**Credential requirements:**
+
+- **Elasticsearch**: Use a **read-only** user or API key. The migration tool only reads from ES — a read-only credential protects your source data from accidental writes.
+- **ClickHouse**: Use a user with **write access**. The tool needs to insert into `event_log` and projection tables.
+
+### Disable ClickHouse TTLs Before Migrating
+
+<Warning>
+**This step is critical.** If you skip it, ClickHouse may immediately expire or offload historical data as it arrives during migration.
+</Warning>
+
+LangWatch uses TTL rules to manage data retention and tiered storage in ClickHouse. By default, data older than 49 days is moved to cold storage (or dropped if cold storage isn't configured). When you migrate historical data from Elasticsearch, much of it will be older than 49 days — so ClickHouse would try to expire or offload it the moment it lands.
+
+**Before starting the migration**, set the TTL to a very high value so all migrated data stays in hot storage:
+
+#### Docker Compose
+
+Add to your app and workers environment:
+
+```yaml
+services:
+  app:
+    environment:
+      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+  workers:
+    environment:
+      TIERED_STORAGE_DEFAULT_HOT_DAYS: "9999"
+```
+
+Then restart:
+
+```bash
+docker compose up -d
+```
+
+#### Helm Chart
+
+```yaml
+app:
+  extraEnvs:
+    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
+      value: "9999"
+workers:
+  extraEnvs:
+    - name: TIERED_STORAGE_DEFAULT_HOT_DAYS
+      value: "9999"
+```
+
+Then upgrade:
+
+```bash
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+The TTL reconciler runs on startup and updates the ClickHouse table metadata without reorganizing existing data. Any data that needs to be moved to a different storage tier due to the new TTL policy, will happen asynchronously and be managed by ClickHouse.
+
+#### After Migration: Restore TTLs
+
+Once the migration is complete, set `TIERED_STORAGE_DEFAULT_HOT_DAYS` back to your desired retention value and restart LangWatch. ClickHouse handles the offloading gracefully in the background.
+
+<Tip>
+We recommend setting TTL values to a **multiple of 7** (e.g., 7, 14, 28, 49) to align with ClickHouse partition boundaries for more efficient data management.
+</Tip>
+
+### Migration Targets
+
+The tool migrates data in separate targets:
+
+| Target | Description |
+|--------|-------------|
+| `traces-combined` | Traces and their evaluations |
+| `simulations` | Simulation run events |
+| `batch-evaluations` | Batch experiment evaluation data |
+| `dspy-steps` | DSPy optimization steps |
+| `all` | Run all primary targets in sequence |
+
+### Testing Workflow
+
+Start small and verify before running the full migration:
+
+**1. Dry-run a single batch** — validate the mapping without writing anything:
+
+```bash
+pnpm tsx src/index.ts traces-combined --dry-run --single-batch
+```
+
+Review the output in `./dry-run-traces-combined.json` to confirm the data looks correct.
+
+**2. Live single batch** — process one batch and verify in ClickHouse:
+
+```bash
+pnpm tsx src/index.ts traces-combined --single-batch
+```
+
+**3. Limited run** — process a few thousand events to catch edge cases:
+
+```bash
+MAX_EVENTS=5000 pnpm tsx src/index.ts traces-combined
+```
+
+**4. Full migration** — migrate everything:
+
+```bash
+pnpm tsx src/index.ts all
+```
+
+<Tip>
+For large history systems, we recommend running one target at a time instead of `all`, so you can apply the tuning profiles below for each target individually.
+</Tip>
+
+### Recommended Tuning
+
+Each target has different document sizes and volumes, so tuning per-target improves throughput.
+
+**Traces and evaluations** (large volume):
+
+```bash
+export BATCH_SIZE=5000
+export SUB_BATCH_SIZE=2000
+export CH_BATCH_SIZE=5000
+export CONCURRENCY=1000
+export CURSOR_REWIND_MS=21600000
+```
+
+**DSPy steps** (smaller documents):
+
+```bash
+export BATCH_SIZE=100
+export CH_BATCH_SIZE=100
+export CONCURRENCY=10
+export CURSOR_REWIND_MS=21600000
+```
+
+### Runtime Controls
+
+- **Pause/Resume**: Press `p` during migration to pause after the current batch. Press `p` again to resume.
+- **Graceful shutdown**: `Ctrl+C` finishes the current batch then exits. Press again to force quit.
+- **ClickHouse backpressure**: The tool monitors ClickHouse merge load and pauses automatically when it's too high. It resumes when merges catch up.
+
+### Resume After Interruption
+
+The migration saves progress to a cursor file (e.g., `./cursor-traces-combined.json`). If interrupted, it resumes from the last checkpoint on restart.
+
+To start a target from scratch, delete its cursor file.
+
+### Verify the Migration
+
+After migration completes, verify the data in ClickHouse:
+
+```bash
+# Connect to ClickHouse
+clickhouse-client --host localhost --port 9000
+
+# Check trace counts
+SELECT COUNT(*) FROM langwatch.trace_summaries;
+
+# Check event log
+SELECT AggregateType, COUNT(*) FROM langwatch.event_log GROUP BY AggregateType;
+```
+
+Compare these counts against your Elasticsearch indices to confirm completeness. Note that you may wish to run a distinct check against the `ProjectionId` column on trace summaries as if there are any MergeTree Replacements that need to happen it could cause the count operation to report duplicates in the count.
+
+## Step 4: Remove Elasticsearch
+
+Once you've verified the migration:
+
+1. **Remove Elasticsearch environment variables** from your configuration:
+   - `ELASTICSEARCH_NODE_URL`
+   - `ELASTICSEARCH_API_KEY`
+
+2. **Remove the Elasticsearch service** from your `compose.yml` or Helm values
+
+3. **Restart LangWatch** to apply the changes
+
+### Docker Compose
+
+```bash
+# After removing the elasticsearch service from compose.yml
+docker compose up -d
+```
+
+### Helm
+
+```bash
+helm upgrade langwatch langwatch/langwatch \
+  --namespace langwatch \
+  -f values-production.yaml \
+  --wait --timeout 10m
+```
+
+## Environment Variable Changes
+
+| Variable | v1.x / v2.x | v3.0 |
+|----------|-------------|------|
+| `ELASTICSEARCH_NODE_URL` | Required | Remove |
+| `ELASTICSEARCH_API_KEY` | Optional | Remove |
+| `CLICKHOUSE_URL` | — | Required |
+
+All other environment variables remain the same. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+
+## Troubleshooting
+
+### Toxic documents
+
+If a single Elasticsearch document is too large and crashes an ES shard during migration, the tool detects this, skips the problematic document, and logs its ID to `./skipped-toxic-docs.log`. These documents may need manual handling.
+
+### Response too large
+
+If an Elasticsearch response exceeds the Node.js string limit (~1 GB), the tool automatically halves the batch size and retries.
+
+### Transient Elasticsearch errors
+
+For timeouts or connection issues, the tool uses exponential backoff (up to 5 retries) and reduces batch size if errors persist.
+
+### Migration seems slow
+
+- Check ClickHouse merge load in the progress output (`ch_parts` column)
+- Increase `CONCURRENCY` and `BATCH_SIZE` if your hardware can handle it
+- The tool auto-pauses when ClickHouse is under merge pressure — this is normal
+
+## Getting Help
+
+- Check the [Troubleshooting guide](/self-hosting/troubleshooting)
+- Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
+- Contact [support](https://langwatch.ai/support)
+
+---
+
 # FILE: ./self-hosting/upgrade.mdx
 
 ---
@@ -26846,19 +27237,11 @@ docker compose up -d
 
 ## Breaking Changes
 
-### v2 to v3: ClickHouse Migration
+### v1.x / v2.x to v3: ClickHouse Migration
 
-LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a significant architectural change.
+LangWatch v3 replaces Elasticsearch/OpenSearch with ClickHouse as the primary data store. This is a zero-downtime migration — Elasticsearch and ClickHouse run side-by-side while you migrate historical data.
 
-**What changes:**
-- Trace, span, and evaluation data is stored in ClickHouse instead of Elasticsearch
-- New event-sourcing architecture for data processing
-- New Helm chart structure with composable overlays
-- `clickhouse-serverless` subchart for auto-tuned ClickHouse
-
-**Migration path:**
-- New deployments: Use the v3 Helm chart directly
-- Existing v2 deployments: Contact the [LangWatch team](https://langwatch.ai/schedule-demo) for migration assistance
+See the **[full migration guide](/self-hosting/upgrade-v3)** for step-by-step instructions covering infrastructure setup, data migration, and cleanup.
 
 ### Helm Chart Pre-1.0.0 to 1.0.0+
 
