@@ -125,7 +125,7 @@ async function resolveLegacyFallback({
   userId: string;
   organizationId: string;
   scope: ScopeRef;
-}): Promise<ResolvedRole | null> {
+}): Promise<{ role: TeamUserRole; customRoleId: string | null; fromFallback: boolean } | null> {
   const teamId =
     scope.type === "project"
       ? scope.teamId

@@ -1,14 +1,12 @@
 /**
  * @vitest-environment node
  *
- * Integration tests for resolveEffectiveRole and checkRoleBindingPermission
- * against a real database.
+ * Integration tests for checkRoleBindingPermission against a real database.
  *
  * Covers the scenarios in specs/rbac/scoped-role-bindings.feature:
  * - Scope hierarchy (project → team → org)
  * - Group-expanded bindings
- * - Most-specific scope wins
- * - Multiple bindings at same scope → highest role wins
+ * - Permission union across all matching bindings
  * - Fallback to TeamUser when no RoleBindings exist
  * - RoleBinding takes precedence over TeamUser when both exist
  */
@@ -25,13 +23,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import {
   checkRoleBindingPermission,
-  resolveEffectiveRole,
   type ScopeRef,
 } from "../role-binding-resolver";
 
 const NS = `rbac-int-${nanoid(6)}`;
 
-describe("resolveEffectiveRole() integration", () => {
+// ============================================================================
+// checkRoleBindingPermission() — scope hierarchy and group expansion
+// ============================================================================
+
+describe("checkRoleBindingPermission() scope hierarchy integration", () => {
   let org: Organization;
   let teamA: Team;
   let teamB: Team;
@@ -127,7 +128,7 @@ describe("resolveEffectiveRole() integration", () => {
   // ──────────────────────────────────────────────────────────────────────────
 
   describe("when resolving scope hierarchy for direct bindings", () => {
-    it("returns team-level binding when checking a project in that team", async () => {
+    it("grants analytics:view via team-level binding when checking a project in that team", async () => {
       await prisma.roleBinding.create({
         data: {
           organizationId: org.id,
@@ -143,17 +144,19 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
         scope,
+        permission: "analytics:view",
       });
 
-      expect(result).toMatchObject({ role: TeamUserRole.MEMBER, fromFallback: false });
+      expect(result).toBe(true);
     });
 
-    it("returns project-level binding when it overrides the team binding", async () => {
+    it("unions permissions across scope levels — MEMBER at team grants datasets:manage even with VIEWER at project", async () => {
+      // Union model: both bindings contribute; MEMBER at team covers datasets:manage
       await prisma.roleBinding.createMany({
         data: [
           {
@@ -178,34 +181,28 @@ describe("resolveEffectiveRole() integration", () => {
         id: prodProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
         scope,
+        permission: "datasets:manage",
       });
 
-      expect(result?.role).toBe(TeamUserRole.VIEWER);
+      // MEMBER (from team) grants datasets:manage via union
+      expect(result).toBe(true);
     });
 
-    it("does not apply the project-level override to a different project in the same team", async () => {
-      await prisma.roleBinding.createMany({
-        data: [
-          {
-            organizationId: org.id,
-            userId: alice.id,
-            role: TeamUserRole.MEMBER,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamA.id,
-          },
-          {
-            organizationId: org.id,
-            userId: alice.id,
-            role: TeamUserRole.VIEWER,
-            scopeType: RoleBindingScopeType.PROJECT,
-            scopeId: prodProject.id,
-          },
-        ],
+    it("does not grant access from a binding on a different project", async () => {
+      // VIEWER at prodProject only — devProject is not an ancestor scope of prodProject
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: org.id,
+          userId: alice.id,
+          role: TeamUserRole.VIEWER,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: prodProject.id,
+        },
       });
 
       const scope: ScopeRef = {
@@ -213,17 +210,18 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
         scope,
+        permission: "analytics:view",
       });
 
-      expect(result?.role).toBe(TeamUserRole.MEMBER);
+      expect(result).toBe(false);
     });
 
-    it("grants ADMIN access everywhere when an org-level ADMIN binding exists", async () => {
+    it("grants team:manage via org-level ADMIN binding when checking a project scope", async () => {
       await prisma.roleBinding.create({
         data: {
           organizationId: org.id,
@@ -239,17 +237,18 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
         scope,
+        permission: "team:manage",
       });
 
-      expect(result?.role).toBe(TeamUserRole.ADMIN);
+      expect(result).toBe(true);
     });
 
-    it("returns null when the user only has a binding on a different team", async () => {
+    it("denies access when user only has a binding on a different team", async () => {
       await prisma.roleBinding.create({
         data: {
           organizationId: org.id,
@@ -265,14 +264,15 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: carol.id,
         organizationId: org.id,
         scope,
+        permission: "analytics:view",
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe(false);
     });
   });
 
@@ -281,7 +281,7 @@ describe("resolveEffectiveRole() integration", () => {
   // ──────────────────────────────────────────────────────────────────────────
 
   describe("when resolving group-expanded bindings", () => {
-    it("returns group binding role when user is a member of the group", async () => {
+    it("grants analytics:view to user via group VIEWER binding at project scope", async () => {
       const group = await prisma.group.create({
         data: {
           organizationId: org.id,
@@ -307,17 +307,18 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
         scope,
+        permission: "analytics:view",
       });
 
-      expect(result?.role).toBe(TeamUserRole.VIEWER);
+      expect(result).toBe(true);
     });
 
-    it("resolves to highest role when user is in multiple groups with different roles at the same scope", async () => {
+    it("grants datasets:manage when user is in multiple groups and one grants MEMBER at the same scope", async () => {
       const groupViewer = await prisma.group.create({
         data: {
           organizationId: org.id,
@@ -358,17 +359,20 @@ describe("resolveEffectiveRole() integration", () => {
       });
 
       const scope: ScopeRef = { type: "team", id: teamA.id };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
         scope,
+        permission: "datasets:manage",
       });
 
-      expect(result?.role).toBe(TeamUserRole.MEMBER);
+      // Union: MEMBER (groupMember) grants datasets:manage
+      expect(result).toBe(true);
     });
 
-    it("applies most-specific scope when group bindings exist at both team and project level", async () => {
+    it("unions permissions from group bindings at different scope levels", async () => {
+      // MEMBER via team-group + VIEWER via prod-group — union grants datasets:manage at prodProject
       const teamGroup = await prisma.group.create({
         data: {
           organizationId: org.id,
@@ -413,14 +417,16 @@ describe("resolveEffectiveRole() integration", () => {
         id: prodProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
         scope,
+        permission: "datasets:manage",
       });
 
-      expect(result?.role).toBe(TeamUserRole.VIEWER);
+      // MEMBER (teamGroup at team scope) grants datasets:manage via union
+      expect(result).toBe(true);
     });
   });
 
@@ -429,7 +435,7 @@ describe("resolveEffectiveRole() integration", () => {
   // ──────────────────────────────────────────────────────────────────────────
 
   describe("when falling back to TeamUser during migration", () => {
-    it("uses TeamUser when no RoleBinding exists for the user", async () => {
+    it("grants analytics:view via TeamUser when no RoleBinding exists for the user", async () => {
       await prisma.teamUser.create({
         data: {
           userId: alice.id,
@@ -443,20 +449,18 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
         scope,
+        permission: "analytics:view",
       });
 
-      expect(result).toMatchObject({
-        role: TeamUserRole.MEMBER,
-        fromFallback: true,
-      });
+      expect(result).toBe(true);
     });
 
-    it("uses RoleBinding and ignores TeamUser when both exist", async () => {
+    it("ignores TeamUser and uses RoleBinding only when both exist — denies team:manage for VIEWER binding despite ADMIN TeamUser", async () => {
       await prisma.teamUser.create({
         data: {
           userId: alice.id,
@@ -479,39 +483,40 @@ describe("resolveEffectiveRole() integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
         scope,
+        permission: "team:manage",
       });
 
-      expect(result).toMatchObject({
-        role: TeamUserRole.VIEWER,
-        fromFallback: false,
-      });
+      // RoleBinding (VIEWER) exists → TeamUser fallback is skipped.
+      // VIEWER does not grant team:manage.
+      expect(result).toBe(false);
     });
 
-    it("returns null when there are no RoleBindings and no TeamUser", async () => {
+    it("denies access when there are no RoleBindings and no TeamUser", async () => {
       const scope: ScopeRef = {
         type: "project",
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await resolveEffectiveRole({
+      const result = await checkRoleBindingPermission({
         prisma,
         userId: carol.id,
         organizationId: org.id,
         scope,
+        permission: "analytics:view",
       });
 
-      expect(result).toBeNull();
+      expect(result).toBe(false);
     });
   });
 });
 
 // ============================================================================
-// checkRoleBindingPermission() integration
+// checkRoleBindingPermission() — permission mapping
 // ============================================================================
 
 describe("checkRoleBindingPermission() integration", () => {
