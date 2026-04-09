@@ -180,7 +180,7 @@ jobs:
           POSTGRES_PASSWORD: ci_password
           POSTGRES_DB: langwatch_test
         options: >-
-          --health-cmd "pg_isready -U langwatch_ci"
+          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
