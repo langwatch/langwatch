@@ -24673,8 +24673,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # Remove clickhouse from depends_on
 ```
+
+Then remove the `clickhouse` service definition from the file.
 
 ## Limitations
 
@@ -27224,15 +27225,6 @@ openapi: post /langevals/valid_format/evaluate
 ---
 ---
 
-# FILE: ./api-reference/prompts/create-prompt.mdx
-
----
-title: "Create prompt"
-openapi: "POST /api/prompts"
----
-
----
-
 # FILE: ./api-reference/prompts/create-prompt-version.mdx
 
 ---
@@ -27242,11 +27234,29 @@ openapi: "POST /api/prompts/{id}/versions"
 
 ---
 
+# FILE: ./api-reference/prompts/create-prompt.mdx
+
+---
+title: "Create prompt"
+openapi: "POST /api/prompts"
+---
+
+---
+
 # FILE: ./api-reference/prompts/delete-prompt.mdx
 
 ---
 title: "Delete prompt"
 openapi: "DELETE /api/prompts/{id}"
+---
+
+---
+
+# FILE: ./api-reference/prompts/get-prompt-versions.mdx
+
+---
+title: "Get prompt versions"
+openapi: "GET /api/prompts/{id}/versions"
 ---
 
 ---
@@ -27265,15 +27275,6 @@ openapi: "GET /api/prompts/{id}"
 ---
 title: "Get prompts"
 openapi: "GET /api/prompts"
----
-
----
-
-# FILE: ./api-reference/prompts/get-prompt-versions.mdx
-
----
-title: "Get prompt versions"
-openapi: "GET /api/prompts/{id}/versions"
 ---
 
 ---

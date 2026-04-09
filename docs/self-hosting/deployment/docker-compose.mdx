@@ -138,8 +138,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      # Remove clickhouse from depends_on
 ```
+
+Then remove the `clickhouse` service definition from the file.
 
 ## Limitations
 
