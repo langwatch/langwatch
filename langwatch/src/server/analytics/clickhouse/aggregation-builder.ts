@@ -711,6 +711,16 @@ function buildArrayJoinTimeseriesQuery(
     `${ts}.TotalCompletionTokenCount AS trace_completion_tokens`,
   );
 
+  // Include evaluation columns in CTE when evaluation metrics are used
+  const es = tableAliases.evaluation_runs;
+  const metricExprs = simpleMetrics.map((m) => m.selectExpression);
+  const referencedEvalCols = extractReferencedEvaluationColumns(metricExprs);
+  for (const col of referencedEvalCols) {
+    cteSelectExprs.push(
+      `${es}.${col} AS eval_${col.toLowerCase()}`,
+    );
+  }
+
   // Build outer SELECT expressions
   const outerSelectExprs: string[] = ["period"];
   if (dateTrunc) {
@@ -1446,6 +1456,29 @@ function transformMetricForDedup(
       const result = hasCoalesce ? `coalesce(${transformed}, 0)` : transformed;
       return `${result} AS ${alias}`;
     }
+  }
+
+  // Handle evaluation metrics that reference evaluation_runs columns (es.Passed, es.Score, etc.)
+  // Replace table-qualified references with CTE column aliases so the outer SELECT is valid.
+  const es = tableAliases.evaluation_runs;
+  if (selectExpression.includes(`${es}.`)) {
+    let rewritten = selectExpression;
+    for (const col of [
+      "EvaluatorId",
+      "EvaluatorName",
+      "EvaluatorType",
+      "Score",
+      "Passed",
+      "Label",
+      "Status",
+      "IsGuardrail",
+    ]) {
+      rewritten = rewritten.replaceAll(
+        `${es}.${col}`,
+        `eval_${col.toLowerCase()}`,
+      );
+    }
+    return rewritten;
   }
 
   // Handle event-based metrics that reference stored_spans columns (ss."Events.Name", etc.)
