@@ -1,6 +1,8 @@
 import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { generate } from "@langwatch/ksuid";
 import { UserService } from "../users/user.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   ScimUser,
   ScimListResponse,
@@ -61,6 +63,7 @@ export class ScimService {
         });
         await this.prisma.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             organizationId,
             userId: existingUser.id,
             role: TeamUserRole.MEMBER,

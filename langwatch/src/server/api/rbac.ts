@@ -8,7 +8,6 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
-import { resolveHighestRole } from "~/server/scim/scim-role-resolver";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -482,28 +481,28 @@ export const checkOrganizationPermission =
 // ROLE BINDING RESOLUTION
 // ============================================================================
 
-const SCOPE_PRIORITY: Record<RoleBindingScopeType, number> = {
-  [RoleBindingScopeType.PROJECT]: 2,
-  [RoleBindingScopeType.TEAM]: 1,
-  [RoleBindingScopeType.ORGANIZATION]: 0,
-};
-
 /**
- * Resolves the effective role for a user at a set of scopes by checking
- * RoleBindings (direct + via group membership). Returns the most-specific
- * binding found, or null if no bindings exist.
+ * Checks whether any of the user's RoleBindings at the given scopes grants the
+ * requested permission. All matching bindings are evaluated and their permission
+ * sets are unioned — a user is permitted if ANY binding grants the permission.
+ *
+ * Falls back to the legacy TeamUser table when no RoleBindings exist.
  */
-async function resolveRoleFromBindings({
+async function checkPermissionFromBindings({
   prisma,
   userId,
   organizationId,
   scopes,
+  organizationRole,
+  permission,
 }: {
   prisma: PrismaClient;
   userId: string;
   organizationId: string;
   scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
-}): Promise<{ role: TeamUserRole; customRoleId: string | null } | null> {
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+}): Promise<boolean> {
   const scopeIds = scopes.map((s) => s.scopeId);
 
   // Fetch groups the user belongs to in this org
@@ -513,7 +512,7 @@ async function resolveRoleFromBindings({
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  // Fetch all matching RoleBindings for this user (direct + via groups)
+  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes
   const bindings = await prisma.roleBinding.findMany({
     where: {
       organizationId,
@@ -523,12 +522,7 @@ async function resolveRoleFromBindings({
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
-    select: {
-      scopeType: true,
-      scopeId: true,
-      role: true,
-      customRoleId: true,
-    },
+    select: { role: true, customRoleId: true },
   });
 
   if (bindings.length === 0) {
@@ -536,39 +530,41 @@ async function resolveRoleFromBindings({
     const teamScope = scopes.find(
       (s) => s.scopeType === RoleBindingScopeType.TEAM,
     );
-    if (!teamScope) return null;
+    if (!teamScope) return false;
 
     const teamUser = await prisma.teamUser.findFirst({
       where: { userId, teamId: teamScope.scopeId },
       select: { role: true, assignedRoleId: true },
     });
 
-    if (!teamUser) return null;
-    return { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null };
+    if (!teamUser) return false;
+    return resolveBindingPermission(
+      { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
+      organizationRole,
+      permission,
+      prisma,
+    );
   }
 
-  // Collect all bindings at the highest scope priority, then pick the highest role
-  const maxPriority = Math.max(
-    ...bindings.map((b) => SCOPE_PRIORITY[b.scopeType] ?? 0),
-  );
-  const bestBindings = bindings.filter(
-    (b) => (SCOPE_PRIORITY[b.scopeType] ?? 0) === maxPriority,
-  );
-  const highest = resolveHighestRole(bestBindings.map((b) => b.role));
-  const customRoleId =
-    highest === TeamUserRole.CUSTOM
-      ? (bestBindings.find(
-          (b) => b.role === TeamUserRole.CUSTOM && b.customRoleId,
-        )?.customRoleId ?? null)
-      : null;
+  // Union permissions across ALL matching bindings — permitted if any grants it
+  for (const binding of bindings) {
+    const permitted = await resolveBindingPermission(
+      binding,
+      organizationRole,
+      permission,
+      prisma,
+    );
+    if (permitted) return true;
+  }
 
-  return { role: highest, customRoleId };
+  return false;
 }
 
 /**
- * Resolve role permission from a binding result, respecting EXTERNAL restrictions.
+ * Checks whether a single binding grants the requested permission,
+ * respecting EXTERNAL user restrictions and custom role permission lists.
  */
-async function resolvePermissionFromBinding(
+async function resolveBindingPermission(
   binding: { role: TeamUserRole; customRoleId: string | null },
   organizationRole: OrganizationUserRole | null,
   permission: Permission,
@@ -642,8 +638,7 @@ export async function resolveProjectPermission(
     return { permitted: false, organizationRole };
   }
 
-  // ── Try RoleBindings first (PROJECT > TEAM > ORG priority) ──
-  const binding = await resolveRoleFromBindings({
+  const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
     userId: ctx.session.user.id,
     organizationId,
@@ -652,16 +647,11 @@ export async function resolveProjectPermission(
       { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
       { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
     ],
+    organizationRole,
+    permission,
   });
 
-  if (binding) {
-    return {
-      permitted: await resolvePermissionFromBinding(binding, organizationRole, permission, ctx.prisma),
-      organizationRole,
-    };
-  }
-
-  return { permitted: false, organizationRole };
+  return { permitted, organizationRole };
 }
 
 /**
@@ -709,8 +699,7 @@ export async function resolveTeamPermission(
     return { permitted: true, organizationRole };
   }
 
-  // ── Try RoleBindings first (TEAM > ORG priority) ──
-  const binding = await resolveRoleFromBindings({
+  const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
     userId: ctx.session.user.id,
     organizationId: team.organizationId,
@@ -718,16 +707,11 @@ export async function resolveTeamPermission(
       { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
       { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: team.organizationId },
     ],
+    organizationRole,
+    permission,
   });
 
-  if (binding) {
-    return {
-      permitted: await resolvePermissionFromBinding(binding, organizationRole, permission, ctx.prisma),
-      organizationRole,
-    };
-  }
-
-  return { permitted: false, organizationRole };
+  return { permitted, organizationRole };
 }
 
 /**

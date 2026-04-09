@@ -1,6 +1,8 @@
 import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -130,6 +132,7 @@ export const roleBindingRouter = createTRPCRouter({
 
       return ctx.prisma.roleBinding.create({
         data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId: input.organizationId,
           userId: input.userId ?? null,
           groupId: input.groupId ?? null,

@@ -5,6 +5,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
  * Derives create params from Prisma schema, omitting auto-generated fields
@@ -104,6 +106,7 @@ export class RoleRepository {
       });
       await tx.roleBinding.create({
         data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId: team.organizationId,
           userId,
           role: TeamUserRole.CUSTOM,
@@ -132,6 +135,7 @@ export class RoleRepository {
       });
       await tx.roleBinding.create({
         data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId: team.organizationId,
           userId,
           role: TeamUserRole.VIEWER,

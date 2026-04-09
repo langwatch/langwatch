@@ -7,8 +7,10 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import type { Session } from "next-auth";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -211,6 +213,7 @@ export const projectRouter = createTRPCRouter({
 
         await prisma.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             organizationId: input.organizationId,
             userId: userId,
             role: TeamUserRole.ADMIN,

@@ -1,7 +1,9 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
@@ -407,6 +409,7 @@ export const teamRouter = createTRPCRouter({
         for (const member of rbToAdd) {
           await tx.roleBinding.create({
             data: {
+              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
               organizationId,
               userId: member.userId,
               role: isCustomRole(member.role) ? TeamUserRole.CUSTOM : (member.role as TeamUserRole),
@@ -545,6 +548,7 @@ export const teamRouter = createTRPCRouter({
 
           await tx.roleBinding.create({
             data: {
+              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
               organizationId: input.organizationId,
               userId: member.userId,
               role: memberRole,

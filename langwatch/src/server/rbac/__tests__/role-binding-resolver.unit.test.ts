@@ -92,7 +92,7 @@ describe("resolveEffectiveRole()", () => {
       });
     });
 
-    it("returns project-level role when project binding overrides team binding", async () => {
+    it("returns highest role across all matching ancestor bindings (permissions are unioned)", async () => {
       const prisma = makePrisma({
         directBindings: [
           {
@@ -117,7 +117,8 @@ describe("resolveEffectiveRole()", () => {
         scope: projectScope,
       });
 
-      expect(result?.role).toBe(TeamUserRole.VIEWER);
+      // All ancestor-scope bindings are unioned — MEMBER > VIEWER
+      expect(result?.role).toBe(TeamUserRole.MEMBER);
     });
 
     it("returns ADMIN for org-level ADMIN binding regardless of scope", async () => {
@@ -239,7 +240,7 @@ describe("resolveEffectiveRole()", () => {
   });
 
   describe("when a group binding at project scope overrides a team-level binding", () => {
-    it("resolves to the project-level binding (most specific wins)", async () => {
+    it("returns highest role across all ancestor-scope group bindings (permissions are unioned)", async () => {
       const prisma = makePrisma({
         groupBindings: [
           {
@@ -264,7 +265,8 @@ describe("resolveEffectiveRole()", () => {
         scope: projectScope,
       });
 
-      expect(result?.role).toBe(TeamUserRole.VIEWER);
+      // All ancestor-scope bindings are unioned — MEMBER > VIEWER
+      expect(result?.role).toBe(TeamUserRole.MEMBER);
     });
   });
 

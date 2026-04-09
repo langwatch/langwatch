@@ -57,20 +57,68 @@ function ancestorScopes(
 // ============================================================================
 
 /**
- * Resolves the effective role a user has at a given scope by walking
- * RoleBinding records (direct + via group membership).
+ * Collects all RoleBindings for a user that are relevant to the given scope
+ * (i.e. at any ancestor scope: project → team → org).
  *
- * Resolution rules:
- * 1. Collect all RoleBindings for the user (direct) and all groups the user
- *    belongs to (expanded).
- * 2. Walk scopes from most-specific to least-specific. The first scope that
- *    has at least one binding wins. Multiple bindings at the same winning
- *    scope are resolved to the highest role.
- * 3. ORG-level ADMIN bindings always grant access regardless of scope.
- * 4. If no RoleBinding exists at any scope, falls back to the legacy TeamUser
- *    table. This fallback is removed once migration is complete.
+ * Falls back to the legacy TeamUser table only when the user has NO RoleBindings
+ * in the org at all (migration guard — prevents privilege escalation when a user
+ * has bindings for some teams but not the one being checked).
  *
- * Returns null if the user has no access at any scope.
+ * @internal — use checkRoleBindingPermission for access-control decisions.
+ */
+async function collectBindingsForScope({
+  prisma,
+  userId,
+  organizationId,
+  scope,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  scope: ScopeRef;
+}): Promise<Array<{ role: TeamUserRole; customRoleId: string | null; fromFallback: boolean }>> {
+  // Fetch ALL bindings for the user in this org (no scope filter) so we can
+  // decide whether to fall back to TeamUser.
+  const [directBindings, groupBindings] = await Promise.all([
+    prisma.roleBinding.findMany({
+      where: { organizationId, userId },
+      select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
+    }),
+    prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        group: { members: { some: { userId } } },
+      },
+      select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
+    }),
+  ]);
+
+  const allOrgBindings = [...directBindings, ...groupBindings];
+
+  // If the user has NO bindings in this org at all, fall back to TeamUser
+  if (allOrgBindings.length === 0) {
+    const fallback = await resolveLegacyFallback({ prisma, userId, organizationId, scope });
+    return fallback ? [{ ...fallback }] : [];
+  }
+
+  // Filter to bindings at ancestor scopes of the requested scope
+  const ancestorScopeList = ancestorScopes(scope);
+  if (scope.type !== "org") {
+    ancestorScopeList.push({ type: RoleBindingScopeType.ORGANIZATION, id: organizationId });
+  }
+
+  const matching = allOrgBindings.filter((b) =>
+    ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId),
+  );
+
+  return matching.map((b) => ({ role: b.role, customRoleId: b.customRoleId, fromFallback: false }));
+}
+
+/**
+ * @deprecated Prefer checkRoleBindingPermission — there is no single
+ * "effective role" when a user holds multiple bindings. This function
+ * returns the highest built-in role across all matching bindings as a
+ * best-effort approximation (used by migration tooling only).
  */
 export async function resolveEffectiveRole({
   prisma,
@@ -83,87 +131,17 @@ export async function resolveEffectiveRole({
   organizationId: string;
   scope: ScopeRef;
 }): Promise<ResolvedRole | null> {
-  // ── 1. Fetch all RoleBindings for this user in this org (direct + via groups) ──
-  const [directBindings, groupBindings] = await Promise.all([
-    prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: {
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
-    }),
-    prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        group: { members: { some: { userId } } },
-      },
-      select: {
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
-    }),
-  ]);
+  const bindings = await collectBindingsForScope({ prisma, userId, organizationId, scope });
+  if (bindings.length === 0) return null;
 
-  const allBindings = [...directBindings, ...groupBindings];
+  const fromFallback = bindings.some((b) => b.fromFallback);
+  const highest = resolveHighestRole(bindings.map((b) => b.role));
+  const customRoleId =
+    highest === TeamUserRole.CUSTOM
+      ? (bindings.find((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)?.customRoleId ?? null)
+      : null;
 
-  // If no RoleBindings exist for this user at all, fall back to TeamUser
-  if (allBindings.length === 0) {
-    return resolveLegacyFallback({ prisma, userId, organizationId, scope });
-  }
-
-  // ── 2. Check org-level ADMIN binding — always grants full access ──
-  const orgAdminBinding = allBindings.find(
-    (b) =>
-      b.scopeType === RoleBindingScopeType.ORGANIZATION &&
-      b.scopeId === organizationId &&
-      b.role === TeamUserRole.ADMIN,
-  );
-  if (orgAdminBinding) {
-    return {
-      role: TeamUserRole.ADMIN,
-      customRoleId: orgAdminBinding.customRoleId,
-      fromFallback: false,
-    };
-  }
-
-  // ── 3. Walk scopes most-specific → least-specific ──
-  const scopes = ancestorScopes(scope);
-
-  // Also include org scope as last resort (non-admin org bindings)
-  if (scope.type !== "org") {
-    scopes.push({
-      type: RoleBindingScopeType.ORGANIZATION,
-      id: organizationId,
-    });
-  }
-
-  for (const { type, id } of scopes) {
-    const matchingBindings = allBindings.filter(
-      (b) => b.scopeType === type && b.scopeId === id,
-    );
-
-    if (matchingBindings.length === 0) continue;
-
-    // Multiple bindings at same scope → pick highest role
-    const roles = matchingBindings.map((b) => b.role);
-    const highest = resolveHighestRole(roles);
-
-    // For CUSTOM role, find the associated customRoleId (prefer direct binding)
-    const customRoleId =
-      highest === TeamUserRole.CUSTOM
-        ? (matchingBindings.find(
-            (b) => b.role === TeamUserRole.CUSTOM && b.customRoleId,
-          )?.customRoleId ?? null)
-        : null;
-
-    return { role: highest, customRoleId, fromFallback: false };
-  }
-
-  return null;
+  return { role: highest, customRoleId, fromFallback };
 }
 
 // ============================================================================
@@ -215,10 +193,11 @@ async function resolveLegacyFallback({
 // ============================================================================
 
 /**
- * Checks whether a user has a specific permission at a given scope,
- * taking into account the resolved role and any custom role permissions.
+ * Checks whether a user has a specific permission at a given scope.
  *
- * Returns false if the user has no binding at the requested scope.
+ * All matching bindings across ancestor scopes are evaluated and their
+ * permission sets are unioned — the user is permitted if ANY binding grants
+ * the requested permission.
  */
 export async function checkRoleBindingPermission({
   prisma,
@@ -233,29 +212,28 @@ export async function checkRoleBindingPermission({
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  const resolved = await resolveEffectiveRole({
-    prisma,
-    userId,
-    organizationId,
-    scope,
-  });
+  const bindings = await collectBindingsForScope({ prisma, userId, organizationId, scope });
 
-  if (!resolved) return false;
-
-  // Custom role — look up its permissions
-  if (resolved.role === TeamUserRole.CUSTOM && resolved.customRoleId) {
-    const customRole = await prisma.customRole.findUnique({
-      where: { id: resolved.customRoleId },
-      select: { permissions: true },
-    });
-    const perms = Array.isArray(customRole?.permissions)
-      ? (customRole.permissions as string[])
-      : [];
-    if (perms.length > 0) {
-      return hasPermissionWithHierarchy(perms, permission);
+  for (const binding of bindings) {
+    // Custom role — look up its permissions
+    if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
+      const customRole = await prisma.customRole.findUnique({
+        where: { id: binding.customRoleId },
+        select: { permissions: true },
+      });
+      const perms = Array.isArray(customRole?.permissions)
+        ? (customRole.permissions as string[])
+        : [];
+      if (perms.length > 0 && hasPermissionWithHierarchy(perms, permission)) {
+        return true;
+      }
+      // Empty custom role — fall through to built-in VIEWER check below
     }
-    // Empty custom role — fall through to built-in VIEWER
+
+    if (teamRoleHasPermission(binding.role, permission)) {
+      return true;
+    }
   }
 
-  return teamRoleHasPermission(resolved.role, permission);
+  return false;
 }

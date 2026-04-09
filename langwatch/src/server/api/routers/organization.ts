@@ -6,6 +6,8 @@ import {
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -995,6 +997,7 @@ export const organizationRouter = createTRPCRouter({
           });
           await prisma.roleBinding.create({
             data: {
+              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
               organizationId: invite.organizationId,
               userId: session.user.id,
               role: invite.role as unknown as TeamUserRole,
@@ -1099,6 +1102,7 @@ export const organizationRouter = createTRPCRouter({
             });
             await prisma.roleBinding.create({
               data: {
+                id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
                 organizationId: invite.organizationId,
                 userId: member.userId,
                 role: member.role,

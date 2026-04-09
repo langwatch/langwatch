@@ -2,6 +2,8 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { Account, Organization } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { compare } from "bcrypt";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type { GetServerSidePropsContext, NextApiRequest } from "next";
 import type { NextRequest } from "next/server";
 import {
@@ -389,6 +391,7 @@ const createUserAndAddToOrganization = async (
 
   await prisma.roleBinding.create({
     data: {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
       organizationId: organization.id,
       userId: newUser.id,
       role: TeamUserRole.MEMBER,

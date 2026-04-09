@@ -1,6 +1,7 @@
 import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { generate } from "@langwatch/ksuid";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
@@ -9,6 +10,7 @@ import { checkOrganizationPermission } from "../rbac";
 import { assertScopeInOrg } from "./roleBinding";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 async function resolveScopeNames(
   prisma: PrismaClient,
@@ -192,12 +194,13 @@ export const groupRouter = createTRPCRouter({
         const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
 
         const group = await tx.group.create({
-          data: { organizationId: input.organizationId, name: input.name, slug },
+          data: { id: generate(KSUID_RESOURCES.GROUP).toString(), organizationId: input.organizationId, name: input.name, slug },
         });
 
         if (input.bindings?.length) {
           await tx.roleBinding.createMany({
             data: input.bindings.map((b) => ({
+              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
               organizationId: input.organizationId,
               groupId: group.id,
               role: b.role,
@@ -250,6 +253,7 @@ export const groupRouter = createTRPCRouter({
 
       return ctx.prisma.roleBinding.create({
         data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId: input.organizationId,
           groupId: input.groupId,
           role: input.role,

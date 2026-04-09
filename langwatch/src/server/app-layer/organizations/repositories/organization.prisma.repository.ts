@@ -8,8 +8,10 @@ import {
   type PrismaClient,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { generate } from "@langwatch/ksuid";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { encrypt } from "~/utils/encryption";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   isTeamRoleAllowedForOrganizationRole,
   type TeamRoleValue,
@@ -212,6 +214,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
       await tx.roleBinding.create({
         data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId: organization.id,
           userId: input.userId,
           role: TeamUserRole.ADMIN,
@@ -222,6 +225,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
       await tx.roleBinding.create({
         data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
           organizationId: organization.id,
           userId: input.userId,
           role: TeamUserRole.ADMIN,
@@ -505,6 +509,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
         await tx.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             organizationId,
             userId,
             role: role as unknown as TeamUserRole,
@@ -644,6 +649,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
         await tx.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             organizationId,
             userId,
             role: nextRole,
@@ -783,6 +789,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
         await tx.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             organizationId: team.organizationId,
             userId,
             role: TeamUserRole.CUSTOM,
@@ -912,6 +919,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
         await tx.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
             organizationId: team.organizationId,
             userId,
             role: role as TeamUserRole,

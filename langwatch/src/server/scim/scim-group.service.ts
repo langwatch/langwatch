@@ -1,5 +1,7 @@
 import { type Group, type PrismaClient } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { slugify } from "~/utils/slugify";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   ScimCreateGroupRequest,
   ScimError,
@@ -104,6 +106,7 @@ export class ScimGroupService {
     const slug = await this.uniqueSlug(organizationId, request.displayName);
     const group = await this.prisma.group.create({
       data: {
+        id: generate(KSUID_RESOURCES.GROUP).toString(),
         organizationId,
         name: request.displayName,
         slug,
