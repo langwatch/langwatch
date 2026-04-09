@@ -162,6 +162,11 @@ jobs:
         run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
+        env:
+          # Migrations already ran in earlier steps; skip them during pnpm start
+          SKIP_PRISMA_MIGRATE: "true"
+          SKIP_ELASTIC_MIGRATE: "true"
+          SKIP_CLICKHOUSE_MIGRATE: "true"
         run: |
           # Start the app in background
           cd langwatch && PORT=5570 pnpm start &
