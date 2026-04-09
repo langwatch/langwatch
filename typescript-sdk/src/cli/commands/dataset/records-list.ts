@@ -5,7 +5,7 @@ import {
   DatasetNotFoundError,
 } from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatTable } from "../../utils/format";
+import { formatTable } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
 
 /**
@@ -77,7 +77,7 @@ export const recordsListCommand = async (
     });
 
     console.log();
-    formatTable(tableData, headers, { ID: chalk.gray });
+    formatTable({ data: tableData, headers, colorMap: { ID: chalk.gray } });
 
     console.log();
     console.log(

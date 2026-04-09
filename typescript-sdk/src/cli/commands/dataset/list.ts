@@ -45,8 +45,10 @@ export const listCommand = async (): Promise<void> => {
       Updated: ds.updatedAt ? formatRelativeTime(ds.updatedAt) : "N/A",
     }));
 
-    formatTable(tableData, ["Name", "Slug", "Records", "Updated"], {
-      Name: (s: string) => chalk.cyan(s),
+    formatTable({
+      data: tableData,
+      headers: ["Name", "Slug", "Records", "Updated"],
+      colorMap: { Name: chalk.cyan },
     });
 
     if (pagination.totalPages > 1) {

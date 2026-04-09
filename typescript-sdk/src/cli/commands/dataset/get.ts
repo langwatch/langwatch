@@ -75,7 +75,7 @@ export const getCommand = async (slugOrId: string): Promise<void> => {
         return row;
       });
 
-      formatTable(tableData, headers);
+      formatTable({ data: tableData, headers });
 
       if (dataset.entries.length > 10) {
         console.log(
