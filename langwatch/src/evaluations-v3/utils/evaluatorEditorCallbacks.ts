@@ -69,5 +69,5 @@ export const createEvaluatorEditorCallbacks = ({
     // Only update localEvaluatorConfig for tracking unsaved changes
     updateTarget(targetId, { localEvaluatorConfig: localConfig });
   },
-  ...(onMappingChange ? { onMappingChange } : {}),
+  onMappingChange,
 });
