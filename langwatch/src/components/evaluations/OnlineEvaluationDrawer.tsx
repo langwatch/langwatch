@@ -635,6 +635,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
+      onMappingChange: handleMappingChange,
     };
 
     setFlowCallbacks("evaluatorEditor", {
@@ -688,6 +689,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         const newMappingsConfig: EvaluatorMappingsConfig = {
           level: level ?? undefined,
           initialMappings: autoMappings,
+          onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
@@ -709,6 +711,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
+      onMappingChange: handleMappingChange,
     };
 
     // Open the evaluator editor directly - use default "Save Changes" text
@@ -764,6 +767,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       const mappingsConfig: EvaluatorMappingsConfig = {
         level: level ?? undefined,
         initialMappings: autoMappings,
+        onMappingChange: handleMappingChange,
       };
 
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)

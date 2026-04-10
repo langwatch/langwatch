@@ -76,13 +76,8 @@ export type EvaluatorMappingsConfig = {
   availableSources?: AvailableSource[];
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
-  /**
-   * Callback when a mapping changes - used to persist to store.
-   * Optional here — callers should pass onMappingChange via setFlowCallbacks()
-   * so it persists across drawer navigation. Kept for non-drawer consumers
-   * (e.g., EvaluatorPropertiesPanel) that pass mappingsConfig directly.
-   */
-  onMappingChange?: (
+  /** Callback when a mapping changes - used to persist to store */
+  onMappingChange: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;

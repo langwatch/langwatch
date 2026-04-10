@@ -142,17 +142,15 @@ export function EvaluatorEditorContent({
           </VStack>
         )}
 
-        {/* No settings message - only for non-workflow evaluators with no settings and no active mappings */}
-        {!hasSettings &&
-          (!mappingsConfig || !mappingsConfig.onMappingChange) &&
-          !isWorkflowEvaluator && (
+        {/* No settings message - only for non-workflow evaluators with no settings and no mappings */}
+        {!hasSettings && !mappingsConfig && !isWorkflowEvaluator && (
           <Text fontSize="sm" color="fg.muted">
             This evaluator does not have any settings to configure.
           </Text>
         )}
 
-        {/* Mappings section - shown when caller provides mappingsConfig with onMappingChange */}
-        {mappingsConfig && mappingsConfig.onMappingChange && (
+        {/* Mappings section - shown when caller provides mappingsConfig */}
+        {mappingsConfig && (
           <Box>
             <EvaluatorMappingsSection
               evaluatorDef={effectiveEvaluatorDef}
