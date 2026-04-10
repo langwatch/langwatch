@@ -13805,13 +13805,11 @@ for r in records:
   ### TypeScript
 
 ```typescript
-const records = await langwatch.datasets.createRecords("my-dataset", {
-  entries: [
-    { input: "What is LangWatch?", output: "An LLM observability platform." },
-    { input: "How do I get started?", output: "Install the SDK and call setup()." },
-  ],
-});
-for (const r of records) {
+const records = await langwatch.datasets.createRecords("my-dataset", [
+  { input: "What is LangWatch?", output: "An LLM observability platform." },
+  { input: "How do I get started?", output: "Install the SDK and call setup()." },
+]);
+for (const r of records.data) {
   console.log(`Created record: ${r.id}`);
 }
 ```
@@ -13838,7 +13836,7 @@ print(f"Updated: {record.id} -> {record.entry}")
 
 ```typescript
 const record = await langwatch.datasets.updateRecord("my-dataset", "rec-1", {
-  entry: { input: "updated question", output: "updated answer" },
+  input: "updated question", output: "updated answer",
 });
 console.log(`Updated: ${record.id}`);
 ```
@@ -13863,9 +13861,7 @@ print(f"Deleted {deleted_count} records")
   ### TypeScript
 
 ```typescript
-const result = await langwatch.datasets.deleteRecords("my-dataset", {
-  recordIds: ["rec-1", "rec-2"],
-});
+const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
 console.log(`Deleted ${result.deletedCount} records`);
 ```
 
@@ -13902,26 +13898,28 @@ The `if_exists` parameter controls how conflicts are handled:
   ### TypeScript
 
 ```typescript
-const result = await langwatch.datasets.upload("my-dataset", {
-  filePath: "data.csv",
-});
+// Upload to existing or create new (default: append)
+const file = new File([csvContent], "data.csv", { type: "text/csv" });
+const result = await langwatch.datasets.upload("my-dataset", file);
 console.log(`Created ${result.recordsCreated} records`);
+
+// Replace all records (delete existing, then upload)
+await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
+
+// Error if dataset already exists (create-only)
+await langwatch.datasets.upload("my-dataset", file, { ifExists: "error" });
 ```
 
+The `ifExists` parameter controls how conflicts are handled:
+
+| Value | Behavior |
+|-------|----------|
+| `"append"` (default) | Append rows to the existing dataset, or create it if it doesn't exist |
+| `"replace"` | Delete all existing records first, then upload. Creates the dataset if it doesn't exist |
+| `"error"` | Throw an error if the dataset already exists. Creates it otherwise |
 
 
-### Create Dataset from File (TypeScript)
 
-In the TypeScript SDK, you can also create a new dataset from a file in one call:
-
-```typescript
-const result = await langwatch.datasets.createFromFile({
-  name: "From CSV",
-  filePath: "feedback.csv",
-});
-console.log(`Dataset: ${result.dataset.name} (${result.dataset.slug})`);
-console.log(`Records created: ${result.recordsCreated}`);
-```
 
 ## Using with Evaluations
 
