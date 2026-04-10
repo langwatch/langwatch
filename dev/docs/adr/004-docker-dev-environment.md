@@ -6,7 +6,7 @@
 
 ## Context
 
-Local development required running multiple services (postgres, redis, opensearch, NLP, workers, app) manually in separate terminals. Different developers need different service combinations:
+Local development required running multiple services (postgres, redis, clickhouse, NLP, workers, app) manually in separate terminals. Different developers need different service combinations:
 - Frontend work: just app + postgres + redis
 - Scenario development: + workers + bullboard + ai-server (scenario processing is part of workers)
 - Full stack: everything
@@ -21,8 +21,7 @@ We use Docker Compose with **profiles** for selective service startup, and an **
 
 | Profile | Services | Use Case |
 |---------|----------|----------|
-| (none) | postgres, redis, app | Minimal frontend dev |
-| search | + opensearch | Trace/search features |
+| (none) | postgres, redis, clickhouse, app | Minimal frontend dev |
 | nlp | + langwatch_nlp, langevals | Evaluations |
 | scenarios | + workers (includes scenarios), bullboard, ai-server, nlp | Scenario development |
 | full | Everything | Full integration |
@@ -50,11 +49,11 @@ The init container installs Linux-native dependencies into a named volume. All o
 
 ### Networking
 
-Internal services (postgres, redis, opensearch, nlp, langevals) have no host port exposure. They communicate via Docker network hostnames (`postgres:5432`, `redis:6379`). Only app, bullboard, and ai-server expose ports for browser access.
+Internal services (postgres, redis, clickhouse, nlp, langevals) have no host port exposure. They communicate via Docker network hostnames (`postgres:5432`, `redis:6379`, `clickhouse:8123`). Only app, bullboard, and ai-server expose ports for browser access.
 
 ### Environment Variables
 
-`ELASTICSEARCH_NODE_URL` comes from `.env`, not hardcoded in compose. This allows developers to use shared dev Elasticsearch instead of local opensearch when the search profile isn't needed.
+`CLICKHOUSE_URL` is set in the `x-common-env` anchor, pointing to the local ClickHouse container. `ELASTICSEARCH_NODE_URL` comes from `.env` for any remaining ES-compatible integrations.
 
 ### Resource Limits
 
