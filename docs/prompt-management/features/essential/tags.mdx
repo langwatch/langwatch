@@ -37,11 +37,15 @@ import { LangWatch } from "langwatch";
 const langwatch = new LangWatch();
 
 // Fetch the production version
-const prompt = await langwatch.prompts.get("pizza-prompt", { tag: "production" });
+const prompt = await langwatch.prompts.get("pizza-prompt", { label: "production" });
 
 // Fetch the staging version
-const staging = await langwatch.prompts.get("pizza-prompt", { tag: "staging" });
+const staging = await langwatch.prompts.get("pizza-prompt", { label: "staging" });
 ```
+
+<Note>
+  The TypeScript SDK uses `label` (not `tag`) in the options object. This maps to the same tag concept on the server.
+</Note>
 
 ### Python SDK
 
@@ -65,6 +69,14 @@ curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
 # Using shorthand syntax
 curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   "https://app.langwatch.ai/api/prompts/pizza-prompt:production"
+```
+
+### MCP Tools
+
+Use `platform_get_prompt` with the `tag` parameter to fetch a specific tagged version:
+
+```
+platform_get_prompt({ idOrHandle: "pizza-prompt", tag: "production" })
 ```
 
 ## Shorthand Syntax
@@ -115,6 +127,137 @@ Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_p
 <Note>
   Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected and cannot be renamed or deleted. `production` and `staging` are default seeded tags that can be renamed or deleted like any custom tag.
 </Note>
+
+## Tag Management via SDKs
+
+Both SDKs provide a `.tags` namespace for managing tags programmatically.
+
+### TypeScript SDK
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+// List all tags
+const tags = await langwatch.prompts.tags.list();
+
+// Create a new tag
+await langwatch.prompts.tags.create({ name: "canary" });
+
+// Assign a tag to a specific version
+await langwatch.prompts.tags.assign("pizza-prompt", {
+  label: "canary",
+  versionId: "version-abc123",
+});
+
+// Delete a tag
+await langwatch.prompts.tags.delete("canary");
+```
+
+<Warning>
+  The TypeScript SDK does not currently support `tags.rename()`. Use the REST API or Python SDK for renaming tags.
+</Warning>
+
+### Python SDK
+
+```python
+import langwatch
+
+# List all tags
+tags = langwatch.prompts.tags.list()
+
+# Create a new tag
+langwatch.prompts.tags.create("canary")
+
+# Assign a tag to a specific version
+langwatch.prompts.tags.assign("pizza-prompt", tag="canary", version_id="version-abc123")
+
+# Rename a tag
+langwatch.prompts.tags.rename("canary", new_name="canary-v2")
+
+# Delete a tag
+langwatch.prompts.tags.delete("canary")
+```
+
+## Assigning Tags at Create and Update Time
+
+You can assign tags when creating or updating prompts, so the version is tagged in a single operation.
+
+### TypeScript SDK
+
+```typescript
+// Create a prompt with initial tags
+await langwatch.prompts.create({
+  handle: "my-prompt",
+  messages: [{ role: "system", content: "You are a helpful assistant." }],
+  model: "gpt-5-mini",
+  tags: ["staging"],
+});
+
+// Update a prompt and reassign tags
+await langwatch.prompts.update("my-prompt", {
+  tags: ["production"],
+  commitMessage: "promote to production",
+});
+```
+
+### Python SDK
+
+```python
+# Create a prompt with initial tags
+langwatch.prompts.create(
+    handle="my-prompt",
+    messages=[{"role": "system", "content": "You are a helpful assistant."}],
+    tags=["staging"],
+)
+
+# Update a prompt and reassign tags
+langwatch.prompts.update(
+    "my-prompt",
+    scope="PROJECT",
+    tags=["production"],
+    commit_message="promote to production",
+)
+```
+
+### MCP Tools
+
+Tags can also be assigned during prompt creation and updates via MCP:
+
+```
+// Create with tags
+platform_create_prompt({
+  name: "My Prompt",
+  handle: "my-prompt",
+  messages: [...],
+  model: "gpt-5-mini",
+  tags: ["staging"]
+})
+
+// Update with tags
+platform_update_prompt({
+  idOrHandle: "my-prompt",
+  commitMessage: "promote to production",
+  tags: ["production"]
+})
+```
+
+## REST API Tag Endpoints
+
+Tag CRUD endpoints are **organization-scoped** (use an org-level API key). The assign endpoint is **project-scoped**.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/prompts/tags` | List all tags for the organization |
+| `POST` | `/api/prompts/tags` | Create a new tag (`{ "name": "canary" }`) |
+| `PUT` | `/api/prompts/tags/:tag` | Rename a tag (`{ "name": "new-name" }`) |
+| `DELETE` | `/api/prompts/tags/:tag` | Delete a tag (cascades removal from all versions) |
+| `PUT` | `/api/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
+
+## CLI
+
+CLI tag management is planned — see [issue #3090](https://github.com/langwatch/langwatch/issues/3090). Once available, you will be able to list, create, rename, delete, and assign tags from the command line.
 
 ## Common Workflows
 
