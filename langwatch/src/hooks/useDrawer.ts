@@ -53,7 +53,10 @@ export const setFlowCallbacks = <T extends DrawerType>(
   drawer: T,
   callbacks: DrawerCallbacks<T>,
 ) => {
-  flowCallbacks[drawer] = callbacks as Record<string, unknown>;
+  flowCallbacks[drawer] = {
+    ...flowCallbacks[drawer],
+    ...callbacks,
+  } as Record<string, unknown>;
 };
 
 /**
