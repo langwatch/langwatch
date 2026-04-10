@@ -105,9 +105,10 @@ jobs:
         options: >-
           --add-host host.docker.internal:host-gateway
           --health-cmd "curl -sf http://localhost:5561/ || exit 1"
-          --health-interval 10s
+          --health-interval 15s
           --health-timeout 10s
-          --health-retries 6
+          --health-retries 12
+          --health-start-period 30s
 
       langevals:
         image: langwatch/langevals:latest
@@ -117,9 +118,10 @@ jobs:
           DISABLE_EVALUATORS_PRELOAD: "true"
         options: >-
           --health-cmd "curl -sf http://localhost:5562/ || exit 1"
-          --health-interval 10s
+          --health-interval 15s
           --health-timeout 10s
-          --health-retries 6
+          --health-retries 12
+          --health-start-period 30s
 
     steps:
       - name: Checkout
