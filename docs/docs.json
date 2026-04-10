@@ -175,6 +175,7 @@
                   "prompt-management/scope",
                   "prompt-management/features/essential/analytics",
                   "prompt-management/features/essential/github-integration",
+                  "prompt-management/features/essential/tags",
                   "prompt-management/features/advanced/link-to-traces",
                   "prompt-management/features/advanced/optimization-studio",
                   "prompt-management/features/advanced/guaranteed-availability",
