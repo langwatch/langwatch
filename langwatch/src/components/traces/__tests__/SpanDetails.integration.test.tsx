@@ -316,4 +316,65 @@ describe("<SpanDetails/>", () => {
       expect(buttons).toHaveLength(0);
     });
   });
+
+  describe("when span has a tagged prompt reference in params", () => {
+    it("renders a dropdown menu trigger button", () => {
+      const span = buildLLMSpan({
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sample-prompt:production",
+            },
+          },
+        },
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SpanDetails project={project} span={span} />
+        </ChakraProvider>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+  });
+
+  describe("when tagged prompt reference is on parent span", () => {
+    it("renders a dropdown menu trigger button for tag-based ancestor reference", () => {
+      const parentSpan = buildLLMSpan({
+        span_id: "parent-span",
+        type: "span" as Span["type"],
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sample-prompt:production",
+            },
+          },
+        },
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[parentSpan, llmSpan]}
+          />
+        </ChakraProvider>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+  });
 });

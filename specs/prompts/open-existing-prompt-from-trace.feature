@@ -6,6 +6,7 @@ Feature: Open existing prompt from trace
   Background:
     Given a project with traced LLM calls
     And a prompt "team/sample-prompt" exists with versions 1, 2, and 3
+    And tag "production" is assigned to version 2 of "team/sample-prompt"
 
   # --- SDK attribute format ---
   # When a LangWatch prompt is used, the SDK sets:
@@ -172,3 +173,66 @@ Feature: Open existing prompt from trace
     And attribute "langwatch.prompt.version.number" = "2"
     When the getForPromptStudio API is called
     Then the response includes promptHandle "team/sample-prompt" and promptVersionNumber 2
+
+  # --- Tagged prompt reference (issue #2894) ---
+  # When a trace contains a prompt tag reference like "pizza-prompt:production",
+  # the playground should resolve the tag and open the tagged version.
+  #
+  # Note: tags are live pointers — opening by tag resolves at open-time, not
+  # trace-time. If the tag was reassigned after the trace was captured, the user
+  # sees the current tagged version, not the version that ran. This is accepted
+  # behavior for tags (use version numbers for exact reproducibility).
+
+  @unit
+  Scenario: Opens existing prompt at tagged version with variables applied
+    Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:production"
+    And the trace has variables name="Alice" and topic="AI"
+    When I choose "Open team/sample-prompt:production" from the menu
+    Then the Playground opens a tab with prompt "team/sample-prompt" at the version tagged "production"
+    And the playground variables are set to name="Alice" and topic="AI"
+    And the chat history from the trace is loaded
+
+  @unit
+  Scenario: Auto-detects open-existing action for tagged prompt reference
+    Given a traced LLM span has attribute "langwatch.prompt.id" = "team/sample-prompt:production"
+    When the playground determines the action for this span
+    Then the effective action is "open-existing"
+
+  @unit
+  Scenario: Tag-based open does not show version-not-found toast
+    Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:production"
+    When I choose "Open team/sample-prompt:production" from the menu
+    Then the Playground opens the prompt at the version tagged "production"
+    And no "version not found" toast is shown
+
+  @unit
+  Scenario: Button dropdown shows tag reference in menu option
+    Given a traced LLM span has attribute "langwatch.prompt.id" = "team/sample-prompt:production"
+    When I view the span details
+    Then the "Open in Prompts" button shows a dropdown menu
+    And the menu has option "Open team/sample-prompt:production"
+    And the menu has option "Create new prompt"
+
+  @unit
+  Scenario: Trace references a tag that is not assigned to any version
+    Given a traced LLM call has "langwatch.prompt.id" = "team/sample-prompt:staging"
+    And tag "staging" is not assigned to any version of "team/sample-prompt"
+    When I choose "Open team/sample-prompt:staging" from the menu
+    Then a new playground tab is created from the trace data
+    And a warning toast is shown that the tag could not be resolved
+
+  @unit
+  Scenario: Trace references a tagged prompt that no longer exists
+    Given a traced LLM call has "langwatch.prompt.id" = "team/deleted-prompt:production"
+    And prompt "team/deleted-prompt" does not exist in the project
+    When I choose "Open team/deleted-prompt:production" from the menu
+    Then a new playground tab is created from the trace data
+    And a warning toast is shown that the original prompt was not found
+
+  @integration
+  Scenario: Backend extracts prompt tag from span attributes
+    Given a span with attribute "langwatch.prompt.id" = "team/sample-prompt:production"
+    And the span is stored in the trace service
+    When the getForPromptStudio API is called for that span
+    Then the response includes promptHandle "team/sample-prompt" and promptTag "production"
+    And the response has promptVersionNumber null
