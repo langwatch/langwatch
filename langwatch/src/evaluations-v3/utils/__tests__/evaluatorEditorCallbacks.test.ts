@@ -65,4 +65,42 @@ describe("createEvaluatorEditorCallbacks()", () => {
       });
     });
   });
+
+  describe("onMappingChange()", () => {
+    // @regression: onMappingChange was embedded inside mappingsConfig objects
+    // passed to openDrawer, causing it to be lost when complexProps was cleared.
+    // Now it flows through createEvaluatorEditorCallbacks → setFlowCallbacks.
+
+    describe("when provided", () => {
+      it("includes onMappingChange in the returned callbacks", () => {
+        const onMappingChange = vi.fn();
+        const callbacks = createEvaluatorEditorCallbacks({
+          targetId: "target-1",
+          updateTarget: vi.fn(),
+          onMappingChange,
+        });
+
+        callbacks.onMappingChange?.("input", {
+          source: "dataset-1",
+          key: "col-a",
+        });
+
+        expect(onMappingChange).toHaveBeenCalledWith("input", {
+          source: "dataset-1",
+          key: "col-a",
+        });
+      });
+    });
+
+    describe("when omitted", () => {
+      it("does not include onMappingChange in the returned callbacks", () => {
+        const callbacks = createEvaluatorEditorCallbacks({
+          targetId: "target-1",
+          updateTarget: vi.fn(),
+        });
+
+        expect(callbacks.onMappingChange).toBeUndefined();
+      });
+    });
+  });
 });
