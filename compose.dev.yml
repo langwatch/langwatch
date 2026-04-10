@@ -111,11 +111,19 @@ services:
       - ./langevals:/langevals
       - app_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
+      - goose_bin:/opt/goose-bin
     command: >
       sh -c "
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
         mkdir -p /app/node_modules &&
+        if [ ! -x /opt/goose-bin/goose ]; then
+          echo 'Installing goose binary for ClickHouse migrations...' &&
+          ARCH=$$(uname -m) &&
+          if [ \"$$ARCH\" = \"aarch64\" ]; then GOOSE_ARCH=arm64; else GOOSE_ARCH=x86_64; fi &&
+          curl -fsSL \"https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_$${GOOSE_ARCH}\" -o /opt/goose-bin/goose &&
+          chmod +x /opt/goose-bin/goose;
+        fi &&
         (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
         pnpm install &&
         pnpm prisma generate &&
@@ -137,8 +145,10 @@ services:
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - app_modules:/app/node_modules
+      - goose_bin:/opt/goose-bin:ro
     command: >
       sh -c "
+        export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
         pnpm run start:prepare:db &&
         pnpm run start:app
@@ -187,7 +197,8 @@ services:
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - app_modules:/app/node_modules
-    command: sh -c "corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
+      - goose_bin:/opt/goose-bin:ro
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
@@ -301,6 +312,8 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-redis-data
   clickhouse-data:
     name: ${VOLUME_PREFIX:-langwatch}-clickhouse-data
+  goose_bin:
+    name: ${VOLUME_PREFIX:-langwatch}-goose-bin
   app_modules:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
   pnpm_store:
