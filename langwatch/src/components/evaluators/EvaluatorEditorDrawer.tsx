@@ -76,8 +76,13 @@ export type EvaluatorMappingsConfig = {
   availableSources?: AvailableSource[];
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
-  /** Callback when a mapping changes - used to persist to store */
-  onMappingChange: (
+  /**
+   * Callback when a mapping changes - used to persist to store.
+   * Optional here — callers should pass onMappingChange via setFlowCallbacks()
+   * so it persists across drawer navigation. Kept for non-drawer consumers
+   * (e.g., EvaluatorPropertiesPanel) that pass mappingsConfig directly.
+   */
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -120,6 +125,15 @@ export type EvaluatorEditorDrawerProps = {
    * When provided, overrides DB data for form initialization.
    */
   initialLocalConfig?: LocalEvaluatorConfig;
+  /**
+   * Callback when an evaluator mapping changes.
+   * Prefer passing this via setFlowCallbacks("evaluatorEditor", { onMappingChange })
+   * so it persists across drawer navigation. Falls back to mappingsConfig.onMappingChange.
+   */
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
 };
 
 /**
@@ -151,6 +165,12 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const mappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+
+  // Resolve onMappingChange: top-level prop → flowCallbacks → mappingsConfig
+  const onMappingChange =
+    props.onMappingChange ??
+    (flowCallbacks?.onMappingChange as EvaluatorEditorDrawerProps["onMappingChange"]) ??
+    mappingsConfig?.onMappingChange;
 
   // Get custom save button text from props or complexProps
   const saveButtonText =
@@ -647,15 +667,15 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                   </Text>
                 )}
 
-                {/* Mappings section - shown when caller provides mappingsConfig */}
-                {mappingsConfig && (
+                {/* Mappings section - shown when caller provides mappingsConfig and onMappingChange */}
+                {mappingsConfig && onMappingChange && (
                   <Box paddingTop={4}>
                     <EvaluatorMappingsSection
                       evaluatorDef={effectiveEvaluatorDef}
                       level={mappingsConfig.level}
                       providedSources={mappingsConfig.availableSources}
                       initialMappings={mappingsConfig.initialMappings}
-                      onMappingChange={mappingsConfig.onMappingChange}
+                      onMappingChange={onMappingChange}
                       scrollToMissingOnMount={true}
                     />
                   </Box>

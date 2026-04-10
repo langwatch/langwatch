@@ -318,38 +318,38 @@ export const useOpenTargetEditor = () => {
           createEvaluatorEditorCallbacks({
             targetId: target.id,
             updateTarget,
+            onMappingChange: (
+              identifier: string,
+              mapping: UIFieldMapping | undefined,
+            ) => {
+              const currentActiveDatasetId =
+                useEvaluationsV3Store.getState().activeDatasetId;
+              const currentDatasets = useEvaluationsV3Store.getState().datasets;
+              const checkIsDatasetSource = (sourceId: string) =>
+                currentDatasets.some((d) => d.id === sourceId);
+
+              if (mapping) {
+                setTargetMapping(
+                  target.id,
+                  currentActiveDatasetId,
+                  identifier,
+                  convertFromUIMapping(mapping, checkIsDatasetSource),
+                );
+              } else {
+                removeTargetMapping(
+                  target.id,
+                  currentActiveDatasetId,
+                  identifier,
+                );
+              }
+            },
           }),
         );
 
-        // Build mappings config for the evaluator editor
+        // Build mappings config for the evaluator editor (data only, callbacks via flow)
         const mappingsConfig = {
           availableSources,
           initialMappings: uiMappings,
-          onMappingChange: (
-            identifier: string,
-            mapping: UIFieldMapping | undefined,
-          ) => {
-            const currentActiveDatasetId =
-              useEvaluationsV3Store.getState().activeDatasetId;
-            const currentDatasets = useEvaluationsV3Store.getState().datasets;
-            const checkIsDatasetSource = (sourceId: string) =>
-              currentDatasets.some((d) => d.id === sourceId);
-
-            if (mapping) {
-              setTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-                convertFromUIMapping(mapping, checkIsDatasetSource),
-              );
-            } else {
-              removeTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-              );
-            }
-          },
         };
 
         // Pass initialLocalConfig from target state so drawer resumes unsaved changes

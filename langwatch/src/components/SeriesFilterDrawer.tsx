@@ -9,7 +9,7 @@ import { Drawer } from "./ui/drawer";
 
 export function SeriesFiltersDrawer({
   onClose,
-  filters: formFilters,
+  filters: formFilters = {} as Record<FilterField, FilterParam>,
   onChange,
 }: {
   onClose?: () => void;
@@ -23,10 +23,12 @@ export function SeriesFiltersDrawer({
   const { closeDrawer } = useDrawer();
   const onClose_ = onClose ?? closeDrawer;
 
-  const [filters, setFilters] = useState(formFilters);
+  const [filters, setFilters] = useState(
+    formFilters ?? ({} as Record<FilterField, FilterParam>),
+  );
 
   useEffect(() => {
-    setFilters(formFilters);
+    setFilters(formFilters ?? ({} as Record<FilterField, FilterParam>));
   }, [formFilters]);
 
   return (
@@ -55,7 +57,7 @@ export function SeriesFiltersDrawer({
                     ([_, value]) => value !== undefined,
                   ),
                 ) as Record<FilterField, FilterParam>;
-                onChange({
+                onChange?.({
                   filters: updatedFilters,
                 });
                 setFilters(updatedFilters);

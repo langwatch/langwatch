@@ -8,6 +8,7 @@
  * Mirrors the pattern in promptEditorCallbacks.ts for prompt targets.
  */
 
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import type { LocalEvaluatorConfig } from "../types";
 
 /**
@@ -22,6 +23,10 @@ export type CreateEvaluatorEditorCallbacksParams = {
       localEvaluatorConfig?: LocalEvaluatorConfig;
     },
   ) => void;
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
 };
 
 /**
@@ -31,6 +36,10 @@ export type CreateEvaluatorEditorCallbacksParams = {
 export type EvaluatorEditorCallbacksForTarget = {
   onLocalConfigChange: (
     localConfig: LocalEvaluatorConfig | undefined,
+  ) => void;
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
   ) => void;
 };
 
@@ -46,6 +55,7 @@ export type EvaluatorEditorCallbacksForTarget = {
  * const callbacks = createEvaluatorEditorCallbacks({
  *   targetId,
  *   updateTarget,
+ *   onMappingChange,
  * });
  * setFlowCallbacks("evaluatorEditor", callbacks);
  * ```
@@ -53,9 +63,11 @@ export type EvaluatorEditorCallbacksForTarget = {
 export const createEvaluatorEditorCallbacks = ({
   targetId,
   updateTarget,
+  onMappingChange,
 }: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => ({
   onLocalConfigChange: (localConfig) => {
     // Only update localEvaluatorConfig for tracking unsaved changes
     updateTarget(targetId, { localEvaluatorConfig: localConfig });
   },
+  ...(onMappingChange ? { onMappingChange } : {}),
 });
