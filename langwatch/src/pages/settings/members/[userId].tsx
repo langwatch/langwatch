@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   Card,
   Field,
@@ -25,6 +26,10 @@ import {
   MISSING_CUSTOM_ROLE_VALUE,
   TeamUserRoleField,
 } from "../../../components/settings/TeamUserRoleField";
+import {
+  roleBadgeColor,
+  scopeTypeLabel,
+} from "../../../components/settings/GroupBindingInputRow";
 import { Link } from "../../../components/ui/link";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
@@ -66,6 +71,11 @@ export default function UserDetailsPage() {
       enabled: !!organization?.id && !!userId,
       retry: false,
     },
+  );
+
+  const memberGroups = api.group.listForMember.useQuery(
+    { organizationId: organization?.id ?? "", userId: userId ?? "" },
+    { enabled: !!organization?.id && !!userId },
   );
 
   const removeMemberFromTeam = api.team.removeMember.useMutation();
@@ -357,6 +367,52 @@ export default function UserDetailsPage() {
             </HorizontalFormControl>
           </Card.Body>
         </Card.Root>
+
+        {memberGroups.data && memberGroups.data.length > 0 && (
+          <>
+            <Heading size="md">Groups</Heading>
+            <Card.Root width="full">
+              <Card.Body paddingY={0} paddingX={0}>
+                <Table.Root variant="line" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader width="35%" paddingLeft={6}>Group</Table.ColumnHeader>
+                      <Table.ColumnHeader>Access granted</Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {memberGroups.data.map((group) => (
+                      <Table.Row key={group.id}>
+                        <Table.Cell paddingLeft={6}>
+                          <Link href="/settings/groups">{group.name}</Link>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {group.bindings.length === 0 ? (
+                            <Text fontSize="sm" color="fg.muted">No access configured</Text>
+                          ) : (
+                            <HStack gap={2} flexWrap="wrap">
+                              {group.bindings.map((b) => (
+                                <HStack key={b.id} gap={1}>
+                                  <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+                                    {b.customRoleName ?? b.role}
+                                  </Badge>
+                                  <Text fontSize="xs" color="fg.muted">on</Text>
+                                  <Badge colorPalette="purple" size="sm">
+                                    {scopeTypeLabel(b.scopeType)} {b.scopeName}
+                                  </Badge>
+                                </HStack>
+                              ))}
+                            </HStack>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
+          </>
+        )}
 
         <Heading size="md">Teams</Heading>
         <Card.Root width="full">

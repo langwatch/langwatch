@@ -665,15 +665,20 @@ export const teamRouter = createTRPCRouter({
           });
         }
 
-        // Remove RoleBinding
-        await tx.roleBinding.deleteMany({
-          where: {
-            organizationId: team.organizationId,
-            userId: input.userId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: input.teamId,
-          },
-        });
+        // Remove RoleBinding and legacy TeamUser row (if any) atomically
+        await Promise.all([
+          tx.roleBinding.deleteMany({
+            where: {
+              organizationId: team.organizationId,
+              userId: input.userId,
+              scopeType: RoleBindingScopeType.TEAM,
+              scopeId: input.teamId,
+            },
+          }),
+          tx.teamUser.deleteMany({
+            where: { userId: input.userId, teamId: input.teamId },
+          }),
+        ]);
 
         // Post-removal validation: ensure we still have at least one admin
         const finalAdminCount = await tx.roleBinding.count({

@@ -355,6 +355,85 @@ export const groupRouter = createTRPCRouter({
   /**
    * Remove a user from a manual group.
    */
+  rename: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        groupId: z.string(),
+        name: z.string().min(1).max(100),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const group = await ctx.prisma.group.findFirst({
+        where: { id: input.groupId, organizationId: input.organizationId },
+      });
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+      if (group.scimSource) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot rename a SCIM-managed group",
+        });
+      }
+
+      const baseSlug = slugify(input.name, { lower: true, strict: true });
+      const existing = await ctx.prisma.group.count({
+        where: {
+          organizationId: input.organizationId,
+          slug: { startsWith: baseSlug },
+          id: { not: input.groupId },
+        },
+      });
+      const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
+
+      return ctx.prisma.group.update({
+        where: { id: input.groupId },
+        data: { name: input.name, slug },
+      });
+    }),
+
+  listForMember: protectedProcedure
+    .input(z.object({ organizationId: z.string(), userId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      await assertEnterprisePlan({
+        organizationId: input.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
+      });
+
+      const groups = await ctx.prisma.group.findMany({
+        where: {
+          organizationId: input.organizationId,
+          members: { some: { userId: input.userId } },
+        },
+        include: {
+          roleBindings: {
+            include: { customRole: { select: { id: true, name: true } } },
+          },
+        },
+        orderBy: { name: "asc" },
+      });
+
+      const allBindings = groups.flatMap((g) => g.roleBindings);
+      const scopeNames = await resolveScopeNames(ctx.prisma, allBindings);
+
+      return groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        scimSource: g.scimSource,
+        bindings: g.roleBindings.map((b) => ({
+          id: b.id,
+          role: b.role,
+          customRoleName: b.customRole?.name ?? null,
+          scopeType: b.scopeType,
+          scopeName: scopeNames.get(b.scopeId) ?? b.scopeId,
+        })),
+      }));
+    }),
+
   removeMember: protectedProcedure
     .input(
       z.object({

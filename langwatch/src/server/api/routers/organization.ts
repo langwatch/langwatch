@@ -130,6 +130,36 @@ export const organizationRouter = createTRPCRouter({
         demoProjectId,
       })) as FullyLoadedOrganization[];
 
+      // Fetch all team- and org-scoped RoleBindings for the user (direct or via group)
+      // so we can synthesize team membership for users who have access only through groups.
+      const orgIds = organizations.map((o) => o.id);
+      const userRoleBindings =
+        orgIds.length > 0
+          ? await ctx.prisma.roleBinding.findMany({
+              where: {
+                organizationId: { in: orgIds },
+                OR: [
+                  { userId },
+                  { group: { members: { some: { userId } } } },
+                ],
+                scopeType: {
+                  in: [
+                    RoleBindingScopeType.TEAM,
+                    RoleBindingScopeType.ORGANIZATION,
+                    RoleBindingScopeType.PROJECT,
+                  ],
+                },
+              },
+              select: {
+                organizationId: true,
+                scopeType: true,
+                scopeId: true,
+                role: true,
+                customRoleId: true,
+              },
+            })
+          : [];
+
       for (const organization of organizations) {
         for (const project of organization.teams.flatMap(
           (team) => team.projects,
@@ -190,6 +220,37 @@ export const organizationRouter = createTRPCRouter({
             (member) =>
               member.userId === userId || member.userId === demoProjectUserId,
           );
+
+          // If the user has no TeamUser row but has a RoleBinding for this team
+          // (direct or via a group), synthesize a member entry so downstream
+          // checks (userIsPartOfTeam, hasPermission) work correctly.
+          const userHasTeamMember = team.members.some(
+            (m) => m.userId === userId,
+          );
+          if (!userHasTeamMember) {
+            const teamProjectIds = new Set(team.projects.map((p) => p.id));
+            const binding = userRoleBindings.find(
+              (b) =>
+                b.organizationId === organization.id &&
+                ((b.scopeType === RoleBindingScopeType.TEAM &&
+                  b.scopeId === team.id) ||
+                  b.scopeType === RoleBindingScopeType.ORGANIZATION ||
+                  (b.scopeType === RoleBindingScopeType.PROJECT &&
+                    teamProjectIds.has(b.scopeId))),
+            );
+            if (binding) {
+              team.members.push({
+                userId,
+                teamId: team.id,
+                role: binding.role,
+                assignedRoleId: binding.customRoleId ?? null,
+                assignedRole: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+            }
+          }
+
           if (isDemoOrg) return true;
           return isExternal
             ? team.members.some((member) => member.userId === userId)
