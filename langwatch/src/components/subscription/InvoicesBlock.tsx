@@ -36,7 +36,7 @@ export function InvoicesBlock({
     <Card.Root
       data-testid="invoices-block"
       borderWidth={1}
-      borderColor="gray.200"
+      borderColor="border"
     >
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={4}>
@@ -53,9 +53,9 @@ export function InvoicesBlock({
                   data-testid="view-all-invoices-link"
                   as="button"
                   fontSize="sm"
-                  color="gray.600"
+                  color="fg.muted"
                   cursor="pointer"
-                  _hover={{ color: "blue.500" }}
+                  _hover={{ color: "blue.fg" }}
                   onClick={onViewAllInStripe}
                 >
                   <HStack gap={1}>
@@ -75,7 +75,7 @@ export function InvoicesBlock({
           )}
 
           {invoices.isError && (
-            <Text color="red.500" fontSize="sm">
+            <Text color="red.fg" fontSize="sm">
               Failed to load invoices. Please try again later.
             </Text>
           )}
@@ -84,7 +84,7 @@ export function InvoicesBlock({
             !invoices.isError &&
             invoices.data?.length === 0 && (
               <Text
-                color="gray.500"
+                color="fg.muted"
                 fontSize="sm"
                 textAlign="center"
                 paddingY={4}
@@ -148,7 +148,7 @@ export function InvoicesBlock({
                             isExternal
                             aria-label={`Download PDF for invoice ${invoice.number ?? invoice.id}`}
                           >
-                            <HStack gap={1} color="blue.500" fontSize="sm">
+                            <HStack gap={1} color="blue.fg" fontSize="sm">
                               <Download size={14} />
                               <Text>PDF</Text>
                             </HStack>
