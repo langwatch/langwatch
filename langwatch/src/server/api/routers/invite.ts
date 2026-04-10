@@ -29,7 +29,7 @@ import { LimitExceededError } from "../../license-enforcement/errors";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission } from "../rbac";
-import { teamRoleInputSchema } from "./organization";
+import { teamRoleInputSchema } from "./schemas/teamRole";
 
 export const inviteRouter = createTRPCRouter({
   createInvites: protectedProcedure
@@ -167,8 +167,8 @@ export const inviteRouter = createTRPCRouter({
 
             // Validate custom role IDs belong to this organization
             const customRoleIds = teamAssignments
-              .filter((t) => t.customRoleId)
-              .map((t) => t.customRoleId!);
+              .map((t) => t.customRoleId)
+              .filter((id): id is string => !!id);
             if (customRoleIds.length > 0) {
               const validCustomRoles = await prisma.customRole.findMany({
                 where: {
@@ -446,8 +446,8 @@ export const inviteRouter = createTRPCRouter({
 
               // Validate custom role IDs belong to this organization
               const customRoleIds = teamAssignments
-                .filter((t) => t.customRoleId)
-                .map((t) => t.customRoleId!);
+                .map((t) => t.customRoleId)
+                .filter((id): id is string => !!id);
               if (customRoleIds.length > 0) {
                 const validCustomRoles = await prisma.customRole.findMany({
                   where: {
@@ -729,7 +729,8 @@ export const inviteRouter = createTRPCRouter({
             (data) => data.role !== TeamUserRole.CUSTOM,
           );
           const customRoles = teamMembershipData.filter(
-            (data) => data.role === TeamUserRole.CUSTOM && data.customRoleId,
+            (data): data is typeof data & { customRoleId: string } =>
+              data.role === TeamUserRole.CUSTOM && !!data.customRoleId,
           );
 
           // Create team memberships with built-in roles
@@ -750,7 +751,7 @@ export const inviteRouter = createTRPCRouter({
                   userId: customRole.userId,
                   teamId: customRole.teamId,
                   role: TeamUserRole.CUSTOM,
-                  assignedRoleId: customRole.customRoleId!,
+                  assignedRoleId: customRole.customRoleId,
                 },
               });
             } catch (error: unknown) {
