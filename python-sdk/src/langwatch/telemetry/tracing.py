@@ -49,6 +49,7 @@ from langwatch.domain import (
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.__version__ import __version__
 from langwatch.utils.initialization import ensure_setup
+from langwatch.utils.validation import validate_list_param, validate_metadata
 import langwatch.telemetry.context
 
 if TYPE_CHECKING:
@@ -104,6 +105,18 @@ class LangWatchTrace:
                 "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
             )
             set_api_key(api_key=api_key)
+
+        metadata = validate_metadata(metadata)
+        contexts = validate_list_param(
+            "contexts",
+            contexts,
+            '[{"document_id": "doc-1", "content": "..."}]',
+        )
+        evaluations = validate_list_param(
+            "evaluations",
+            evaluations,
+            '[{"name": "answer-relevance", "status": "processed", "score": 0.9}]',
+        )
 
         self.metadata = metadata or {}
         self.api_key = api_key
@@ -345,6 +358,13 @@ class LangWatchTrace:
         metrics: Optional[SpanMetrics] = None,
     ) -> None:
         ensure_setup()
+
+        metadata = validate_metadata(metadata)
+        contexts = validate_list_param(
+            "contexts",
+            contexts,
+            '[{"document_id": "doc-1", "content": "..."}]',
+        )
 
         client = get_instance()
 
