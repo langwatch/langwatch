@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.18.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.17.0...python-sdk@v0.18.0) (2026-04-10)
+
+
+### Features
+
+* **evaluations:** expose thread variables in trace-level evaluator mapping ([#2794](https://github.com/langwatch/langwatch/issues/2794)) ([750ad39](https://github.com/langwatch/langwatch/commit/750ad39c77314e477df3784ba807124fc1eb4c1b))
+* prompt labels data model, migration, and API endpoints ([#2712](https://github.com/langwatch/langwatch/issues/2712)) ([3ae192d](https://github.com/langwatch/langwatch/commit/3ae192d8ca9256305222bb008693ad564527a0d0))
+* python SDK prompt label support ([#2795](https://github.com/langwatch/langwatch/issues/2795)) ([13b230b](https://github.com/langwatch/langwatch/commit/13b230b879e8ebde77654b88ba2cfb28813fe97c))
+* **python-sdk:** add custom prompt tag support ([#2843](https://github.com/langwatch/langwatch/issues/2843)) ([8699076](https://github.com/langwatch/langwatch/commit/869907635b9c57f0216f0f9cb7beb2b85c31eef5))
+* **python-sdk:** add dataset CRUD methods ([#2871](https://github.com/langwatch/langwatch/issues/2871)) ([d455079](https://github.com/langwatch/langwatch/commit/d45507916074048fbddbcd550d92d4901547b947))
+* **typescript-sdk:** add custom tag support (fetch, CRUD, list) ([#2841](https://github.com/langwatch/langwatch/issues/2841)) ([f8839ab](https://github.com/langwatch/langwatch/commit/f8839abea053e1fa1e879c27db193ee641add526))
+
+
+### Bug Fixes
+
+* **docs:** broken docs/ references after move to dev/docs/ ([#2650](https://github.com/langwatch/langwatch/issues/2650)) ([5c29d48](https://github.com/langwatch/langwatch/commit/5c29d488704eb6d4cfdfd8c95d982fe716686335))
+* update ~45 broken docs/ references to dev/docs/ after docs move ([5c29d48](https://github.com/langwatch/langwatch/commit/5c29d488704eb6d4cfdfd8c95d982fe716686335)), closes [#2648](https://github.com/langwatch/langwatch/issues/2648)
+
+
+### Code Refactoring
+
+* rename promptLabel to promptTag for naming consistency ([#2900](https://github.com/langwatch/langwatch/issues/2900)) ([70be268](https://github.com/langwatch/langwatch/commit/70be2689124e21e8f7d90c12aaa83887ed97f98c))
+
 ## [0.17.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.16.0...python-sdk@v0.17.0) (2026-03-18)
 
 
