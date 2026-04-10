@@ -2,12 +2,9 @@ import { readFileSync } from "fs";
 import { basename } from "path";
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Uploads a file to a dataset with a configurable strategy for handling existing datasets.
@@ -64,7 +61,7 @@ export const uploadCommand = async (
   try {
     const result = await service.uploadWithStrategy(slugOrId, file, ifExists);
 
-    const recordCount = result.records?.length ?? result.recordsCreated ?? 0;
+    const recordCount = result.recordsCreated ?? result.records?.length ?? "unknown";
 
     if (result.dataset) {
       spinner.succeed(
@@ -80,24 +77,6 @@ export const uploadCommand = async (
     }
   } catch (error) {
     spinner.fail("Failed to upload file");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-    } else if (error instanceof DatasetApiError && error.status === 409) {
-      console.error(
-        chalk.red(
-          `Dataset "${slugOrId}" already exists. Use --if-exists append or --if-exists replace.`,
-        ),
-      );
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "uploading file");
   }
 };

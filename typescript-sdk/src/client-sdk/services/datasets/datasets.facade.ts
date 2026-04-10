@@ -1,7 +1,7 @@
 import { type LangwatchApiClient } from "@/internal/api/client";
 import { type Logger } from "@/logger";
 import { DatasetService } from "./dataset.service";
-import { DatasetApiError } from "./errors";
+import { DatasetValidationError } from "./errors";
 import {
   type Dataset,
   type DatasetMetadata,
@@ -94,11 +94,7 @@ export class DatasetsFacade {
    */
   create = (options: CreateDatasetOptions): Promise<DatasetMetadata> => {
     if (!options.name || options.name.trim().length === 0) {
-      throw new DatasetApiError(
-        "Dataset name must not be empty",
-        0,
-        "create",
-      );
+      throw new DatasetValidationError("Dataset name must not be empty");
     }
     return this.#datasetService.createDataset(options);
   };
@@ -141,10 +137,8 @@ export class DatasetsFacade {
    */
   update = (slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> => {
     if (options.name == null && options.columnTypes == null) {
-      throw new DatasetApiError(
+      throw new DatasetValidationError(
         "At least one field (name or columnTypes) must be provided for update",
-        0,
-        "update",
       );
     }
     return this.#datasetService.updateDataset(slugOrId, options);
@@ -172,11 +166,7 @@ export class DatasetsFacade {
     entries: Record<string, unknown>[],
   ): Promise<BatchCreateRecordsResponse> => {
     if (!entries || entries.length === 0) {
-      throw new DatasetApiError(
-        "Entries must not be empty",
-        0,
-        "createRecords",
-      );
+      throw new DatasetValidationError("Entries must not be empty");
     }
     return this.#datasetService.createRecords(slugOrId, entries);
   };
@@ -269,11 +259,7 @@ export class DatasetsFacade {
     },
   ): Promise<UploadResponse> => {
     if (!file) {
-      throw new DatasetApiError(
-        "File must be provided for upload",
-        0,
-        "upload",
-      );
+      throw new DatasetValidationError("File must be provided for upload");
     }
     return this.#datasetService.uploadWithStrategy(
       slugOrId,

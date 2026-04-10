@@ -41,6 +41,17 @@ export class DatasetApiError extends DatasetError {
 }
 
 /**
+ * Thrown for client-side validation failures (e.g. empty name, no update fields, empty entries).
+ * Distinguished from DatasetApiError which represents server-side errors.
+ */
+export class DatasetValidationError extends DatasetError {
+  constructor(message: string) {
+    super(message);
+    this.name = "DatasetValidationError";
+  }
+}
+
+/**
  * Thrown when a dataset operation exceeds the plan limit (403).
  * The message includes the upgrade/subscription URL from the server.
  */

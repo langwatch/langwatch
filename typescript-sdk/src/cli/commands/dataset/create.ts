@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
-import {
-  DatasetApiError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Parses a comma-separated column spec string into DatasetColumnType[].
@@ -65,20 +63,6 @@ export const createCommand = async (
     }
   } catch (error) {
     spinner.fail("Failed to create dataset");
-
-    if (error instanceof DatasetApiError && error.status === 409) {
-      console.error(
-        chalk.red("A dataset with this name already exists. Choose a different name."),
-      );
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "creating dataset");
   }
 };

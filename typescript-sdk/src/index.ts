@@ -47,10 +47,10 @@ export {
 // Dataset API exports
 export {
   DatasetsFacade,
-  DatasetService,
   DatasetError,
   DatasetNotFoundError,
   DatasetApiError,
+  DatasetValidationError,
   DatasetPlanLimitError,
   type Dataset,
   type DatasetEntry,

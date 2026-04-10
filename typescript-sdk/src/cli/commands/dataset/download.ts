@@ -1,12 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Escapes a value for inclusion in a CSV field.
@@ -80,16 +77,12 @@ export const downloadCommand = async (
     let page = 1;
     const limit = 1000;
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
-    while (true) {
-      const result = await service.listRecords(slugOrId, { page, limit });
+    let result;
+    do {
+      result = await service.listRecords(slugOrId, { page, limit });
       allRecords.push(...result.data);
-
-      if (page >= result.pagination.totalPages) {
-        break;
-      }
       page++;
-    }
+    } while (page <= result.pagination.totalPages);
 
     spinner.stop();
 
@@ -114,18 +107,6 @@ export const downloadCommand = async (
     );
   } catch (error) {
     spinner.fail("Failed to download dataset");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "downloading dataset");
   }
 };

@@ -162,15 +162,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       it("throws a DatasetApiError with status 409", async () => {
-        await expect(
-          langwatch.datasets.create({ name: "existing-name" }),
-        ).rejects.toThrow(DatasetApiError);
-
-        await expect(
-          langwatch.datasets.create({ name: "existing-name" }),
-        ).rejects.toMatchObject({
-          status: 409,
-        });
+        const error = await langwatch.datasets.create({ name: "existing-name" }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(DatasetApiError);
+        expect((error as DatasetApiError).status).toBe(409);
       });
     });
   });
@@ -701,13 +695,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
         it("throws a DatasetApiError with status 409", async () => {
           const file = new File(["data"], "data.csv", { type: "text/csv" });
 
-          await expect(
-            langwatch.datasets.upload("my-data", file, { ifExists: "error" }),
-          ).rejects.toThrow(DatasetApiError);
-
-          await expect(
-            langwatch.datasets.upload("my-data", file, { ifExists: "error" }),
-          ).rejects.toMatchObject({ status: 409 });
+          const error = await langwatch.datasets.upload("my-data", file, { ifExists: "error" }).catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(DatasetApiError);
+          expect((error as DatasetApiError).status).toBe(409);
         });
       });
 

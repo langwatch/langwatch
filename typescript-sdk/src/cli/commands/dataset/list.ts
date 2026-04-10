@@ -1,12 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Lists all datasets for the current project.
@@ -61,18 +58,6 @@ export const listCommand = async (): Promise<void> => {
     }
   } catch (error) {
     spinner.fail("Failed to fetch datasets");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "listing datasets");
   }
 };

@@ -272,13 +272,8 @@ datasetCmd
   .command("list")
   .description("List all datasets")
   .action(async () => {
-    try {
-      const { listCommand: listDatasetsImpl } = await import("./commands/dataset/list.js");
-      await listDatasetsImpl();
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { listCommand: listDatasetsImpl } = await import("./commands/dataset/list.js");
+    await listDatasetsImpl();
   });
 
 datasetCmd
@@ -286,39 +281,24 @@ datasetCmd
   .description("Create a new dataset")
   .option("-c, --columns <columns>", "Column definitions (e.g. input:string,output:string)")
   .action(async (name: string, options: { columns?: string }) => {
-    try {
-      const { createCommand: createDatasetImpl } = await import("./commands/dataset/create.js");
-      await createDatasetImpl(name, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { createCommand: createDatasetImpl } = await import("./commands/dataset/create.js");
+    await createDatasetImpl(name, options);
   });
 
 datasetCmd
   .command("get <slugOrId>")
   .description("Get dataset details and preview records")
   .action(async (slugOrId: string) => {
-    try {
-      const { getCommand: getDatasetImpl } = await import("./commands/dataset/get.js");
-      await getDatasetImpl(slugOrId);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { getCommand: getDatasetImpl } = await import("./commands/dataset/get.js");
+    await getDatasetImpl(slugOrId);
   });
 
 datasetCmd
   .command("delete <slugOrId>")
   .description("Delete (archive) a dataset")
   .action(async (slugOrId: string) => {
-    try {
-      const { deleteCommand: deleteDatasetImpl } = await import("./commands/dataset/delete.js");
-      await deleteDatasetImpl(slugOrId);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { deleteCommand: deleteDatasetImpl } = await import("./commands/dataset/delete.js");
+    await deleteDatasetImpl(slugOrId);
   });
 
 datasetCmd
@@ -326,13 +306,8 @@ datasetCmd
   .description("Upload a file to a dataset (creates if not found)")
   .option("--if-exists <strategy>", "Strategy when dataset exists: append (default), replace, error")
   .action(async (slug: string, file: string, options: { ifExists?: string }) => {
-    try {
-      const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
-      await uploadDatasetImpl(slug, file, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
+    await uploadDatasetImpl(slug, file, options);
   });
 
 datasetCmd
@@ -340,13 +315,8 @@ datasetCmd
   .description("Download dataset records as CSV or JSONL")
   .option("-f, --format <format>", "Output format: csv or jsonl", "csv")
   .action(async (slugOrId: string, options: { format?: string }) => {
-    try {
-      const { downloadCommand: downloadDatasetImpl } = await import("./commands/dataset/download.js");
-      await downloadDatasetImpl(slugOrId, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { downloadCommand: downloadDatasetImpl } = await import("./commands/dataset/download.js");
+    await downloadDatasetImpl(slugOrId, options);
   });
 
 datasetCmd
@@ -355,13 +325,8 @@ datasetCmd
   .option("--name <name>", "New dataset name")
   .option("--columns <columns>", "New column definitions (e.g. input:string,output:string)")
   .action(async (slugOrId: string, options: { name?: string; columns?: string }) => {
-    try {
-      const { updateCommand: updateDatasetImpl } = await import("./commands/dataset/update.js");
-      await updateDatasetImpl(slugOrId, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { updateCommand: updateDatasetImpl } = await import("./commands/dataset/update.js");
+    await updateDatasetImpl(slugOrId, options);
   });
 
 // Records subcommand group
@@ -375,13 +340,8 @@ recordsCmd
   .option("--page <n>", "Page number (default: 1)")
   .option("--limit <n>", "Records per page (default: 20)")
   .action(async (slugOrId: string, options: { page?: string; limit?: string }) => {
-    try {
-      const { recordsListCommand } = await import("./commands/dataset/records-list.js");
-      await recordsListCommand(slugOrId, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { recordsListCommand } = await import("./commands/dataset/records-list.js");
+    await recordsListCommand(slugOrId, options);
   });
 
 recordsCmd
@@ -390,13 +350,8 @@ recordsCmd
   .option("--json <json>", "JSON array of records (inline)")
   .option("--stdin", "Read JSON array from stdin")
   .action(async (slugOrId: string, options: { json?: string; stdin?: boolean }) => {
-    try {
-      const { recordsAddCommand } = await import("./commands/dataset/records-add.js");
-      await recordsAddCommand(slugOrId, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { recordsAddCommand } = await import("./commands/dataset/records-add.js");
+    await recordsAddCommand(slugOrId, options);
   });
 
 recordsCmd
@@ -404,25 +359,15 @@ recordsCmd
   .description("Update a single record in a dataset")
   .requiredOption("--json <json>", "JSON object with updated fields")
   .action(async (slugOrId: string, recordId: string, options: { json: string }) => {
-    try {
-      const { recordsUpdateCommand } = await import("./commands/dataset/records-update.js");
-      await recordsUpdateCommand(slugOrId, recordId, options);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { recordsUpdateCommand } = await import("./commands/dataset/records-update.js");
+    await recordsUpdateCommand(slugOrId, recordId, options);
   });
 
 recordsCmd
   .command("delete <slugOrId> <recordIds...>")
   .description("Delete records from a dataset")
   .action(async (slugOrId: string, recordIds: string[]) => {
-    try {
-      const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
-      await recordsDeleteCommand(slugOrId, recordIds);
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
-      process.exit(1);
-    }
+    const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
+    await recordsDeleteCommand(slugOrId, recordIds);
   });
 program.parse(process.argv);

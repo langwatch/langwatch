@@ -58,6 +58,7 @@ export const listCommand = async (): Promise<void> => {
           Version: chalk.green,
           Model: chalk.yellow,
         },
+        emptyMessage: "No prompts found",
       });
 
       console.log();

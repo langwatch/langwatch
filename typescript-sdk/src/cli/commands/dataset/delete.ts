@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Deletes (archives) a dataset by slug or ID.
@@ -24,18 +21,6 @@ export const deleteCommand = async (slugOrId: string): Promise<void> => {
     );
   } catch (error) {
     spinner.fail("Failed to delete dataset");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "deleting dataset");
   }
 };

@@ -1,12 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Truncates a string to a maximum length, adding ellipsis if truncated.
@@ -87,18 +84,6 @@ export const recordsListCommand = async (
     );
   } catch (error) {
     spinner.fail("Failed to list records");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "listing records");
   }
 };

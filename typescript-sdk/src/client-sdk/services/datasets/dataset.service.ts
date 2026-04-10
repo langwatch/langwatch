@@ -40,10 +40,10 @@ type DatasetServiceConfig = {
  * - Error handling with contextual information
  */
 export class DatasetService {
-  readonly #config: DatasetServiceConfig;
+  private readonly config: DatasetServiceConfig;
 
   constructor(config: DatasetServiceConfig) {
-    this.#config = config;
+    this.config = config;
 
     /**
      * Wraps the service in a tracing proxy that automatically creates
@@ -110,7 +110,7 @@ export class DatasetService {
     path: string,
     options?: Record<string, unknown>,
   ) {
-    return (this.#config.langwatchApiClient[method] as any)(path, options);
+    return (this.config.langwatchApiClient[method] as any)(path, options);
   }
 
   /**
@@ -139,9 +139,9 @@ export class DatasetService {
     slugOrId: string,
     _options?: GetDatasetOptions
   ): Promise<Dataset<T>> {
-    this.#config.logger.debug(`Fetching dataset: ${slugOrId}`);
+    this.config.logger.debug(`Fetching dataset: ${slugOrId}`);
 
-    const response = await this.#config.langwatchApiClient.GET(
+    const response = await this.config.langwatchApiClient.GET(
       "/api/dataset/{slugOrId}",
       {
         params: {
@@ -167,7 +167,7 @@ export class DatasetService {
       updatedAt: item.updatedAt,
     }));
 
-    this.#config.logger.debug(
+    this.config.logger.debug(
       `Fetched dataset ${slugOrId} with ${entries.length} entries`
     );
 
@@ -186,7 +186,7 @@ export class DatasetService {
    * Lists all datasets for the project, with optional pagination.
    */
   async listDatasets(options?: ListDatasetsOptions): Promise<ListDatasetsApiResponse> {
-    this.#config.logger.debug("Listing datasets");
+    this.config.logger.debug("Listing datasets");
 
     const response = await this.untypedRequest('GET', '/api/dataset', {
       params: {
@@ -207,7 +207,7 @@ export class DatasetService {
    * Creates a new dataset.
    */
   async createDataset(options: CreateDatasetOptions): Promise<DatasetMetadata> {
-    this.#config.logger.debug(`Creating dataset: ${options.name}`);
+    this.config.logger.debug(`Creating dataset: ${options.name}`);
 
     const response = await this.untypedRequest('POST', '/api/dataset', {
       body: {
@@ -226,7 +226,7 @@ export class DatasetService {
    * Updates a dataset by its slug or ID.
    */
   async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
-    this.#config.logger.debug(`Updating dataset: ${slugOrId}`);
+    this.config.logger.debug(`Updating dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}', {
       params: {
@@ -246,7 +246,7 @@ export class DatasetService {
    * Deletes (archives) a dataset by its slug or ID.
    */
   async deleteDataset(slugOrId: string): Promise<DatasetMetadata> {
-    this.#config.logger.debug(`Deleting dataset: ${slugOrId}`);
+    this.config.logger.debug(`Deleting dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}', {
       params: {
@@ -268,7 +268,7 @@ export class DatasetService {
     slugOrId: string,
     entries: Record<string, unknown>[],
   ): Promise<BatchCreateRecordsResponse> {
-    this.#config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
+    this.config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest('POST', '/api/dataset/{slugOrId}/records', {
       params: {
@@ -292,7 +292,7 @@ export class DatasetService {
     recordId: string,
     entry: Record<string, unknown>,
   ): Promise<DatasetRecordResponse> {
-    this.#config.logger.debug(`Updating record ${recordId} in dataset: ${slugOrId}`);
+    this.config.logger.debug(`Updating record ${recordId} in dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest('PATCH', '/api/dataset/{slugOrId}/records/{recordId}', {
       params: {
@@ -315,7 +315,7 @@ export class DatasetService {
     slugOrId: string,
     recordIds: string[],
   ): Promise<DeleteRecordsResponse> {
-    this.#config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
+    this.config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest('DELETE', '/api/dataset/{slugOrId}/records', {
       params: {
@@ -342,7 +342,7 @@ export class DatasetService {
     slugOrId: string,
     options?: ListRecordsOptions,
   ): Promise<ListRecordsApiResponse> {
-    this.#config.logger.debug(`Listing records for dataset: ${slugOrId}`);
+    this.config.logger.debug(`Listing records for dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest('GET', '/api/dataset/{slugOrId}/records', {
       params: {
@@ -362,24 +362,24 @@ export class DatasetService {
   }
 
   /**
-   * Creates a new dataset from a file upload.
-   * Uses raw fetch with FormData since openapi-fetch hardcodes content-type: application/json.
+   * Sends a multipart/form-data request using raw fetch.
+   * openapi-fetch hardcodes content-type: application/json, so file uploads
+   * must bypass it. This helper centralizes URL building, auth headers,
+   * error parsing, and response unwrapping.
    *
-   * @param options - The dataset name and file to upload
-   * @returns The created dataset metadata with record count
+   * @param path - The API path (appended to the endpoint)
+   * @param formData - The FormData payload
+   * @param operation - Human-readable operation name for error messages
+   * @param slugOrId - Optional dataset identifier (passed to handleApiError for 404 mapping)
    */
-  async createDatasetFromUpload(
-    options: CreateFromUploadOptions,
-  ): Promise<CreateFromUploadResponse> {
-    this.#config.logger.debug(`Creating dataset from upload: ${options.name}`);
-
-    const { endpoint, apiKey } = this.#config;
-
-    const url = `${endpoint.replace(/\/$/, "")}/api/dataset/upload`;
-
-    const formData = new FormData();
-    formData.append("name", options.name);
-    formData.append("file", options.file);
+  private async fetchMultipart<T>(
+    path: string,
+    formData: FormData,
+    operation: string,
+    slugOrId?: string,
+  ): Promise<T> {
+    const { endpoint, apiKey } = this.config;
+    const url = `${endpoint.replace(/\/$/, "")}${path}`;
 
     const response = await fetch(url, {
       method: "POST",
@@ -401,14 +401,32 @@ export class DatasetService {
         }
       }
 
-      this.handleApiError(
-        `create dataset from upload "${options.name}"`,
-        errorBody,
-        response.status,
-      );
+      this.handleApiError(operation, errorBody, response.status, slugOrId);
     }
 
-    return (await response.json()) as CreateFromUploadResponse;
+    return (await response.json()) as T;
+  }
+
+  /**
+   * Creates a new dataset from a file upload.
+   *
+   * @param options - The dataset name and file to upload
+   * @returns The created dataset metadata with record count
+   */
+  async createDatasetFromUpload(
+    options: CreateFromUploadOptions,
+  ): Promise<CreateFromUploadResponse> {
+    this.config.logger.debug(`Creating dataset from upload: ${options.name}`);
+
+    const formData = new FormData();
+    formData.append("name", options.name);
+    formData.append("file", options.file);
+
+    return this.fetchMultipart<CreateFromUploadResponse>(
+      "/api/dataset/upload",
+      formData,
+      `create dataset from upload "${options.name}"`,
+    );
   }
 
   /**
@@ -510,66 +528,48 @@ export class DatasetService {
   /**
    * Deletes all records from a dataset by iterating through pages.
    * Always fetches page 1 since records shift after deletion.
+   * Includes a safety valve to prevent infinite loops.
    */
   private async _deleteAllRecords(slugOrId: string): Promise<void> {
     const BATCH_SIZE = 1000;
+    const MAX_DELETE_ITERATIONS = 100;
 
-    while (true) {
+    let iteration = 0;
+    while (iteration < MAX_DELETE_ITERATIONS) {
       const page = await this.listRecords(slugOrId, { page: 1, limit: BATCH_SIZE });
       if (page.data.length === 0) {
-        break;
+        return;
       }
 
       const ids = page.data.map((record) => record.id);
       await this.deleteRecords(slugOrId, ids);
+      iteration++;
     }
+
+    throw new DatasetApiError(
+      `Failed to delete all records from dataset "${slugOrId}": exceeded ${MAX_DELETE_ITERATIONS} iterations`,
+      0,
+      `delete all records from dataset "${slugOrId}"`,
+    );
   }
 
   /**
    * Uploads a file to an existing dataset.
-   * Uses raw fetch with FormData since openapi-fetch hardcodes content-type: application/json.
    */
   async uploadFile(
     slugOrId: string,
     file: File | Blob,
   ): Promise<UploadResponse> {
-    this.#config.logger.debug(`Uploading file to dataset: ${slugOrId}`);
-
-    const { endpoint, apiKey } = this.#config;
-
-    const url = `${endpoint.replace(/\/$/, "")}/api/dataset/${encodeURIComponent(slugOrId)}/upload`;
+    this.config.logger.debug(`Uploading file to dataset: ${slugOrId}`);
 
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "X-Auth-Token": apiKey,
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const rawBody = await response.text();
-      let errorBody: unknown = rawBody;
-      if (rawBody) {
-        try {
-          errorBody = JSON.parse(rawBody);
-        } catch {
-          // Keep the plain-text body.
-        }
-      }
-
-      this.handleApiError(
-        `upload file to dataset "${slugOrId}"`,
-        errorBody,
-        response.status,
-        slugOrId,
-      );
-    }
-
-    return (await response.json()) as UploadResponse;
+    return this.fetchMultipart<UploadResponse>(
+      `/api/dataset/${encodeURIComponent(slugOrId)}/upload`,
+      formData,
+      `upload file to dataset "${slugOrId}"`,
+      slugOrId,
+    );
   }
 }

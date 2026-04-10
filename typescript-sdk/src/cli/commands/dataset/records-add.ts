@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Reads all data from stdin as a string.
@@ -90,20 +87,6 @@ export const recordsAddCommand = async (
     });
   } catch (error) {
     spinner.fail("Failed to add records");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-    } else if (error instanceof DatasetApiError && error.status === 400) {
-      console.error(chalk.red(`Validation error: ${error.message}`));
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "adding records");
   }
 };

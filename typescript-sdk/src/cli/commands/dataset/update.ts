@@ -1,13 +1,10 @@
 import chalk from "chalk";
 import ora from "ora";
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
-import {
-  DatasetApiError,
-  DatasetNotFoundError,
-} from "@/client-sdk/services/datasets/errors";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
 import { parseColumns } from "./create";
+import { handleDatasetCommandError } from "./error-handler";
 
 /**
  * Updates an existing dataset's name and/or column types.
@@ -58,22 +55,6 @@ export const updateCommand = async (
     }
   } catch (error) {
     spinner.fail("Failed to update dataset");
-
-    if (error instanceof DatasetNotFoundError) {
-      console.error(chalk.red(`Dataset not found: ${slugOrId}`));
-    } else if (error instanceof DatasetApiError && error.status === 409) {
-      console.error(
-        chalk.red("A dataset with this name already exists. Choose a different name."),
-      );
-    } else if (error instanceof DatasetApiError) {
-      console.error(chalk.red(`API Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
-    process.exit(1);
+    handleDatasetCommandError(error, "updating dataset");
   }
 };
