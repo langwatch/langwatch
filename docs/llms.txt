@@ -235,7 +235,7 @@ Always navigate to docs links using the .md extension for better readability.
 ### Datasets
 
 - [Datasets](https://langwatch.ai/docs/datasets/overview.md): Create and manage datasets in LangWatch to build evaluation sets for LLMs and structured AI agent testing.
-- [Programmatic Access](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+- [Programmatic Access](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
 - [Generating a dataset with AI](https://langwatch.ai/docs/datasets/ai-dataset-generation.md): Generate datasets with AI to bootstrap LLM evaluations, regression tests, and simulation-based agent testing.
 - [Automatically build datasets from real-time traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Automatically build datasets from real-time traces to power LLM evaluations, regression tests, and AI agent testing workflows.
 - [Add trace threads to datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add full conversation threads to datasets in LangWatch to generate richer evaluation inputs for AI agent testing.

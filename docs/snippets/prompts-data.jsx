@@ -510,7 +510,7 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 When the user has no codebase and wants to set up evaluation building blocks on the platform:
 
-NOTE: Full UI experiments and dataset creation are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators) that can then be used in the platform UI.
+NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
 
 ### Create or Update a Prompt
 
@@ -535,19 +535,26 @@ Use the \`platform_create_evaluator\` MCP tool to set up evaluation criteria:
 - Create an LLM-as-judge evaluator for quality assessment
 - Or create a specific evaluator type matching your use case
 
+### Create a Dataset
+
+Use the \`platform_create_dataset\` MCP tool to create a test dataset:
+- Provide a name and column definitions (e.g., \`input\` string, \`expected_output\` string)
+- Use \`platform_create_dataset_records\` to add records in batch (max 1000 per call)
+- Use \`platform_list_datasets\` to browse existing datasets
+- Use \`platform_get_dataset\` to view dataset contents and metadata
+
 ### Test in the Platform
 
 Go to https://app.langwatch.ai and:
 1. Navigate to your project's Prompts section
 2. Open the prompt you created
 3. Use the Prompt Playground to test variations
-4. Set up an experiment in the Experiments section using your prompt and evaluator
+4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
 ### Current Limitations
 
 - UI experiments cannot be created via MCP yet — use the platform UI
-- Datasets cannot be created via MCP yet — use the platform UI or SDK
-- The MCP can create prompts and evaluators, which are the building blocks for experiments
+- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
 
 ## Common Mistakes
 
@@ -2104,7 +2111,7 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 When the user has no codebase and wants to set up evaluation building blocks on the platform:
 
-NOTE: Full UI experiments and dataset creation are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators) that can then be used in the platform UI.
+NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
 
 ### Create or Update a Prompt
 
@@ -2129,19 +2136,26 @@ Use the \`platform_create_evaluator\` MCP tool to set up evaluation criteria:
 - Create an LLM-as-judge evaluator for quality assessment
 - Or create a specific evaluator type matching your use case
 
+### Create a Dataset
+
+Use the \`platform_create_dataset\` MCP tool to create a test dataset:
+- Provide a name and column definitions (e.g., \`input\` string, \`expected_output\` string)
+- Use \`platform_create_dataset_records\` to add records in batch (max 1000 per call)
+- Use \`platform_list_datasets\` to browse existing datasets
+- Use \`platform_get_dataset\` to view dataset contents and metadata
+
 ### Test in the Platform
 
 Go to https://app.langwatch.ai and:
 1. Navigate to your project's Prompts section
 2. Open the prompt you created
 3. Use the Prompt Playground to test variations
-4. Set up an experiment in the Experiments section using your prompt and evaluator
+4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
 ### Current Limitations
 
 - UI experiments cannot be created via MCP yet — use the platform UI
-- Datasets cannot be created via MCP yet — use the platform UI or SDK
-- The MCP can create prompts and evaluators, which are the building blocks for experiments
+- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
 
 ## Common Mistakes
 
@@ -4132,7 +4146,7 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 When the user has no codebase and wants to set up evaluation building blocks on the platform:
 
-NOTE: Full UI experiments and dataset creation are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators) that can then be used in the platform UI.
+NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
 
 ### Create or Update a Prompt
 
@@ -4157,19 +4171,26 @@ Use the \`platform_create_evaluator\` MCP tool to set up evaluation criteria:
 - Create an LLM-as-judge evaluator for quality assessment
 - Or create a specific evaluator type matching your use case
 
+### Create a Dataset
+
+Use the \`platform_create_dataset\` MCP tool to create a test dataset:
+- Provide a name and column definitions (e.g., \`input\` string, \`expected_output\` string)
+- Use \`platform_create_dataset_records\` to add records in batch (max 1000 per call)
+- Use \`platform_list_datasets\` to browse existing datasets
+- Use \`platform_get_dataset\` to view dataset contents and metadata
+
 ### Test in the Platform
 
 Go to https://app.langwatch.ai and:
 1. Navigate to your project's Prompts section
 2. Open the prompt you created
 3. Use the Prompt Playground to test variations
-4. Set up an experiment in the Experiments section using your prompt and evaluator
+4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
 ### Current Limitations
 
 - UI experiments cannot be created via MCP yet — use the platform UI
-- Datasets cannot be created via MCP yet — use the platform UI or SDK
-- The MCP can create prompts and evaluators, which are the building blocks for experiments
+- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
 
 ## Common Mistakes
 

@@ -402,7 +402,17 @@
             },
             "platform": {
               "ui": "/datasets",
-              "mcp": null,
+              "mcp": [
+                "platform_list_datasets",
+                "platform_get_dataset",
+                "platform_create_dataset",
+                "platform_update_dataset",
+                "platform_delete_dataset",
+                "platform_list_dataset_records",
+                "platform_create_dataset_records",
+                "platform_update_dataset_record",
+                "platform_delete_dataset_records"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/datasets/overview.md"
             },

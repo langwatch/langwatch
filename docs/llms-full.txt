@@ -13489,6 +13489,8 @@ There are a couple ways to add data to a dataset;
 - **From traces**: You can fill the dataset by selecting a group of messages already captured.
 - **CSV Upload**: You can fill the dataset by uploading a CSV file.
 - **Continuously populate**: You can continuously populate the dataset with data traced from production.
+- **Via MCP tools**: AI coding agents can create and manage datasets through the [MCP server](/integration/mcp). See [Programmatic Access](/datasets/programmatic-access) for details.
+- **Via SDK**: Use the Python or TypeScript SDK for programmatic dataset management. See [Programmatic Access](/datasets/programmatic-access).
 
 ### Manually
 
@@ -13542,10 +13544,10 @@ You can fetch datasets from LangWatch using the SDK for use in offline evaluatio
 ---
 title: Programmatic Access
 sidebarTitle: Programmatic Access
-description: Manage datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+description: Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
 ---
 
-You can manage datasets from LangWatch using the SDK to use in your offline evaluations or other automated workflows.
+You can manage datasets from LangWatch using the SDK, MCP tools, or REST API for offline evaluations and automated workflows.
 
 ## Setup
 
@@ -14007,6 +14009,23 @@ for (const entry of dataset.entries) {
   console.log(entry.entry.expected_output);  // Typed as string
 }
 ```
+
+## MCP Tools (AI Coding Agents)
+
+If you're using an AI coding agent (Claude Code, Cursor, etc.) with the [LangWatch MCP server](/integration/mcp), dataset tools are available directly:
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_datasets` | List all datasets with record counts |
+| `platform_get_dataset` | Get dataset metadata, columns, and record preview |
+| `platform_create_dataset` | Create a new dataset with optional column definitions |
+| `platform_update_dataset` | Update dataset name or column types |
+| `platform_delete_dataset` | Archive a dataset |
+| `platform_create_dataset_records` | Add records in batch (max 1000) |
+| `platform_update_dataset_record` | Update a single record |
+| `platform_delete_dataset_records` | Delete records by IDs |
+
+The `platform_list_datasets` and `platform_get_dataset` tools support a `format` parameter — use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
 
 ## Finding Your Dataset Slug
 
