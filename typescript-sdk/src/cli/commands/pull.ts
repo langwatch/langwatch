@@ -21,11 +21,13 @@ export const pullPrompts = async ({
   lock,
   promptsApiService,
   result,
+  tag,
 }: {
   config: PromptsConfig;
   lock: PromptsLock;
   promptsApiService: PromptsApiService;
   result: SyncResult;
+  tag?: string;
 }): Promise<void> => {
   const remoteDeps = Object.entries(config.prompts).filter(
     ([, dependency]) => {
@@ -51,9 +53,13 @@ export const pullPrompts = async ({
             ? dependency
             : dependency.version ?? "latest";
 
+        const displaySpec = tag ?? versionSpec;
+
         const lockEntry = lock.prompts[name];
 
-        const prompt = await promptsApiService.get(name, { version: versionSpec });
+        const prompt = tag
+          ? await promptsApiService.get(name, { tag })
+          : await promptsApiService.get(name, { version: versionSpec });
 
         if (prompt) {
           const needsUpdate =
@@ -73,7 +79,7 @@ export const pullPrompts = async ({
             result.fetched.push({
               name,
               version: prompt.version,
-              versionSpec,
+              versionSpec: displaySpec,
             });
 
             FileManager.updateLockEntry(
@@ -84,7 +90,7 @@ export const pullPrompts = async ({
             );
 
             fetchSpinner.text = `Fetched ${chalk.cyan(
-              `${name}@${versionSpec}`
+              `${name}@${displaySpec}`
             )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(
               relativePath
             )}`;
@@ -185,7 +191,7 @@ const printPullResults = ({
   }
 };
 
-export const pullCommand = async (): Promise<void> => {
+export const pullCommand = async (options?: { tag?: string }): Promise<void> => {
   console.log("⬇️  Pulling remote prompts...");
 
   const startTime = Date.now();
@@ -208,7 +214,7 @@ export const pullCommand = async (): Promise<void> => {
       errors: [],
     };
 
-    await pullPrompts({ config, lock, promptsApiService, result });
+    await pullPrompts({ config, lock, promptsApiService, result, tag: options?.tag });
 
     FileManager.savePromptsLock(lock);
 

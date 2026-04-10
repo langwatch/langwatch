@@ -6,6 +6,41 @@ import type { InternalConfig } from "@/client-sdk/types";
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
+describe("PromptsApiService.renameTag", () => {
+  let service: PromptsApiService;
+  let mockPut: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockPut = vi.fn();
+    const apiClient = {
+      PUT: mockPut,
+    } as unknown as LangwatchApiClient;
+    service = new PromptsApiService({
+      langwatchApiClient: apiClient,
+      logger: mock(),
+    } as InternalConfig);
+  });
+
+  it("calls PUT /api/prompts/tags/{tag} with new name", async () => {
+    mockPut.mockResolvedValue({ data: undefined, error: undefined });
+    await service.renameTag({ tag: "old-name", name: "new-name" });
+    expect(mockPut).toHaveBeenCalledWith(
+      "/api/prompts/tags/{tag}",
+      expect.objectContaining({
+        params: expect.objectContaining({ path: { tag: "old-name" } }),
+        body: { name: "new-name" },
+      }),
+    );
+  });
+
+  describe("when the API returns an error", () => {
+    it("throws PromptsApiError", async () => {
+      mockPut.mockResolvedValue({ data: undefined, error: "tag not found" });
+      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(PromptsApiError);
+    });
+  });
+});
+
 describe("PromptsApiService.get", () => {
   let service: PromptsApiService;
   let mockGet: ReturnType<typeof vi.fn>;

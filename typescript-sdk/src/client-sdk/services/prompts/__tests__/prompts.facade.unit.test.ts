@@ -443,3 +443,34 @@ describe("Prompt Retrieval", () => {
     });
   });
 });
+
+describe("PromptsFacade.tags.rename", () => {
+  let facade: PromptsFacade;
+  let promptsApiService: MockProxy<PromptsApiService>;
+  let localPromptsService: MockProxy<LocalPromptsService>;
+
+  beforeEach(() => {
+    localPromptsService = mock<LocalPromptsService>();
+    promptsApiService = mock<PromptsApiService>();
+    facade = new PromptsFacade({
+      localPromptsService,
+      promptsApiService,
+      langwatchApiClient: {} as InternalConfig["langwatchApiClient"],
+      logger: {} as InternalConfig["logger"],
+    });
+    vi.clearAllMocks();
+  });
+
+  describe("when renaming a tag", () => {
+    it("delegates to promptsApiService.renameTag with old and new names", async () => {
+      promptsApiService.renameTag.mockResolvedValue(undefined);
+
+      await facade.tags.rename("old-name", "new-name");
+
+      expect(promptsApiService.renameTag).toHaveBeenCalledWith({
+        tag: "old-name",
+        name: "new-name",
+      });
+    });
+  });
+});

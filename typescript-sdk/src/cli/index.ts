@@ -40,9 +40,35 @@ const syncCommand = async (): Promise<void> => {
   return syncCommandImpl();
 };
 
-const pullCommand = async (): Promise<void> => {
+const pullCommand = async (options?: { tag?: string }): Promise<void> => {
   const { pullCommand: pullCommandImpl } = await import("./commands/pull.js");
-  return pullCommandImpl();
+  return pullCommandImpl(options);
+};
+
+// Tag commands
+const tagListCommand = async (): Promise<void> => {
+  const { tagListCommand: impl } = await import("./commands/tag/list.js");
+  return impl();
+};
+
+const tagCreateCommand = async (name: string): Promise<void> => {
+  const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
+  return impl(name);
+};
+
+const tagRenameCommand = async (oldName: string, newName: string): Promise<void> => {
+  const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
+  return impl(oldName, newName);
+};
+
+const tagAssignCommand = async (promptHandle: string, tagName: string, options?: { version?: string }): Promise<void> => {
+  const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
+  return impl(promptHandle, tagName, options);
+};
+
+const tagDeleteCommand = async (tagName: string, options?: { force?: boolean }): Promise<void> => {
+  const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
+  return impl(tagName, options);
 };
 
 const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
@@ -186,9 +212,10 @@ promptCmd
 promptCmd
   .command("pull")
   .description("Pull remote prompts and materialize locally")
-  .action(async () => {
+  .option("--tag <name>", "Pull the version pointed to by this tag instead of the configured version")
+  .action(async (options: { tag?: string }) => {
     try {
-      await pullCommand();
+      await pullCommand(options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -203,6 +230,73 @@ promptCmd
   .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
     try {
       await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+// Add prompt tag subcommand group
+const tagCmd = promptCmd
+  .command("tag")
+  .description("Manage prompt tags");
+
+tagCmd
+  .command("list")
+  .description("List all tag definitions for the organization")
+  .action(async () => {
+    try {
+      await tagListCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+tagCmd
+  .command("create <name>")
+  .description("Create a custom tag")
+  .action(async (name: string) => {
+    try {
+      await tagCreateCommand(name);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+tagCmd
+  .command("rename <oldName> <newName>")
+  .description("Rename a tag")
+  .action(async (oldName: string, newName: string) => {
+    try {
+      await tagRenameCommand(oldName, newName);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+tagCmd
+  .command("assign <prompt> <tag>")
+  .description("Assign a tag to a prompt version")
+  .option("--version <number>", "Version number to assign (defaults to latest)")
+  .action(async (prompt: string, tag: string, options: { version?: string }) => {
+    try {
+      await tagAssignCommand(prompt, tag, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+tagCmd
+  .command("delete <name>")
+  .description("Delete a tag and remove all its assignments")
+  .option("--force", "Skip confirmation prompt")
+  .action(async (name: string, options: { force?: boolean }) => {
+    try {
+      await tagDeleteCommand(name, options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
