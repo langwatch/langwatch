@@ -299,7 +299,8 @@ export class EsScanner {
   /**
    * Fetch all events for a specific (tenantId, aggregateId) pair.
    * Tenant-scoped to prevent cross-tenant data leakage.
-   * Returns hits sorted by the configured sort order.
+   * Paginates via search_after so aggregates with more than one page of
+   * events are returned in full.
    */
   async fetchAggregateEvents(
     aggregateId: string,
@@ -319,31 +320,20 @@ export class EsScanner {
       filters.push(this.options.query);
     }
 
-    const query =
-      filters.length === 1 ? filters[0]! : { bool: { must: filters } };
-
-    return this.withRetry("fetchAggregateEvents", async () => {
-      const response = await this.client.search<Record<string, unknown>>({
-        index: this.options.index,
-        body: {
-          size: 10000,
-          sort: this.options.sort,
-          query,
-        },
-      });
-
-      return response.hits.hits.map((hit) => ({
-        _id: hit._id!,
-        ...(hit._source as Record<string, unknown>),
-      }));
-    });
+    return this.paginateSearch(filters, "fetchAggregateEvents");
   }
 
   /**
-   * Fetch all events for multiple aggregates in a single bulk query.
-   * Uses a `terms` filter on aggregateIdField to fetch everything at once,
-   * then groups the results by "tenantId:aggregateId" composite key.
-   * Paginates via search_after for large result sets.
+   * Fetch all events for multiple aggregates, grouped by tenant.
+   *
+   * Runs one paginated query per tenant, each scoped with a single
+   * `term: tenantId` plus a `terms: aggregateIds` clause for that tenant's
+   * IDs. This is required for correctness: a single combined query using
+   * `terms` on both fields would also match foreign (tenantA, aggregateB)
+   * combinations and leak them into the wrong groups.
+   *
+   * Per-tenant queries run sequentially to keep ES load predictable —
+   * search_after pagination already handles large result sets internally.
    *
    * @param timeHint - Optional time range hint. Adds a generous ±24h range
    *   filter so ES can use its time-based index to pre-filter before applying
@@ -359,29 +349,74 @@ export class EsScanner {
       throw new Error("aggregateIdField is required for fetchBulkAggregateEvents");
     }
 
-    const aggregateIds = [...new Set(aggregates.map((a) => a.aggregateId))];
-    if (aggregateIds.length === 0) return new Map();
+    if (aggregates.length === 0) return new Map();
 
-    const tenantIds = [...new Set(aggregates.map((a) => a.tenantId))];
-    const filters: Record<string, unknown>[] = [
-      { terms: { [field]: aggregateIds } },
-      { terms: { [tenantIdField]: tenantIds } },
-    ];
-    // Time-range hint: generous ±24h buffer to help ES narrow down shards/segments
-    if (timeHint) {
-      const BUFFER_MS = 24 * 60 * 60 * 1000;
-      filters.push({
-        range: {
-          [this.timestampField]: {
-            gte: timeHint.from - BUFFER_MS,
-            lt: timeHint.to + BUFFER_MS,
+    // Group aggregate IDs by tenant so each ES query is tenant-scoped.
+    const byTenant = new Map<string, Set<string>>();
+    for (const { tenantId, aggregateId } of aggregates) {
+      let set = byTenant.get(tenantId);
+      if (!set) {
+        set = new Set();
+        byTenant.set(tenantId, set);
+      }
+      set.add(aggregateId);
+    }
+
+    const grouped = new Map<string, EsHit[]>();
+
+    for (const [tenantId, aggregateIdSet] of byTenant) {
+      const aggregateIds = [...aggregateIdSet];
+      if (aggregateIds.length === 0) continue;
+
+      const filters: Record<string, unknown>[] = [
+        { term: { [tenantIdField]: tenantId } },
+        { terms: { [field]: aggregateIds } },
+      ];
+      // Time-range hint: generous ±24h buffer to help ES narrow down shards/segments
+      if (timeHint) {
+        const BUFFER_MS = 24 * 60 * 60 * 1000;
+        filters.push({
+          range: {
+            [this.timestampField]: {
+              gte: timeHint.from - BUFFER_MS,
+              lt: timeHint.to + BUFFER_MS,
+            },
           },
-        },
-      });
+        });
+      }
+      if (this.options.query) {
+        filters.push(this.options.query);
+      }
+
+      const tenantHits = await this.paginateSearch(
+        filters,
+        "fetchBulkAggregateEvents",
+      );
+
+      for (const hit of tenantHits) {
+        const aggregateId = (hit as Record<string, unknown>)[field] as string;
+        const key = `${tenantId}:${aggregateId}`;
+        let events = grouped.get(key);
+        if (!events) {
+          events = [];
+          grouped.set(key, events);
+        }
+        events.push(hit);
+      }
     }
-    if (this.options.query) {
-      filters.push(this.options.query);
-    }
+
+    return grouped;
+  }
+
+  /**
+   * Run a search_after-paginated ES query and return every matching hit.
+   * Caller supplies the fully-built filter list; this helper handles the
+   * page loop, retries, and source flattening.
+   */
+  private async paginateSearch(
+    filters: Record<string, unknown>[],
+    opName: string,
+  ): Promise<EsHit[]> {
     const query =
       filters.length === 1 ? filters[0]! : { bool: { must: filters } };
 
@@ -390,15 +425,8 @@ export class EsScanner {
     let searchAfter: unknown[] | undefined;
 
     while (true) {
-      const body: Record<string, unknown> = {
-        size: PAGE_SIZE,
-        sort: this.options.sort,
-        query,
-      };
-      if (searchAfter) body.search_after = searchAfter;
-
       const currentSearchAfter = searchAfter;
-      const hits = await this.withRetry("fetchBulkAggregateEvents", async () => {
+      const hits = await this.withRetry(opName, async () => {
         const response = await this.client.search<Record<string, unknown>>({
           index: this.options.index,
           body: {
@@ -425,21 +453,7 @@ export class EsScanner {
       searchAfter = [...(hits[hits.length - 1]!.sort as unknown[])];
     }
 
-    // Group by "tenantId:aggregateId"
-    const grouped = new Map<string, EsHit[]>();
-    for (const hit of allHits) {
-      const tenantId = (hit as Record<string, unknown>)[tenantIdField] as string;
-      const aggregateId = (hit as Record<string, unknown>)[field] as string;
-      const key = `${tenantId}:${aggregateId}`;
-      let events = grouped.get(key);
-      if (!events) {
-        events = [];
-        grouped.set(key, events);
-      }
-      events.push(hit);
-    }
-
-    return grouped;
+    return allHits;
   }
 
   private buildRangeQuery(from: number, to: number): Record<string, unknown> {

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import type { Cursor, CursorStore } from "./types.js";
 
 /**
@@ -67,6 +67,12 @@ export class FileCursorStore implements CursorStore {
   }
 
   async save(cursor: Cursor): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(cursor) + "\n");
+    // Atomic write: write to a temp file in the same directory, then rename
+    // over the target. `rename` is atomic on the same filesystem on POSIX and
+    // Windows, so an interrupted save can never leave a truncated cursor file
+    // (which `load()` would treat as null and cause a full re-ingest).
+    const tmpPath = `${this.filePath}.tmp`;
+    await writeFile(tmpPath, JSON.stringify(cursor) + "\n");
+    await rename(tmpPath, this.filePath);
   }
 }

@@ -146,6 +146,11 @@ export class Migrator {
 			}
 
 			// --- Process aggregates ---
+			// Tracks whether the direct-write path failed mid-batch. Checked
+			// below when deciding whether to advance the cursor (a failure
+			// must leave the cursor in place so the next run retries the
+			// batch). NOT checked at the top of the sub-batch loop — the
+			// inner break already exits it on failure.
 			let batchInsertFailed = false;
 			const useDirectWrite = !!definition.processAggregate;
 
@@ -194,8 +199,6 @@ export class Migrator {
 					const aggregatesWithoutCommands: string[] = [];
 
 					for (let subIdx = 0; subIdx < aggregateEntries.length; subIdx += config.subBatchSize) {
-						if (batchInsertFailed) break;
-
 						const chunk = aggregateEntries.slice(subIdx, subIdx + config.subBatchSize);
 						const chunkEventRecords: EventRecord[] = [];
 						const chunkProjectionWrites: Array<() => Promise<void>> = [];
@@ -299,6 +302,7 @@ export class Migrator {
 										storeEventsFn: wrappedStore,
 										aggregateType: definition.aggregateType as any,
 										commandName: cmd.commandName,
+										pipelineName: "es_migration",
 									});
 									stats.dispatched++;
 								} catch (err) {
@@ -348,6 +352,7 @@ export class Migrator {
 										storeEventsFn: capturingStore as any,
 										aggregateType: definition.aggregateType as any,
 										commandName: cmd.commandName,
+										pipelineName: "es_migration",
 									});
 								} catch (err) {
 									logger.warn("Dry-run processCommand failed", {
@@ -550,6 +555,7 @@ export class Migrator {
 											storeEventsFn: capturingStore as any,
 											aggregateType: definition.aggregateType as any,
 											commandName: cmd.commandName,
+											pipelineName: "es_migration",
 										});
 									} catch (err) {
 										logger.warn("Dry-run processCommand failed (flush)", {
@@ -610,6 +616,7 @@ export class Migrator {
 									storeEventsFn: wrappedStore,
 									aggregateType: definition.aggregateType as any,
 									commandName: cmd.commandName,
+									pipelineName: "es_migration",
 								});
 								stats.dispatched++;
 							} catch (err) {

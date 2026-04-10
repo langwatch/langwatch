@@ -1,7 +1,7 @@
 import type { Event } from "~/server/event-sourcing/domain/types.js";
-import { createExperimentRunStateFoldProjection } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunState.foldProjection.js";
+import { ExperimentRunStateFoldProjection } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunState.foldProjection.js";
 import type { ExperimentRunStateData } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunState.foldProjection.js";
-import { createExperimentRunResultStorageMapProjection } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection.js";
+import { ExperimentRunResultStorageMapProjection } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection.js";
 import type { ClickHouseExperimentRunResultRecord } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection.js";
 import {
   EXPERIMENT_RUN_EVENT_TYPES,
@@ -45,10 +45,10 @@ export function createEvaluationMigrationDefinition(
   const noopAppendStore = { append: async () => {} };
 
   // Create projection definitions to reuse their pure init/apply/map functions
-  const foldProjection = createExperimentRunStateFoldProjection({
+  const foldProjection = new ExperimentRunStateFoldProjection({
     store: noopStore as any,
   });
-  const mapProjection = createExperimentRunResultStorageMapProjection({
+  const mapProjection = new ExperimentRunResultStorageMapProjection({
     store: noopAppendStore as any,
   });
 

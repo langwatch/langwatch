@@ -6,10 +6,22 @@ const RESPAWN_DELAY_MS = 1_000;
 const PROBE_INTERVAL_MS = 200;
 const PROBE_TIMEOUT_MS = 30_000;
 
+export interface PortForwardStartOptions {
+  /**
+   * Verify that the tunnel actually speaks to the expected service — e.g.
+   * by issuing a cheap ping to the underlying backend. Runs once after the
+   * local port becomes reachable. If it throws, `start()` rejects with a
+   * descriptive error that explains the likely cause (another process
+   * holding the port).
+   */
+  identityCheck?: () => Promise<void>;
+}
+
 export class PortForward {
   private child: ChildProcess | null = null;
   private stopped = false;
   private portInUseDeath = false;
+  private spawnError: Error | null = null;
 
   constructor(
     private readonly opts: {
@@ -21,10 +33,23 @@ export class PortForward {
     },
   ) {}
 
-  async start(): Promise<void> {
+  async start(startOpts: PortForwardStartOptions = {}): Promise<void> {
     this.stopped = false;
+    this.spawnError = null;
     this.spawn();
     await this.waitForReady();
+
+    if (startOpts.identityCheck) {
+      try {
+        await startOpts.identityCheck();
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `port-forward on localhost:${this.opts.localPort} came up but identity check failed — another process may be holding this port. Original error: ${message}`,
+        );
+      }
+    }
   }
 
   async stop(): Promise<void> {
@@ -53,6 +78,15 @@ export class PortForward {
 
     const child = spawn("kubectl", args, {
       stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    // Capture spawn failures (e.g. ENOENT if kubectl is not on PATH) so
+    // waitForReady() can reject promptly instead of polling to its deadline.
+    child.on("error", (err: Error) => {
+      this.spawnError = err;
+      logger.error("kubectl port-forward failed to spawn", {
+        error: err.message,
+      });
     });
 
     child.stdout?.on("data", (data: Buffer) => {
@@ -111,6 +145,11 @@ export class PortForward {
     const deadline = Date.now() + PROBE_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
+      if (this.spawnError) {
+        throw new Error(
+          `port-forward failed to spawn: ${this.spawnError.message}`,
+        );
+      }
       if (await this.probe(localPort)) {
         logger.info("port-forward ready", { localPort });
         return;
@@ -118,6 +157,11 @@ export class PortForward {
       await sleep(PROBE_INTERVAL_MS);
     }
 
+    if (this.spawnError) {
+      throw new Error(
+        `port-forward failed to spawn: ${this.spawnError.message}`,
+      );
+    }
     throw new Error(
       `port-forward not ready after ${PROBE_TIMEOUT_MS}ms on port ${localPort}`,
     );

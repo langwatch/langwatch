@@ -15,8 +15,8 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants.js";
-import { createTraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.js";
-import { createSpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection.js";
+import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.js";
+import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection.js";
 import type {
   EvaluationReportedEvent,
   EvaluationProcessingEvent,
@@ -25,7 +25,7 @@ import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants.js";
-import { createEvaluationRunFoldProjection } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.foldProjection.js";
+import { EvaluationRunFoldProjection } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.foldProjection.js";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils.js";
 import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils.js";
 import type {
@@ -54,15 +54,15 @@ export function createCombinedTraceMigrationDefinition(
   const noopAppendStore = { append: async () => {} };
 
   // Trace projection definitions (reuse pure init/apply/map functions)
-  const traceFoldProjection = createTraceSummaryFoldProjection({
+  const traceFoldProjection = new TraceSummaryFoldProjection({
     store: noopStore as any,
   });
-  const spanMapProjection = createSpanStorageMapProjection({
+  const spanMapProjection = new SpanStorageMapProjection({
     store: noopAppendStore as any,
   });
 
   // Evaluation projection definition
-  const evalFoldProjection = createEvaluationRunFoldProjection({
+  const evalFoldProjection = new EvaluationRunFoldProjection({
     store: noopStore as any,
   });
 
