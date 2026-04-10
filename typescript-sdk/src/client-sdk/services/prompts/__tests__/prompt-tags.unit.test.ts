@@ -38,9 +38,9 @@ describe("Prompt Tags", () => {
           error: undefined,
         });
 
-        await service.assignLabel({
+        await service.assignTag({
           id: "pizza-prompt",
-          label: "production",
+          tag: "production",
           versionId: "prompt_version_abc123",
         });
 
@@ -64,9 +64,9 @@ describe("Prompt Tags", () => {
         };
         mockPut.mockResolvedValue({ data: expectedResult, error: undefined });
 
-        const result = await service.assignLabel({
+        const result = await service.assignTag({
           id: "pizza-prompt",
-          label: "production",
+          tag: "production",
           versionId: "prompt_version_abc123",
         });
 
@@ -99,9 +99,9 @@ describe("Prompt Tags", () => {
         });
 
         await expect(
-          service.assignLabel({
+          service.assignTag({
             id: "pizza-prompt",
-            label: "production",
+            tag: "production",
             versionId: "prompt_version_abc123",
           }),
         ).rejects.toThrow(PromptsApiError);
@@ -124,24 +124,24 @@ describe("Prompt Tags", () => {
         });
       });
 
-      it("delegates to PromptsApiService.assignLabel", async () => {
+      it("delegates to PromptsApiService.assignTag", async () => {
         const expectedResult = {
           configId: "config_abc",
           versionId: "prompt_version_abc123",
           tag: "production",
           updatedAt: "2026-01-01T00:00:00.000Z",
         };
-        promptsApiService.assignLabel.mockResolvedValue(expectedResult);
+        promptsApiService.assignTag.mockResolvedValue(expectedResult);
 
         const result = await facade.tags.assign("pizza-prompt", {
-          label: "production",
+          tag: "production",
           versionId: "prompt_version_abc123",
         });
 
         // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(promptsApiService.assignLabel).toHaveBeenCalledWith({
+        expect(promptsApiService.assignTag).toHaveBeenCalledWith({
           id: "pizza-prompt",
-          label: "production",
+          tag: "production",
           versionId: "prompt_version_abc123",
         });
         expect(result).toEqual(expectedResult);

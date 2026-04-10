@@ -1,4 +1,4 @@
-import { PromptsApiService, type AssignLabelResult } from "./prompts-api.service";
+import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody, PromptData, TagDefinition, CreatedTag } from "./types";
 import { FetchPolicy } from "./types";
@@ -12,8 +12,8 @@ import { PromptsError } from "./errors";
 export interface GetPromptOptions {
   /** Specific version to fetch */
   version?: string;
-  /** Label to fetch (e.g., "production", "staging", or a custom label) */
-  label?: string;
+  /** Tag to fetch (e.g., "production", "staging", or a custom tag) */
+  tag?: string;
   /** Fetch policy to use */
   fetchPolicy?: FetchPolicy;
   /** Cache TTL in minutes (only used with CACHE_TTL policy) */
@@ -39,7 +39,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
   readonly tags: {
-    assign(id: string, params: { label: string; versionId: string }): Promise<AssignLabelResult>;
+    assign(id: string, params: { tag: string; versionId: string }): Promise<AssignTagResult>;
     list(): Promise<TagDefinition[]>;
     create(params: { name: string }): Promise<CreatedTag>;
     delete(tagName: string): Promise<void>;
@@ -49,8 +49,8 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
     this.tags = {
-      assign: (id, { label, versionId }) =>
-        this.promptsApiService.assignLabel({ id, label, versionId }),
+      assign: (id, { tag, versionId }) =>
+        this.promptsApiService.assignTag({ id, tag, versionId }),
       list: () => this.promptsApiService.listTags(),
       create: ({ name }) => this.promptsApiService.createTag({ name }),
       delete: (tagName) => this.promptsApiService.deleteTag(tagName),
@@ -71,10 +71,10 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   /**
    * Retrieves a prompt by handle or ID.
    *
-   * Supports shorthand `handle:label` syntax — e.g. `get("pizza-prompt:production")`.
+   * Supports shorthand `handle:tag` syntax — e.g. `get("pizza-prompt:production")`.
    * Shorthand is parsed server-side; the SDK passes the string through as-is.
    *
-   * @param handleOrId The prompt's handle, unique identifier, or `handle:label` shorthand.
+   * @param handleOrId The prompt's handle, unique identifier, or `handle:tag` shorthand.
    * @param options Optional parameters for the request.
    * @returns The Prompt instance.
    * @throws {PromptsError} If the prompt is not found or the API call fails.
@@ -138,8 +138,8 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   }
 
   private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
-    const labelSegment = options?.label != null ? `::label:${options.label}` : '';
-    return `${handleOrId}::version:${options?.version ?? ''}${labelSegment}`;
+    const tagSegment = options?.tag != null ? `::tag:${options.tag}` : '';
+    return `${handleOrId}::version:${options?.version ?? ''}${tagSegment}`;
   }
 
   private async getCacheTtl(
