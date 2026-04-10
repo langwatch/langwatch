@@ -97,7 +97,7 @@ export class PromptsApiService {
    * @param id The prompt's unique identifier.
    * @param options Optional parameters for the request.
    * @param options.version Specific version to fetch (numeric string or "latest").
-   * @param options.tag Tag to fetch ("production" or "staging").
+   * @param options.tag Tag to fetch (e.g., "production", "staging", or a custom tag).
    * @returns Raw PromptResponse data.
    * @throws {PromptsApiError} If the API call fails.
    */
