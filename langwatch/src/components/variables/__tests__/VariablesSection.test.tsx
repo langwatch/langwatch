@@ -396,8 +396,7 @@ describe("VariablesSection", () => {
       expect(screen.getByRole("textbox")).toBeInTheDocument();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays mapping value when mapped", () => {
+    it("displays mapping value when mapped", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       const mappings: Record<string, FieldMapping> = {
         question: { type: "source", sourceId: "dataset-1", path: ["input"] },
@@ -410,9 +409,9 @@ describe("VariablesSection", () => {
         mappings,
       });
 
-      // Should show a tag with the field name
+      // Should show a tag with the source prefix and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("input")).toBeInTheDocument();
+      expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
     });
   });
 
