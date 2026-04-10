@@ -3,7 +3,7 @@ import { type LangWatch } from "../../../dist";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import { HandleUtil } from "./helpers/handle.util";
 
-describe("Prompt labels and versions (real API)", () => {
+describe("Prompt tags and versions (real API)", () => {
   let langwatch: LangWatch;
 
   beforeEach(async () => {
@@ -12,7 +12,7 @@ describe("Prompt labels and versions (real API)", () => {
   });
 
   describe("when fetching by tag", () => {
-    describe("when using explicit label option", () => {
+    describe("when using explicit tag option", () => {
       it("fetches the tagged version via explicit option", async () => {
         const handle = HandleUtil.unique("tag-explicit");
         const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
@@ -30,12 +30,12 @@ describe("Prompt labels and versions (real API)", () => {
           expect(v1VersionId).not.toBe("");
 
           await langwatch.prompts.tags.assign(handle, {
-            label: tag.name,
+            tag: tag.name,
             versionId: v1VersionId,
           });
 
           const fetched = await langwatch.prompts.get(handle, {
-            label: tag.name,
+            tag: tag.name,
             fetchPolicy: "ALWAYS_FETCH",
           });
 
@@ -65,7 +65,7 @@ describe("Prompt labels and versions (real API)", () => {
           expect(v1VersionId).not.toBe("");
 
           await langwatch.prompts.tags.assign(handle, {
-            label: tag.name,
+            tag: tag.name,
             versionId: v1VersionId,
           });
 
@@ -135,7 +135,7 @@ describe("Prompt labels and versions (real API)", () => {
     });
   });
 
-  describe("when fetching without label or version", () => {
+  describe("when fetching without tag or version", () => {
     it("returns the latest version", async () => {
       const handle = HandleUtil.unique("tag-latest");
       const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
@@ -153,7 +153,7 @@ describe("Prompt labels and versions (real API)", () => {
         expect(v1VersionId).not.toBe("");
 
         await langwatch.prompts.tags.assign(handle, {
-          label: tag.name,
+          tag: tag.name,
           versionId: v1VersionId,
         });
 
@@ -201,7 +201,7 @@ describe("Prompt labels and versions (real API)", () => {
 
         await expect(
           langwatch.prompts.get(handle, {
-            label: tag.name,
+            tag: tag.name,
             fetchPolicy: "ALWAYS_FETCH",
           }),
         ).rejects.toThrow();
