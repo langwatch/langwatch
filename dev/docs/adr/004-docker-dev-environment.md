@@ -7,7 +7,7 @@
 ## Context
 
 Local development required running multiple services (postgres, redis, clickhouse, NLP, workers, app) manually in separate terminals. Different developers need different service combinations:
-- Frontend work: just app + postgres + redis
+- Frontend work: app + postgres + redis + clickhouse
 - Scenario development: + workers + bullboard + ai-server (scenario processing is part of workers)
 - Full stack: everything
 

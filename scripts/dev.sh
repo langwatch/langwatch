@@ -19,7 +19,7 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
   fi
 fi
 
-LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-${COMPOSE_PROJECT_NAME:-langwatch}"
+LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v2-${COMPOSE_PROJECT_NAME:-langwatch}"
 
 # Check for required .env files
 check_env_files() {
