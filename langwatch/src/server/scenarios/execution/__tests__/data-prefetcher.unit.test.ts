@@ -473,32 +473,41 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("returns success with complete data", async () => {
           // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
+          const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
           process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
 
-          const deps = createMockDeps({
-            promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-            },
-          });
-
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
-
-          expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.context).toEqual(defaultContext);
-            expect(result.data.scenario).toEqual(defaultScenario);
-            expect(result.data.adapterData).toMatchObject({
-              type: "prompt",
-              promptId: "prompt_123",
-              systemPrompt: "You are helpful",
+          try {
+            const deps = createMockDeps({
+              promptFetcher: {
+                getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              },
             });
-            expect(result.data.modelParams).toEqual(defaultModelParams);
-            expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
-            expect(result.telemetry).toEqual({
-              endpoint: "http://localhost:3000",
-              apiKey: "test-api-key",
-            });
+
+            const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+            const result = await prefetchScenarioData(defaultContext, target, deps);
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+              expect(result.data.context).toEqual(defaultContext);
+              expect(result.data.scenario).toEqual(defaultScenario);
+              expect(result.data.adapterData).toMatchObject({
+                type: "prompt",
+                promptId: "prompt_123",
+                systemPrompt: "You are helpful",
+              });
+              expect(result.data.modelParams).toEqual(defaultModelParams);
+              expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
+              expect(result.telemetry).toEqual({
+                endpoint: "http://localhost:3000",
+                apiKey: "test-api-key",
+              });
+            }
+          } finally {
+            if (previousLangwatchEndpoint === undefined) {
+              delete process.env.LANGWATCH_ENDPOINT;
+            } else {
+              process.env.LANGWATCH_ENDPOINT = previousLangwatchEndpoint;
+            }
           }
         });
       });

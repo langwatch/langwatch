@@ -160,7 +160,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
     vi.useRealTimers();
   });
 
-  it("REGRESSION: selecting evaluator in list should return to guardrails drawer", async () => {
+  it("REGRESSION: selecting evaluator in list returns to guardrails drawer", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Start with guardrails drawer open

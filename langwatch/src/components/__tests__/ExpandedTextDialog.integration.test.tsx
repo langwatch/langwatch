@@ -129,10 +129,9 @@ describe("<ExpandedTextDialog/>", () => {
   });
 
   describe("when JSON content is displayed with formatted mode enabled", () => {
-    // Skipped: The RenderInputOutput component that renders the copy button is loaded
-    // via next/dynamic. The mock resolves synchronously, but the copy button is inside
-    // a CodeMirror/json-view subtree that does not render in jsdom. The button selector
-    // "button svg" finds no element.
+    // Skipped: The local next/dynamic test mock resolves loader() asynchronously but does
+    // not trigger a re-render when the module arrives, so the copy-button subtree may never
+    // mount in this test environment.
     it.skip("renders the copy button within the dialog", () => {
       const { baseElement } = renderDialog({
         text: JSON.stringify({ nested: { key: "value" } }),

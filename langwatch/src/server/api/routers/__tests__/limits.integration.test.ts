@@ -125,7 +125,7 @@ describe("Limits Router Integration", () => {
     });
 
     describe("when usage is below 80% threshold", () => {
-      // Skipped: getUsage calls UsageStatsService.getUsageStats which requires App singleton (usage, planProvider) to be fully wired.
+      // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("returns messageLimitInfo with status ok", async () => {
         mockGetCurrentMonthCount.mockResolvedValue(500);
 
@@ -138,7 +138,7 @@ describe("Limits Router Integration", () => {
     });
 
     describe("when usage is between 80% and 100%", () => {
-      // Skipped: getUsage calls UsageStatsService.getUsageStats which requires App singleton (usage, planProvider) to be fully wired.
+      // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("returns messageLimitInfo with status warning and percentage", async () => {
         mockGetCurrentMonthCount.mockResolvedValue(850);
 
@@ -151,7 +151,7 @@ describe("Limits Router Integration", () => {
     });
 
     describe("when usage reaches or exceeds limit", () => {
-      // Skipped: getUsage calls UsageStatsService.getUsageStats which requires App singleton (usage, planProvider) to be fully wired.
+      // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("returns messageLimitInfo with status exceeded", async () => {
         mockGetCurrentMonthCount.mockResolvedValue(1000);
 
@@ -161,7 +161,7 @@ describe("Limits Router Integration", () => {
         expect(result.messageLimitInfo.message).toMatch(/reached the limit/);
       });
 
-      // Skipped: getUsage calls UsageStatsService.getUsageStats which requires App singleton (usage, planProvider) to be fully wired.
+      // Skipped: env.mjs requires DATABASE_URL, BASE_HOST, NEXTAUTH_SECRET etc. which are not available in this test environment.
       it.skip("keeps enforcement behavior when plan provider returns a copied FREE plan object", async () => {
         mockGetCurrentMonthCount.mockResolvedValue(1500);
         mockGetActivePlan.mockResolvedValue({
