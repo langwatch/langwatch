@@ -1,4 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createSemaphore } from "~/server/evaluations-v3/execution/semaphore.js";
+
+const FIND_EXISTING_TENANT_CONCURRENCY = 8;
 
 export class ExistenceChecker {
   constructor(
@@ -10,11 +13,18 @@ export class ExistenceChecker {
    * Load ALL existing (TenantId, AggregateId) pairs for this aggregate type.
    * Returns a Set of "tenantId:aggregateId" composite keys.
    * Used at startup to seed the in-memory done set for discovery mode.
+   *
+   * NOTE: this is a cross-tenant seed scan — it intentionally does not start
+   * with a single `TenantId = {x}` predicate, because its purpose is to load
+   * state for all tenants. It uses keyset pagination over the composite
+   * (TenantId, AggregateId) sort key, which is stable under concurrent writes
+   * and avoids the slow-OFFSET / shifted-page problems of LIMIT/OFFSET.
    */
   async loadAllExisting(): Promise<Set<string>> {
     const keys = new Set<string>();
-    let offset = 0;
     const pageSize = 10000;
+    let lastTenantId = "";
+    let lastAggregateId = "";
 
     while (true) {
       const result = await this.clickhouse.query({
@@ -22,13 +32,15 @@ export class ExistenceChecker {
           SELECT DISTINCT TenantId, AggregateId
           FROM event_log
           WHERE AggregateType = {aggregateType:String}
+            AND (TenantId, AggregateId) > ({lastTenantId:String}, {lastAggregateId:String})
           ORDER BY TenantId, AggregateId
-          LIMIT {limit:UInt64} OFFSET {offset:UInt64}
+          LIMIT {limit:UInt64}
         `,
         query_params: {
           aggregateType: this.aggregateType,
+          lastTenantId,
+          lastAggregateId,
           limit: pageSize,
-          offset,
         },
         format: "JSONEachRow",
       });
@@ -40,8 +52,11 @@ export class ExistenceChecker {
         keys.add(ExistenceChecker.compositeKey(row.TenantId, row.AggregateId));
       }
 
+      const last = rows[rows.length - 1]!;
+      lastTenantId = last.TenantId;
+      lastAggregateId = last.AggregateId;
+
       if (rows.length < pageSize) break;
-      offset += pageSize;
     }
 
     return keys;
@@ -77,8 +92,8 @@ export class ExistenceChecker {
           query: `
             SELECT DISTINCT AggregateId
             FROM event_log
-            WHERE AggregateType = {aggregateType:String}
-              AND TenantId = {tenantId:String}
+            WHERE TenantId = {tenantId:String}
+              AND AggregateType = {aggregateType:String}
               AND AggregateId IN ({ids:Array(String)})
           `,
           query_params: {
@@ -100,11 +115,18 @@ export class ExistenceChecker {
       }
     };
 
-    // Parallelize across tenants
+    // Parallelize across tenants with a bounded concurrency limit so a batch
+    // with many tenants doesn't spike ClickHouse load.
+    const semaphore = createSemaphore(FIND_EXISTING_TENANT_CONCURRENCY);
     await Promise.all(
-      [...tenantAggregates.entries()].map(([tenantId, aggregateIds]) =>
-        findForTenant(tenantId, aggregateIds),
-      ),
+      [...tenantAggregates.entries()].map(async ([tenantId, aggregateIds]) => {
+        await semaphore.acquire();
+        try {
+          await findForTenant(tenantId, aggregateIds);
+        } finally {
+          semaphore.release();
+        }
+      }),
     );
 
     return result;

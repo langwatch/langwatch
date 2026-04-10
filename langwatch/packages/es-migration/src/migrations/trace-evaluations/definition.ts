@@ -8,7 +8,7 @@ import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants.js";
-import { createEvaluationRunFoldProjection } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.foldProjection.js";
+import { EvaluationRunFoldProjection } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.foldProjection.js";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils.js";
 import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils.js";
 import type {
@@ -41,7 +41,7 @@ export function createTraceEvaluationMigrationDefinition(
   };
 
   // Create projection definition to reuse init/apply pure functions
-  const foldProjection = createEvaluationRunFoldProjection({
+  const foldProjection = new EvaluationRunFoldProjection({
     store: noopStore as any,
   });
 

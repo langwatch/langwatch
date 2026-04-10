@@ -13,8 +13,8 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants.js";
-import { createTraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.js";
-import { createSpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection.js";
+import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.js";
+import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection.js";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils.js";
 import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils.js";
 import type {
@@ -42,10 +42,10 @@ export function createTraceMigrationDefinition(
   const noopAppendStore = { append: async () => {} };
 
   // Create projection definitions to reuse their pure init/apply/map functions
-  const foldProjection = createTraceSummaryFoldProjection({
+  const foldProjection = new TraceSummaryFoldProjection({
     store: noopStore as any,
   });
-  const mapProjection = createSpanStorageMapProjection({
+  const mapProjection = new SpanStorageMapProjection({
     store: noopAppendStore as any,
   });
 

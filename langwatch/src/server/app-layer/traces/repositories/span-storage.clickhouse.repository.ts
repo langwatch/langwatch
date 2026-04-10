@@ -2,6 +2,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -218,8 +219,23 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       );
     }
 
+    // Enforce that a single bulk insert only writes spans for one tenant —
+    // the client is resolved once from the first span's tenantId, so mixed
+    // batches would silently route another tenant's data through the wrong
+    // (possibly private) ClickHouse instance.
+    const tenantId = spans[0]!.tenantId;
+    for (const span of spans) {
+      if (span.tenantId !== tenantId) {
+        throw new SecurityError(
+          "SpanStorageClickHouseRepository.insertSpans",
+          "all spans in a single batch must share the same tenantId",
+          tenantId,
+          { mismatchedTenantId: span.tenantId },
+        );
+      }
+    }
+
     try {
-      const tenantId = spans[0]!.tenantId;
       const client = await this.resolveClient(tenantId);
       const records = spans.map((span) => this.toClickHouseRecord(span));
       await client.insert({

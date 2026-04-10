@@ -1,6 +1,6 @@
 import type { Event } from "~/server/event-sourcing/domain/types.js";
 import {
-  createSimulationRunStateFoldProjection,
+  SimulationRunStateFoldProjection,
   type SimulationRunStateData,
 } from "~/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection.js";
 import {
@@ -88,7 +88,7 @@ export function createSimulationMigrationDefinition(
   };
 
   // Create projection definition to reuse init/apply pure functions
-  const foldProjection = createSimulationRunStateFoldProjection({
+  const foldProjection = new SimulationRunStateFoldProjection({
     store: noopStore as any,
   });
 

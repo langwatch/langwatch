@@ -246,9 +246,21 @@ export class DiscoveryMigrator {
         // Release event records for GC before executing projection writes
         allEventRecords.length = 0;
 
-        // Execute projection writes only if event insert succeeded
+        // Execute projection writes only if event insert succeeded. A
+        // projection failure fails the window just like an event-insert
+        // failure — otherwise the cursor would advance / aggregates would be
+        // marked done while projections were only partially written.
         if (!config.dryRun && !windowFailed && allProjectionWrites.length > 0) {
-          await Promise.all(allProjectionWrites.map((fn) => fn()));
+          try {
+            await Promise.all(allProjectionWrites.map((fn) => fn()));
+          } catch (err) {
+            logger.error("Failed to execute projection writes", {
+              count: allProjectionWrites.length,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            stats.errors++;
+            windowFailed = true;
+          }
         }
 
         // Flush CH before saving cursor

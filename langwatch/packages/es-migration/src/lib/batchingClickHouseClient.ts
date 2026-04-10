@@ -108,14 +108,32 @@ export function createBatchingClickHouseClient(
           [key: string]: unknown;
         }) => {
           const table = opts.table;
+          const incomingFormat = opts.format ?? "JSONEachRow";
           let batch = buffers.get(table);
           if (!batch) {
             batch = {
               values: [],
-              format: opts.format ?? "JSONEachRow",
+              format: incomingFormat,
               clickhouse_settings: opts.clickhouse_settings,
             };
             buffers.set(table, batch);
+          } else {
+            // Guard against silent data corruption: the buffer stores the
+            // first caller's `format` / `clickhouse_settings`, so later
+            // callers with different values would be coerced. Fail loudly.
+            if (batch.format !== incomingFormat) {
+              throw new Error(
+                `batchingClickHouseClient: format mismatch for table "${table}" (buffered as "${batch.format}", new call uses "${incomingFormat}")`,
+              );
+            }
+            if (
+              JSON.stringify(batch.clickhouse_settings ?? null) !==
+              JSON.stringify(opts.clickhouse_settings ?? null)
+            ) {
+              throw new Error(
+                `batchingClickHouseClient: clickhouse_settings mismatch for table "${table}" — batched inserts to the same table must share identical settings`,
+              );
+            }
           }
 
           if (Array.isArray(opts.values)) {
