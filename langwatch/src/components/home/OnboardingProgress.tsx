@@ -91,7 +91,7 @@ export const buildOnboardingSteps = (
     {
       key: "createProject",
       title: "Create your new project",
-      href: "/settings/projects",
+      href: "/settings/teams",
       complete: true,
     },
     {

@@ -47,6 +47,8 @@ import { tracesRouter } from "./routers/traces";
 import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
 import { scimTokenRouter } from "./routers/scimToken";
+import { roleBindingRouter } from "./routers/roleBinding";
+import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
 
@@ -99,6 +101,8 @@ const coreRouters = {
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
   scimToken: scimTokenRouter,
+  roleBinding: roleBindingRouter,
+  group: groupRouter,
 };
 
 const eeRouters = {

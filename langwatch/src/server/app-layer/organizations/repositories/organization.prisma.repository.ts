@@ -1,14 +1,17 @@
 import {
   OrganizationUserRole,
   PricingModel,
+  RoleBindingScopeType,
   TeamUserRole,
   type Currency,
   type Prisma,
   type PrismaClient,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { generate } from "@langwatch/ksuid";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { encrypt } from "~/utils/encryption";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   isTeamRoleAllowedForOrganizationRole,
   type TeamRoleValue,
@@ -206,6 +209,28 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           userId: input.userId,
           teamId: team.id,
           role: "ADMIN",
+        },
+      });
+
+      await tx.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: organization.id,
+          userId: input.userId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organization.id,
+        },
+      });
+
+      await tx.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: organization.id,
+          userId: input.userId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
         },
       });
 
@@ -408,10 +433,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       await tx.teamUser.deleteMany({
         where: {
           userId,
-          team: {
-            organizationId,
-          },
+          team: { organizationId },
         },
+      });
+      // Delete all RoleBindings for this user in this org (all scopes)
+      await tx.roleBinding.deleteMany({
+        where: { organizationId, userId },
       });
     });
   }
@@ -469,6 +496,38 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
         data: { role },
       });
+
+      // Keep ORGANIZATION-scoped RoleBinding in sync (skip EXTERNAL)
+      if (role !== OrganizationUserRole.EXTERNAL) {
+        await tx.roleBinding.deleteMany({
+          where: {
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
+        await tx.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId,
+            userId,
+            role: role as unknown as TeamUserRole,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
+      } else {
+        // EXTERNAL (Lite Member) users have no org-level binding
+        await tx.roleBinding.deleteMany({
+          where: {
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
+      }
 
       const organizationTeams = await tx.team.findMany({
         where: { organizationId },
@@ -581,6 +640,22 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             assignedRoleId: shouldClearCustomRole
               ? null
               : teamRoleUpdate.customRoleId,
+          },
+        });
+
+        // Keep TEAM-scoped RoleBinding in sync
+        await tx.roleBinding.deleteMany({
+          where: { organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        });
+        await tx.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId,
+            userId,
+            role: nextRole,
+            customRoleId: shouldClearCustomRole ? null : (teamRoleUpdate.customRoleId ?? null),
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
           },
         });
       }
@@ -709,6 +784,21 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         });
 
+        await tx.roleBinding.deleteMany({
+          where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        });
+        await tx.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId: team.organizationId,
+            userId,
+            role: TeamUserRole.CUSTOM,
+            customRoleId: storedCustomRoleId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        });
+
         const finalAdminCount = await tx.teamUser.count({
           where: {
             teamId,
@@ -821,6 +911,21 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           data: {
             role,
             assignedRoleId: null,
+          },
+        });
+
+        await tx.roleBinding.deleteMany({
+          where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+        });
+        await tx.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId: team.organizationId,
+            userId,
+            role: role as TeamUserRole,
+            customRoleId: null,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
           },
         });
 

@@ -1,12 +1,13 @@
-import type { PrismaClient, User } from "@prisma/client";
+import { RoleBindingScopeType, TeamUserRole, type PrismaClient, type User } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { generate } from "@langwatch/ksuid";
 import { UserService } from "../users/user.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   ScimUser,
   ScimListResponse,
   ScimError,
   ScimCreateUserRequest,
-  ScimPatchOperation,
   ScimPatchRequest,
 } from "./scim.types";
 
@@ -60,9 +61,19 @@ export class ScimService {
             role: "MEMBER",
           },
         });
+        await this.prisma.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId,
+            userId: existingUser.id,
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        });
       } catch (e) {
         if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
-          return this.scimError({ status: "409", detail: "User already exists in this organization" });
+          return this.toScimUser(existingUser);
         }
         throw e;
       }
@@ -86,6 +97,15 @@ export class ScimService {
           userId: newUser.id,
           organizationId,
           role: "MEMBER",
+        },
+      });
+      await this.prisma.roleBinding.create({
+        data: {
+          organizationId,
+          userId: newUser.id,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organizationId,
         },
       });
     } catch (e) {
@@ -140,7 +160,7 @@ export class ScimService {
     };
 
     if (emailFilter) {
-      whereClause.user = { email: emailFilter };
+      whereClause.user = { email: { equals: emailFilter, mode: 'insensitive' } };
     }
 
     const [memberships, totalCount] = await Promise.all([
@@ -229,8 +249,53 @@ export class ScimService {
     }
 
     for (const operation of patchRequest.Operations) {
-      if (operation.op === "replace") {
-        await this.applyReplaceOperation({ id, operation });
+      if (operation.op !== "replace") continue;
+
+      // Handle path="active" with a scalar boolean value (e.g. Okta/Azure AD style)
+      if (operation.path === "active") {
+        if (operation.value === false || operation.value === "false") {
+          await this.userService.deactivate({ id });
+        } else {
+          await this.userService.reactivate({ id });
+        }
+        continue;
+      }
+
+      if (operation.value == null || typeof operation.value !== "object") continue;
+
+      const value = operation.value as Record<string, unknown>;
+      const updates: { name?: string; email?: string } = {};
+
+      if ("active" in value) {
+        if (value.active === false) {
+          await this.userService.deactivate({ id });
+        } else {
+          await this.userService.reactivate({ id });
+        }
+      }
+
+      if ("userName" in value && typeof value.userName === "string") {
+        updates.email = value.userName;
+      }
+
+      if ("name" in value && typeof value.name === "object") {
+        const nameObj = value.name as Record<string, string>;
+        const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
+        if (parts.length > 0) {
+          updates.name = parts.join(" ");
+        }
+      } else if ("name.givenName" in value || "name.familyName" in value) {
+        // Dot-notation attribute paths in value object (RFC 7644 §3.5.2)
+        const given = typeof value["name.givenName"] === "string" ? value["name.givenName"] : null;
+        const family = typeof value["name.familyName"] === "string" ? value["name.familyName"] : null;
+        const parts = [given, family].filter(Boolean);
+        if (parts.length > 0) {
+          updates.name = parts.join(" ");
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await this.userService.updateProfile({ id, ...updates });
       }
     }
 
@@ -261,6 +326,14 @@ export class ScimService {
       return this.scimError({ status: "404", detail: "User not found" });
     }
 
+    await this.prisma.$transaction([
+      this.prisma.organizationUser.delete({
+        where: { userId_organizationId: { userId: id, organizationId } },
+      }),
+      this.prisma.roleBinding.deleteMany({
+        where: { userId: id, organizationId },
+      }),
+    ]);
     await this.userService.deactivate({ id });
     return null;
   }
@@ -290,56 +363,6 @@ export class ScimService {
         lastModified: user.updatedAt.toISOString(),
       },
     };
-  }
-
-  private async applyReplaceOperation({
-    id,
-    operation,
-  }: {
-    id: string;
-    operation: ScimPatchOperation;
-  }): Promise<void> {
-    // Path-based replace with primitive value, e.g. { op: "replace", path: "active", value: false }
-    if (operation.path && typeof operation.value !== "object") {
-      if (operation.path === "active") {
-        if (operation.value === false) {
-          await this.userService.deactivate({ id });
-        } else {
-          await this.userService.reactivate({ id });
-        }
-      }
-      return;
-    }
-
-    // Object-based replace, e.g. { op: "replace", value: { active: false, userName: "..." } }
-    if (operation.value != null && typeof operation.value === "object") {
-      const value = operation.value as Record<string, unknown>;
-      const updates: { name?: string; email?: string } = {};
-
-      if ("active" in value) {
-        if (value.active === false) {
-          await this.userService.deactivate({ id });
-        } else {
-          await this.userService.reactivate({ id });
-        }
-      }
-
-      if ("userName" in value && typeof value.userName === "string") {
-        updates.email = value.userName;
-      }
-
-      if ("name" in value && typeof value.name === "object") {
-        const nameObj = value.name as Record<string, string>;
-        const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
-        if (parts.length > 0) {
-          updates.name = parts.join(" ");
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await this.userService.updateProfile({ id, ...updates });
-      }
-    }
   }
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {

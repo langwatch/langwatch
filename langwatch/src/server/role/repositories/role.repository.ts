@@ -2,8 +2,11 @@ import {
   type CustomRole,
   type Prisma,
   type PrismaClient,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
  * Derives create params from Prisma schema, omitting auto-generated fields
@@ -87,32 +90,60 @@ export class RoleRepository {
   }
 
   async assignToUser(userId: string, teamId: string, customRoleId: string) {
-    await this.prisma.teamUser.update({
-      where: {
-        userId_teamId: {
+    const team = await this.prisma.team.findUniqueOrThrow({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.teamUser.update({
+        where: { userId_teamId: { userId, teamId } },
+        data: { role: TeamUserRole.CUSTOM, assignedRoleId: customRoleId },
+      });
+
+      await tx.roleBinding.deleteMany({
+        where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+      });
+      await tx.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: team.organizationId,
           userId,
-          teamId,
+          role: TeamUserRole.CUSTOM,
+          customRoleId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
         },
-      },
-      data: {
-        role: TeamUserRole.CUSTOM,
-        assignedRoleId: customRoleId,
-      },
+      });
     });
   }
 
   async removeFromUser(userId: string, teamId: string) {
-    await this.prisma.teamUser.update({
-      where: {
-        userId_teamId: {
+    const team = await this.prisma.team.findUniqueOrThrow({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.teamUser.update({
+        where: { userId_teamId: { userId, teamId } },
+        data: { role: TeamUserRole.VIEWER, assignedRoleId: null },
+      });
+
+      await tx.roleBinding.deleteMany({
+        where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+      });
+      await tx.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: team.organizationId,
           userId,
-          teamId,
+          role: TeamUserRole.VIEWER,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
         },
-      },
-      data: {
-        role: TeamUserRole.VIEWER, // Revert to VIEWER when removing custom role
-        assignedRoleId: null,
-      },
+      });
     });
   }
 }
