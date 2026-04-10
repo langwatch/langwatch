@@ -81,13 +81,15 @@ describe("createEvaluatorEditorCallbacks()", () => {
         });
 
         callbacks.onMappingChange?.("input", {
-          source: "dataset-1",
-          key: "col-a",
+          type: "source",
+          sourceId: "dataset-1",
+          path: ["col-a"],
         });
 
         expect(onMappingChange).toHaveBeenCalledWith("input", {
-          source: "dataset-1",
-          key: "col-a",
+          type: "source",
+          sourceId: "dataset-1",
+          path: ["col-a"],
         });
       });
     });
