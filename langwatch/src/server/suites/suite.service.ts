@@ -331,11 +331,11 @@ export class SuiteService {
       scenarioRows.map((r) => [r.id, r.name]),
     );
 
-    const httpIds = targets.filter((t) => t.type === "http").map((t) => t.referenceId);
+    const agentIds = targets.filter((t) => t.type === "http" || t.type === "code").map((t) => t.referenceId);
     const promptIds = targets.filter((t) => t.type === "prompt").map((t) => t.referenceId);
 
-    const agentRows = httpIds.length > 0
-      ? await this.agentRepository.findNamesByIds({ ids: httpIds, projectId })
+    const agentRows = agentIds.length > 0
+      ? await this.agentRepository.findNamesByIds({ ids: agentIds, projectId })
       : [];
 
     const promptRows = promptIds.length > 0
