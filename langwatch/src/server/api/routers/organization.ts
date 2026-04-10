@@ -1,7 +1,5 @@
 import {
   OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -33,21 +31,7 @@ import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/re
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 
 
-const customTeamRoleInputSchema = z
-  .string()
-  .regex(
-    /^custom:[a-zA-Z0-9_-]+$/,
-    "Custom role must be in format 'custom:{roleId}'",
-  );
-const builtInTeamRoleInputSchema = z.enum([
-  TeamUserRole.ADMIN,
-  TeamUserRole.MEMBER,
-  TeamUserRole.VIEWER,
-]);
-export const teamRoleInputSchema = z.union([
-  builtInTeamRoleInputSchema,
-  customTeamRoleInputSchema,
-]);
+import { teamRoleInputSchema } from "./schemas/teamRole";
 
 
 export const organizationRouter = createTRPCRouter({
