@@ -377,19 +377,16 @@ export function useLoadSpanIntoPromptPlayground() {
 
         const variables = spanData.promptVariables ?? {};
 
+        const hasPromptReference =
+          spanData.promptHandle &&
+          (spanData.promptVersionNumber != null || spanData.promptTag != null);
+
         // Determine effective action: explicit or auto-detected from prompt reference
         const effectiveAction: PlaygroundAction =
-          action ??
-          (spanData.promptHandle && (spanData.promptVersionNumber ?? spanData.promptTag)
-            ? "open-existing"
-            : "create-new");
+          action ?? (hasPromptReference ? "open-existing" : "create-new");
 
         // When action is "open-existing" and span references a managed prompt
-        if (
-          effectiveAction === "open-existing" &&
-          spanData.promptHandle &&
-          (spanData.promptVersionNumber ?? spanData.promptTag)
-        ) {
+        if (effectiveAction === "open-existing" && hasPromptReference) {
           const existingPrompt = await tryOpenExistingPromptTab({
             promptHandle: spanData.promptHandle,
             promptVersionNumber: spanData.promptVersionNumber,

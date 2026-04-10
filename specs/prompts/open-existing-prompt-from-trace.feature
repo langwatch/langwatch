@@ -229,6 +229,8 @@ Feature: Open existing prompt from trace
     Then a new playground tab is created from the trace data
     And a warning toast is shown that the original prompt was not found
 
+  # Note: This scenario is already covered by existing trace service tests from PR #2826
+  # which added promptTag propagation through ClickHouse and Elasticsearch services.
   @integration
   Scenario: Backend extracts prompt tag from span attributes
     Given a span with attribute "langwatch.prompt.id" = "team/sample-prompt:production"
