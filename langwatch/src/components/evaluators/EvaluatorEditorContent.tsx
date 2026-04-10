@@ -149,8 +149,8 @@ export function EvaluatorEditorContent({
           </Text>
         )}
 
-        {/* Mappings section - shown when caller provides mappingsConfig */}
-        {mappingsConfig && (
+        {/* Mappings section - shown when caller provides mappingsConfig with onMappingChange */}
+        {mappingsConfig && mappingsConfig.onMappingChange && (
           <Box>
             <EvaluatorMappingsSection
               evaluatorDef={effectiveEvaluatorDef}

@@ -1181,7 +1181,7 @@ function SeriesField({
 
   const metric_ = metric ? getMetric(metric) : undefined;
 
-  const { openDrawer } = useDrawer();
+  const { openDrawer, setFlowCallbacks } = useDrawer();
 
   // Sync aggregation when metric changes — if the current aggregation
   // isn't allowed by the new metric, switch to the first allowed one.
@@ -1373,10 +1373,8 @@ function SeriesField({
                   filters={
                     field.value ?? ({} as Record<FilterField, FilterParam>)
                   }
-                  onClick={() =>
-                    openDrawer("seriesFilters", {
-                      filters:
-                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                  onClick={() => {
+                    setFlowCallbacks("seriesFilters", {
                       onChange: ({
                         filters,
                       }: {
@@ -1384,8 +1382,12 @@ function SeriesField({
                       }) => {
                         form.setValue(`series.${index}.filters`, filters);
                       },
-                    })
-                  }
+                    });
+                    openDrawer("seriesFilters", {
+                      filters:
+                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                    });
+                  }}
                 >
                   {Object.keys(nonEmptyFilters).length > 0
                     ? "Edit Filters"

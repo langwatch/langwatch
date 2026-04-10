@@ -635,9 +635,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
+    setFlowCallbacks("evaluatorEditor", {
+      onMappingChange: handleMappingChange,
+    });
     openDrawer("evaluatorEditor", {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
@@ -686,10 +688,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         const newMappingsConfig: EvaluatorMappingsConfig = {
           level: level ?? undefined,
           initialMappings: autoMappings,
-          onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
+        setFlowCallbacks("evaluatorEditor", {
+          onMappingChange: handleMappingChange,
+        });
         openDrawer(
           "evaluatorEditor",
           {
@@ -705,11 +709,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     // Open the evaluator editor directly - use default "Save Changes" text
     // since we're editing an already-selected evaluator
+    setFlowCallbacks("evaluatorEditor", {
+      onMappingChange: handleMappingChange,
+    });
     openDrawer("evaluatorEditor", {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
@@ -758,12 +764,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       const mappingsConfig: EvaluatorMappingsConfig = {
         level: level ?? undefined,
         initialMappings: autoMappings,
-        onMappingChange: handleMappingChange,
       };
 
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)
       // This way, Cancel/back from evaluatorEditor goes to onlineEvaluation, not evaluatorList
       // Use "Select Evaluator" button text since we're selecting, not editing
+      setFlowCallbacks("evaluatorEditor", {
+        onMappingChange: handleMappingChange,
+      });
       openDrawer(
         "evaluatorEditor",
         {
