@@ -1,15 +1,8 @@
-import crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
-import superjson from "superjson";
-import {
-  fetchExistingMD5s,
-  scheduleTraceCollectionWithFallback,
-} from "~/server/background/workers/collectorWorker";
-import { openTelemetryMetricsRequestToTracesForCollection } from "~/server/tracer/otel.metrics";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { readBody } from "../../decompressBody";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
@@ -174,82 +167,14 @@ async function handleMetricsRequest(req: NextRequest) {
         }
       }
 
-      // Event sourcing dual-write for metrics
-      if (project.featureEventSourcingTraceIngestion) {
-        await getApp().traces.metricCollection.handleOtlpMetricRequest({
-          tenantId: project.id,
-          metricRequest: metricsRequest,
-          piiRedactionLevel: project.piiRedactionLevel,
-        });
-      }
-      if (project.disableElasticSearchTraceWriting) {
-        return NextResponse.json({ message: "OK" });
-      }
+      // Ingest metrics via event sourcing into ClickHouse
+      await getApp().traces.metricCollection.handleOtlpMetricRequest({
+        tenantId: project.id,
+        metricRequest: metricsRequest,
+        piiRedactionLevel: project.piiRedactionLevel,
+      });
 
-      const tracesGeneratedFromMetrics =
-        await openTelemetryMetricsRequestToTracesForCollection(metricsRequest);
-
-      const promises = await tracer.withActiveSpan(
-        "check which traces have already been collected",
-        { kind: SpanKind.INTERNAL },
-        async () => {
-          const promises: Promise<void>[] = [];
-          for (const traceForCollection of tracesGeneratedFromMetrics) {
-            const paramsMD5 = crypto
-              .createHash("md5")
-              .update(superjson.stringify({ ...traceForCollection }))
-              .digest("hex");
-            const existingTrace = await fetchExistingMD5s(
-              traceForCollection.traceId,
-              project.id,
-            );
-            if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
-              continue;
-            }
-
-            logger.info(
-              {
-                traceId: traceForCollection.traceId,
-                metricsRequestSizeMb: parseFloat(
-                  (body.byteLength / (1024 * 1024)).toFixed(3),
-                ),
-              },
-              "collecting traces from metrics",
-            );
-
-            promises.push(
-              scheduleTraceCollectionWithFallback(
-                {
-                  ...traceForCollection,
-                  projectId: project.id,
-                  existingTrace,
-                  paramsMD5,
-                  expectedOutput: void 0,
-                  evaluations: void 0,
-                  collectedAt: Date.now(),
-                },
-                false,
-                body.byteLength,
-              ),
-            );
-          }
-          return promises;
-        },
-      );
-
-      if (promises.length === 0) {
-        return NextResponse.json({ message: "No changes" });
-      }
-
-      await tracer.withActiveSpan(
-        "push pending traces to collector queue",
-        { kind: SpanKind.PRODUCER },
-        async () => {
-          await Promise.all(promises);
-        },
-      );
-
-      return NextResponse.json({ message: "OK" }, { status: 200 });
+      return NextResponse.json({ message: "OK" });
     },
   );
 }

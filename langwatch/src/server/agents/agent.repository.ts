@@ -230,6 +230,33 @@ export class AgentRepository {
   }
 
   /**
+   * Finds agents for a project with pagination.
+   * Excludes archived agents. Orders by most recently updated.
+   */
+  async findAllPaginated(input: {
+    projectId: string;
+    page: number;
+    limit: number;
+  }): Promise<{ data: TypedAgent[]; total: number }> {
+    const where = {
+      projectId: input.projectId,
+      archivedAt: null,
+    };
+
+    const [agents, total] = await Promise.all([
+      this.prisma.agent.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: (input.page - 1) * input.limit,
+        take: input.limit,
+      }),
+      this.prisma.agent.count({ where }),
+    ]);
+
+    return { data: agents.map(parseAgent), total };
+  }
+
+  /**
    * Creates a new agent.
    * Validates config matches the specified type's DSL schema.
    */

@@ -1,0 +1,74 @@
+# values-e2e.yaml — CI e2e test values for the langwatch Helm chart.
+#
+# Skips private-registry images (app, workers, nlp, langevals) so the test
+# can run without Docker Hub credentials.  Focuses on validating the
+# infrastructure tier: ClickHouse, PostgreSQL, Redis, and chart wiring.
+#
+# Usage: helm install lw-test . -f tests/values-e2e.yaml -n lw-test --create-namespace
+
+autogen:
+  enabled: true
+
+images:
+  app:
+    pullPolicy: Never
+
+# ── services that require private images — set to 0 replicas ─────────────────
+app:
+  replicaCount: 0
+  features:
+    skipEnvValidation: true
+
+workers:
+  replicaCount: 0
+
+langwatch_nlp:
+  replicaCount: 0
+
+langevals:
+  replicaCount: 0
+
+# ── ClickHouse (chart-managed, known password for testing) ───────────────────
+clickhouse:
+  chartManaged: true
+  image:
+    pullPolicy: Never
+  replicas: 1
+  memory: 2Gi
+  cpu: 1
+  storage:
+    size: 1Gi
+  auth:
+    password: "e2etest"
+
+# ── PostgreSQL ─────────────────────────────────────────────────────────────────
+postgresql:
+  chartManaged: true
+  auth:
+    password: "e2etest"
+    database: "langwatch"
+  primary:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits: { cpu: 250m, memory: 256Mi }
+
+# ── Redis (no auth — simpler for testing) ────────────────────────────────────
+redis:
+  chartManaged: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 1Gi
+    resources:
+      requests: { cpu: 25m, memory: 32Mi }
+      limits: { cpu: 100m, memory: 128Mi }
+
+# ── Prometheus (disabled — not needed for infra testing) ───────────���─────────
+prometheus:
+  chartManaged: false
+
+cronjobs:
+  enabled: false

@@ -1,4 +1,8 @@
-import type { CreateEvaluatorBody, EvaluatorResponse } from "./types";
+import type {
+  CreateEvaluatorBody,
+  DeleteEvaluatorResponse,
+  EvaluatorResponse,
+} from "./types";
 import {
   createLangWatchApiClient,
   type LangwatchApiClient,
@@ -76,6 +80,21 @@ export class EvaluatorsApiService {
       body: params,
     });
     if (error) this.handleApiError("create evaluator", error);
+    return data;
+  }
+
+  /**
+   * Deletes (archives) an evaluator by its ID.
+   */
+  async delete(id: string): Promise<DeleteEvaluatorResponse> {
+    const { data, error } = await this.apiClient.DELETE(
+      "/api/evaluators/{id}",
+      {
+        params: { path: { id } },
+      },
+    );
+    if (error)
+      this.handleApiError(`delete evaluator with ID "${id}"`, error);
     return data;
   }
 }

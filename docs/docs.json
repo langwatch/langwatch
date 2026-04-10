@@ -464,29 +464,44 @@
         "icon": "server",
         "groups": [
           {
-            "group": "Deployment",
+            "group": "Overview",
             "pages": [
               "self-hosting/overview",
-              "self-hosting/docker-compose",
-              "self-hosting/docker-images",
-              "self-hosting/kubernetes-helm",
-              "self-hosting/onprem"
+              "hybrid-setup/overview",
+              "self-hosting/troubleshooting"
             ]
           },
           {
             "group": "Configuration",
             "pages": [
-              "self-hosting/env-variables",
-              "self-hosting/sso-setup-langwatch",
-              "self-hosting/grafana"
+              "self-hosting/configuration/environment-variables",
+              "self-hosting/configuration/sizing-and-scaling",
+              "self-hosting/configuration/backups",
+              "self-hosting/configuration/sso",
+              "self-hosting/configuration/observability",
+              "self-hosting/configuration/third-party-integrations"
             ]
           },
           {
-            "group": "Hybrid Setup",
+            "group": "Deployment",
             "pages": [
-              "hybrid-setup/overview",
-              "hybrid-setup/elasticsearch",
-              "hybrid-setup/s3-storage"
+              "self-hosting/deployment/docker-compose",
+              "self-hosting/deployment/docker-images",
+              "self-hosting/deployment/kubernetes-helm",
+              "self-hosting/deployment/kubernetes-local"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "self-hosting/infrastructure/architecture"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "self-hosting/security",
+              "self-hosting/upgrade"
             ]
           }
         ]
@@ -659,7 +674,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1775473672",
+      "source": "/ci/cache/busted/1775739805",
       "destination": "/"
     },
     {
@@ -728,7 +743,7 @@
     },
     {
       "source": "/self-hosting/sso-hybrid",
-      "destination": "/hybrid-setup/sso-setup-langwatch"
+      "destination": "/self-hosting/configuration/sso"
     },
     {
       "source": "/self-hosting/open-source",
@@ -809,6 +824,42 @@
     {
       "source": "/integration/rags-context-tracking",
       "destination": "/integration/python/tutorials/capturing-rag"
+    },
+    {
+      "source": "/self-hosting/env-variables",
+      "destination": "/self-hosting/configuration/environment-variables"
+    },
+    {
+      "source": "/self-hosting/sso-setup-langwatch",
+      "destination": "/self-hosting/configuration/sso"
+    },
+    {
+      "source": "/self-hosting/grafana",
+      "destination": "/self-hosting/configuration/observability"
+    },
+    {
+      "source": "/self-hosting/onprem",
+      "destination": "/self-hosting/infrastructure/architecture"
+    },
+    {
+      "source": "/hybrid-setup/elasticsearch",
+      "destination": "/hybrid-setup/overview"
+    },
+    {
+      "source": "/hybrid-setup/s3-storage",
+      "destination": "/hybrid-setup/overview"
+    },
+    {
+      "source": "/self-hosting/docker-compose",
+      "destination": "/self-hosting/deployment/docker-compose"
+    },
+    {
+      "source": "/self-hosting/docker-images",
+      "destination": "/self-hosting/deployment/docker-images"
+    },
+    {
+      "source": "/self-hosting/kubernetes-helm",
+      "destination": "/self-hosting/deployment/kubernetes-helm"
     }
   ]
 }

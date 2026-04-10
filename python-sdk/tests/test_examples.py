@@ -66,6 +66,8 @@ async def test_example(example_file: str):
         pytest.skip("CLI examples are tested separately via make cli-examples")
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
+    if example_file == "dataset_crud_example.py":
+        pytest.skip("dataset_crud_example.py requires a live LangWatch instance")
     if example_file == "opentelemetry/openllmetry_anthropic_bot.py":
         pytest.skip(
             "openllmetry anthropic has a bug starting another async process inside"

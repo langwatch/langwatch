@@ -461,55 +461,9 @@ const processCollectorJob_ = async (
     );
   }
 
-  const esWriteDisabled = project.disableElasticSearchTraceWriting;
-
-  if (!esWriteDisabled) {
-    await withSpan("updateTrace", () =>
-      updateTrace(trace, esSpans, evaluations),
-    );
-  } else {
-    logger.debug(
-      { projectId: project.id, traceId },
-      "Skipping ES trace write — disableElasticSearchTraceWriting is enabled",
-    );
-  }
+  // ES writes are disabled — ClickHouse handles all trace persistence via event sourcing.
 
   void markProjectFirstMessage(project, trace.metadata);
-
-  if (env.IS_QUICKWIT || esWriteDisabled) {
-    // Skip check and adjust for quickwit or when ES writes are disabled
-    return;
-  }
-
-  const checkAndAdjust = async (postfix = "") => {
-    return collectorQueue.add(
-      "collector",
-      {
-        action: "check_and_adjust",
-        traceId,
-        projectId,
-      },
-      {
-        jobId: `collector_${traceId}_check_and_adjust${postfix}`,
-        delay: 3000,
-      },
-    );
-  };
-
-  const job = await checkAndAdjust();
-  try {
-    // Push it forward if two traces are processed at the same time
-    await job?.changeDelay(3000);
-  } catch {
-    try {
-      // Remove the existing job and start a new one to rerun adjust
-      await job?.remove();
-      await checkAndAdjust();
-    } catch {
-      // If that fails too because adjust is running, start a new job with different id for later
-      await checkAndAdjust("_2");
-    }
-  }
 };
 
 const updateTrace = async (

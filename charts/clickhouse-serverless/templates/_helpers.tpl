@@ -23,7 +23,7 @@ app.kubernetes.io/name: {{ include "clickhouse-serverless.fullname" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/* Password secret name */}}
+{{/* Password secret name (supports tpl expressions in existingSecret for parent-chart ownership) */}}
 {{- define "clickhouse-serverless.secretName" -}}
   {{- if .Values.auth.existingSecret -}}
     {{- tpl .Values.auth.existingSecret . -}}

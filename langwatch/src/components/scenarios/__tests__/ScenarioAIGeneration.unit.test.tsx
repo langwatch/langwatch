@@ -4,7 +4,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  extractProviderFromModel,
   formHasContent,
   type GeneratedScenario,
   usePromptHistory,
@@ -275,22 +274,3 @@ describe("formHasContent", () => {
   });
 });
 
-describe("extractProviderFromModel", () => {
-  it("extracts provider from model ID", () => {
-    expect(extractProviderFromModel("openai/gpt-4")).toBe("openai");
-    expect(extractProviderFromModel("anthropic/claude-3")).toBe("anthropic");
-    expect(extractProviderFromModel("azure/gpt-4-turbo")).toBe("azure");
-  });
-
-  it("returns the string itself for model without separator", () => {
-    expect(extractProviderFromModel("gpt-4")).toBe("gpt-4");
-  });
-
-  it("handles empty string", () => {
-    expect(extractProviderFromModel("")).toBe("");
-  });
-
-  it("handles multiple separators", () => {
-    expect(extractProviderFromModel("provider/model/version")).toBe("provider");
-  });
-});
