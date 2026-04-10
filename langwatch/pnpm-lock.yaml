@@ -850,8 +850,8 @@ importers:
   packages/es-migration:
     dependencies:
       '@clickhouse/client':
-        specifier: ^1.13.0
-        version: 1.15.0
+        specifier: 1.13.0
+        version: 1.13.0
       '@elastic/elasticsearch':
         specifier: ^8.17.0
         version: 8.19.1
