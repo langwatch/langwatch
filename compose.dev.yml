@@ -21,8 +21,8 @@
 #
 # Resource limits:
 #   minimal (dev):     ~10.3GB (postgres 256 + redis 64 + clickhouse 2048 + app 8192)
-#   scenarios:         ~11.8GB (+ workers 1536 + nlp 1024 + bullboard 512 + ai-server 256)
-#   full:              ~12.1GB (+ langevals 256)
+#   scenarios:         ~13.6GB (+ workers 1536 + nlp 1024 + bullboard 512 + ai-server 256)
+#   full:              ~13.8GB (+ langevals 256)
 #
 # Stop everything:
 #   docker compose -f compose.dev.yml --profile full down
