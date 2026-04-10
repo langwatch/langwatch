@@ -13,11 +13,11 @@ export function PricingSummary({
 }) {
   return (
     <VStack align="start" gap={0}>
-      <Text data-testid={totalTestId} fontSize="sm" color="gray.700">
+      <Text data-testid={totalTestId} fontSize="sm" color="fg">
         {totalPrice} for {seatCount} seat{seatCount !== 1 ? "s" : ""}
       </Text>
       {perSeatPrice && seatCount > 1 && (
-        <Text fontSize="xs" color="gray.500">
+        <Text fontSize="xs" color="fg.muted">
           {perSeatPrice}
         </Text>
       )}

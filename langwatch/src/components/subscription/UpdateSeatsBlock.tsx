@@ -30,7 +30,7 @@ export function UpdateSeatsBlock({
     <Card.Root
       data-testid="update-seats-block"
       borderWidth={1}
-      borderColor="gray.200"
+      borderColor="border"
     >
       <Card.Body paddingY={5} paddingX={6}>
         <Flex justifyContent="space-between" alignItems="center">
