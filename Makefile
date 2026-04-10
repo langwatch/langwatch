@@ -14,19 +14,15 @@ COMPOSE = docker compose -f compose.dev.yml
 setup-hooks:
 	@git config core.hooksPath .githooks 2>/dev/null || true
 
-# Minimal: postgres + redis + app (no opensearch)
+# Minimal: postgres + redis + clickhouse + app
 dev:
 	$(COMPOSE) up
-
-# + opensearch (for traces/search features)
-dev-search:
-	$(COMPOSE) --profile search up
 
 # + NLP service + langevals (for evaluations)
 dev-nlp:
 	$(COMPOSE) --profile nlp up
 
-# + scenario worker + bullboard + NLP (no opensearch needed)
+# + scenario worker + bullboard + NLP
 dev-scenarios:
 	$(COMPOSE) --profile scenarios up
 
