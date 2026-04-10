@@ -140,6 +140,11 @@ jobs:
           cache-dependency-path: |
             langwatch/pnpm-lock.yaml
             agentic-e2e-tests/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
+
+      - name: Build MCP server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm build
 
       - name: Install app dependencies
         working-directory: langwatch
@@ -181,10 +186,6 @@ jobs:
       - name: Build app
         working-directory: langwatch
         run: NODE_ENV=test pnpm build
-
-      - name: Build MCP server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm build
 
       - name: Run E2E tests
         run: |
