@@ -660,8 +660,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                   </VStack>
                 )}
 
-                {/* No settings message - only for non-workflow evaluators with no settings and no mappings */}
-                {!hasSettings && !mappingsConfig && !isWorkflowEvaluator && (
+                {/* No settings message - only for non-workflow evaluators with no settings and no active mappings */}
+                {!hasSettings &&
+                  (!mappingsConfig || !onMappingChange) &&
+                  !isWorkflowEvaluator && (
                   <Text fontSize="sm" color="fg.muted">
                     This evaluator does not have any settings to configure.
                   </Text>
