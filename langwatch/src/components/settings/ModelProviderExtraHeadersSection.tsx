@@ -33,7 +33,11 @@ export const ExtraHeadersSection = ({
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
 }) => {
-  if (provider.provider !== "azure" && provider.provider !== "custom") {
+  if (
+    provider.provider !== "azure" &&
+    provider.provider !== "custom" &&
+    provider.provider !== "azure_safety"
+  ) {
     return null;
   }
 

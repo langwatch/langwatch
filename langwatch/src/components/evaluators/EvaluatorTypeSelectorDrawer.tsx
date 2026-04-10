@@ -1,9 +1,13 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { LuArrowLeft } from "react-icons/lu";
+import { useRouter } from "next/router";
+import { LuArrowLeft, LuExternalLink } from "react-icons/lu";
 
+import { Tooltip } from "~/components/ui/tooltip";
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import { api } from "~/utils/api";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 export type EvaluatorTypeSelectorDrawerProps = {
@@ -118,6 +122,8 @@ export function EvaluatorTypeSelectorDrawer(
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
@@ -132,9 +138,23 @@ export function EvaluatorTypeSelectorDrawer(
 
   const evaluatorTypes = category ? (categoryEvaluators[category] ?? []) : [];
 
+  // Query availableEvaluators to get project-aware missingEnvVars so we can
+  // gate Azure evaluator cards behind a configured azure_safety provider.
+  const availableEvaluatorsQuery = api.evaluations.availableEvaluators.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && isOpen },
+  );
+
   const handleSelectEvaluator = (evaluatorType: string) => {
     onSelect?.(evaluatorType);
     openDrawer("evaluatorEditor", { evaluatorType, category });
+  };
+
+  const handleConfigureAzureSafety = () => {
+    onClose();
+    if (project?.slug) {
+      void router.push(`/settings/model-providers?provider=azure_safety`);
+    }
   };
 
   return (
@@ -188,12 +208,33 @@ export function EvaluatorTypeSelectorDrawer(
                 const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
                 if (!evaluator) return null;
 
+                const availableEntry =
+                  availableEvaluatorsQuery.data?.[evaluatorType];
+                const missingEnvVars = availableEntry?.missingEnvVars ?? [];
+                const isAzureEvaluator = evaluatorType.startsWith("azure/");
+                const isDisabled =
+                  isAzureEvaluator && missingEnvVars.length > 0;
+
                 return (
                   <EvaluatorCard
                     key={evaluatorType}
                     evaluatorType={evaluatorType}
                     name={evaluator.name}
                     description={evaluator.description}
+                    disabled={isDisabled}
+                    disabledTooltip={
+                      isDisabled
+                        ? "Configure Azure Safety provider in Settings → Model Providers"
+                        : undefined
+                    }
+                    disabledCta={
+                      isDisabled
+                        ? {
+                            label: "Configure Azure Safety",
+                            onClick: handleConfigureAzureSafety,
+                          }
+                        : undefined
+                    }
                     onClick={() => handleSelectEvaluator(evaluatorType)}
                   />
                 );
@@ -219,6 +260,9 @@ type EvaluatorCardProps = {
   evaluatorType: string;
   name: string;
   description: string;
+  disabled?: boolean;
+  disabledTooltip?: string;
+  disabledCta?: { label: string; onClick: () => void };
   onClick: () => void;
 };
 
@@ -226,31 +270,71 @@ function EvaluatorCard({
   evaluatorType,
   name,
   description,
+  disabled,
+  disabledTooltip,
+  disabledCta,
   onClick,
 }: EvaluatorCardProps) {
-  return (
+  const testId = `evaluator-type-${evaluatorType.replace("/", "-")}`;
+
+  const card = (
     <Box
       as="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       padding={4}
       borderRadius="lg"
       border="1px solid"
       borderColor="border"
-      bg="bg.panel"
+      bg={disabled ? "gray.50" : "bg.panel"}
+      color={disabled ? "gray.400" : undefined}
+      cursor={disabled ? "default" : "pointer"}
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
+      _hover={
+        disabled
+          ? undefined
+          : { borderColor: "green.muted", bg: "green.subtle" }
+      }
       transition="all 0.15s"
-      data-testid={`evaluator-type-${evaluatorType.replace("/", "-")}`}
+      data-testid={testId}
+      data-disabled={disabled ? "true" : undefined}
     >
-      <VStack align="start" gap={1}>
+      <VStack align="start" gap={2}>
         <Text fontWeight="500" fontSize="sm">
           {name}
         </Text>
-        <Text fontSize="xs" color="fg.muted" lineClamp={2}>
+        <Text fontSize="xs" color={disabled ? "gray.400" : "fg.muted"} lineClamp={2}>
           {description}
         </Text>
+        {disabled && disabledCta && (
+          <HStack
+            as="span"
+            gap={1}
+            color="orange.600"
+            fontSize="xs"
+            fontWeight="500"
+            onClick={(e) => {
+              e.stopPropagation();
+              disabledCta.onClick();
+            }}
+            data-testid={`${testId}-cta`}
+            cursor="pointer"
+          >
+            <Text>{disabledCta.label}</Text>
+            <LuExternalLink size={12} />
+          </HStack>
+        )}
       </VStack>
     </Box>
   );
+
+  if (disabled && disabledTooltip) {
+    return (
+      <Tooltip content={disabledTooltip} positioning={{ placement: "top" }}>
+        {card}
+      </Tooltip>
+    );
+  }
+
+  return card;
 }

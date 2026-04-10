@@ -54,6 +54,7 @@ import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
+import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { EvaluationRunFoldProjection } from "./pipelines/evaluation-processing/projections/evaluationRun.foldProjection";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
@@ -181,6 +182,7 @@ export class PipelineRegistry {
       traceEvents: this.deps.traces.spans,
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
+      azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
     });
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);

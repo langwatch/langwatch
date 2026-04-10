@@ -3,15 +3,29 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
+import {
+  getAzureSafetyEnvFromProject,
+  isAzureEvaluatorType,
+} from "./azure-safety-env";
 import { EvaluatorConfigError } from "./errors";
 import type { ModelEnvResolver } from "./evaluation-execution.service";
 
 export function createDefaultModelEnvResolver(): ModelEnvResolver {
   return {
     async resolveForEvaluator({ evaluatorType, evaluator, projectId, settings }) {
-      let evaluatorEnv: Record<string, string> = Object.fromEntries(
-        (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
-      );
+      // Hard cutover: Azure Content Safety evaluators never read from process.env.
+      // They require a per-project `azure_safety` Model Provider, resolved here.
+      // Phase 5 gates runtime execution so unresolved credentials turn into a
+      // clear skipped status before reaching this resolver.
+      let evaluatorEnv: Record<string, string>;
+      if (isAzureEvaluatorType(evaluatorType)) {
+        const azureEnv = await getAzureSafetyEnvFromProject(projectId);
+        evaluatorEnv = azureEnv ?? {};
+      } else {
+        evaluatorEnv = Object.fromEntries(
+          (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
+        );
+      }
 
       if (
         settings &&

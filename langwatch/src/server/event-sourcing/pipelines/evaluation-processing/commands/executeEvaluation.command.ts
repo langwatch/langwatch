@@ -8,6 +8,11 @@ import {
 import { extractErrorMessage } from "../../../../../utils/captureError";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
+import {
+  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+  getAzureSafetyEnvFromProject,
+  isAzureEvaluatorType,
+} from "../../../../app-layer/evaluations/azure-safety-env";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
@@ -43,6 +48,15 @@ export interface ExecuteEvaluationCommandDeps {
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
   costRecorder: EvaluationCostRecorder;
+  /**
+   * Resolves Azure Content Safety credentials from the per-project
+   * `azure_safety` model provider. Returns null when no credentials are
+   * configured — the command then emits a "skipped" status instead of
+   * running the evaluator. Injected for testability.
+   */
+  azureSafetyEnvResolver?: (
+    projectId: string,
+  ) => Promise<Record<string, string> | null>;
 }
 
 const SCHEMA = defineCommandSchema(
@@ -123,6 +137,30 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         status: "skipped",
         details: "Monitor not found",
       });
+    }
+
+    // 1a. Azure Safety BYOK gate — hard cutover to per-project credentials.
+    // If the monitor uses an Azure evaluator and the project has no
+    // azure_safety provider configured, skip with a clear configure message
+    // so the customer can self-serve the fix from the UI.
+    if (isAzureEvaluatorType(monitor.checkType)) {
+      const azureEnvResolver =
+        this.deps.azureSafetyEnvResolver ?? getAzureSafetyEnvFromProject;
+      const azureEnv = await azureEnvResolver(tenantId);
+      if (!azureEnv) {
+        logger.warn(
+          {
+            tenantId,
+            evaluatorId: data.evaluatorId,
+            evaluatorType: monitor.checkType,
+          },
+          "Azure Safety provider not configured — skipping evaluation",
+        );
+        return emitReported(data, tenantId, {
+          status: "skipped",
+          details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+        });
+      }
     }
 
     // 2. Sampling
