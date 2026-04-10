@@ -27806,6 +27806,8 @@ To make a call to the Prompts API, you will need to pass through your LangWatch 
 - `DELETE /api/prompts/tags/:tag` - Delete a tag
 - `PUT /api/prompts/:id/tags/:tag` - Assign a tag to a prompt version
 
+> **Auth scope:** Tag CRUD endpoints (`/api/prompts/tags*`) are organization-scoped, while tag assignment (`PUT /api/prompts/:id/tags/:tag`) is project-scoped.
+
 ---
 
 # FILE: ./api-reference/prompts/update-prompt.mdx
