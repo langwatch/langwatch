@@ -49,18 +49,20 @@ describe("ScenarioService", () => {
     await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
   });
 
-  it("creates a scenario", async () => {
-    const result = await service.create({
-      projectId,
-      name: "Refund Test",
-      situation: "User requests refund",
-      criteria: ["Acknowledges issue"],
-      labels: ["support"],
-    });
+  describe("when creating a scenario", () => {
+    it("creates a scenario", async () => {
+      const result = await service.create({
+        projectId,
+        name: "Refund Test",
+        situation: "User requests refund",
+        criteria: ["Acknowledges issue"],
+        labels: ["support"],
+      });
 
-    expect(result.id).toMatch(/^scenario_/);
-    expect(result.name).toBe("Refund Test");
-    expect(result.projectId).toBe(projectId);
+      expect(result.id).toMatch(/^scenario_/);
+      expect(result.name).toBe("Refund Test");
+      expect(result.projectId).toBe(projectId);
+    });
   });
 
   it("gets all scenarios for project", async () => {
