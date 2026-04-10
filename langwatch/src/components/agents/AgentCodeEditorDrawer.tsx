@@ -199,9 +199,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       setOutputs(getOutputsFromConfig(agentQuery.data.config));
       const existingMappings = (agentQuery.data.config as CodeComponentConfig).scenarioMappings ?? {};
       // If no saved mappings, compute best-match defaults from input names
+      const effectiveInputs = agentInputs.length > 0
+        ? agentInputs
+        : [{ identifier: "input", type: "str" }];
       const mappings = Object.keys(existingMappings).length > 0
         ? existingMappings
-        : computeBestMatchMappings({ inputs: agentInputs });
+        : computeBestMatchMappings({ inputs: effectiveInputs });
       setScenarioMappings(mappings);
       setScenarioOutputField((agentQuery.data.config as CodeComponentConfig).scenarioOutputField ?? undefined);
       setHasUnsavedChanges(false);
@@ -308,9 +311,12 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     setInputs(newInputs);
     // Recompute best-match for any new inputs that don't already have a mapping
     setScenarioMappings((prev) => {
-      const bestMatch = computeBestMatchMappings({ inputs: newInputs });
+      const effectiveInputs = newInputs.length > 0
+        ? newInputs
+        : [{ identifier: "input", type: "str" }];
+      const bestMatch = computeBestMatchMappings({ inputs: effectiveInputs });
       const merged = { ...prev };
-      for (const inp of newInputs) {
+      for (const inp of effectiveInputs) {
         const match = bestMatch[inp.identifier];
         if (!merged[inp.identifier] && match) {
           merged[inp.identifier] = match;
@@ -318,7 +324,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       }
       // Remove mappings for inputs that no longer exist
       for (const key of Object.keys(merged)) {
-        if (!newInputs.some((inp) => inp.identifier === key)) {
+        if (!effectiveInputs.some((inp) => inp.identifier === key)) {
           delete merged[key];
         }
       }
@@ -365,11 +371,25 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     [],
   );
 
+  const handleScenarioOutputFieldChange = useCallback(
+    (field: string | undefined) => {
+      setScenarioOutputField(field);
+      setHasUnsavedChanges(true);
+    },
+    [],
+  );
+
   // Convert DSL inputs to Variable[] for VariablesSection
   const variablesForUI: Variable[] = inputs.map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
+
+  // For scenario mappings, mirror the backend's implicit input fallback
+  // (code-agent.adapter.ts synthesizes { identifier: "input", type: "str" } when inputs is empty)
+  const scenarioInputsForUI: Variable[] = variablesForUI.length > 0
+    ? variablesForUI
+    : [{ identifier: "input", type: "str" }];
 
   // Convert DSL outputs to Output[] for OutputsSection
   const outputsForUI: Output[] = outputs.map((output) => ({
@@ -496,19 +516,17 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   />
                 </Box>
 
-                {/* Scenario Input/Output Mapping — only shown when agent has inputs */}
-                {variablesForUI.length > 0 && (
-                  <Box>
-                    <ScenarioInputMappingSection
-                      inputs={variablesForUI}
-                      mappings={scenarioMappings}
-                      onMappingChange={handleScenarioMappingChange}
-                      outputs={outputsForUI}
-                      outputField={scenarioOutputField}
-                      onOutputFieldChange={setScenarioOutputField}
-                    />
-                  </Box>
-                )}
+                {/* Scenario Input/Output Mapping */}
+                <Box>
+                  <ScenarioInputMappingSection
+                    inputs={scenarioInputsForUI}
+                    mappings={scenarioMappings}
+                    onMappingChange={handleScenarioMappingChange}
+                    outputs={outputsForUI}
+                    outputField={scenarioOutputField}
+                    onOutputFieldChange={handleScenarioOutputFieldChange}
+                  />
+                </Box>
               </VStack>
             )}
           </Drawer.Body>
