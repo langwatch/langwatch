@@ -413,11 +413,10 @@ describe("Prompts Skill", () => {
 
             // Code should reference tag-based fetching
             const usesTagFetch = /tag\s*=\s*["']production["']|tag\s*=\s*["']staging["']|{\s*tag:/.test(mainPy);
-            const usesLangwatch = /langwatch/.test(mainPy);
 
             expect(
-              usesTagFetch || usesLangwatch,
-              "Expected code to use tag-based prompt fetching or langwatch integration"
+              usesTagFetch,
+              "Expected code to fetch prompts by tag (e.g., tag='production' or tag='staging')"
             ).toBe(true);
           },
           scenario.judge(),
