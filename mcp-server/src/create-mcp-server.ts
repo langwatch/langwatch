@@ -2,7 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import packageJson from "../package.json" assert { type: "json" };
-import { requireApiKey } from "./config.js";
 
 const modelSchema = z
   .string()
@@ -13,15 +12,19 @@ const modelSchema = z
 /**
  * Creates a new McpServer instance with all LangWatch tools registered.
  *
+ * `requireApiKey` must be the function from the caller's own config import so
+ * that all tool handlers share the same module instance and AsyncLocalStorage
+ * context as the HTTP transport layer.
+ *
  * This is used both for stdio mode (single server) and HTTP mode (per-session servers).
  */
-export function createMcpServer(): McpServer {
+export function createMcpServer(requireApiKey: () => string): McpServer {
   const server = new McpServer({
     name: "LangWatch",
     version: packageJson.version,
   });
 
-  registerTools(server);
+  registerTools(server, requireApiKey);
 
   return server;
 }
@@ -49,7 +52,7 @@ function withToolLogging<T extends unknown[], R>(
   };
 }
 
-function registerTools(server: McpServer): void {
+function registerTools(server: McpServer, requireApiKey: () => string): void {
   server.tool(
     "fetch_langwatch_docs",
     "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",

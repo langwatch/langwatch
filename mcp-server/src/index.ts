@@ -2,7 +2,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-import { initConfig } from "./config.js";
+import { initConfig, requireApiKey } from "./config.js";
 import { createMcpServer } from "./create-mcp-server.js";
 
 const argv = await yargs(hideBin(process.argv))
@@ -41,6 +41,6 @@ if (argv.http) {
   );
 } else {
   const transport = new StdioServerTransport();
-  const server = createMcpServer();
+  const server = createMcpServer(requireApiKey);
   await server.connect(transport);
 }

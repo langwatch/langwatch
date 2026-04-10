@@ -20,7 +20,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
-import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";
+import { getConfig, initConfig, runWithConfig, requireApiKey } from "@langwatch/mcp-server/config";
 import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
 import { encrypt, decrypt } from "../utils/encryption";
@@ -801,7 +801,7 @@ export function createMcpHandler(): McpHandler {
         }
       };
 
-      const sessionServer = createMcpServer();
+      const sessionServer = createMcpServer(requireApiKey);
       await handleWithSessionConfig(apiKey, () =>
         sessionServer.connect(transport),
       );
@@ -899,7 +899,7 @@ export function createMcpHandler(): McpHandler {
       lastActivityAt: Date.now(),
     });
 
-    const sessionServer = createMcpServer();
+    const sessionServer = createMcpServer(requireApiKey);
 
     res.on("close", () => {
       sseSessions.delete(transport.sessionId);
