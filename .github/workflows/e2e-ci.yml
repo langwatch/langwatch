@@ -182,14 +182,17 @@ jobs:
         working-directory: langwatch
         run: NODE_ENV=test pnpm build
 
+      - name: Build MCP server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm build
+
       - name: Run E2E tests
         run: |
           # Start the app in background
           cd langwatch && PORT=5570 pnpm start &
           APP_PID=$!
 
-          # Wait for app to be ready (NLP/langevals services have health checks)
-          sleep 5
+          # The e2e test global-setup.ts handles waiting for the app to be ready
 
           # Run tests from the self-contained e2e package
           cd agentic-e2e-tests && pnpm test
