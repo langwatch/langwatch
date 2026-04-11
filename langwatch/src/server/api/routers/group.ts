@@ -12,6 +12,34 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
+async function findUniqueGroupSlug(
+  prisma: Pick<PrismaClient, "group">,
+  organizationId: string,
+  baseSlug: string,
+  excludeId?: string,
+): Promise<string> {
+  if (!baseSlug) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Group name cannot be empty after formatting",
+    });
+  }
+  let candidate = baseSlug;
+  let suffix = 2;
+  while (true) {
+    const exists = await prisma.group.findFirst({
+      where: {
+        organizationId,
+        slug: candidate,
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (!exists) return candidate;
+    candidate = `${baseSlug}-${suffix++}`;
+  }
+}
+
 async function resolveScopeNames(
   prisma: PrismaClient,
   bindings: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
@@ -148,7 +176,7 @@ export const groupRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-        name: z.string().min(1).max(100),
+        name: z.string().trim().min(1, "Group name is required").max(100),
         bindings: z
           .array(
             z.object({
@@ -185,13 +213,7 @@ export const groupRouter = createTRPCRouter({
       }
 
       return ctx.prisma.$transaction(async (tx) => {
-        const existing = await tx.group.count({
-          where: {
-            organizationId: input.organizationId,
-            slug: { startsWith: baseSlug },
-          },
-        });
-        const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
+        const slug = await findUniqueGroupSlug(tx, input.organizationId, baseSlug);
 
         const group = await tx.group.create({
           data: { id: generate(KSUID_RESOURCES.GROUP).toString(), organizationId: input.organizationId, name: input.name, slug },
@@ -360,7 +382,7 @@ export const groupRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         groupId: z.string(),
-        name: z.string().min(1).max(100),
+        name: z.string().trim().min(1, "Group name is required").max(100),
       }),
     )
     .use(checkOrganizationPermission("organization:manage"))
@@ -379,14 +401,12 @@ export const groupRouter = createTRPCRouter({
       }
 
       const baseSlug = slugify(input.name, { lower: true, strict: true });
-      const existing = await ctx.prisma.group.count({
-        where: {
-          organizationId: input.organizationId,
-          slug: { startsWith: baseSlug },
-          id: { not: input.groupId },
-        },
-      });
-      const slug = existing > 0 ? `${baseSlug}-${existing}` : baseSlug;
+      const slug = await findUniqueGroupSlug(
+        ctx.prisma,
+        input.organizationId,
+        baseSlug,
+        input.groupId,
+      );
 
       return ctx.prisma.group.update({
         where: { id: input.groupId },

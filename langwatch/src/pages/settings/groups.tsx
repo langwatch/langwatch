@@ -12,8 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Edit2, Plus, Trash2 } from "lucide-react";
-import { MoreVertical } from "react-feather";
+import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CreateGroupDialog } from "~/components/settings/CreateGroupDialog";
 import { GroupDetailDialog } from "~/components/settings/GroupDetailDialog";

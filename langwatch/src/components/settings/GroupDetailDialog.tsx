@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
@@ -46,6 +46,12 @@ export function GroupDetailDialog({
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [pendingName, setPendingName] = useState(group.name);
+
+  useEffect(() => {
+    if (open) {
+      setPendingName(group.name);
+    }
+  }, [open, group.id, group.name]);
 
   const nameChanged = pendingName.trim() !== group.name && pendingName.trim() !== "";
 

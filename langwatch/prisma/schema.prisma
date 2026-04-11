@@ -1292,7 +1292,9 @@ model RoleBinding {
     createdAt      DateTime             @default(now())
     updatedAt      DateTime             @default(now()) @updatedAt
 
-    @@unique([userId, groupId, role, customRoleId, scopeType, scopeId])
+    // Uniqueness is enforced by four partial unique indexes defined in migrations
+    // (20260410120000_fix_role_binding_unique_custom_role). Prisma does not
+    // support partial indexes natively, so there is no @@unique here.
     @@index([organizationId])
     @@index([userId])
     @@index([groupId])
