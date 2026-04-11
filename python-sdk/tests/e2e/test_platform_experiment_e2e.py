@@ -53,6 +53,7 @@ class TestErrorHandling:
         assert exc_info.value.status_code == 401
 
 
+@pytest.mark.e2e
 class TestRunExperiment:
     def test_runs_experiment_and_returns_results(self):
         with mock_platform_run() as (mock_start, mock_status):
