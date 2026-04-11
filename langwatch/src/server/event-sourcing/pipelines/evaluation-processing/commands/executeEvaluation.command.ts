@@ -267,13 +267,23 @@ export class ExecuteEvaluationCommand implements CommandHandler<
         });
       }
 
-      // 6. Emit single reported event — fold projection persists to CH
+      // 6. Emit single reported event — fold projection persists to CH.
+      // For error results, lift `details` into `error` if the service didn't
+      // already set it, so the real failure message always lands in the
+      // event's error field where the UI reads from.
+      const isError = result.status === "error";
+      const errorField = isError
+        ? result.error ?? result.details ?? "Evaluator failed"
+        : result.error;
+
       return emitReported(data, tenantId, {
         status: result.status,
         score: result.score,
         passed: result.passed,
         label: result.label,
-        details: result.details,
+        details: isError ? undefined : result.details,
+        error: errorField,
+        errorDetails: result.errorDetails ?? null,
         inputs: result.inputs ?? null,
         costId,
       });
