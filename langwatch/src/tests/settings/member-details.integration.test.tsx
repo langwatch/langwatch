@@ -155,6 +155,11 @@ vi.mock("../../utils/api", () => ({
         }),
       },
     },
+    group: {
+      listForMember: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
   },
 }));
 
