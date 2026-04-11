@@ -28,4 +28,5 @@ export const modelProviderIcons: Record<
   custom: <Custom />,
   xai: <Xai />,
   cerebras: <Cerebras />,
+  azure_safety: <Azure />,
 };

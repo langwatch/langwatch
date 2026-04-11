@@ -115,6 +115,23 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawerParams: () => ({}),
 }));
 
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-test", slug: "test-project" },
+    organization: { id: "org-test" },
+  }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    evaluations: {
+      availableEvaluators: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+  },
+}));
+
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

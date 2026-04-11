@@ -109,6 +109,8 @@ export const EditModelProviderForm = ({
       provider.provider as keyof typeof modelProvidersRegistry
     ];
 
+  const isLlmProvider = providerDefinition?.type === "llm";
+
   const {
     validate: validateApiKey,
     validateWithCustomUrl,
@@ -163,23 +165,26 @@ export const EditModelProviderForm = ({
       }
     }
 
-    // ALWAYS validate API key on save
-    if (userEnteredNewApiKey) {
-      // User entered new API key - validate it (against custom or default URL)
-      const isValid = await validateApiKey();
-      if (!isValid) return;
-    } else if (customBaseUrl) {
-      // Stored/env key + custom URL - validate against custom URL
-      const isValid = await validateWithCustomUrl(customBaseUrl);
-      if (!isValid) return;
-    } else {
-      // Stored/env key + default URL - validate against default URL
-      const isValid = await validateWithCustomUrl();
-      if (!isValid) return;
+    // Validate API key on save for LLM providers. Safety providers like
+    // azure_safety point at content moderation endpoints and can't be
+    // validated with the OpenAI-compatible chat-completion probe, so we
+    // skip client-side validation and let runtime usage surface errors.
+    if (isLlmProvider) {
+      if (userEnteredNewApiKey) {
+        const isValid = await validateApiKey();
+        if (!isValid) return;
+      } else if (customBaseUrl) {
+        const isValid = await validateWithCustomUrl(customBaseUrl);
+        if (!isValid) return;
+      } else {
+        const isValid = await validateWithCustomUrl();
+        if (!isValid) return;
+      }
     }
 
     void actions.submit();
   }, [
+    isLlmProvider,
     isUsingEnvVars,
     providerDefinition,
     state.customKeys,
@@ -193,7 +198,7 @@ export const EditModelProviderForm = ({
   return (
     <VStack gap={4} align="start" width="full">
       <VStack align="start" width="full" gap={4}>
-        {provider.provider === "azure" && (
+        {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>
             <Switch
               onCheckedChange={(details) => {
@@ -224,20 +229,24 @@ export const EditModelProviderForm = ({
           provider={provider}
         />
 
-        <CustomModelInputSection
-          state={state}
-          actions={actions}
-          provider={provider}
-        />
+        {isLlmProvider && (
+          <>
+            <CustomModelInputSection
+              state={state}
+              actions={actions}
+              provider={provider}
+            />
 
-        <DefaultProviderSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          enabledProvidersCount={enabledProvidersCount}
-          project={project}
-          providers={providers}
-        />
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={provider}
+              enabledProvidersCount={enabledProvidersCount}
+              project={project}
+              providers={providers}
+            />
+          </>
+        )}
 
         <HStack width="full" justify="end">
           <Button
