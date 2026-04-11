@@ -83,6 +83,36 @@ const config = {
     ],
   },
 
+  /**
+   * Backward-compat shim for OAuth callback URLs.
+   *
+   * NextAuth used `${baseURL}/api/auth/callback/{provider}` for ALL providers.
+   * BetterAuth's social providers (google/github/gitlab/microsoft) keep that
+   * path, but the genericOAuth plugin (auth0/okta) uses
+   * `${baseURL}/api/auth/oauth2/callback/{provider}`. Existing customer
+   * applications in Auth0 / Okta have the legacy path baked in as the
+   * allowed redirect URI — making customers update their IdP application
+   * during deploy is risky.
+   *
+   * Internal rewrite: when a request comes in to the legacy path for one
+   * of the generic-oauth providers, transparently route it to the new
+   * BetterAuth handler. The auth config in `src/server/better-auth/index.ts`
+   * sets `redirectURI` to the legacy path so BetterAuth's outgoing
+   * authorization URL also matches what the customer's IdP has registered.
+   */
+  async rewrites() {
+    return [
+      {
+        source: "/api/auth/callback/auth0",
+        destination: "/api/auth/oauth2/callback/auth0",
+      },
+      {
+        source: "/api/auth/callback/okta",
+        destination: "/api/auth/oauth2/callback/okta",
+      },
+    ];
+  },
+
   async headers() {
     // Only enable HSTS in production to avoid Safari caching issues in development
     const securityHeaders = [
@@ -123,7 +153,6 @@ const config = {
     config.resolve.alias["react-dom"] = `${__dirname}/node_modules/react-dom`;
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
-    config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 

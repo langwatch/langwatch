@@ -3,7 +3,7 @@ import {
   ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
 } from "@prisma/client";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import type { Protections } from "../elasticsearch/protections";
 import { hasProjectPermission, isDemoProject } from "./rbac";
 

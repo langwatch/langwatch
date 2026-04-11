@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { generateText, tool } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { z } from "zod";
 import {
   type Workflow,

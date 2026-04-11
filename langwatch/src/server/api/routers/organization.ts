@@ -1026,7 +1026,17 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      if (session.user.email !== invite.email) {
+      // Case-insensitive email comparison: BetterAuth lowercases emails
+      // during signup/signin (see `findUserByEmail` in
+      // node_modules/better-auth/dist/db/internal-adapter.mjs) so
+      // `session.user.email` is always lowercase, but `invite.email`
+      // preserves the admin's original casing. A strict `!==` would
+      // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
+      // The old NextAuth flow worked accidentally because it didn't
+      // lowercase emails either — this is now a real mismatch post-migration.
+      if (
+        session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()
+      ) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,

@@ -1,497 +1,182 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import type { Account, Organization } from "@prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { compare } from "bcrypt";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import type { IncomingHttpHeaders } from "http";
 import type { GetServerSidePropsContext, NextApiRequest } from "next";
 import type { NextRequest } from "next/server";
-import {
-  type DefaultSession,
-  getServerSession,
-  type Account as NextAuthAccount,
-  type NextAuthOptions,
-  type User,
-} from "next-auth";
-import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
-import AzureADProvider from "next-auth/providers/azure-ad";
-import CognitoProvider, {
-  type CognitoProfile,
-} from "next-auth/providers/cognito";
-import CredentialsProvider from "next-auth/providers/credentials";
-import GitHubProvider from "next-auth/providers/github";
-import GitlabProvider from "next-auth/providers/gitlab";
-import GoogleProvider from "next-auth/providers/google";
-import OktaProvider from "next-auth/providers/okta";
-import { env } from "~/env.mjs";
+
+import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
-import { handleAdminImpersonationSession } from "../../ee/admin/sessionHandler";
-import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
-import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
-import { ensureUserSyncedToCio } from "../../ee/billing/nurturing/hooks/userSync";
-import { getApp } from "./app-layer/app";
 
 const logger = createLogger("langwatch:auth");
 
 /**
- * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
- * object and keep type safety.
+ * The session shape consumers across the codebase rely on.
  *
- * @see https://next-auth.js.org/getting-started/typescript#module-augmentation
+ * This is intentionally backwards-compatible with the NextAuth `Session` type
+ * so that the ~40 consumer files that read `session.user.id`, `.email`,
+ * `.impersonator`, and `.pendingSsoSetup` continue to work without change.
+ *
+ * The underlying session store is BetterAuth; this file adapts the shape.
  */
-declare module "next-auth" {
-  interface Session extends DefaultSession {
-    user: DefaultSession["user"] & {
+export interface Session {
+  user: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    pendingSsoSetup?: boolean;
+    /**
+     * Set when an admin is impersonating another user. The outer
+     * `session.user` fields reflect the impersonated user; `impersonator`
+     * reflects the real admin for audit logging and UI banners.
+     */
+    impersonator?: {
       id: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
     };
-  }
+  };
+  /** ISO-8601 expiration timestamp. */
+  expires: string;
+  /**
+   * The BetterAuth session row id (Session.id in Postgres). Exposed so
+   * server-side mutations like `changePassword` can call
+   * `revokeOtherSessionsForUser({keepSessionId})` without re-fetching the
+   * BetterAuth session via headers. This is the impersonation-aware
+   * session id — i.e. the OUTER admin's session id, NOT the impersonated
+   * user's id, since impersonation reuses the admin's session row.
+   *
+   * Optional because many test fixtures construct fake Session objects
+   * without one, and the legacy NextAuth Session type didn't have it.
+   * Production runtime always populates it via `getServerAuthSession`.
+   */
+  sessionId?: string;
 }
 
+const toHeaders = (
+  input: IncomingHttpHeaders | Headers | undefined,
+): Headers => {
+  if (!input) return new Headers();
+  if (input instanceof Headers) return input;
+  const h = new Headers();
+  for (const [k, v] of Object.entries(input)) {
+    if (v == null) continue;
+    if (Array.isArray(v)) {
+      for (const x of v) h.append(k, x);
+    } else {
+      h.set(k, String(v));
+    }
+  }
+  return h;
+};
+
 /**
- * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
+ * Server-side session fetch. Wraps BetterAuth's `auth.api.getSession`.
  *
- * @see https://next-auth.js.org/configuration/options
+ * Preserves the old NextAuth-shaped Session so consumer code does not
+ * need to know the underlying auth provider changed. Also handles admin
+ * impersonation by inspecting the `Session.impersonating` JSON column and
+ * rewriting `session.user` to the impersonated identity.
+ *
+ * Accepts either `{ req, res }` (Pages Router / getServerSideProps) or
+ * `{ req }` (App Router — pass a NextRequest).
  */
-export const authOptions = (
-  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest,
-): NextAuthOptions => ({
-  session: {
-    strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  callbacks: {
-    session: async ({ session, user }) => {
-      const impersonatedSession = await handleAdminImpersonationSession({
-        req,
-        session,
-        user,
+export const getServerAuthSession = async (ctx: {
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest;
+  res?: unknown;
+}): Promise<Session | null> => {
+  try {
+    const headers = toHeaders(
+      (ctx.req as { headers?: IncomingHttpHeaders | Headers }).headers,
+    );
+    const result = await auth.api.getSession({ headers });
+    if (!result) return null;
+
+    const baseSession: Session = {
+      user: {
+        id: result.user.id,
+        name: result.user.name ?? null,
+        email: result.user.email ?? null,
+        image: result.user.image ?? null,
+        pendingSsoSetup:
+          ((result.user as Record<string, unknown>).pendingSsoSetup as
+            | boolean
+            | undefined) ?? false,
+      },
+      expires:
+        result.session.expiresAt instanceof Date
+          ? result.session.expiresAt.toISOString()
+          : new Date(result.session.expiresAt).toISOString(),
+      sessionId: result.session.id,
+    };
+
+    // Admin impersonation compat: read Session.impersonating JSON directly.
+    // We keep this legacy column (added in migration 20260406120000) so the
+    // existing impersonate endpoint + UI banner keep working unchanged.
+    const dbSession = await prisma.session.findUnique({
+      where: { id: result.session.id },
+      select: { impersonating: true },
+    });
+
+    const impersonating = dbSession?.impersonating as
+      | {
+          id?: string;
+          name?: string | null;
+          email?: string | null;
+          image?: string | null;
+          expires?: string | Date;
+        }
+      | null
+      | undefined;
+
+    if (
+      impersonating &&
+      typeof impersonating === "object" &&
+      impersonating.id &&
+      impersonating.expires &&
+      new Date(impersonating.expires) > new Date()
+    ) {
+      // Verify the impersonation target still exists and isn't deactivated.
+      // If the target was deleted or deactivated AFTER impersonation started,
+      // fall through to the real admin session rather than acting on behalf
+      // of a stale / banned user. The cost is a single findUnique per
+      // impersonated request — acceptable for a flow used only by admins.
+      const targetStillValid = await prisma.user.findUnique({
+        where: { id: impersonating.id },
+        select: { id: true, deactivatedAt: true },
       });
-      if (impersonatedSession) return impersonatedSession;
+      const isTargetActive =
+        targetStillValid && !targetStillValid.deactivatedAt;
 
-      if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
-        const user_ = await prisma.user.findUnique({
-          where: {
-            email: session.user.email,
-          },
-        });
-
-        if (!user_) {
-          throw new Error("User not found");
-        }
-
-        // Fire-and-forget: skip the DB query entirely when nurturing is off
-        if (getApp().nurturing) {
-          void prisma.organizationUser
-            .count({ where: { userId: user_.id } })
-            .then((orgCount_) => {
-              const hasOrg_ = orgCount_ > 0;
-              fireActivityTrackingNurturing({ userId: user_.id, hasOrganization: hasOrg_ });
-              ensureUserSyncedToCio({ userId: user_.id, hasOrganization: hasOrg_ });
-            })
-            .catch(() => {});
-        }
-
+      if (isTargetActive) {
         return {
-          ...session,
+          ...baseSession,
           user: {
-            ...session.user,
-            id: user_.id,
-            email: user_.email,
+            id: impersonating.id,
+            name: impersonating.name ?? null,
+            email: impersonating.email ?? null,
+            image: impersonating.image ?? null,
+            impersonator: {
+              id: baseSession.user.id,
+              name: baseSession.user.name ?? null,
+              email: baseSession.user.email ?? null,
+              image: baseSession.user.image ?? null,
+            },
           },
         };
       }
-
-      // Fire-and-forget: skip the DB query entirely when nurturing is off
-      if (getApp().nurturing) {
-        void prisma.organizationUser
-          .count({ where: { userId: user.id } })
-          .then((orgCount) => {
-            const hasOrg = orgCount > 0;
-            fireActivityTrackingNurturing({ userId: user.id, hasOrganization: hasOrg });
-            ensureUserSyncedToCio({ userId: user.id, hasOrganization: hasOrg });
-          })
-          .catch(() => {});
-      }
-
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          id: user.id,
-          email: user.email,
+      logger.warn(
+        {
+          adminId: baseSession.user.id,
+          impersonatedUserId: impersonating.id,
         },
-      };
-    },
-    signIn: async ({ user, account }) => {
-      if (!user.email) {
-        logger.error({ user }, "SignIn failed: No email provided");
-        return false;
-      }
+        "Impersonation target is deleted or deactivated — falling back to admin session",
+      );
+    }
 
-      const existingUser = await prisma.user.findUnique({
-        where: { email: user.email },
-      });
-
-      if (existingUser?.deactivatedAt) {
-        return false;
-      }
-
-      const domain = user.email.split("@")[1];
-      const orgWithSsoDomain = await prisma.organization.findUnique({
-        where: {
-          ssoDomain: domain,
-        },
-      });
-
-      // SSO flow for orgs with ssoDomain+ssoProvider configured:
-      // - Existing user + correct SSO provider → auto-link account (clears pendingSsoSetup)
-      // - Existing user + wrong provider → set pendingSsoSetup and let them in to show the
-      //   "link your SSO account" banner (avoids hard-blocking existing users during migration)
-      if (existingUser && account && orgWithSsoDomain) {
-        if (isSsoProviderMatch(orgWithSsoDomain, account)) {
-          await linkExistingUserToOAuthProvider(existingUser, account);
-          return true;
-        }
-        if (!existingUser.pendingSsoSetup) {
-          await prisma.user.update({
-            where: { id: existingUser.id },
-            data: { pendingSsoSetup: true },
-          });
-        }
-        return true;
-      }
-
-      // Fallback: user is already marked pendingSsoSetup but org lookup returned nothing
-      // (e.g. credentials provider login, or domain no longer has an SSO org) — let them in
-      if (existingUser?.pendingSsoSetup) {
-        return true;
-      }
-
-      // Block non-SSO sign-in attempts for new users whose domain has SSO enforced
-      if (orgWithSsoDomain && account) {
-        await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
-      }
-
-      // New user with matching SSO domain → auto-create and add to org
-      if (domain && account && orgWithSsoDomain && !existingUser) {
-        await createUserAndAddToOrganization(
-          user,
-          orgWithSsoDomain,
-          account as Account,
-        );
-
-        return true;
-      }
-
-      const sessionToken = getNextAuthSessionToken(req as any);
-      if (!sessionToken) return true;
-
-      const dbSession = await prisma.session.findUnique({
-        where: { sessionToken },
-      });
-      const dbUser = await prisma.user.findUnique({
-        where: { id: dbSession?.userId },
-      });
-
-      if (dbUser && dbUser?.email !== user.email) {
-        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
-      }
-
-      return true;
-    },
-  },
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    env.NEXTAUTH_PROVIDER === "auth0"
-      ? Auth0Provider({
-          clientId: env.AUTH0_CLIENT_ID ?? "",
-          clientSecret: env.AUTH0_CLIENT_SECRET ?? "",
-          issuer: env.AUTH0_ISSUER ?? "",
-          authorization: { params: { prompt: "login" } },
-          profile(profile: Auth0Profile) {
-            return {
-              id: profile.sub,
-              name: (profile.name as string) ?? profile.nickname,
-              email: profile.email,
-              image: profile.picture,
-            };
-          },
-        })
-      : env.NEXTAUTH_PROVIDER === "azure-ad"
-        ? AzureADProvider({
-            clientId: env.AZURE_AD_CLIENT_ID ?? "",
-            clientSecret: env.AZURE_AD_CLIENT_SECRET ?? "",
-            tenantId: env.AZURE_AD_TENANT_ID ?? "",
-            authorization: {
-              params: {
-                prompt: "login",
-                scope: "openid email profile User.Read",
-              },
-            },
-            profile(profile) {
-              return {
-                id: profile.sub ?? profile.oid ?? profile.id,
-                name: profile.name ?? profile.displayName,
-                email:
-                  profile.email ?? profile.mail ?? profile.userPrincipalName,
-                image: null, // Microsoft Graph doesn't return image by default
-              };
-            },
-          })
-        : env.NEXTAUTH_PROVIDER === "cognito"
-          ? CognitoProvider({
-              clientId: env.COGNITO_CLIENT_ID ?? "",
-              clientSecret: env.COGNITO_CLIENT_SECRET ?? "",
-              issuer: env.COGNITO_ISSUER ?? "",
-              client: {
-                token_endpoint_auth_method: "none",
-              },
-
-              profile(profile: CognitoProfile) {
-                return {
-                  id: profile.sub,
-                  name: profile.name,
-                  email: profile.email,
-                  image: profile.picture,
-                };
-              },
-            })
-          : env.NEXTAUTH_PROVIDER === "github"
-            ? GitHubProvider({
-                clientId: env.GITHUB_CLIENT_ID ?? "",
-                clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
-                profile(profile) {
-                  return {
-                    id: profile.id.toString(),
-                    name: profile.name ?? profile.login,
-                    email: profile.email,
-                    image: profile.avatar_url,
-                  };
-                },
-              })
-            : env.NEXTAUTH_PROVIDER === "gitlab"
-              ? GitlabProvider({
-                  clientId: env.GITLAB_CLIENT_ID ?? "",
-                  clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
-                  profile(profile) {
-                    return {
-                      id: profile.sub?.toString(),
-                      name: profile.name ?? profile.username,
-                      email: profile.email,
-                      image: profile.avatar_url,
-                    };
-                  },
-                })
-              : env.NEXTAUTH_PROVIDER === "google"
-                ? GoogleProvider({
-                    clientId: env.GOOGLE_CLIENT_ID ?? "",
-                    clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
-                    profile(profile) {
-                      return {
-                        id: profile.sub,
-                        name: profile.name,
-                        email: profile.email,
-                        image: profile.picture,
-                      };
-                    },
-                  })
-                : env.NEXTAUTH_PROVIDER === "okta"
-                  ? OktaProvider({
-                      clientId: env.OKTA_CLIENT_ID ?? "",
-                      clientSecret: env.OKTA_CLIENT_SECRET ?? "",
-                      issuer: env.OKTA_ISSUER ?? "",
-                      profile(profile) {
-                        return {
-                          id: profile.sub,
-                          name: profile.name,
-                          email: profile.email,
-                          image: profile.image,
-                        };
-                      },
-                    })
-                  : CredentialsProvider({
-                      name: "Credentials",
-                      credentials: {
-                        email: {},
-                        password: {},
-                      },
-                      async authorize(credentials, _req) {
-                        const user = await prisma.user.findUnique({
-                          where: {
-                            email: credentials?.email,
-                          },
-                        });
-                        if (!user?.password) return null;
-                        const passwordMatch = await compare(
-                          credentials?.password ?? "",
-                          user.password,
-                        );
-                        if (!passwordMatch) return null;
-
-                        return {
-                          id: user.id,
-                          name: user.name,
-                          email: user.email,
-                          image: user.image,
-                        };
-                      },
-                    }),
-    /**
-     * ...add more providers here.
-     *
-     * Most other providers require a bit more work than the Discord provider. For example, the
-     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
-     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
-     *
-     * @see https://next-auth.js.org/providers/github
-     */
-  ],
-  pages: {
-    error: "/auth/error",
-    signIn: "/auth/signin",
-  },
-});
-
-const createUserAndAddToOrganization = async (
-  user: User,
-  organization: Organization,
-  account: Account,
-) => {
-  const newUser = await prisma.user.create({
-    data: {
-      email: user.email,
-      name: user.name,
-      image: user.image,
-    },
-  });
-
-  await prisma.account.create({
-    data: {
-      userId: newUser.id,
-      type: account.type ?? "oauth",
-      provider: account.provider,
-      providerAccountId: account.providerAccountId,
-      access_token: account.access_token,
-      refresh_token: account.refresh_token,
-      expires_at: account.expires_at,
-      token_type: account.token_type,
-      scope: account.scope,
-      id_token: account.id_token,
-    },
-  });
-
-  await prisma.organizationUser.create({
-    data: {
-      userId: newUser.id,
-      organizationId: organization.id,
-      role: "MEMBER",
-    },
-  });
-
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId: newUser.id,
-      role: TeamUserRole.MEMBER,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
-  });
-
-  return newUser;
-};
-
-/**
- * Links (or re-links) an existing user to their SSO OAuth account.
- * Uses upsert so it's idempotent: first login creates the link,
- * subsequent logins just refresh tokens. Old auth methods for the
- * same provider are removed in the same transaction.
- */
-const linkExistingUserToOAuthProvider = async (
-  existingUser: User,
-  account: NextAuthAccount,
-) => {
-  const accountData = {
-    userId: existingUser.id,
-    type: account.type ?? "oauth",
-    provider: account.provider,
-    providerAccountId: account.providerAccountId,
-    access_token: account.access_token,
-    refresh_token: account.refresh_token,
-    expires_at: account.expires_at,
-    token_type: account.token_type,
-    scope: account.scope,
-    id_token: account.id_token,
-  };
-
-  await prisma.$transaction([
-    prisma.account.upsert({
-      where: {
-        provider_providerAccountId: {
-          provider: account.provider,
-          providerAccountId: account.providerAccountId,
-        },
-      },
-      create: accountData,
-      update: {
-        access_token: account.access_token,
-        refresh_token: account.refresh_token,
-        expires_at: account.expires_at,
-        token_type: account.token_type,
-        scope: account.scope,
-        id_token: account.id_token,
-      },
-    }),
-    prisma.account.deleteMany({
-      where: {
-        userId: existingUser.id,
-        provider: account.provider,
-        providerAccountId: { not: account.providerAccountId },
-      },
-    }),
-    prisma.user.update({
-      where: { id: existingUser.id },
-      data: { pendingSsoSetup: false },
-    }),
-  ]);
-};
-
-/**
- * Checks if the incoming account matches the org's configured SSO provider.
- * For Auth0: matches via providerAccountId prefix (e.g. "waad|connection-name")
- * For direct NextAuth providers: matches via provider name (e.g. "google", "okta")
- */
-const isSsoProviderMatch = (
-  org: Organization,
-  account: NextAuthAccount,
-): boolean => {
-  if (!org.ssoProvider) return false;
-  return (
-    account.providerAccountId.startsWith(org.ssoProvider) ||
-    account.provider === org.ssoProvider
-  );
-};
-
-const checkIfSsoProviderIsAllowed = async (
-  org: Organization,
-  provider: NextAuthAccount,
-) => {
-  if (org?.ssoProvider && !isSsoProviderMatch(org, provider)) {
-    throw new Error("SSO_PROVIDER_NOT_ALLOWED");
+    return baseSession;
+  } catch (error) {
+    logger.error({ error }, "getServerAuthSession failed");
+    return null;
   }
-
-  return true;
-};
-/**
- * Wrapper for `getServerSession` so that you don't need to import the `authOptions` in every file.
- *
- * @see https://next-auth.js.org/configuration/nextjs
- */
-export const getServerAuthSession = (ctx: {
-  req: GetServerSidePropsContext["req"];
-  res: GetServerSidePropsContext["res"];
-}) => {
-  return getServerSession(ctx.req, ctx.res, authOptions(ctx.req));
 };

@@ -2,6 +2,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ScimService } from "../scim.service";
 import type { User } from "@prisma/client";
 
+// Mock the redis connection so the revoke helper used by deactivate()
+// (transitively reachable from SCIM deactivation paths) doesn't try to
+// talk to a real Redis from a unit test.
+vi.mock("~/server/redis", () => ({ connection: undefined }));
+
 function createMockPrisma() {
   const roleBinding = {
     create: vi.fn().mockResolvedValue({}),
@@ -22,6 +27,12 @@ function createMockPrisma() {
     },
     organizationUser,
     roleBinding,
+    session: {
+      // UserService.deactivate (called from SCIM) revokes all sessions —
+      // mock the session model so the revocation succeeds with zero rows.
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
   };
   return mock as unknown as Parameters<typeof ScimService.create>[0];
@@ -32,8 +43,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     id: "user-1",
     name: "Alice Smith",
     email: "alice@acme.com",
-    emailVerified: null,
-    password: null,
+    emailVerified: false,
     image: null,
     pendingSsoSetup: false,
     createdAt: new Date("2024-01-01T00:00:00Z"),

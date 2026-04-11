@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { ScimService } from "~/server/scim/scim.service";
+import { extractEmailDomain } from "~/server/better-auth/sso";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
  * Receives Auth0 Log Stream webhook events for SCIM provisioning.
@@ -41,7 +43,10 @@ export async function POST(request: NextRequest) {
     const email = extractEmail(event);
     if (!email) continue;
 
-    const domain = email.split("@")[1];
+    // Lowercase the domain so "Alice@ACME.com" matches an org with
+    // ssoDomain: "acme.com". Without this, a mixed-case email would silently
+    // fail SCIM provisioning.
+    const domain = extractEmailDomain(email);
     if (!domain) continue;
 
     const org = await prisma.organization.findUnique({

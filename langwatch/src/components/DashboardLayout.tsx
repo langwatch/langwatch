@@ -16,7 +16,7 @@ import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { signIn, signOut } from "next-auth/react";
+import { signOut } from "~/utils/auth-client";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
@@ -454,7 +454,24 @@ export const DashboardLayout = ({
                 minWidth="auto"
                 height="auto"
                 borderRadius="full"
-                {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
+                {...(publicPage
+                  ? {
+                      // On a public share page, clicking the avatar offers
+                      // sign-in. Route to the signin page with the current
+                      // URL as callbackUrl so the UI picks the right provider
+                      // from `publicEnv.NEXTAUTH_PROVIDER`. The old version
+                      // hardcoded `signIn("auth0")` which broke for on-prem
+                      // (email mode), google, gitlab, etc.
+                      onClick: () => {
+                        if (typeof window !== "undefined") {
+                          const callbackUrl = encodeURIComponent(
+                            window.location.pathname + window.location.search,
+                          );
+                          window.location.href = `/auth/signin?callbackUrl=${callbackUrl}`;
+                        }
+                      },
+                    }
+                  : {})}
               >
                 <Avatar.Root
                   size="xs"

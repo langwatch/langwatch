@@ -1,11 +1,15 @@
 import { createServerSideHelpers } from "@trpc/react-query/server";
 import type { GetServerSidePropsContext } from "next";
-import { getSession } from "next-auth/react";
+import { getServerAuthSession } from "~/server/auth";
 import { appRouter } from "~/server/api/root";
 import { prisma } from "../server/db";
 
 async function createInnerTRPCContext(context: GetServerSidePropsContext) {
-  const session = await getSession(context);
+  // Server-side: must read the cookie via auth.api.getSession headers, not
+  // the browser-bound BetterAuth client. The `~/utils/auth-client` getSession
+  // helper has no access to the request and would always return null on the
+  // server.
+  const session = await getServerAuthSession({ req: context.req });
   return {
     prisma,
     session,

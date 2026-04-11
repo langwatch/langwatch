@@ -14,8 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { GetServerSidePropsContext } from "next";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { Session } from "next-auth";
-import { getSession, signIn } from "next-auth/react";
+import { getServerAuthSession, type Session } from "~/server/auth";
+import { signIn } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -71,7 +71,10 @@ export default function SignIn({ session }: { session: Session | null }) {
 export const getServerSideProps = async (
   context: GetServerSidePropsContext,
 ) => {
-  const session = await getSession(context);
+  // Server-side helper — reads cookies from request headers via
+  // BetterAuth's auth.api.getSession. The browser-bound
+  // `~/utils/auth-client` getSession would always return null here.
+  const session = await getServerAuthSession({ req: context.req });
 
   if (session) {
     return {

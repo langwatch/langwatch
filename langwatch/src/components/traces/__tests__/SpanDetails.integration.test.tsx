@@ -40,7 +40,7 @@ vi.mock("next/router", () => ({
   }),
 }));
 
-vi.mock("next-auth/react", () => ({
+vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({ data: { user: { id: "user-1" } }, status: "authenticated" }),
 }));
 

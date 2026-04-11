@@ -35,7 +35,7 @@ import {
 } from "../license-enforcement/license-enforcement.repository";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { TeamUserRole } from "@prisma/client";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { getApp } from "../app-layer/app";
 import { createLogger } from "~/utils/logger";

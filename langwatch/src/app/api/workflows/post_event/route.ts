@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { handle } from "hono/vercel";
 import type { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerAuthSession } from "../../../../server/auth";
 import { z } from "zod";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { addEnvs } from "../../../../optimization_studio/server/addEnvs";
@@ -14,7 +14,6 @@ import {
   studioClientEventSchema,
 } from "../../../../optimization_studio/types/events";
 import { hasProjectPermission } from "../../../../server/api/rbac";
-import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { createLogger } from "../../../../utils/logger/server";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -40,9 +39,9 @@ app.post(
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
     logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
 
-    const session = await getServerSession(
-      authOptions(c.req.raw as NextRequest),
-    );
+    const session = await getServerAuthSession({
+      req: c.req.raw as NextRequest,
+    });
     if (!session) {
       return c.json(
         { error: "You must be logged in to access this endpoint." },

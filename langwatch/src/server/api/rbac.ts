@@ -5,7 +5,7 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 

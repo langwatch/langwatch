@@ -1,14 +1,13 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { env } from "../../../env.mjs";
 import { hasProjectPermission } from "../../../server/api/rbac";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../../server/api/routers/modelProviders.utils";
-import { authOptions } from "../../../server/auth";
+import { getServerAuthSession } from "../../../server/auth";
 import { prisma } from "../../../server/db";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +15,7 @@ export const dynamic = "force-dynamic";
 const errorCache: Record<string, any> = {};
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions(req));
+  const session = await getServerAuthSession({ req });
   if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to access this endpoint." },

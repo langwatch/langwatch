@@ -7,9 +7,8 @@ import {
   type UIMessage,
 } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { hasProjectPermission } from "../../../../server/api/rbac";
-import { authOptions } from "../../../../server/auth";
+import { getServerAuthSession } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
 import { createLogger } from "../../../../utils/logger/server";
@@ -24,7 +23,7 @@ interface Body {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions(req));
+  const session = await getServerAuthSession({ req });
   if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to access this endpoint." },
