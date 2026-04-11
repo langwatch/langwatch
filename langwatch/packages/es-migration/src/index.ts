@@ -403,7 +403,15 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`Fatal error: ${err}\n`);
-  process.exit(2);
-});
+main()
+  .then(() => {
+    // Force exit after main() resolves. Some handle in the event-sourcing
+    // runtime or the ClickHouse keep-alive pool keeps the event loop alive
+    // even after app.close() finishes, so the process would otherwise hang
+    // forever in CI (and had to be killed by hand locally).
+    process.exit(process.exitCode ?? 0);
+  })
+  .catch((err) => {
+    process.stderr.write(`Fatal error: ${err}\n`);
+    process.exit(2);
+  });
