@@ -107,6 +107,20 @@ describe("getServerAuthSession", () => {
     });
   });
 
+  describe("when BetterAuth returns a cached session but the DB row is gone (CodeRabbit)", () => {
+    // This covers the fail-closed fix for bug 38: if the Redis-cached
+    // BetterAuth session outlives the DB row (Redis delete failed during
+    // revocation, or some out-of-band DB delete happened), we must
+    // reject the session instead of accepting it.
+    it("returns null and does not expose user identity", async () => {
+      mockGetSession.mockResolvedValue(makeBetterAuthResponse());
+      mockSessionFindUnique.mockResolvedValue(null);
+
+      const result = await getServerAuthSession({ req: fakeReq });
+      expect(result).toBeNull();
+    });
+  });
+
   describe("when an admin is impersonating another user", () => {
     it("rewrites session.user to the impersonated user and sets impersonator", async () => {
       mockGetSession.mockResolvedValue(makeBetterAuthResponse({

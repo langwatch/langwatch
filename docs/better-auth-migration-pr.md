@@ -111,9 +111,9 @@ write.
 - `specs/auth/phase-2-cutover-migration.feature`
 - `specs/auth/phase-3-big-swap.feature`
 - `docs/better-auth-cutover.md` (deployment notes)
-- `scripts/better-auth-smoketest.ts` (37 end-to-end checks)
-- `scripts/better-auth-sso-smoketest.ts` (11 SSO checks)
-- `scripts/better-auth-compat-smoketest.ts` (20 compat layer checks)
+- `e2e/auth-regression/better-auth-smoketest.ts` (37 end-to-end checks)
+- `e2e/auth-regression/better-auth-sso-smoketest.ts` (11 SSO checks)
+- `e2e/auth-regression/better-auth-compat-smoketest.ts` (20 compat layer checks)
 
 **Net deletions:**
 - `src/pages/api/auth/[...nextauth].ts` (NextAuth handler)
@@ -181,9 +181,9 @@ development and caught two bugs that would have broken the first deploy.
 - `user.deactivation.unit.test.ts` — 2 tests locked to the iter-24 SessionService wiring
 
 **Integration smoketests (68 checks against real Postgres):**
-- `scripts/better-auth-smoketest.ts` — 39 checks: credentials signin/signup, wrong password, nonexistent user, deactivated user, session lookup, lastLoginAt update, signout, admin impersonation start/stop, expired impersonation, legacy bcrypt hash compat, SCIM `UserService.create`, session TTL (30 days), deleted-target fallback
-- `scripts/better-auth-sso-smoketest.ts` — 11 checks: new SSO user auto-add, non-SSO no-op, provider match, Auth0 WAAD prefix, stale account cleanup, deactivated blocking, mixed-case matching, idempotency
-- `scripts/better-auth-compat-smoketest.ts` — 20 checks: no cookie, fresh signin, tampered cookie, admin impersonation round-trip, expired impersonation, concurrent calls, Headers object, pendingSsoSetup flag
+- `e2e/auth-regression/better-auth-smoketest.ts` — 39 checks: credentials signin/signup, wrong password, nonexistent user, deactivated user, session lookup, lastLoginAt update, signout, admin impersonation start/stop, expired impersonation, legacy bcrypt hash compat, SCIM `UserService.create`, session TTL (30 days), deleted-target fallback
+- `e2e/auth-regression/better-auth-sso-smoketest.ts` — 11 checks: new SSO user auto-add, non-SSO no-op, provider match, Auth0 WAAD prefix, stale account cleanup, deactivated blocking, mixed-case matching, idempotency
+- `e2e/auth-regression/better-auth-compat-smoketest.ts` — 20 checks: no cookie, fresh signin, tampered cookie, admin impersonation round-trip, expired impersonation, concurrent calls, Headers object, pendingSsoSetup flag
 
 **Real-HTTP end-to-end validation** (bookended with server reboots
 against an isolated Postgres on port 5571):
@@ -1060,14 +1060,14 @@ of Parts A/B programmatically:
 cd langwatch
 # Start dev server on port 5571 in email mode first, then:
 NEXTAUTH_URL=http://localhost:5571 NEXTAUTH_PROVIDER=email \
-  pnpm exec tsx scripts/iter43-browser-qa.ts         # 17 checks
-pnpm exec tsx scripts/iter44-browser-flows.ts         # 10 checks
-pnpm exec tsx scripts/iter45-change-password-flow.ts  # 18 checks
-pnpm exec tsx scripts/iter45-csrf-browser.ts          #  5 checks
-pnpm exec tsx scripts/iter46-bug30-31-fixes.ts        # 10 checks
-pnpm exec tsx scripts/iter47-invite-edge-cases.ts     # 10 checks
-pnpm exec tsx scripts/iter49-bug36-changepw-rate-limit.ts  # 4 checks
-pnpm exec tsx scripts/iter49-bug37-unlink-race.ts     #  4 checks
+  pnpm exec tsx e2e/auth-regression/iter43-browser-qa.ts         # 17 checks
+pnpm exec tsx e2e/auth-regression/iter44-browser-flows.ts         # 10 checks
+pnpm exec tsx e2e/auth-regression/iter45-change-password-flow.ts  # 18 checks
+pnpm exec tsx e2e/auth-regression/iter45-csrf-browser.ts          #  5 checks
+pnpm exec tsx e2e/auth-regression/iter46-bug30-31-fixes.ts        # 10 checks
+pnpm exec tsx e2e/auth-regression/iter47-invite-edge-cases.ts     # 10 checks
+pnpm exec tsx e2e/auth-regression/iter49-bug36-changepw-rate-limit.ts  # 4 checks
+pnpm exec tsx e2e/auth-regression/iter49-bug37-unlink-race.ts     #  4 checks
 ```
 
 All 78 checks should pass. If any fails, do NOT merge.
@@ -1202,6 +1202,9 @@ These exist in the worktree but are intentionally NOT committed:
 - `.claude/scheduled_tasks.lock` — Claude harness lockfile.
 - `langwatch/.claude/` — nested Claude state.
 
-The `scripts/iter*.ts` regression scripts **ARE** committed because
+The `e2e/auth-regression/*.ts` scripts **ARE** committed because
 they're the automated part of the manual test plan and will stay
-useful for future audits or for verifying a rollback.
+useful for future audits or for verifying a rollback. They live
+under `e2e/` (not `scripts/`) but are explicitly **not** part of
+`pnpm test:e2e` — see `langwatch/e2e/auth-regression/README.md`
+for why and how to run them.

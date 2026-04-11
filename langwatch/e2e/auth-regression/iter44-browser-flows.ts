@@ -19,17 +19,15 @@
  * http://localhost:5571) in email mode.
  */
 import { chromium, type BrowserContext } from "playwright";
-import { prisma } from "../src/server/db";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
-const ADMIN_EMAIL = `iter44-admin-${TS}@test.com`;
 const USER1_EMAIL = `iter44-u1-${TS}@test.com`;
 const USER2_EMAIL = `iter44-u2-${TS}@test.com`;
 const INVITED_EMAIL = `iter44-invited-${TS}@test.com`;
 const WRONG_EMAIL = `iter44-wrong-${TS}@test.com`;
 const PASSWORD = "iter44pass1234";
-const NEW_PASSWORD = "iter44newpass1234";
 
 let passes = 0;
 let fails = 0;
@@ -76,20 +74,6 @@ async function signUp(ctx: BrowserContext, email: string, password: string, name
     console.log(`  !! toasts: ${JSON.stringify(toasts.slice(0, 5))}`);
     throw e;
   }
-  return page;
-}
-
-async function signIn(ctx: BrowserContext, email: string, password: string) {
-  const page = await ctx.newPage();
-  await page.goto(`${BASE_URL}/auth/signin`, { waitUntil: "networkidle" });
-  await page.waitForSelector("form", { timeout: 10000 });
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', password);
-  await page.click('button:has-text("Sign in")');
-  await page.waitForURL(
-    (url) => !url.toString().includes("/auth/signin"),
-    { timeout: 15000 },
-  );
   return page;
 }
 
@@ -378,14 +362,18 @@ async function main() {
     await prisma.organization.deleteMany({
       where: { id: `iter44-org-${TS}` },
     });
+    // Scope cleanup to THIS run's TS suffix so we never touch users
+    // created by other test runs or by staging data that happens to
+    // share the "iter44" prefix. CodeRabbit caught this.
+    const runSuffix = `-${TS}@test.com`;
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter44" } } },
+      where: { user: { email: { endsWith: runSuffix } } },
     });
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter44" } } },
+      where: { user: { email: { endsWith: runSuffix } } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter44" } },
+      where: { email: { endsWith: runSuffix } },
     });
   }
 

@@ -23,7 +23,7 @@
  * in NEXTAUTH_PROVIDER=email mode.
  */
 import { chromium, type BrowserContext } from "playwright";
-import { prisma } from "../src/server/db";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
@@ -261,14 +261,15 @@ async function main() {
     await browser.close();
 
     // Clean up test users.
+    // Scope cleanup to the exact test user (CodeRabbit).
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter45" } } },
+      where: { user: { email: EMAIL } },
     });
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter45" } } },
+      where: { user: { email: EMAIL } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter45" } },
+      where: { email: EMAIL },
     });
   }
 

@@ -13,7 +13,7 @@
  *   5. Direct tRPC call to acceptInvite without auth → UNAUTHORIZED.
  */
 import { chromium, type BrowserContext } from "playwright";
-import { prisma } from "../src/server/db";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
@@ -343,14 +343,16 @@ async function main() {
     await prisma.project.deleteMany({ where: { teamId } });
     await prisma.team.deleteMany({ where: { id: teamId } });
     await prisma.organization.deleteMany({ where: { id: orgId } });
+    // Scope cleanup to this run's TS suffix (CodeRabbit).
+    const runSuffix = `-${TS}@test.com`;
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter47" } } },
+      where: { user: { email: { endsWith: runSuffix } } },
     });
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter47" } } },
+      where: { user: { email: { endsWith: runSuffix } } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter47" } },
+      where: { email: { endsWith: runSuffix } },
     });
   }
 

@@ -22,6 +22,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 let exitCode = 0;
 
@@ -35,16 +36,11 @@ const check = (label: string, condition: boolean, detail?: string): void => {
 };
 
 async function main() {
-  if (!process.env.DATABASE_URL?.includes("localhost")) {
-    console.error(
-      "REFUSING TO RUN: DATABASE_URL must point to localhost to avoid shared-DB damage",
-    );
-    process.exit(1);
-  }
+  assertLocalhostDatabaseUrl();
 
   const prisma = new PrismaClient();
   const { afterUserCreate, beforeAccountCreate } = await import(
-    "../src/server/better-auth/hooks"
+    "../../src/server/better-auth/hooks"
   );
 
   // ─────────────────────────────────────────────────────────────────

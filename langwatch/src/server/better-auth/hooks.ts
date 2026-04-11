@@ -1,4 +1,4 @@
-import type { Organization, PrismaClient } from "@prisma/client";
+import { Prisma, type Organization, type PrismaClient } from "@prisma/client";
 import { APIError } from "better-auth/api";
 import { createLogger } from "../../utils/logger/server";
 import { isSsoProviderMatch, extractEmailDomain } from "./sso";
@@ -60,18 +60,34 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    await prisma.organizationUser.create({
-      data: {
-        userId: user.id,
-        organizationId: org.id,
-        role: "MEMBER",
-      },
-    });
-
-    logger.info(
-      { userId: user.id, organizationId: org.id },
-      "Auto-added new user to SSO organization",
-    );
+    try {
+      await prisma.organizationUser.create({
+        data: {
+          userId: user.id,
+          organizationId: org.id,
+          role: "MEMBER",
+        },
+      });
+      logger.info(
+        { userId: user.id, organizationId: org.id },
+        "Auto-added new user to SSO organization",
+      );
+    } catch (err) {
+      // P2002 (unique constraint) means another concurrent OAuth callback
+      // or a retry already created this membership. Idempotent success —
+      // don't log as an error. Caught by CodeRabbit in PR review.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        logger.info(
+          { userId: user.id, organizationId: org.id },
+          "Auto-add SSO membership was already present (P2002) — treating as success",
+        );
+        return;
+      }
+      throw err;
+    }
   } catch (err) {
     logger.error(
       { err, userId: user.id, domain },

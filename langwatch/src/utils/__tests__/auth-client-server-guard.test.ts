@@ -7,12 +7,19 @@
  * `~/server/auth` instead. This test locks in the explicit failure mode so
  * a future regression doesn't reintroduce the silent-null behavior.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 // Force a non-browser environment for this test, even though vitest defaults
 // to jsdom for the project. We delete `window` so the guard's
 // `typeof window === "undefined"` check fires.
 vi.stubGlobal("window", undefined);
+
+// Restore the stub after this file so other test files that rely on
+// jsdom's `window` don't leak the stubbed-undefined state. Caught by
+// CodeRabbit in PR review.
+afterAll(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("auth-client getSession server-side guard", () => {
   it("throws a descriptive error when called from a non-browser context", async () => {

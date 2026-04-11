@@ -15,6 +15,7 @@
 
 import { hash } from "bcrypt";
 import { PrismaClient } from "@prisma/client";
+import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 let exitCode = 0;
 const check = (label: string, condition: boolean, detail?: string): void => {
@@ -27,10 +28,7 @@ const check = (label: string, condition: boolean, detail?: string): void => {
 };
 
 async function main() {
-  if (!process.env.DATABASE_URL?.includes("localhost")) {
-    console.error("REFUSING: DATABASE_URL must point to localhost");
-    process.exit(1);
-  }
+  assertLocalhostDatabaseUrl();
 
   const prisma = new PrismaClient();
 
@@ -76,8 +74,8 @@ async function main() {
     },
   });
 
-  const { auth } = await import("../src/server/better-auth");
-  const { getServerAuthSession } = await import("../src/server/auth");
+  const { auth } = await import("../../src/server/better-auth");
+  const { getServerAuthSession } = await import("../../src/server/auth");
 
   // Helper: get a real session cookie for a given user
   const signInAs = async (e: string): Promise<string> => {

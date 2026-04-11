@@ -28,6 +28,12 @@ if (!fs.existsSync(authFilePath)) {
  */
 export default defineConfig({
   testDir: "./",
+  // Exclude the auth-regression subfolder from `pnpm test:e2e`. Those
+  // scripts are standalone `tsx` regression scripts, not
+  // `@playwright/test` specs — they need a running dev server plus an
+  // isolated Postgres and talk directly to Prisma for fixture setup.
+  // See `e2e/auth-regression/README.md`.
+  testIgnore: ["**/auth-regression/**"],
   /* Run tests in files in parallel */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

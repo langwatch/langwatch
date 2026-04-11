@@ -101,14 +101,24 @@ Feature: BetterAuth config (unmounted)
     And pendingSsoSetup is set to true
 
   # ============================================================================
-  # Admin impersonation via admin plugin
+  # Admin impersonation via the legacy Session.impersonating JSON column
+  #
+  # We deliberately do NOT use BetterAuth's `admin()` plugin — it expects
+  # `User.role` / `User.banned` columns our schema doesn't have, and it
+  # would force an additional schema migration for no behavioral benefit.
+  # Impersonation is handled end-to-end by `src/pages/api/admin/impersonate.ts`
+  # writing to the existing `Session.impersonating` JSON column, and
+  # `src/server/auth.ts` reading it to rewrite `session.user` on each
+  # request. The compat layer also re-verifies the target user is still
+  # active on each request.
   # ============================================================================
 
-  Scenario: Admin plugin is configured for impersonation
+  Scenario: The BetterAuth admin plugin is intentionally omitted
     Given the BetterAuth instance is initialized
     When I inspect the configured plugins
-    Then the admin plugin is present
-    And impersonation is supported via the admin plugin
+    Then only genericOAuth is present in the plugins array
+    And impersonation is handled via the legacy Session.impersonating JSON column
+    And the compat layer re-verifies the impersonation target on every request
 
   # ============================================================================
   # bcrypt-compatible password verification
@@ -126,12 +136,19 @@ Feature: BetterAuth config (unmounted)
     Then the signin is rejected
 
   # ============================================================================
-  # The config file does not mount yet
+  # BetterAuth is now the live handler
+  #
+  # Originally (during phase 1 of the migration) this file tracked a
+  # "NextAuth still live, BetterAuth loaded but unmounted" phase. That
+  # phase is no longer the reality — this PR swaps `/api/auth/[...all].ts`
+  # to mount BetterAuth directly. The scenario is updated to reflect the
+  # post-cutover state. Phase-3 (`phase-3-big-swap.feature`) contains the
+  # detailed cutover assertions.
   # ============================================================================
 
-  Scenario: NextAuth is still the live handler
-    Given this phase is complete
-    When I visit `/api/auth/signin` in dev
-    Then NextAuth still renders the page
-    And BetterAuth is not wired to any request handler yet
+  Scenario: BetterAuth is the live handler
+    Given the BetterAuth instance is initialized
+    When I visit `/api/auth/sign-in/email` in dev
+    Then BetterAuth handles the request
+    And no NextAuth handler is reachable on any `/api/auth/*` path
     And `pnpm typecheck` passes

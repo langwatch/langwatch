@@ -237,8 +237,14 @@ export default async function handler(
         // If the admin picked a specific historical date rather than
         // "now", apply it as a follow-up update. This is cosmetic —
         // the revocation already happened with the real current date.
+        // Validate the picked date before using it anywhere. Without the
+        // isValidPickedDate guard, `pickedDate.toISOString()` throws
+        // RangeError for malformed input and the admin gets a 500
+        // AFTER the user was already deactivated and logged out. Caught
+        // by CodeRabbit in PR review.
         const pickedDate = v instanceof Date ? v : new Date(v);
-        if (!Number.isNaN(pickedDate.getTime())) {
+        const isValidPickedDate = !Number.isNaN(pickedDate.getTime());
+        if (isValidPickedDate) {
           await prisma.user.update({
             where: { id: userId },
             data: { deactivatedAt: pickedDate },
@@ -246,7 +252,13 @@ export default async function handler(
         }
         sideEffectAudit.push({
           action: "update/user",
-          payload: { id: userId, deactivate: true, pickedDate: pickedDate.toISOString() },
+          payload: {
+            id: userId,
+            deactivate: true,
+            ...(isValidPickedDate
+              ? { pickedDate: pickedDate.toISOString() }
+              : {}),
+          },
         });
       }
     }

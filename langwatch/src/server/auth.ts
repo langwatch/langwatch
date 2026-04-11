@@ -118,7 +118,22 @@ export const getServerAuthSession = async (ctx: {
       select: { impersonating: true },
     });
 
-    const impersonating = dbSession?.impersonating as
+    // Fail closed when BetterAuth returns a cached session but the DB row
+    // is gone. This happens when a session was revoked (either via the
+    // tRPC `user.deactivate`/`changePassword` flow or the admin panel)
+    // and the Redis cache deletion failed or the cache entry outlived the
+    // DB row for any other reason. Without this guard, a revoked session
+    // would keep authenticating server-side callers until the cache TTL
+    // expired (up to 30 days). Caught by CodeRabbit in PR review (bug 38).
+    if (!dbSession) {
+      logger.warn(
+        { sessionId: result.session.id, userId: result.user.id },
+        "BetterAuth returned a cached session that no longer exists in the DB; treating it as revoked",
+      );
+      return null;
+    }
+
+    const impersonating = dbSession.impersonating as
       | {
           id?: string;
           name?: string | null;

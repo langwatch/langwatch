@@ -189,6 +189,24 @@ describe("UserService", () => {
         });
       });
     });
+
+    describe("when the email is blank after normalization (CodeRabbit)", () => {
+      it("throws and does NOT touch the user row or sessions", async () => {
+        await expect(
+          service.updateProfile({ id: "user-1", email: "   " }),
+        ).rejects.toThrow(/blank/i);
+        // No write, no revocation.
+        expect(prisma.user.update).not.toHaveBeenCalled();
+        expect((prisma as any).session.deleteMany).not.toHaveBeenCalled();
+      });
+
+      it("also rejects an empty string", async () => {
+        await expect(
+          service.updateProfile({ id: "user-1", email: "" }),
+        ).rejects.toThrow(/blank/i);
+        expect(prisma.user.update).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("create()", () => {

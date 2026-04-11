@@ -16,8 +16,8 @@
  *           rejects POST/PUT/DELETE/PATCH requests whose Origin
  *           (or Referer fallback) doesn't match NEXTAUTH_URL.
  */
-import { _resetMemoryRateLimitStore } from "../src/server/rateLimit";
-import { prisma } from "../src/server/db";
+import { _resetMemoryRateLimitStore } from "../../src/server/rateLimit";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
@@ -182,15 +182,17 @@ async function main() {
       rejectionsContinued,
     );
   } finally {
-    // Clean up any users created during the test.
+    // Scope cleanup to this run's TS suffix (CodeRabbit). iter46 creates
+    // ~25 spam users to exercise the rate limit, all sharing this suffix.
+    const runSuffix = `-${TS}@test.com`;
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter46-" } } },
+      where: { user: { email: { endsWith: runSuffix } } },
     });
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter46-" } } },
+      where: { user: { email: { endsWith: runSuffix } } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter46-" } },
+      where: { email: { endsWith: runSuffix } },
     });
   }
 

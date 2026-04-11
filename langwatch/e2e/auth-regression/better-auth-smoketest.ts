@@ -29,6 +29,7 @@
 
 import { hash } from "bcrypt";
 import { PrismaClient } from "@prisma/client";
+import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 const check = (label: string, condition: boolean, detail?: string): void => {
   if (condition) {
@@ -62,12 +63,7 @@ const parseSetCookie = (header: string | null): Record<string, string | boolean>
 };
 
 async function main() {
-  if (!process.env.DATABASE_URL?.includes("localhost")) {
-    console.error(
-      "REFUSING TO RUN: DATABASE_URL must point to localhost to avoid shared-DB damage",
-    );
-    process.exit(1);
-  }
+  assertLocalhostDatabaseUrl();
 
   const prisma = new PrismaClient();
 
@@ -130,7 +126,7 @@ async function main() {
     },
   });
 
-  const { auth } = await import("../src/server/better-auth");
+  const { auth } = await import("../../src/server/better-auth");
 
   // ─────────────────────────────────────────────────────────────────
   // HAPPY PATH: credentials signin
@@ -351,7 +347,7 @@ async function main() {
     });
 
     // Use the compat getServerAuthSession helper.
-    const { getServerAuthSession } = await import("../src/server/auth");
+    const { getServerAuthSession } = await import("../../src/server/auth");
     const fakeReq = {
       headers: { cookie: impCookie.split(";")[0] ?? "" },
     } as any;
@@ -399,7 +395,7 @@ async function main() {
       },
     });
 
-    const { getServerAuthSession } = await import("../src/server/auth");
+    const { getServerAuthSession } = await import("../../src/server/auth");
     const fakeReq = {
       headers: { cookie: impCookie.split(";")[0] ?? "" },
     } as any;
@@ -630,7 +626,7 @@ async function main() {
       },
     });
 
-    const { getServerAuthSession } = await import("../src/server/auth");
+    const { getServerAuthSession } = await import("../../src/server/auth");
     const fakeReq = {
       headers: { cookie: impCookie.split(";")[0] ?? "" },
     } as any;

@@ -37,6 +37,18 @@ describe("isSsoProviderMatch", () => {
       ).toBe(true);
     });
 
+    it("returns true when providerAccountId equals the prefix exactly", () => {
+      expect(
+        isSsoProviderMatch(
+          { ssoProvider: "waad|acme-azure-connection" },
+          {
+            providerId: "auth0",
+            accountId: "waad|acme-azure-connection",
+          },
+        ),
+      ).toBe(true);
+    });
+
     it("returns false when providerAccountId does NOT start with the prefix", () => {
       expect(
         isSsoProviderMatch(
@@ -44,6 +56,20 @@ describe("isSsoProviderMatch", () => {
           {
             providerId: "auth0",
             accountId: "google-oauth2|other-user-id",
+          },
+        ),
+      ).toBe(false);
+    });
+
+    it("rejects a sibling connection that merely shares a literal prefix (CodeRabbit)", () => {
+      // Without the `|` delimiter check, an org pinned to `waad|acme`
+      // would accept `waad|acme-prod|user-123` — a sibling connection.
+      expect(
+        isSsoProviderMatch(
+          { ssoProvider: "waad|acme" },
+          {
+            providerId: "auth0",
+            accountId: "waad|acme-prod|user-123",
           },
         ),
       ).toBe(false);
@@ -83,6 +109,13 @@ describe("extractEmailDomain", () => {
 
     it("returns null for an email ending in @", () => {
       expect(extractEmailDomain("user@")).toBeNull();
+    });
+
+    it("returns null for an email with multiple @ chars (CodeRabbit)", () => {
+      // Without this check, "a@b@c.com" would silently return "b@c.com"
+      // and route SSO based on the wrong domain.
+      expect(extractEmailDomain("a@b@c.com")).toBeNull();
+      expect(extractEmailDomain("user@@acme.com")).toBeNull();
     });
   });
 });

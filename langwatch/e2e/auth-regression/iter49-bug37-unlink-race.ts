@@ -11,7 +11,7 @@
  * one account (not zero).
  */
 import { chromium } from "playwright";
-import { prisma } from "../src/server/db";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
@@ -32,7 +32,6 @@ const check = (label: string, ok: boolean, extra = "") => {
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
-  let userId: string | null = null;
   try {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
@@ -43,6 +42,11 @@ async function main() {
     await page.fill('input[name="name"]', "Bug37 Test");
     await page.fill('input[type="email"]', EMAIL);
     const pwFields = await page.locator('input[type="password"]').all();
+    if (pwFields.length !== 2) {
+      throw new Error(
+        `expected 2 password inputs on the signup form, found ${pwFields.length}`,
+      );
+    }
     await pwFields[0]!.fill(PASSWORD);
     await pwFields[1]!.fill(PASSWORD);
     await page.click('button:has-text("Sign up")');
@@ -53,7 +57,6 @@ async function main() {
 
     const user = await prisma.user.findUnique({ where: { email: EMAIL } });
     if (!user) throw new Error("user row missing after signup");
-    userId = user.id;
 
     // Inject a SECOND Account row directly so we can exercise the race
     // (BetterAuth normally allows only one credential account, and we
@@ -129,14 +132,15 @@ async function main() {
     await ctx.close();
   } finally {
     await browser.close();
+    // Scope cleanup to the exact test user (CodeRabbit).
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter49-bug37" } } },
+      where: { user: { email: EMAIL } },
     });
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter49-bug37" } } },
+      where: { user: { email: EMAIL } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter49-bug37" } },
+      where: { email: EMAIL },
     });
   }
 

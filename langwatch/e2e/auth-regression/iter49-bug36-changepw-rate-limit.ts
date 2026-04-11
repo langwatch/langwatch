@@ -15,7 +15,7 @@
  *      reset — we just verify rate-limit fires).
  */
 import { chromium } from "playwright";
-import { prisma } from "../src/server/db";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
@@ -152,14 +152,15 @@ async function main() {
     await ctx2.close();
   } finally {
     await browser.close();
+    // Scope cleanup to the exact test user (CodeRabbit).
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter49-bug36" } } },
+      where: { user: { email: EMAIL } },
     });
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter49-bug36" } } },
+      where: { user: { email: EMAIL } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter49-bug36" } },
+      where: { email: EMAIL },
     });
   }
 

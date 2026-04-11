@@ -51,6 +51,14 @@ async function main() {
   await page.fill('input[type="email"]', EMAIL);
   const pwFields = await page.locator('input[type="password"]').all();
   check("two password fields (pw + confirm)", pwFields.length === 2);
+  // Guard against out-of-bounds indexing if the form rendered fewer than
+  // two password inputs. Without this, a failed `check` above just logs
+  // and Lines 55-56 crash the whole script. CodeRabbit flagged this.
+  if (pwFields.length < 2) {
+    throw new Error(
+      `expected 2 password inputs on signup form, found ${pwFields.length}`,
+    );
+  }
   await page.fill('input[name="name"]', NAME);
   await pwFields[0]!.fill(PASSWORD);
   await pwFields[1]!.fill(PASSWORD);

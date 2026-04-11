@@ -46,6 +46,14 @@ export class UserService {
     const normalizedEmail =
       email !== undefined ? email.trim().toLowerCase() : undefined;
 
+    // Reject blank email after normalization. Without this, a whitespace-only
+    // input like "   " becomes "" and persists an empty string into User.email
+    // before revoking every session. Both the admin panel and SCIM sync share
+    // this code path. Caught by CodeRabbit in PR review.
+    if (normalizedEmail === "") {
+      throw new Error("Email cannot be blank");
+    }
+
     let emailChanged = false;
     if (normalizedEmail !== undefined) {
       const current = await this.prisma.user.findUnique({

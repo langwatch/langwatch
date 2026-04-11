@@ -100,10 +100,10 @@ Self-hosted deployments run the same migration. Key differences:
 
 Run this in order on prod:
 
-1. `GET /api/auth/session` on an unauthenticated request → returns null/empty
+1. `GET /api/auth/get-session` on an unauthenticated request → returns null/empty
 2. `POST /api/auth/sign-in/email` with valid creds → 200 + `Set-Cookie: better-auth.session_token=...`
 3. Same request, check cookie flags: `HttpOnly`, `Secure` (HTTPS), `SameSite=Lax`, `Path=/`
-4. `GET /api/auth/session` with the cookie → returns the user
+4. `GET /api/auth/get-session` with the cookie → returns the user
 5. Open `/settings` → loads without redirect loop
 6. Open `/admin` (as admin) → admin panel loads
 7. Trigger impersonation → session shows impersonated user + `impersonator` field populated

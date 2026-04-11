@@ -11,7 +11,7 @@
  */
 import { chromium } from "playwright";
 import { createServer } from "http";
-import { prisma } from "../src/server/db";
+import { prisma } from "../../src/server/db";
 
 const BASE_URL = process.env.NEXTAUTH_URL ?? "http://localhost:5571";
 const TS = Date.now();
@@ -149,14 +149,15 @@ async function main() {
     attackerServer.close();
 
     // Clean up any attacker user that might have been created.
+    // Scope cleanup to the exact attacker email (CodeRabbit).
     await prisma.session.deleteMany({
-      where: { user: { email: { contains: "iter45-attacker" } } },
+      where: { user: { email: ATTACKER_EMAIL } },
     });
     await prisma.account.deleteMany({
-      where: { user: { email: { contains: "iter45-attacker" } } },
+      where: { user: { email: ATTACKER_EMAIL } },
     });
     await prisma.user.deleteMany({
-      where: { email: { contains: "iter45-attacker" } },
+      where: { email: ATTACKER_EMAIL },
     });
   }
 

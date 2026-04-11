@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactElement, ReactNode } from "react";
+import { useEffect, type ReactElement, type ReactNode } from "react";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -83,15 +83,20 @@ export const useSession = (
       ? "authenticated"
       : "unauthenticated";
 
-  if (
-    options?.required &&
-    status === "unauthenticated" &&
-    options.onUnauthenticated
-  ) {
-    // Fire-and-forget — mirrors NextAuth's behavior of triggering this
-    // callback once per unauthenticated render.
-    options.onUnauthenticated();
-  }
+  // Fire the onUnauthenticated callback from an effect, NOT during render.
+  // NextAuth's old `useSession({required, onUnauthenticated})` also ran the
+  // callback as a side effect — we just need to honor React's rules by
+  // moving it out of the render path so Strict Mode's double-invoke doesn't
+  // fire navigate twice. Caught by CodeRabbit in PR review.
+  useEffect(() => {
+    if (
+      options?.required &&
+      status === "unauthenticated" &&
+      options.onUnauthenticated
+    ) {
+      options.onUnauthenticated();
+    }
+  }, [options?.required, options?.onUnauthenticated, status]);
 
   return {
     data: adapted,
@@ -144,9 +149,16 @@ export const signIn = async (
   // the generic-oauth plugin both honor the same providerId. BetterAuth
   // handles the redirect to the provider URL itself when `disableRedirect`
   // is unset.
+  //
+  // Normalize `azure-ad` → `microsoft` (BetterAuth's internal provider id)
+  // to match `linkAccount()` which does the same mapping. Also honor
+  // `redirect: false` by passing `disableRedirect: true` so the caller can
+  // handle navigation itself. Caught by CodeRabbit in PR review.
+  const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
   const result = await client.signIn.social({
-    provider: provider as "google",
+    provider: mappedProvider as "google",
     callbackURL,
+    disableRedirect: !shouldRedirect,
   });
   if (result.error) {
     return {
