@@ -55,7 +55,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum(["prompt", "http", "code"]),
+  targetType: z.enum(["prompt", "http", "code", "workflow"]),
   simulationSuiteId: z.string().optional(),
 });
 
