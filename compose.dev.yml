@@ -160,9 +160,12 @@ services:
       - "${APP_PORT:-5560}:5560"
     environment:
       <<: *common-env
-      # Override .env so Auth0 callback matches the dynamic host port
-      BASE_HOST: http://localhost:${APP_PORT:-5560}
-      NEXTAUTH_URL: http://localhost:${APP_PORT:-5560}
+      # Override .env so Auth0 callback matches the dynamic host port.
+      # Falls back to localhost when not running behind a proxy; set
+      # BASE_HOST/NEXTAUTH_URL in the shell to point at a proxied URL
+      # (e.g. Boxd: https://langwatch-main.boxd.sh).
+      BASE_HOST: ${BASE_HOST:-http://localhost:${APP_PORT:-5560}}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-5560}}
       # Enable scenarios UI in dev
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
