@@ -204,12 +204,16 @@ describe("AgentCodeEditorDrawer", () => {
         expect(screen.getAllByText("Inputs").length).toBeGreaterThanOrEqual(1);
       });
 
-      // The "=" sign and value input should NOT appear when there are no mapping sources
-      // for the main agent Inputs section (Evaluations V3 context).
-      // The ScenarioInputMappingSection always shows "=" since it always has sources.
-      // Verify the main agent variables section has no EvaluationsV3 "=" sign by
-      // checking the main Inputs section doesn't show dataset mapping.
-      // The scenario section shows "=" for its own mappings — that's expected.
+      // When no mapping sources are provided (Evaluations V3 context),
+      // the main agent Inputs section must not render a VariableMappingInput for
+      // the default "input" variable — the #1640 bug rendered a controlled input
+      // with no onChange, making it impossible to type.
+      //
+      // The ScenarioInputMappingSection always has sources and so always renders
+      // exactly one mapping-input for its "input" scenario row. If the regression
+      // reappears, the main section would render a second one and this length
+      // would be >= 2.
+      expect(screen.getAllByTestId("mapping-input-input")).toHaveLength(1);
     });
 
     it("allows renaming an input variable", async () => {
