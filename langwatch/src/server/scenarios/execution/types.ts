@@ -131,11 +131,47 @@ export const CodeAgentDataSchema = z.object({
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
+/**
+ * Pre-fetched workflow agent configuration for serialized execution.
+ *
+ * Contains the fully published workflow DSL plus scenario-mapping metadata.
+ * Workflow execution is delegated to the langwatch_nlp service's /studio/execute_sync
+ * endpoint using an execute_flow event, identical to code agents but with the
+ * user's own workflow DSL (rather than a synthesized entry→code→end workflow).
+ */
+export const WorkflowAgentDataSchema = z.object({
+  type: z.literal("workflow"),
+  agentId: z.string(),
+  workflowId: z.string(),
+  /** The published workflow DSL (from WorkflowVersion.dsl). Opaque to the adapter. */
+  workflow: z.record(z.string(), z.unknown()),
+  /** Ordered declared entry-node inputs used for mapping resolution + fallback. */
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Ordered end-node outputs used for default/fallback output extraction. */
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
+});
+export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
+  WorkflowAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -195,7 +231,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code"]),
+  type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;

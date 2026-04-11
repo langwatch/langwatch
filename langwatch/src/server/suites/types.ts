@@ -9,7 +9,7 @@ import { z } from "zod";
 
 /** Target reference in a suite configuration */
 export const suiteTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code"]),
+  type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
 });
 

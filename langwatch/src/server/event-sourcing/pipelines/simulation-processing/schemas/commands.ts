@@ -12,7 +12,7 @@ export const queueRunCommandDataSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   /** Target for execution. Used by the execution reactor to spawn the right adapter. */
   target: z.object({
-    type: z.enum(["prompt", "http", "code"]),
+    type: z.enum(["prompt", "http", "code", "workflow"]),
     referenceId: z.string(),
   }).optional(),
   occurredAt: z.number(),

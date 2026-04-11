@@ -10,7 +10,7 @@ import {
 } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http" | "code";
+  type: "prompt" | "http" | "code" | "workflow";
   id: string;
 } | null;
 

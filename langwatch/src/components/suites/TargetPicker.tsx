@@ -14,7 +14,7 @@ import { SearchInput } from "../ui/SearchInput";
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt" | "code";
+  type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
 }
 
@@ -123,7 +123,15 @@ export function TargetPicker({
                     {target.name}
                   </Text>
                   <Text fontSize="xs" color="fg.muted">
-                    ({target.type === "http" ? "HTTP" : target.type === "code" ? "Code" : "Prompt"})
+                    (
+                    {target.type === "http"
+                      ? "HTTP"
+                      : target.type === "code"
+                        ? "Code"
+                        : target.type === "workflow"
+                          ? "Workflow"
+                          : "Prompt"}
+                    )
                   </Text>
                 </HStack>
               </Checkbox>
