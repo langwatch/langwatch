@@ -339,6 +339,20 @@ describe("RoleService Tests", () => {
           assignedRoleId: "role-123",
         },
       });
+      expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+        }),
+      );
+      expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: "user-123",
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "role-123",
+          }),
+        }),
+      );
     });
 
     it("should throw NOT_FOUND when custom role does not exist", async () => {
@@ -429,6 +443,19 @@ describe("RoleService Tests", () => {
           assignedRoleId: null,
         },
       });
+      expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+        }),
+      );
+      expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: "user-123",
+            role: TeamUserRole.VIEWER,
+          }),
+        }),
+      );
     });
   });
 });

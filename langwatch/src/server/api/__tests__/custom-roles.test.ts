@@ -91,7 +91,7 @@ describe("Custom Role Functionality Tests", () => {
   describe("Custom Role Permission Inheritance", () => {
     it("should allow custom role with manage permission to access view permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -109,7 +109,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should allow custom role with manage permission to access create permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -127,7 +127,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should allow custom role with manage permission to access update permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -145,7 +145,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should allow custom role with manage permission to access delete permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -163,7 +163,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should not allow custom role with only view permission to access manage permission", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -183,7 +183,7 @@ describe("Custom Role Functionality Tests", () => {
   describe("Complex Custom Role Scenarios", () => {
     it("should handle custom role with mixed permissions correctly", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -300,7 +300,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should handle custom role with no permissions", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
@@ -319,7 +319,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should handle custom role with invalid permission format", async () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         id: "custom-role-123",
