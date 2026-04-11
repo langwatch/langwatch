@@ -114,6 +114,32 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
+    it("grants access via group membership when user has no direct teamUser row", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          organizationId: "org-123",
+          organization: { members: [] },
+        },
+      });
+      // User belongs to a group (no direct teamUser)
+      mockPrisma.groupMembership.findMany.mockResolvedValue([
+        { groupId: "group-abc" },
+      ]);
+      // Group has a MEMBER binding on the team scope
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: TeamUserRole.MEMBER, customRoleId: null },
+      ]);
+      mockPrisma.teamUser.findFirst.mockResolvedValue(null);
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "workflows:view" as Permission,
+      );
+      expect(result).toBe(true);
+    });
+
     it("should return true when user has built-in role permission", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
@@ -143,7 +169,7 @@ describe("RBAC Integration Tests", () => {
         },
       });
       mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: "custom-role-123" },
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
       mockPrisma.customRole.findUnique.mockResolvedValue({
         permissions: ["workflows:manage"],

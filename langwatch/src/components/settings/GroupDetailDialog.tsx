@@ -46,14 +46,16 @@ export function GroupDetailDialog({
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [pendingName, setPendingName] = useState(group.name);
+  const [committedName, setCommittedName] = useState(group.name);
 
   useEffect(() => {
     if (open) {
       setPendingName(group.name);
+      setCommittedName(group.name);
     }
   }, [open, group.id, group.name]);
 
-  const nameChanged = pendingName.trim() !== group.name && pendingName.trim() !== "";
+  const nameChanged = pendingName.trim() !== committedName && pendingName.trim() !== "";
 
   const detail = api.group.getById.useQuery(
     { organizationId, groupId: group.id },
@@ -86,6 +88,7 @@ export function GroupDetailDialog({
       void queryClient.group.listAll.invalidate();
       void queryClient.group.getById.invalidate();
       setPendingName(updated.name);
+      setCommittedName(updated.name);
       toaster.create({ title: "Group renamed", type: "success" });
     },
     onError: (e) => toaster.create({ title: e.message, type: "error" }),
