@@ -147,5 +147,19 @@ describe("AgentHttpEditorDrawer", () => {
         });
       });
     });
+
+    // ========================================================================
+    // Scenario Mappings section (issue #3064)
+    // ========================================================================
+
+    describe("when the editor renders the Body tab", () => {
+      it("renders the Scenario Mappings section below the body template", async () => {
+        renderHttpDrawer();
+
+        await waitFor(() => {
+          expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+        });
+      });
+    });
   });
 });

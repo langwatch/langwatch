@@ -50,6 +50,8 @@ import {
   OutputPathInput,
   useHttpTest,
 } from "./http";
+import { ScenarioInputMappingSection } from "~/components/suites/ScenarioInputMappingSection";
+import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 // ============================================================================
 // Constants
@@ -93,6 +95,7 @@ function buildHttpConfig(
   outputPath: string,
   headers: HttpHeader[],
   auth: HttpAuth | undefined,
+  scenarioMappings: Record<string, FieldMapping>,
 ): HttpComponentConfig {
   return {
     name: "HTTP",
@@ -103,6 +106,8 @@ function buildHttpConfig(
     outputPath,
     headers: headers.length > 0 ? headers : undefined,
     auth: auth?.type === "none" ? undefined : auth,
+    scenarioMappings:
+      Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
   };
 }
 
@@ -210,6 +215,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Custom variables (in addition to fixed ones)
   const [customVariables, setCustomVariables] = useState<Variable[]>([]);
+  // Scenario mappings persisted on the agent config
+  const [scenarioMappings, setScenarioMappings] = useState<Record<string, FieldMapping>>({});
   // Default to variables tab when in evaluations context (has availableSources)
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 
@@ -283,6 +290,12 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setOutputPath(config.outputPath || DEFAULT_OUTPUT_PATH);
       setHeaders(config.headers ?? []);
       setAuth(config.auth ?? { type: "none" });
+      const savedMappings = config.scenarioMappings ?? {};
+      setScenarioMappings(
+        Object.keys(savedMappings).length > 0
+          ? savedMappings
+          : computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
+      );
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     } else if (!agentId && isOpen) {
@@ -294,6 +307,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setOutputPath(DEFAULT_OUTPUT_PATH);
       setHeaders([]);
       setAuth({ type: "none" });
+      setScenarioMappings(computeBestMatchMappings({ inputs: FIXED_VARIABLES }));
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
@@ -346,8 +360,35 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  const hasRequiredInputMapping = useMemo(() => {
+    // The HTTP adapter falls back to legacy body-template behavior when no
+    // scenarioMappings are present, so empty mappings are allowed.
+    if (Object.keys(scenarioMappings).length === 0) return true;
+    return Object.values(scenarioMappings).some(
+      (m) => m.type === "source" && (m.path[0] === "input" || m.path[0] === "messages"),
+    );
+  }, [scenarioMappings]);
+
   const isValid =
-    (name?.trim().length ?? 0) > 0 && (url?.trim().length ?? 0) > 0;
+    (name?.trim().length ?? 0) > 0 &&
+    (url?.trim().length ?? 0) > 0 &&
+    hasRequiredInputMapping;
+
+  const handleScenarioMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      setScenarioMappings((prev) => {
+        if (!mapping) {
+          const next = { ...prev };
+          delete next[identifier];
+          return next;
+        }
+        return { ...prev, [identifier]: mapping };
+      });
+      setHasUnsavedChanges(true);
+    },
+    [],
+  );
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -359,6 +400,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       outputPath,
       headers,
       auth,
+      scenarioMappings,
     );
 
     if (agentId) {
@@ -390,6 +432,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     outputPath,
     headers,
     auth,
+    scenarioMappings,
     isValid,
     createMutation,
     updateMutation,
@@ -551,7 +594,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                         }}
                       />
                     </Field.Root>
-                    {/* TODO: Wire HTTP agent adapter to use fieldMappings (see GitHub issue) */}
+                    <ScenarioInputMappingSection
+                      inputs={variables}
+                      mappings={scenarioMappings}
+                      onMappingChange={handleScenarioMappingChange}
+                    />
                   </VStack>
                 </Tabs.Content>
 
