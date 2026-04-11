@@ -21,15 +21,23 @@ const mockPrisma = {
   team: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
   },
   teamUser: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
   },
+  roleBinding: {
+    deleteMany: vi.fn(),
+    create: vi.fn(),
+  },
   organizationUser: {
     findFirst: vi.fn(),
   },
+  $transaction: vi.fn().mockImplementation((fn: (tx: any) => Promise<any>) =>
+    fn(mockPrisma),
+  ),
 } as any;
 
 describe("RoleService Tests", () => {
@@ -306,7 +314,11 @@ describe("RoleService Tests", () => {
 
       mockPrisma.customRole.findUnique.mockResolvedValue(mockCustomRole);
       mockPrisma.team.findUnique.mockResolvedValue(mockTeam);
+      mockPrisma.team.findUniqueOrThrow.mockResolvedValue(mockTeam);
       mockPrisma.teamUser.findUnique.mockResolvedValue(mockTeamUser);
+      mockPrisma.roleBinding.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.roleBinding.create.mockResolvedValue({});
+      mockPrisma.teamUser.update.mockResolvedValue({});
 
       const result = await roleService.assignRoleToUser(
         "user-123",
@@ -391,6 +403,14 @@ describe("RoleService Tests", () => {
 
   describe("removeRoleFromUser", () => {
     it("should remove custom role from user", async () => {
+      mockPrisma.team.findUniqueOrThrow.mockResolvedValue({
+        id: "team-123",
+        organizationId: "org-123",
+      });
+      mockPrisma.roleBinding.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.roleBinding.create.mockResolvedValue({});
+      mockPrisma.teamUser.update.mockResolvedValue({});
+
       const result = await roleService.removeRoleFromUser(
         "user-123",
         "team-123",
