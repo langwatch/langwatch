@@ -3,19 +3,28 @@ import { ScimService } from "../scim.service";
 import type { User } from "@prisma/client";
 
 function createMockPrisma() {
-  return {
+  const roleBinding = {
+    create: vi.fn().mockResolvedValue({}),
+    deleteMany: vi.fn().mockResolvedValue({}),
+  };
+  const organizationUser = {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
+    count: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn().mockResolvedValue({}),
+  };
+  const mock = {
     user: {
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
-    organizationUser: {
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-      count: vi.fn(),
-      create: vi.fn(),
-    },
-  } as unknown as Parameters<typeof ScimService.create>[0];
+    organizationUser,
+    roleBinding,
+    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
+  };
+  return mock as unknown as Parameters<typeof ScimService.create>[0];
 }
 
 function buildMockUser(overrides: Partial<User> = {}): User {
@@ -228,7 +237,7 @@ describe("ScimService", () => {
           expect.objectContaining({
             where: {
               organizationId: "org-1",
-              user: { email: "alice@acme.com" },
+              user: { email: { equals: "alice@acme.com", mode: "insensitive" } },
             },
           })
         );
