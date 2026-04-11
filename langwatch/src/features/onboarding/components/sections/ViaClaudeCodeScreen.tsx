@@ -41,7 +41,6 @@ const SKILLS: SkillItem[] = [
     prompt: PROMPT_LEVEL_UP,
     installCommand: "npx skills add langwatch/skills/level-up",
     slashCommand: "/level-up",
-    highlight: true,
   },
   {
     id: "evaluations",
@@ -105,20 +104,47 @@ function glassCard({
     borderRadius: "xl",
     border: "1px solid",
     borderColor: highlight ? { base: "orange.200", _dark: "orange.800" } : "border.subtle",
-    bg: highlight ? "orange.subtle" : "bg.panel/70",
+    bg: highlight
+      ? { base: "orange.subtle", _dark: "rgba(237,137,38,0.12)" }
+      : "bg.panel/70",
     backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: highlight
-      ? "0 0 0 1px var(--chakra-colors-orange-100)"
+      ? {
+          base: "0 0 0 1px var(--chakra-colors-orange-100)",
+          _dark: "0 6px 28px rgba(237,137,38,0.08)",
+        }
       : "sm",
     transition: "all 0.17s ease",
     _hover: {
       borderColor: highlight ? "orange.emphasized" : "border.emphasized",
       boxShadow: highlight
-        ? "0 0 0 1px var(--chakra-colors-orange-200)"
+        ? {
+            base: "0 0 0 1px var(--chakra-colors-orange-200)",
+            _dark: "0 8px 32px rgba(237,137,38,0.12)",
+          }
         : "md",
       transform: "translateY(-1px)",
     },
   };
+}
+
+function SectionLabel({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <Text
+      fontSize="2xs"
+      fontWeight="semibold"
+      color="fg.muted"
+      letterSpacing="0.08em"
+      textTransform="uppercase"
+      px={1}
+    >
+      {children}
+    </Text>
+  );
 }
 
 function PromptRow({
@@ -133,7 +159,9 @@ function PromptRow({
       px={5}
       py={3.5}
       gap={4}
-      {...glassCard({ highlight: skill.highlight })}
+      {...glassCard({ highlight: true })}
+      bg="bg.panel/70"
+      boxShadow="sm"
     >
       <Text
         fontSize="sm"
@@ -159,7 +187,9 @@ function SkillRow({
       px={5}
       py={4}
       gap={3}
-      {...glassCard({ highlight: skill.highlight })}
+      {...glassCard({ highlight: true })}
+      bg="bg.panel/70"
+      boxShadow="sm"
     >
       <Text
         fontSize="sm"
@@ -241,9 +271,9 @@ function QuickCommand({
       align="center"
       px={4}
       py={3}
-      {...glassCard({ highlight: false })}
-      borderColor={{ base: "orange.200", _dark: "orange.800" }}
-      _hover={{ borderColor: "orange.emphasized", boxShadow: "md", transform: "translateY(-1px)" }}
+      {...glassCard({ highlight: true })}
+      bg="bg.panel/70"
+      boxShadow="sm"
     >
       <HStack gap={2.5} align="center" minW={0}>
         <Box flexShrink={0} display="flex" alignItems="center">
@@ -308,7 +338,7 @@ function McpTab({
         borderRadius="xl"
         overflow="hidden"
         border="1px solid"
-        borderColor="border.subtle"
+        borderColor={{ base: "border.subtle", _dark: "orange.800" }}
         bg="bg.panel/70"
         backdropFilter="blur(20px) saturate(1.3)"
         boxShadow="0 1px 3px rgba(0,0,0,0.04)"
@@ -465,20 +495,44 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
           <MotionVStack
             key={activeTab}
             align="stretch"
-            gap={activeTab === "mcp" ? 0 : 4}
+            gap={activeTab === "mcp" ? 0 : 6}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12, ease: "easeOut" }}
           >
-            {activeTab === "prompt" &&
-              SKILLS.map((skill) => (
-                <PromptRow key={skill.id} skill={skill} />
-              ))}
-            {activeTab === "skill" &&
-              SKILLS.map((skill) => (
-                <SkillRow key={skill.id} skill={skill} />
-              ))}
+            {activeTab === "prompt" && (
+              <>
+                <VStack align="stretch" gap={2}>
+                  <SectionLabel>Start here</SectionLabel>
+                  <PromptRow skill={SKILLS[0]!} />
+                </VStack>
+                <VStack align="stretch" gap={2}>
+                  <SectionLabel>Or pick a specific topic</SectionLabel>
+                  <VStack align="stretch" gap={3}>
+                    {SKILLS.slice(1).map((skill) => (
+                      <PromptRow key={skill.id} skill={skill} />
+                    ))}
+                  </VStack>
+                </VStack>
+              </>
+            )}
+            {activeTab === "skill" && (
+              <>
+                <VStack align="stretch" gap={2}>
+                  <SectionLabel>Start here</SectionLabel>
+                  <SkillRow skill={SKILLS[0]!} />
+                </VStack>
+                <VStack align="stretch" gap={2}>
+                  <SectionLabel>Or pick a specific topic</SectionLabel>
+                  <VStack align="stretch" gap={3}>
+                    {SKILLS.slice(1).map((skill) => (
+                      <SkillRow key={skill.id} skill={skill} />
+                    ))}
+                  </VStack>
+                </VStack>
+              </>
+            )}
             {activeTab === "mcp" && (
               <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} endpoint={effectiveEndpoint} />
             )}
