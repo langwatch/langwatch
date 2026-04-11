@@ -11,7 +11,7 @@ Feature: SDK Prompt Tag Support
   @unit
   Scenario: Fetch prompt by tag via options
     Given "pizza-prompt" has production=v3 and latest=v4
-    When I call prompts.get("pizza-prompt", { label: "production" })
+    When I call prompts.get("pizza-prompt", { tag: "production" })
     Then I receive version v3 config data
 
   @unit
@@ -28,7 +28,7 @@ Feature: SDK Prompt Tag Support
 
   # --- Custom tag fetch (transparent) ---
   # Note: fetch-by-custom-tag exercises the same SDK code path as built-in tags.
-  # Type widening (label: string instead of "production"|"staging") is verified at
+  # Type widening (tag: string instead of "production"|"staging") is verified at
   # compile time via pnpm typecheck — no separate runtime scenario needed.
 
   # --- Cache key isolation ---
@@ -36,26 +36,26 @@ Feature: SDK Prompt Tag Support
   @unit
   Scenario: Tag is included in cache key
     Given "pizza-prompt" has production=v3
-    When I call get("pizza-prompt", { label: "production", fetchPolicy: "CACHE_TTL" })
-    Then the cache key includes the label
+    When I call get("pizza-prompt", { tag: "production", fetchPolicy: "CACHE_TTL" })
+    Then the cache key includes the tag
     And it returns v3
 
   @unit
   Scenario: Different tags produce different cache entries
     Given "pizza-prompt" has production=v3 and staging=v4
-    When I fetch with label "production" using CACHE_TTL
-    And I fetch with label "staging" using CACHE_TTL
+    When I fetch with tag "production" using CACHE_TTL
+    And I fetch with tag "staging" using CACHE_TTL
     Then both results are cached independently
 
   # Note: custom tags reuse the same cache key logic as built-in tags
-  # (any string in the label segment). No separate scenario needed.
+  # (any string in the tag segment). No separate scenario needed.
 
   # --- Error handling ---
 
   @unit
   Scenario: Unassigned tag returns error
     Given "pizza-prompt" has no version assigned to "production"
-    When I call get("pizza-prompt", { label: "production" })
+    When I call get("pizza-prompt", { tag: "production" })
     Then the API returns an error and the SDK surfaces it cleanly
 
   # --- Tag assignment (sub-resource) ---
@@ -63,7 +63,7 @@ Feature: SDK Prompt Tag Support
   @unit
   Scenario: Assign tag to existing version
     Given "pizza-prompt" version v3 exists with a known versionId
-    When I call prompts.tags.assign("pizza-prompt", { label: "production", versionId })
+    When I call prompts.tags.assign("pizza-prompt", { tag: "production", versionId })
     Then the API receives PUT /api/prompts/pizza-prompt/tags/production
     And the request body contains the versionId
 
@@ -72,8 +72,8 @@ Feature: SDK Prompt Tag Support
 
   @unit
   Scenario: Assign tag returns confirmation
-    When I call prompts.tags.assign("pizza-prompt", { label: "staging", versionId })
-    Then I receive a response with configId, versionId, label, and updatedAt
+    When I call prompts.tags.assign("pizza-prompt", { tag: "staging", versionId })
+    Then I receive a response with configId, versionId, tag, and updatedAt
 
   # --- Tags on create/update ---
 
@@ -121,10 +121,10 @@ Feature: SDK Prompt Tag Support
   # --- E2E (real API) ---
 
   @e2e
-  Scenario: Fetch tagged version via explicit label option
+  Scenario: Fetch tagged version via explicit tag option
     Given I create a prompt with two versions via the SDK
     And the "production" tag is assigned to version 1
-    When I fetch the prompt using get(handle, { label: "production" })
+    When I fetch the prompt using get(handle, { tag: "production" })
     Then I receive version 1 config data
 
   @e2e
@@ -161,7 +161,7 @@ Feature: SDK Prompt Tag Support
   @e2e
   Scenario: Fetch with unassigned tag returns error via explicit option
     Given a prompt with no tags assigned
-    When I fetch the prompt using get(handle, { label: "production" })
+    When I fetch the prompt using get(handle, { tag: "production" })
     Then I receive an error
 
   @e2e

@@ -324,8 +324,8 @@ function McpTab({
         />
         <QuickCommand
           label="OpenAI Codex"
-          displayCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${maskedKey}${maskedEndpointFlag}"`}
-          copyCommand={`codex --mcp-server "npx -y @langwatch/mcp-server --api-key ${apiKey}${endpointFlag}"`}
+          displayCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${maskedKey}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
+          copyCommand={`codex mcp add langwatch --env LANGWATCH_API_KEY=${apiKey}${isSelfHosted ? ` --env LANGWATCH_ENDPOINT=${endpoint}` : ""} -- npx -y @langwatch/mcp-server`}
         />
       </VStack>
 

@@ -27,6 +27,14 @@ export type ParameterConstraints = Record<string, ParameterConstraint>;
 
 type ModelProviderDefinition = {
   name: string;
+  /**
+   * Category of provider. "llm" providers offer chat/embedding models and
+   * power the LangWatch app features (default model, topic clustering, etc).
+   * "safety" providers are non-LLM credential containers for services like
+   * Azure Content Safety — they only expose credentials + extra headers
+   * and never appear in model selectors or default-model settings.
+   */
+  type: "llm" | "safety";
   apiKey: string;
   endpointKey: string | undefined;
   keysSchema: z.ZodTypeAny;
@@ -154,6 +162,7 @@ export const getRegistryMetadata = () => ({
 export const modelProviders = {
   custom: {
     name: "Custom (OpenAI-compatible)",
+    type: "llm",
     apiKey: "CUSTOM_API_KEY",
     endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
@@ -166,6 +175,7 @@ export const modelProviders = {
   },
   openai: {
     name: "OpenAI",
+    type: "llm",
     apiKey: "OPENAI_API_KEY",
     endpointKey: "OPENAI_BASE_URL",
     keysSchema: z
@@ -189,6 +199,7 @@ export const modelProviders = {
   },
   anthropic: {
     name: "Anthropic",
+    type: "llm",
     apiKey: "ANTHROPIC_API_KEY",
     endpointKey: "ANTHROPIC_BASE_URL",
     keysSchema: z.object({
@@ -203,6 +214,7 @@ export const modelProviders = {
   },
   gemini: {
     name: "Gemini",
+    type: "llm",
     apiKey: "GEMINI_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -212,6 +224,7 @@ export const modelProviders = {
   },
   azure: {
     name: "Azure OpenAI",
+    type: "llm",
     apiKey: "AZURE_OPENAI_API_KEY",
     endpointKey: "AZURE_OPENAI_ENDPOINT",
     keysSchema: z
@@ -226,6 +239,7 @@ export const modelProviders = {
   },
   bedrock: {
     name: "Bedrock",
+    type: "llm",
     apiKey: "AWS_ACCESS_KEY_ID",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -237,6 +251,7 @@ export const modelProviders = {
   },
   vertex_ai: {
     name: "Vertex AI",
+    type: "llm",
     apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -248,6 +263,7 @@ export const modelProviders = {
   },
   deepseek: {
     name: "DeepSeek",
+    type: "llm",
     apiKey: "DEEPSEEK_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -257,6 +273,7 @@ export const modelProviders = {
   },
   xai: {
     name: "xAI",
+    type: "llm",
     apiKey: "XAI_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -266,6 +283,7 @@ export const modelProviders = {
   },
   cerebras: {
     name: "Cerebras",
+    type: "llm",
     apiKey: "CEREBRAS_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
@@ -275,12 +293,26 @@ export const modelProviders = {
   },
   groq: {
     name: "Groq",
+    type: "llm",
     apiKey: "GROQ_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
       GROQ_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
+  },
+  azure_safety: {
+    name: "Azure Safety",
+    type: "safety",
+    apiKey: "AZURE_CONTENT_SAFETY_KEY",
+    endpointKey: "AZURE_CONTENT_SAFETY_ENDPOINT",
+    keysSchema: z.object({
+      AZURE_CONTENT_SAFETY_ENDPOINT: z.string().url(),
+      AZURE_CONTENT_SAFETY_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-04-10"),
+    blurb:
+      "Azure Content Safety for content moderation, prompt injection, and jailbreak detection. Your subscription is billed directly by Microsoft.",
   },
 } satisfies Record<string, ModelProviderDefinition>;
 

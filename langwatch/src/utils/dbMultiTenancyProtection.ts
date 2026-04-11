@@ -49,6 +49,14 @@ const EXEMPT_MODELS = [
    * They are scoped by organizationId.
    */
   "PromptTag",
+  /**
+   * Scoped RBAC models are organization-level.
+   * Groups and RoleBindings are scoped by organizationId, not projectId.
+   * GroupMembership is scoped indirectly via groupId.
+   */
+  "Group",
+  "GroupMembership",
+  "RoleBinding",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

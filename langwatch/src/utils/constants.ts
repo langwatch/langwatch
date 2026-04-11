@@ -39,4 +39,6 @@ export const KSUID_RESOURCES = {
   USER: "user",
   PROMPT_PLAYGROUND_THREAD: "promptthread",
   DATASET_RECORD: "dsrecord",
+  GROUP: "group",
+  ROLE_BINDING: "rolebinding",
 } as const;

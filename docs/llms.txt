@@ -235,7 +235,7 @@ Always navigate to docs links using the .md extension for better readability.
 ### Datasets
 
 - [Datasets](https://langwatch.ai/docs/datasets/overview.md): Create and manage datasets in LangWatch to build evaluation sets for LLMs and structured AI agent testing.
-- [Programmatic Access](https://langwatch.ai/docs/datasets/programmatic-access.md): Fetch datasets from LangWatch using the SDK for offline evaluations and automated workflows.
+- [Programmatic Access](https://langwatch.ai/docs/datasets/programmatic-access.md): Manage datasets from LangWatch using the SDK, MCP, or REST API for offline evaluations and automated workflows.
 - [Generating a dataset with AI](https://langwatch.ai/docs/datasets/ai-dataset-generation.md): Generate datasets with AI to bootstrap LLM evaluations, regression tests, and simulation-based agent testing.
 - [Automatically build datasets from real-time traces](https://langwatch.ai/docs/datasets/automatically-from-traces.md): Automatically build datasets from real-time traces to power LLM evaluations, regression tests, and AI agent testing workflows.
 - [Add trace threads to datasets](https://langwatch.ai/docs/datasets/dataset-threads.md): Add full conversation threads to datasets in LangWatch to generate richer evaluation inputs for AI agent testing.
@@ -258,6 +258,7 @@ Always navigate to docs links using the .md extension for better readability.
 - [Scope](https://langwatch.ai/docs/prompt-management/scope.md): Understand how prompt scope affects access, sharing, and collaboration across projects and organizations
 - [Analytics](https://langwatch.ai/docs/prompt-management/features/essential/analytics.md): Use Analytics in LangWatch to measure prompt performance, detect regressions, and support continuous AI agent evaluations.
 - [GitHub Integration](https://langwatch.ai/docs/prompt-management/features/essential/github-integration.md): Sync prompts with GitHub using LangWatch to maintain version history, enable review workflows, and support agent evaluations.
+- [Tags](https://langwatch.ai/docs/prompt-management/features/essential/tags.md): Use tags to manage prompt deployment stages like production, staging, and custom environments in LangWatch.
 - [Link to Traces](https://langwatch.ai/docs/prompt-management/features/advanced/link-to-traces.md): Link prompts to execution traces in LangWatch to analyze performance, measure regressions, and support informed AI agent evaluations.
 - [Using Prompts in the Optimization Studio](https://langwatch.ai/docs/prompt-management/features/advanced/optimization-studio.md): Learn how to version, test, and optimize prompts directly inside the Optimization Studio.
 - [Guaranteed Availability](https://langwatch.ai/docs/prompt-management/features/advanced/guaranteed-availability.md): Ensure prompt availability with LangWatch’s Guaranteed Availability feature, even in offline or air-gapped agent testing setups.

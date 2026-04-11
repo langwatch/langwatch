@@ -22,11 +22,11 @@ import {
   type UseFormReturn,
   useFieldArray,
 } from "react-hook-form";
+import { ProjectAvatar } from "../../components/ProjectAvatar";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamProjectsList } from "../../pages/settings/projects";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -36,6 +36,55 @@ import {
   type TeamUserRoleForm,
   teamRolesOptions,
 } from "./TeamUserRoleField";
+
+function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
+  const queryClient = api.useContext();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const archiveProject = api.project.archiveById.useMutation({
+    onSuccess: () => {
+      void queryClient.organization.getAll.invalidate();
+    },
+  });
+
+  return (
+    <Table.Body>
+      {team.projects.map((teamProject) => (
+        <Table.Row key={teamProject.id}>
+          <Table.Cell>
+            <HStack gap={2}>
+              <ProjectAvatar name={teamProject.name} />
+              <Link href={`/${teamProject.slug}`}>{teamProject.name}</Link>
+            </HStack>
+          </Table.Cell>
+          <Table.Cell textAlign="right">
+            {teamProject.id !== project?.id && hasPermission("project:delete") && (
+              <Button
+                variant="ghost"
+                color="red.fg"
+                size="sm"
+                onClick={() => {
+                  if (!project) return;
+                  if (confirm("Are you sure you want to archive this project? Contact LangWatch support to restore it.")) {
+                    archiveProject.mutate({ projectId: project.id, projectToArchiveId: teamProject.id });
+                  }
+                }}
+              >
+                <Trash2 size={16} />
+              </Button>
+            )}
+          </Table.Cell>
+        </Table.Row>
+      ))}
+      {team.projects.length === 0 && (
+        <Table.Row>
+          <Table.Cell colSpan={2}>
+            <Text>No projects on this team</Text>
+          </Table.Cell>
+        </Table.Row>
+      )}
+    </Table.Body>
+  );
+}
 
 export type TeamFormData = {
   name: string;

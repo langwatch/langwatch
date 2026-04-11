@@ -15,9 +15,7 @@ import { Mail, Plus, Trash2 } from "lucide-react";
 import {
   Controller,
   type Control,
-  type FieldErrors,
   type SubmitHandler,
-  type UseFormRegister,
   type UseFormSetValue,
   useFieldArray,
   useForm,
@@ -36,8 +34,8 @@ type Option = { label: string; value: string; description?: string };
 
 type TeamAssignment = {
   teamId: string;
-  role: TeamUserRole | string; // Can be TeamUserRole or "custom:{roleId}"
-  customRoleId?: string; // Required when role starts with "custom:"
+  role: TeamUserRole | string;
+  customRoleId?: string;
 };
 
 type InviteData = {
@@ -50,6 +48,13 @@ export type MembersForm = {
   invites: InviteData[];
 };
 
+// Internal form shape — flattened: one email input, shared role + teams
+type InternalForm = {
+  emailsRaw: string;
+  orgRole: OrganizationUserRole;
+  teams: TeamAssignment[];
+};
+
 interface AddMembersFormProps {
   teamOptions: Option[];
   orgRoleOptions: Option[];
@@ -59,14 +64,9 @@ interface AddMembersFormProps {
   hasEmailProvider?: boolean;
   onClose?: () => void;
   onCloseText?: string;
-  /** Whether the user submitting this form is an org admin. Controls which team roles are selectable. */
   isInviterAdmin?: boolean;
 }
 
-/**
- * Reusable form component for adding members to an organization
- * Single Responsibility: Handles the form logic and UI for inviting new members
- */
 export function AddMembersForm({
   teamOptions,
   orgRoleOptions,
@@ -84,210 +84,59 @@ export function AddMembersForm({
     handleSubmit,
     setValue,
     formState: { errors },
-  } = useForm<MembersForm>({
+  } = useForm<InternalForm>({
     defaultValues: {
-      invites: [
-        {
-          email: "",
-          orgRole: OrganizationUserRole.MEMBER,
-          teams:
-            teamOptions.length > 0
-              ? [
-                  {
-                    teamId: teamOptions[0]?.value ?? "",
-                    role: TeamUserRole.MEMBER,
-                  },
-                ]
-              : [],
-        },
-      ],
-    },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "invites",
-  });
-
-  const onAddField = () => {
-    append({
-      email: "",
+      emailsRaw: "",
       orgRole: OrganizationUserRole.MEMBER,
       teams:
         teamOptions.length > 0
-          ? [
-              {
-                teamId: teamOptions[0]?.value ?? "",
-                role: TeamUserRole.MEMBER,
-              },
-            ]
+          ? [{ teamId: teamOptions[0]?.value ?? "", role: TeamUserRole.MEMBER }]
           : [],
-    });
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    void handleSubmit(onSubmit)(e);
-  };
-
-  return (
-    <form onSubmit={handleFormSubmit}>
-      <VStack align="start" gap={4} width="100%">
-        {fields.map((field, index) => (
-          <MemberRow
-            key={field.id}
-            index={index}
-            control={control}
-            register={register}
-            errors={errors}
-            teamOptions={teamOptions}
-            orgRoleOptions={orgRoleOptions}
-            organizationId={organizationId}
-            setValue={setValue}
-            onRemove={() => remove(index)}
-            isInviterAdmin={isInviterAdmin}
-          />
-        ))}
-        <Button type="button" onClick={onAddField} marginTop={2}>
-          <Plus size={16} /> Add another
-        </Button>
-
-        <HStack justify="end" width="100%" marginTop={4}>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            {onCloseText}
-          </Button>
-          <Button
-            colorPalette={isLoading ? "gray" : "orange"}
-            type="submit"
-            disabled={isLoading}
-          >
-            <HStack>
-              {isLoading ? <Spinner size="sm" /> : <Mail size={18} />}
-              <Text>
-                {hasEmailProvider ? "Send invites" : "Create invites"}
-              </Text>
-            </HStack>
-          </Button>
-        </HStack>
-      </VStack>
-    </form>
-  );
-}
-
-/**
- * MemberRow component - renders a single member row with nested teams table
- */
-function MemberRow({
-  index,
-  control,
-  register,
-  errors,
-  teamOptions,
-  orgRoleOptions,
-  organizationId,
-  setValue,
-  onRemove,
-  isInviterAdmin,
-}: {
-  index: number;
-  control: Control<MembersForm>;
-  register: UseFormRegister<MembersForm>;
-  errors: FieldErrors<MembersForm>;
-  teamOptions: Option[];
-  orgRoleOptions: Option[];
-  organizationId: string;
-  setValue: UseFormSetValue<MembersForm>;
-  onRemove: () => void;
-  isInviterAdmin: boolean;
-}) {
-  const {
-    fields: teamFields,
-    append: appendTeam,
-    remove: removeTeam,
-  } = useFieldArray({
-    control,
-    name: `invites.${index}.teams`,
+    },
   });
 
-  // Watch the teams array for this specific member to track selected teams
-  const selectedTeams = useWatch({
+  const { fields: teamFields, append: appendTeam, remove: removeTeam } = useFieldArray({
     control,
-    name: `invites.${index}.teams`,
+    name: "teams",
   });
 
-  // Watch the org role for this member to filter team role options
-  const orgRole = useWatch({
-    control,
-    name: `invites.${index}.orgRole`,
-  }) as OrganizationUserRole;
-
-  // Track previous org role to detect changes
+  const selectedTeams = useWatch({ control, name: "teams" });
+  const orgRole = useWatch({ control, name: "orgRole" }) as OrganizationUserRole;
   const prevOrgRoleRef = useRef<OrganizationUserRole>(orgRole);
 
-  // Auto-correct team roles when org role changes
   useEffect(() => {
     if (prevOrgRoleRef.current !== orgRole && selectedTeams?.length > 0) {
-      selectedTeams.forEach(
-        (team: TeamAssignment | undefined, teamIndex: number) => {
-          if (!team) return;
-
-          const currentRole = team.role;
-
-          if (orgRole === OrganizationUserRole.EXTERNAL) {
-            // Viewer: force all team roles to Viewer
-            if (currentRole !== TeamUserRole.VIEWER) {
-              setValue(`invites.${index}.teams.${teamIndex}.role`, TeamUserRole.VIEWER);
-              setValue(`invites.${index}.teams.${teamIndex}.customRoleId`, undefined);
-            }
-          } else if (orgRole === OrganizationUserRole.MEMBER) {
-            // Member: if current role is Viewer, switch to Member
-            if (currentRole === TeamUserRole.VIEWER) {
-              setValue(`invites.${index}.teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-            }
+      selectedTeams.forEach((team: TeamAssignment | undefined, teamIndex: number) => {
+        if (!team) return;
+        if (orgRole === OrganizationUserRole.EXTERNAL) {
+          if (team.role !== TeamUserRole.VIEWER) {
+            setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
+            setValue(`teams.${teamIndex}.customRoleId`, undefined);
           }
-          // Admin: no changes needed, all roles are valid
-        },
-      );
+        } else if (orgRole === OrganizationUserRole.MEMBER) {
+          if (team.role === TeamUserRole.VIEWER) {
+            setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
+          }
+        }
+      });
     }
     prevOrgRoleRef.current = orgRole;
-  }, [orgRole, selectedTeams, index, setValue]);
+  }, [orgRole, selectedTeams, setValue]);
 
-  /**
-   * Get available team options by filtering out already selected teams
-   * @param currentTeamIndex - The index of the team currently being edited (to exclude it from filtering)
-   * @returns Filtered array of team options
-   */
   const getAvailableTeamOptions = (currentTeamIndex?: number) => {
     const selectedTeamIds = selectedTeams
       ?.map((team: TeamAssignment | undefined, idx: number) => {
-        // Include the current team being edited so it doesn't filter itself out
-        if (currentTeamIndex !== undefined && idx === currentTeamIndex) {
-          return null;
-        }
+        if (currentTeamIndex !== undefined && idx === currentTeamIndex) return null;
         return team?.teamId;
       })
-      .filter(
-        (id: string | null | undefined): id is string =>
-          id !== null && id !== "" && id !== undefined,
-      );
-
-    return teamOptions.filter(
-      (option) => !selectedTeamIds?.includes(option.value),
-    );
+      .filter((id: string | null | undefined): id is string => !!id && id !== "");
+    return teamOptions.filter((opt) => !selectedTeamIds?.includes(opt.value));
   };
 
   const handleAddTeam = () => {
-    const availableTeams = getAvailableTeamOptions();
-    if (availableTeams.length > 0) {
-      appendTeam({
-        teamId: availableTeams[0]?.value ?? "",
-        role: getDefaultTeamRole(orgRole),
-      });
+    const available = getAvailableTeamOptions();
+    if (available.length > 0) {
+      appendTeam({ teamId: available[0]?.value ?? "", role: getDefaultTeamRole(orgRole) });
     }
   };
 
@@ -296,190 +145,198 @@ function MemberRow({
     [orgRoleOptions],
   );
 
+  const handleInternalSubmit = (data: InternalForm) => {
+    const emails = data.emailsRaw
+      .split(/[\s,;]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    // Normalize team roles to match org role constraints
+    const normalizedTeams = data.teams.map((team) => {
+      if (data.orgRole === OrganizationUserRole.EXTERNAL) {
+        return { teamId: team.teamId, role: TeamUserRole.VIEWER, customRoleId: undefined };
+      }
+      if (data.orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
+        return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
+      }
+      return team;
+    });
+
+    const invites: InviteData[] = emails.map((email) => ({
+      email,
+      orgRole: data.orgRole,
+      teams: normalizedTeams,
+    }));
+    return onSubmit({ invites });
+  };
+
   return (
-    <VStack align="stretch" gap={4} width="full">
-      <HStack gap={4} align="start">
-        <Field.Root flex="1" invalid={!!errors.invites?.[index]?.email}>
-          <Field.Label>Email</Field.Label>
-          <Input
-            placeholder="Enter email address"
-            {...register(`invites.${index}.email`, {
-              required: "Email is required",
-              pattern: {
-                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: "Invalid email address",
-              },
-            })}
-          />
-          <Field.ErrorText>
-            {errors.invites?.[index]?.email?.message}
-          </Field.ErrorText>
-        </Field.Root>
-        <Field.Root flex="1">
-          <Field.Label>Org Role</Field.Label>
-          <Controller
-            control={control}
-            name={`invites.${index}.orgRole`}
-            render={({ field }) => (
-              <Select.Root
-                collection={orgRoleCollection}
-                value={[field.value]}
-                onValueChange={(details) => {
-                  const selectedValue = details.value[0];
-                  if (selectedValue) {
-                    field.onChange(selectedValue);
-                  }
-                }}
+    <form onSubmit={handleSubmit(handleInternalSubmit)}>
+      <VStack align="start" gap={4} width="100%">
+        <HStack gap={4} align="start" width="full">
+          <Field.Root flex="2" invalid={!!errors.emailsRaw}>
+            <Field.Label>Email addresses</Field.Label>
+            <Input
+              placeholder="alice@example.com, bob@example.com"
+              {...register("emailsRaw", {
+                required: "At least one email is required",
+                validate: (value) => {
+                  const emails = value.split(/[\s,;]+/).map((e) => e.trim()).filter(Boolean);
+                  if (emails.length === 0) return "At least one email is required";
+                  const invalid = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+                  if (invalid) return `Invalid email: ${invalid}`;
+                  return true;
+                },
+              })}
+            />
+            <Field.ErrorText>{errors.emailsRaw?.message}</Field.ErrorText>
+          </Field.Root>
+          <Field.Root flex="1">
+            <Field.Label>Org Role</Field.Label>
+            <Controller
+              control={control}
+              name="orgRole"
+              render={({ field }) => (
+                <Select.Root
+                  collection={orgRoleCollection}
+                  value={[field.value]}
+                  onValueChange={(details) => {
+                    const val = details.value[0];
+                    if (val) field.onChange(val);
+                  }}
+                >
+                  <Select.Trigger>
+                    <Select.ValueText placeholder="Select role" />
+                  </Select.Trigger>
+                  <Select.Content paddingY={2} width="320px">
+                    {orgRoleOptions.map((option) => (
+                      <Select.Item key={option.value} item={option}>
+                        <VStack align="start" gap={0} flex={1}>
+                          <Text>{option.label}</Text>
+                          <Text color="fg.muted" fontSize="13px">
+                            {option.description}
+                          </Text>
+                        </VStack>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              )}
+            />
+          </Field.Root>
+        </HStack>
+
+        {teamFields.length > 0 && (
+          <VStack align="start" gap={2} width="100%">
+            <HStack justify="space-between" width="100%">
+              <Text fontSize="sm" fontWeight="medium" color="fg">
+                Team Assignments
+              </Text>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleAddTeam}
+                disabled={getAvailableTeamOptions().length === 0}
               >
-                <Select.Trigger>
-                  <Select.ValueText placeholder="Select role" />
-                </Select.Trigger>
-                <Select.Content paddingY={2} width="320px">
-                  {orgRoleOptions.map((option) => (
-                    <Select.Item key={option.value} item={option}>
-                      <VStack align="start" gap={0} flex={1}>
-                        <Text>{option.label}</Text>
-                        <Text color="fg.muted" fontSize="13px">
-                          {option.description}
-                        </Text>
-                      </VStack>
-                    </Select.Item>
+                <Plus size={14} /> Add team
+              </Button>
+            </HStack>
+            <Box
+              paddingX={4}
+              paddingY={3}
+              backgroundColor="bg.muted"
+              borderRadius="xl"
+              width="100%"
+            >
+              <Table.Root variant={"ghost" as any} width="100%">
+                <Table.Header>
+                  <Table.Row backgroundColor="transparent">
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>Team</Table.ColumnHeader>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>Role</Table.ColumnHeader>
+                    <Table.ColumnHeader paddingLeft={0} paddingRight={0} paddingTop={0} width="50px" />
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {teamFields.map((teamField, teamIndex) => (
+                    <Table.Row key={teamField.id} backgroundColor="transparent">
+                      <Table.Cell paddingLeft={0}>
+                        <TeamSelect
+                          teamIndex={teamIndex}
+                          control={control}
+                          getAvailableTeamOptions={getAvailableTeamOptions}
+                        />
+                      </Table.Cell>
+                      <Table.Cell paddingLeft={0}>
+                        <TeamRoleSelect
+                          teamIndex={teamIndex}
+                          control={control}
+                          organizationId={organizationId}
+                          orgRole={orgRole}
+                          setValue={setValue}
+                          isInviterAdmin={isInviterAdmin}
+                        />
+                      </Table.Cell>
+                      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          colorPalette="red"
+                          variant="ghost"
+                          aria-label="Remove team assignment"
+                          onClick={() => removeTeam(teamIndex)}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </Table.Cell>
+                    </Table.Row>
                   ))}
-                </Select.Content>
-              </Select.Root>
-            )}
-          />
-        </Field.Root>
-        <Box alignSelf="start" paddingTop={7}>
-          <Button
-            type="button"
-            size="sm"
-            colorPalette="red"
-            variant="ghost"
-            onClick={onRemove}
-          >
-            <Trash2 size={16} />
-          </Button>
-        </Box>
-      </HStack>
-      {teamFields.length > 0 && (
-        <VStack
-          align="start"
-          gap={2}
-          width="100%"
-        >
-          <HStack justify="space-between" width="100%">
-            <Text fontSize="sm" fontWeight="medium" color="fg">
-              Team Assignments
-            </Text>
+                </Table.Body>
+              </Table.Root>
+            </Box>
+          </VStack>
+        )}
+
+        {teamFields.length === 0 && (
+          <HStack gap={2}>
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              data-variant="ghost"
+              variant="outline"
               onClick={handleAddTeam}
               disabled={getAvailableTeamOptions().length === 0}
             >
               <Plus size={14} /> Add team
             </Button>
           </HStack>
-          <Box
-            paddingX={4}
-            paddingY={3}
-            backgroundColor="bg.muted"
-            borderRadius="xl"
-            width="100%"
-          >
-            <Table.Root variant={"ghost" as any} width="100%">
-              <Table.Header>
-                <Table.Row backgroundColor="transparent">
-                  <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                    Team
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                    Role
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader
-                    paddingLeft={0}
-                    paddingRight={0}
-                    paddingTop={0}
-                    width="50px"
-                  ></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {teamFields.map((teamField, teamIndex) => (
-                  <Table.Row key={teamField.id} backgroundColor="transparent">
-                    <Table.Cell paddingLeft={0}>
-                      <TeamSelect
-                        index={index}
-                        teamIndex={teamIndex}
-                        control={control}
-                        getAvailableTeamOptions={getAvailableTeamOptions}
-                      />
-                    </Table.Cell>
-                    <Table.Cell paddingLeft={0}>
-                      <TeamRoleSelect
-                        index={index}
-                        teamIndex={teamIndex}
-                        control={control}
-                        organizationId={organizationId}
-                        orgRole={orgRole}
-                        setValue={setValue}
-                        isInviterAdmin={isInviterAdmin}
-                      />
-                    </Table.Cell>
-                    <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                      <Button
-                        type="button"
-                        size="sm"
-                        colorPalette="red"
-                        variant="ghost"
-                        onClick={() => removeTeam(teamIndex)}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Box>
-        </VStack>
-      )}
-      {teamFields.length === 0 && (
-        <HStack gap={2}>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={handleAddTeam}
-            disabled={getAvailableTeamOptions().length === 0}
-          >
-            <Plus size={14} /> Add team
+        )}
+
+        <HStack justify="end" width="100%" marginTop={4}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+            {onCloseText}
+          </Button>
+          <Button colorPalette={isLoading ? "gray" : "orange"} type="submit" disabled={isLoading}>
+            <HStack>
+              {isLoading ? <Spinner size="sm" /> : <Mail size={18} />}
+              <Text>{hasEmailProvider ? "Send invites" : "Create invites"}</Text>
+            </HStack>
           </Button>
         </HStack>
-      )}
-    </VStack>
+      </VStack>
+    </form>
   );
 }
 
-/**
- * TeamSelect component - renders a dropdown for selecting a team
- */
 function TeamSelect({
-  index,
   teamIndex,
   control,
   getAvailableTeamOptions,
 }: {
-  index: number;
   teamIndex: number;
-  control: Control<MembersForm>;
+  control: Control<InternalForm>;
   getAvailableTeamOptions: (currentTeamIndex?: number) => Option[];
 }) {
   const availableOptions = getAvailableTeamOptions(teamIndex);
-
   const teamCollection = useMemo(
     () => createListCollection({ items: availableOptions }),
     [availableOptions],
@@ -488,17 +345,15 @@ function TeamSelect({
   return (
     <Controller
       control={control}
-      name={`invites.${index}.teams.${teamIndex}.teamId`}
+      name={`teams.${teamIndex}.teamId`}
       rules={{ required: "Team is required" }}
       render={({ field }) => (
         <Select.Root
           collection={teamCollection}
           value={[field.value]}
           onValueChange={(details) => {
-            const selectedValue = details.value[0];
-            if (selectedValue) {
-              field.onChange(selectedValue);
-            }
+            const val = details.value[0];
+            if (val) field.onChange(val);
           }}
         >
           <Select.Trigger background="bg" width="full">
@@ -517,20 +372,12 @@ function TeamSelect({
   );
 }
 
-/**
- * Get the appropriate team role options based on org role and whether the inviter is an admin.
- * - EXTERNAL (Viewer): only Viewer
- * - MEMBER invitee role + non-admin inviter: only Member (no Admin, no Viewer)
- * - MEMBER invitee role + admin inviter: all except Viewer (+ custom roles)
- * - ADMIN invitee role (only selectable by org admins): all roles (+ custom roles)
- */
 function getFilteredTeamRoles(
   orgRole: OrganizationUserRole,
   customRoles: Array<{ id: string; name: string; description?: string | null }>,
   isInviterAdmin: boolean,
 ): RoleOption[] {
   const baseRoles = Object.values(teamRolesOptions);
-
   const customRoleOptions: RoleOption[] = customRoles.map((role) => ({
     label: role.name,
     value: `custom:${role.id}`,
@@ -539,46 +386,19 @@ function getFilteredTeamRoles(
     customRoleId: role.id,
   }));
 
-  if (orgRole === OrganizationUserRole.EXTERNAL) {
-    // Viewer: only Viewer, no custom roles
-    return [teamRolesOptions.VIEWER];
-  }
-
+  if (orgRole === OrganizationUserRole.EXTERNAL) return [teamRolesOptions.VIEWER];
   if (orgRole === OrganizationUserRole.MEMBER) {
-    if (!isInviterAdmin) {
-      // Non-admin inviter: can only assign Member role, not Admin
-      return [teamRolesOptions.MEMBER];
-    }
-    // Admin inviter: all except Viewer, plus custom roles
-    return [
-      ...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER),
-      ...customRoleOptions,
-    ];
+    if (!isInviterAdmin) return [teamRolesOptions.MEMBER];
+    return [...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER), ...customRoleOptions];
   }
-
-  // Admin invitee org role (only reachable by org admins): all roles plus custom roles
   return [...baseRoles, ...customRoleOptions];
 }
 
-/**
- * Get the default team role based on org role
- * - EXTERNAL (Viewer): Viewer
- * - MEMBER: Member
- * - ADMIN: Member
- */
 function getDefaultTeamRole(orgRole: OrganizationUserRole): TeamUserRole {
-  if (orgRole === OrganizationUserRole.EXTERNAL) {
-    return TeamUserRole.VIEWER;
-  }
-  return TeamUserRole.MEMBER;
+  return orgRole === OrganizationUserRole.EXTERNAL ? TeamUserRole.VIEWER : TeamUserRole.MEMBER;
 }
 
-/**
- * TeamRoleSelect component - renders a dropdown for team roles including custom roles
- * Filters available roles based on organization role
- */
 function TeamRoleSelect({
-  index,
   teamIndex,
   control,
   organizationId,
@@ -586,17 +406,15 @@ function TeamRoleSelect({
   setValue,
   isInviterAdmin,
 }: {
-  index: number;
   teamIndex: number;
-  control: Control<MembersForm>;
+  control: Control<InternalForm>;
   organizationId: string;
   orgRole: OrganizationUserRole;
-  setValue: UseFormSetValue<MembersForm>;
+  setValue: UseFormSetValue<InternalForm>;
   isInviterAdmin: boolean;
 }) {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  // Build role options filtered by org role and whether the inviter is an admin
   const roleOptions = useMemo(
     () => getFilteredTeamRoles(orgRole, customRoles.data ?? [], isInviterAdmin),
     [orgRole, customRoles.data, isInviterAdmin],
@@ -610,27 +428,16 @@ function TeamRoleSelect({
   return (
     <Controller
       control={control}
-      name={`invites.${index}.teams.${teamIndex}.role`}
+      name={`teams.${teamIndex}.role`}
       render={({ field }) => {
         const handleValueChange = (details: { value: string[] }) => {
-          const selectedValue = details.value[0];
-          if (!selectedValue) return;
-
-          field.onChange(selectedValue);
-
-          // If it's a custom role, extract the roleId and set customRoleId
-          if (selectedValue.startsWith("custom:")) {
-            const customRoleId = selectedValue.replace("custom:", "");
-            setValue(
-              `invites.${index}.teams.${teamIndex}.customRoleId`,
-              customRoleId,
-            );
+          const val = details.value[0];
+          if (!val) return;
+          field.onChange(val);
+          if (val.startsWith("custom:")) {
+            setValue(`teams.${teamIndex}.customRoleId`, val.replace("custom:", ""));
           } else {
-            // Clear customRoleId for built-in roles
-            setValue(
-              `invites.${index}.teams.${teamIndex}.customRoleId`,
-              undefined,
-            );
+            setValue(`teams.${teamIndex}.customRoleId`, undefined);
           }
         };
 

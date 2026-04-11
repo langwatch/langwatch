@@ -28,14 +28,6 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
-const mockUseModelSelectionOptions = vi.fn();
-
-// Mock useModelSelectionOptions
-vi.mock("../../ModelSelector", () => ({
-  allModelOptions: [],
-  useModelSelectionOptions: (..._args: unknown[]) => mockUseModelSelectionOptions(),
-}));
-
 const mockUseModelProvidersSettings = vi.fn();
 
 // Mock useModelProvidersSettings
@@ -68,9 +60,6 @@ describe("<ScenarioAIGeneration/>", () => {
     mockUseOrganizationTeamProject.mockReturnValue({
       project: { id: "project-123", defaultModel: "openai/gpt-4" },
     });
-    mockUseModelSelectionOptions.mockReturnValue({
-      modelOption: { isDisabled: false },
-    });
     mockUseModelProvidersSettings.mockReturnValue({
       providers: { openai: { enabled: true } },
       hasEnabledProviders: true,
@@ -92,9 +81,6 @@ describe("when default model is Azure deployment not in registry", () => {
     beforeEach(() => {
       mockUseOrganizationTeamProject.mockReturnValue({
         project: { id: "project-123", defaultModel: "azure/my-gpt4-deployment" },
-      });
-      mockUseModelSelectionOptions.mockReturnValue({
-        modelOption: undefined,
       });
       mockUseModelProvidersSettings.mockReturnValue({
         providers: { azure: { enabled: true } },
@@ -127,10 +113,6 @@ describe("when default model is Azure deployment not in registry", () => {
       mockUseOrganizationTeamProject.mockReturnValue({
         project: { id: "project-123", defaultModel: "azure/my-gpt4-deployment" },
       });
-      mockUseModelSelectionOptions.mockReturnValue({
-        // modelOption is undefined because azure deployment is not in the static registry
-        modelOption: undefined,
-      });
       mockUseModelProvidersSettings.mockReturnValue({
         // OpenAI is enabled, but Azure is not — yet the default model is Azure
         providers: { openai: { enabled: true } },
@@ -156,9 +138,6 @@ describe("when no model providers are configured", () => {
     mockUseOrganizationTeamProject.mockReturnValue({
       project: { id: "project-123", defaultModel: "azure/my-gpt4-deployment" },
     });
-    mockUseModelSelectionOptions.mockReturnValue({
-      modelOption: undefined,
-    });
     mockUseModelProvidersSettings.mockReturnValue({
       providers: {},
       hasEnabledProviders: false,
@@ -170,5 +149,135 @@ describe("when no model providers are configured", () => {
     render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
     expect(screen.getByText("Model Provider Required")).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regression tests for issue #2919 — misleading "API keys" error in AI gen
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("given azure is the only enabled provider and project.defaultModel is azure/my-gpt4", () => {
+  beforeEach(() => {
+    mockUseOrganizationTeamProject.mockReturnValue({
+      project: { id: "p1", defaultModel: "azure/my-gpt4" },
+    });
+    mockUseModelProvidersSettings.mockReturnValue({
+      providers: { azure: { enabled: true }, openai: { enabled: false } },
+      hasEnabledProviders: true,
+      isLoading: false,
+    });
+  });
+
+  describe("when user switches to input view", () => {
+    it("does not disable the textarea (healthy non-openai default)", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      const textarea = screen.getByRole("textbox");
+      expect(textarea).not.toBeDisabled();
+    });
+
+    it("does not render API keys warning", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("given azure is the only enabled provider and project.defaultModel is null", () => {
+  beforeEach(() => {
+    mockUseOrganizationTeamProject.mockReturnValue({
+      // null defaultModel → getDefaultModelState returns { ok: false, reason: "no-default" }
+      project: { id: "p1", defaultModel: null },
+    });
+    mockUseModelProvidersSettings.mockReturnValue({
+      providers: { azure: { enabled: true }, openai: { enabled: false } },
+      hasEnabledProviders: true,
+      isLoading: false,
+    });
+  });
+
+  describe("when user switches to input view", () => {
+    it("does not render API keys warning (misleading bug message)", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
+    });
+
+    it("renders an error mentioning default model", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      expect(screen.getByText(/default model/i)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given azure is the only enabled provider and project.defaultModel is openai/gpt-5.2 (stale)", () => {
+  beforeEach(() => {
+    mockUseOrganizationTeamProject.mockReturnValue({
+      project: { id: "p1", defaultModel: "openai/gpt-5.2" },
+    });
+    // openai provider is disabled → getDefaultModelState returns { ok: false, reason: "stale-default" }
+    mockUseModelProvidersSettings.mockReturnValue({
+      providers: { azure: { enabled: true }, openai: { enabled: false } },
+      hasEnabledProviders: true,
+      isLoading: false,
+    });
+  });
+
+  describe("when user switches to input view", () => {
+    it("does not render API keys warning (misleading bug message)", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
+    });
+
+    it("renders an error mentioning the provider is disabled", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      expect(screen.getByText(/provider.*disabled|disabled.*provider/i)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given providers are still loading", () => {
+  beforeEach(() => {
+    mockUseOrganizationTeamProject.mockReturnValue({
+      project: { id: "p1", defaultModel: "openai/gpt-5.2" },
+    });
+    // providers: undefined → getDefaultModelState returns { ok: true } (no-flash during load)
+    mockUseModelProvidersSettings.mockReturnValue({
+      providers: undefined,
+      hasEnabledProviders: true,
+      isLoading: true,
+    });
+  });
+
+  describe("when the component renders in prompt view", () => {
+    it("does not render any error banner", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      expect(screen.queryByText(/api keys/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/no default model/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/provider.*disabled/i)).not.toBeInTheDocument();
+    });
+
+    it("renders the Generate with AI button", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
+    });
   });
 });

@@ -94,8 +94,9 @@ export function SpanDetails({
         spans: lookupSpans,
       });
 
-      if (ref?.promptHandle && ref.promptVersionNumber != null) {
-        return `${ref.promptHandle}:${ref.promptVersionNumber}`;
+      if (ref?.promptHandle && (ref.promptVersionNumber != null || ref.promptTag)) {
+        const suffix = ref.promptTag ?? String(ref.promptVersionNumber);
+        return `${ref.promptHandle}:${suffix}`;
       }
     }
 

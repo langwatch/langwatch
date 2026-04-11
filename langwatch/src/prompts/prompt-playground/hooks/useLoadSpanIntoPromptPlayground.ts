@@ -225,11 +225,13 @@ function addIdToMessages(
 async function tryOpenExistingPromptTab({
   promptHandle,
   promptVersionNumber,
+  promptTag,
   projectId,
   trpc,
 }: {
   promptHandle: string;
-  promptVersionNumber: number;
+  promptVersionNumber?: number | null;
+  promptTag?: string | null;
   projectId: string;
   trpc: ReturnType<typeof api.useContext>;
 }): Promise<{ formValues: PromptConfigFormValues; versionNumber: number } | null> {
@@ -237,7 +239,7 @@ async function tryOpenExistingPromptTab({
     const prompt = await trpc.prompts.getByIdOrHandle.fetch({
       idOrHandle: promptHandle,
       projectId,
-      version: promptVersionNumber,
+      ...(promptTag ? { tag: promptTag } : { version: promptVersionNumber ?? undefined }),
     });
 
     if (!prompt) {
@@ -255,7 +257,8 @@ async function tryOpenExistingPromptTab({
     });
 
     // If the requested version differs from what was returned, the version was not found
-    if (prompt.version !== promptVersionNumber) {
+    // Only check when fetching by version number — tag fetches skip this check
+    if (promptVersionNumber != null && prompt.version !== promptVersionNumber) {
       toaster.create({
         title: "Version not found",
         description: `Version ${promptVersionNumber} of "${promptHandle}" was not found. Opened latest version (${prompt.version}) instead.`,
@@ -265,11 +268,19 @@ async function tryOpenExistingPromptTab({
 
     return { formValues, versionNumber: prompt.version };
   } catch {
-    toaster.create({
-      title: "Prompt not found",
-      description: `Could not load prompt "${promptHandle}". Opening from trace data instead.`,
-      meta: { closable: true },
-    });
+    if (promptTag) {
+      toaster.create({
+        title: "Tag not resolved",
+        description: `Tag "${promptTag}" could not be resolved for "${promptHandle}". Opening from trace data instead.`,
+        meta: { closable: true },
+      });
+    } else {
+      toaster.create({
+        title: "Prompt not found",
+        description: `Could not load prompt "${promptHandle}". Opening from trace data instead.`,
+        meta: { closable: true },
+      });
+    }
     return null;
   }
 }
@@ -366,22 +377,24 @@ export function useLoadSpanIntoPromptPlayground() {
 
         const variables = spanData.promptVariables ?? {};
 
+        const hasPromptReference =
+          spanData.promptHandle &&
+          (spanData.promptVersionNumber != null || spanData.promptTag != null);
+
         // Determine effective action: explicit or auto-detected from prompt reference
         const effectiveAction: PlaygroundAction =
-          action ??
-          (spanData.promptHandle && spanData.promptVersionNumber
-            ? "open-existing"
-            : "create-new");
+          action ?? (hasPromptReference ? "open-existing" : "create-new");
 
         // When action is "open-existing" and span references a managed prompt
         if (
           effectiveAction === "open-existing" &&
           spanData.promptHandle &&
-          spanData.promptVersionNumber
+          hasPromptReference
         ) {
           const existingPrompt = await tryOpenExistingPromptTab({
             promptHandle: spanData.promptHandle,
             promptVersionNumber: spanData.promptVersionNumber,
+            promptTag: spanData.promptTag,
             projectId: project.id,
             trpc,
           });

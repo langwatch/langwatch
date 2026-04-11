@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.4...langwatch@v3.0.0) (2026-04-08)
+
+
+### Bug Fixes
+
+* address kubernetes-local guide bugbash findings ([#3039](https://github.com/langwatch/langwatch/issues/3039)) ([3148479](https://github.com/langwatch/langwatch/commit/31484795574f88edec6173dac9fff92551ddd086))
+
 ## [3.0.0-prerelease.4](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.3...langwatch@v3.0.0-prerelease.4) (2026-04-08)
 
 

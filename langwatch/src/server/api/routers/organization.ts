@@ -1,10 +1,13 @@
 import {
   OrganizationUserRole,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -982,6 +985,28 @@ export const organizationRouter = createTRPCRouter({
           skipDuplicates: true,
         });
 
+        // Create ORGANIZATION-scoped RoleBinding (skip EXTERNAL — they get access via team/project bindings)
+        if (invite.role !== OrganizationUserRole.EXTERNAL) {
+          await prisma.roleBinding.deleteMany({
+            where: {
+              organizationId: invite.organizationId,
+              userId: session.user.id,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: invite.organizationId,
+            },
+          });
+          await prisma.roleBinding.create({
+            data: {
+              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+              organizationId: invite.organizationId,
+              userId: session.user.id,
+              role: invite.role as unknown as TeamUserRole,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: invite.organizationId,
+            },
+          });
+        }
+
         // Use teamAssignments if available (new format), otherwise fall back to legacy teamIds
         let teamMembershipData: Array<{
           userId: string;
@@ -1063,6 +1088,29 @@ export const organizationRouter = createTRPCRouter({
               // Rethrow other errors
               throw error;
             }
+          }
+
+          // Create TEAM-scoped RoleBindings for all team assignments
+          for (const member of teamMembershipData) {
+            await prisma.roleBinding.deleteMany({
+              where: {
+                organizationId: invite.organizationId,
+                userId: member.userId,
+                scopeType: RoleBindingScopeType.TEAM,
+                scopeId: member.teamId,
+              },
+            });
+            await prisma.roleBinding.create({
+              data: {
+                id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+                organizationId: invite.organizationId,
+                userId: member.userId,
+                role: member.role,
+                customRoleId: member.customRoleId ?? null,
+                scopeType: RoleBindingScopeType.TEAM,
+                scopeId: member.teamId,
+              },
+            });
           }
         }
 

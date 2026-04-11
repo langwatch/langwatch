@@ -1,5 +1,6 @@
 import {
   OrganizationUserRole,
+  RoleBindingScopeType,
   type PrismaClient,
   TeamUserRole,
 } from "@prisma/client";
@@ -476,6 +477,120 @@ export const checkOrganizationPermission =
 // BACKEND PERMISSION CHECKS
 // ============================================================================
 
+// ============================================================================
+// ROLE BINDING RESOLUTION
+// ============================================================================
+
+/**
+ * Checks whether any of the user's RoleBindings at the given scopes grants the
+ * requested permission. All matching bindings are evaluated and their permission
+ * sets are unioned — a user is permitted if ANY binding grants the permission.
+ *
+ * Falls back to the legacy TeamUser table when no RoleBindings exist.
+ */
+async function checkPermissionFromBindings({
+  prisma,
+  userId,
+  organizationId,
+  scopes,
+  organizationRole,
+  permission,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+}): Promise<boolean> {
+  const scopeIds = scopes.map((s) => s.scopeId);
+
+  // Fetch groups the user belongs to in this org
+  const groupMemberships = await prisma.groupMembership.findMany({
+    where: { userId, group: { organizationId } },
+    select: { groupId: true },
+  });
+  const groupIds = groupMemberships.map((m) => m.groupId);
+
+  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes
+  const bindings = await prisma.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeId: { in: scopeIds },
+      OR: [
+        { userId },
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+      ],
+    },
+    select: { role: true, customRoleId: true },
+  });
+
+  if (bindings.length === 0) {
+    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
+    const teamScope = scopes.find(
+      (s) => s.scopeType === RoleBindingScopeType.TEAM,
+    );
+    if (!teamScope) return false;
+
+    const teamUser = await prisma.teamUser.findFirst({
+      where: { userId, teamId: teamScope.scopeId },
+      select: { role: true, assignedRoleId: true },
+    });
+
+    if (!teamUser) return false;
+    return resolveBindingPermission(
+      { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
+      organizationRole,
+      permission,
+      prisma,
+    );
+  }
+
+  // Union permissions across ALL matching bindings — permitted if any grants it
+  for (const binding of bindings) {
+    const permitted = await resolveBindingPermission(
+      binding,
+      organizationRole,
+      permission,
+      prisma,
+    );
+    if (permitted) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether a single binding grants the requested permission,
+ * respecting EXTERNAL user restrictions and custom role permission lists.
+ */
+async function resolveBindingPermission(
+  binding: { role: TeamUserRole; customRoleId: string | null },
+  organizationRole: OrganizationUserRole | null,
+  permission: Permission,
+  prisma: PrismaClient,
+): Promise<boolean> {
+  if (binding.customRoleId) {
+    const customRole = await prisma.customRole.findUnique({
+      where: { id: binding.customRoleId },
+    });
+    if (customRole) {
+      const perms = Array.isArray(customRole.permissions)
+        ? (customRole.permissions as string[])
+        : [];
+      if (perms.length > 0) {
+        return hasPermissionWithHierarchy(perms, permission);
+      }
+    }
+  }
+
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
+  }
+
+  return teamRoleHasPermission(binding.role, permission);
+}
+
 /**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
@@ -501,15 +616,6 @@ export async function resolveProjectPermission(
         select: {
           id: true,
           organizationId: true,
-          members: {
-            where: { userId: ctx.session.user.id },
-            select: {
-              userId: true,
-              teamId: true,
-              role: true,
-              assignedRoleId: true,
-            },
-          },
           organization: {
             select: {
               members: {
@@ -523,63 +629,29 @@ export async function resolveProjectPermission(
     },
   });
 
+  const teamId = projectTeam?.team.id;
+  const organizationId = projectTeam?.team.organizationId;
   const organizationRole =
     projectTeam?.team.organization?.members[0]?.role ?? null;
-  const teamMember = projectTeam?.team.members[0];
 
-  if (!teamMember) {
+  if (!teamId || !organizationId) {
     return { permitted: false, organizationRole };
   }
 
-  // Check user's individual permissions (custom role or built-in role)
-  if (teamMember.assignedRoleId) {
-    const customRole = await ctx.prisma.customRole.findUnique({
-      where: { id: teamMember.assignedRoleId },
-    });
-
-    if (customRole) {
-      const rawPermissions = customRole.permissions as
-        | string[]
-        | null
-        | undefined;
-      const userPermissions = Array.isArray(rawPermissions)
-        ? rawPermissions
-        : [];
-
-      // If custom role has permissions, use them; otherwise fall back to built-in role
-      if (userPermissions.length > 0) {
-        return {
-          permitted: hasPermissionWithHierarchy(userPermissions, permission),
-          organizationRole,
-        };
-      }
-      // Fall back to built-in role if custom role has no permissions
-      // EXTERNAL users get restricted defaults instead of full team role
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        return {
-          permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-          organizationRole,
-        };
-      }
-      return {
-        permitted: teamRoleHasPermission(teamMember.role, permission),
-        organizationRole,
-      };
-    }
-  }
-
-  // Only fall back to built-in team role if NO custom role exists
-  // EXTERNAL users get restricted defaults instead of full VIEWER permissions
-  if (organizationRole === OrganizationUserRole.EXTERNAL) {
-    return {
-      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-      organizationRole,
-    };
-  }
-  return {
-    permitted: teamRoleHasPermission(teamMember.role, permission),
+  const permitted = await checkPermissionFromBindings({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId,
+    scopes: [
+      { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
+    ],
     organizationRole,
-  };
+    permission,
+  });
+
+  return { permitted, organizationRole };
 }
 
 /**
@@ -616,71 +688,30 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  // Check organization admin override
   const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      organizationId: team.organizationId,
-    },
+    where: { userId: ctx.session.user.id, organizationId: team.organizationId },
   });
 
   const organizationRole = organizationUser?.role ?? null;
 
-  // Organization ADMINs can do anything on all teams
+  // Org ADMINs can do anything on all teams
   if (organizationUser?.role === OrganizationUserRole.ADMIN) {
     return { permitted: true, organizationRole };
   }
 
-  // Check team membership
-  const teamUser = await ctx.prisma.teamUser?.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      teamId: teamId,
-    },
-    select: {
-      userId: true,
-      teamId: true,
-      role: true,
-      assignedRoleId: true,
-    },
+  const permitted = await checkPermissionFromBindings({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId: team.organizationId,
+    scopes: [
+      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: team.organizationId },
+    ],
+    organizationRole,
+    permission,
   });
 
-  if (!teamUser) {
-    return { permitted: false, organizationRole };
-  }
-
-  // Check user's individual permissions (custom role or built-in role)
-  if (teamUser.assignedRoleId) {
-    const customRole = await ctx.prisma.customRole.findUnique({
-      where: { id: teamUser.assignedRoleId },
-    });
-
-    if (customRole) {
-      const rawPermissions = customRole.permissions as
-        | string[]
-        | null
-        | undefined;
-      const userPermissions = Array.isArray(rawPermissions)
-        ? rawPermissions
-        : [];
-      if (hasPermissionWithHierarchy(userPermissions, permission)) {
-        return { permitted: true, organizationRole };
-      }
-    }
-  }
-
-  // Fall back to user's built-in team role only
-  // EXTERNAL users get restricted defaults instead of full team role permissions
-  if (organizationRole === OrganizationUserRole.EXTERNAL) {
-    return {
-      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-      organizationRole,
-    };
-  }
-  return {
-    permitted: teamRoleHasPermission(teamUser.role, permission),
-    organizationRole,
-  };
+  return { permitted, organizationRole };
 }
 
 /**

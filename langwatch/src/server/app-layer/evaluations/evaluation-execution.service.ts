@@ -152,12 +152,21 @@ export class EvaluationExecutionService {
       workflowId,
     });
 
+    const isError = result.status === "error";
+    const rawDetails = "details" in result ? result.details : undefined;
+    const traceback =
+      isError && "traceback" in result && Array.isArray(result.traceback)
+        ? result.traceback.join("\n")
+        : undefined;
+
     return {
       status: result.status,
       score: result.status === "processed" ? result.score : undefined,
       passed: result.status === "processed" ? result.passed : undefined,
       label: result.status === "processed" ? result.label : undefined,
-      details: "details" in result ? result.details : undefined,
+      details: isError ? undefined : rawDetails,
+      error: isError ? rawDetails ?? "Evaluator failed" : undefined,
+      errorDetails: traceback,
       cost:
         result.status === "processed" && "cost" in result && result.cost
           ? result.cost

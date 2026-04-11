@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "3.0.0-prerelease.4",
+  "version": "3.0.0",
   "private": true,
   "engines": {
     "node": "24.x",
@@ -26,13 +26,14 @@
     "start:quickwit": "cd quickwit && ./quickwit run",
     "start:prepare:files": "pnpm run generate:sdk-versions && pnpm run copy:langevals-types && pnpm run types:zod:generate && pnpm run prisma:generate:typescript",
     "generate:sdk-versions": "bash scripts/generate-sdk-versions.sh",
-    "start:prepare:db": "pnpm run prisma:migrate && pnpm run elastic:migrate && pnpm run clickhouse:migrate",
+    "start:prepare:db": "pnpm run prisma:migrate && pnpm run clickhouse:migrate",
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
     "typecheck:legacy": "./node_modules/.bin/tsc --noEmit --project ./tsconfig.json",
     "typecheck": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.json",
     "test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",
     "test:ci": "pnpm run test:unit",
     "test:integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.integration.config.ts",
+    "test:pg-integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.pg-integration.config.ts",
     "test:stress": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stress.config.ts",
     "test:stripe-integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stripe-integration.config.ts",
     "task": " tsx --tsconfig tsconfig.workers.json src/task.ts",

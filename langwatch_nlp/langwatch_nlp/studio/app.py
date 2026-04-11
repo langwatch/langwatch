@@ -173,7 +173,7 @@ async def execute_event_on_a_subprocess(
 
         process = cast(Any, process)
 
-        timeout_without_messages = 120  # seconds
+        timeout_without_messages = 900  # seconds (match AWS Lambda max execution timeout)
         if isinstance(event, ExecuteOptimization):
             # TODO: temporary until we actually send events in the middle of optimization process
             timeout_without_messages = 120 * 60  # 120 minutes

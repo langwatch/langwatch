@@ -80,9 +80,9 @@ describe("VariableMappingInput", () => {
         path: ["input"],
       };
       renderComponent({ mapping });
-      // Should show a tag with just the field name (no source name prefix)
+      // Should show a tag with the source prefix and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("input")).toBeInTheDocument();
+      expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
       // Should have a close button
       expect(screen.getByTestId("clear-mapping-button")).toBeInTheDocument();
     });
@@ -582,7 +582,7 @@ describe("VariableMappingInput", () => {
       // Should immediately show the new mapping as a tag
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("input")).toBeInTheDocument();
+        expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
       });
     });
 
@@ -637,7 +637,7 @@ describe("VariableMappingInput", () => {
       // Should show the mapping immediately without needing to close/reopen
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("input")).toBeInTheDocument();
+        expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
       });
     });
   });
@@ -1285,7 +1285,7 @@ describe("VariableMappingInput", () => {
 
         // Should show the mapping tag
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("traces")).toBeInTheDocument();
+        expect(screen.getByText("thread.traces")).toBeInTheDocument();
       });
     });
   });

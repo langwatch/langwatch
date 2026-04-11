@@ -298,38 +298,38 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Fetch by Label", () => {
-    describe("when fetching with a label using MATERIALIZED_FIRST", () => {
-      it("passes label through to API service when no local prompt exists", async () => {
+  describe("Scenario: Fetch by Tag", () => {
+    describe("when fetching with a tag using MATERIALIZED_FIRST", () => {
+      it("passes tag through to API service when no local prompt exists", async () => {
         const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
         localPromptsService.get.mockResolvedValue(null);
         promptsApiService.get.mockResolvedValue(productionPrompt);
 
         const result = await facade.get(testHandle, {
-          label: "production",
+          tag: "production",
           fetchPolicy: FetchPolicy.MATERIALIZED_FIRST,
         });
 
         expect(promptsApiService.get).toHaveBeenCalledWith(testHandle, {
-          label: "production",
+          tag: "production",
           fetchPolicy: FetchPolicy.MATERIALIZED_FIRST,
         });
         expect(result).toEqual(new Prompt(productionPrompt));
       });
     });
 
-    describe("when fetching with a label using ALWAYS_FETCH", () => {
-      it("passes label through to API service", async () => {
+    describe("when fetching with a tag using ALWAYS_FETCH", () => {
+      it("passes tag through to API service", async () => {
         const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
         promptsApiService.get.mockResolvedValue(stagingPrompt);
 
         const result = await facade.get(testHandle, {
-          label: "staging",
+          tag: "staging",
           fetchPolicy: FetchPolicy.ALWAYS_FETCH,
         });
 
         expect(promptsApiService.get).toHaveBeenCalledWith(testHandle, {
-          label: "staging",
+          tag: "staging",
           fetchPolicy: FetchPolicy.ALWAYS_FETCH,
         });
         expect(result).toEqual(new Prompt(stagingPrompt));
@@ -337,17 +337,17 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Invalid Label Error", () => {
-    describe("when the API returns an error for an invalid label", () => {
+  describe("Scenario: Invalid Tag Error", () => {
+    describe("when the API returns an error for an invalid tag", () => {
       it("throws an error when API rejects and no local fallback exists", async () => {
         promptsApiService.get.mockRejectedValue(
-          new Error("Invalid label: must be 'production' or 'staging'")
+          new Error("Invalid tag: must be 'production' or 'staging'")
         );
         localPromptsService.get.mockResolvedValue(null);
 
         await expect(
           facade.get(testHandle, {
-            label: "production",
+            tag: "production",
             fetchPolicy: FetchPolicy.ALWAYS_FETCH,
           })
         ).rejects.toThrow(`Prompt "${testHandle}" not found locally or on server`);
@@ -355,31 +355,31 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache Key Isolation by Label", () => {
+  describe("Scenario: Cache Key Isolation by Tag", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
-    it("returns cached prompt on second call with same label within TTL", async () => {
+    it("returns cached prompt on second call with same tag within TTL", async () => {
       const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
       promptsApiService.get.mockResolvedValue(productionPrompt);
 
       await facade.get(testHandle, {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
-        label: "production",
+        tag: "production",
       });
 
       // Second call within TTL should hit cache (API called only once)
       await facade.get(testHandle, {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
-        label: "production",
+        tag: "production",
       });
 
       expect(promptsApiService.get).toHaveBeenCalledTimes(1);
     });
 
-    it("returns cached unlabeled prompt on second call within TTL", async () => {
+    it("returns cached untagged prompt on second call within TTL", async () => {
       const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
       promptsApiService.get.mockResolvedValue(latestPrompt);
 
@@ -388,7 +388,7 @@ describe("Prompt Retrieval", () => {
         cacheTtlMinutes: 5,
       });
 
-      // Second call without label within TTL should hit cache (API called only once)
+      // Second call without tag within TTL should hit cache (API called only once)
       await facade.get(testHandle, {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
@@ -397,7 +397,7 @@ describe("Prompt Retrieval", () => {
       expect(promptsApiService.get).toHaveBeenCalledTimes(1);
     });
 
-    it("returns different prompts for different labels with CACHE_TTL", async () => {
+    it("returns different prompts for different tags with CACHE_TTL", async () => {
       const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
       const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
       promptsApiService.get.mockResolvedValueOnce(productionPrompt);
@@ -406,13 +406,13 @@ describe("Prompt Retrieval", () => {
       const productionResult = await facade.get(testHandle, {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
-        label: "production",
+        tag: "production",
       });
 
       const stagingResult = await facade.get(testHandle, {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
-        label: "staging",
+        tag: "staging",
       });
 
       expect(promptsApiService.get).toHaveBeenCalledTimes(2);
@@ -420,7 +420,7 @@ describe("Prompt Retrieval", () => {
       expect(stagingResult).toEqual(new Prompt(stagingPrompt));
     });
 
-    it("returns latest version for unlabeled request even when labeled version is cached", async () => {
+    it("returns latest version for untagged request even when tagged version is cached", async () => {
       const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
       const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
       promptsApiService.get.mockResolvedValueOnce(productionPrompt);
@@ -429,7 +429,7 @@ describe("Prompt Retrieval", () => {
       const productionResult = await facade.get(testHandle, {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
-        label: "production",
+        tag: "production",
       });
 
       const latestResult = await facade.get(testHandle, {

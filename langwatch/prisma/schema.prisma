@@ -82,6 +82,8 @@ model User {
     versionTagsUpdated      PromptTagAssignment[]  @relation("versionTagUpdatedBy")
     promptTagsCreated       PromptTag[]            @relation("promptTagCreatedBy")
     promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
+    groupMemberships        GroupMembership[]
+    roleBindings            RoleBinding[]
 
 }
 
@@ -98,6 +100,13 @@ enum TeamUserRole {
     MEMBER
     VIEWER
     CUSTOM
+}
+
+// Scoped RBAC — scope levels for RoleBinding
+enum RoleBindingScopeType {
+    ORGANIZATION
+    TEAM
+    PROJECT
 }
 
 enum OrganizationUserRole {
@@ -138,17 +147,16 @@ model OrganizationUser {
 }
 
 model Team {
-    id             String       @id @default(nanoid())
-    name           String
-    slug           String       @unique
-    members        TeamUser[]
-    organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id])
-    projects       Project[]
-    createdAt      DateTime     @default(now())
-    updatedAt      DateTime     @default(now()) @updatedAt
-    archivedAt     DateTime?
-
+    id              String       @id @default(nanoid())
+    name            String
+    slug            String       @unique
+    members         TeamUser[]
+    organizationId  String
+    organization    Organization @relation(fields: [organizationId], references: [id])
+    projects        Project[]
+    createdAt       DateTime     @default(now())
+    updatedAt       DateTime     @default(now()) @updatedAt
+    archivedAt      DateTime?
     @@index([organizationId])
 }
 
@@ -187,6 +195,8 @@ model Organization {
     subscriptions Subscription[]
     scimTokens    ScimToken[]
     promptTags    PromptTag[]
+    groups        Group[]
+    roleBindings  RoleBinding[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -1031,7 +1041,8 @@ model CustomRole {
     permissions    Json // Array of Permission strings
     createdAt      DateTime     @default(now())
     updatedAt      DateTime     @default(now()) @updatedAt
-    assignedUsers  TeamUser[]
+    assignedUsers      TeamUser[]
+    roleBindings       RoleBinding[]
 
     @@unique([organizationId, name])
     @@index([organizationId])
@@ -1222,6 +1233,71 @@ model InvoiceItem {
     @@index([invoiceId])
 }
 
+
+// ============================================================================
+// Scoped RBAC — Groups, GroupMembership, RoleBinding
+// ============================================================================
+
+model Group {
+    id             String            @id @default(nanoid())
+    organizationId String
+    organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    name           String
+    slug           String
+    // SCIM provenance — null for manually created groups
+    externalId     String?           // IdP-side group ID (SCIM externalId)
+    scimSource     String?           // e.g. "azure-ad", "okta"
+    members        GroupMembership[]
+    roleBindings   RoleBinding[]     @relation("GroupBindings")
+    createdAt      DateTime          @default(now())
+    updatedAt      DateTime          @default(now()) @updatedAt
+
+    @@unique([organizationId, slug])
+    @@unique([organizationId, externalId])
+    @@index([organizationId])
+}
+
+model GroupMembership {
+    userId    String
+    groupId   String
+    user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+
+    @@id([userId, groupId])
+    @@index([userId])
+    @@index([groupId])
+}
+
+model RoleBinding {
+    id             String               @id @default(nanoid())
+    organizationId String
+    organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+    // Principal — exactly one must be set
+    userId         String?
+    user           User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    groupId        String?
+    group          Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
+
+    // Role — built-in named role or custom
+    role           TeamUserRole
+    customRoleId   String?
+    customRole     CustomRole?          @relation(fields: [customRoleId], references: [id])
+
+    // Scope — scopeType + scopeId identify the resource
+    scopeType      RoleBindingScopeType
+    scopeId        String               // orgId, teamId, or projectId depending on scopeType
+
+    createdAt      DateTime             @default(now())
+    updatedAt      DateTime             @default(now()) @updatedAt
+
+    @@unique([userId, groupId, role, scopeType, scopeId])
+    @@index([organizationId])
+    @@index([userId])
+    @@index([groupId])
+    @@index([scopeType, scopeId])
+}
 
 model BillingMeterCheckpoint {
     id                   String   @id @default(cuid())
