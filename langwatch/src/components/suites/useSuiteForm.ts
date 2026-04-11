@@ -15,8 +15,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
+  isSuiteAgentTargetType,
   parseSuiteTargets,
-  suiteAgentTargetTypes,
   suiteTargetSchema,
   type SuiteTarget,
 } from "~/server/suites/types";
@@ -49,7 +49,6 @@ interface Scenario {
   name: string;
   labels: string[];
 }
-
 
 interface Agent {
   id: string;
@@ -124,8 +123,8 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        if (!suiteAgentTargetTypes.has(agent.type)) continue;
-        result.push({ name: agent.name, type: agent.type as SuiteTarget["type"], referenceId: agent.id });
+        if (!isSuiteAgentTargetType(agent.type)) continue;
+        result.push({ name: agent.name, type: agent.type, referenceId: agent.id });
       }
     }
     if (prompts) {
