@@ -1,14 +1,7 @@
-import { setEnvironment } from "@langwatch/ksuid";
-import dotenv from "dotenv";
-import events from "events";
+// Must be first: loads dotenv + env-dependent setup before `./start` evaluates.
+// ES module imports run in declaration order, so side effects here land before
+// `./start` pulls in modules that read process.env at load time.
+import "./bootstrap";
+import { startApp } from "./start";
 
-dotenv.config();
-setEnvironment(process.env.ENVIRONMENT ?? "local");
-
-if (process.env.NODE_ENV === "production") {
-  process.setMaxListeners(128);
-  events.EventEmitter.defaultMaxListeners = 128;
-}
-
-const { startApp } = await import("./start");
 void startApp();
