@@ -554,10 +554,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // otherwise summary widgets (timeScale: "full") mixing eval + trace metrics
   // would route through buildSubqueryTimeseriesQuery which still joins
   // evaluation_runs directly and reproduces the fan-out bug.
-  const hasEvalMixWithTrace =
-    simpleMetrics.some((m) => m.requiredJoins.includes("evaluation_runs")) &&
-    simpleMetrics.some((m) => !m.requiredJoins.includes("evaluation_runs"));
-  if (hasEvalMixWithTrace) {
+  if (hasEvalMixedWithTraceMetrics(simpleMetrics)) {
     return buildMixedEvalTimeseriesQuery({
       input,
       ts,
@@ -773,8 +770,14 @@ function buildMixedEvalTimeseriesQuery({
 
     if (metric.requiredJoins.includes("evaluation_runs")) {
       innerSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
-      const outerAgg =
-        mapEvalAggregationToOuter(metric.selectExpression) ?? "avg";
+      const outerAgg = mapEvalAggregationToOuter(metric.selectExpression);
+      if (!outerAgg) {
+        throw new Error(
+          `Cannot map evaluation metric aggregation to outer aggregation for expression: "${metric.selectExpression}". ` +
+            `This likely means metric-translator.ts emits a conditional aggregation pattern that mapEvalAggregationToOuter doesn't yet handle. ` +
+            `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
+        );
+      }
       outerMetricExprs.push(`${outerAgg}(${perTraceAlias}) AS ${quotedAlias}`);
       continue;
     }
@@ -855,6 +858,24 @@ function buildMixedEvalTimeseriesQuery({
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };
+}
+
+/**
+ * True when the query mixes evaluation metrics (which fan out via the
+ * evaluation_runs JOIN) with non-evaluation metrics whose aggregations would
+ * be inflated by that fan-out. Gates the per-trace CTE path that fixes
+ * issue #3088.
+ */
+function hasEvalMixedWithTraceMetrics(
+  metrics: readonly MetricTranslation[],
+): boolean {
+  const hasEval = metrics.some((m) =>
+    m.requiredJoins.includes("evaluation_runs"),
+  );
+  const hasNonEval = metrics.some(
+    (m) => !m.requiredJoins.includes("evaluation_runs"),
+  );
+  return hasEval && hasNonEval;
 }
 
 /**
@@ -969,9 +990,7 @@ function buildArrayJoinTimeseriesQuery(
   //
   // @regression issue #3088
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
-  const hasEvalMixWithTrace =
-    simpleMetrics.some((m) => m.requiredJoins.includes("evaluation_runs")) &&
-    simpleMetrics.some((m) => !m.requiredJoins.includes("evaluation_runs"));
+  const hasEvalMixWithTrace = hasEvalMixedWithTraceMetrics(simpleMetrics);
 
   // When eval metrics are mixed with trace metrics, switch from SELECT DISTINCT
   // (which cannot dedupe the eval fan-out because eval columns differ per row)
@@ -994,6 +1013,14 @@ function buildArrayJoinTimeseriesQuery(
   // are constant per (trace_id, group_key) combination.
   const traceColumnWrapper = (col: string) =>
     hasEvalMixWithTrace ? `any(${col})` : col;
+  // IMPORTANT: When adding a new trace-level column to metric-translator.ts, it
+  // MUST also be added to this CTE select list AND to DEDUP_FIELD_MAPPINGS
+  // (consumed by transformMetricForDedup below). The simple-path
+  // buildMixedEvalTimeseriesQuery uses dynamic column extraction via
+  // extractTraceAggregationColumn, but this arrayJoin path still uses the
+  // hard-coded approach. Missing the update here will make the new column
+  // silently return null (or throw) when combined with an arrayJoin groupBy.
+  // TODO(#3115): port this path to extractTraceAggregationColumn for parity.
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TotalCost`)} AS trace_total_cost`,
   );
@@ -1050,8 +1077,14 @@ function buildArrayJoinTimeseriesQuery(
     const perTraceAlias = evalPerTraceAliases.get(metric.alias);
     if (perTraceAlias !== undefined) {
       // Eval metric: outer query re-aggregates the per-trace value across traces.
-      const outerAgg =
-        mapEvalAggregationToOuter(metric.selectExpression) ?? "avg";
+      const outerAgg = mapEvalAggregationToOuter(metric.selectExpression);
+      if (!outerAgg) {
+        throw new Error(
+          `Cannot map evaluation metric aggregation to outer aggregation for expression: "${metric.selectExpression}". ` +
+            `This likely means metric-translator.ts emits a conditional aggregation pattern that mapEvalAggregationToOuter doesn't yet handle. ` +
+            `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
+        );
+      }
       outerSelectExprs.push(
         `${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`,
       );
@@ -2259,3 +2292,11 @@ export function buildFeedbacksQuery(
     },
   };
 }
+
+// Exported for test coverage — do not use outside tests.
+export const __testOnly__ = {
+  mapEvalAggregationToOuter,
+  extractTraceAggregationColumn,
+  replaceColumnWithAlias,
+  hasEvalMixedWithTraceMetrics,
+};
