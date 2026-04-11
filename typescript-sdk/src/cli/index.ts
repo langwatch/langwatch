@@ -80,7 +80,7 @@ const program = new Command();
 
 program
   .name("langwatch")
-  .description("LangWatch CLI - The npm of prompts")
+  .description("LangWatch CLI - Manage prompts and datasets")
   .version(__CLI_VERSION__, "-v, --version", "Display the current version")
   .configureHelp({
     showGlobalOptions: true,
@@ -263,4 +263,111 @@ evaluatorCmd
     }
   });
 
+// Add dataset command group
+const datasetCmd = program
+  .command("dataset")
+  .description("Manage datasets");
+
+datasetCmd
+  .command("list")
+  .description("List all datasets")
+  .action(async () => {
+    const { listCommand: listDatasetsImpl } = await import("./commands/dataset/list.js");
+    await listDatasetsImpl();
+  });
+
+datasetCmd
+  .command("create <name>")
+  .description("Create a new dataset")
+  .option("-c, --columns <columns>", "Column definitions (e.g. input:string,output:string)")
+  .action(async (name: string, options: { columns?: string }) => {
+    const { createCommand: createDatasetImpl } = await import("./commands/dataset/create.js");
+    await createDatasetImpl(name, options);
+  });
+
+datasetCmd
+  .command("get <slugOrId>")
+  .description("Get dataset details and preview records")
+  .action(async (slugOrId: string) => {
+    const { getCommand: getDatasetImpl } = await import("./commands/dataset/get.js");
+    await getDatasetImpl(slugOrId);
+  });
+
+datasetCmd
+  .command("delete <slugOrId>")
+  .description("Delete (archive) a dataset")
+  .action(async (slugOrId: string) => {
+    const { deleteCommand: deleteDatasetImpl } = await import("./commands/dataset/delete.js");
+    await deleteDatasetImpl(slugOrId);
+  });
+
+datasetCmd
+  .command("upload <slug> <file>")
+  .description("Upload a file to a dataset (creates if not found)")
+  .option("--if-exists <strategy>", "Strategy when dataset exists: append (default), replace, error")
+  .action(async (slug: string, file: string, options: { ifExists?: string }) => {
+    const { uploadCommand: uploadDatasetImpl } = await import("./commands/dataset/upload.js");
+    await uploadDatasetImpl(slug, file, options);
+  });
+
+datasetCmd
+  .command("download <slugOrId>")
+  .description("Download dataset records as CSV or JSONL")
+  .option("-f, --format <format>", "Output format: csv or jsonl", "csv")
+  .action(async (slugOrId: string, options: { format?: string }) => {
+    const { downloadCommand: downloadDatasetImpl } = await import("./commands/dataset/download.js");
+    await downloadDatasetImpl(slugOrId, options);
+  });
+
+datasetCmd
+  .command("update <slugOrId>")
+  .description("Update a dataset name or columns")
+  .option("--name <name>", "New dataset name")
+  .option("--columns <columns>", "New column definitions (e.g. input:string,output:string)")
+  .action(async (slugOrId: string, options: { name?: string; columns?: string }) => {
+    const { updateCommand: updateDatasetImpl } = await import("./commands/dataset/update.js");
+    await updateDatasetImpl(slugOrId, options);
+  });
+
+// Records subcommand group
+const recordsCmd = datasetCmd
+  .command("records")
+  .description("Manage dataset records");
+
+recordsCmd
+  .command("list <slugOrId>")
+  .description("List records in a dataset")
+  .option("--page <n>", "Page number (default: 1)")
+  .option("--limit <n>", "Records per page (default: 20)")
+  .action(async (slugOrId: string, options: { page?: string; limit?: string }) => {
+    const { recordsListCommand } = await import("./commands/dataset/records-list.js");
+    await recordsListCommand(slugOrId, options);
+  });
+
+recordsCmd
+  .command("add <slugOrId>")
+  .description("Add records to a dataset")
+  .option("--json <json>", "JSON array of records (inline)")
+  .option("--stdin", "Read JSON array from stdin")
+  .action(async (slugOrId: string, options: { json?: string; stdin?: boolean }) => {
+    const { recordsAddCommand } = await import("./commands/dataset/records-add.js");
+    await recordsAddCommand(slugOrId, options);
+  });
+
+recordsCmd
+  .command("update <slugOrId> <recordId>")
+  .description("Update a single record in a dataset")
+  .requiredOption("--json <json>", "JSON object with updated fields")
+  .action(async (slugOrId: string, recordId: string, options: { json: string }) => {
+    const { recordsUpdateCommand } = await import("./commands/dataset/records-update.js");
+    await recordsUpdateCommand(slugOrId, recordId, options);
+  });
+
+recordsCmd
+  .command("delete <slugOrId> <recordIds...>")
+  .description("Delete records from a dataset")
+  .action(async (slugOrId: string, recordIds: string[]) => {
+    const { recordsDeleteCommand } = await import("./commands/dataset/records-delete.js");
+    await recordsDeleteCommand(slugOrId, recordIds);
+  });
 program.parse(process.argv);

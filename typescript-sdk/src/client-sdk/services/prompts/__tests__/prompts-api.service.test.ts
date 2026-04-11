@@ -21,12 +21,12 @@ describe("PromptsApiService.get", () => {
     } as InternalConfig);
   });
 
-  describe("when fetching with a label", () => {
-    it("passes label as query parameter to the API", async () => {
+  describe("when fetching with a tag", () => {
+    it("passes tag as query parameter to the API", async () => {
       const mockPrompt = promptResponseFactory.build();
       mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
 
-      await service.get("pizza-prompt", { label: "production" });
+      await service.get("pizza-prompt", { tag: "production" });
 
       expect(mockGet).toHaveBeenCalledWith(
         "/api/prompts/{id}",
@@ -39,11 +39,11 @@ describe("PromptsApiService.get", () => {
       );
     });
 
-    it("passes both label and version to the API when both provided", async () => {
+    it("passes both tag and version to the API when both provided", async () => {
       const mockPrompt = promptResponseFactory.build();
       mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
 
-      await service.get("pizza-prompt", { label: "production", version: "3" });
+      await service.get("pizza-prompt", { tag: "production", version: "3" });
 
       expect(mockGet).toHaveBeenCalledWith(
         "/api/prompts/{id}",

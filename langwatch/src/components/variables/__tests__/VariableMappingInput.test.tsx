@@ -73,17 +73,16 @@ describe("VariableMappingInput", () => {
       expect(screen.getByDisplayValue("Hello world")).toBeInTheDocument();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays source mapping as a closable tag", () => {
+    it("displays source mapping as a closable tag", () => {
       const mapping: FieldMapping = {
         type: "source",
         sourceId: "dataset-1",
         path: ["input"],
       };
       renderComponent({ mapping });
-      // Should show a tag with just the field name (no source name prefix)
+      // Should show a tag with the source prefix and field name
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-      expect(screen.getByText("input")).toBeInTheDocument();
+      expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
       // Should have a close button
       expect(screen.getByTestId("clear-mapping-button")).toBeInTheDocument();
     });
@@ -545,8 +544,7 @@ describe("VariableMappingInput", () => {
   });
 
   describe("prop synchronization", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("updates display when mapping prop changes externally", async () => {
+    it("updates display when mapping prop changes externally", async () => {
       const onMappingChange = vi.fn();
 
       // Start with no mapping
@@ -584,12 +582,11 @@ describe("VariableMappingInput", () => {
       // Should immediately show the new mapping as a tag
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("input")).toBeInTheDocument();
+        expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("reflects mapping immediately after selecting from dropdown", async () => {
+    it("reflects mapping immediately after selecting from dropdown", async () => {
       const user = userEvent.setup();
       let currentMapping: FieldMapping | undefined = undefined;
 
@@ -640,7 +637,7 @@ describe("VariableMappingInput", () => {
       // Should show the mapping immediately without needing to close/reopen
       await waitFor(() => {
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("input")).toBeInTheDocument();
+        expect(screen.getByText("dataset-1.input")).toBeInTheDocument();
       });
     });
   });
@@ -1221,8 +1218,7 @@ describe("VariableMappingInput", () => {
         );
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("shows 'Use all X' option when in nested view with complete parent", async () => {
+      it("shows 'Use all X' option when in nested view with complete parent", async () => {
         const user = userEvent.setup();
         const onMappingChange = vi.fn();
 
@@ -1289,7 +1285,7 @@ describe("VariableMappingInput", () => {
 
         // Should show the mapping tag
         expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
-        expect(screen.getByText("traces")).toBeInTheDocument();
+        expect(screen.getByText("thread.traces")).toBeInTheDocument();
       });
     });
   });

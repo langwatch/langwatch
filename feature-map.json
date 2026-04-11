@@ -394,7 +394,7 @@
             "code": {
               "sdk": {
                 "python": "langwatch.dataset",
-                "typescript": null
+                "typescript": "langwatch.datasets"
               },
               "cli": null,
               "skill": "evaluations",
