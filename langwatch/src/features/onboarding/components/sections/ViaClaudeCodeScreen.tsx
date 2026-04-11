@@ -103,17 +103,12 @@ function glassCard({
   return {
     borderRadius: "xl",
     border: "1px solid",
-    borderColor: highlight ? { base: "orange.200", _dark: "orange.800" } : "border.subtle",
-    bg: highlight
-      ? { base: "orange.subtle", _dark: "rgba(237,137,38,0.12)" }
-      : "bg.panel/70",
+    borderColor: highlight
+      ? { base: "orange.200", _dark: "orange.800" }
+      : "border.subtle",
+    bg: "bg.panel/70",
     backdropFilter: "blur(20px) saturate(1.3)",
-    boxShadow: highlight
-      ? {
-          base: "0 0 0 1px var(--chakra-colors-orange-100)",
-          _dark: "0 6px 28px rgba(237,137,38,0.08)",
-        }
-      : "sm",
+    boxShadow: "sm",
     transition: "all 0.17s ease",
     _hover: {
       borderColor: highlight ? "orange.emphasized" : "border.emphasized",
@@ -160,8 +155,6 @@ function PromptRow({
       py={3.5}
       gap={4}
       {...glassCard({ highlight: true })}
-      bg="bg.panel/70"
-      boxShadow="sm"
     >
       <Text
         fontSize="sm"
@@ -188,8 +181,6 @@ function SkillRow({
       py={4}
       gap={3}
       {...glassCard({ highlight: true })}
-      bg="bg.panel/70"
-      boxShadow="sm"
     >
       <Text
         fontSize="sm"
@@ -272,8 +263,6 @@ function QuickCommand({
       px={4}
       py={3}
       {...glassCard({ highlight: true })}
-      bg="bg.panel/70"
-      boxShadow="sm"
     >
       <HStack gap={2.5} align="center" minW={0}>
         <Box flexShrink={0} display="flex" alignItems="center">

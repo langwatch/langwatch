@@ -159,7 +159,7 @@ export function ViaPlatformScreen(): React.ReactElement {
               alignItems: "center",
               gap: "4px",
               fontSize: "13px",
-              color: "#e5e7eb",
+              color: "var(--chakra-colors-fg-muted)",
               textDecoration: "none",
             }}
           >

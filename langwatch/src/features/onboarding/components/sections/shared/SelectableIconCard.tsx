@@ -19,14 +19,16 @@ interface SelectableIconCardProps {
   ariaLabel: string;
 }
 
-const iconSizeToPixels: Record<string, string> = {
+const iconSizeToPixels = {
   xs: "12px",
   sm: "16px",
   md: "24px",
   lg: "32px",
   xl: "40px",
   "2xl": "48px",
-};
+} as const;
+
+type IconSizeKey = keyof typeof iconSizeToPixels;
 
 export function SelectableIconCard(
   props: SelectableIconCardProps,
@@ -44,7 +46,8 @@ export function SelectableIconCard(
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
   const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
 
-  const resolvedSize = iconSizeToPixels[String(iconSize ?? "md")] ?? "24px";
+  const resolvedSize =
+    iconSizeToPixels[(iconSize ?? "md") as IconSizeKey] ?? "24px";
 
   const themedIconSrc = useColorModeValue(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
@@ -73,6 +76,12 @@ export function SelectableIconCard(
         aria-label={ariaLabel}
         aria-pressed={selected}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
         cursor="pointer"
         w={cardSize}
         h={cardSize}
@@ -116,12 +125,16 @@ export function SelectableIconCard(
         >
           {icon ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={iconSrc}
-                alt={iconAlt}
-                style={{ width: resolvedSize, height: resolvedSize, objectFit: "contain", display: "block" }}
-              />
+              {iconSrc ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={iconSrc}
+                  alt={iconAlt}
+                  style={{ width: resolvedSize, height: resolvedSize, objectFit: "contain", display: "block" }}
+                />
+              ) : (
+                <Box w={resolvedSize} h={resolvedSize} aria-hidden />
+              )}
               {iconLabel && (
                 <Text
                   textStyle={size === "sm" ? "2xs" : "xs"}
