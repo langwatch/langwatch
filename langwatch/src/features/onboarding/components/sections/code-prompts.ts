@@ -45,7 +45,7 @@ Or add an entry named \`langwatch\` under the \`mcpServers\` object of \`~/.clau
 - \`env.LANGWATCH_API_KEY\`: the user's LangWatch API key
 
 ## For other editors
-Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file (Cursor's \`.cursor/mcp.json\`, VS Code's \`.vscode/mcp.json\`, Windsurf's \`~/.codeium/windsurf/mcp_config.json\`, Claude Desktop's \`~/Library/Application Support/Claude/claude_desktop_config.json\`). Use the same fields listed above.
+Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file using the fields listed above.
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
 

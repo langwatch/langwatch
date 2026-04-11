@@ -1,3 +1,6 @@
+import { lstatSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   PROMPT_ANALYTICS,
@@ -7,47 +10,59 @@ import {
   PROMPT_SCENARIOS,
   PROMPT_TRACING,
 } from "./code-prompts";
+import { buildMcpJson } from "./shared/build-mcp-config";
 
 /**
  * Regression suite for langwatch/langwatch#3104.
  *
- * Gemini CLI's chat input runs an `@`-file-reference parser on every pasted
- * string (see google-gemini/gemini-cli `atCommandProcessor.ts`). If any
- * `@`-prefixed run it extracts exceeds the OS filesystem NAME_MAX (255 chars
- * on macOS / Linux), Gemini calls `lstat()` on it and crashes with
- * ENAMETOOLONG. Any LangWatch prompt a user pastes into Gemini must therefore
- * stay within a safe margin below NAME_MAX for *every* `@`-token the parser
- * extracts — not just every whitespace-delimited word.
+ * Gemini CLI's chat-input parser extracts `@`-prefixed runs from pasted text
+ * and calls `fs.lstatSync()` on each one (see google-gemini/gemini-cli
+ * packages/cli/src/ui/hooks/atCommandProcessor.ts). If the tail path-component
+ * of the extracted run exceeds the OS filesystem NAME_MAX (255 on macOS /
+ * Linux), lstat throws `ENAMETOOLONG` and the Gemini process dies with an
+ * unhandled rejection. Any LangWatch content a user might paste into Gemini
+ * must therefore extract cleanly — not just as a short whole token, but as a
+ * short longest-component after splitting on `/`.
  *
- * The regex below is copied verbatim from
- * https://github.com/google-gemini/gemini-cli packages/cli/src/ui/hooks/atCommandProcessor.ts
- * (`AT_COMMAND_PATH_REGEX_SOURCE`). The double-quoted-run alternative
- * `"[^"]*"` is the dangerous one: it eats across newlines and drags JSON
- * strings together into one giant pseudo-path.
+ * The regex below is copied verbatim from Gemini's
+ * `AT_COMMAND_PATH_REGEX_SOURCE`. Its `"[^"]*"` alternative is the bug: it
+ * matches across newlines, so a `"@langwatch/mcp-server"` sequence embedded in
+ * a JSON block drags the rest of the block into a single match.
  */
-const GEMINI_AT_COMMAND_PATH_REGEX_SOURCE =
-  '(?:(?:"(?:[^"]*)")|(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r])))+';
+const GEMINI_AT_COMMAND_PATH_REGEX_SOURCE = String.raw`(?:(?:"(?:[^"]*)")|(?:\\.|[^ \t\n\r,;!?()\[\]{}.]|\.(?!$|[ \t\n\r])))+`;
 const GEMINI_AT_COMMAND_REGEX = new RegExp(
-  `(?<!\\\\)@${GEMINI_AT_COMMAND_PATH_REGEX_SOURCE}`,
+  String.raw`(?<!\\)@` + GEMINI_AT_COMMAND_PATH_REGEX_SOURCE,
   "g",
 );
 
 /**
- * Safe upper bound for a single `@`-token in any prompt. NAME_MAX is 255 on
- * macOS/Linux; we leave a generous margin so that prepended workspace roots
- * (e.g. `/Users/someone/very/long/project/path`) and future edits do not
- * push us over.
+ * macOS and Linux cap a single filesystem path component at NAME_MAX = 255
+ * bytes. Observed longest component for realistic content today: 121 bytes
+ * (cloud) and 160 bytes (self-hosted with the longest LANGWATCH_API_KEY
+ * format LangWatch issues — fixed at 54 bytes, see apiKeyGenerator.ts). A
+ * 32-byte safety margin below NAME_MAX leaves headroom for future edits
+ * while still catching any regression that reintroduces the issue-#3104
+ * crash pattern (where the longest component was 2179 bytes).
  */
-const MAX_AT_TOKEN_LENGTH = 100;
+const NAME_MAX = 255;
+const SAFETY_MARGIN = 32;
+const MAX_COMPONENT_LENGTH = NAME_MAX - SAFETY_MARGIN;
 
-function longestAtMatch(text: string): { value: string; length: number } {
-  let longest = "";
+interface AtTokenProbe {
+  match: string;
+  longestComponent: string;
+}
+
+function longestAtTokenComponent(text: string): AtTokenProbe {
+  let result: AtTokenProbe = { match: "", longestComponent: "" };
   for (const match of text.matchAll(GEMINI_AT_COMMAND_REGEX)) {
-    if (match[0].length > longest.length) {
-      longest = match[0];
+    for (const component of match[0].split("/")) {
+      if (component.length > result.longestComponent.length) {
+        result = { match: match[0], longestComponent: component };
+      }
     }
   }
-  return { value: longest, length: longest.length };
+  return result;
 }
 
 describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
@@ -64,31 +79,85 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
     "given $name pasted into Gemini CLI",
     ({ name, text }) => {
       describe("when Gemini's atCommandProcessor scans the prompt", () => {
-        it(`extracts no @-token longer than ${MAX_AT_TOKEN_LENGTH} characters`, () => {
-          const { value, length } = longestAtMatch(text);
+        it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
+          const { match, longestComponent } = longestAtTokenComponent(text);
           expect(
-            length,
-            `${name} contains an @-token of ${length} chars that would crash ` +
-              `Gemini CLI with ENAMETOOLONG when lstat'd. Excerpt: ${JSON.stringify(
-                value.slice(0, 120),
-              )}`,
-          ).toBeLessThanOrEqual(MAX_AT_TOKEN_LENGTH);
+            longestComponent.length,
+            `${name} would have Gemini CLI lstat a ${longestComponent.length}-byte ` +
+              `component (NAME_MAX=${NAME_MAX}). Full match excerpt: ` +
+              JSON.stringify(match.slice(0, 120)),
+          ).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
+        });
+
+        it("does not embed @langwatch/mcp-server inside a JSON string literal", () => {
+          // The crash trigger in issue #3104 is the sequence
+          //   "@langwatch/mcp-server"
+          // inside a JSON block: the closing `"` kicks off Gemini's
+          // `"[^"]*"` alternative, which eats across newlines through the
+          // rest of the JSON. Forbidding the exact pattern makes the regex
+          // match terminate at the next whitespace instead.
+          expect(text).not.toContain('"@langwatch/mcp-server"');
         });
       });
     },
   );
 
   describe("given PROMPT_TRACING as the primary regression target", () => {
-    describe("when looking for the exact crash pattern", () => {
-      it("does not embed @langwatch/mcp-server inside a JSON string literal", () => {
-        // The crash in issue #3104 is triggered by the sequence
-        //   "@langwatch/mcp-server"
-        // inside a JSON block: the closing `"` kicks off Gemini's
-        // `"[^"]*"` alternative which eats across newlines through the rest
-        // of the JSON. Removing that exact pattern makes the regex match
-        // terminate at the next whitespace instead.
-        expect(PROMPT_TRACING).not.toContain('"@langwatch/mcp-server"');
+    describe("when Node.js lstat'es the worst extracted @-token", () => {
+      it("does not throw ENAMETOOLONG", () => {
+        // Execute the crashing code path directly: pull the longest @-token
+        // Gemini would extract, prepend an ephemeral workspace root, and
+        // call fs.lstatSync exactly as Gemini's resolveToRealPath does.
+        // Pre-fix, this threw ENAMETOOLONG. Post-fix, it throws ENOENT (or
+        // succeeds, which is fine — we only care that NAME_MAX is not hit).
+        const { match } = longestAtTokenComponent(PROMPT_TRACING);
+        const fakeWorkspace = mkdtempSync(join(tmpdir(), "gemini-regression-"));
+        const crashingPath = join(fakeWorkspace, match);
+        try {
+          lstatSync(crashingPath);
+        } catch (error) {
+          expect(
+            (error as NodeJS.ErrnoException).code,
+            `lstat on the longest @-token from PROMPT_TRACING raised ` +
+              `${(error as NodeJS.ErrnoException).code}; ENAMETOOLONG means ` +
+              `Gemini CLI would crash. Match: ${JSON.stringify(match.slice(0, 120))}`,
+          ).not.toBe("ENAMETOOLONG");
+        }
       });
+    });
+  });
+});
+
+describe("buildMcpJson Gemini CLI compatibility (issue #3104)", () => {
+  // LangWatch API keys have a fixed format: `sk-lw-` + 48 alphanumeric
+  // characters = 54 bytes total (see server/utils/apiKeyGenerator.ts).
+  // The MCP config JSON is also pasteable via the onboarding "Copy Config"
+  // button, so it must extract cleanly under Gemini's regex too. The `/`
+  // in the scoped package name `@langwatch/mcp-server` naturally splits
+  // the match into shorter components, keeping each one well below
+  // NAME_MAX in practice — this test locks that invariant in.
+  const REALISTIC_API_KEY = "sk-lw-" + "a".repeat(48);
+
+  describe("given a cloud config with a realistic API key", () => {
+    it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
+      const json = buildMcpJson({
+        apiKey: REALISTIC_API_KEY,
+        endpoint: undefined,
+      });
+      const { longestComponent } = longestAtTokenComponent(json);
+      expect(longestComponent.length).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
+    });
+  });
+
+  describe("given a self-hosted config with a long enterprise endpoint", () => {
+    it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
+      const json = buildMcpJson({
+        apiKey: REALISTIC_API_KEY,
+        endpoint:
+          "https://langwatch.extremely-long-enterprise-subdomain.internal.global.example.com",
+      });
+      const { longestComponent } = longestAtTokenComponent(json);
+      expect(longestComponent.length).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
     });
   });
 });
