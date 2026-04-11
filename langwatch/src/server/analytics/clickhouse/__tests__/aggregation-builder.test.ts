@@ -86,6 +86,123 @@ describe("aggregation-builder", () => {
     // metric forced a stored_spans JOIN even though cardinality only uses uniq(TraceId)
     // from trace_summaries. The JOIN created one row per span per trace, inflating
     // the trace-level SUM aggregations (cost ~4x, tokens ~6x).
+    // @regression issue #3088: When trace-level metrics (sum of TotalCost) are combined
+    // with evaluation metrics (avg of evaluation_pass_rate) in buildSimpleTimeseriesQuery,
+    // the evaluation_runs JOIN produces N rows per trace, inflating sum(TotalCost) by N.
+    // The fix must ensure trace-level aggregations are not fanned out by eval join cardinality.
+    it("does not inflate trace-level aggregations when mixed with evaluation metrics in simple path", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The trace-level SUM must operate on deduplicated trace rows — not on the fanned-out
+      // JOIN result. The buggy pattern is a plain `sum(ts.TotalCost)` in the outer SELECT
+      // while `evaluation_runs` is joined with no CTE wrapping the trace source. Any valid
+      // fix must break this combination — either by introducing a CTE, removing the raw
+      // sum(ts.TotalCost) pattern, or scoping the sum to distinct traces.
+      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(result.sql);
+      const hasEvalRunsJoin = result.sql.includes("evaluation_runs");
+      const hasCTE = /\bWITH\b/.test(result.sql);
+      expect(hasRawTotalCostSum && hasEvalRunsJoin && !hasCTE).toBe(false);
+
+      // Both metrics must still be emitted by any valid fix.
+      expect(result.sql).toContain("Passed");
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When timeScale is "full" (summary widgets) with mixed eval and
+    // trace metrics, the previous routing fell through to buildSubqueryTimeseriesQuery which
+    // still joined evaluation_runs directly and inflated sum(ts.TotalCost) by the number of
+    // evaluation runs per trace.
+    it("does not inflate trace metrics with mixed eval metrics when timeScale is full", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must use per-trace CTE approach, not plain sum(ts.TotalCost) over fanned-out eval rows
+      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(result.sql);
+      expect(hasRawTotalCostSum).toBe(false);
+
+      // Must contain the per-trace CTE (the fix uses a WITH clause that groups by trace_id)
+      expect(result.sql).toMatch(/\bWITH\b/);
+      expect(result.sql).toMatch(/GROUP BY\s+trace_id\b/);
+
+      // Both aliases still present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When metadata.user_id (cardinality, which uses
+    // Attributes['langwatch.user_id']) was mixed with evaluation metrics,
+    // extractTraceAggregationColumn returned null because its regex didn't handle
+    // Attributes-indexed columns, and the defensive fallback produced invalid nested
+    // any(uniqIf(...)) SQL.
+    it("handles metadata.user_id mixed with evaluation metrics correctly", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.user_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must not produce nested aggregations like any(uniqIf(...)) or any(avg(...))
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*\w+If\s*\(/);
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*(sum|avg|min|max|count|uniq)\s*\(/);
+
+      // Both metric aliases still emitted
+      expect(result.sql).toContain("0__metadata_user_id__cardinality");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When trace-level metrics (sum TotalCost) are combined with
+    // evaluation metrics (avg evaluation_pass_rate) while using a groupBy that activates
+    // the CTE/arrayJoin path (metadata.labels), the outer SELECT previously referenced
+    // `es.Passed` outside the CTE where the `es` alias no longer exists. Trace-level
+    // metrics would also be double-counted via the eval JOIN fanout.
+    it("produces valid SQL when mixing trace and evaluation metrics with arrayJoin groupBy", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels",
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The query must still group by the label arrayJoin
+      expect(result.sql).toContain("arrayJoin");
+
+      // The trace-level metric must be transformed to use the CTE column
+      expect(result.sql).toContain("trace_total_cost");
+
+      // The outer query must reference a pre-aggregated eval value, not es.Passed directly.
+      // With the fix, the per-trace alias pattern is present (the eval metric is
+      // pre-aggregated inside the CTE) and the outer aggregation is a plain avg over that
+      // per-trace column, not an avgIf conditional aggregation.
+      expect(result.sql).toMatch(/_per_trace/);
+      expect(result.sql).toMatch(
+        /\bavg\s*\(\s*`?1__evaluations_evaluation_pass_rate__avg__my_evaluator__per_trace`?\s*\)/,
+      );
+
+      // The eval metric alias must still be emitted
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
     it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
       const input = {
         ...baseInput,
