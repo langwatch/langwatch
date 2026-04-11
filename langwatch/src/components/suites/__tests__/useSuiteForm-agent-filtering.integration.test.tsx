@@ -6,7 +6,7 @@
  * (signature, workflow) must still be excluded from availableTargets.
  *
  * The set of allowed agent target types is derived from
- * `suiteAgentTargetTypes` (see `~/server/suites/types`), so these tests
+ * `SUITE_AGENT_TARGET_TYPES` (see `~/server/suites/types`), so these tests
  * pin the current contract: http + code in, everything else out.
  */
 
