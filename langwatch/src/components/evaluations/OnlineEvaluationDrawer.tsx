@@ -632,10 +632,13 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const openEvaluatorEditorForMappings = useCallback(() => {
     if (!selectedEvaluator) return;
 
+    setFlowCallbacks("evaluatorEditor", {
+      onMappingChange: handleMappingChange,
+    });
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     setFlowCallbacks("evaluatorEditor", {
@@ -686,10 +689,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         };
 
         // Build mappings config and navigate to evaluator editor
+        // onMappingChange goes through flowCallbacks (durable) not mappingsConfig (ephemeral)
+        setFlowCallbacks("evaluatorEditor", {
+          onMappingChange: handleMappingChange,
+        });
+
         const newMappingsConfig: EvaluatorMappingsConfig = {
           level: level ?? undefined,
           initialMappings: autoMappings,
-          onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
@@ -708,10 +715,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       },
     });
 
+    // onMappingChange goes through flowCallbacks (durable) not mappingsConfig (ephemeral)
+    setFlowCallbacks("evaluatorEditor", {
+      onMappingChange: handleMappingChange,
+    });
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     // Open the evaluator editor directly - use default "Save Changes" text
@@ -763,11 +774,15 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         threadIdleTimeout,
       };
 
+      // onMappingChange goes through flowCallbacks (durable) not mappingsConfig (ephemeral)
+      setFlowCallbacks("evaluatorEditor", {
+        onMappingChange: handleMappingChange,
+      });
+
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
         level: level ?? undefined,
         initialMappings: autoMappings,
-        onMappingChange: handleMappingChange,
       };
 
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)

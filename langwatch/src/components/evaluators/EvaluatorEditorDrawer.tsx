@@ -77,7 +77,7 @@ export type EvaluatorMappingsConfig = {
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback when a mapping changes - used to persist to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -115,6 +115,15 @@ export type EvaluatorEditorDrawerProps = {
    * Pass undefined to clear local changes (when form matches saved state).
    */
   onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
+  /**
+   * Callback for when a variable mapping changes.
+   * Registered via setFlowCallbacks (durable) rather than inside mappingsConfig
+   * (ephemeral complexProps) so it survives page reload / ErrorBoundary recovery.
+   */
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
   /**
    * Initial local config to load (for resuming unpublished changes).
    * When provided, overrides DB data for form initialization.
@@ -156,10 +165,19 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     drawerParams.evaluatorId ??
     (complexProps.evaluatorId as string | undefined);
 
-  // Get mappingsConfig from props or complexProps
-  const mappingsConfig =
+  // Resolve onMappingChange: prefer top-level prop or flowCallbacks (both durable)
+  // over mappingsConfig.onMappingChange (ephemeral complexProps, lost on reload)
+  const resolvedOnMappingChange =
+    props.onMappingChange ??
+    flowCallbacks?.onMappingChange;
+
+  // Get mappingsConfig from props or complexProps, then inject the resolved callback
+  const rawMappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+  const mappingsConfig = rawMappingsConfig
+    ? { ...rawMappingsConfig, onMappingChange: resolvedOnMappingChange }
+    : undefined;
 
   // Resolve onMappingChange: top-level prop → flowCallbacks → mappingsConfig
   const onMappingChange =
@@ -760,7 +778,7 @@ type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -892,7 +910,7 @@ function EvaluatorMappingsSection({
       });
 
       // Persist to store
-      onMappingChange(identifier, mapping);
+      onMappingChange?.(identifier, mapping);
     },
     [onMappingChange],
   );

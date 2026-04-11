@@ -32,7 +32,7 @@ export type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -167,7 +167,7 @@ export function EvaluatorMappingsSection({
       });
 
       // Persist to store
-      onMappingChange(identifier, mapping);
+      onMappingChange?.(identifier, mapping);
     },
     [onMappingChange],
   );
