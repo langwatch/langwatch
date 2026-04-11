@@ -137,6 +137,7 @@ services:
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      CI: "true"
 
   # =============================================================================
   # APP (mounted for hot reload)

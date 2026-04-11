@@ -9,6 +9,7 @@ import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { maskApiKey } from "./shared/api-key-utils";
 import { buildMcpConfig } from "./shared/build-mcp-config";
 import { InlineCopyButton } from "./shared/InlineCopyButton";
+import { JsonHighlight } from "./shared/JsonHighlight";
 import { TabButton } from "./shared/TabButton";
 
 const MotionVStack = motion(VStack);
@@ -231,33 +232,17 @@ export function ViaMcpClientScreen(): React.ReactElement {
           borderRadius="xl"
           overflow="hidden"
           border="1px solid"
-          borderColor="border.subtle"
+          borderColor={{ base: "border.subtle", _dark: "orange.800" }}
           bg="bg.panel/70"
           backdropFilter="blur(20px) saturate(1.3)"
           boxShadow="sm"
           transition="all 0.17s ease"
           _hover={{
-            borderColor: "orange.200",
+            borderColor: "orange.emphasized",
             boxShadow: "md",
           }}
         >
-          <Box
-            as="pre"
-            px={5}
-            py={4}
-            pr={12}
-            fontSize="12.5px"
-            fontFamily="'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace"
-            color="fg.DEFAULT"
-            lineHeight="1.8"
-            overflowX="hidden"
-            whiteSpace="pre-wrap"
-            wordBreak="break-all"
-            letterSpacing="0.01em"
-            fontWeight="500"
-          >
-            {displayConfigJson ?? "Loading config…"}
-          </Box>
+          <JsonHighlight code={displayConfigJson ?? "Loading config…"} />
           {configJson && (
             <Box position="absolute" top={2.5} right={2.5}>
               <InlineCopyButton text={configJson} label="Config" />

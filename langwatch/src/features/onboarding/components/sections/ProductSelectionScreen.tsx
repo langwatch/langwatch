@@ -72,7 +72,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           borderRadius="2xl"
           bg="bg.panel/80"
           border="1px solid"
-          borderColor="border.subtle"
+          borderColor={{ base: "orange.200", _dark: "orange.800" }}
           boxShadow="sm"
           backdropFilter="blur(20px) saturate(1.3)"
           px={6}
@@ -87,12 +87,12 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           textAlign="left"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.32, delay: i * 0.064, ease: "easeOut" }}
+          transition={{ duration: 0.27, delay: i * 0.054, ease: "easeOut" }}
           whileHover={{
             y: -3,
             boxShadow:
               "0 12px 40px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
-            borderColor: "var(--chakra-colors-orange-200)",
+            borderColor: "var(--chakra-colors-orange-emphasized)",
             transition: { duration: 0.25, ease: "easeOut" },
           }}
           whileTap={{ scale: 0.98, transition: { duration: 0.1 } }}
