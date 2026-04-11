@@ -227,9 +227,11 @@ describe("ScenarioInputMappingSection", () => {
 
         renderSection({ mappings });
 
-        // The context row's mapping input should display the static text "Use the KB"
-        // invertMappings currently only handles type:"source", so stored value mappings
-        // never reach the display — this FAILS
+        // Stored value mappings round-trip via the read-only render block:
+        // invertMappings only handles type:"source", so the section surfaces
+        // type:"value" entries as an inert <key>: <value> line beneath the
+        // scenario-field rows. Creating or editing them from the UI is
+        // deferred to a future agent-input-row variant.
         expect(screen.getByText("Use the KB")).toBeInTheDocument();
       });
     });
