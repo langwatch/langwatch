@@ -117,12 +117,15 @@ services:
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
         mkdir -p /app/node_modules &&
-        if [ ! -x /opt/goose-bin/goose ]; then
-          echo 'Installing goose binary for ClickHouse migrations...' &&
-          ARCH=$$(uname -m) &&
-          if [ \"$$ARCH\" = \"aarch64\" ]; then GOOSE_ARCH=arm64; else GOOSE_ARCH=x86_64; fi &&
-          curl -fsSL \"https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_$${GOOSE_ARCH}\" -o /opt/goose-bin/goose &&
-          chmod +x /opt/goose-bin/goose;
+        GOOSE_VERSION=v3.26.0 &&
+        ARCH=$$(uname -m) &&
+        if [ \"$$ARCH\" = \"aarch64\" ]; then GOOSE_ARCH=arm64; else GOOSE_ARCH=x86_64; fi &&
+        GOOSE_MARKER=\"$$GOOSE_VERSION/$$GOOSE_ARCH\" &&
+        if [ ! -x /opt/goose-bin/goose ] || [ \"$$(cat /opt/goose-bin/.goose-meta 2>/dev/null)\" != \"$$GOOSE_MARKER\" ]; then
+          echo \"Installing goose $$GOOSE_VERSION ($$GOOSE_ARCH) for ClickHouse migrations...\" &&
+          curl -fsSL \"https://github.com/pressly/goose/releases/download/$${GOOSE_VERSION}/goose_linux_$${GOOSE_ARCH}\" -o /opt/goose-bin/goose &&
+          chmod +x /opt/goose-bin/goose &&
+          printf '%s' \"$$GOOSE_MARKER\" > /opt/goose-bin/.goose-meta;
         fi &&
         (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
         pnpm install &&
@@ -157,10 +160,11 @@ services:
       - "${APP_PORT:-5560}:5560"
     environment:
       <<: *common-env
-      # Override .env so Auth0 callback matches the dynamic host port.
-      # Falls back to localhost when not running behind a proxy; set
-      # BASE_HOST/NEXTAUTH_URL in the shell to point at a proxied URL
-      # (e.g. Boxd: https://langwatch-main.boxd.sh).
+      # BASE_HOST/NEXTAUTH_URL intentionally override langwatch/.env so
+      # worktree-isolated dev gets the correct dynamic APP_PORT (each
+      # worktree picks a different free port). Set shell vars to point at
+      # a proxied URL (e.g. BASE_HOST=https://langwatch-main.boxd.sh) —
+      # shell wins over the localhost fallback.
       BASE_HOST: ${BASE_HOST:-http://localhost:${APP_PORT:-5560}}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-5560}}
       # Enable scenarios UI in dev
