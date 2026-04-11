@@ -5,8 +5,15 @@ import {
   buildDataForFilterQuery,
   buildTopDocumentsQuery,
   buildFeedbacksQuery,
+  __testOnly__,
 } from "../aggregation-builder";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
+
+const {
+  mapEvalAggregationToOuter,
+  extractTraceAggregationColumn,
+  hasEvalMixedWithTraceMetrics,
+} = __testOnly__;
 
 describe("aggregation-builder", () => {
   beforeEach(() => {
@@ -100,15 +107,12 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // The trace-level SUM must operate on deduplicated trace rows — not on the fanned-out
-      // JOIN result. The buggy pattern is a plain `sum(ts.TotalCost)` in the outer SELECT
-      // while `evaluation_runs` is joined with no CTE wrapping the trace source. Any valid
-      // fix must break this combination — either by introducing a CTE, removing the raw
-      // sum(ts.TotalCost) pattern, or scoping the sum to distinct traces.
-      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(result.sql);
-      const hasEvalRunsJoin = result.sql.includes("evaluation_runs");
-      const hasCTE = /\bWITH\b/.test(result.sql);
-      expect(hasRawTotalCostSum && hasEvalRunsJoin && !hasCTE).toBe(false);
+      // Assert the fix's specific SQL shape: a per-trace CTE exists with trace_id
+      // in its GROUP BY, and the outer query aggregates over that CTE — not over
+      // the raw evaluation_runs join.
+      expect(result.sql).toMatch(/WITH\s+per_trace_metrics\s+AS\s*\(/);
+      expect(result.sql).toMatch(/GROUP BY[^)]*\btrace_id\b/);
+      expect(result.sql).not.toMatch(/\bsum\s*\(\s*ts\.TotalCost\s*\)/);
 
       // Both metrics must still be emitted by any valid fix.
       expect(result.sql).toContain("Passed");
@@ -944,6 +948,90 @@ describe("aggregation-builder", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");
+    });
+  });
+
+  describe("mapEvalAggregationToOuter", () => {
+    const cases: Array<{ expression: string; expected: string }> = [
+      { expression: "avgIf(toFloat64(es.Passed), cond)", expected: "avg" },
+      { expression: "sumIf(es.Score, cond)", expected: "sum" },
+      { expression: "minIf(es.Score, cond)", expected: "min" },
+      { expression: "maxIf(es.Score, cond)", expected: "max" },
+      // uniqIf -> sum: per-trace count of unique evaluation runs, safe to
+      // sum across traces because EvaluationId is unique per trace.
+      { expression: "uniqIf(es.EvaluationId, cond)", expected: "sum" },
+      { expression: "countIf(es.Score, cond)", expected: "sum" },
+      // quantileExactIf collapses to avg — an approximation that preserves
+      // monotonic ordering of the metric across periods.
+      { expression: "quantileExactIf(0.5)(es.Score, cond)", expected: "avg" },
+    ];
+
+    for (const { expression, expected } of cases) {
+      const name = expression.split("(")[0];
+      it(`maps ${name} to ${expected}`, () => {
+        expect(mapEvalAggregationToOuter(expression)).toBe(expected);
+      });
+    }
+
+    it("returns null for unknown aggregation patterns", () => {
+      expect(mapEvalAggregationToOuter("stddevIf(es.Score, cond)")).toBeNull();
+    });
+  });
+
+  describe("extractTraceAggregationColumn", () => {
+    it("returns null for expressions that do not contain a column reference", () => {
+      // No `<alias>.<column>` shape at all — should not match anything.
+      expect(extractTraceAggregationColumn("some_udf(42)")).toBeNull();
+    });
+
+    it("handles bracketed Attributes columns", () => {
+      expect(
+        extractTraceAggregationColumn(
+          "uniqIf(ts.Attributes['langwatch.user_id'], ts.Attributes['langwatch.user_id'] != '')",
+        ),
+      ).toBe("ts.Attributes['langwatch.user_id']");
+    });
+
+    it("handles dot-access columns wrapped in coalesce+sum", () => {
+      expect(
+        extractTraceAggregationColumn("coalesce(sum(ts.TotalCost), 0)"),
+      ).toBe("ts.TotalCost");
+    });
+  });
+
+  describe("hasEvalMixedWithTraceMetrics", () => {
+    // Minimal MetricTranslation-shaped fixtures — the helper only inspects
+    // `requiredJoins`, so other fields are intentionally stub values.
+    type MetricStub = Parameters<typeof hasEvalMixedWithTraceMetrics>[0][number];
+    const evalMetric = {
+      selectExpression: "avgIf(es.Passed, 1)",
+      alias: "e",
+      requiredJoins: ["evaluation_runs"],
+      params: {},
+    } as unknown as MetricStub;
+    const traceMetric = {
+      selectExpression: "sum(ts.TotalCost)",
+      alias: "t",
+      requiredJoins: [],
+      params: {},
+    } as unknown as MetricStub;
+
+    it("returns true when both eval and trace metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([evalMetric, traceMetric])).toBe(
+        true,
+      );
+    });
+
+    it("returns false when only eval metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([evalMetric])).toBe(false);
+    });
+
+    it("returns false when only trace metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([traceMetric])).toBe(false);
+    });
+
+    it("returns false for an empty list", () => {
+      expect(hasEvalMixedWithTraceMetrics([])).toBe(false);
     });
   });
 });
