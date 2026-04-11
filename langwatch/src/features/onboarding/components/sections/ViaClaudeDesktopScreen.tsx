@@ -232,7 +232,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
           borderRadius="xl"
           overflow="hidden"
           border="1px solid"
-          borderColor="border.subtle"
+          borderColor={{ base: "border.subtle", _dark: "orange.800" }}
           bg="bg.panel/70"
           backdropFilter="blur(20px) saturate(1.3)"
           boxShadow="sm"

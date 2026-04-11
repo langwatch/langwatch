@@ -150,19 +150,22 @@ export function ViaPlatformScreen(): React.ReactElement {
         </Grid>
 
         <HStack justify="center" pt={2}>
-          <Link
+          <a
             href="https://docs.langwatch.ai"
-            isExternal
-            display="inline-flex"
-            alignItems="center"
-            gap="4px"
-            fontSize="13px"
-            color={{ base: "gray.400", _dark: "gray.100" }}
-            textDecoration="none"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "13px",
+              color: "#e5e7eb",
+              textDecoration: "none",
+            }}
           >
             Read the docs
             <ArrowUpRight size={14} />
-          </Link>
+          </a>
         </HStack>
       </VStack>
 
