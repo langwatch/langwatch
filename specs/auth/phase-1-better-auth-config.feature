@@ -6,8 +6,8 @@ Feature: BetterAuth config (unmounted)
 
   # The file `langwatch/src/server/better-auth/index.ts` exports a `betterAuth`
   # instance with every provider we care about and every custom hook ported
-  # from the NextAuth callbacks. This phase does NOT mount it — NextAuth is
-  # still the live handler. This is pure code + tests.
+  # from the NextAuth callbacks. BetterAuth is now the live auth handler,
+  # mounted at `/api/auth/[...all]`.
 
   Background:
     Given the BetterAuth instance is exported from `~/server/better-auth`

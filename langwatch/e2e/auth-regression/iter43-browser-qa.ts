@@ -9,7 +9,7 @@
  *
  * Run via:
  *   DATABASE_URL=... NEXTAUTH_URL=... NEXTAUTH_SECRET=... NEXTAUTH_PROVIDER=email \
- *     pnpm exec tsx scripts/iter43-browser-qa.ts
+ *     pnpm exec tsx e2e/auth-regression/iter43-browser-qa.ts
  *
  * Requires the dev server to be running on NEXTAUTH_URL.
  */
