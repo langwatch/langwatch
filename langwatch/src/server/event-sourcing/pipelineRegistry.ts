@@ -303,7 +303,7 @@ export class PipelineRegistry {
         extend: false,  // Don't reset the 5-min timer on new spans
         replace: false,  // Don't update payload (same trace, same data)
       },
-      groupKeyFn: (p) => p.traceId,  // Per-trace parallelism (was per-project serial)
+      groupKeyFn: (p) => p.traceId,  // Per-trace parallelism (framework prepends tenantId)
       spanAttributes: (payload) => ({
         "deferred.tenant_id": payload.tenantId,
         "deferred.trace_id": payload.traceId,
