@@ -91,13 +91,21 @@ export const useSession = (
   const fetchSession = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/session", { credentials: "include" });
+      if (!res.ok) {
+        // Network succeeded but server returned an error (5xx, etc.).
+        // Don't treat this as "unauthenticated" — keep the previous state
+        // so transient server errors don't flash the user as logged out.
+        setIsPending(false);
+        return;
+      }
       const json = await res.json();
       setData(adaptSession(json));
     } catch {
-      setData(null);
-    } finally {
+      // Network error — keep previous state, don't flash as logged out.
       setIsPending(false);
+      return;
     }
+    setIsPending(false);
   }, []);
 
   useEffect(() => {
@@ -241,10 +249,13 @@ export const signOut = async (opts?: {
   redirect?: boolean;
 }): Promise<void> => {
   if (opts?.redirect === false) {
-    await fetch("/api/auth/logout", {
+    // Programmatic logout without redirect. The caller is responsible for
+    // updating the UI (e.g., calling session.update() or navigating).
+    const res = await fetch("/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });
+    if (!res.ok) throw new Error("Logout failed");
     return;
   }
   // Navigate directly to the logout endpoint as a full page navigation.

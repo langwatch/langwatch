@@ -17,6 +17,9 @@ export default async function sessionHandler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
+  // Prevent caching — stale impersonation state or session data is dangerous.
+  res.setHeader("Cache-Control", "no-store, must-revalidate");
+
   const session = await getServerAuthSession({ req });
 
   if (!session) {
