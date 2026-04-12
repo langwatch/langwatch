@@ -99,14 +99,9 @@ export class TraceOriginService {
       typeof explicitOrigin === "string" && explicitOrigin !== "";
 
     if (hasExplicitOrigin) {
-      if (isRootSpan) {
-        mergedAttributes["langwatch.origin"] = explicitOrigin as string;
-      } else if (!state.attributes["langwatch.origin"]) {
-        mergedAttributes["langwatch.origin"] = explicitOrigin as string;
-      } else {
-        mergedAttributes["langwatch.origin"] =
-          state.attributes["langwatch.origin"];
-      }
+      // Explicit langwatch.origin on any span always wins — it's a
+      // deliberate, high-confidence signal (SDK or platform).
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
     } else {
       // For root spans, always try legacy markers first — a root with a
       // legacy marker should override a provisional origin (e.g. "application")
@@ -119,11 +114,11 @@ export class TraceOriginService {
       } else if (state.attributes["langwatch.origin"]) {
         mergedAttributes["langwatch.origin"] =
           state.attributes["langwatch.origin"];
-      } else if (mergedAttributes["sdk.name"]) {
-        // SDK heuristic: sdk.name present but no explicit origin and no
-        // legacy markers -> old SDK that doesn't tag origin. Old SDK
-        // evaluations/simulations are already caught by legacy rules above,
-        // so what's left must be a regular application trace.
+      } else if (isRootSpan && mergedAttributes["sdk.name"]) {
+        // SDK heuristic: only on root spans. sdk.name is a resource
+        // attribute identical across ALL spans — inferring origin from it
+        // on child spans creates a race where origin flips from "application"
+        // to the real value when the platform span arrives.
         mergedAttributes["langwatch.origin"] = "application";
       }
     }

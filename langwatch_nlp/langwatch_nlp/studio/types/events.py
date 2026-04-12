@@ -70,6 +70,7 @@ class ExecuteEvaluationPayload(BaseModel):
     workflow_version_id: str
     evaluate_on: Literal["full", "test", "train", "specific"]
     dataset_entry: Optional[int] = None
+    origin: Optional[str] = None
 
 
 class ExecuteEvaluation(BaseModel):

@@ -121,6 +121,7 @@ export const useEvaluationExecution = () => {
           workflow_version_id,
           evaluate_on,
           dataset_entry,
+          origin: "evaluation",
         },
       };
       postEvent(payload);
