@@ -110,6 +110,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   return (
     <DrawerOffsetProvider value={offsetValue}>
       <ErrorBoundary
+        resetKeys={[drawerType]}
         fallback={null}
         onError={() => {
           void router.push(
