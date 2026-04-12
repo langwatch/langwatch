@@ -35,7 +35,7 @@ export function UpgradePlanBlock({
     <Card.Root
       data-testid="upgrade-plan-block"
       borderWidth={1}
-      borderColor="gray.200"
+      borderColor="border"
     >
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5}>
@@ -70,8 +70,8 @@ export function UpgradePlanBlock({
           >
             {features.map((feature, index) => (
               <HStack key={index} gap={2}>
-                <Check size={16} color="var(--chakra-colors-blue-500)" />
-                <Text fontSize="sm" color="gray.600">
+                <Check size={16} color="var(--chakra-colors-blue-solid)" />
+                <Text fontSize="sm" color="fg.muted">
                   {feature}
                 </Text>
               </HStack>

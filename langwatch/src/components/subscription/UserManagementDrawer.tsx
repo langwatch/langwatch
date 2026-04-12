@@ -189,7 +189,7 @@ export function UserManagementDrawer({
                     <Button
                       variant="ghost"
                       size="xs"
-                      color="gray.500"
+                      color="fg.muted"
                       fontSize="xs"
                     >
                       Show members ({editableUsers.length + pendingInvitesWithMemberType.length})
@@ -203,10 +203,10 @@ export function UserManagementDrawer({
                       {editableUsers.map((user) => (
                         <Box as="tr" key={user.id}>
                           <Box as="td" paddingY={2} verticalAlign="top">
-                            <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                            <Text fontSize="sm" fontWeight="medium" color="fg">
                               {user.email}
                             </Text>
-                            <Text fontSize="xs" color="gray.500">
+                            <Text fontSize="xs" color="fg.muted">
                               Active
                             </Text>
                           </Box>
@@ -228,10 +228,10 @@ export function UserManagementDrawer({
                           data-testid={`pending-invite-${invite.email}`}
                         >
                           <Box as="td" paddingY={2} verticalAlign="top">
-                            <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                            <Text fontSize="sm" fontWeight="medium" color="fg">
                               {invite.email}
                             </Text>
-                            <Text fontSize="xs" color="gray.500">
+                            <Text fontSize="xs" color="fg.muted">
                               Invited - Waiting for acceptance
                             </Text>
                           </Box>
@@ -253,7 +253,7 @@ export function UserManagementDrawer({
               {/* New Planned Seats section (editable) */}
               <VStack align="start" gap={3} width="full">
                 <HStack justify="space-between" width="full">
-                  <Text fontWeight="semibold" fontSize="sm" color="gray.500">
+                  <Text fontWeight="semibold" fontSize="sm" color="fg.muted">
                     Seats available
                   </Text>
                   <Button variant="outline" size="sm" onClick={handleAddSeat}>
@@ -270,7 +270,7 @@ export function UserManagementDrawer({
                       padding={3}
                       borderWidth={1}
                       borderRadius="md"
-                      borderColor={emailErrors[user.id] ? "red.300" : "gray.200"}
+                      borderColor={emailErrors[user.id] ? "red.emphasized" : "border"}
                     >
                       <Input
                         data-testid={`seat-email-${index}`}
@@ -300,7 +300,7 @@ export function UserManagementDrawer({
                       </Button>
                     </HStack>
                     {emailErrors[user.id] && (
-                      <Text fontSize="xs" color="red.500" paddingLeft={3}>
+                      <Text fontSize="xs" color="red.fg" paddingLeft={3}>
                         {emailErrors[user.id]}
                       </Text>
                     )}
@@ -319,7 +319,7 @@ export function UserManagementDrawer({
               gap={2}
               fontSize="sm"
               padding={4}
-              bg="gray.50"
+              bg="bg.subtle"
               borderRadius="md"
               width="full"
             >
@@ -335,7 +335,7 @@ export function UserManagementDrawer({
 
               <HStack justify="space-between">
                 <Text fontWeight="bold">{priceLabel}</Text>
-                <Text fontWeight="bold" color="blue.600" data-testid="monthly-price-footer">
+                <Text fontWeight="bold" color="blue.fg" data-testid="monthly-price-footer">
                   {formatPrice({ cents: totalPriceCentsInDrawer, currency })}{periodSuffix}
                 </Text>
               </HStack>
