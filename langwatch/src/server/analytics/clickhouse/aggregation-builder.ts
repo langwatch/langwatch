@@ -553,7 +553,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // otherwise summary widgets (timeScale: "full") mixing eval + trace metrics
   // would route through buildSubqueryTimeseriesQuery which still joins
   // evaluation_runs directly and reproduces the fan-out bug.
-  if (hasEvalMixedWithTraceMetrics(simpleMetrics)) {
+  //
+  // Guard: only fire when there are NO pipeline (subquery) metrics. Pipeline
+  // metrics live in `subqueryMetrics` which `buildMixedEvalTimeseriesQuery`
+  // does not receive — routing here would silently drop them.
+  if (subqueryMetrics.length === 0 && hasEvalMixedWithTraceMetrics(simpleMetrics)) {
     return buildMixedEvalTimeseriesQuery({
       input,
       ts,
@@ -781,6 +785,25 @@ function buildMixedEvalTimeseriesQuery({
       continue;
     }
 
+    // Count-like metrics: in a per-trace CTE each trace is one row, so
+    // count() / count(*) becomes sum(1) across traces = count(distinct traces).
+    if (/\bcount\s*\(\s*\*?\s*\)/.test(exprWithoutAlias)) {
+      innerSelectExprs.push(`1 AS ${perTraceAlias}`);
+      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
+      continue;
+    }
+
+    // uniq/uniqExact of TraceId — same as count: 1 per trace row.
+    if (
+      (/\buniq\s*\(/.test(exprWithoutAlias) ||
+        /\buniqExact\s*\(/.test(exprWithoutAlias)) &&
+      exprWithoutAlias.includes("TraceId")
+    ) {
+      innerSelectExprs.push(`1 AS ${perTraceAlias}`);
+      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
+      continue;
+    }
+
     // Trace metric. Find the underlying column reference, wrap it in any()
     // inside the CTE, then re-aggregate across traces outside by substituting
     // the column reference with the per-trace alias in the original expression.
@@ -825,6 +848,58 @@ function buildMixedEvalTimeseriesQuery({
     groupBy: input.groupBy,
     groupByKey: input.groupByKey,
   });
+
+  // For timeScale "full" without groupBy, split into per-period CTEs with UNION ALL
+  // to guarantee both 'current' and 'previous' rows always appear (even when one
+  // period has no data). This matches the pattern used by buildSubqueryTimeseriesQuery.
+  if (input.timeScale === "full" && !groupByColumn) {
+    // Build inner SELECT without the period CASE — each CTE covers one period.
+    const periodInnerExprs = innerSelectExprs.filter(
+      (expr) => !expr.includes("AS period"),
+    );
+    const periodInnerGroupBy = innerGroupBy.filter((col) => col !== "period");
+
+    const buildPeriodCte = (
+      cteName: string,
+      startParam: string,
+      endParam: string,
+    ): string => `
+      ${cteName} AS (
+        SELECT
+          ${periodInnerExprs.join(",\n          ")}
+        FROM ${dedupedTraceSummaries(ts)}
+        ${joinClauses}
+        WHERE ${ts}.TenantId = {tenantId:String}
+          AND ${ts}.OccurredAt >= {${startParam}:DateTime64(3)} AND ${ts}.OccurredAt < {${endParam}:DateTime64(3)}
+          ${filterWhere}
+        GROUP BY ${periodInnerGroupBy.join(", ")}
+      )`;
+
+    // Outer metric exprs only (no period/date/group_key — those are handled separately).
+    const outerMetricOnly = outerMetricExprs.join(", ");
+
+    const sql = `
+      WITH
+        ${buildPeriodCte("per_trace_metrics_current", "currentStart", "currentEnd")},
+        ${buildPeriodCte("per_trace_metrics_previous", "previousStart", "previousEnd")}
+      SELECT 'current' AS period, ${outerMetricOnly} FROM per_trace_metrics_current
+      UNION ALL
+      SELECT 'previous' AS period, ${outerMetricOnly} FROM per_trace_metrics_previous
+    `;
+
+    return {
+      sql,
+      params: {
+        tenantId: input.projectId,
+        currentStart: input.startDate,
+        currentEnd: input.endDate,
+        previousStart: input.previousPeriodStartDate,
+        previousEnd: input.startDate,
+        ...allTranslationParams,
+        ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
+      },
+    };
+  }
 
   const sql = `
     WITH per_trace_metrics AS (
