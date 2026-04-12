@@ -46,6 +46,15 @@ const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
 /** Max concurrent sessions per API key. */
 const MAX_SESSIONS_PER_KEY = 20;
 
+/**
+ * Derive an opaque key from an API key for use in Redis key names.
+ * Raw API keys must never appear in key names — they're visible in
+ * admin tools, MONITOR, key dumps, and metrics.
+ */
+function hashApiKey(apiKey: string): string {
+  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+}
+
 // ---------------------------------------------------------------------------
 // Rate limiter — sliding window per IP
 // ---------------------------------------------------------------------------
@@ -497,9 +506,9 @@ export function createMcpHandler(): McpHandler {
         SESSION_REDIS_TTL_SECONDS,
       );
       // Track session ID in a per-key set for counting
-      await redis.sadd(`${REDIS_SESSION_SET_PREFIX}${apiKey}`, sessionId);
+      await redis.sadd(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
       await redis.expire(
-        `${REDIS_SESSION_SET_PREFIX}${apiKey}`,
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
         SESSION_REDIS_TTL_SECONDS,
       );
     } catch (err) {
@@ -519,7 +528,7 @@ export function createMcpHandler(): McpHandler {
         SESSION_REDIS_TTL_SECONDS,
       );
       await redis.expire(
-        `${REDIS_SESSION_SET_PREFIX}${apiKey}`,
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
         SESSION_REDIS_TTL_SECONDS,
       );
     } catch {
@@ -551,7 +560,7 @@ export function createMcpHandler(): McpHandler {
     if (!redis) return;
     try {
       await redis.del(`${REDIS_SESSION_PREFIX}${sessionId}`);
-      await redis.srem(`${REDIS_SESSION_SET_PREFIX}${apiKey}`, sessionId);
+      await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
     } catch {
       // Best-effort cleanup
     }
@@ -571,9 +580,9 @@ export function createMcpHandler(): McpHandler {
       return count;
     }
     try {
-      // Clean up stale entries: check each session ID in the set still exists
+      // Count Streamable HTTP sessions from Redis (cross-pod)
       const members = await redis.smembers(
-        `${REDIS_SESSION_SET_PREFIX}${apiKey}`,
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
       );
       let liveCount = 0;
       for (const id of members) {
@@ -582,8 +591,12 @@ export function createMcpHandler(): McpHandler {
           liveCount++;
         } else {
           // Stale entry — session expired, clean it from the set
-          await redis.srem(`${REDIS_SESSION_SET_PREFIX}${apiKey}`, id);
+          await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, id);
         }
+      }
+      // SSE sessions are connection-bound (not in Redis) — count local only
+      for (const session of sseSessions.values()) {
+        if (session.apiKey === apiKey) liveCount++;
       }
       return liveCount;
     } catch (err) {
