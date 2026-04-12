@@ -34,6 +34,11 @@ const mockRedis = {
   get: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
+  expire: vi.fn(),
+  sadd: vi.fn(),
+  srem: vi.fn(),
+  smembers: vi.fn(),
+  exists: vi.fn(),
 };
 
 vi.mock("~/server/db", () => ({
@@ -239,13 +244,17 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     mockRedis.get.mockResolvedValue(null);
     mockRedis.set.mockResolvedValue("OK");
     mockRedis.del.mockResolvedValue(1);
+    mockRedis.expire.mockResolvedValue(1);
+    mockRedis.sadd.mockResolvedValue(1);
+    mockRedis.srem.mockResolvedValue(1);
+    mockRedis.smembers.mockResolvedValue([]);
+    mockRedis.exists.mockResolvedValue(0);
   });
 
   // --- Route Mounting ---
 
   describe("when Streamable HTTP transport is accessed at /mcp", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("responds with 200 and mcp-session-id header", async () => {
+    it("responds with 200 and mcp-session-id header", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const res = await sendRequest({
@@ -260,8 +269,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when GET /mcp/health is requested without credentials", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("responds with 200 and status ok", async () => {
+    it("responds with 200 and status ok", async () => {
       const res = await sendRequest({
         server,
         method: "GET",
@@ -275,8 +283,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when a non-MCP route is requested", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("is not intercepted by the MCP handler", async () => {
+    it("is not intercepted by the MCP handler", async () => {
       const res = await sendRequest({
         server,
         method: "GET",
@@ -290,8 +297,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when MCP POST request body is sent", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns a valid initialize result", async () => {
+    it("returns a valid initialize result", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const res = await sendRequest({
@@ -314,8 +320,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- OAuth authorization_code ---
 
   describe("when OAuth metadata is fetched", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("advertises authorization_code grant", async () => {
+    it("advertises authorization_code grant", async () => {
       const res = await sendRequest({
         server,
         method: "GET",
@@ -334,8 +339,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is used with a valid auth code and PKCE verifier", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("issues an access token", async () => {
+    it("issues an access token", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const code = randomUUID();
@@ -355,7 +359,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const body = await res.json();
       expect(body.access_token).toBeDefined();
       expect(body.token_type).toBe("Bearer");
-      expect(body.expires_in).toBe(3600);
+      expect(body.expires_in).toBe(30 * 24 * 3600); // 30 days
 
       // Verify the auth code was deleted (one-time use)
       expect(mockRedis.del).toHaveBeenCalledWith(`mcp:auth_code:${code}`);
@@ -363,8 +367,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is used with an invalid code_verifier", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 400 with invalid_grant error", async () => {
+    it("returns 400 with invalid_grant error", async () => {
       const code = randomUUID();
       const { codeChallenge } = createPkceChallenge();
 
@@ -386,8 +389,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is missing the code parameter", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 400 with invalid_request error", async () => {
+    it("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
@@ -404,8 +406,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is missing the code_verifier parameter", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 400 with invalid_request error", async () => {
+    it("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
@@ -422,8 +423,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an unsupported grant_type is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 400 with unsupported_grant_type error", async () => {
+    it("returns 400 with unsupported_grant_type error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
@@ -439,8 +439,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an invalid authorization code is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 400 with invalid_grant error", async () => {
+    it("returns 400 with invalid_grant error", async () => {
       // Redis returns null for unknown codes (default mock behavior)
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -459,8 +458,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Bearer Token DB Validation ---
 
   describe("when a direct API key is used as Bearer token", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("validates against the database and accepts the connection", async () => {
+    it("validates against the database and accepts the connection", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const res = await sendRequest({
@@ -477,8 +475,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an invalid Bearer token is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 401", async () => {
+    it("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
       const res = await sendRequest({
@@ -492,8 +489,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an OAuth-issued access token is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("re-validates the API key against the database during MCP init", async () => {
+    it("re-validates the API key against the database during MCP init", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const code = randomUUID();
@@ -535,8 +531,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Redis Token Storage ---
 
   describe("when OAuth token is looked up from Redis after in-memory cache miss", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("accepts the connection via Redis lookup", async () => {
+    it("accepts the connection via Redis lookup", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const code = randomUUID();
@@ -579,8 +574,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an expired OAuth token is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 401", async () => {
+    it("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
       // Mock Redis returning an expired token (encrypted format)
@@ -601,11 +595,65 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
+  // --- Redis Session Recovery (multi-pod) ---
+
+  describe("when a session exists in Redis but not in local memory (different pod)", () => {
+    it("recovers the session from Redis and handles the request", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      // 1. Initialize a session normally
+      const initRes = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+      expect(initRes.status).toBe(200);
+      const sessionId = initRes.headers["mcp-session-id"];
+      expect(sessionId).toBeDefined();
+
+      // 2. Simulate pod switch: close all local sessions (as if this is a
+      //    different pod) but keep the Redis entry.
+      handler.closeAllSessions();
+
+      // 3. Mock Redis returning the session metadata
+      mockRedis.get.mockImplementation(async (key: string) => {
+        if (key === `mcp:session:${sessionId}`) {
+          return JSON.stringify({
+            encryptedApiKey: `encrypted:${VALID_API_KEY}`,
+            createdAt: Date.now(),
+          });
+        }
+        return null;
+      });
+      mockRedis.expire.mockResolvedValue(1);
+
+      // 4. Re-create the server+handler (simulating a different pod)
+      handler.closeAllSessions();
+
+      // 5. Send a tool list request with the old session ID — should recover
+      const toolsRes = await sendRequest({
+        server,
+        body: {
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/list",
+          params: {},
+        },
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId!,
+        },
+      });
+      expect(toolsRes.status).toBe(200);
+      const toolsBody = toolsRes.json() as { result?: { tools?: unknown[] } };
+      expect(toolsBody.result?.tools).toBeDefined();
+    });
+  });
+
   // --- CORS ---
 
   describe("when a request to /mcp includes an Origin header", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes CORS headers in the response", async () => {
+    it("includes CORS headers in the response", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const res = await sendRequest({
@@ -631,8 +679,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an OPTIONS preflight request is sent to /mcp", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("responds with 200 and CORS headers", async () => {
+    it("responds with 200 and CORS headers", async () => {
       const res = await sendRequest({
         server,
         method: "OPTIONS",
@@ -650,8 +697,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: session re-auth ---
 
   describe("when an existing session request omits the Authorization header", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 401 on POST", async () => {
+    it("returns 401 on POST", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       // Initialize a session
@@ -672,8 +718,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.status).toBe(401);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 401 on GET", async () => {
+    it("returns 401 on GET", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const initRes = await sendRequest({
@@ -693,8 +738,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.status).toBe(401);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 401 on DELETE", async () => {
+    it("returns 401 on DELETE", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const initRes = await sendRequest({
@@ -716,8 +760,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an existing session request has a wrong Bearer token", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 401", async () => {
+    it("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const initRes = await sendRequest({
@@ -745,8 +788,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: rate limiting ---
 
   describe("when /oauth/token is called more than 10 times per minute", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 429", async () => {
+    it("returns 429", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const addr = server.address();
@@ -775,8 +817,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Standalone Package Isolation ---
 
   describe("when the standalone mcp-server package is checked for isolation", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("does not import any main app modules", async () => {
+    it("does not import any main app modules", async () => {
       // The mcp-server package's create-mcp-server.ts should not import
       // from the main app (~/server/db, ~/server/redis, etc.)
       const fs = await import("node:fs");
@@ -796,8 +837,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Tool Availability ---
 
   describe("when a client lists available tools via /mcp", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes observability, platform, and documentation tools", async () => {
+    it("includes observability, platform, and documentation tools", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       // First, initialize a session
@@ -859,8 +899,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   //   - "LANGWATCH_API_KEY is required" (globalConfig has no apiKey)
 
   describe("when search_traces is called within an authenticated session", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("receives the API key from session config via AsyncLocalStorage", async () => {
+    it("receives the API key from session config via AsyncLocalStorage", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       // Initialize session
@@ -912,8 +951,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when search_traces is called via an OAuth-obtained access token", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("propagates the OAuth-resolved API key through to the tool handler", async () => {
+    it("propagates the OAuth-resolved API key through to the tool handler", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       // 1. Obtain an access token via OAuth authorization_code + PKCE
@@ -980,8 +1018,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when fetch_langwatch_docs is called with a specific URL", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns page content", async () => {
+    it("returns page content", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const initRes = await sendRequest({
@@ -1029,8 +1066,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when fetch_langwatch_docs is called with a specific docs page URL", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("fetches the page and returns its content", async () => {
+    it("fetches the page and returns its content", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const initRes = await sendRequest({
@@ -1082,8 +1118,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- SSE Transport Tool Execution ---
 
   describe("when a tool is called via the SSE transport", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("propagates the API key to search_traces", async () => {
+    it("propagates the API key to search_traces", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const addr = server.address();

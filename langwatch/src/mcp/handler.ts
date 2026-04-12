@@ -34,11 +34,26 @@ const REDIS_TOKEN_PREFIX = "mcp:oauth:token:";
 /** Redis key prefix for MCP authorization codes. */
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 
-/** OAuth token TTL in seconds. */
-const TOKEN_TTL_SECONDS = 3600;
+/** Redis key prefix for MCP transport sessions. */
+const REDIS_SESSION_PREFIX = "mcp:session:";
+
+/** Redis key for the set of session IDs belonging to an API key. */
+const REDIS_SESSION_SET_PREFIX = "mcp:sessions_by_key:";
+
+/** OAuth token TTL in seconds (30 days — matches cookie-based login duration). */
+const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
 
 /** Max concurrent sessions per API key. */
 const MAX_SESSIONS_PER_KEY = 20;
+
+/**
+ * Derive an opaque key from an API key for use in Redis key names.
+ * Raw API keys must never appear in key names — they're visible in
+ * admin tools, MONITOR, key dumps, and metrics.
+ */
+function hashApiKey(apiKey: string): string {
+  return createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+}
 
 // ---------------------------------------------------------------------------
 // Rate limiter — sliding window per IP
@@ -161,21 +176,23 @@ export function createMcpHandler(): McpHandler {
   // and never-used OAuth tokens.
   // -------------------------------------------------------------------------
 
-  const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+  const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes (local transport cleanup)
+  const SESSION_REDIS_TTL_SECONDS = 35 * 60; // 35 minutes (slightly longer than local, buffer for clock skew)
   const REAPER_INTERVAL_MS = 60 * 1000; // 60 seconds
 
   const reaper = setInterval(() => {
     const now = Date.now();
 
-    // Sweep idle sessions
+    // Sweep idle local transports (Redis entries expire via TTL)
     for (const [id, session] of sessions) {
       if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
         session.transport.close().catch(() => {});
         sessions.delete(id);
+        removeSessionFromRedis(id, session.apiKey).catch(() => {});
       }
     }
 
-    // Sweep idle SSE sessions
+    // Sweep idle SSE sessions (SSE is connection-bound, no Redis needed)
     for (const [id, session] of sseSessions) {
       if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
         session.transport.close().catch(() => {});
@@ -183,7 +200,7 @@ export function createMcpHandler(): McpHandler {
       }
     }
 
-    // Sweep expired OAuth tokens
+    // Sweep expired in-memory OAuth token cache (Redis is source of truth)
     for (const [token, entry] of oauthTokens) {
       if (now >= entry.expiresAt) {
         oauthTokens.delete(token);
@@ -468,18 +485,124 @@ export function createMcpHandler(): McpHandler {
   }
 
   // -------------------------------------------------------------------------
-  // Session helpers
+  // Redis session helpers
   // -------------------------------------------------------------------------
 
-  function sessionCountForKey(apiKey: string): number {
-    let count = 0;
-    for (const session of sessions.values()) {
-      if (session.apiKey === apiKey) count++;
+  /** Store session metadata in Redis so other pods can serve it. */
+  async function storeSessionInRedis(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
+    if (!redis) return;
+    try {
+      const data = JSON.stringify({
+        encryptedApiKey: encrypt(apiKey),
+        createdAt: Date.now(),
+      });
+      await redis.set(
+        `${REDIS_SESSION_PREFIX}${sessionId}`,
+        data,
+        "EX",
+        SESSION_REDIS_TTL_SECONDS,
+      );
+      // Track session ID in a per-key set for counting
+      await redis.sadd(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
+      await redis.expire(
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+        SESSION_REDIS_TTL_SECONDS,
+      );
+    } catch (err) {
+      logger.error({ error: err }, "Failed to store session in Redis");
     }
-    for (const session of sseSessions.values()) {
-      if (session.apiKey === apiKey) count++;
+  }
+
+  /** Refresh the Redis TTL when a session is active (called on each request). */
+  async function touchSessionInRedis(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
+    if (!redis) return;
+    try {
+      await redis.expire(
+        `${REDIS_SESSION_PREFIX}${sessionId}`,
+        SESSION_REDIS_TTL_SECONDS,
+      );
+      await redis.expire(
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+        SESSION_REDIS_TTL_SECONDS,
+      );
+    } catch {
+      // Non-critical — the session will still work until Redis TTL expires
     }
-    return count;
+  }
+
+  /** Look up session metadata from Redis (returns apiKey or null). */
+  async function getSessionFromRedis(
+    sessionId: string,
+  ): Promise<string | null> {
+    if (!redis) return null;
+    try {
+      const data = await redis.get(`${REDIS_SESSION_PREFIX}${sessionId}`);
+      if (!data) return null;
+      const stored = JSON.parse(data) as { encryptedApiKey: string };
+      return decrypt(stored.encryptedApiKey);
+    } catch (err) {
+      logger.error({ error: err }, "Redis session lookup failed");
+      return null;
+    }
+  }
+
+  /** Remove session from Redis. */
+  async function removeSessionFromRedis(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
+    if (!redis) return;
+    try {
+      await redis.del(`${REDIS_SESSION_PREFIX}${sessionId}`);
+      await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, sessionId);
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
+  /** Count sessions for an API key across all pods via Redis. */
+  async function sessionCountForKey(apiKey: string): Promise<number> {
+    if (!redis) {
+      // Fallback to local count if Redis is down
+      let count = 0;
+      for (const session of sessions.values()) {
+        if (session.apiKey === apiKey) count++;
+      }
+      for (const session of sseSessions.values()) {
+        if (session.apiKey === apiKey) count++;
+      }
+      return count;
+    }
+    try {
+      // Count Streamable HTTP sessions from Redis (cross-pod)
+      const members = await redis.smembers(
+        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+      );
+      let liveCount = 0;
+      for (const id of members) {
+        const exists = await redis.exists(`${REDIS_SESSION_PREFIX}${id}`);
+        if (exists) {
+          liveCount++;
+        } else {
+          // Stale entry — session expired, clean it from the set
+          await redis.srem(`${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`, id);
+        }
+      }
+      // SSE sessions are connection-bound (not in Redis) — count local only
+      for (const session of sseSessions.values()) {
+        if (session.apiKey === apiKey) liveCount++;
+      }
+      return liveCount;
+    } catch (err) {
+      logger.error({ error: err }, "Redis session count failed");
+      return 0; // Fail open to avoid blocking users
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -746,30 +869,88 @@ export function createMcpHandler(): McpHandler {
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
-    // Existing session — require Bearer token and verify it matches
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)!;
+    // Existing session — check local Map first, then Redis
+    if (sessionId) {
+      let session = sessions.get(sessionId);
 
-      const token = extractBearerToken(req);
-      if (!token) {
-        send401(res, "Authorization header required");
+      // L2: Redis lookup — session may live on another pod
+      if (!session) {
+        const redisApiKey = await getSessionFromRedis(sessionId);
+        if (redisApiKey) {
+          // Recreate transport locally for this pod.
+          // WORKAROUND: The SDK transport starts uninitialized — we patch its
+          // inner state so it accepts non-init requests with the existing
+          // session ID. This accesses private fields of the SDK's
+          // StreamableHTTPServerTransport wrapper and the underlying
+          // WebStandardStreamableHTTPServerTransport.
+          // Tested against @modelcontextprotocol/sdk@1.26.0.
+          // See: https://github.com/modelcontextprotocol/typescript-sdk/issues/1658
+          const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => sessionId,
+          });
+
+          // Runtime assertion: verify the internal structure hasn't changed
+          const transportAny = transport as unknown as Record<string, unknown>;
+          if (
+            !transportAny._webStandardTransport ||
+            typeof transportAny._webStandardTransport !== "object"
+          ) {
+            logger.error(
+              "StreamableHTTPServerTransport internal structure changed — " +
+                "Redis session recovery unavailable. Update the SDK workaround.",
+            );
+            sendJson(res, 500, { error: "Internal server error" });
+            return;
+          }
+
+          const inner = transportAny._webStandardTransport as Record<
+            string,
+            unknown
+          >;
+          inner._initialized = true;
+          inner.sessionId = sessionId;
+
+          session = {
+            transport,
+            apiKey: redisApiKey,
+            lastActivityAt: Date.now(),
+          };
+          sessions.set(sessionId, session);
+
+          transport.onclose = () => {
+            sessions.delete(sessionId);
+          };
+
+          const sessionServer = createMcpServer();
+          await handleWithSessionConfig(redisApiKey, () =>
+            sessionServer.connect(transport),
+          );
+        }
+      }
+
+      if (session) {
+        const token = extractBearerToken(req);
+        if (!token) {
+          send401(res, "Authorization header required");
+          return;
+        }
+        const apiKey = await resolveApiKey(token);
+        if (apiKey !== session.apiKey) {
+          send401(res, "Bearer token does not match session");
+          return;
+        }
+
+        session.lastActivityAt = Date.now();
+        touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
+        await handleWithSessionConfig(session.apiKey, () =>
+          session.transport.handleRequest(req, res, body),
+        );
         return;
       }
-      const apiKey = await resolveApiKey(token);
-      if (apiKey !== session.apiKey) {
-        send401(res, "Bearer token does not match session");
-        return;
-      }
-
-      session.lastActivityAt = Date.now();
-      await handleWithSessionConfig(session.apiKey, () =>
-        session.transport.handleRequest(req, res, body),
-      );
-      return;
     }
 
     // New session — must be an initialize request
-    if (!sessionId && isInitializeRequest(body)) {
+    if ((!sessionId || !sessions.has(sessionId)) && isInitializeRequest(body)) {
       // Rate limit failed auth attempts (check only — track on failure in authenticateRequest)
       const ip = getClientIp(req);
       if (authFailRateLimiter.isBlocked(ip)) {
@@ -780,8 +961,8 @@ export function createMcpHandler(): McpHandler {
       const apiKey = await authenticateRequest(req, res);
       if (!apiKey) return; // 401 already sent
 
-      // Per-key session limit
-      if (sessionCountForKey(apiKey) >= MAX_SESSIONS_PER_KEY) {
+      // Per-key session limit (cross-pod via Redis)
+      if ((await sessionCountForKey(apiKey)) >= MAX_SESSIONS_PER_KEY) {
         sendJson(res, 429, {
           error: `Too many concurrent sessions (max ${MAX_SESSIONS_PER_KEY})`,
         });
@@ -792,12 +973,14 @@ export function createMcpHandler(): McpHandler {
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id) => {
           sessions.set(id, { transport, apiKey, lastActivityAt: Date.now() });
+          storeSessionInRedis(id, apiKey).catch(() => {});
         },
       });
 
       transport.onclose = () => {
         if (transport.sessionId) {
           sessions.delete(transport.sessionId);
+          removeSessionFromRedis(transport.sessionId, apiKey).catch(() => {});
         }
       };
 
@@ -822,10 +1005,9 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
+    const session = sessionId ? sessions.get(sessionId) : undefined;
 
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)!;
-
+    if (sessionId && session) {
       const token = extractBearerToken(req);
       if (!token) {
         send401(res, "Authorization header required");
@@ -838,6 +1020,7 @@ export function createMcpHandler(): McpHandler {
       }
 
       session.lastActivityAt = Date.now();
+      touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res),
       );
@@ -868,6 +1051,7 @@ export function createMcpHandler(): McpHandler {
 
       await session.transport.close();
       sessions.delete(sessionId);
+      removeSessionFromRedis(sessionId, session.apiKey).catch(() => {});
       sendJson(res, 200, { status: "session closed" });
     } else {
       sendJson(res, 404, { error: "Session not found" });
@@ -885,7 +1069,7 @@ export function createMcpHandler(): McpHandler {
     const apiKey = await authenticateRequest(req, res);
     if (!apiKey) return;
 
-    if (sessionCountForKey(apiKey) >= MAX_SESSIONS_PER_KEY) {
+    if ((await sessionCountForKey(apiKey)) >= MAX_SESSIONS_PER_KEY) {
       sendJson(res, 429, {
         error: `Too many concurrent sessions (max ${MAX_SESSIONS_PER_KEY})`,
       });
