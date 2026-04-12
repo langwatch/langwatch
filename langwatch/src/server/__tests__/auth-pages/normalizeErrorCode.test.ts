@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeErrorCode } from "../error";
+import { normalizeErrorCode } from "../../../pages/auth/error";
 
 describe("normalizeErrorCode", () => {
   describe("when given null or undefined", () => {

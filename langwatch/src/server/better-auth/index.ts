@@ -227,9 +227,11 @@ const secondaryStorage: BetterAuthOptions["secondaryStorage"] = redisConnection
     }
   : undefined;
 
+const isBuildTime = !!process.env.BUILD_TIME;
+
 export const auth = betterAuth({
-  baseURL: env.NEXTAUTH_URL,
-  secret: env.NEXTAUTH_SECRET,
+  baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
+  secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 
   /**
