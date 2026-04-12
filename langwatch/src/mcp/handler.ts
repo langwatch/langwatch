@@ -177,7 +177,7 @@ export function createMcpHandler(): McpHandler {
   // -------------------------------------------------------------------------
 
   const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes (local transport cleanup)
-  const SESSION_REDIS_TTL_SECONDS = 35 * 60; // 35 minutes (slightly longer than local, buffer for clock skew)
+  const SESSION_REDIS_TTL_SECONDS = TOKEN_TTL_SECONDS; // Match OAuth token TTL (30 days) — session metadata is tiny, no reason to expire it sooner
   const REAPER_INTERVAL_MS = 60 * 1000; // 60 seconds
 
   const reaper = setInterval(() => {
