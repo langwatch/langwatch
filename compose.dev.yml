@@ -5,10 +5,9 @@
 #   cp langwatch_nlp/.env.example langwatch_nlp/.env  # Add OPENAI_API_KEY for NLP
 #
 # Usage:
-#   docker compose -f compose.dev.yml up                     # minimal: postgres + redis + app
-#   docker compose -f compose.dev.yml --profile search up    # + opensearch
+#   docker compose -f compose.dev.yml up                     # minimal: postgres + redis + clickhouse + app
 #   docker compose -f compose.dev.yml --profile nlp up       # + NLP + langevals
-#   docker compose -f compose.dev.yml --profile scenarios up # + scenario worker + bullboard + NLP (no opensearch)
+#   docker compose -f compose.dev.yml --profile scenarios up # + scenario worker + bullboard + NLP
 #   docker compose -f compose.dev.yml --profile test up      # + AI test server
 #   docker compose -f compose.dev.yml --profile full up      # everything
 #
@@ -21,9 +20,9 @@
 #   PINO_LOG_LEVEL=debug    # For verbose worker/app logs
 #
 # Resource limits:
-#   minimal (dev):     ~8.3GB (postgres 256 + redis 64 + app 8192)
-#   scenarios:         ~9.3GB (+ workers 1536 + nlp 1024 + bullboard 128 + ai-server 128)
-#   full:              ~10.0GB (+ opensearch 512 + langevals 256)
+#   minimal (dev):     ~10.3GB (postgres 256 + redis 64 + clickhouse 2048 + app 8192)
+#   scenarios:         ~13.6GB (+ workers 1536 + nlp 1024 + bullboard 512 + ai-server 256)
+#   full:              ~13.8GB (+ langevals 256)
 #
 # Stop everything:
 #   docker compose -f compose.dev.yml --profile full down
@@ -34,6 +33,7 @@ x-common-env: &common-env
   SKIP_TIKTOKEN: 'true'
   DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
   REDIS_URL: redis://redis:6379
+  CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
   LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
   LANGEVALS_ENDPOINT: http://langevals:5562
 
@@ -79,37 +79,23 @@ services:
           memory: 64m
           cpus: "0.25"
 
-  opensearch:
-    image: langwatch/opensearch-lite:latest
-    profiles: [search, full] # Not needed for scenarios-only work
+  clickhouse:
+    image: langwatch/clickhouse-serverless:0.2.0
     environment:
-      - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
-      - "cluster.routing.allocation.disk.threshold_enabled=false"
-      - "bootstrap.memory_lock=false"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=dev-password-not-for-prod
-      - "node.store.allow_mmap=false"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
-    # No host port - accessed via docker network as "opensearch:9200"
+      CLICKHOUSE_PASSWORD: langwatch
+    # No host port - accessed via docker network as "clickhouse:8123"
     volumes:
-      - opensearch-data:/usr/share/opensearch/data
+      - clickhouse-data:/var/lib/clickhouse
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 || exit 1"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-      start_period: 40s
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 2g
           cpus: "1.0"
 
   # =============================================================================
@@ -125,11 +111,22 @@ services:
       - ./langevals:/langevals
       - app_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
+      - goose_bin:/opt/goose-bin
     command: >
       sh -c "
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
         mkdir -p /app/node_modules &&
+        GOOSE_VERSION=v3.26.0 &&
+        ARCH=$$(uname -m) &&
+        if [ \"$$ARCH\" = \"aarch64\" ]; then GOOSE_ARCH=arm64; else GOOSE_ARCH=x86_64; fi &&
+        GOOSE_MARKER=\"$$GOOSE_VERSION/$$GOOSE_ARCH\" &&
+        if [ ! -x /opt/goose-bin/goose ] || [ \"$$(cat /opt/goose-bin/.goose-meta 2>/dev/null)\" != \"$$GOOSE_MARKER\" ]; then
+          echo \"Installing goose $$GOOSE_VERSION ($$GOOSE_ARCH) for ClickHouse migrations...\" &&
+          curl -fsSL \"https://github.com/pressly/goose/releases/download/$${GOOSE_VERSION}/goose_linux_$${GOOSE_ARCH}\" -o /opt/goose-bin/goose &&
+          chmod +x /opt/goose-bin/goose &&
+          printf '%s' \"$$GOOSE_MARKER\" > /opt/goose-bin/.goose-meta;
+        fi &&
         (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
         pnpm install &&
         pnpm prisma generate &&
@@ -151,19 +148,25 @@ services:
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - app_modules:/app/node_modules
+      - goose_bin:/opt/goose-bin:ro
     command: >
       sh -c "
+        export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
-        SKIP_CLICKHOUSE_MIGRATE=true SKIP_ELASTIC_MIGRATE=true pnpm run start:prepare:db &&
+        pnpm run start:prepare:db &&
         pnpm run start:app
       "
     ports:
       - "${APP_PORT:-5560}:5560"
     environment:
       <<: *common-env
-      # Override .env so Auth0 callback matches the dynamic host port
-      BASE_HOST: http://localhost:${APP_PORT:-5560}
-      NEXTAUTH_URL: http://localhost:${APP_PORT:-5560}
+      # BASE_HOST/NEXTAUTH_URL intentionally override langwatch/.env so
+      # worktree-isolated dev gets the correct dynamic APP_PORT (each
+      # worktree picks a different free port). Set shell vars to point at
+      # a proxied URL (e.g. BASE_HOST=https://langwatch-main.boxd.sh) —
+      # shell wins over the localhost fallback.
+      BASE_HOST: ${BASE_HOST:-http://localhost:${APP_PORT:-5560}}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-5560}}
       # Enable scenarios UI in dev
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
@@ -177,6 +180,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
     tty: true
     stdin_open: true
@@ -199,7 +204,8 @@ services:
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
       - app_modules:/app/node_modules
-    command: sh -c "corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
+      - goose_bin:/opt/goose-bin:ro
+    command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
@@ -311,8 +317,10 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-db-data
   redis-data:
     name: ${VOLUME_PREFIX:-langwatch}-redis-data
-  opensearch-data:
-    name: ${VOLUME_PREFIX:-langwatch}-opensearch-data
+  clickhouse-data:
+    name: ${VOLUME_PREFIX:-langwatch}-clickhouse-data
+  goose_bin:
+    name: ${VOLUME_PREFIX:-langwatch}-goose-bin
   app_modules:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
   pnpm_store:
