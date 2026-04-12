@@ -71,9 +71,6 @@ export default function SignIn({ session }: { session: Session | null }) {
 export const getServerSideProps = async (
   context: GetServerSidePropsContext,
 ) => {
-  // Server-side helper — reads cookies from request headers via
-  // BetterAuth's auth.api.getSession. The browser-bound
-  // `~/utils/auth-client` getSession would always return null here.
   const session = await getServerAuthSession({ req: context.req });
 
   if (session) {

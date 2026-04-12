@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
+import { env } from "~/env.mjs";
 
 /**
  * Dedicated logout endpoint that explicitly clears BetterAuth session cookies
@@ -21,7 +22,7 @@ export default async function logoutHandler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  if (req.method !== "POST") {
+  if (req.method !== "POST" && req.method !== "GET") {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
@@ -89,7 +90,29 @@ export default async function logoutHandler(
   }
 
   res.setHeader("Set-Cookie", clearCookies);
-  res.status(200).json({ success: true });
+
+  // GET requests redirect to the IdP's logout endpoint (Auth0/Okta) to
+  // clear the upstream SSO session too. Without this, the next visit to
+  // the app auto-fires signIn("auth0") → Auth0 → Google SSO picks up the
+  // active session → user is silently re-authenticated. The IdP logout
+  // endpoint then redirects back to our signin page via `returnTo`.
+  // POST requests return JSON for programmatic use (redirect: false).
+  if (req.method === "GET") {
+    // Build federated logout URL for Auth0/Okta
+    if (env.NEXTAUTH_PROVIDER === "auth0" && env.AUTH0_ISSUER && env.AUTH0_CLIENT_ID) {
+      const returnTo = encodeURIComponent(
+        `${env.NEXTAUTH_URL}/auth/signin`,
+      );
+      const federatedLogoutUrl =
+        `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
+      res.redirect(302, federatedLogoutUrl);
+    } else {
+      // Non-Auth0 providers (email mode, etc.) — just go to signin
+      res.redirect(302, "/auth/signin");
+    }
+  } else {
+    res.status(200).json({ success: true });
+  }
 }
 
 function extractCookie(cookieHeader: string, name: string): string | null {

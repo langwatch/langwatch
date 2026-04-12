@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -68,6 +68,16 @@ interface UseSessionOptions {
   onUnauthenticated?: () => void;
 }
 
+/**
+ * Fetches the impersonation-aware session from our custom endpoint.
+ *
+ * BetterAuth's built-in `client.useSession()` calls `/api/auth/get-session`
+ * which returns the raw admin session — no impersonation rewrite. Our
+ * `/api/auth/session` endpoint runs through `getServerAuthSession` which
+ * reads the `Session.impersonating` JSON column and rewrites `session.user`
+ * to the impersonated identity. This mirrors how NextAuth's `useSession`
+ * worked — both server and client saw the same impersonation-aware session.
+ */
 export const useSession = (
   options?: UseSessionOptions,
 ): {
@@ -75,19 +85,39 @@ export const useSession = (
   status: SessionStatus;
   update: () => Promise<void>;
 } => {
-  const { data, isPending, refetch } = client.useSession();
-  const adapted = adaptSession(data);
+  const [data, setData] = useState<CompatSession | null>(null);
+  const [isPending, setIsPending] = useState(true);
+
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      if (!res.ok) {
+        // Network succeeded but server returned an error (5xx, etc.).
+        // Don't treat this as "unauthenticated" — keep the previous state
+        // so transient server errors don't flash the user as logged out.
+        setIsPending(false);
+        return;
+      }
+      const json = await res.json();
+      setData(adaptSession(json));
+    } catch {
+      // Network error — keep previous state, don't flash as logged out.
+      setIsPending(false);
+      return;
+    }
+    setIsPending(false);
+  }, []);
+
+  useEffect(() => {
+    void fetchSession();
+  }, [fetchSession]);
+
   const status: SessionStatus = isPending
     ? "loading"
-    : adapted
+    : data
       ? "authenticated"
       : "unauthenticated";
 
-  // Fire the onUnauthenticated callback from an effect, NOT during render.
-  // NextAuth's old `useSession({required, onUnauthenticated})` also ran the
-  // callback as a side effect — we just need to honor React's rules by
-  // moving it out of the render path so Strict Mode's double-invoke doesn't
-  // fire navigate twice. Caught by CodeRabbit in PR review.
   useEffect(() => {
     if (
       options?.required &&
@@ -99,11 +129,9 @@ export const useSession = (
   }, [options?.required, options?.onUnauthenticated, status]);
 
   return {
-    data: adapted,
+    data,
     status,
-    update: async () => {
-      await refetch();
-    },
+    update: fetchSession,
   };
 };
 
@@ -220,16 +248,24 @@ export const signOut = async (opts?: {
   callbackUrl?: string;
   redirect?: boolean;
 }): Promise<void> => {
-  // Call our dedicated logout endpoint which explicitly clears cookies
-  // via Next.js res.setHeader. This is more reliable than relying on
-  // BetterAuth's client.signOut() which goes through toNodeHandler's
-  // Set-Cookie translation. The endpoint also handles DB + Redis cleanup.
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "include",
-  });
-  if (opts?.redirect === false) return;
-  navigate(safeRedirectTarget(opts?.callbackUrl));
+  if (opts?.redirect === false) {
+    // Programmatic logout without redirect. The caller is responsible for
+    // updating the UI (e.g., calling session.update() or navigating).
+    const res = await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Logout failed");
+    return;
+  }
+  // Navigate directly to the logout endpoint as a full page navigation.
+  // This guarantees the Set-Cookie headers are applied by the browser
+  // (no fetch/AJAX race conditions). The endpoint clears cookies and
+  // redirects to /auth/signin. We always go to /auth/signin (not /)
+  // because / renders client-side and in Auth0 mode the signin page
+  // auto-fires signIn("auth0") which silently re-authenticates via
+  // Google SSO before the user even sees the page.
+  navigate("/api/auth/logout");
 };
 
 const SOCIAL_PROVIDERS = new Set([
