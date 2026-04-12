@@ -5,23 +5,52 @@ export interface McpConfig {
   endpoint: string;
 }
 
-/**
- * Global config set once at startup via `initConfig()`.
- * Used as the fallback when no per-request config is active.
- */
-let globalConfig: McpConfig | undefined;
+// ---------------------------------------------------------------------------
+// Singleton storage on globalThis
+//
+// When the langwatch app (CJS, no "type": "module") imports this module,
+// tsx creates a CJS-cached copy. When mcp-server's own ESM dist chunks
+// do `await import("./search-traces-*.js")`, Node creates a separate
+// ESM-cached copy. Module-level variables are NOT shared between them.
+//
+// By storing config on globalThis, both CJS and ESM instances read/write
+// the same object, fixing the "Config not initialized" error that occurs
+// when initConfig() runs on the CJS side but tool handlers execute on
+// the ESM side.
+// ---------------------------------------------------------------------------
 
-/**
- * Per-request config scoped via AsyncLocalStorage.
- * When a request handler calls `runWithConfig()`, all downstream code
- * that calls `getConfig()` or `requireApiKey()` receives the scoped config
- * instead of the global one. This enables multi-tenant HTTP mode where
- * each client session carries its own API key.
- */
-const configStorage = new AsyncLocalStorage<McpConfig>();
+const GLOBAL_KEY = "__langwatch_mcp_config" as const;
+const STORAGE_KEY = "__langwatch_mcp_config_storage" as const;
+
+interface McpGlobalState {
+  globalConfig: McpConfig | undefined;
+  configStorage: AsyncLocalStorage<McpConfig>;
+}
+
+function getGlobalState(): McpGlobalState {
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (!g[GLOBAL_KEY]) {
+    g[GLOBAL_KEY] = undefined;
+  }
+  if (!g[STORAGE_KEY]) {
+    g[STORAGE_KEY] = new AsyncLocalStorage<McpConfig>();
+  }
+  return {
+    get globalConfig() {
+      return g[GLOBAL_KEY] as McpConfig | undefined;
+    },
+    set globalConfig(val: McpConfig | undefined) {
+      g[GLOBAL_KEY] = val;
+    },
+    get configStorage() {
+      return g[STORAGE_KEY] as AsyncLocalStorage<McpConfig>;
+    },
+  };
+}
 
 export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
-  globalConfig = {
+  const state = getGlobalState();
+  state.globalConfig = {
     apiKey: args.apiKey || process.env.LANGWATCH_API_KEY,
     endpoint:
       args.endpoint ||
@@ -35,9 +64,10 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
  * a `runWithConfig()` callback, otherwise the global config.
  */
 export function getConfig(): McpConfig {
-  const scoped = configStorage.getStore();
+  const state = getGlobalState();
+  const scoped = state.configStorage.getStore();
   if (scoped) return scoped;
-  if (!globalConfig) {
+  if (!state.globalConfig) {
     console.error(
       "[MCP config] getConfig() failed: globalConfig is null, no scoped config active. " +
         "Was initConfig() called? Stack:",
@@ -45,13 +75,14 @@ export function getConfig(): McpConfig {
     );
     throw new Error("Config not initialized");
   }
-  return globalConfig;
+  return state.globalConfig;
 }
 
 export function requireApiKey(): string {
   const config = getConfig();
   if (!config.apiKey) {
-    const hasScoped = !!configStorage.getStore();
+    const state = getGlobalState();
+    const hasScoped = !!state.configStorage.getStore();
     console.error(
       "[MCP config] requireApiKey() failed: apiKey is undefined. " +
         `scopedConfig=${hasScoped}, endpoint=${config.endpoint}. ` +
@@ -71,5 +102,6 @@ export function requireApiKey(): string {
  * see the provided config instead of the global one.
  */
 export function runWithConfig<T>(config: McpConfig, fn: () => T): T {
-  return configStorage.run(config, fn);
+  const state = getGlobalState();
+  return state.configStorage.run(config, fn);
 }
