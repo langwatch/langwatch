@@ -364,8 +364,13 @@ describe("License Router Integration", () => {
         maxScenarios: 50,
         maxAgents: 50,
         maxExperiments: 50,
+        maxOnlineEvaluations: 50,
+        maxDatasets: 50,
+        maxDashboards: 50,
+        maxCustomGraphs: 50,
+        maxAutomations: 50,
         canPublish: true,
-        usageUnit: "traces" as const,
+        usageUnit: "events" as const,
       },
     });
 
@@ -443,8 +448,13 @@ describe("License Router Integration", () => {
           maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
           maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
           maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
+          maxOnlineEvaluations: ENTERPRISE_TEMPLATE.maxOnlineEvaluations ?? 1000,
+          maxDatasets: ENTERPRISE_TEMPLATE.maxDatasets ?? 1000,
+          maxDashboards: ENTERPRISE_TEMPLATE.maxDashboards ?? 1000,
+          maxCustomGraphs: ENTERPRISE_TEMPLATE.maxCustomGraphs ?? 1000,
+          maxAutomations: ENTERPRISE_TEMPLATE.maxAutomations ?? 1000,
           canPublish: true,
-          usageUnit: "traces" as const,
+          usageUnit: "events" as const,
         },
       });
 
@@ -496,7 +506,7 @@ describe("License Router Integration", () => {
       const result = await adminCaller.license.generate(getValidInput());
 
       const parsedLicense = parseLicenseKey(result.licenseKey);
-      expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
+      expect(parsedLicense?.data.plan.usageUnit).toBe("events");
     });
 
     it("generates license with events usageUnit", async () => {
