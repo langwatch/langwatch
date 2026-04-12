@@ -16,7 +16,7 @@ import type { RouterOutputs } from "~/utils/api";
 import { InvitesTable } from "../InvitesTable";
 
 type OrganizationInvite =
-  RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
+  RouterOutputs["invite"]["getOrganizationPendingInvites"][number];
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

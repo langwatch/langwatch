@@ -26,6 +26,7 @@ import { modelProviderRouter } from "./routers/modelProviders";
 import { monitorsRouter } from "./routers/monitors";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { optimizationRouter } from "./routers/optimization";
+import { inviteRouter } from "./routers/invite";
 import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
@@ -56,6 +57,7 @@ const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
+  invite: inviteRouter,
   organization: organizationRouter,
   project: projectRouter,
   team: teamRouter,
