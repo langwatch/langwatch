@@ -92,9 +92,14 @@ export default async function logoutHandler(
 
   // If a callbackUrl is provided (GET from full-page navigation), redirect.
   // Otherwise return JSON (POST from fetch).
-  const callbackUrl =
+  const rawCallbackUrl =
     typeof req.query.callbackUrl === "string" ? req.query.callbackUrl : null;
-  if (callbackUrl) {
+  if (rawCallbackUrl) {
+    // Prevent open redirect: only allow same-origin relative paths.
+    const callbackUrl =
+      rawCallbackUrl.startsWith("/") && !rawCallbackUrl.startsWith("//")
+        ? rawCallbackUrl
+        : "/";
     res.redirect(302, callbackUrl);
   } else {
     res.status(200).json({ success: true });
