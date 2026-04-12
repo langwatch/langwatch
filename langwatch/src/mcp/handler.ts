@@ -877,7 +877,7 @@ export function createMcpHandler(): McpHandler {
           });
 
           // Runtime assertion: verify the internal structure hasn't changed
-          const transportAny = transport as Record<string, unknown>;
+          const transportAny = transport as unknown as Record<string, unknown>;
           if (
             !transportAny._webStandardTransport ||
             typeof transportAny._webStandardTransport !== "object"
@@ -1007,7 +1007,7 @@ export function createMcpHandler(): McpHandler {
       }
 
       session.lastActivityAt = Date.now();
-      touchSessionInRedis(sessionId).catch(() => {});
+      touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res),
       );
