@@ -312,19 +312,13 @@ export const useOpenTargetEditor = () => {
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
         // Set flow callbacks for the evaluator editor using the centralized helper
-        // This ensures we never forget a required callback
-        setFlowCallbacks(
-          "evaluatorEditor",
-          createEvaluatorEditorCallbacks({
+        // onMappingChange is registered here (durable) instead of inside mappingsConfig
+        // (ephemeral complexProps) so it survives page reload / ErrorBoundary recovery.
+        setFlowCallbacks("evaluatorEditor", {
+          ...createEvaluatorEditorCallbacks({
             targetId: target.id,
             updateTarget,
           }),
-        );
-
-        // Build mappings config for the evaluator editor
-        const mappingsConfig = {
-          availableSources,
-          initialMappings: uiMappings,
           onMappingChange: (
             identifier: string,
             mapping: UIFieldMapping | undefined,
@@ -350,6 +344,12 @@ export const useOpenTargetEditor = () => {
               );
             }
           },
+        });
+
+        // Build mappings config without onMappingChange — callback is durable via flowCallbacks
+        const mappingsConfig = {
+          availableSources,
+          initialMappings: uiMappings,
         };
 
         // Pass initialLocalConfig from target state so drawer resumes unsaved changes

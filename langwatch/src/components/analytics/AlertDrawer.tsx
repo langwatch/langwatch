@@ -150,6 +150,13 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
     }
   }, [graphQuery.data, form]);
 
+  // Close drawer gracefully when form prop is missing (e.g., complexProps cleared on reload)
+  useEffect(() => {
+    if (!providedForm) {
+      closeDrawer();
+    }
+  }, [providedForm, closeDrawer]);
+
   // Initialize alert fields with default values if not set
   useEffect(() => {
     if (!form) return;
