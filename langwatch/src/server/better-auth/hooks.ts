@@ -1,5 +1,7 @@
-import { Prisma, type Organization, type PrismaClient } from "@prisma/client";
+import { Prisma, RoleBindingScopeType, TeamUserRole, type Organization, type PrismaClient } from "@prisma/client";
 import { APIError } from "better-auth/api";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "../../utils/logger/server";
 import { isSsoProviderMatch, extractEmailDomain } from "./sso";
 
@@ -68,9 +70,23 @@ export const afterUserCreate = async ({
           role: "MEMBER",
         },
       });
+
+      // Create the RoleBinding that the RBAC system uses as the
+      // authoritative access record (added by PR #2867 SCIM groups).
+      await prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: org.id,
+          userId: user.id,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: org.id,
+        },
+      });
+
       logger.info(
         { userId: user.id, organizationId: org.id },
-        "Auto-added new user to SSO organization",
+        "Auto-added new user to SSO organization (with RoleBinding)",
       );
     } catch (err) {
       // P2002 (unique constraint) means another concurrent OAuth callback
