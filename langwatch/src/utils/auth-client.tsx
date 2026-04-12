@@ -250,9 +250,11 @@ export const signOut = async (opts?: {
   // Navigate directly to the logout endpoint as a full page navigation.
   // This guarantees the Set-Cookie headers are applied by the browser
   // (no fetch/AJAX race conditions). The endpoint clears cookies and
-  // redirects to callbackUrl. This mirrors how NextAuth's signOut worked.
-  const callbackUrl = safeRedirectTarget(opts?.callbackUrl);
-  navigate(`/api/auth/logout?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  // redirects to /auth/signin. We always go to /auth/signin (not /)
+  // because / renders client-side and in Auth0 mode the signin page
+  // auto-fires signIn("auth0") which silently re-authenticates via
+  // Google SSO before the user even sees the page.
+  navigate("/api/auth/logout?callbackUrl=%2Fauth%2Fsignin");
 };
 
 const SOCIAL_PROVIDERS = new Set([
