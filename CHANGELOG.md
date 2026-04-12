@@ -1,5 +1,52 @@
 # Changelog
 
+## [3.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0...langwatch@v3.1.0) (2026-04-12)
+
+
+### Features
+
+* add agents REST API (Hono) with full CRUD ([#2982](https://github.com/langwatch/langwatch/issues/2982)) ([b270425](https://github.com/langwatch/langwatch/commit/b270425d4cef6ead12dfb4b78d0e707059f2abc1))
+* add mcp-server to langwatch pnpm workspace ([#3069](https://github.com/langwatch/langwatch/issues/3069)) ([73915d2](https://github.com/langwatch/langwatch/commit/73915d24fd47b8d6b5e33210fd3f73ac0f745e11))
+* add SCIM group-to-team mapping with role assignment ([#2867](https://github.com/langwatch/langwatch/issues/2867)) ([07fcd40](https://github.com/langwatch/langwatch/commit/07fcd400b854d889674b5428acf40aaef62fd5dd))
+* **auth:** migrate NextAuth v4 → BetterAuth v1.6.2 ([#3121](https://github.com/langwatch/langwatch/issues/3121)) ([e61e9f3](https://github.com/langwatch/langwatch/commit/e61e9f3bf098049cbb42a7b636b2c2761995be86))
+* bring-your-own-key for Azure Content Safety evaluators (azure_safety provider) ([#3103](https://github.com/langwatch/langwatch/issues/3103)) ([1ebe980](https://github.com/langwatch/langwatch/commit/1ebe9800ac319859d105a713b592e49065b77af2))
+* **cli:** add prompt tag management commands ([#3099](https://github.com/langwatch/langwatch/issues/3099)) ([970ae68](https://github.com/langwatch/langwatch/commit/970ae68dcf934a00d4647db52287acd9e74a9d2a))
+* **mcp:** add dataset mcp tools ([#2926](https://github.com/langwatch/langwatch/issues/2926)) ([666710c](https://github.com/langwatch/langwatch/commit/666710cbb1052f9b7180378a7c24490e4a103b9f))
+* **prompts:** load tagged prompt from trace reference in playground ([#3100](https://github.com/langwatch/langwatch/issues/3100)) ([2fd1bfb](https://github.com/langwatch/langwatch/commit/2fd1bfb0bdf4d20f59368065836fc85b2803b990))
+* **python-sdk:** add dataset CRUD methods ([#2871](https://github.com/langwatch/langwatch/issues/2871)) ([d455079](https://github.com/langwatch/langwatch/commit/d45507916074048fbddbcd550d92d4901547b947))
+* **typescript-sdk:** add dataset CRUD methods for SDK and CLI ([#2925](https://github.com/langwatch/langwatch/issues/2925)) ([8e65e84](https://github.com/langwatch/langwatch/commit/8e65e84b54746c54eb0fdbc4d6eafa56f2aa60d7))
+* update docker compose to v3 with ClickHouse ([#3058](https://github.com/langwatch/langwatch/issues/3058)) ([d0556f2](https://github.com/langwatch/langwatch/commit/d0556f20a74d80124cf32078c53aa9f2848fe4b5))
+
+
+### Bug Fixes
+
+* **auth:** clear __Secure- prefixed cookies on HTTPS logout ([#3124](https://github.com/langwatch/langwatch/issues/3124)) ([fdb5692](https://github.com/langwatch/langwatch/commit/fdb5692ed1847ca8f55d7d9efe7c166d87313353))
+* **auth:** fix logout, impersonation, and federated Auth0 signout ([#3125](https://github.com/langwatch/langwatch/issues/3125)) ([735f0ed](https://github.com/langwatch/langwatch/commit/735f0edf6751c449bae7bdb04e24a6e7455471f7))
+* **ci:** surface vitest failures instead of swallowing via tee ([#3001](https://github.com/langwatch/langwatch/issues/3001)) ([00c4397](https://github.com/langwatch/langwatch/commit/00c43975d718649f2b9c7c7b863142d97e4f8dbd))
+* clean deferred origin resolution to follow CQRS ([#2744](https://github.com/langwatch/langwatch/issues/2744)) ([7a5ff88](https://github.com/langwatch/langwatch/commit/7a5ff88b8ad1cb72d3f1f1ac49526940a63675f4))
+* document default resource requirements in kubernetes-helm guide ([#3051](https://github.com/langwatch/langwatch/issues/3051)) ([b4f31a7](https://github.com/langwatch/langwatch/commit/b4f31a79cb0b38f37b0839277d356b785be2bed0))
+* group-based access bugs + stale test fixes ([#3105](https://github.com/langwatch/langwatch/issues/3105)) ([c8eb625](https://github.com/langwatch/langwatch/commit/c8eb625dea365dc011aa1a8b734438b7ca6ae888))
+* increase WebSocket idle timeout from 120s to 900s ([#3076](https://github.com/langwatch/langwatch/issues/3076)) ([57e6d1f](https://github.com/langwatch/langwatch/commit/57e6d1f1cfff9ee0a193456b00e78788b7ca5cd2)), closes [#3073](https://github.com/langwatch/langwatch/issues/3073)
+* **mcp:** extend session TTL to 30 days, return 401 on expired sessions ([#3126](https://github.com/langwatch/langwatch/issues/3126)) ([050c36e](https://github.com/langwatch/langwatch/commit/050c36e7105d4d8418d87045e2c70c0e65765677))
+* **mcp:** redis-backed sessions for multi-pod support + 30-day OAuth TTL ([#3122](https://github.com/langwatch/langwatch/issues/3122)) ([78f04f3](https://github.com/langwatch/langwatch/commit/78f04f35dfb114b9fa0686d862d7cc10b0b959de))
+* output datatype changes not applied in prompt editor ([#3062](https://github.com/langwatch/langwatch/issues/3062)) ([7d8ebb1](https://github.com/langwatch/langwatch/commit/7d8ebb119789bcd0f09b019699747a4caf284da9))
+* require tag-based fetch pattern in scenario assertion ([#3098](https://github.com/langwatch/langwatch/issues/3098)) ([b20d605](https://github.com/langwatch/langwatch/commit/b20d605c0b6a7478805a4ac6716b08e12c1d08fe)), closes [#2939](https://github.com/langwatch/langwatch/issues/2939)
+* scenario AI gate asks wrong question about default model ([#2919](https://github.com/langwatch/langwatch/issues/2919)) ([0893644](https://github.com/langwatch/langwatch/commit/0893644a746567f9e80586728e4c55a2939e941a))
+* scenario AI gate asks wrong question about default model ([#3070](https://github.com/langwatch/langwatch/issues/3070)) ([0893644](https://github.com/langwatch/langwatch/commit/0893644a746567f9e80586728e4c55a2939e941a))
+* scenario target dropdown opens downward instead of upward ([#3015](https://github.com/langwatch/langwatch/issues/3015)) ([bc7ffea](https://github.com/langwatch/langwatch/commit/bc7ffea3d914aa5d173ce47bddfb1616ac0aeffa))
+* **tests:** update 5 tests for source ID prefix in mapping tags ([#3080](https://github.com/langwatch/langwatch/issues/3080)) ([5aa07da](https://github.com/langwatch/langwatch/commit/5aa07da36ac1a769e2fff2cef63f9d9133ab875a))
+
+
+### Miscellaneous
+
+* **main:** release python-sdk 0.18.0 ([#2651](https://github.com/langwatch/langwatch/issues/2651)) ([345f064](https://github.com/langwatch/langwatch/commit/345f0640c3d20e6ff4255da5e543a92d44f0e615))
+* rename prompt label to tag in TypeScript SDK ([#3094](https://github.com/langwatch/langwatch/issues/3094)) ([0089842](https://github.com/langwatch/langwatch/commit/008984259a5475c272c9592792eae94d3eb4d9ba))
+
+
+### Documentation
+
+* add prompt tags to nav and document all tag surfaces ([#3095](https://github.com/langwatch/langwatch/issues/3095)) ([f165509](https://github.com/langwatch/langwatch/commit/f165509aae3f8f760c9e30d61c848d23bcbb2e96))
+
 ## [3.0.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.0.0-prerelease.4...langwatch@v3.0.0) (2026-04-08)
 
 
