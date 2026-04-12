@@ -137,6 +137,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
               userId: session.user.id,
               event: "evaluation_ran",
               projectId,
+              session,
             });
             if (request.experimentId && isFullRun) {
               fireExperimentRanNurturing({

@@ -47,7 +47,12 @@ export const scenarioCrudRouter = createTRPCRouter({
         lastUpdatedById: ctx.session.user.id,
       });
 
-      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId });
+      trackServerEvent({
+        userId: ctx.session.user.id,
+        event: "scenario_created",
+        projectId: input.projectId,
+        session: ctx.session,
+      });
 
       void ctx.prisma.scenario
         .count({
