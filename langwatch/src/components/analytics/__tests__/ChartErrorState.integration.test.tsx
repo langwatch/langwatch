@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -71,9 +71,11 @@ describe("<ChartErrorState />", () => {
       const detailsTrigger = screen.getByText(/show details/i);
       await user.click(detailsTrigger);
 
-      expect(
-        screen.getByText("ClickHouse connection timeout"),
-      ).toBeVisible();
+      await waitFor(() => {
+        expect(
+          screen.getByText("ClickHouse connection timeout"),
+        ).toBeVisible();
+      });
     });
   });
 });
