@@ -26,11 +26,11 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
-# Build mcp-server first — it's a file: dependency of langwatch, so dist/ must
-# exist before pnpm install copies it into the langwatch node_modules store
+# mcp-server is a workspace member — copy it early so pnpm install can link it.
+# Its build runs automatically as part of langwatch's `pnpm run build`
+# (via start:prepare:files → build:mcp-server).
 COPY mcp-server ./mcp-server
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
-RUN cd mcp-server && pnpm install --frozen-lockfile && pnpm run build
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
 COPY langwatch/vendor ./langwatch/vendor
@@ -56,8 +56,11 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 
 WORKDIR /app
 
-# Copy built artifacts from builder (mcp-server is inside langwatch/node_modules via file: dep)
+# Copy built artifacts from builder.
+# mcp-server must be copied alongside langwatch because pnpm workspace
+# symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
 COPY --from=builder /app/langwatch ./langwatch
+COPY --from=builder /app/mcp-server ./mcp-server
 COPY --from=builder /app/typescript-sdk/package.json ./typescript-sdk/package.json
 COPY --from=builder /app/python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
