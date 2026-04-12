@@ -9,7 +9,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { z } from "zod";
 import { env } from "~/env.mjs";

@@ -14,8 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { GetServerSidePropsContext } from "next";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { Session } from "next-auth";
-import { getSession, signIn } from "next-auth/react";
+import { getServerAuthSession, type Session } from "~/server/auth";
+import { signIn } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -33,16 +33,16 @@ export default function SignIn({ session }: { session: Session | null }) {
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
+  const isSocialProvider =
+    isAuthProvider && isAuthProvider !== "email";
+
   useEffect(() => {
-    if (!publicEnv.data) {
-      return;
-    }
+    if (!publicEnv.data) return;
 
     if (
       error !== "OAuthAccountNotLinked" &&
       !session &&
-      isAuthProvider &&
-      isAuthProvider !== "email"
+      isSocialProvider
     ) {
       setTimeout(
         () => {
@@ -51,7 +51,7 @@ export default function SignIn({ session }: { session: Session | null }) {
         error ? 2000 : 0,
       );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider, error]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -61,17 +61,20 @@ export default function SignIn({ session }: { session: Session | null }) {
     return null;
   }
 
-  return isAuthProvider && isAuthProvider !== "email" ? (
-    <Box padding="12px">Redirecting to Sign in...</Box>
-  ) : (
-    <SignInForm />
-  );
+  if (isSocialProvider) {
+    return <Box padding="12px">Redirecting to Sign in...</Box>;
+  }
+
+  return <SignInForm />;
 }
 
 export const getServerSideProps = async (
   context: GetServerSidePropsContext,
 ) => {
-  const session = await getSession(context);
+  // Server-side helper — reads cookies from request headers via
+  // BetterAuth's auth.api.getSession. The browser-bound
+  // `~/utils/auth-client` getSession would always return null here.
+  const session = await getServerAuthSession({ req: context.req });
 
   if (session) {
     return {

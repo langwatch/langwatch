@@ -2,20 +2,13 @@ import { Menu } from "~/components/ui/menu";
 import { Separator } from "@chakra-ui/react";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 
-type User = {
-  name: string;
-  impersonator?: {
-    name: string;
-  };
-};
-
 export const ImpersonationSwitchBackMenuItem = () => {
   const { data: session } = useRequiredSession();
-  const user = session?.user as User | undefined;
+  const user = session?.user;
 
   return user?.impersonator ? (
     <>
-      <Menu.ItemGroup title={`Impersonating ${user.name}`}>
+      <Menu.ItemGroup title={`Impersonating ${user.name ?? user.email ?? ""}`}>
         <Menu.Item
           value="switch-back"
           // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -28,7 +21,7 @@ export const ImpersonationSwitchBackMenuItem = () => {
             }
           }}
         >
-          Switch back to {user.impersonator.name}
+          Switch back to {user.impersonator.name ?? user.impersonator.email}
         </Menu.Item>
       </Menu.ItemGroup>
       <Separator />

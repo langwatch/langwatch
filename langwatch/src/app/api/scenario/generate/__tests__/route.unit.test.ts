@@ -5,12 +5,8 @@ vi.mock("ai", () => ({
   generateObject: vi.fn(),
 }));
 
-vi.mock("next-auth", () => ({
-  getServerSession: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
-}));
-
 vi.mock("../../../../../server/auth", () => ({
-  authOptions: vi.fn(),
+  getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
 }));
 
 vi.mock("../../../../../server/api/rbac", () => ({

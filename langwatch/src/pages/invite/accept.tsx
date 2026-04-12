@@ -1,6 +1,6 @@
 import { Alert, Button, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { signOut } from "next-auth/react";
+import { signOut } from "~/utils/auth-client";
 import { useEffect } from "react";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";

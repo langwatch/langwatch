@@ -22,8 +22,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-// Mock next-auth
-vi.mock("next-auth/react", () => ({
+// Mock auth-client
+vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({
     data: { user: { id: "test-user" } },
     status: "authenticated",

@@ -15,12 +15,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { prisma } from "~/server/db";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
 
-// Mock next-auth to provide a controllable session
-vi.mock("next-auth", async () => {
-  const actual = await vi.importActual("next-auth");
+// Mock getServerAuthSession — the BetterAuth-backed session helper used by
+// the export route. Tests control auth state by calling
+// mockGetServerAuthSession.mockResolvedValue(...).
+vi.mock("~/server/auth", async () => {
+  const actual = await vi.importActual("~/server/auth");
   return {
     ...actual,
-    getServerSession: vi.fn(),
+    getServerAuthSession: vi.fn(),
   };
 });
 
@@ -43,10 +45,10 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-import { getServerSession } from "next-auth";
+import { getServerAuthSession } from "~/server/auth";
 import { ExportService } from "~/server/export/export.service";
 
-const mockGetServerSession = vi.mocked(getServerSession);
+const mockGetServerSession = vi.mocked(getServerAuthSession);
 const mockExportServiceCreate = vi.mocked(ExportService.create);
 
 /**

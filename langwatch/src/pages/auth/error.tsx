@@ -10,14 +10,39 @@ import {
 } from "@chakra-ui/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { useEffect } from "react";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
+/**
+ * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,
+ * `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) from the link-account flow. Map
+ * them back to the friendly uppercase codes this UI already handles, so
+ * the same error page works for both the NextAuth-era codes we throw from
+ * hooks and the BetterAuth-native ones coming out of the OAuth callback.
+ *
+ * Exported for unit testing.
+ */
+export const normalizeErrorCode = (
+  error: string | null | undefined,
+): string | null => {
+  if (!error) return null;
+  if (
+    error === "email_doesn't_match" ||
+    error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
+  ) {
+    return "DIFFERENT_EMAIL_NOT_ALLOWED";
+  }
+  if (error === "account_already_linked_to_different_user") {
+    return "OAuthAccountNotLinked";
+  }
+  return error;
+};
+
 export default function Error({ session }: { session: Session | null }) {
   const query = useSearchParams();
-  const error = query?.get("error");
+  const error = normalizeErrorCode(query?.get("error"));
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
@@ -69,9 +94,10 @@ export default function Error({ session }: { session: Session | null }) {
   );
 }
 
-export function SignInError({ error }: { error: string }) {
+export function SignInError({ error: rawError }: { error: string }) {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  const error = normalizeErrorCode(rawError) ?? rawError;
 
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">

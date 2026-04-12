@@ -15,21 +15,25 @@ datasource db {
     relationMode = "prisma"
 }
 
-// Necessary for Next auth
+// BetterAuth-compatible Account. Column names preserved; BetterAuth's field
+// mapping in src/server/better-auth/index.ts points its expected names at
+// these columns. `password` is new — credential passwords moved here from
+// `User.password` in the better_auth_cutover migration.
 model Account {
     id                String   @id @default(nanoid())
     userId            String
-    type              String
+    type              String   @default("oauth")
     provider          String
     providerAccountId String
     refresh_token     String?  @db.Text
     access_token      String?  @db.Text
-    expires_at        Int?
+    expires_at        DateTime?
     ext_expires_in    Int?
     token_type        String?
     scope             String?
     id_token          String?  @db.Text
     session_state     String?
+    password          String?  @db.Text
     user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     createdAt         DateTime @default(now())
     updatedAt         DateTime @default(now()) @updatedAt
@@ -45,6 +49,10 @@ model Session {
     expires       DateTime
     user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     impersonating Json?
+    ipAddress     String?
+    userAgent     String?  @db.Text
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now()) @updatedAt
 
     @@index([userId])
 }
@@ -53,8 +61,7 @@ model User {
     id                      String                   @id @default(nanoid())
     name                    String?
     email                   String?                  @unique
-    emailVerified           DateTime?
-    password                String? // for email/password auth without auth0
+    emailVerified           Boolean                  @default(false)
     image                   String?                  @db.Text
     pendingSsoSetup         Boolean                  @default(false)
     accounts                Account[]
@@ -88,9 +95,12 @@ model User {
 }
 
 model VerificationToken {
+    id         String   @id @default(nanoid())
     identifier String
     token      String   @unique
     expires    DateTime
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now()) @updatedAt
 
     @@unique([identifier, token])
 }

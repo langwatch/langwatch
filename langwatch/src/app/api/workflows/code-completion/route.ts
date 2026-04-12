@@ -4,9 +4,8 @@ import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { CompletionCopilot } from "monacopilot";
 import type { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
 import { hasProjectPermission } from "../../../../server/api/rbac";
-import { authOptions } from "../../../../server/auth";
+import { getServerAuthSession } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
 import { createLogger } from "../../../../utils/logger/server";
@@ -22,7 +21,7 @@ app.use(loggerMiddleware());
 app.post("/code-completion", async (c) => {
   const body = await c.req.json();
 
-  const session = await getServerSession(authOptions(c.req.raw as NextRequest));
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },

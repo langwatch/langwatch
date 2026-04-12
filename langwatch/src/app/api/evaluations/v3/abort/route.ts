@@ -6,10 +6,9 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { hasProjectPermission } from "~/server/api/rbac";
-import { authOptions } from "~/server/auth";
+import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { abortManager } from "~/server/evaluations-v3/execution/abortManager";
 import { createLogger } from "~/utils/logger/server";
@@ -36,7 +35,7 @@ export const POST = async (request: NextRequest) => {
     const { projectId, runId } = parsed.data;
 
     // Authenticate
-    const session = await getServerSession(authOptions(request));
+    const session = await getServerAuthSession({ req: request });
     if (!session) {
       return NextResponse.json(
         { error: "You must be logged in to access this endpoint." },

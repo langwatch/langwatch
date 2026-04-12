@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { handle } from "hono/vercel";
 import type { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
@@ -12,7 +11,7 @@ import {
   type EvaluationsV3State,
 } from "~/evaluations-v3/types";
 import { hasProjectPermission } from "~/server/api/rbac";
-import { authOptions } from "~/server/auth";
+import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { loadExecutionData } from "~/server/evaluations-v3/execution/dataLoader";
 import {
@@ -45,7 +44,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
   );
 
   // Authenticate
-  const session = await getServerSession(authOptions(c.req.raw as NextRequest));
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },
@@ -179,9 +178,9 @@ app.post(
     const { projectId, runId } = await c.req.json();
 
     // Authenticate
-    const session = await getServerSession(
-      authOptions(c.req.raw as NextRequest),
-    );
+    const session = await getServerAuthSession({
+      req: c.req.raw as NextRequest,
+    });
     if (!session) {
       return c.json(
         { error: "You must be logged in to access this endpoint." },

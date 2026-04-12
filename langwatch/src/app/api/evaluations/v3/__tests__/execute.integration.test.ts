@@ -10,19 +10,19 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
 
-// Mock next-auth to provide a valid session
-vi.mock("next-auth", async () => {
-  const actual = await vi.importActual("next-auth");
+// Mock getServerAuthSession — the BetterAuth-backed session helper.
+vi.mock("~/server/auth", async () => {
+  const actual = await vi.importActual("~/server/auth");
   return {
     ...actual,
-    getServerSession: vi.fn(),
+    getServerAuthSession: vi.fn(),
   };
 });
 
-import { getServerSession } from "next-auth";
+import { getServerAuthSession } from "~/server/auth";
 import { POST } from "../execute/route";
 
-const mockGetServerSession = vi.mocked(getServerSession);
+const mockGetServerSession = vi.mocked(getServerAuthSession);
 
 /**
  * Helper to create a mock NextRequest for the Hono endpoint.

@@ -1,5 +1,5 @@
 import { Heading } from "@chakra-ui/react";
-import { useSession } from "next-auth/react";
+import { useSession } from "~/utils/auth-client";
 
 /**
  * Extract greeting name from user's name.

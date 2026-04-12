@@ -5,7 +5,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import { TraceService } from "~/server/traces/trace.service";

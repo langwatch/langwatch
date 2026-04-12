@@ -8,16 +8,12 @@ vi.mock("~/server/datasets/types", () => ({
 
 vi.mock("~/server/evaluations/evaluators.generated", () => ({}));
 
-vi.mock("next-auth", () => ({
-  getServerSession: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
-}));
-
 vi.mock("~/server/api/rbac", () => ({
   hasProjectPermission: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("~/server/auth", () => ({
-  authOptions: vi.fn(),
+  getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
 }));
 
 vi.mock("~/server/db", () => ({

@@ -1,5 +1,5 @@
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from "next";
-import type { Session } from "next-auth";
+import type { Session } from "./auth";
 import type { ParsedUrlQuery } from "querystring";
 import { getServerAuthSession } from "./auth";
 

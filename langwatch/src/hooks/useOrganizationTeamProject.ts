@@ -11,7 +11,7 @@ import {
 } from "../server/api/rbac";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
-import { publicRoutes, useRequiredSession } from "./useRequiredSession";
+import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
 export const useOrganizationTeamProject = (
   {
@@ -212,6 +212,10 @@ export const useOrganizationTeamProject = (
     if (isDemo) return;
 
     if (publicRoutes.includes(router.route)) return;
+    // Routes like /invite/accept and /onboarding/* require auth but
+    // shouldn't bounce zero-org users to /onboarding/welcome — see
+    // `noOrgBouncerRoutes` for the rationale (iter 47 invite race fix).
+    if (noOrgBouncerRoutes.includes(router.route)) return;
     if (!redirectToOnboarding) return;
     if (!organizations.data) return;
 

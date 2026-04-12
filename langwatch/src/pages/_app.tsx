@@ -6,8 +6,8 @@ import {
   defineSlotRecipe,
 } from "@chakra-ui/react";
 import type { AppType } from "next/app";
-import type { Session } from "next-auth";
-import { SessionProvider } from "next-auth/react";
+import type { Session } from "~/server/auth";
+import { SessionProvider } from "~/utils/auth-client";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 

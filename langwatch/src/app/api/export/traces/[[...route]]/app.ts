@@ -12,7 +12,6 @@
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { NextRequest } from "next/server";
-import { getServerSession } from "next-auth";
 import crypto from "crypto";
 
 import { handleError } from "../../../middleware/error-handler";
@@ -20,7 +19,7 @@ import { loggerMiddleware } from "../../../middleware/logger";
 import { tracerMiddleware } from "../../../middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getUserProtectionsForProject } from "~/server/api/utils";
-import { authOptions } from "~/server/auth";
+import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { ExportService } from "~/server/export/export.service";
 import { exportRequestSchema } from "~/server/export/types";
@@ -50,7 +49,7 @@ app.post("/download", zValidator("json", exportRequestSchema), async (c) => {
   const request = c.req.valid("json");
 
   // Authenticate
-  const session = await getServerSession(authOptions(c.req.raw as NextRequest));
+  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },

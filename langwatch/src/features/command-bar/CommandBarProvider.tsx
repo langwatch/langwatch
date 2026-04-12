@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "~/utils/auth-client";
 import { CommandBar } from "./CommandBar";
 import { CommandBarContext } from "./CommandBarContext";
 import { useActivityTracker } from "./useActivityTracker";

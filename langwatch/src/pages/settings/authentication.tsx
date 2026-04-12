@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn, useSession } from "next-auth/react";
+import { linkAccount, useSession } from "~/utils/auth-client";
 import { useForm } from "react-hook-form";
 import { LuKeyRound, LuX } from "react-icons/lu";
 import { z } from "zod";
@@ -90,11 +90,20 @@ export default function AuthenticationSettings() {
   }
 
   const handleLinkProvider = () => {
-    if (isAuthProvider) {
-      void signIn(isAuthProvider, {
+    if (!isAuthProvider) return;
+    void (async () => {
+      const result = await linkAccount(isAuthProvider, {
         callbackUrl: window.location.href,
       });
-    }
+      if (result.error) {
+        toaster.create({
+          title: "Failed to link sign-in method",
+          description: result.error,
+          type: "error",
+          meta: { closable: true },
+        });
+      }
+    })();
   };
 
   const handleUnlink = async (accountId: string) => {

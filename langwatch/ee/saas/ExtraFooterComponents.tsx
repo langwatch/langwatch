@@ -77,7 +77,7 @@ export function SignedInExtraFooterComponents() {
       hasUpdatedLastLogin.current
     )
       return;
-    if ((session.data.user as any).impersonator) return;
+    if (session.data.user.impersonator) return;
 
     hasUpdatedLastLogin.current = true;
     void updateLastLogin.mutate({});
@@ -88,7 +88,7 @@ export function SignedInExtraFooterComponents() {
     const gtag = (window as any).gtag;
     if (!session.data?.user || !organization || !project || !gtag) return;
 
-    if (!(session.data.user as any).impersonator) {
+    if (!session.data.user.impersonator) {
       gtag("set", "user_properties", {
         organization_id: organization.id,
         organization_name: organization.name,
@@ -110,7 +110,7 @@ export function SignedInExtraFooterComponents() {
   }, [organization?.id, project?.id]);
 
   useEffect(() => {
-    if (session.data?.user && !(session.data.user as any).impersonator) {
+    if (session.data?.user && !session.data.user.impersonator) {
       posthog.identify(session.data.user.id, {
         email: session.data.user.email,
         name: session.data.user.name,
@@ -126,7 +126,7 @@ export function SignedInExtraFooterComponents() {
     return null;
   }
 
-  const isImpersonating = !!(session.data?.user as any)?.impersonator;
+  const isImpersonating = !!session.data?.user?.impersonator;
   const isInStudio =
     typeof window !== "undefined" &&
     window.location.pathname.includes("/studio");

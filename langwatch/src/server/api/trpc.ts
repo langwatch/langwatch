@@ -20,7 +20,7 @@ import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
@@ -83,7 +83,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts;
 
-  // Get the session from the server using the getServerSession wrapper function
+  // Get the session via the BetterAuth-backed compat helper.
   const session = await getServerAuthSession({ req, res });
 
   return createInnerTRPCContext({
@@ -189,6 +189,14 @@ const auditLogTRPCErrors = t.middleware(
         args: input,
         error: result.error,
         req: ctx.req,
+        // When an admin is impersonating, `session.user.id` reflects the
+        // impersonated user (correct for RBAC attribution). We stamp the
+        // real admin's identity in metadata so security forensics can
+        // filter on `metadata.impersonatorId` to find actions that were
+        // actually performed by an admin.
+        metadata: ctx.session.user.impersonator
+          ? { impersonatorId: ctx.session.user.impersonator.id }
+          : undefined,
       });
     }
 
@@ -216,6 +224,12 @@ const auditLogMutations = t.middleware(
       args: input,
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
+      // Stamp the real admin id when the action is happening during
+      // impersonation. `userId` above is the impersonated target (the
+      // RBAC actor); metadata.impersonatorId is the human performing it.
+      metadata: ctx.session.user.impersonator
+        ? { impersonatorId: ctx.session.user.impersonator.id }
+        : undefined,
     });
 
     return result;
