@@ -67,12 +67,12 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
   describe("traces.origin matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.origin"]!;
 
-    it("returns null when origin is undefined", () => {
-      expect(matcher(makeTraceData({ origin: undefined }), "")).toBeNull();
+    it("defaults to 'application' when origin is undefined", () => {
+      expect(matcher(makeTraceData({ origin: undefined }), "")).toBe("application");
     });
 
-    it("returns null when origin is null", () => {
-      expect(matcher(makeTraceData({ origin: null }), "")).toBeNull();
+    it("defaults to 'application' when origin is null", () => {
+      expect(matcher(makeTraceData({ origin: null }), "")).toBe("application");
     });
 
     it("returns empty string when origin is empty string", () => {

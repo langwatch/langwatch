@@ -89,8 +89,7 @@ describe("OnlineEvaluationDrawer - New Issues & Validation", () => {
    * ACTUAL: Mappings are empty, user has to manually fill them.
    */
   describe("NEW Issue 1: Auto-mapping for trace level", () => {
-    // TODO(#3022): pre-existing failure (TypeError undefined.match) unmasked by #3001 — re-enable after fix
-    it.skip("auto-infers input/output mappings when selecting evaluator with required fields at trace level", async () => {
+    it("auto-infers input/output mappings when selecting evaluator with required fields at trace level", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       state.mockQuery = { "drawer.open": "onlineEvaluation" };
