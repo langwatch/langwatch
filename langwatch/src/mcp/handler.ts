@@ -177,7 +177,7 @@ export function createMcpHandler(): McpHandler {
   // -------------------------------------------------------------------------
 
   const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes (local transport cleanup)
-  const SESSION_REDIS_TTL_SECONDS = 35 * 60; // 35 minutes (slightly longer than local, buffer for clock skew)
+  const SESSION_REDIS_TTL_SECONDS = TOKEN_TTL_SECONDS; // Match OAuth token TTL (30 days) — session metadata is tiny, no reason to expire it sooner
   const REAPER_INTERVAL_MS = 60 * 1000; // 60 seconds
 
   const reaper = setInterval(() => {
@@ -995,6 +995,13 @@ export function createMcpHandler(): McpHandler {
       return;
     }
 
+    // If a session ID was provided but not found, the session expired.
+    // Return 401 with WWW-Authenticate so OAuth clients re-authenticate.
+    if (sessionId) {
+      send401(res, "Session expired or not found");
+      return;
+    }
+
     sendJson(res, 400, {
       error: "Invalid request — no session ID or not an initialize request",
     });
@@ -1024,6 +1031,8 @@ export function createMcpHandler(): McpHandler {
       await handleWithSessionConfig(session.apiKey, () =>
         session.transport.handleRequest(req, res),
       );
+    } else if (sessionId) {
+      send401(res, "Session expired or not found");
     } else {
       sendJson(res, 400, { error: "Invalid request — no valid session ID" });
     }
