@@ -611,6 +611,46 @@ describe("SuiteService", () => {
       });
     });
 
+    describe("given a mix of http and code agent targets", () => {
+      const mixedTargets = [
+        { type: "http", referenceId: "agent_1" },
+        { type: "code", referenceId: "agent_2" },
+      ] as SuiteTarget[];
+
+      describe("when the suite run is triggered", () => {
+        it("batches both into the agent repository call", async () => {
+          const { service, agentRepo } = createService();
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: mixedTargets,
+          });
+
+          await service.run({
+            suite, ...RUN_DEFAULTS,
+          });
+
+          expect(agentRepo.findManyIncludingArchived).toHaveBeenCalledWith({
+            ids: ["agent_1", "agent_2"],
+            projectId: "proj_1",
+          });
+        });
+
+        it("does not invoke the llm config repository", async () => {
+          const { service, llmConfigRepo } = createService();
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: mixedTargets,
+          });
+
+          await service.run({
+            suite, ...RUN_DEFAULTS,
+          });
+
+          expect(llmConfigRepo.findExistingIds).not.toHaveBeenCalled();
+        });
+      });
+    });
+
     describe("given idempotencyKey is provided", () => {
       describe("when the suite run is triggered", () => {
         it("passes idempotencyKey through to suiteRunService", async () => {

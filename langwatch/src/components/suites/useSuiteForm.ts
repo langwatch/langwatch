@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
+  isSuiteAgentTargetType,
   parseSuiteTargets,
   suiteTargetSchema,
   type SuiteTarget,
@@ -62,7 +63,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt";
+  type: SuiteTarget["type"];
   referenceId: string;
 }
 
@@ -122,8 +123,8 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        if (agent.type !== "http") continue;
-        result.push({ name: agent.name, type: "http", referenceId: agent.id });
+        if (!isSuiteAgentTargetType(agent.type)) continue;
+        result.push({ name: agent.name, type: agent.type, referenceId: agent.id });
       }
     }
     if (prompts) {

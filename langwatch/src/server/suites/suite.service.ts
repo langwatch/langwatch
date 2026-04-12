@@ -16,7 +16,7 @@ import {
   type CreateSuiteInput,
   type UpdateSuiteInput,
 } from "./suite.repository";
-import { parseSuiteTargets, type SuiteTarget } from "./types";
+import { isSuiteAgentTargetType, parseSuiteTargets, type SuiteTarget } from "./types";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -331,11 +331,11 @@ export class SuiteService {
       scenarioRows.map((r) => [r.id, r.name]),
     );
 
-    const httpIds = targets.filter((t) => t.type === "http").map((t) => t.referenceId);
+    const agentIds = targets.filter((t) => isSuiteAgentTargetType(t.type)).map((t) => t.referenceId);
     const promptIds = targets.filter((t) => t.type === "prompt").map((t) => t.referenceId);
 
-    const agentRows = httpIds.length > 0
-      ? await this.agentRepository.findNamesByIds({ ids: httpIds, projectId })
+    const agentRows = agentIds.length > 0
+      ? await this.agentRepository.findNamesByIds({ ids: agentIds, projectId })
       : [];
 
     const promptRows = promptIds.length > 0
@@ -485,18 +485,19 @@ export class SuiteService {
   }): Promise<ResolvedTargetReferences> {
     const { targets, projectId, organizationId } = params;
 
-    // Partition targets by type (parseSuiteTargets validates types upstream)
-    const httpTargets = targets.filter((t) => t.type === "http");
+    // Partition targets by type. Use a positive filter so that future SuiteTarget["type"] additions
+    // must be explicitly handled here instead of silently routing into the agent path.
+    const agentTargets = targets.filter((t) => isSuiteAgentTargetType(t.type));
     const promptTargets = targets.filter((t) => t.type === "prompt");
 
-    // Batch HTTP targets
-    const httpRows = httpTargets.length > 0
+    // Batch agent targets (both HTTP and code agents live in the Agent table)
+    const agentRows = agentTargets.length > 0
       ? await this.agentRepository.findManyIncludingArchived({
-          ids: httpTargets.map((t) => t.referenceId),
+          ids: agentTargets.map((t) => t.referenceId),
           projectId,
         })
       : [];
-    const httpMap = new Map(httpRows.map((r) => [r.id, r]));
+    const agentMap = new Map(agentRows.map((r) => [r.id, r]));
 
     // Batch prompt targets
     const promptExistingIds = promptTargets.length > 0
@@ -511,8 +512,8 @@ export class SuiteService {
     const archived: SuiteTarget[] = [];
     const missing: SuiteTarget[] = [];
 
-    for (const target of httpTargets) {
-      const row = httpMap.get(target.referenceId);
+    for (const target of agentTargets) {
+      const row = agentMap.get(target.referenceId);
       if (!row) {
         missing.push(target);
       } else if (row.archivedAt) {

@@ -5,6 +5,7 @@ import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import type { SuiteTarget } from "~/server/suites/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { traced } from "../tracing";
@@ -39,7 +40,7 @@ export type SuiteRunResult = {
 
 /** Target reference for scheduling */
 export type SuiteRunTarget = {
-  type: "http" | "prompt";
+  type: SuiteTarget["type"];
   referenceId: string;
 };
 

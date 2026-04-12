@@ -50,6 +50,25 @@ function renderPicker(overrides: Partial<TargetPickerProps> = {}) {
 describe("<TargetPicker />", () => {
   afterEach(cleanup);
 
+  describe("given a code agent target", () => {
+    describe("when the picker renders", () => {
+      it("displays the Code type label", () => {
+        renderPicker({
+          targets: [
+            { name: "Code Agent", type: "code", referenceId: "agent_code" },
+            { name: "HTTP Agent", type: "http", referenceId: "agent_http" },
+            { name: "Test Prompt", type: "prompt", referenceId: "prompt_1" },
+          ],
+          totalCount: 3,
+        });
+
+        expect(screen.getByText("(Code)")).toBeInTheDocument();
+        expect(screen.getByText("(HTTP)")).toBeInTheDocument();
+        expect(screen.getByText("(Prompt)")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given no archived targets", () => {
     describe("when the picker renders", () => {
       it("does not show the archived-targets section", () => {
