@@ -190,12 +190,9 @@ describe("isAllowedAuthOrigin", () => {
     });
 
     describe("and Origin is malformed", () => {
-      it("rejects requests with garbage Origin (does NOT fall through to Referer)", () => {
-        // Origin header is present (so we use it) but it's malformed →
-        // originOf returns null → we treat it as "no header origin" only
-        // if the value was undefined. With a present-but-invalid Origin,
-        // we still go to the Referer fallback path because originOf
-        // returned null.
+      it("falls through to Referer when Origin is garbage", () => {
+        // Origin header is present but malformed → originOf returns null →
+        // falls through to the Referer fallback path which matches BASE.
         expect(
           isAllowedAuthOrigin({
             method: "POST",

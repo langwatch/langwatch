@@ -3,7 +3,6 @@ import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { ScimService } from "~/server/scim/scim.service";
 import { extractEmailDomain } from "~/server/better-auth/sso";
-import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
  * Receives Auth0 Log Stream webhook events for SCIM provisioning.
