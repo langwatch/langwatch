@@ -568,6 +568,41 @@ describe("aggregation-builder", () => {
         expect(result.params).not.toHaveProperty("groupByKey");
       });
     });
+
+    describe("when evaluation pass rate metric is combined with labels groupBy", () => {
+      // @regression issue #3067: evaluation metrics reference `es.Passed` which is
+      // out of scope in the CTE outer SELECT. The fix includes eval columns in the
+      // CTE and rewrites `es.X` → `eval_snake_case` in the outer query.
+      it("rewrites es.Passed and es.Status to CTE column aliases", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "metadata.labels" as const,
+          series: [
+            {
+              metric:
+                "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "some-evaluator",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // CTE must include evaluation columns with eval_ prefix
+        expect(result.sql).toContain("AS eval_passed");
+        expect(result.sql).toContain("AS eval_status");
+        expect(result.sql).toContain("AS eval_evaluator_id");
+
+        // Outer SELECT (after the CTE) must use eval_ aliases, not es.X
+        const outerSelect = result.sql.split("FROM deduped_traces")[0]!
+          .split(")\n    SELECT")[1]!;
+        expect(outerSelect).toContain("eval_passed");
+        expect(outerSelect).toContain("eval_status");
+        expect(outerSelect).toContain("eval_evaluator_id");
+        expect(outerSelect).not.toContain("es.");
+      });
+    });
   });
 
   describe("buildDataForFilterQuery", () => {
