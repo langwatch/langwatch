@@ -5,8 +5,15 @@ import {
   buildDataForFilterQuery,
   buildTopDocumentsQuery,
   buildFeedbacksQuery,
+  __testOnly__,
 } from "../aggregation-builder";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
+
+const {
+  mapEvalAggregationToOuter,
+  extractTraceAggregationColumn,
+  hasEvalMixedWithTraceMetrics,
+} = __testOnly__;
 
 describe("aggregation-builder", () => {
   beforeEach(() => {
@@ -86,6 +93,120 @@ describe("aggregation-builder", () => {
     // metric forced a stored_spans JOIN even though cardinality only uses uniq(TraceId)
     // from trace_summaries. The JOIN created one row per span per trace, inflating
     // the trace-level SUM aggregations (cost ~4x, tokens ~6x).
+    // @regression issue #3088: When trace-level metrics (sum of TotalCost) are combined
+    // with evaluation metrics (avg of evaluation_pass_rate) in buildSimpleTimeseriesQuery,
+    // the evaluation_runs JOIN produces N rows per trace, inflating sum(TotalCost) by N.
+    // The fix must ensure trace-level aggregations are not fanned out by eval join cardinality.
+    it("does not inflate trace-level aggregations when mixed with evaluation metrics in simple path", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Assert the fix's specific SQL shape: a per-trace CTE exists with trace_id
+      // in its GROUP BY, and the outer query aggregates over that CTE — not over
+      // the raw evaluation_runs join.
+      expect(result.sql).toMatch(/WITH\s+per_trace_metrics\s+AS\s*\(/);
+      expect(result.sql).toMatch(/GROUP BY[^)]*\btrace_id\b/);
+      expect(result.sql).not.toMatch(/\bsum\s*\(\s*ts\.TotalCost\s*\)/);
+
+      // Both metrics must still be emitted by any valid fix.
+      expect(result.sql).toContain("Passed");
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When timeScale is "full" (summary widgets) with mixed eval and
+    // trace metrics, the previous routing fell through to buildSubqueryTimeseriesQuery which
+    // still joined evaluation_runs directly and inflated sum(ts.TotalCost) by the number of
+    // evaluation runs per trace.
+    it("does not inflate trace metrics with mixed eval metrics when timeScale is full", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must use per-trace CTE approach, not plain sum(ts.TotalCost) over fanned-out eval rows
+      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(result.sql);
+      expect(hasRawTotalCostSum).toBe(false);
+
+      // Must contain the per-trace CTE (the fix uses a WITH clause that groups by trace_id)
+      expect(result.sql).toMatch(/\bWITH\b/);
+      expect(result.sql).toMatch(/GROUP BY\s+trace_id\b/);
+
+      // Both aliases still present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When metadata.user_id (cardinality, which uses
+    // Attributes['langwatch.user_id']) was mixed with evaluation metrics,
+    // extractTraceAggregationColumn returned null because its regex didn't handle
+    // Attributes-indexed columns, and the defensive fallback produced invalid nested
+    // any(uniqIf(...)) SQL.
+    it("handles metadata.user_id mixed with evaluation metrics correctly", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.user_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must not produce nested aggregations like any(uniqIf(...)) or any(avg(...))
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*\w+If\s*\(/);
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*(sum|avg|min|max|count|uniq)\s*\(/);
+
+      // Both metric aliases still emitted
+      expect(result.sql).toContain("0__metadata_user_id__cardinality");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When trace-level metrics (sum TotalCost) are combined with
+    // evaluation metrics (avg evaluation_pass_rate) while using a groupBy that activates
+    // the CTE/arrayJoin path (metadata.labels), the outer SELECT previously referenced
+    // `es.Passed` outside the CTE where the `es` alias no longer exists. Trace-level
+    // metrics would also be double-counted via the eval JOIN fanout.
+    it("produces valid SQL when mixing trace and evaluation metrics with arrayJoin groupBy", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels",
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The query must still group by the label arrayJoin
+      expect(result.sql).toContain("arrayJoin");
+
+      // The trace-level metric must be transformed to use the CTE column
+      expect(result.sql).toContain("trace_total_cost");
+
+      // The outer query must reference a pre-aggregated eval value, not es.Passed directly.
+      // With the fix, the per-trace alias pattern is present (the eval metric is
+      // pre-aggregated inside the CTE) and the outer aggregation is a plain avg over that
+      // per-trace column, not an avgIf conditional aggregation.
+      expect(result.sql).toMatch(/_per_trace/);
+      expect(result.sql).toMatch(
+        /\bavg\s*\(\s*`?1__evaluations_evaluation_pass_rate__avg__my_evaluator__per_trace`?\s*\)/,
+      );
+
+      // The eval metric alias must still be emitted
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
     it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
       const input = {
         ...baseInput,
@@ -568,6 +689,75 @@ describe("aggregation-builder", () => {
         expect(result.params).not.toHaveProperty("groupByKey");
       });
     });
+
+    // @regression: Pipeline metrics must not be dropped when hasEvalMixedWithTraceMetrics fires.
+    // Before the guard, buildMixedEvalTimeseriesQuery only received simpleMetrics,
+    // so pipeline series (requiresSubquery=true) vanished from the output.
+    it("preserves pipeline metrics when mixed with trace and eval simple metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // All three metric aliases must be present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("2__metadata_thread_id__cardinality");
+    });
+
+    // @regression: count-like trace metrics (count(), uniq(TraceId)) mixed with eval
+    // metrics previously threw because extractTraceAggregationColumn returned null for
+    // expressions without a table.column reference.
+    it("handles count() trace metric mixed with evaluation metrics", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      // Should NOT throw — count-like metrics must be handled explicitly
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      // The per-trace CTE should exist
+      expect(result.sql).toMatch(/WITH\s+per_trace_metrics/);
+    });
+
+    // @regression: timeScale "full" without groupBy must guarantee both 'current' and
+    // 'previous' period rows even when one period has no data. The UNION ALL approach
+    // with per-period CTEs ensures this.
+    it("guarantees both period rows for timeScale full with mixed eval and trace metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must use UNION ALL to guarantee both periods
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("'current' AS period");
+      expect(result.sql).toContain("'previous' AS period");
+
+      // Must use per-period CTEs
+      expect(result.sql).toContain("per_trace_metrics_current");
+      expect(result.sql).toContain("per_trace_metrics_previous");
+    });
   });
 
   describe("buildDataForFilterQuery", () => {
@@ -827,6 +1017,90 @@ describe("aggregation-builder", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");
+    });
+  });
+
+  describe("mapEvalAggregationToOuter", () => {
+    const cases: Array<{ expression: string; expected: string }> = [
+      { expression: "avgIf(toFloat64(es.Passed), cond)", expected: "avg" },
+      { expression: "sumIf(es.Score, cond)", expected: "sum" },
+      { expression: "minIf(es.Score, cond)", expected: "min" },
+      { expression: "maxIf(es.Score, cond)", expected: "max" },
+      // uniqIf -> sum: per-trace count of unique evaluation runs, safe to
+      // sum across traces because EvaluationId is unique per trace.
+      { expression: "uniqIf(es.EvaluationId, cond)", expected: "sum" },
+      { expression: "countIf(es.Score, cond)", expected: "sum" },
+      // quantileExactIf collapses to avg — an approximation that preserves
+      // monotonic ordering of the metric across periods.
+      { expression: "quantileExactIf(0.5)(es.Score, cond)", expected: "avg" },
+    ];
+
+    for (const { expression, expected } of cases) {
+      const name = expression.split("(")[0];
+      it(`maps ${name} to ${expected}`, () => {
+        expect(mapEvalAggregationToOuter(expression)).toBe(expected);
+      });
+    }
+
+    it("returns null for unknown aggregation patterns", () => {
+      expect(mapEvalAggregationToOuter("stddevIf(es.Score, cond)")).toBeNull();
+    });
+  });
+
+  describe("extractTraceAggregationColumn", () => {
+    it("returns null for expressions that do not contain a column reference", () => {
+      // No `<alias>.<column>` shape at all — should not match anything.
+      expect(extractTraceAggregationColumn("some_udf(42)")).toBeNull();
+    });
+
+    it("handles bracketed Attributes columns", () => {
+      expect(
+        extractTraceAggregationColumn(
+          "uniqIf(ts.Attributes['langwatch.user_id'], ts.Attributes['langwatch.user_id'] != '')",
+        ),
+      ).toBe("ts.Attributes['langwatch.user_id']");
+    });
+
+    it("handles dot-access columns wrapped in coalesce+sum", () => {
+      expect(
+        extractTraceAggregationColumn("coalesce(sum(ts.TotalCost), 0)"),
+      ).toBe("ts.TotalCost");
+    });
+  });
+
+  describe("hasEvalMixedWithTraceMetrics", () => {
+    // Minimal MetricTranslation-shaped fixtures — the helper only inspects
+    // `requiredJoins`, so other fields are intentionally stub values.
+    type MetricStub = Parameters<typeof hasEvalMixedWithTraceMetrics>[0][number];
+    const evalMetric = {
+      selectExpression: "avgIf(es.Passed, 1)",
+      alias: "e",
+      requiredJoins: ["evaluation_runs"],
+      params: {},
+    } as unknown as MetricStub;
+    const traceMetric = {
+      selectExpression: "sum(ts.TotalCost)",
+      alias: "t",
+      requiredJoins: [],
+      params: {},
+    } as unknown as MetricStub;
+
+    it("returns true when both eval and trace metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([evalMetric, traceMetric])).toBe(
+        true,
+      );
+    });
+
+    it("returns false when only eval metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([evalMetric])).toBe(false);
+    });
+
+    it("returns false when only trace metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([traceMetric])).toBe(false);
+    });
+
+    it("returns false for an empty list", () => {
+      expect(hasEvalMixedWithTraceMetrics([])).toBe(false);
     });
   });
 });
