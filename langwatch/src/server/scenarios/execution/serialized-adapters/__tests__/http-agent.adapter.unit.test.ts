@@ -277,6 +277,44 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
+  describe("when scenarioMappings are on the agent config", () => {
+    it("merges resolved mappings into the template context, overriding defaults", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        bodyTemplate: '{"query": "{{query}}", "history": {{context}}}',
+        scenarioMappings: {
+          query: { type: "source", sourceId: "scenario", path: ["input"] },
+          context: { type: "source", sourceId: "scenario", path: ["messages"] },
+        },
+      };
+      const adapter = new SerializedHttpAgentAdapter(config);
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+      const body = JSON.parse(callArgs?.body as string);
+      expect(body.query).toBe("Hello");
+      expect(body.history).toEqual([{ role: "user", content: "Hello" }]);
+    });
+  });
+
+  describe("when no scenarioMappings are on the agent config", () => {
+    it("falls back to legacy template context with input, messages, threadId", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        bodyTemplate: '{"input": "{{input}}", "messages": {{messages}}}',
+      };
+      const adapter = new SerializedHttpAgentAdapter(config);
+
+      await adapter.call(defaultInput);
+
+      const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+      const body = JSON.parse(callArgs?.body as string);
+      expect(body.input).toBe("Hello");
+      expect(body.messages).toEqual([{ role: "user", content: "Hello" }]);
+    });
+  });
+
   describe("trace ID capture", () => {
     it("exposes captured trace ID after a request", async () => {
       mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
