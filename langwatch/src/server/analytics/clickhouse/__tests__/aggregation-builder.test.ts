@@ -724,6 +724,75 @@ describe("aggregation-builder", () => {
         expect(outerSelect).not.toContain("es.");
       });
     });
+
+    // @regression: Pipeline metrics must not be dropped when hasEvalMixedWithTraceMetrics fires.
+    // Before the guard, buildMixedEvalTimeseriesQuery only received simpleMetrics,
+    // so pipeline series (requiresSubquery=true) vanished from the output.
+    it("preserves pipeline metrics when mixed with trace and eval simple metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // All three metric aliases must be present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("2__metadata_thread_id__cardinality");
+    });
+
+    // @regression: count-like trace metrics (count(), uniq(TraceId)) mixed with eval
+    // metrics previously threw because extractTraceAggregationColumn returned null for
+    // expressions without a table.column reference.
+    it("handles count() trace metric mixed with evaluation metrics", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      // Should NOT throw — count-like metrics must be handled explicitly
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      // The per-trace CTE should exist
+      expect(result.sql).toMatch(/WITH\s+per_trace_metrics/);
+    });
+
+    // @regression: timeScale "full" without groupBy must guarantee both 'current' and
+    // 'previous' period rows even when one period has no data. The UNION ALL approach
+    // with per-period CTEs ensures this.
+    it("guarantees both period rows for timeScale full with mixed eval and trace metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must use UNION ALL to guarantee both periods
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("'current' AS period");
+      expect(result.sql).toContain("'previous' AS period");
+
+      // Must use per-period CTEs
+      expect(result.sql).toContain("per_trace_metrics_current");
+      expect(result.sql).toContain("per_trace_metrics_previous");
+    });
   });
 
   describe("buildDataForFilterQuery", () => {
