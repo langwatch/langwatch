@@ -116,7 +116,7 @@ describe("SignaturePromptEditorBridge", () => {
   describe("when initialLocalConfig is computed", () => {
     it("uses localPromptConfig when present on node data", () => {
       const localConfig: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [{ role: "system", content: "You are helpful" }],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -128,12 +128,37 @@ describe("SignaturePromptEditorBridge", () => {
       expect(mockNodeDataToLocalPromptConfig).not.toHaveBeenCalled();
     });
 
-    it("returns undefined when node has promptId", () => {
+    it("falls back to nodeDataToLocalPromptConfig when node has promptId but no localPromptConfig", () => {
+      const fallbackConfig: LocalPromptConfig = {
+        llm: { model: "gpt-5-mini" },
+        messages: [{ role: "system", content: "You are helpful" }],
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+      };
+      mockNodeDataToLocalPromptConfig.mockReturnValue(fallbackConfig);
+
+      const node = createSignatureNode({
+        promptId: "prompt-from-other-project",
+        parameters: [
+          { identifier: "llm", type: "llm", value: { model: "gpt-5-mini" } },
+          { identifier: "instructions", type: "str", value: "You are helpful" },
+        ],
+      });
+      render(<SignaturePromptEditorBridge node={node} />);
+
+      // Bridge should provide fallback so the drawer can use it when DB query returns null
+      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
+      expect(capturedProps.initialLocalConfig).toBe(fallbackConfig);
+    });
+
+    it("returns undefined when node has promptId but no inline parameters", () => {
+      mockNodeDataToLocalPromptConfig.mockReturnValue(undefined);
+
       const node = createSignatureNode({ promptId: "prompt-123" });
       render(<SignaturePromptEditorBridge node={node} />);
 
+      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
       expect(capturedProps.initialLocalConfig).toBeUndefined();
-      expect(mockNodeDataToLocalPromptConfig).not.toHaveBeenCalled();
     });
 
     it("falls back to nodeDataToLocalPromptConfig when no promptId and no localPromptConfig", () => {
@@ -159,7 +184,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [
           { identifier: "input", type: "str" },
@@ -187,7 +212,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [
@@ -215,7 +240,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -243,7 +268,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -279,7 +304,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [{ identifier: "question", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -440,7 +465,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [{ role: "system", content: "Be helpful" }],
         inputs: [{ identifier: "query", type: "str" }],
         outputs: [{ identifier: "response", type: "str" }],
@@ -484,7 +509,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
@@ -537,7 +562,7 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       const config: LocalPromptConfig = {
-        llm: { model: "gpt-4" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [
           { identifier: "input", type: "str" },
