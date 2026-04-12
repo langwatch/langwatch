@@ -504,15 +504,8 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
-                    <Menu.Item
-                      value="logout"
-                      onClick={() =>
-                        void signOut({
-                          callbackUrl: window.location.origin,
-                        })
-                      }
-                    >
-                      Logout
+                    <Menu.Item value="logout" asChild>
+                      <a href="/api/auth/logout">Logout</a>
                     </Menu.Item>
                   </Menu.ItemGroup>
                 </Menu.Content>

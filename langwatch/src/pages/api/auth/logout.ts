@@ -21,6 +21,8 @@ export default async function logoutHandler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
+  console.log(`[LOGOUT] ${req.method} /api/auth/logout callbackUrl=${req.query.callbackUrl ?? "none"} cookie=${req.headers.cookie ? "present" : "absent"}`);
+
   if (req.method !== "POST" && req.method !== "GET") {
     res.status(405).json({ error: "Method not allowed" });
     return;
@@ -90,17 +92,13 @@ export default async function logoutHandler(
 
   res.setHeader("Set-Cookie", clearCookies);
 
-  // If a callbackUrl is provided (GET from full-page navigation), redirect.
-  // Otherwise return JSON (POST from fetch).
-  const rawCallbackUrl =
-    typeof req.query.callbackUrl === "string" ? req.query.callbackUrl : null;
-  if (rawCallbackUrl) {
-    // Prevent open redirect: only allow same-origin relative paths.
-    const callbackUrl =
-      rawCallbackUrl.startsWith("/") && !rawCallbackUrl.startsWith("//")
-        ? rawCallbackUrl
-        : "/";
-    res.redirect(302, callbackUrl);
+  // GET requests (from full-page navigation or direct link) always redirect
+  // to the signin page with `logged_out=true` so the auto-redirect to Auth0
+  // is skipped and the user sees a "Signed out" confirmation instead of being
+  // silently re-authenticated via Google SSO.
+  // POST requests return JSON for programmatic use.
+  if (req.method === "GET") {
+    res.redirect(302, "/auth/signin?logged_out=true");
   } else {
     res.status(200).json({ success: true });
   }

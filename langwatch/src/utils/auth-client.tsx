@@ -254,6 +254,7 @@ export const signOut = async (opts?: {
   // because / renders client-side and in Auth0 mode the signin page
   // auto-fires signIn("auth0") which silently re-authenticates via
   // Google SSO before the user even sees the page.
+  console.log("[SIGNOUT] navigating to /api/auth/logout");
   navigate("/api/auth/logout?callbackUrl=%2Fauth%2Fsignin");
 };
 
