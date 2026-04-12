@@ -233,6 +233,25 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 
   /**
+   * Tell BetterAuth's rate limiter (and session IP tracking) which
+   * headers carry the real client IP. The default is `["x-forwarded-for"]`
+   * which works for most proxies, but behind Cloudflare the definitive
+   * header is `cf-connecting-ip` — it's always a single IP set by
+   * Cloudflare itself, not a forwarding chain. We list both so the
+   * setup works with and without Cloudflare. The order matters:
+   * BetterAuth takes the first header that has a valid IP.
+   */
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: [
+        "cf-connecting-ip",
+        "x-forwarded-for",
+        "x-real-ip",
+      ],
+    },
+  },
+
+  /**
    * Route OAuth callback errors to our Next.js `/auth/error` page (which
    * handles the friendly messages for `DIFFERENT_EMAIL_NOT_ALLOWED`,
    * `SSO_PROVIDER_NOT_ALLOWED`, `OAuthAccountNotLinked`, etc.). Without
@@ -336,9 +355,9 @@ export const auth = betterAuth({
     max: 100,
     storage: secondaryStorage ? "secondary-storage" : "memory",
     customRules: {
-      "/sign-in/email": { window: 60 * 15, max: 10 },
-      "/sign-up/email": { window: 60 * 60, max: 20 },
-      "/sign-in/social": { window: 60 * 15, max: 20 },
+      "/sign-in/email": { window: 60 * 15, max: 30 },
+      "/sign-up/email": { window: 60 * 60, max: 50 },
+      "/sign-in/social": { window: 60 * 15, max: 50 },
       // BetterAuth's password reset endpoints are `request-password-reset`
       // and `reset-password`. The NextAuth-era rule named `/forget-password`
       // didn't match anything under BetterAuth — we ported it literally

@@ -153,8 +153,11 @@ const config = {
     config.resolve.alias["react-dom"] = `${__dirname}/node_modules/react-dom`;
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
-    // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
-    config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
+    // NOTE: zod alias was removed during the BetterAuth migration.
+    // BetterAuth depends on Zod v4 (for z.ipv4() etc.) while our app uses
+    // Zod v3. The old alias forced ALL imports to Zod v3, breaking
+    // BetterAuth at compile time. pnpm's strict node_modules layout
+    // already isolates the two versions correctly.
 
     // Add fallback for pino logger requirements (browser-side)
     if (!config.isServer) {

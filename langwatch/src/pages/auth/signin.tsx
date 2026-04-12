@@ -33,16 +33,16 @@ export default function SignIn({ session }: { session: Session | null }) {
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
+  const isSocialProvider =
+    isAuthProvider && isAuthProvider !== "email";
+
   useEffect(() => {
-    if (!publicEnv.data) {
-      return;
-    }
+    if (!publicEnv.data) return;
 
     if (
       error !== "OAuthAccountNotLinked" &&
       !session &&
-      isAuthProvider &&
-      isAuthProvider !== "email"
+      isSocialProvider
     ) {
       setTimeout(
         () => {
@@ -51,7 +51,7 @@ export default function SignIn({ session }: { session: Session | null }) {
         error ? 2000 : 0,
       );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider, error]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -61,11 +61,11 @@ export default function SignIn({ session }: { session: Session | null }) {
     return null;
   }
 
-  return isAuthProvider && isAuthProvider !== "email" ? (
-    <Box padding="12px">Redirecting to Sign in...</Box>
-  ) : (
-    <SignInForm />
-  );
+  if (isSocialProvider) {
+    return <Box padding="12px">Redirecting to Sign in...</Box>;
+  }
+
+  return <SignInForm />;
 }
 
 export const getServerSideProps = async (

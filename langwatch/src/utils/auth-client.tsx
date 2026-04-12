@@ -220,7 +220,14 @@ export const signOut = async (opts?: {
   callbackUrl?: string;
   redirect?: boolean;
 }): Promise<void> => {
-  await client.signOut();
+  // Call our dedicated logout endpoint which explicitly clears cookies
+  // via Next.js res.setHeader. This is more reliable than relying on
+  // BetterAuth's client.signOut() which goes through toNodeHandler's
+  // Set-Cookie translation. The endpoint also handles DB + Redis cleanup.
+  await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+  });
   if (opts?.redirect === false) return;
   navigate(safeRedirectTarget(opts?.callbackUrl));
 };
