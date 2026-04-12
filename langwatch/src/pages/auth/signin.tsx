@@ -8,7 +8,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,7 +28,6 @@ import { SignInError } from "./error";
 export default function SignIn({ session }: { session: Session | null }) {
   const query = useSearchParams();
   const error = query?.get("error");
-  const loggedOut = query?.get("logged_out") === "true";
 
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
@@ -40,7 +38,6 @@ export default function SignIn({ session }: { session: Session | null }) {
 
   useEffect(() => {
     if (!publicEnv.data) return;
-    if (loggedOut) return;
 
     if (
       error !== "OAuthAccountNotLinked" &&
@@ -54,7 +51,7 @@ export default function SignIn({ session }: { session: Session | null }) {
         error ? 2000 : 0,
       );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error, loggedOut]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -62,34 +59,6 @@ export default function SignIn({ session }: { session: Session | null }) {
 
   if (!publicEnv.data) {
     return null;
-  }
-
-  if (isSocialProvider && loggedOut) {
-    return (
-      <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
-        <Card.Root>
-          <Card.Header>
-            <HStack gap={4}>
-              <LogoIcon width={30.69} height={42} />
-              <Heading size="lg" as="h1">
-                Signed out
-              </Heading>
-            </HStack>
-          </Card.Header>
-          <Card.Body>
-            <VStack width="full" gap={4}>
-              <Text>You have been signed out successfully.</Text>
-              <Button
-                colorPalette="orange"
-                onClick={() => void signIn(isAuthProvider, { callbackUrl })}
-              >
-                Sign in again
-              </Button>
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      </Container>
-    );
   }
 
   if (isSocialProvider) {
