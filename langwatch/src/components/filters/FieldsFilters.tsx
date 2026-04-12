@@ -567,6 +567,25 @@ function ListSelection({
 		overscan: 5,
 	});
 
+	// When nested content appears/disappears (selection changes), the virtual
+	// item's height changes. measure() is wrong here — it clears the size cache
+	// back to estimateSize (36px), and React won't re-call measureElement refs
+	// (same function, same element). Instead, imperatively re-measure all visible
+	// DOM elements so the virtualizer picks up the new heights directly.
+	const currentValuesKey = currentValues.join(",");
+	useEffect(() => {
+		if (!parentRef.current) return;
+		const frameId = requestAnimationFrame(() => {
+			parentRef.current
+				?.querySelectorAll<HTMLElement>("[data-index]")
+				.forEach((el) => {
+					virtualizer.measureElement(el);
+				});
+		});
+		return () => cancelAnimationFrame(frameId);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [virtualizer, currentValuesKey]);
+
 	const isEmpty = options && options.length === 0 && !showCustomValue;
 
 	// Handle selecting custom value

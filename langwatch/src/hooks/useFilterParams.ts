@@ -1,7 +1,10 @@
 import { useRouter } from "next/router";
 import qs from "qs";
 import { usePeriodSelector } from "../components/PeriodSelector";
-import { filterOutEmptyFilters } from "../server/analytics/utils";
+import {
+  countActiveFilters,
+  filterOutEmptyFilters,
+} from "../server/analytics/utils";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
@@ -10,6 +13,28 @@ export type FilterParam =
   | string[]
   | Record<string, string[]>
   | Record<string, Record<string, string[]>>;
+
+// Shared qs options — kept in one place so parse/stringify never drift.
+// allowDots: true is used for filter parsing (e.g. evaluations.passed.eval-1)
+// allowDots: false is used for parseCurrentQuery to avoid merging unrelated
+// dot-separated keys (e.g. "group_by=topics.topics") into nested objects.
+const FILTER_PARSE_OPTIONS = {
+  allowDots: true,
+  comma: true,
+  allowEmptyArrays: true,
+} as const;
+
+const CURRENT_QUERY_PARSE_OPTIONS = {
+  allowDots: false,
+  comma: true,
+  allowEmptyArrays: true,
+} as const;
+
+const QUERY_STRINGIFY_OPTIONS = {
+  allowDots: true,
+  arrayFormat: "comma" as const,
+  allowEmptyArrays: true,
+} as const;
 
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
@@ -22,11 +47,7 @@ export const useFilterParams = () => {
   const filters: Partial<Record<FilterField, FilterParam>> = {};
 
   const queryString = router.asPath.split("?")[1] ?? "";
-  const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
-    allowDots: true,
-    comma: true,
-    allowEmptyArrays: true,
-  });
+  const queryParams = qs.parse(queryString, FILTER_PARSE_OPTIONS);
 
   for (const [filterKey, filter] of Object.entries(availableFilters)) {
     const param = queryParams[filter.urlKey];
@@ -117,28 +138,33 @@ export const useFilterParams = () => {
     }
   }
 
+  // Read the query from window.location.search (always current after
+  // history.pushState) instead of router.query/router.asPath (React state,
+  // stale between renders) to avoid race conditions when multiple filter
+  // changes happen before React re-renders.
+  const parseCurrentQuery = () => {
+    const search =
+      typeof window !== "undefined" ? window.location.search.slice(1) : "";
+    return qs.parse(search, CURRENT_QUERY_PARSE_OPTIONS);
+  };
+
   const setFilter = (filter: FilterField, params: FilterParam) => {
     const filterUrl = availableFilters[filter].urlKey;
+    const currentQuery = parseCurrentQuery();
     void router.push(
       "?" +
         qs.stringify(
           {
             ...Object.fromEntries(
-              Object.entries(router.query).filter(
+              Object.entries(currentQuery).filter(
                 ([key]) =>
-                  key !== "project" &&
                   key !== filterUrl &&
                   !key.startsWith(filterUrl + "."),
               ),
             ),
             [filterUrl]: params,
           },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
@@ -146,14 +172,14 @@ export const useFilterParams = () => {
   };
 
   const setFilters = (filtersToSet: Record<FilterField, FilterParam>) => {
+    const currentQuery = parseCurrentQuery();
     void router.push(
       "?" +
         qs.stringify(
           {
             ...Object.fromEntries(
-              Object.entries(router.query).filter(
+              Object.entries(currentQuery).filter(
                 ([key]) =>
-                  key !== "project" &&
                   !Object.values(availableFilters).some(
                     (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
                   ),
@@ -168,12 +194,7 @@ export const useFilterParams = () => {
               {},
             ),
           },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
@@ -181,20 +202,23 @@ export const useFilterParams = () => {
   };
 
   const clearFilters = () => {
+    const currentQuery = parseCurrentQuery();
     void router.push(
-      {
-        pathname: router.pathname,
-        query: Object.fromEntries(
-          Object.entries(router.query).filter(
-            ([key]) =>
-              key !== "query" &&
-              !Object.values(availableFilters).some(
-                (filter) =>
-                  key === filter.urlKey || key.startsWith(filter.urlKey + "."),
-              ),
+      "?" +
+        qs.stringify(
+          Object.fromEntries(
+            Object.entries(currentQuery).filter(
+              ([key]) =>
+                key !== "query" &&
+                !Object.values(availableFilters).some(
+                  (filter) =>
+                    key === filter.urlKey ||
+                    key.startsWith(filter.urlKey + "."),
+                ),
+            ),
           ),
+          QUERY_STRINGIFY_OPTIONS,
         ),
-      },
       undefined,
       { shallow: true, scroll: false },
     );
@@ -214,20 +238,15 @@ export const useFilterParams = () => {
   };
 
   const setNegateFilters = (negateFilters: boolean) => {
-    const { project: _project, ...rest } = router.query;
+    const currentQuery = parseCurrentQuery();
     void router.push(
       "?" +
         qs.stringify(
           {
-            ...rest,
+            ...currentQuery,
             negateFilters: negateFilters ? "true" : "false",
           },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
+          QUERY_STRINGIFY_OPTIONS,
         ),
       undefined,
       { shallow: true, scroll: false },
@@ -235,7 +254,7 @@ export const useFilterParams = () => {
   };
 
   const nonEmptyFilters = filterOutEmptyFilters(filterParams.filters);
-  const filterCount = Object.keys(nonEmptyFilters).length;
+  const filterCount = countActiveFilters(filterParams.filters);
   const hasAnyFilters = filterCount > 0;
 
   return {
