@@ -210,6 +210,7 @@ export const useRunEvalution = () => {
           workflow_version_id: versionId ?? "",
           evaluate_on: evaluate_on ?? "full",
           dataset_entry,
+          origin: "evaluation",
         },
       };
       postEvent(payload);
