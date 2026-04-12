@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
@@ -45,6 +45,17 @@ export function GroupDetailDialog({
   const queryClient = api.useContext();
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [pendingName, setPendingName] = useState(group.name);
+  const [committedName, setCommittedName] = useState(group.name);
+
+  useEffect(() => {
+    if (open) {
+      setPendingName(group.name);
+      setCommittedName(group.name);
+    }
+  }, [open, group.id, group.name]);
+
+  const nameChanged = pendingName.trim() !== committedName && pendingName.trim() !== "";
 
   const detail = api.group.getById.useQuery(
     { organizationId, groupId: group.id },
@@ -65,7 +76,21 @@ export function GroupDetailDialog({
   );
 
   const removeMember = api.group.removeMember.useMutation({
-    onSuccess: () => void queryClient.group.getById.invalidate(),
+    onSuccess: () => {
+      void queryClient.group.getById.invalidate();
+      void queryClient.group.listAll.invalidate();
+    },
+    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+  });
+
+  const renameGroup = api.group.rename.useMutation({
+    onSuccess: (updated) => {
+      void queryClient.group.listAll.invalidate();
+      void queryClient.group.getById.invalidate();
+      setPendingName(updated.name);
+      setCommittedName(updated.name);
+      toaster.create({ title: "Group renamed", type: "success" });
+    },
     onError: (e) => toaster.create({ title: e.message, type: "error" }),
   });
 
@@ -87,6 +112,7 @@ export function GroupDetailDialog({
         if (!e.open) {
           setAddMemberId("");
           setMemberSearch("");
+          setPendingName(group.name);
           onClose();
         }
       }}
@@ -102,6 +128,14 @@ export function GroupDetailDialog({
             <Spinner />
           ) : !d ? null : (
             <VStack gap={5} align="stretch">
+              {canManage && !d.scimSource && (
+                <Input
+                  value={pendingName}
+                  onChange={(e) => setPendingName(e.target.value)}
+                  placeholder="Group name"
+                  size="md"
+                />
+              )}
               <HStack>
                 <SourceBadge scimSource={d.scimSource} />
                 <Text fontSize="sm" color="fg.muted">
@@ -289,6 +323,23 @@ export function GroupDetailDialog({
             </VStack>
           )}
         </Dialog.Body>
+        {canManage && !detail.data?.scimSource && nameChanged && (
+          <Dialog.Footer>
+            <Button
+              colorPalette="blue"
+              loading={renameGroup.isPending}
+              onClick={() =>
+                renameGroup.mutate({
+                  organizationId,
+                  groupId: group.id,
+                  name: pendingName.trim(),
+                })
+              }
+            >
+              Save
+            </Button>
+          </Dialog.Footer>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );

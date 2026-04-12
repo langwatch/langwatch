@@ -12,6 +12,7 @@ vi.mock("~/server/db", () => ({
       findUnique: vi.fn(),
     },
     organizationUser: { create: vi.fn() },
+    roleBinding: { create: vi.fn() },
     $transaction: vi.fn(),
   },
 }));

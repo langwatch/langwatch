@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
-import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, Users, X } from "lucide-react";
 import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -645,8 +645,10 @@ function TeamCard({
             {team.projects.length}{" "}
             {team.projects.length === 1 ? "project" : "projects"}
             {" · "}
-            {team.directMembers.length}{" "}
-            {team.directMembers.length === 1 ? "member" : "members"}
+            {team.directMembers.filter((m) => m.userId).length}{" "}
+            {team.directMembers.filter((m) => m.userId).length === 1 ? "member" : "members"}
+            {team.directMembers.some((m) => m.groupId) &&
+              ` · ${team.directMembers.filter((m) => m.groupId).length} ${team.directMembers.filter((m) => m.groupId).length === 1 ? "group" : "groups"}`}
             {team.projectOnlyAccess.length > 0 &&
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
@@ -696,18 +698,16 @@ function TeamCard({
                 )}
               </HStack>
 
-              {team.directMembers.length === 0 ? (
+              {team.directMembers.filter((m) => m.userId).length === 0 ? (
                 <Text fontSize="sm" color="gray.400" fontStyle="italic">
                   No members yet.
                 </Text>
               ) : (
-                team.directMembers.map((m, i) => (
+                team.directMembers.filter((m) => m.userId).map((m, i, arr) => (
                   <HStack
                     key={i}
                     py={2}
-                    borderBottomWidth={
-                      i < team.directMembers.length - 1 ? "1px" : "0"
-                    }
+                    borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
                   >
@@ -757,6 +757,42 @@ function TeamCard({
                 Editing a role here changes their team-level access, inherited
                 by all projects below.
               </Text>
+
+              {/* ── Groups with team-level bindings ── */}
+              {team.directMembers.some((m) => m.groupId) && (
+                <Box mt={4}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="gray.500"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    mb={3}
+                  >
+                    Groups
+                  </Text>
+                  {team.directMembers.filter((m) => m.groupId).map((m, i, arr) => (
+                    <HStack
+                      key={i}
+                      py={2}
+                      borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
+                      borderColor="gray.100"
+                      _dark={{ borderColor: "gray.700" }}
+                    >
+                      <Users size={16} color="gray" />
+                      <Text fontSize="sm" flex={1}>
+                        {m.name}
+                      </Text>
+                      <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                        {m.role}
+                      </Badge>
+                      <Link href="/settings/groups" fontSize="xs" color="purple.400">
+                        Manage →
+                      </Link>
+                    </HStack>
+                  ))}
+                </Box>
+              )}
             </Box>
 
             {/* ── Project-only access (read-only at team level) ── */}

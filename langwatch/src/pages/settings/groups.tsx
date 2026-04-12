@@ -12,8 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus, Trash2 } from "lucide-react";
-import { MoreVertical } from "react-feather";
+import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CreateGroupDialog } from "~/components/settings/CreateGroupDialog";
 import { GroupDetailDialog } from "~/components/settings/GroupDetailDialog";
@@ -164,6 +163,18 @@ function GroupsSettings() {
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
+                              <Menu.Item
+                                value="edit"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedGroup(g);
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Edit2 size={14} />
+                                  Edit
+                                </Box>
+                              </Menu.Item>
                               <Menu.Item
                                 value="delete"
                                 color="red.500"
