@@ -89,6 +89,7 @@ const mockPush = vi.fn((url: string) => {
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    pathname: "",
     asPath:
       Object.keys(mockQuery).length > 0
         ? "/test?" + qs.stringify(mockQuery)
@@ -159,8 +160,7 @@ describe("GuardrailsDrawer + CurrentDrawer Integration (REGRESSION)", () => {
     vi.useRealTimers();
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("REGRESSION: selecting evaluator in list should return to guardrails drawer", async () => {
+  it("REGRESSION: selecting evaluator in list returns to guardrails drawer", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Start with guardrails drawer open
@@ -251,8 +251,7 @@ describe("GuardrailsDrawer + EvaluatorListDrawer Integration", () => {
     vi.useRealTimers();
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("CRITICAL: evaluator selection persists when returning from EvaluatorListDrawer", async () => {
+  it("CRITICAL: evaluator selection persists when returning from EvaluatorListDrawer", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Helper to determine which drawer should be open based on URL
@@ -388,8 +387,7 @@ describe("GuardrailsDrawer", () => {
       expect(screen.queryByText("Integration Code")).not.toBeInTheDocument();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("opens evaluator list when clicking Select Evaluator", async () => {
+    it("opens evaluator list when clicking Select Evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<GuardrailsDrawer open={true} />, { wrapper: Wrapper });
@@ -408,8 +406,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("sets flow callback when clicking Select Evaluator", async () => {
+    it("sets flow callback when clicking Select Evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<GuardrailsDrawer open={true} />, { wrapper: Wrapper });
@@ -450,8 +447,7 @@ describe("GuardrailsDrawer", () => {
       callbacks?.onSelect?.(mockEvaluators[0]!);
     };
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows New Guardrail header after selection", async () => {
+    it("shows New Guardrail header after selection", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -459,8 +455,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays selected evaluator name", async () => {
+    it("displays selected evaluator name", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -468,8 +463,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays evaluator slug", async () => {
+    it("displays evaluator slug", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -477,8 +471,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows clickable selection box with caret for changing evaluator", async () => {
+    it("shows clickable selection box with caret for changing evaluator", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -487,8 +480,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows integration code section", async () => {
+    it("shows integration code section", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -496,8 +488,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows Python (async) selected by default in language dropdown", async () => {
+    it("shows Python (async) selected by default in language dropdown", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -507,8 +498,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows language dropdown with Python, TypeScript, and cURL options", async () => {
+    it("shows language dropdown with Python, TypeScript, and cURL options", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -517,8 +507,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows API key instructions with link", async () => {
+    it("shows API key instructions with link", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -529,8 +518,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("code contains evaluator slug", async () => {
+    it("code contains evaluator slug", async () => {
       await selectEvaluator();
 
       await waitFor(() => {
@@ -566,8 +554,7 @@ describe("GuardrailsDrawer", () => {
       return user;
     };
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("switches to TypeScript when selected in dropdown", async () => {
+    it("switches to TypeScript when selected in dropdown", async () => {
       const user = await selectEvaluatorAndWait();
 
       const select = screen.getByRole("combobox") as HTMLSelectElement;
@@ -579,8 +566,7 @@ describe("GuardrailsDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("switches to cURL when selected in dropdown", async () => {
+    it("switches to cURL when selected in dropdown", async () => {
       const user = await selectEvaluatorAndWait();
 
       const select = screen.getByRole("combobox") as HTMLSelectElement;
@@ -594,8 +580,7 @@ describe("GuardrailsDrawer", () => {
   });
 
   describe("Copy functionality", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("has copy button in code block", async () => {
+    it("has copy button in code block", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<GuardrailsDrawer open={true} />, { wrapper: Wrapper });
@@ -620,8 +605,7 @@ describe("GuardrailsDrawer", () => {
   });
 
   describe("Change evaluator via selection box", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("selection box is clickable after evaluator selection", async () => {
+    it("selection box is clickable after evaluator selection", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<GuardrailsDrawer open={true} />, { wrapper: Wrapper });
@@ -677,8 +661,7 @@ describe("GuardrailsDrawer", () => {
   });
 
   describe("Full flow with EvaluatorListDrawer", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("GuardrailsDrawer registers flow callback when clicking Select Evaluator", async () => {
+    it("GuardrailsDrawer registers flow callback when clicking Select Evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       // Render GuardrailsDrawer

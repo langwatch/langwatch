@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerContext } from "../../types";
 import { handleAddToDataset } from "../addToDataset";
 
-vi.mock("~/server/api/routers/datasetRecord", () => ({
+vi.mock("~/server/api/routers/datasetRecord.utils", () => ({
   createManyDatasetRecords: vi.fn(),
 }));
 
@@ -70,8 +70,7 @@ describe("handleAddToDataset", () => {
       expect(mapTraceToDatasetEntry).toHaveBeenCalled();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("creates dataset records with mapped entries", async () => {
+    it("creates dataset records with mapped entries", async () => {
       await handleAddToDataset(context);
 
       expect(createManyDatasetRecords).toHaveBeenCalledWith({
@@ -89,8 +88,7 @@ describe("handleAddToDataset", () => {
   });
 
   describe("when entry contains string with null bytes", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("removes null bytes from the string", async () => {
+    it("removes null bytes from the string", async () => {
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { field1: "test\u0000value", field2: "clean\u0000\u0000data" },
       ]);
@@ -136,8 +134,7 @@ describe("handleAddToDataset", () => {
   });
 
   describe("when entry contains non-string values", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("preserves the value unchanged", async () => {
+    it("preserves the value unchanged", async () => {
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { number: 42, boolean: "true", object: '{"nested":"value"}' },
       ]);
@@ -184,8 +181,7 @@ describe("handleAddToDataset", () => {
   });
 
   describe("when createManyDatasetRecords throws an error", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("captures the exception with full context", async () => {
+    it("captures the exception with full context", async () => {
       const error = new Error("Dataset creation failed");
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([{}]);
       vi.mocked(createManyDatasetRecords).mockRejectedValue(error);

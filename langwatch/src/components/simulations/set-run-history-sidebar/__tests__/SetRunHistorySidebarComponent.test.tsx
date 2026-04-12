@@ -50,7 +50,9 @@ describe("<SetRunHistorySidebarComponent/>", () => {
     const internalSetId = "__internal__proj_abc123__on-platform-scenarios";
 
     describe("when the empty state is displayed", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: ON_PLATFORM_DISPLAY_NAME is currently "Manual Run" not "On-Platform Scenarios".
+      // The source (internal-set-id.ts) needs to be updated to use "On-Platform Scenarios"
+      // before this test can pass.
       it.skip('shows "On-Platform Scenarios" in the message', () => {
         const props = createMockProps({
           scenarioSetId: internalSetId,

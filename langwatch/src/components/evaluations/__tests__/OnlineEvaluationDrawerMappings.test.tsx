@@ -87,8 +87,7 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     await vi.advanceTimersByTimeAsync(50);
   };
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("INTEGRATION: shows trace mapping dropdown with nested fields when configuring evaluator", async () => {
+  it("INTEGRATION: shows trace mapping dropdown with nested fields when configuring evaluator", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Start with online evaluation drawer open
@@ -204,8 +203,7 @@ describe("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integration", (
     });
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("INTEGRATION: selecting spans shows nested span subfields", async () => {
+  it("INTEGRATION: selecting spans shows nested span subfields", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     // Start with online evaluation drawer open

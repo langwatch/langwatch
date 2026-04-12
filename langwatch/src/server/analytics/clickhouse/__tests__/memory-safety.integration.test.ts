@@ -265,7 +265,7 @@ describe("memory-safety integration", () => {
 
   describe("when executing generated analytics queries against ClickHouse", () => {
     for (const { label, series } of REPRESENTATIVE_METRICS) {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       const itFn = label === "events.event_details (cardinality)" ? it.skip : it;
       itFn(`executes valid SQL for ${label}`, async () => {
         const { sql, params } = buildQuery(series);
@@ -309,7 +309,7 @@ describe("memory-safety integration", () => {
     });
 
     for (const { label, series } of REPRESENTATIVE_METRICS) {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       const itFn = label === "events.event_details (cardinality)" ? it.skip : it;
       itFn(`completes ${label} within 50MB memory budget`, async () => {
         resetParamCounter();
@@ -350,7 +350,7 @@ describe("memory-safety integration", () => {
     const TIME_BUDGET_MS = 5_000;
 
     for (const { label, series } of REPRESENTATIVE_METRICS) {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       const itFn = label === "events.event_details (cardinality)" ? it.skip : it;
       itFn(`completes ${label} within ${TIME_BUDGET_MS}ms`, async () => {
         const { sql, params } = buildQuery(series);

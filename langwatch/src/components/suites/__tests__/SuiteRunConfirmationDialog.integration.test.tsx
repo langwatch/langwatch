@@ -35,14 +35,13 @@ describe("<SuiteRunConfirmationDialog/>", () => {
   });
 
   describe("given the dialog is open", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays the estimated run count in the title", () => {
+    it("displays the estimated run count in the title", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
       expect(
-        screen.getByText(/Start 6 new runs\?/),
+        screen.getByText(/Run 6 simulations\?/),
       ).toBeInTheDocument();
     });
 
@@ -178,8 +177,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       expect(screen.getByText("repeats")).toBeInTheDocument();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("multiplies estimated jobs by repeatCount", () => {
+    it("multiplies estimated jobs by repeatCount", () => {
       render(
         <SuiteRunConfirmationDialog {...defaultProps} repeatCount={3} />,
         { wrapper: Wrapper },
@@ -187,7 +185,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
 
       // 3 scenarios * 2 targets * 3 repeats = 18
       expect(
-        screen.getByText(/Start 18 new runs\?/),
+        screen.getByText(/Run 18 simulations\?/),
       ).toBeInTheDocument();
       expect(screen.getByText("Run 18 Jobs")).toBeInTheDocument();
     });
@@ -204,8 +202,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
   });
 
   describe("when using singular forms", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("displays singular nouns for count of 1", () => {
+    it("displays singular nouns for count of 1", () => {
       render(
         <SuiteRunConfirmationDialog
           {...defaultProps}
@@ -218,7 +215,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       expect(screen.getByText("scenario")).toBeInTheDocument();
       expect(screen.getByText("target")).toBeInTheDocument();
       expect(
-        screen.getByText(/Start 1 new run\?/),
+        screen.getByText(/Run 1 simulation\?/),
       ).toBeInTheDocument();
       expect(screen.getByText("Run 1 Job")).toBeInTheDocument();
     });

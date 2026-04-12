@@ -389,8 +389,7 @@ describe("THREAD_MAPPINGS", () => {
 });
 
 describe("formatSpansDigest", () => {
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("produces a string digest from spans", () => {
+  it("produces a string digest from spans", async () => {
     const spans = [
       {
         span_id: "span-1",
@@ -427,21 +426,19 @@ describe("formatSpansDigest", () => {
       },
     ];
 
-    const result = formatSpansDigest(spans);
+    const result = await formatSpansDigest(spans);
 
     expect(typeof result).toBe("string");
     expect(result).toContain("my-agent");
     expect(result).toContain("gpt-4o");
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("returns empty digest for empty spans array", () => {
-    const result = formatSpansDigest([]);
+  it("returns empty digest for empty spans array", async () => {
+    const result = await formatSpansDigest([]);
     expect(typeof result).toBe("string");
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("includes error information in the digest", () => {
+  it("includes error information in the digest", async () => {
     const spans = [
       {
         span_id: "span-err",
@@ -461,15 +458,14 @@ describe("formatSpansDigest", () => {
       },
     ];
 
-    const result = formatSpansDigest(spans);
+    const result = await formatSpansDigest(spans);
 
     expect(typeof result).toBe("string");
     expect(result).toContain("failing-tool");
     expect(result).toContain("ERROR");
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
-  it.skip("joins multiple trace digests with separator for thread use", () => {
+  it("joins multiple trace digests with separator for thread use", async () => {
     const trace1Spans = [
       {
         span_id: "s1",
@@ -499,9 +495,11 @@ describe("formatSpansDigest", () => {
       },
     ];
 
-    const result = [trace1Spans, trace2Spans]
-      .map((spans) => formatSpansDigest(spans))
-      .join("\n\n---\n\n");
+    const result = (
+      await Promise.all(
+        [trace1Spans, trace2Spans].map((spans) => formatSpansDigest(spans)),
+      )
+    ).join("\n\n---\n\n");
 
     expect(typeof result).toBe("string");
     expect(result).toContain("first-span");

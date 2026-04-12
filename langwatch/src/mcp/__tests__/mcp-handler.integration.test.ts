@@ -244,7 +244,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Route Mounting ---
 
   describe("when Streamable HTTP transport is accessed at /mcp", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("responds with 200 and mcp-session-id header", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -260,7 +260,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when GET /mcp/health is requested without credentials", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("responds with 200 and status ok", async () => {
       const res = await sendRequest({
         server,
@@ -275,7 +275,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when a non-MCP route is requested", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("is not intercepted by the MCP handler", async () => {
       const res = await sendRequest({
         server,
@@ -290,7 +290,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when MCP POST request body is sent", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns a valid initialize result", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -314,7 +314,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- OAuth authorization_code ---
 
   describe("when OAuth metadata is fetched", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("advertises authorization_code grant", async () => {
       const res = await sendRequest({
         server,
@@ -334,7 +334,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is used with a valid auth code and PKCE verifier", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("issues an access token", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -363,7 +363,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is used with an invalid code_verifier", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 400 with invalid_grant error", async () => {
       const code = randomUUID();
       const { codeChallenge } = createPkceChallenge();
@@ -386,7 +386,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is missing the code parameter", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -404,7 +404,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when authorization_code grant is missing the code_verifier parameter", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -422,7 +422,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an unsupported grant_type is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 400 with unsupported_grant_type error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -439,7 +439,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an invalid authorization code is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 400 with invalid_grant error", async () => {
       // Redis returns null for unknown codes (default mock behavior)
       const addr = server.address();
@@ -459,7 +459,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Bearer Token DB Validation ---
 
   describe("when a direct API key is used as Bearer token", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("validates against the database and accepts the connection", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -477,7 +477,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an invalid Bearer token is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
@@ -492,7 +492,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an OAuth-issued access token is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("re-validates the API key against the database during MCP init", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -535,7 +535,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Redis Token Storage ---
 
   describe("when OAuth token is looked up from Redis after in-memory cache miss", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("accepts the connection via Redis lookup", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -579,7 +579,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an expired OAuth token is used", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
@@ -604,7 +604,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- CORS ---
 
   describe("when a request to /mcp includes an Origin header", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("includes CORS headers in the response", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -631,7 +631,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an OPTIONS preflight request is sent to /mcp", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("responds with 200 and CORS headers", async () => {
       const res = await sendRequest({
         server,
@@ -650,7 +650,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: session re-auth ---
 
   describe("when an existing session request omits the Authorization header", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 401 on POST", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -672,7 +672,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.status).toBe(401);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 401 on GET", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -693,7 +693,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(res.status).toBe(401);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 401 on DELETE", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -716,7 +716,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an existing session request has a wrong Bearer token", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 401", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -745,7 +745,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: rate limiting ---
 
   describe("when /oauth/token is called more than 10 times per minute", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns 429", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -775,7 +775,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Standalone Package Isolation ---
 
   describe("when the standalone mcp-server package is checked for isolation", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("does not import any main app modules", async () => {
       // The mcp-server package's create-mcp-server.ts should not import
       // from the main app (~/server/db, ~/server/redis, etc.)
@@ -796,7 +796,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Tool Availability ---
 
   describe("when a client lists available tools via /mcp", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("includes observability, platform, and documentation tools", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -859,7 +859,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   //   - "LANGWATCH_API_KEY is required" (globalConfig has no apiKey)
 
   describe("when search_traces is called within an authenticated session", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("receives the API key from session config via AsyncLocalStorage", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -912,7 +912,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when search_traces is called via an OAuth-obtained access token", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("propagates the OAuth-resolved API key through to the tool handler", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -980,7 +980,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when fetch_langwatch_docs is called with a specific URL", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("returns page content", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -1029,7 +1029,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when fetch_langwatch_docs is called with a specific docs page URL", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("fetches the page and returns its content", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
@@ -1082,7 +1082,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- SSE Transport Tool Execution ---
 
   describe("when a tool is called via the SSE transport", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: @langwatch/mcp-server package not built (no dist/ directory). Run build in packages/mcp-server to enable.
     it.skip("propagates the API key to search_traces", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
