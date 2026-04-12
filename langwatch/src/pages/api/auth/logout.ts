@@ -76,9 +76,6 @@ export default async function logoutHandler(
   //
   // BetterAuth uses `__Secure-` prefix on HTTPS (production) and no prefix
   // on HTTP (dev). We clear BOTH variants to handle all environments.
-  const isSecure = req.headers["x-forwarded-proto"] === "https" ||
-    req.headers.host?.includes("langwatch.ai");
-
   const cookieNames = [
     "better-auth.session_token",
     "better-auth.session_data",
@@ -87,12 +84,8 @@ export default async function logoutHandler(
 
   const clearCookies: string[] = [];
   for (const name of cookieNames) {
-    // Clear the non-prefixed version (HTTP / dev)
     clearCookies.push(`${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
-    // Clear the __Secure- prefixed version (HTTPS / production)
-    if (isSecure) {
-      clearCookies.push(`__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
-    }
+    clearCookies.push(`__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
   }
 
   res.setHeader("Set-Cookie", clearCookies);
