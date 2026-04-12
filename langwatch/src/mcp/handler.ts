@@ -508,11 +508,18 @@ export function createMcpHandler(): McpHandler {
   }
 
   /** Refresh the Redis TTL when a session is active (called on each request). */
-  async function touchSessionInRedis(sessionId: string): Promise<void> {
+  async function touchSessionInRedis(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
     if (!redis) return;
     try {
       await redis.expire(
         `${REDIS_SESSION_PREFIX}${sessionId}`,
+        SESSION_REDIS_TTL_SECONDS,
+      );
+      await redis.expire(
+        `${REDIS_SESSION_SET_PREFIX}${apiKey}`,
         SESSION_REDIS_TTL_SECONDS,
       );
     } catch {
@@ -858,19 +865,35 @@ export function createMcpHandler(): McpHandler {
         const redisApiKey = await getSessionFromRedis(sessionId);
         if (redisApiKey) {
           // Recreate transport locally for this pod.
-          // The SDK transport starts uninitialized — we patch its inner state
-          // so it accepts non-init requests with the existing session ID.
+          // WORKAROUND: The SDK transport starts uninitialized — we patch its
+          // inner state so it accepts non-init requests with the existing
+          // session ID. This accesses private fields of the SDK's
+          // StreamableHTTPServerTransport wrapper and the underlying
+          // WebStandardStreamableHTTPServerTransport.
+          // Tested against @modelcontextprotocol/sdk@1.26.0.
+          // See: https://github.com/modelcontextprotocol/typescript-sdk/issues/1658
           const transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => sessionId,
           });
-          const inner = (
-            transport as unknown as {
-              _webStandardTransport: {
-                _initialized: boolean;
-                sessionId: string;
-              };
-            }
-          )._webStandardTransport;
+
+          // Runtime assertion: verify the internal structure hasn't changed
+          const transportAny = transport as Record<string, unknown>;
+          if (
+            !transportAny._webStandardTransport ||
+            typeof transportAny._webStandardTransport !== "object"
+          ) {
+            logger.error(
+              "StreamableHTTPServerTransport internal structure changed — " +
+                "Redis session recovery unavailable. Update the SDK workaround.",
+            );
+            sendJson(res, 500, { error: "Internal server error" });
+            return;
+          }
+
+          const inner = transportAny._webStandardTransport as Record<
+            string,
+            unknown
+          >;
           inner._initialized = true;
           inner.sessionId = sessionId;
 
@@ -905,7 +928,7 @@ export function createMcpHandler(): McpHandler {
         }
 
         session.lastActivityAt = Date.now();
-        touchSessionInRedis(sessionId).catch(() => {});
+        touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
         await handleWithSessionConfig(session.apiKey, () =>
           session.transport.handleRequest(req, res, body),
         );
