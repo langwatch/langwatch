@@ -21,7 +21,7 @@ export default async function logoutHandler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  if (req.method !== "POST") {
+  if (req.method !== "POST" && req.method !== "GET") {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
@@ -89,7 +89,16 @@ export default async function logoutHandler(
   }
 
   res.setHeader("Set-Cookie", clearCookies);
-  res.status(200).json({ success: true });
+
+  // If a callbackUrl is provided (GET from full-page navigation), redirect.
+  // Otherwise return JSON (POST from fetch).
+  const callbackUrl =
+    typeof req.query.callbackUrl === "string" ? req.query.callbackUrl : null;
+  if (callbackUrl) {
+    res.redirect(302, callbackUrl);
+  } else {
+    res.status(200).json({ success: true });
+  }
 }
 
 function extractCookie(cookieHeader: string, name: string): string | null {

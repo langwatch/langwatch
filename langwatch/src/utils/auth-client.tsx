@@ -220,16 +220,19 @@ export const signOut = async (opts?: {
   callbackUrl?: string;
   redirect?: boolean;
 }): Promise<void> => {
-  // Call our dedicated logout endpoint which explicitly clears cookies
-  // via Next.js res.setHeader. This is more reliable than relying on
-  // BetterAuth's client.signOut() which goes through toNodeHandler's
-  // Set-Cookie translation. The endpoint also handles DB + Redis cleanup.
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "include",
-  });
-  if (opts?.redirect === false) return;
-  navigate(safeRedirectTarget(opts?.callbackUrl));
+  if (opts?.redirect === false) {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+    return;
+  }
+  // Navigate directly to the logout endpoint as a full page navigation.
+  // This guarantees the Set-Cookie headers are applied by the browser
+  // (no fetch/AJAX race conditions). The endpoint clears cookies and
+  // redirects to callbackUrl. This mirrors how NextAuth's signOut worked.
+  const callbackUrl = safeRedirectTarget(opts?.callbackUrl);
+  navigate(`/api/auth/logout?callbackUrl=${encodeURIComponent(callbackUrl)}`);
 };
 
 const SOCIAL_PROVIDERS = new Set([
