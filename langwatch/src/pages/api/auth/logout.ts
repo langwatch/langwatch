@@ -26,9 +26,12 @@ export default async function logoutHandler(
     return;
   }
 
-  // Read the session token from the cookie header (same name BetterAuth uses)
+  // Read the session token from the cookie header. BetterAuth uses
+  // `__Secure-` prefix on HTTPS, plain name on HTTP.
   const cookies = req.headers.cookie ?? "";
-  const sessionToken = extractCookie(cookies, "better-auth.session_token");
+  const sessionToken =
+    extractCookie(cookies, "__Secure-better-auth.session_token") ??
+    extractCookie(cookies, "better-auth.session_token");
 
   if (sessionToken) {
     // Decode the signed cookie to get the raw token
@@ -70,11 +73,20 @@ export default async function logoutHandler(
   // Explicitly clear ALL BetterAuth cookies with matching attributes.
   // This is the critical part — we set Set-Cookie headers directly on the
   // Next.js response, bypassing BetterAuth's internal cookie handling.
-  const clearCookies = [
-    "better-auth.session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
-    "better-auth.session_data=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
-    "better-auth.dont_remember=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+  //
+  // BetterAuth uses `__Secure-` prefix on HTTPS (production) and no prefix
+  // on HTTP (dev). We clear BOTH variants to handle all environments.
+  const cookieNames = [
+    "better-auth.session_token",
+    "better-auth.session_data",
+    "better-auth.dont_remember",
   ];
+
+  const clearCookies: string[] = [];
+  for (const name of cookieNames) {
+    clearCookies.push(`${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+    clearCookies.push(`__Secure-${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
+  }
 
   res.setHeader("Set-Cookie", clearCookies);
   res.status(200).json({ success: true });
