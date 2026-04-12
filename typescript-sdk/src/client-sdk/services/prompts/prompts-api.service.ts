@@ -223,6 +223,20 @@ export class PromptsApiService {
     if (error) this.handleApiError(`delete tag "${tagName}"`, error);
   }
 
+  /**
+   * Renames an existing prompt tag.
+   * @param tag The current tag name.
+   * @param name The new tag name.
+   * @throws {PromptsApiError} If the API call fails.
+   */
+  async renameTag({ tag, name }: { tag: string; name: string }): Promise<void> {
+    const { error } = await this.apiClient.PUT(
+      "/api/prompts/tags/{tag}",
+      { params: { path: { tag } }, body: { name } },
+    );
+    if (error) this.handleApiError(`rename tag "${tag}"`, error);
+  }
+
   async assignTag({
     id,
     tag,

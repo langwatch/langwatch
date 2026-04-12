@@ -43,6 +43,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     list(): Promise<TagDefinition[]>;
     create(params: { name: string }): Promise<CreatedTag>;
     delete(tagName: string): Promise<void>;
+    rename(oldName: string, newName: string): Promise<void>;
   };
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
@@ -54,6 +55,8 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
       list: () => this.promptsApiService.listTags(),
       create: ({ name }) => this.promptsApiService.createTag({ name }),
       delete: (tagName) => this.promptsApiService.deleteTag(tagName),
+      rename: (oldName, newName) =>
+        this.promptsApiService.renameTag({ tag: oldName, name: newName }),
     };
   }
 
