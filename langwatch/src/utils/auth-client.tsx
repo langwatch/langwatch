@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactElement, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -68,6 +68,16 @@ interface UseSessionOptions {
   onUnauthenticated?: () => void;
 }
 
+/**
+ * Fetches the impersonation-aware session from our custom endpoint.
+ *
+ * BetterAuth's built-in `client.useSession()` calls `/api/auth/get-session`
+ * which returns the raw admin session — no impersonation rewrite. Our
+ * `/api/auth/session` endpoint runs through `getServerAuthSession` which
+ * reads the `Session.impersonating` JSON column and rewrites `session.user`
+ * to the impersonated identity. This mirrors how NextAuth's `useSession`
+ * worked — both server and client saw the same impersonation-aware session.
+ */
 export const useSession = (
   options?: UseSessionOptions,
 ): {
@@ -75,19 +85,31 @@ export const useSession = (
   status: SessionStatus;
   update: () => Promise<void>;
 } => {
-  const { data, isPending, refetch } = client.useSession();
-  const adapted = adaptSession(data);
+  const [data, setData] = useState<CompatSession | null>(null);
+  const [isPending, setIsPending] = useState(true);
+
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      const json = await res.json();
+      setData(adaptSession(json));
+    } catch {
+      setData(null);
+    } finally {
+      setIsPending(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchSession();
+  }, [fetchSession]);
+
   const status: SessionStatus = isPending
     ? "loading"
-    : adapted
+    : data
       ? "authenticated"
       : "unauthenticated";
 
-  // Fire the onUnauthenticated callback from an effect, NOT during render.
-  // NextAuth's old `useSession({required, onUnauthenticated})` also ran the
-  // callback as a side effect — we just need to honor React's rules by
-  // moving it out of the render path so Strict Mode's double-invoke doesn't
-  // fire navigate twice. Caught by CodeRabbit in PR review.
   useEffect(() => {
     if (
       options?.required &&
@@ -99,11 +121,9 @@ export const useSession = (
   }, [options?.required, options?.onUnauthenticated, status]);
 
   return {
-    data: adapted,
+    data,
     status,
-    update: async () => {
-      await refetch();
-    },
+    update: fetchSession,
   };
 };
 
