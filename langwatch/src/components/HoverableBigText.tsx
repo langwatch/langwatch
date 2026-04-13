@@ -46,7 +46,7 @@ export function ExpandedTextDialog({
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
             ) : (
-              <Markdown className="markdown">
+              <Markdown>
                 {typeof textExpanded === "string"
                   ? textExpanded
                       .replace(/(\n+)\\(\n+)/g, "$1$2")

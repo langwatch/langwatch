@@ -1,19 +1,26 @@
-import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
+import {
+  Card,
+  Grid,
+  GridItem,
+  Heading,
+  HStack,
+  IconButton,
+  Tabs,
+} from "@chakra-ui/react";
+import { ArrowUpRight } from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../hooks/usePublicEnv";
 import { analyticsMetrics } from "../server/analytics/registry";
 import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
+import { Link } from "./ui/link";
+import { Tooltip } from "./ui/tooltip";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
 export function LLMMetrics() {
-  const publicEnv = usePublicEnv();
-  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
-  const isNotQuickwit = !isQuickwit;
-  const { hasPermission } = useOrganizationTeamProject();
+  const { hasPermission, project } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {
     graphId: "llmCallsGraph",
@@ -63,28 +70,6 @@ export function LLMMetrics() {
     timeScale: "full",
   };
 
-  const promptAndCompletionTokensSummary: CustomGraphInput = {
-    graphId: "promptAndCompletionTokensSummary",
-    graphType: "summary",
-    series: [
-      {
-        name: "Prompt Tokens",
-        metric: "performance.prompt_tokens",
-        aggregation: "sum",
-        colorSet: analyticsMetrics.performance.prompt_tokens.colorSet,
-      },
-      {
-        name: "Completion Tokens",
-        metric: "performance.completion_tokens",
-        aggregation: "sum",
-        colorSet: analyticsMetrics.performance.completion_tokens.colorSet,
-      },
-    ],
-    groupBy: undefined,
-    includePrevious: false,
-    timeScale: "full",
-  };
-
   const tokensGraph: CustomGraphInput = {
     graphId: "tokensGraph",
     graphType: "stacked_bar",
@@ -124,40 +109,86 @@ export function LLMMetrics() {
     timeScale: "full",
   };
 
+  const errorTrend: CustomGraphInput = {
+    graphId: "overviewErrorTrend",
+    graphType: "stacked_bar",
+    series: [
+      {
+        name: "Traces",
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+        colorSet: "positiveNegativeNeutral",
+      },
+    ],
+    groupBy: "error.has_error",
+    includePrevious: false,
+    timeScale: ONE_DAY,
+  };
+
+  const latencyTrend: CustomGraphInput = {
+    graphId: "overviewLatencyTrend",
+    graphType: "line",
+    series: [
+      {
+        name: analyticsMetrics.performance.completion_time.label,
+        metric: "performance.completion_time",
+        aggregation: "median",
+        colorSet: analyticsMetrics.performance.completion_time.colorSet,
+      },
+      {
+        name: analyticsMetrics.performance.first_token.label,
+        metric: "performance.first_token",
+        aggregation: "median",
+        colorSet: analyticsMetrics.performance.first_token.colorSet,
+      },
+    ],
+    groupBy: undefined,
+    includePrevious: false,
+    timeScale: ONE_DAY,
+  };
+
   return (
     <>
-      <Heading as="h1" size="lg" paddingTop={6} paddingBottom={2}>
-        LLM Metrics
-      </Heading>
-      <Grid
-        width="100%"
-        templateColumns={isNotQuickwit ? "1fr 0.5fr" : "1fr"}
-        gap={6}
-      >
-        <GridItem colSpan={isNotQuickwit ? 2 : undefined}>
+      <HStack paddingTop={6} paddingBottom={2}>
+        <Heading as="h2" size="md">
+          LLM Metrics
+        </Heading>
+        <Tooltip content="View LLM Metrics dashboard">
+          <Link href={`/${project?.slug}/analytics/metrics`}>
+            <IconButton
+              aria-label="View LLM Metrics"
+              variant="ghost"
+              size="xs"
+              color="fg.subtle"
+            >
+              <ArrowUpRight size={14} />
+            </IconButton>
+          </Link>
+        </Tooltip>
+      </HStack>
+      <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
+        <GridItem colSpan={2}>
           <Card.Root>
             <Card.Body>
               <Tabs.Root variant="plain" defaultValue="llmCallsGraph">
                 <Tabs.List gap={12}>
-                  {isNotQuickwit && (
-                    <Tabs.Trigger
-                      value="llmCallsGraph"
-                      paddingX={0}
-                      paddingBottom={4}
-                    >
-                      <CustomGraph
-                        input={{
-                          ...llmCallsGraph,
-                          graphType: "summary",
-                          groupBy: undefined,
-                        }}
-                        titleProps={{
-                          fontSize: 16,
-                          color: "fg",
-                        }}
-                      />
-                    </Tabs.Trigger>
-                  )}
+                  <Tabs.Trigger
+                    value="llmCallsGraph"
+                    paddingX={0}
+                    paddingBottom={4}
+                  >
+                    <CustomGraph
+                      input={{
+                        ...llmCallsGraph,
+                        graphType: "summary",
+                        groupBy: undefined,
+                      }}
+                      titleProps={{
+                        textStyle: "sm",
+                        color: "fg",
+                      }}
+                    />
+                  </Tabs.Trigger>
                   {hasPermission("cost:view") && (
                     <Tabs.Trigger
                       value="totalCostGraph"
@@ -167,7 +198,7 @@ export function LLMMetrics() {
                       <CustomGraph
                         input={{ ...totalCostGraph, graphType: "summary" }}
                         titleProps={{
-                          fontSize: 16,
+                          textStyle: "sm",
                           color: "fg",
                         }}
                       />
@@ -178,27 +209,13 @@ export function LLMMetrics() {
                     paddingX={0}
                     paddingBottom={4}
                   >
-                    <VStack align="start">
-                      {isNotQuickwit ? (
-                        <CustomGraph
-                          input={totalTokensSummary}
-                          titleProps={{
-                            fontSize: 16,
-                            color: "fg",
-                          }}
-                        />
-                      ) : isQuickwit ? (
-                        <CustomGraph
-                          input={promptAndCompletionTokensSummary}
-                          titleProps={{
-                            fontSize: 16,
-                            color: "fg",
-                          }}
-                        />
-                      ) : (
-                        <></>
-                      )}
-                    </VStack>
+                    <CustomGraph
+                      input={totalTokensSummary}
+                      titleProps={{
+                        textStyle: "sm",
+                        color: "fg",
+                      }}
+                    />
                   </Tabs.Trigger>
                   <Tabs.Indicator
                     mt="-1.5px"
@@ -208,11 +225,9 @@ export function LLMMetrics() {
                     bottom={0}
                   />
                 </Tabs.List>
-                {isNotQuickwit && (
-                  <Tabs.Content value="llmCallsGraph">
-                    <CustomGraph input={llmCallsGraph} />
-                  </Tabs.Content>
-                )}
+                <Tabs.Content value="llmCallsGraph">
+                  <CustomGraph input={llmCallsGraph} />
+                </Tabs.Content>
                 {hasPermission("cost:view") && (
                   <Tabs.Content value="totalCostGraph">
                     <CustomGraph input={totalCostGraph} />
@@ -228,23 +243,55 @@ export function LLMMetrics() {
         <GridItem>
           <LLMSummary />
         </GridItem>
-        {isNotQuickwit && (
-          <GridItem>
-            <Card.Root height="full">
-              <Card.Header>
+        <GridItem>
+          <Card.Root height="full">
+            <Card.Header>
+              <HStack gap={1}>
                 <Heading size="sm">Evaluations Summary</Heading>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph
-                  input={{
-                    ...evaluationsSummary,
-                    graphType: "summary",
-                  }}
-                />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-        )}
+                <Tooltip content="View Online Evaluations">
+                  <Link href={`/${project?.slug}/analytics/evaluations`}>
+                    <IconButton
+                      aria-label="View Evaluations"
+                      variant="ghost"
+                      size="2xs"
+                      color="fg.subtle"
+                    >
+                      <ArrowUpRight size={14} />
+                    </IconButton>
+                  </Link>
+                </Tooltip>
+              </HStack>
+            </Card.Header>
+            <Card.Body>
+              <CustomGraph
+                input={{
+                  ...evaluationsSummary,
+                  graphType: "summary",
+                }}
+              />
+            </Card.Body>
+          </Card.Root>
+        </GridItem>
+        <GridItem>
+          <Card.Root height="full">
+            <Card.Header>
+              <Heading size="sm">Error Trend</Heading>
+            </Card.Header>
+            <Card.Body>
+              <CustomGraph input={errorTrend} />
+            </Card.Body>
+          </Card.Root>
+        </GridItem>
+        <GridItem>
+          <Card.Root height="full">
+            <Card.Header>
+              <Heading size="sm">Latency Trend</Heading>
+            </Card.Header>
+            <Card.Body>
+              <CustomGraph input={latencyTrend} />
+            </Card.Body>
+          </Card.Root>
+        </GridItem>
       </Grid>
     </>
   );

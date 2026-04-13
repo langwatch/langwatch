@@ -9,7 +9,6 @@ import type { AppType } from "next/app";
 import type { Session } from "~/server/auth";
 import { SessionProvider } from "~/utils/auth-client";
 import "~/styles/globals.scss";
-import "~/styles/markdown.scss";
 
 import { Inter } from "next/font/google";
 import Head from "next/head";
@@ -476,6 +475,16 @@ export const system = createSystem(defaultConfig, {
       },
     },
     recipes: {
+      skeleton: defineRecipe({
+        base: {
+          "--skeleton-from": "{colors.gray.100}",
+          "--skeleton-to": "{colors.gray.200}",
+          _dark: {
+            "--skeleton-from": "{colors.gray.800}",
+            "--skeleton-to": "{colors.gray.700}",
+          },
+        },
+      }),
       heading: defineRecipe({
         base: {
           fontWeight: "500",

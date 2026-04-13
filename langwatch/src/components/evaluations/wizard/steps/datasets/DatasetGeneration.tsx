@@ -567,7 +567,7 @@ export function DatasetGeneration() {
           </HStack>
         )}
         <Text fontSize="13px" color="fg.muted">
-          <Markdown className="">
+          <Markdown>
             {assistantMessage?.parts[0]?.type === "text"
               ? assistantMessage.parts[0].text
               : ""}

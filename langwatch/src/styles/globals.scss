@@ -62,19 +62,6 @@ label {
         0 0 5px #ed8926;
 }
 
-.markdown {
-    p {
-        padding: 6px 0;
-    }
-
-    ol,
-    ul {
-        padding-left: 40px;
-        &:dir(rtl) {
-            padding-right: 40px;
-        }
-    }
-}
 
 div input[type="number"] {
     appearance: auto;
@@ -301,8 +288,7 @@ span[data-highlight]::after {
     animation: trace-highlight-fade 2s ease-out;
 }
 
-/* Remove recharts focus outlines */
-.recharts-wrapper *:focus,
-.recharts-wrapper *:focus-visible {
-    outline: none !important;
+/* Suppress recharts focus outlines for mouse clicks only; keep :focus-visible for keyboard users */
+.recharts-wrapper *:focus:not(:focus-visible) {
+    outline: none;
 }

@@ -198,7 +198,8 @@ export function CustomDashboardsSection({
             key={dashboard.id}
             position="relative"
             width="full"
-            _hover={{ "& .menu-btn": { opacity: 1 } }}
+            borderRadius="lg"
+            _hover={{ background: "bg.muted", "& .menu-btn": { opacity: 1 } }}
           >
             {isEditing ? (
               <Input
@@ -214,7 +215,7 @@ export function CustomDashboardsSection({
                     setEditingName("");
                   }
                 }}
-                marginLeft={6}
+                marginLeft={4}
                 marginRight={2}
                 marginY={1}
                 fontSize="14px"
@@ -223,7 +224,6 @@ export function CustomDashboardsSection({
               <>
                 <MenuLink
                   href={`/${projectSlug}/analytics/reports?dashboard=${dashboard.id}`}
-                  paddingX={6}
                   isSelected={isSelected}
                 >
                   {dashboard.name}

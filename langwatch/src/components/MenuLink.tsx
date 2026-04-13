@@ -12,6 +12,7 @@ export const MenuLink = ({
   menuEnd,
   isSelected,
   isSelectedAnnotation,
+  disabled,
 }: PropsWithChildren<{
   paddingX?: number;
   href: string;
@@ -20,6 +21,7 @@ export const MenuLink = ({
   isSelected?: boolean;
   isSelectedAnnotation?: boolean;
   includePath?: string;
+  disabled?: boolean;
 }>) => {
   const pathname = usePathname();
   const selected =
@@ -35,15 +37,20 @@ export const MenuLink = ({
       width="full"
       position="relative"
       borderRadius="lg"
-      background={selected ? "bg.muted" : "transparent"}
-      _hover={{ background: "bg.muted" }}
+      background={!disabled && selected ? "bg.muted" : "transparent"}
+      _hover={!disabled ? { background: "bg.muted" } : undefined}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : undefined}
+      opacity={disabled ? 0.4 : undefined}
+      cursor={disabled ? "not-allowed" : undefined}
+      pointerEvents={disabled ? "none" : undefined}
     >
       <NextLink href={href}>
         <HStack width="full" gap={2}>
-          {icon && icon}
+          {icon}
           <Text>{children}</Text>
           <Spacer />
-          {menuEnd && menuEnd}
+          {menuEnd}
         </HStack>
       </NextLink>
     </Link>

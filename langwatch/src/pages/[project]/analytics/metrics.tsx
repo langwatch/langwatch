@@ -1,19 +1,11 @@
-import {
-  Box,
-  Card,
-  GridItem,
-  Heading,
-  HStack,
-  SimpleGrid,
-} from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { Box, HStack, SimpleGrid } from "@chakra-ui/react";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { ChartCard } from "~/components/analytics/ChartCard";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
@@ -21,8 +13,8 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY; // 1440
 
-const LLMMetrics = {
-  graphId: "custom",
+const LLMMetrics: CustomGraphInput = {
+  graphId: "llmMetricsSummary",
   graphType: "summary",
   series: [
     {
@@ -44,13 +36,13 @@ const LLMMetrics = {
       aggregation: "sum",
     },
   ],
-  includePrevious: false,
+  includePrevious: true,
   timeScale: ONE_DAY,
   height: 300,
 };
 
-const LLMSummary = {
-  graphId: "custom",
+const LLMSummary: CustomGraphInput = {
+  graphId: "llmPerformanceSummary",
   graphType: "summary",
   series: [
     {
@@ -78,17 +70,17 @@ const LLMSummary = {
       aggregation: "p90",
     },
   ],
-  includePrevious: false,
+  includePrevious: true,
   timeScale: ONE_DAY,
   height: 300,
 };
 
-const LLMs = {
-  graphId: "custom",
+const llmCallsByModel: CustomGraphInput = {
+  graphId: "llmCallsByModel",
   graphType: "area",
   series: [
     {
-      name: "90th Percentile Completion Time",
+      name: "LLM Calls",
       colorSet: "colors",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -100,12 +92,12 @@ const LLMs = {
   height: 300,
 };
 
-const llmUsage = {
-  graphId: "custom",
+const llmSplitByModel: CustomGraphInput = {
+  graphId: "llmSplitByModel",
   graphType: "donnut",
   series: [
     {
-      name: "90th Percentile Completion Time",
+      name: "LLM Calls",
       colorSet: "colors",
       metric: "metadata.span_type",
       aggregation: "cardinality",
@@ -118,8 +110,8 @@ const llmUsage = {
   height: 300,
 };
 
-const completionTime = {
-  graphId: "custom",
+const completionTime: CustomGraphInput = {
+  graphId: "avgCompletionTimeByModel",
   graphType: "horizontal_bar",
   series: [
     {
@@ -135,12 +127,12 @@ const completionTime = {
   height: 300,
 };
 
-const totalCostPerModel = {
-  graphId: "custom",
+const totalCostPerModel: CustomGraphInput = {
+  graphId: "avgCostPerModel",
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Average total cost average per message",
+      name: "Average cost per message",
       colorSet: "colors",
       metric: "performance.total_cost",
       aggregation: "avg",
@@ -156,12 +148,12 @@ const totalCostPerModel = {
   height: 300,
 };
 
-const averageTokensPerMessage = {
-  graphId: "custom",
+const averageTokensPerMessage: CustomGraphInput = {
+  graphId: "avgTokensPerModel",
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Average completion tokens average per message",
+      name: "Average completion tokens per message",
       colorSet: "colors",
       metric: "performance.completion_tokens",
       aggregation: "avg",
@@ -172,6 +164,62 @@ const averageTokensPerMessage = {
     },
   ],
   groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const latencyTrend: CustomGraphInput = {
+  graphId: "latencyTrend",
+  graphType: "line",
+  series: [
+    {
+      name: "P90 Completion Time",
+      colorSet: "greenTones",
+      metric: "performance.completion_time",
+      aggregation: "p90",
+    },
+    {
+      name: "P90 Time to First Token",
+      colorSet: "cyanTones",
+      metric: "performance.first_token",
+      aggregation: "p90",
+    },
+  ],
+  includePrevious: false,
+  timeScale: ONE_DAY,
+  height: 300,
+};
+
+const tokensPerSecondByModel: CustomGraphInput = {
+  graphId: "tokensPerSecondByModel",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Average tokens per second",
+      colorSet: "cyanTones",
+      metric: "performance.tokens_per_second",
+      aggregation: "avg",
+    },
+  ],
+  groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const errorRateByModel: CustomGraphInput = {
+  graphId: "errorRateByModel",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Traces with errors",
+      colorSet: "orangeTones",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+    },
+  ],
+  groupBy: "error.has_error",
   includePrevious: false,
   timeScale: "full",
   height: 300,
@@ -200,102 +248,38 @@ function MetricsContent() {
     <GraphsLayout title="LLM Metrics">
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">LLM Metrics</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={LLMMetricsFiltered as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Summary</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={LLMSummaryFiltered as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-
-          <GridItem colSpan={4} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">LLM Usage</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={LLMs as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">LLM Split</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={llmUsage as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Completion Time</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={completionTime as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          <ChartCard title="LLM Metrics" colSpan={2}>
+            <CustomGraph input={LLMMetricsFiltered} />
+          </ChartCard>
+          <ChartCard title="Summary" colSpan={2}>
+            <CustomGraph input={LLMSummaryFiltered} />
+          </ChartCard>
+          <ChartCard title="LLM Usage" colSpan={4}>
+            <CustomGraph input={llmCallsByModel} />
+          </ChartCard>
+          <ChartCard title="LLM Split" colSpan={2}>
+            <CustomGraph input={llmSplitByModel} />
+          </ChartCard>
+          <ChartCard title="Average Completion Time" colSpan={2}>
+            <CustomGraph input={completionTime} />
+          </ChartCard>
           {canViewCost && (
-            <GridItem colSpan={2} display="inline-grid">
-              <Card.Root>
-                <Card.Header>
-                  <HStack gap={2}>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">Average Cost Per Message</Heading>
-                  </HStack>
-                </Card.Header>
-                <Card.Body>
-                  <CustomGraph input={totalCostPerModel as CustomGraphInput} />
-                </Card.Body>
-              </Card.Root>
-            </GridItem>
+            <ChartCard title="Average Cost Per Message" colSpan={2}>
+              <CustomGraph input={totalCostPerModel} />
+            </ChartCard>
           )}
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Tokens Per Message</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph
-                  input={averageTokensPerMessage as CustomGraphInput}
-                />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          <ChartCard title="Average Tokens Per Message" colSpan={2}>
+            <CustomGraph input={averageTokensPerMessage} />
+          </ChartCard>
+          <ChartCard title="Latency Trend" colSpan={4}>
+            <CustomGraph input={latencyTrend} />
+          </ChartCard>
+          <ChartCard title="Tokens Per Second" colSpan={2}>
+            <CustomGraph input={tokensPerSecondByModel} />
+          </ChartCard>
+          <ChartCard title="Error Distribution" colSpan={2}>
+            <CustomGraph input={errorRateByModel} />
+          </ChartCard>
         </SimpleGrid>
         <Box padding={3}>
           <FilterSidebar hideTopics={true} />

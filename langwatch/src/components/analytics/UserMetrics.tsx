@@ -1,5 +1,4 @@
-import { Card, Grid, GridItem, Heading, Tabs } from "@chakra-ui/react";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { Card, EmptyState, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
@@ -8,8 +7,9 @@ import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-export const userThreads = {
-  graphId: "custom",
+// Thread-focused: metrics without user grouping
+const threadMetrics: CustomGraphInput = {
+  graphId: "threadMetrics",
   graphType: "summary",
   series: [
     {
@@ -18,36 +18,18 @@ export const userThreads = {
       metric: "metadata.thread_id",
       aggregation: "cardinality",
     },
-
     {
-      name: "Average threads per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-    {
-      name: "Average thread duration",
-      colorSet: "purpleTones",
-      metric: "threads.average_duration_per_thread",
-      aggregation: "avg",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-    {
-      name: "Average messages per user",
+      name: "Avg messages per thread",
       colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
+      pipeline: { field: "thread_id", aggregation: "avg" },
+    },
+    {
+      name: "Avg thread duration",
+      colorSet: "purpleTones",
+      metric: "threads.average_duration_per_thread",
+      aggregation: "avg",
     },
   ],
   includePrevious: false,
@@ -55,10 +37,28 @@ export const userThreads = {
   height: 300,
 };
 
-export function UserMetrics() {
-  const publicEnv = usePublicEnv();
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+const userEmptyState = (
+  <EmptyState.Root size="sm" paddingY={10}>
+    <EmptyState.Content>
+      <VStack textAlign="center">
+        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
+        <EmptyState.Description textStyle="xs">
+          Start tracking users to see metrics here.{" "}
+          <a
+            href="https://langwatch.ai/docs/integration/metadata-and-labels"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            Learn how to set up
+          </a>
+        </EmptyState.Description>
+      </VStack>
+    </EmptyState.Content>
+  </EmptyState.Root>
+);
 
+export function UserMetrics() {
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -100,6 +100,7 @@ export function UserMetrics() {
         metric: "metadata.user_id",
         aggregation: "cardinality",
         colorSet: analyticsMetrics.metadata.user_id.colorSet,
+        noDataUrl: "https://langwatch.ai/docs/integration/metadata-and-labels",
       },
     ],
     groupBy: undefined,
@@ -120,7 +121,7 @@ export function UserMetrics() {
     >
       <GridItem>
         <Card.Root border="1px solid" borderColor="border.emphasized">
-          <Card.Body>
+          <Card.Body paddingTop={2}>
             <Tabs.Root variant="plain" defaultValue="messages">
               <Tabs.List gap={8}>
                 <Tabs.Trigger
@@ -132,7 +133,7 @@ export function UserMetrics() {
                   <CustomGraph
                     input={{ ...messagesGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 14,
+                      textStyle: "sm",
                       color: "fg",
                     }}
                   />
@@ -146,7 +147,7 @@ export function UserMetrics() {
                   <CustomGraph
                     input={{ ...threadsGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 14,
+                      textStyle: "sm",
                       color: "fg",
                     }}
                   />
@@ -160,7 +161,7 @@ export function UserMetrics() {
                   <CustomGraph
                     input={{ ...usersGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 14,
+                      textStyle: "sm",
                       color: "fg",
                     }}
                   />
@@ -180,7 +181,7 @@ export function UserMetrics() {
                 <CustomGraph input={threadsGraph} />
               </Tabs.Content>
               <Tabs.Content value="users">
-                <CustomGraph input={usersGraph} />
+                <CustomGraph input={usersGraph} emptyState={userEmptyState} />
               </Tabs.Content>
             </Tabs.Root>
           </Card.Body>
@@ -196,18 +197,16 @@ export function UserMetrics() {
           </Card.Body>
         </Card.Root>
       </GridItem>
-      {isNotQuickwit && (
-        <GridItem>
-          <Card.Root overflow="auto">
-            <Card.Header>
-              <Heading size="sm">User Threads</Heading>
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph input={userThreads as CustomGraphInput} />
-            </Card.Body>
-          </Card.Root>
-        </GridItem>
-      )}
+      <GridItem>
+        <Card.Root overflow="auto">
+          <Card.Header>
+            <Heading size="sm">Thread Metrics</Heading>
+          </Card.Header>
+          <Card.Body>
+            <CustomGraph input={threadMetrics} />
+          </Card.Body>
+        </Card.Root>
+      </GridItem>
     </Grid>
   );
 }

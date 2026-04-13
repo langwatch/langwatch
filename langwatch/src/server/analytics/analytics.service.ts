@@ -4,10 +4,12 @@
  * Routes analytics queries to ClickHouse.
  */
 
+import { createHash } from "crypto";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "../db";
 import type { FilterField } from "../filters/types";
+import { TtlCache } from "../utils/ttlCache";
 import type {
   TimeseriesResult,
   FilterDataResult,
@@ -17,6 +19,8 @@ import type {
 } from "./types";
 import type { TimeseriesInputType } from "./registry";
 import { getClickHouseAnalyticsService } from "./clickhouse/clickhouse-analytics.service";
+
+const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
 
 /**
  * Dependencies required by AnalyticsService
@@ -35,6 +39,10 @@ export class AnalyticsService {
   private readonly prisma: PrismaClient;
   private readonly chService: AnalyticsBackend;
   private readonly tracer = getLangWatchTracer("langwatch.analytics.service");
+  private readonly timeseriesCache = new TtlCache<TimeseriesResult>(
+    TIMESERIES_CACHE_TTL_MS,
+    "analytics:ts:",
+  );
 
   constructor(deps: AnalyticsServiceDependencies) {
     this.chService = deps.chService;
@@ -59,13 +67,24 @@ export class AnalyticsService {
   }
 
   /**
-   * Get timeseries analytics data
+   * Get timeseries analytics data (with 30s TTL cache)
    */
   async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
     return this.executeWithRouting(
       "getTimeseries",
       input.projectId,
-      () => this.chService.getTimeseries(input),
+      async () => {
+        const hash = createHash("sha256")
+          .update(JSON.stringify(input))
+          .digest("hex");
+        const cacheKey = `${input.projectId}:${hash}`;
+        const cached = await this.timeseriesCache.get(cacheKey);
+        if (cached) return cached;
+
+        const result = await this.chService.getTimeseries(input);
+        await this.timeseriesCache.set(cacheKey, result);
+        return result;
+      },
     );
   }
 
