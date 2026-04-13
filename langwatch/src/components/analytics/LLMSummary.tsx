@@ -1,46 +1,24 @@
-import { Card, Heading } from "@chakra-ui/react";
+import { Card, Heading, HStack, IconButton } from "@chakra-ui/react";
+import { ArrowUpRight } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
+import { Link } from "../ui/link";
+import { Tooltip } from "../ui/tooltip";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 
 export const LLMSummary = () => {
-  const publicEnv = usePublicEnv();
-  const { hasPermission } = useOrganizationTeamProject();
-
-  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
-  const isNotQuickwit = !isQuickwit;
+  const { hasPermission, project } = useOrganizationTeamProject();
 
   const llmSummary: CustomGraphInput = {
     graphId: "llmSummary",
     graphType: "summary",
     series: [
-      ...(isNotQuickwit
-        ? ([
-            {
-              name: "Mean Tokens per Message",
-              metric: "performance.total_tokens",
-              aggregation: "avg",
-              colorSet: analyticsMetrics.performance.total_tokens.colorSet,
-            },
-          ] as CustomGraphInput["series"])
-        : isQuickwit
-          ? ([
-              {
-                name: "Mean Prompt Tokens per Message",
-                metric: "performance.prompt_tokens",
-                aggregation: "avg",
-                colorSet: analyticsMetrics.performance.prompt_tokens.colorSet,
-              },
-              {
-                name: "Mean Completion Tokens per Message",
-                metric: "performance.completion_tokens",
-                aggregation: "avg",
-                colorSet:
-                  analyticsMetrics.performance.completion_tokens.colorSet,
-              },
-            ] as CustomGraphInput["series"])
-          : []),
+      {
+        name: "Mean Tokens per Message",
+        metric: "performance.total_tokens",
+        aggregation: "avg",
+        colorSet: analyticsMetrics.performance.total_tokens.colorSet,
+      },
       ...(hasPermission("cost:view")
         ? ([
             {
@@ -72,7 +50,21 @@ export const LLMSummary = () => {
   return (
     <Card.Root>
       <Card.Header>
-        <Heading size="sm">Summary</Heading>
+        <HStack gap={1}>
+          <Heading size="sm">Summary</Heading>
+          <Tooltip content="View LLM Metrics">
+            <Link href={`/${project?.slug}/analytics/metrics`}>
+              <IconButton
+                aria-label="View LLM Metrics"
+                variant="ghost"
+                size="2xs"
+                color="fg.subtle"
+              >
+                <ArrowUpRight size={14} />
+              </IconButton>
+            </Link>
+          </Tooltip>
+        </HStack>
       </Card.Header>
       <Card.Body>
         <CustomGraph input={llmSummary} />

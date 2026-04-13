@@ -1,22 +1,19 @@
 import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { ChartCard } from "~/components/analytics/ChartCard";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
-import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
-import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-const messagesCount = {
+const messagesCount: CustomGraphInput = {
   graphId: "custom",
   graphType: "summary",
   series: [
@@ -48,7 +45,7 @@ const messagesCount = {
   height: 300,
 };
 
-const userCountGrapgh = {
+const userCountGrapgh: CustomGraphInput = {
   graphId: "custom",
   graphType: "area",
   series: [
@@ -64,7 +61,7 @@ const userCountGrapgh = {
   height: 300,
 };
 
-const dailyActiveThreads = {
+const dailyActiveThreads: CustomGraphInput = {
   graphId: "custom",
   graphType: "area",
   series: [
@@ -80,7 +77,7 @@ const dailyActiveThreads = {
   height: 300,
 };
 
-const powerUsers = {
+const powerUsers: CustomGraphInput = {
   graphId: "custom",
   graphType: "horizontal_bar",
   series: [
@@ -97,7 +94,7 @@ const powerUsers = {
   height: 300,
 };
 
-const maxMessagePerThread = {
+const maxMessagePerThread: CustomGraphInput = {
   graphId: "custom",
   graphType: "scatter",
   series: [
@@ -118,7 +115,7 @@ const maxMessagePerThread = {
   height: 300,
 };
 
-const userThreads = {
+const userThreads: CustomGraphInput = {
   graphId: "custom",
   graphType: "summary",
   series: [
@@ -156,10 +153,6 @@ const userThreads = {
 };
 
 function UsersContent() {
-  const publicEnv = usePublicEnv();
-  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
-  const isNotQuickwit = !isQuickwit;
-
   return (
     <GraphsLayout title="Users">
       <HStack alignItems="start" width="full" gap={6}>
@@ -170,7 +163,7 @@ function UsersContent() {
                 <Heading size="sm">User Traces</Heading>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={messagesCount as CustomGraphInput} />
+                <CustomGraph input={messagesCount} />
               </Card.Body>
             </Card.Root>
           </GridItem>
@@ -180,81 +173,25 @@ function UsersContent() {
                 <Heading size="sm">User Threads</Heading>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={userThreads as CustomGraphInput} />
+                <CustomGraph input={userThreads} />
               </Card.Body>
             </Card.Root>
           </GridItem>
-
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Daily Users</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={userCountGrapgh as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Daily Threads</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={dailyActiveThreads as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Max Traces Per Thread</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={maxMessagePerThread as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">User Leaderboard</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={powerUsers as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={4} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">User Feedbacks</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                {isNotQuickwit ? (
-                  <FeedbacksTable />
-                ) : isQuickwit ? (
-                  <QuickwitNote />
-                ) : null}
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          <ChartCard title="Daily Users" colSpan={2}>
+            <CustomGraph input={userCountGrapgh} />
+          </ChartCard>
+          <ChartCard title="Daily Threads" colSpan={2}>
+            <CustomGraph input={dailyActiveThreads} />
+          </ChartCard>
+          <ChartCard title="Max Traces Per Thread" colSpan={2}>
+            <CustomGraph input={maxMessagePerThread} />
+          </ChartCard>
+          <ChartCard title="User Leaderboard" colSpan={2}>
+            <CustomGraph input={powerUsers} />
+          </ChartCard>
+          <ChartCard title="User Feedbacks" colSpan={4}>
+            <FeedbacksTable />
+          </ChartCard>
         </SimpleGrid>
         <FilterSidebar hideTopics={true} />
       </HStack>

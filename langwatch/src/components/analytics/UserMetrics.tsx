@@ -1,5 +1,4 @@
 import { Card, Grid, GridItem, Heading, Tabs } from "@chakra-ui/react";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
@@ -56,9 +55,6 @@ export const userThreads = {
 };
 
 export function UserMetrics() {
-  const publicEnv = usePublicEnv();
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
-
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -132,7 +128,7 @@ export function UserMetrics() {
                   <CustomGraph
                     input={{ ...messagesGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 14,
+                      textStyle: "sm",
                       color: "fg",
                     }}
                   />
@@ -146,7 +142,7 @@ export function UserMetrics() {
                   <CustomGraph
                     input={{ ...threadsGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 14,
+                      textStyle: "sm",
                       color: "fg",
                     }}
                   />
@@ -160,7 +156,7 @@ export function UserMetrics() {
                   <CustomGraph
                     input={{ ...usersGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 14,
+                      textStyle: "sm",
                       color: "fg",
                     }}
                   />
@@ -196,18 +192,16 @@ export function UserMetrics() {
           </Card.Body>
         </Card.Root>
       </GridItem>
-      {isNotQuickwit && (
-        <GridItem>
-          <Card.Root overflow="auto">
-            <Card.Header>
-              <Heading size="sm">User Threads</Heading>
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph input={userThreads as CustomGraphInput} />
-            </Card.Body>
-          </Card.Root>
-        </GridItem>
-      )}
+      <GridItem>
+        <Card.Root overflow="auto">
+          <Card.Header>
+            <Heading size="sm">User Threads</Heading>
+          </Card.Header>
+          <Card.Body>
+            <CustomGraph input={userThreads} />
+          </Card.Body>
+        </Card.Root>
+      </GridItem>
     </Grid>
   );
 }
