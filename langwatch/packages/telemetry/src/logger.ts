@@ -99,8 +99,9 @@ export function createLogger(
 // ── Browser ──────────────────────────────────────────────────────────
 
 function createBrowserLogger(name: string): PinoLogger {
-  const isTest = process.env.NODE_ENV === "test";
-  const level = isTest ? "error" : (process.env.PINO_LOG_LEVEL ?? "info");
+  const hasProcess = typeof process !== "undefined";
+  const isTest = hasProcess && process.env.NODE_ENV === "test";
+  const level = isTest ? "error" : ((hasProcess ? process.env.PINO_LOG_LEVEL : undefined) ?? "info");
 
   return pino({
     name,
