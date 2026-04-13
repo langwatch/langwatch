@@ -962,6 +962,7 @@ const CustomGraph_ = React.memo(
           <Tooltip
             content={<ChartTooltip />}
             formatter={tooltipValueFormatter}
+            cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
             labelFormatter={(_label, payload) => {
               if (input.graphType === "scatter") return "";
               return (
@@ -1034,7 +1035,11 @@ const CustomGraph_ = React.memo(
                         ? 0.8
                         : undefined
                   }
-                  radius={isBarType ? [3, 3, 0, 0] : undefined}
+                  radius={
+                    isBarType && !["stacked_bar"].includes(input.graphType)
+                      ? [3, 3, 0, 0]
+                      : undefined
+                  }
                   strokeWidth={isBarType ? 0 : 2.5}
                   dot={false}
                   activeDot={
