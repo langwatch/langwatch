@@ -34,7 +34,11 @@ export const normalizeErrorCode = (
   ) {
     return "DIFFERENT_EMAIL_NOT_ALLOWED";
   }
-  if (error === "account_already_linked_to_different_user") {
+  if (
+    error === "account_already_linked_to_different_user" ||
+    error === "account_not_linked" ||
+    error === "OAuthAccountNotLinked"
+  ) {
     return "OAuthAccountNotLinked";
   }
   return error;
@@ -116,20 +120,26 @@ export function SignInError({ error: rawError }: { error: string }) {
           >
             <Alert.Indicator />
             <Alert.Content gap={4}>
-              <Alert.Title fontWeight="bold">{error}</Alert.Title>
+              <Alert.Title fontWeight="bold">
+                {error === "OAuthAccountNotLinked"
+                  ? "Account already exists"
+                  : error}
+              </Alert.Title>
               {error === "OAuthAccountNotLinked" ? (
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      It might be that an account using this email already
-                      exists but it&apos;s not linked with this authentication
-                      method. <br />
-                      Please sign in with email/password or the other provider
-                      you used before and go to the <b>Settings</b> page to link
-                      this one.
+                      An account with this email already exists but was created
+                      with a different sign-in method (e.g. Google, GitHub).
+                      <br />
+                      <br />
+                      To link this method, sign in with the method you used
+                      originally, then go to{" "}
+                      <b>Settings &gt; Authentication</b> to link additional
+                      sign-in methods.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/settings/authentication">
+                      <Link href="/auth/signin">
                         Sign in with another method
                       </Link>
                     </Button>
