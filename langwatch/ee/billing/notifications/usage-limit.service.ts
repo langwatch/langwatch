@@ -157,8 +157,6 @@ export class UsageLimitService {
         );
 
         if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
-          // Seed the cache so subsequent ticks skip the DB round-trip too.
-          await planLimitCooldown.set(organizationId, true);
           return;
         }
       }
@@ -177,17 +175,12 @@ export class UsageLimitService {
         planName,
       };
 
-      try {
-        await Promise.all([
-          this.notificationService.sendSlackPlanLimitAlert(context),
-          this.notificationService.sendHubspotPlanLimitForm(context),
-        ]);
-      } catch {
-        // Roll back cooldown so the next request can retry delivery,
-        // matching the pattern in notifyResourceLimitReached.
-        await planLimitCooldown.delete(organizationId);
-        return;
-      }
+      // Both sends are fire-and-forget (errors swallowed internally),
+      // so use allSettled to await completion without short-circuiting.
+      await Promise.allSettled([
+        this.notificationService.sendSlackPlanLimitAlert(context),
+        this.notificationService.sendHubspotPlanLimitForm(context),
+      ]);
 
       try {
         await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());

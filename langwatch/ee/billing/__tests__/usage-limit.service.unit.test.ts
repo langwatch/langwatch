@@ -297,21 +297,18 @@ describe("UsageLimitService", () => {
       });
     });
 
-    describe("when notification delivery fails", () => {
-      it("rolls back cooldown so next request can retry", async () => {
+    describe("when one notification channel fails", () => {
+      it("completes without throwing (fire-and-forget sends)", async () => {
         const { service, organizationService, notificationService } = createService();
         (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
         (notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>)
-          .mockRejectedValueOnce(new Error("Slack down"))
-          .mockResolvedValue(undefined);
+          .mockRejectedValueOnce(new Error("Slack down"));
 
-        // First call: delivery fails, cooldown should be rolled back
+        // Should not throw — allSettled absorbs the rejection
         await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
-        expect(await planLimitCooldown.get("org_1")).toBeUndefined();
 
-        // Second call: should retry successfully
-        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
-        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(2);
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendHubspotPlanLimitForm).toHaveBeenCalledTimes(1);
       });
     });
   });
