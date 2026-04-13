@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   Heading,
   HStack,
   Separator,
@@ -227,15 +228,31 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                 </React.Fragment>
               ))
           ) : (
-            <HStack>
-              <Text>No topics found</Text>
-              <Tooltip content="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
-                <HelpCircle width="14px" />
-              </Tooltip>
-            </HStack>
+            <EmptyState.Root size="sm">
+              <EmptyState.Content>
+                <VStack textAlign="center">
+                  <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+                  <EmptyState.Description textStyle="xs">
+                    Topics are assigned automatically after enough messages are collected.{" "}
+                    <a
+                      href="https://docs.langwatch.ai/features/topics"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: "underline" }}
+                    >
+                      Learn more
+                    </a>
+                  </EmptyState.Description>
+                </VStack>
+              </EmptyState.Content>
+            </EmptyState.Root>
           )
         ) : (
-          <Text>No topics found</Text>
+          <EmptyState.Root size="sm">
+            <EmptyState.Content>
+              <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
       </VStack>
     </VStack>

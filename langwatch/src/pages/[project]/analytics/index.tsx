@@ -1,13 +1,17 @@
 import {
   Alert,
   Box,
+  Button,
   Card,
+  Grid,
   Heading,
   HStack,
   Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
+import { BarChart2 } from "react-feather";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
@@ -56,6 +60,7 @@ function AnalyticsContent() {
           <UserMetrics />
           <LLMMetrics />
           <DocumentsMetrics />
+          {project && <CustomReportsSection slug={project.slug} />}
         </VStack>
         <FilterSidebar hideTopics={true} />
       </HStack>
@@ -79,7 +84,7 @@ function DocumentsMetrics() {
   return (
     <>
       <HStack width="full" align="top">
-        <Heading as="h1" size="lg" paddingTop={6} paddingBottom={2}>
+        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
           Documents
         </Heading>
       </HStack>
@@ -93,8 +98,8 @@ function DocumentsMetrics() {
                 paddingBottom={4}
               >
                 <VStack align="start">
-                  <Text color="black">Total documents</Text>
-                  <Box fontSize="24px" color="black" fontWeight="bold">
+                  <Text color="fg">Total documents</Text>
+                  <Box textStyle="2xl" color="fg" fontWeight="bold">
                     <DocumentsCountsSummary />
                   </Box>
                 </VStack>
@@ -113,6 +118,71 @@ function DocumentsMetrics() {
           </Tabs.Root>
         </Card.Body>
       </Card.Root>
+    </>
+  );
+}
+
+function CustomReportsSection({ slug }: { slug: string }) {
+  const { project } = useOrganizationTeamProject();
+  const dashboardsQuery = api.dashboards.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const dashboards = dashboardsQuery.data ?? [];
+
+  return (
+    <>
+      <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        Custom Dashboards
+      </Heading>
+      {dashboards.length > 0 ? (
+        <Grid width="full" templateColumns="repeat(3, 1fr)" gap={4}>
+          {dashboards.map((dashboard) => (
+            <Link
+              key={dashboard.id}
+              href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
+              _hover={{ textDecoration: "none" }}
+            >
+              <Card.Root
+                height="full"
+                cursor="pointer"
+                _hover={{ borderColor: "orange.300", shadow: "sm" }}
+                transition="all 0.15s ease"
+              >
+                <Card.Body padding={4}>
+                  <HStack gap={3} align="start">
+                    <Box color="orange.400" marginTop={0.5}>
+                      <BarChart2 size={18} />
+                    </Box>
+                    <Text fontWeight="500" textStyle="sm">
+                      {dashboard.name}
+                    </Text>
+                  </HStack>
+                </Card.Body>
+              </Card.Root>
+            </Link>
+          ))}
+        </Grid>
+      ) : (
+        <Card.Root>
+          <Card.Body padding={6}>
+            <VStack gap={2}>
+              <Text textStyle="sm" color="fg.muted">
+                Create custom dashboards to track the metrics that matter most to
+                your team.
+              </Text>
+              <Link
+                href={`/${slug}/analytics/reports`}
+                _hover={{ textDecoration: "none" }}
+              >
+                <Button size="sm" variant="outline">
+                  <Plus size={14} /> Create Dashboard
+                </Button>
+              </Link>
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      )}
     </>
   );
 }
