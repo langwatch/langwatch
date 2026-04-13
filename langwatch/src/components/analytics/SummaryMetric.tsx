@@ -163,11 +163,7 @@ export function SummaryMetricValue({
           )
         ) : (
           <Delayed takeSpace>
-            <VStack align="start" gap={2} paddingY="0.25em">
-              <Skeleton height="1.2em" width="78px" />
-              <Skeleton height="0.7em" width="50px" />
-              <Skeleton height="0.7em" width="65px" />
-            </VStack>
+            <Skeleton height="1.5em" width="78px" />
           </Delayed>
         )}
       </Box>

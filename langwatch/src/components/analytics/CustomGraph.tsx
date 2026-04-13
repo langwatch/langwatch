@@ -1002,6 +1002,11 @@ const CustomGraph_ = React.memo(
             const isAreaType = ["area", "stacked_area"].includes(
               input.graphType,
             );
+            const isBarType = [
+              "bar",
+              "stacked_bar",
+              "horizontal_bar",
+            ].includes(input.graphType);
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
             const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
@@ -1022,8 +1027,15 @@ const CustomGraph_ = React.memo(
                       : undefined
                   }
                   fill={fillColor}
-                  fillOpacity={isAreaType ? areaFillOpacity : undefined}
-                  strokeWidth={2.5}
+                  fillOpacity={
+                    isAreaType
+                      ? areaFillOpacity
+                      : isBarType
+                        ? 0.8
+                        : undefined
+                  }
+                  radius={isBarType ? [3, 3, 0, 0] : undefined}
+                  strokeWidth={isBarType ? 0 : 2.5}
                   dot={false}
                   activeDot={
                     input.graphType !== "scatter" ? { r: 8 } : undefined
