@@ -121,35 +121,38 @@ export function SummaryMetricValue({
         : "red.500";
 
   return (
-    <VStack align="start" gap={0}>
-      <HStack gap={2} align="baseline">
-        <Box textStyle="2xl" fontWeight="600">
-          {current !== undefined ? (
-            typeof format === "function" ? (
-              //@ts-ignore
-              format(current)
-            ) : (
-              numeral(current).format(format ?? "0a")
-            )
+    <VStack align="start" gap={1}>
+      <Box textStyle="2xl" fontWeight="600">
+        {current !== undefined ? (
+          typeof format === "function" ? (
+            //@ts-ignore
+            format(current)
           ) : (
-            <Delayed takeSpace>
-              <Box paddingY="0.25em" height="2.35em">
-                <Skeleton height="1em" width="78px" />
-              </Box>
-            </Delayed>
-          )}
-        </Box>
-        {change !== undefined && change !== 0 && (
-          <Text textStyle="xs" fontWeight={500} color={changeColor}>
-            {change > 0 ? "+" : ""}
-            {formatChangeValue(change)}
-          </Text>
+            numeral(current).format(format ?? "0a")
+          )
+        ) : (
+          <Delayed takeSpace>
+            <Box paddingY="0.25em" height="2.35em">
+              <Skeleton height="1em" width="78px" />
+            </Box>
+          </Delayed>
         )}
-      </HStack>
-      {typeof previous === "number" && (
-        <Text textStyle="xs" color="fg.subtle">
-          {formatPreviousValue(previous)} previous period
-        </Text>
+      </Box>
+      {change !== undefined && (
+        <HStack gap={1} textStyle="xs">
+          {change !== 0 && (
+            <Text fontWeight={500} color={changeColor}>
+              {change > 0 ? "+" : ""}
+              {formatChangeValue(change)}
+            </Text>
+          )}
+          {typeof previous === "number" && (
+            <Text color="fg.subtle">
+              {change !== 0 ? "vs " : ""}
+              {formatPreviousValue(previous)} prev
+            </Text>
+          )}
+        </HStack>
       )}
     </VStack>
   );

@@ -130,59 +130,81 @@ function CustomReportsSection({ slug }: { slug: string }) {
   );
   const dashboards = dashboardsQuery.data ?? [];
 
-  return (
-    <>
-      <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
-        Custom Dashboards
-      </Heading>
-      {dashboards.length > 0 ? (
-        <Grid width="full" templateColumns="repeat(3, 1fr)" gap={4}>
-          {dashboards.map((dashboard) => (
-            <Link
-              key={dashboard.id}
-              href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
-              _hover={{ textDecoration: "none" }}
-            >
-              <Card.Root
-                height="full"
-                cursor="pointer"
-                _hover={{ borderColor: "orange.300", shadow: "sm" }}
-                transition="all 0.15s ease"
-              >
-                <Card.Body padding={4}>
-                  <HStack gap={3} align="start">
-                    <Box color="orange.400" marginTop={0.5}>
-                      <BarChart2 size={18} />
-                    </Box>
-                    <Text fontWeight="500" textStyle="sm">
-                      {dashboard.name}
-                    </Text>
-                  </HStack>
-                </Card.Body>
-              </Card.Root>
-            </Link>
-          ))}
-        </Grid>
-      ) : (
-        <Card.Root>
-          <Card.Body padding={6}>
-            <VStack gap={2}>
-              <Text textStyle="sm" color="fg.muted">
-                Create custom dashboards to track the metrics that matter most to
-                your team.
-              </Text>
+  if (dashboards.length === 0 && !dashboardsQuery.isLoading) {
+    return (
+      <>
+        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+          Custom Dashboards
+        </Heading>
+        <Card.Root borderStyle="dashed">
+          <Card.Body padding={5}>
+            <HStack gap={4}>
+              <Box color="fg.subtle">
+                <BarChart2 size={20} />
+              </Box>
+              <VStack align="start" gap={1} flex={1}>
+                <Text textStyle="sm" fontWeight="500">
+                  Build your own dashboard
+                </Text>
+                <Text textStyle="xs" color="fg.muted">
+                  Drag and drop charts to track the metrics that matter most to
+                  your team.
+                </Text>
+              </VStack>
               <Link
                 href={`/${slug}/analytics/reports`}
                 _hover={{ textDecoration: "none" }}
               >
                 <Button size="sm" variant="outline">
-                  <Plus size={14} /> Create Dashboard
+                  <Plus size={14} /> Create
                 </Button>
               </Link>
-            </VStack>
+            </HStack>
           </Card.Body>
         </Card.Root>
-      )}
+      </>
+    );
+  }
+
+  if (dashboards.length === 0) return null;
+
+  return (
+    <>
+      <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        Custom Dashboards
+      </Heading>
+      <Grid
+        width="full"
+        templateColumns={`repeat(${Math.min(dashboards.length, 3)}, 1fr)`}
+        gap={4}
+      >
+        {dashboards.map((dashboard) => (
+          <Link
+            key={dashboard.id}
+            href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
+            _hover={{ textDecoration: "none" }}
+          >
+            <Card.Root
+              height="full"
+              cursor="pointer"
+              borderColor="border"
+              _hover={{ borderColor: "orange.400", shadow: "sm" }}
+              transition="all 0.15s ease"
+            >
+              <Card.Body padding={4}>
+                <HStack gap={3}>
+                  <Box color="orange.400">
+                    <BarChart2 size={16} />
+                  </Box>
+                  <Text fontWeight="500" textStyle="sm">
+                    {dashboard.name}
+                  </Text>
+                </HStack>
+              </Card.Body>
+            </Card.Root>
+          </Link>
+        ))}
+      </Grid>
     </>
   );
 }
