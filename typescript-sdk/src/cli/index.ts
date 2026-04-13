@@ -82,14 +82,14 @@ const createCommand = async (name: string, options: Record<string, unknown>): Pr
 };
 
 // Evaluator commands
-const listEvaluatorsCommand = async (): Promise<void> => {
+const listEvaluatorsCommand = async (options?: { format?: string }): Promise<void> => {
   const { listEvaluatorsCommand: impl } = await import("./commands/evaluators/list.js");
-  return impl();
+  return impl(options);
 };
 
-const getEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+const getEvaluatorCommand = async (idOrSlug: string, options?: { format?: string }): Promise<void> => {
   const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-  return impl(idOrSlug);
+  return impl(idOrSlug, options);
 };
 
 const createEvaluatorCommand = async (name: string, options: { type: string }): Promise<void> => {
@@ -311,9 +311,10 @@ const evaluatorCmd = program
 evaluatorCmd
   .command("list")
   .description("List all evaluators in the project")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     try {
-      await listEvaluatorsCommand();
+      await listEvaluatorsCommand(options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -323,9 +324,10 @@ evaluatorCmd
 evaluatorCmd
   .command("get <idOrSlug>")
   .description("Get evaluator details by ID or slug")
-  .action(async (idOrSlug: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (idOrSlug: string, options: { format?: string }) => {
     try {
-      await getEvaluatorCommand(idOrSlug);
+      await getEvaluatorCommand(idOrSlug, options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -365,9 +367,10 @@ const dashboardCmd = program
 dashboardCmd
   .command("list")
   .description("List all dashboards in the project")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     const { listDashboardsCommand: impl } = await import("./commands/dashboards/list.js");
-    await impl();
+    await impl(options);
   });
 
 dashboardCmd
@@ -394,9 +397,10 @@ const modelProviderCmd = program
 modelProviderCmd
   .command("list")
   .description("List all configured model providers")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     const { listModelProvidersCommand: impl } = await import("./commands/model-providers/list.js");
-    await impl();
+    await impl(options);
   });
 
 modelProviderCmd
@@ -419,7 +423,8 @@ annotationCmd
   .command("list")
   .description("List all annotations (optionally filtered by trace)")
   .option("--trace-id <traceId>", "Filter by trace ID")
-  .action(async (options: { traceId?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { traceId?: string; format?: string }) => {
     const { listAnnotationsCommand: impl } = await import("./commands/annotations/list.js");
     await impl(options);
   });
@@ -427,9 +432,10 @@ annotationCmd
 annotationCmd
   .command("get <id>")
   .description("Get annotation details by ID")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { getAnnotationCommand: impl } = await import("./commands/annotations/get.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 annotationCmd
@@ -507,17 +513,19 @@ const scenarioCmd = program
 scenarioCmd
   .command("list")
   .description("List all scenarios in the project")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     const { listScenariosCommand: impl } = await import("./commands/scenarios/list.js");
-    await impl();
+    await impl(options);
   });
 
 scenarioCmd
   .command("get <id>")
   .description("Get scenario details by ID")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 scenarioCmd

@@ -7,7 +7,7 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 
-export const listScenariosCommand = async (): Promise<void> => {
+export const listScenariosCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new ScenariosApiService();
@@ -19,6 +19,11 @@ export const listScenariosCommand = async (): Promise<void> => {
     spinner.succeed(
       `Found ${scenarios.length} scenario${scenarios.length !== 1 ? "s" : ""}`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(scenarios, null, 2));
+      return;
+    }
 
     if (scenarios.length === 0) {
       console.log();

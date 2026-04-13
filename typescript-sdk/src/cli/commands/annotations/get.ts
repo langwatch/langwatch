@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const getAnnotationCommand = async (id: string): Promise<void> => {
+export const getAnnotationCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new AnnotationsApiService();
@@ -15,6 +15,11 @@ export const getAnnotationCommand = async (id: string): Promise<void> => {
   try {
     const annotation = await service.get(id);
     spinner.succeed(`Found annotation "${id}"`);
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(annotation, null, 2));
+      return;
+    }
 
     console.log();
     console.log(chalk.bold.cyan(`Annotation ${annotation.id ?? id}`));

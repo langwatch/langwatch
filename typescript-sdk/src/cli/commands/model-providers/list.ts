@@ -7,7 +7,7 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 
-export const listModelProvidersCommand = async (): Promise<void> => {
+export const listModelProvidersCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new ModelProvidersApiService();
@@ -20,6 +20,11 @@ export const listModelProvidersCommand = async (): Promise<void> => {
     const providerEntries = Object.entries(providers);
 
     spinner.succeed(`Found ${providerEntries.length} model provider${providerEntries.length !== 1 ? "s" : ""}`);
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(providers, null, 2));
+      return;
+    }
 
     if (providerEntries.length === 0) {
       console.log();

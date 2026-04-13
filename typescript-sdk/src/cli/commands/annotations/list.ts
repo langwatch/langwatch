@@ -9,6 +9,7 @@ import { formatTable, formatRelativeTime } from "../../utils/formatting";
 
 export const listAnnotationsCommand = async (options: {
   traceId?: string;
+  format?: string;
 }): Promise<void> => {
   checkApiKey();
 
@@ -26,6 +27,11 @@ export const listAnnotationsCommand = async (options: {
     spinner.succeed(
       `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(annotations, null, 2));
+      return;
+    }
 
     if (annotations.length === 0) {
       console.log();

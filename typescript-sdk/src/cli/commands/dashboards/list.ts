@@ -7,7 +7,7 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 
-export const listDashboardsCommand = async (): Promise<void> => {
+export const listDashboardsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new DashboardsApiService();
@@ -20,6 +20,11 @@ export const listDashboardsCommand = async (): Promise<void> => {
     spinner.succeed(
       `Found ${dashboards.length} dashboard${dashboards.length !== 1 ? "s" : ""}`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
 
     if (dashboards.length === 0) {
       console.log();

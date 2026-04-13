@@ -35,7 +35,7 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
 };
 
-export const getScenarioCommand = async (id: string): Promise<void> => {
+export const getScenarioCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new ScenariosApiService();
@@ -44,6 +44,10 @@ export const getScenarioCommand = async (id: string): Promise<void> => {
   try {
     const scenario = await service.get(id);
     spinner.succeed(`Found scenario "${scenario.name}"`);
+    if (options?.format === "json") {
+      console.log(JSON.stringify(scenario, null, 2));
+      return;
+    }
     formatScenarioDetails(scenario);
   } catch (error) {
     spinner.fail();
