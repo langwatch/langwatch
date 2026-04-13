@@ -41,6 +41,18 @@ describe("requestLogging", () => {
         expect(getStatusCodeFromError(err)).toBe(409);
       });
     });
+
+    describe("when error is a plain object with status", () => {
+      it("returns the status value", () => {
+        expect(getStatusCodeFromError({ status: 401 })).toBe(401);
+      });
+    });
+
+    describe("when error is a plain object with httpStatus", () => {
+      it("returns the httpStatus value", () => {
+        expect(getStatusCodeFromError({ httpStatus: 403 })).toBe(403);
+      });
+    });
   });
 
   describe("getLogLevelFromStatusCode", () => {
@@ -88,6 +100,26 @@ describe("requestLogging", () => {
           expect.objectContaining({ method: "GET", statusCode: 200 }),
           "request handled",
         );
+      });
+    });
+
+    describe("when extra fields overlap with canonical fields", () => {
+      it("preserves canonical field values", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+        logHttpRequest(logger, {
+          method: "GET",
+          url: "/real-url",
+          statusCode: 200,
+          duration: 42,
+          userAgent: "test-agent",
+          extra: { statusCode: 999, url: "/fake-url", customField: "kept" },
+        });
+
+        const logData = logger.info.mock.calls[0][0];
+        expect(logData.statusCode).toBe(200);
+        expect(logData.url).toBe("/real-url");
+        expect(logData.customField).toBe("kept");
       });
     });
 

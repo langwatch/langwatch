@@ -1,4 +1,4 @@
-import { context as otelContext, trace } from "@opentelemetry/api";
+import { context as otelContext, trace, isSpanContextValid } from "@opentelemetry/api";
 
 /**
  * Business context that can be propagated across async boundaries.
@@ -85,12 +85,13 @@ export function updateCurrentContext(updates: Partial<RequestContext>): void {
  */
 export function getOtelSpanContext(): { traceId: string; spanId: string } | undefined {
   const span = trace.getSpan(otelContext.active());
-  if (span) {
-    const spanContext = span.spanContext();
-    return {
-      traceId: spanContext.traceId,
-      spanId: spanContext.spanId,
-    };
-  }
-  return undefined;
+  if (!span) return undefined;
+
+  const spanContext = span.spanContext();
+  if (!isSpanContextValid(spanContext)) return undefined;
+
+  return {
+    traceId: spanContext.traceId,
+    spanId: spanContext.spanId,
+  };
 }

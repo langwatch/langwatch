@@ -15,6 +15,7 @@ vi.mock("@opentelemetry/api", () => ({
   trace: {
     getSpan: vi.fn(() => undefined),
   },
+  isSpanContextValid: vi.fn(() => true),
 }));
 
 describe("context/core", () => {
@@ -107,25 +108,49 @@ describe("context/core", () => {
       });
     });
 
-    describe("when an active span exists", () => {
+    describe("when an active span has a valid context", () => {
       it("returns traceId and spanId", async () => {
         const { trace } = await import("@opentelemetry/api");
         vi.mocked(trace.getSpan).mockReturnValueOnce({
           spanContext: () => ({
-            traceId: "abc123",
-            spanId: "def456",
+            traceId: "abc123def456abc123def456abc123de",
+            spanId: "def456abc123def4",
             traceFlags: 1,
           }),
         } as any);
 
         const result = getOtelSpanContext();
-        expect(result).toEqual({ traceId: "abc123", spanId: "def456" });
+        expect(result).toEqual({
+          traceId: "abc123def456abc123def456abc123de",
+          spanId: "def456abc123def4",
+        });
+      });
+    });
+
+    describe("when the span context is invalid", () => {
+      it("returns undefined", async () => {
+        const { trace, isSpanContextValid } = await import("@opentelemetry/api");
+        vi.mocked(trace.getSpan).mockReturnValueOnce({
+          spanContext: () => ({
+            traceId: "00000000000000000000000000000000",
+            spanId: "0000000000000000",
+            traceFlags: 0,
+          }),
+        } as any);
+        vi.mocked(isSpanContextValid).mockReturnValueOnce(false);
+
+        const result = getOtelSpanContext();
+        expect(result).toBeUndefined();
       });
     });
   });
 });
 
 describe("context/logging", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe("when no context and no OTel span exist", () => {
     it("returns null values for all fields", () => {
       const logCtx = getLogContext();
@@ -147,6 +172,30 @@ describe("context/logging", () => {
           expect(logCtx.organizationId).toBe("log-org");
           expect(logCtx.projectId).toBe("log-proj");
           expect(logCtx.userId).toBe("log-user");
+        },
+      );
+    });
+  });
+
+  describe("when an OTel span is active", () => {
+    it("returns traceId and spanId from the span context", async () => {
+      const { trace } = await import("@opentelemetry/api");
+      vi.mocked(trace.getSpan).mockReturnValueOnce({
+        spanContext: () => ({
+          traceId: "trace-id-123",
+          spanId: "span-id-456",
+          traceFlags: 1,
+        }),
+      } as any);
+
+      runWithContext(
+        { organizationId: "org-x", projectId: "proj-y" },
+        () => {
+          const logCtx = getLogContext();
+          expect(logCtx.traceId).toBe("trace-id-123");
+          expect(logCtx.spanId).toBe("span-id-456");
+          expect(logCtx.organizationId).toBe("org-x");
+          expect(logCtx.projectId).toBe("proj-y");
         },
       );
     });
