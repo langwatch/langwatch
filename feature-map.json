@@ -100,7 +100,11 @@
             },
             "platform": {
               "ui": "/annotations",
-              "mcp": null,
+              "mcp": [
+                "platform_list_annotations",
+                "platform_create_annotation",
+                "platform_delete_annotation"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/features/annotations.md"
             },
@@ -325,7 +329,13 @@
             },
             "platform": {
               "ui": "/agents",
-              "mcp": null,
+              "mcp": [
+                "platform_list_agents",
+                "platform_get_agent",
+                "platform_create_agent",
+                "platform_update_agent",
+                "platform_delete_agent"
+              ],
               "skill": null,
               "docs": null
             },
@@ -439,7 +449,12 @@
         },
         "platform": {
           "ui": "/analytics/dashboards",
-          "mcp": null,
+          "mcp": [
+            "platform_list_dashboards",
+            "platform_get_dashboard",
+            "platform_create_dashboard",
+            "platform_delete_dashboard"
+          ],
           "skill": null,
           "docs": null
         },

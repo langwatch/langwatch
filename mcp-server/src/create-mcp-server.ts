@@ -756,6 +756,196 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Agent Tools (require API key) ---
+
+  server.tool(
+    "platform_list_agents",
+    "List all agents in the LangWatch project with their names, types, and IDs.",
+    {},
+    withToolLogging("platform_list_agents", async () => {
+      requireApiKey();
+      const { handleListAgents } = await import("./tools/list-agents.js");
+      return {
+        content: [{ type: "text", text: await handleListAgents() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_agent",
+    "Get detailed information about a specific agent by its ID, including its configuration.",
+    {
+      id: z.string().describe("The agent ID"),
+    },
+    withToolLogging("platform_get_agent", async (params) => {
+      requireApiKey();
+      const { handleGetAgent } = await import("./tools/get-agent.js");
+      return {
+        content: [{ type: "text", text: await handleGetAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_agent",
+    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API).",
+    {
+      name: z.string().describe("Agent name"),
+      type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
+      config: z.record(z.unknown()).optional().describe("Agent configuration as JSON object"),
+    },
+    withToolLogging("platform_create_agent", async (params) => {
+      requireApiKey();
+      const { handleCreateAgent } = await import("./tools/create-agent.js");
+      return {
+        content: [{ type: "text", text: await handleCreateAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_agent",
+    "Update an existing agent's name, type, or configuration.",
+    {
+      id: z.string().describe("The agent ID"),
+      name: z.string().optional().describe("New agent name"),
+      type: z.enum(["signature", "code", "workflow", "http"]).optional().describe("New agent type"),
+      config: z.record(z.unknown()).optional().describe("Updated configuration"),
+    },
+    withToolLogging("platform_update_agent", async (params) => {
+      requireApiKey();
+      const { handleUpdateAgent } = await import("./tools/update-agent.js");
+      return {
+        content: [{ type: "text", text: await handleUpdateAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_agent",
+    "Archive (soft-delete) an agent by its ID.",
+    {
+      id: z.string().describe("The agent ID to archive"),
+    },
+    withToolLogging("platform_delete_agent", async (params) => {
+      requireApiKey();
+      const { handleDeleteAgent } = await import("./tools/delete-agent.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteAgent(params) }],
+      };
+    })
+  );
+
+  // --- Platform Dashboard Tools (require API key) ---
+
+  server.tool(
+    "platform_list_dashboards",
+    "List all analytics dashboards in the LangWatch project.",
+    {},
+    withToolLogging("platform_list_dashboards", async () => {
+      requireApiKey();
+      const { handleListDashboards } = await import("./tools/list-dashboards.js");
+      return {
+        content: [{ type: "text", text: await handleListDashboards() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_dashboard",
+    "Get a dashboard by its ID, including its graphs.",
+    {
+      id: z.string().describe("The dashboard ID"),
+    },
+    withToolLogging("platform_get_dashboard", async (params) => {
+      requireApiKey();
+      const { handleGetDashboard } = await import("./tools/get-dashboard.js");
+      return {
+        content: [{ type: "text", text: await handleGetDashboard(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_dashboard",
+    "Create a new analytics dashboard.",
+    {
+      name: z.string().describe("Dashboard name"),
+    },
+    withToolLogging("platform_create_dashboard", async (params) => {
+      requireApiKey();
+      const { handleCreateDashboard } = await import("./tools/create-dashboard.js");
+      return {
+        content: [{ type: "text", text: await handleCreateDashboard(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_dashboard",
+    "Delete a dashboard and all its graphs.",
+    {
+      id: z.string().describe("The dashboard ID to delete"),
+    },
+    withToolLogging("platform_delete_dashboard", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboard } = await import("./tools/delete-dashboard.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteDashboard(params) }],
+      };
+    })
+  );
+
+  // --- Platform Annotation Tools (require API key) ---
+
+  server.tool(
+    "platform_list_annotations",
+    "List all annotations for the project, optionally filtered by trace ID.",
+    {
+      traceId: z.string().optional().describe("Filter annotations by trace ID"),
+    },
+    withToolLogging("platform_list_annotations", async (params) => {
+      requireApiKey();
+      const { handleListAnnotations } = await import("./tools/list-annotations.js");
+      return {
+        content: [{ type: "text", text: await handleListAnnotations(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_annotation",
+    "Create an annotation (thumbs up/down, comment) for a trace.",
+    {
+      traceId: z.string().describe("The trace ID to annotate"),
+      comment: z.string().optional().describe("Annotation comment"),
+      isThumbsUp: z.boolean().optional().describe("True for positive feedback, false for negative"),
+      email: z.string().optional().describe("Email of the annotator"),
+    },
+    withToolLogging("platform_create_annotation", async (params) => {
+      requireApiKey();
+      const { handleCreateAnnotation } = await import("./tools/create-annotation.js");
+      return {
+        content: [{ type: "text", text: await handleCreateAnnotation(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_annotation",
+    "Delete an annotation by its ID.",
+    {
+      id: z.string().describe("The annotation ID to delete"),
+    },
+    withToolLogging("platform_delete_annotation", async (params) => {
+      requireApiKey();
+      const { handleDeleteAnnotation } = await import("./tools/delete-annotation.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteAnnotation(params) }],
+      };
+    })
+  );
+
   // --- Platform Dataset Tools (require API key) ---
   // These tools manage datasets on the LangWatch platform via API.
 
