@@ -36,8 +36,12 @@ const createUniquePromptName = () => {
   return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
 };
 
+const createdTagNames = new Set<string>();
+
 const createUniqueTagName = () => {
-  return `e2e-tag-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const name = `e2e-tag-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  createdTagNames.add(name);
+  return name;
 };
 
 describe("CLI E2E", () => {
@@ -71,12 +75,11 @@ describe("CLI E2E", () => {
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
     await apiHelpers.cleapUpTestPrompts();
-    // Clean up any test tags that were created
-    const tags = await langwatch.prompts.tags.list();
+    // Only delete tags created by this test run to avoid interference with parallel runs
     await Promise.all(
-      tags
-        .filter((t: Tag) => t.name.startsWith("e2e-tag-"))
-        .map((t: Tag) => langwatch.prompts.tags.delete(t.name).catch(() => undefined)),
+      [...createdTagNames].map((name) =>
+        langwatch.prompts.tags.delete(name).catch(() => undefined),
+      ),
     );
   });
 
