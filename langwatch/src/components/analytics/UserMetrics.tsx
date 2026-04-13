@@ -100,6 +100,7 @@ export function UserMetrics() {
         metric: "metadata.user_id",
         aggregation: "cardinality",
         colorSet: analyticsMetrics.metadata.user_id.colorSet,
+        noDataUrl: "https://langwatch.ai/docs/integration/metadata-and-labels",
       },
     ],
     groupBy: undefined,

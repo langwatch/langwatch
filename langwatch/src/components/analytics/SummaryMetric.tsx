@@ -20,6 +20,7 @@ export function SummaryMetric({
   format,
   tooltip,
   increaseIs,
+  noDataUrl,
   titleProps,
 }: {
   label: string;
@@ -28,6 +29,7 @@ export function SummaryMetric({
   format?: ((value: number) => string) | ((value: string) => string) | string;
   tooltip?: string;
   increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
   titleProps?: {
     fontSize?: SystemStyleObject["fontSize"];
     textStyle?: SystemStyleObject["textStyle"];
@@ -76,6 +78,7 @@ export function SummaryMetric({
         previous={previous}
         format={format}
         increaseIs={increaseIs}
+        noDataUrl={noDataUrl}
       />
     </VStack>
   );
@@ -102,21 +105,25 @@ export function SummaryMetricValue({
   if (isZeroZero) {
     return (
       <VStack align="start" gap={1}>
-        <Text textStyle="sm" color="fg.muted">
+        <Box textStyle="2xl" fontWeight="600" color="fg.muted">
+          -
+        </Box>
+        <Text textStyle="xs" color="fg.subtle">
           No data yet
+          {noDataUrl && (
+            <>
+              {" · "}
+              <a
+                href={noDataUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "underline" }}
+              >
+                Set up
+              </a>
+            </>
+          )}
         </Text>
-        {noDataUrl && (
-          <a
-            href={noDataUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "underline" }}
-          >
-            <Text textStyle="xs" color="fg.subtle">
-              Learn how to set up
-            </Text>
-          </a>
-        )}
       </VStack>
     );
   }

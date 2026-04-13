@@ -70,6 +70,7 @@ type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
   colorSet: RotatingColorSet;
   increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
 };
 
 export type CustomGraphInput = {
@@ -737,6 +738,7 @@ const CustomGraph_ = React.memo(
                 previous={previousByKey[entry.key]?.value}
                 format={entry.metric?.format}
                 increaseIs={entry.metric?.increaseIs}
+                noDataUrl={entry.noDataUrl}
                 titleProps={titleProps}
               />
             ))}
@@ -1298,6 +1300,7 @@ const shapeDataForSummary = (
             : formatOverride
           : undefined,
         value: totalValue,
+        noDataUrl: series?.noDataUrl,
       };
     });
   };
