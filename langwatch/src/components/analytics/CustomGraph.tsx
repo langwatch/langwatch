@@ -555,6 +555,10 @@ const CustomGraph_ = React.memo(
       "rgba(0, 0, 0, 0.08)",
       "rgba(255, 255, 255, 0.08)",
     );
+    const cursorColor = useColorModeValue(
+      "rgba(0, 0, 0, 0.1)",
+      "rgba(255, 255, 255, 0.1)",
+    );
 
     const formatDate = (date: string) =>
       formatChartDate({ date, timeScale, daysDifference });
@@ -998,7 +1002,7 @@ const CustomGraph_ = React.memo(
           <Tooltip
             content={<ChartTooltip />}
             formatter={tooltipValueFormatter}
-            cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
+            cursor={{ fill: cursorColor }}
             labelFormatter={(_label, payload) => {
               if (input.graphType === "scatter") return "";
               return (
@@ -1018,14 +1022,16 @@ const CustomGraph_ = React.memo(
               cursor: "pointer",
               fontSize: 11,
             }}
-            onClick={(e: { dataKey?: string }) => {
-              if (e.dataKey) toggleSeries(e.dataKey);
+            onClick={(e) => {
+              const key = e.dataKey as string | undefined;
+              if (key) toggleSeries(key);
             }}
-            formatter={(value: string, entry: { dataKey?: string }) => (
+            formatter={(value, entry) => (
               <span
                 style={{
                   opacity:
-                    entry.dataKey && hiddenSeries.has(entry.dataKey)
+                    entry.dataKey &&
+                    hiddenSeries.has(entry.dataKey as string)
                       ? 0.3
                       : 1,
                 }}
@@ -1049,32 +1055,24 @@ const CustomGraph_ = React.memo(
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
             const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
             const isHidden = hiddenSeries.has(aggKey);
-
+            // Extra props that only apply to Bar-type graphs
+            const extraProps: Record<string, unknown> = {};
+            if (isBarType && !["stacked_bar"].includes(input.graphType)) {
+              extraProps.radius = [3, 3, 0, 0];
+            }
             return (
               <React.Fragment key={aggKey}>
-                {/* @ts-ignore */}
+                {/* @ts-ignore - GraphElement is a union type (Line|Bar|Area|Scatter), some props are Bar-specific */}
                 <GraphElement
                   key={aggKey}
                   type="monotone"
                   hide={isHidden}
                   dataKey={aggKey}
                   stroke={strokeColor}
-                  stackId={
-                    ["stacked_bar", "stacked_area"].includes(input.graphType)
-                      ? "same"
-                      : undefined
-                  }
-                  fill={
-                    isAreaType
-                      ? `url(#gradient-${input.graphId}-${index})`
-                      : fillColor
-                  }
+                  stackId={["stacked_bar", "stacked_area"].includes(input.graphType) ? "same" : undefined}
+                  fill={isAreaType ? `url(#gradient-${input.graphId}-${index})` : fillColor}
                   fillOpacity={isBarType ? 0.8 : undefined}
-                  radius={
-                    isBarType && !["stacked_bar"].includes(input.graphType)
-                      ? [3, 3, 0, 0]
-                      : undefined
-                  }
+                  {...extraProps}
                   strokeWidth={isBarType ? 0 : 2.5}
                   dot={false}
                   activeDot={
