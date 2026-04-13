@@ -67,8 +67,13 @@ import { useFilterParams } from "../useFilterParams";
 function lastPushUrl(): string {
   const lastCall = mockPush.mock.lastCall;
   if (!lastCall) throw new Error("router.push was not called");
-  // First arg can be a string (URL) or an object ({ pathname, query })
-  return typeof lastCall[0] === "string" ? lastCall[0] : "";
+  // With the (url, as) overload, the display URL is the second arg.
+  // Fall back to first arg for string-form or object-form pushes.
+  if (typeof lastCall[1] === "string") return lastCall[1];
+  if (typeof lastCall[0] === "string") return lastCall[0];
+  throw new Error(
+    "router.push did not receive a string URL in either `url` or `as`",
+  );
 }
 
 function lastPushQuery(): Record<string, unknown> {
@@ -159,7 +164,19 @@ describe("useFilterParams() write operations", () => {
           "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true";
       });
 
-      it("does not leak route params into the query string", () => {
+      it("uses the (url, as) overload so Next.js resolves the route correctly", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("traces.origin", ["application"]);
+
+        const [routeArg, asArg] = mockPush.mock.lastCall!;
+        // First arg must be an object (tells Next.js "same page")
+        expect(typeof routeArg).toBe("object");
+        expect(routeArg).toHaveProperty("pathname");
+        // Second arg is the display URL string
+        expect(typeof asArg).toBe("string");
+      });
+
+      it("does not leak route params into the display URL", () => {
         const { result } = renderHook(() => useFilterParams());
         result.current.setFilter("traces.origin", ["application"]);
 
