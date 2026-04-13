@@ -21,6 +21,7 @@ import {
   type SubmitHandler,
   type UseFormReturn,
   useFieldArray,
+  useWatch,
 } from "react-hook-form";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import { Link } from "../../components/ui/link";
@@ -130,10 +131,20 @@ export const TeamForm = ({
     [users.data],
   );
 
-  const userCollection = useMemo(
-    () => createListCollection({ items: userOptions }),
-    [userOptions],
-  );
+  const watchedMembers = useWatch({ control, name: "members" });
+
+  const perRowCollections = useMemo(() => {
+    return members.fields.map((_, index) => {
+      const selectedIds = new Set(
+        (watchedMembers ?? [])
+          .filter((_, i) => i !== index)
+          .map((m) => m.userId?.value)
+          .filter(Boolean),
+      );
+      const filtered = userOptions.filter((o) => !selectedIds.has(o.value));
+      return createListCollection({ items: filtered });
+    });
+  }, [watchedMembers, userOptions, members.fields]);
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -211,34 +222,37 @@ export const TeamForm = ({
                               control={control}
                               name={`members.${index}.userId`}
                               rules={{ required: "User is required" }}
-                              render={({ field }) => (
-                                <Select.Root
-                                  collection={userCollection}
-                                  value={field.value ? [field.value.value] : []}
-                                  onValueChange={(details) => {
-                                    const selectedValue = details.value[0];
-                                    if (selectedValue) {
-                                      const selectedOption = userOptions.find(
-                                        (o) => o.value === selectedValue,
-                                      );
-                                      if (selectedOption) {
-                                        field.onChange(selectedOption);
+                              render={({ field }) => {
+                                const rowCollection = perRowCollections[index] ?? createListCollection({ items: userOptions });
+                                return (
+                                  <Select.Root
+                                    collection={rowCollection}
+                                    value={field.value ? [field.value.value] : []}
+                                    onValueChange={(details) => {
+                                      const selectedValue = details.value[0];
+                                      if (selectedValue) {
+                                        const selectedOption = userOptions.find(
+                                          (o) => o.value === selectedValue,
+                                        );
+                                        if (selectedOption) {
+                                          field.onChange(selectedOption);
+                                        }
                                       }
-                                    }
-                                  }}
-                                >
-                                  <Select.Trigger width="full" background="bg">
-                                    <Select.ValueText placeholder="Select..." />
-                                  </Select.Trigger>
-                                  <Select.Content paddingY={2}>
-                                    {userOptions.map((option) => (
-                                      <Select.Item key={option.value} item={option}>
-                                        {option.label}
-                                      </Select.Item>
-                                    ))}
-                                  </Select.Content>
-                                </Select.Root>
-                              )}
+                                    }}
+                                  >
+                                    <Select.Trigger width="full" background="bg">
+                                      <Select.ValueText placeholder="Select..." />
+                                    </Select.Trigger>
+                                    <Select.Content paddingY={2}>
+                                      {rowCollection.items.map((option) => (
+                                        <Select.Item key={option.value} item={option}>
+                                          {option.label}
+                                        </Select.Item>
+                                      ))}
+                                    </Select.Content>
+                                  </Select.Root>
+                                );
+                              }}
                             />
                             <Tooltip
                               content={
