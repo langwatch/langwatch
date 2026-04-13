@@ -138,14 +138,17 @@ export class UsageLimitService {
     planLimitInFlight.add(organizationId);
 
     try {
-      // Async guard: blocks subsequent ticks and cross-pod duplicates via Redis.
-      if (await planLimitCooldown.get(organizationId)) {
+      // Atomic cross-pod guard: SET NX EX claims the cooldown slot in a
+      // single Redis round-trip, closing the distributed TOCTOU window.
+      const claimed = await planLimitCooldown.claim(organizationId, true);
+      if (!claimed) {
         return;
       }
 
       const organization = await this.organizationService.findWithAdmins(organizationId);
 
       if (!organization) {
+        await planLimitCooldown.delete(organizationId);
         return;
       }
 
@@ -160,10 +163,6 @@ export class UsageLimitService {
           return;
         }
       }
-
-      // Claim the cooldown slot before sending so concurrent calls on other
-      // pods are blocked immediately, even if sending takes a few seconds.
-      await planLimitCooldown.set(organizationId, true);
 
       const admin = organization.members[0]?.user;
 
