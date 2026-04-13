@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  propagation,
   trace,
 } from "@opentelemetry/api";
 import { injectTraceContextHeaders, getActiveTraceId } from "../trace/traceContext";
