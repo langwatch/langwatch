@@ -221,6 +221,36 @@ describe("Trace metrics", () => {
       expect(metrics!.total_cost).toBe(0.0001);
     });
 
+    it("excludes langwatch.track_event spans from timing calculation", () => {
+      const spans: Span[] = [
+        {
+          trace_id: "trace_1",
+          span_id: "span_1",
+          type: "span",
+          name: "agent-chat",
+          timestamps: {
+            started_at: 1000,
+            finished_at: 2600,
+          },
+        },
+        {
+          trace_id: "trace_1",
+          span_id: "span_2",
+          type: "span",
+          name: "langwatch.track_event",
+          timestamps: {
+            started_at: 19000,
+            finished_at: 19000,
+          },
+        },
+      ];
+
+      const metrics = computeTraceMetrics(spans);
+
+      expect(metrics!.total_time_ms).toBe(1600);
+      expect(metrics!.first_token_ms).toBeNull();
+    });
+
     it("should set tokens_estimated to true when any span has tokens_estimated", () => {
       const spans: Span[] = [
         {
