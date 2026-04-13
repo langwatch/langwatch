@@ -144,6 +144,81 @@ describe("useFilterParams() write operations", () => {
     });
   });
 
+  describe("setFilter() on dynamic route pages", () => {
+    describe("when page has [id] route param (e.g. custom graph edit)", () => {
+      beforeEach(() => {
+        // On /[project]/analytics/custom/[id], router.query includes `id`
+        // from the path segment, but the actual URL query string does not
+        mockRouterQuery = {
+          project: "my-project",
+          id: "graph-abc",
+          dashboard: "dash-123",
+          show_filters: "true",
+        };
+        mockRouterAsPath =
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true";
+      });
+
+      it("does not leak route params into the query string", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("traces.origin", ["application"]);
+
+        const url = lastPushUrl();
+        expect(url).not.toContain("project=");
+        expect(url).not.toContain("id=");
+      });
+
+      it("preserves existing query params and adds the new filter", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("traces.origin", ["application"]);
+
+        const url = lastPushUrl();
+        expect(url).toContain("dashboard=dash-123");
+        expect(url).toContain("show_filters=true");
+        expect(url).toContain("origin=application");
+      });
+    });
+  });
+
+  describe("setFilters() on dynamic route pages", () => {
+    describe("when page has [id] route param", () => {
+      beforeEach(() => {
+        mockRouterQuery = {
+          project: "my-project",
+          id: "graph-abc",
+          dashboard: "dash-123",
+        };
+        mockRouterAsPath =
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123";
+      });
+
+      it("does not leak route params into the query string", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilters({
+          "traces.origin": ["application"],
+          "spans.model": ["gpt-5-mini"],
+        } as Parameters<typeof result.current.setFilters>[0]);
+
+        const url = lastPushUrl();
+        expect(url).not.toContain("project=");
+        expect(url).not.toContain("id=");
+      });
+
+      it("preserves existing query params and adds new filters", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilters({
+          "traces.origin": ["application"],
+          "spans.model": ["gpt-5-mini"],
+        } as Parameters<typeof result.current.setFilters>[0]);
+
+        const url = lastPushUrl();
+        expect(url).toContain("dashboard=dash-123");
+        expect(url).toContain("origin=application");
+        expect(url).toContain("model=gpt-5-mini");
+      });
+    });
+  });
+
   describe("setNegateFilters()", () => {
     describe("when URL has nested filter params", () => {
       it("preserves params using correct qs options", () => {
@@ -151,6 +226,8 @@ describe("useFilterParams() write operations", () => {
           "metadata.env": "prod",
           origin: "application",
         };
+        mockRouterAsPath =
+          "/test-project/messages?metadata.env=prod&origin=application";
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setNegateFilters(true);
