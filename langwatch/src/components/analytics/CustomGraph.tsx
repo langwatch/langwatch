@@ -15,7 +15,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
 import { ChartTooltip } from "./ChartTooltip";
 import { ChartErrorState } from "./ChartErrorState";
@@ -210,6 +210,19 @@ const CustomGraph_ = React.memo(
         return new Set();
       }
     });
+
+    // Re-sync when storageKey changes (project or graphId changed)
+    useEffect(() => {
+      try {
+        const stored = localStorage.getItem(storageKey);
+        setHiddenSeries(stored ? new Set(JSON.parse(stored) as string[]) : new Set());
+      } catch {
+        setHiddenSeries(new Set());
+      }
+    }, [storageKey]);
+
+    // Unique prefix for SVG gradient ids to avoid collisions across charts
+    const uniqueId = useId();
 
     const toggleSeries = useCallback(
       (dataKey: string) => {
@@ -952,7 +965,7 @@ const CustomGraph_ = React.memo(
             {(sortedKeys ?? []).map((aggKey, index) => (
               <linearGradient
                 key={`gradient-${aggKey}`}
-                id={`gradient-${input.graphId}-${index}`}
+                id={`gradient-${uniqueId}-${index}`}
                 x1="0"
                 y1="0"
                 x2="0"
