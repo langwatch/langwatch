@@ -16,6 +16,7 @@ import {
   extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
 } from "./field-mappings";
+import { snakeCase } from "../../../utils/stringCasing";
 import {
   type MetricTranslation,
   translateMetric,
@@ -710,6 +711,16 @@ function buildArrayJoinTimeseriesQuery(
   cteSelectExprs.push(
     `${ts}.TotalCompletionTokenCount AS trace_completion_tokens`,
   );
+
+  // Include evaluation columns in CTE when evaluation metrics are used
+  const es = tableAliases.evaluation_runs;
+  const metricExprs = simpleMetrics.map((m) => m.selectExpression);
+  const referencedEvalCols = extractReferencedEvaluationColumns(metricExprs);
+  for (const col of referencedEvalCols) {
+    cteSelectExprs.push(
+      `${es}.${col} AS eval_${snakeCase(col)}`,
+    );
+  }
 
   // Build outer SELECT expressions
   const outerSelectExprs: string[] = ["period"];
@@ -1446,6 +1457,24 @@ function transformMetricForDedup(
       const result = hasCoalesce ? `coalesce(${transformed}, 0)` : transformed;
       return `${result} AS ${alias}`;
     }
+  }
+
+  // Handle evaluation metrics that reference evaluation_runs columns (es.Passed, es.Score, etc.)
+  // Replace table-qualified references with CTE column aliases so the outer SELECT is valid.
+  // Uses the same extractReferencedEvaluationColumns as the CTE projection to stay in sync.
+  const es = tableAliases.evaluation_runs;
+  const referencedEvalCols = extractReferencedEvaluationColumns([
+    selectExpression,
+  ]);
+  if (referencedEvalCols.size > 0) {
+    let rewritten = selectExpression;
+    for (const col of referencedEvalCols) {
+      rewritten = rewritten.replaceAll(
+        `${es}.${col}`,
+        `eval_${snakeCase(col)}`,
+      );
+    }
+    return rewritten;
   }
 
   // Handle event-based metrics that reference stored_spans columns (ss."Events.Name", etc.)
