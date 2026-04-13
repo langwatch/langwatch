@@ -9,14 +9,14 @@ import { z } from "zod";
 
 /** Target reference in a suite configuration */
 export const suiteTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code"]),
+  type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
 });
 
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
 /** Agent target types — every suite target type except "prompt". Must stay in sync with suiteTargetSchema. */
-export const SUITE_AGENT_TARGET_TYPES = ["http", "code"] as const;
+export const SUITE_AGENT_TARGET_TYPES = ["http", "code", "workflow"] as const;
 export type SuiteAgentTargetType = (typeof SUITE_AGENT_TARGET_TYPES)[number];
 
 /** Type guard: narrows `type` to `SuiteAgentTargetType`. */

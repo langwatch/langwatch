@@ -18,6 +18,7 @@ import {
   type AgentFetcher,
   type ProjectFetcher,
   type ModelParamsProvider,
+  type WorkflowVersionFetcher,
 } from "../data-prefetcher";
 import type { ExecutionContext, TargetConfig, LiteLLMParams } from "../types";
 
@@ -75,6 +76,10 @@ describe("prefetchScenarioData", () => {
       findById: vi.fn().mockResolvedValue(null),
     };
 
+    const workflowVersionFetcher: WorkflowVersionFetcher = {
+      getPublishedDsl: vi.fn().mockResolvedValue(null),
+    };
+
     const projectFetcher: ProjectFetcher = {
       findUnique: vi.fn().mockResolvedValue(defaultProject),
     };
@@ -87,6 +92,7 @@ describe("prefetchScenarioData", () => {
       scenarioFetcher,
       promptFetcher,
       agentFetcher,
+      workflowVersionFetcher,
       projectFetcher,
       modelParamsProvider,
       ...overrides,
@@ -493,6 +499,168 @@ describe("prefetchScenarioData", () => {
             });
           }
         });
+      });
+    });
+  });
+
+  describe("when the target is a workflow agent", () => {
+    const workflowAgent = {
+      id: "agent_wf",
+      type: "workflow" as const,
+      name: "Greeter",
+      workflowId: "wf_1",
+      config: {
+        name: "Greeter",
+        isCustom: true,
+        workflow_id: "wf_1",
+        scenarioMappings: {
+          query: {
+            type: "source",
+            sourceId: "scenario",
+            path: ["input"],
+          },
+        },
+        scenarioOutputField: "answer",
+      },
+    };
+
+    const publishedDsl = {
+      workflow_id: "wf_1",
+      nodes: [
+        {
+          id: "entry",
+          type: "entry",
+          data: {
+            name: "Entry",
+            outputs: [{ identifier: "query", type: "str" }],
+          },
+        },
+        {
+          id: "end",
+          type: "end",
+          data: {
+            name: "End",
+            inputs: [
+              { identifier: "answer", type: "str" },
+              { identifier: "trace", type: "str" },
+            ],
+          },
+        },
+      ],
+      edges: [
+        {
+          id: "entry-greeter",
+          source: "entry",
+          sourceHandle: "outputs.query",
+          target: "greeter",
+          targetHandle: "inputs.query",
+        },
+      ],
+    };
+
+    const workflowTarget: TargetConfig = {
+      type: "workflow",
+      referenceId: "agent_wf",
+    };
+
+    describe("when the agent and published workflow exist", () => {
+      it("returns WorkflowAgentData with inputs, outputs, mappings and workflow DSL", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getPublishedDsl: vi.fn().mockResolvedValue({
+              workflowId: "wf_1",
+              dsl: publishedDsl,
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.adapterData.type).toBe("workflow");
+          if (result.data.adapterData.type === "workflow") {
+            expect(result.data.adapterData.agentId).toBe("agent_wf");
+            expect(result.data.adapterData.workflowId).toBe("wf_1");
+            expect(result.data.adapterData.inputs).toEqual([
+              { identifier: "query", type: "str" },
+            ]);
+            expect(result.data.adapterData.outputs).toEqual([
+              { identifier: "answer", type: "str" },
+              { identifier: "trace", type: "str" },
+            ]);
+            expect(result.data.adapterData.scenarioMappings).toEqual({
+              query: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["input"],
+              },
+            });
+            expect(result.data.adapterData.scenarioOutputField).toBe("answer");
+            expect(result.data.adapterData.workflow).toEqual(publishedDsl);
+          }
+        }
+      });
+    });
+
+    describe("when the workflow has no published version", () => {
+      it("returns a friendly 'Workflow agent not found' error", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getPublishedDsl: vi.fn().mockResolvedValue(null),
+          },
+        });
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe("Workflow agent agent_wf not found");
+        }
+      });
+    });
+
+    describe("when the agent has no workflowId", () => {
+      it("returns 'Workflow agent not found' without touching the version fetcher", async () => {
+        const getPublishedDsl = vi.fn();
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue({
+              ...workflowAgent,
+              workflowId: null,
+              config: { ...workflowAgent.config, workflow_id: undefined },
+            }),
+          },
+          workflowVersionFetcher: {
+            getPublishedDsl,
+          },
+        });
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error).toBe("Workflow agent agent_wf not found");
+        }
+        expect(getPublishedDsl).not.toHaveBeenCalled();
       });
     });
   });
