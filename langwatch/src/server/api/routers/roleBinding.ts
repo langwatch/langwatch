@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { checkOrganizationPermission } from "../rbac";
+import { checkOrganizationPermission, getOrganizationRolePermissions, getTeamRolePermissions } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeTypeSchema = z.nativeEnum(RoleBindingScopeType);
@@ -87,6 +87,108 @@ export const roleBindingRouter = createTRPCRouter({
         memberUserIds: b.groupId ? (membersByGroup.get(b.groupId) ?? []) : [],
         createdAt: b.createdAt,
       }));
+    }),
+
+  /**
+   * Debug endpoint — returns current user's full RBAC breakdown:
+   * org role, group memberships + their bindings, direct bindings, all with resolved permissions.
+   */
+  debugCurrentUser: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const { organizationId } = input;
+
+      const [orgMember, groupMemberships] = await Promise.all([
+        ctx.prisma.organizationUser.findFirst({
+          where: { userId, organizationId },
+          select: { role: true },
+        }),
+        ctx.prisma.groupMembership.findMany({
+          where: { userId, group: { organizationId } },
+          include: { group: { select: { id: true, name: true, slug: true, scimSource: true } } },
+        }),
+      ]);
+
+      const groupIds = groupMemberships.map((gm) => gm.groupId);
+
+      const allBindings = await ctx.prisma.roleBinding.findMany({
+        where: {
+          organizationId,
+          OR: [
+            { userId },
+            ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+          ],
+        },
+        include: {
+          customRole: { select: { id: true, name: true, permissions: true } },
+          group: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      // Resolve scope names
+      const orgScopeIds = allBindings.filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION).map((b) => b.scopeId);
+      const teamScopeIds = allBindings.filter((b) => b.scopeType === RoleBindingScopeType.TEAM).map((b) => b.scopeId);
+      const projectScopeIds = allBindings.filter((b) => b.scopeType === RoleBindingScopeType.PROJECT).map((b) => b.scopeId);
+
+      const [orgs, teams, projects] = await Promise.all([
+        orgScopeIds.length > 0 ? ctx.prisma.organization.findMany({ where: { id: { in: orgScopeIds } }, select: { id: true, name: true } }) : [],
+        teamScopeIds.length > 0 ? ctx.prisma.team.findMany({ where: { id: { in: teamScopeIds } }, select: { id: true, name: true } }) : [],
+        projectScopeIds.length > 0 ? ctx.prisma.project.findMany({ where: { id: { in: projectScopeIds } }, select: { id: true, name: true } }) : [],
+      ]);
+
+      const scopeNames = new Map<string, string>();
+      for (const o of orgs) scopeNames.set(o.id, o.name);
+      for (const t of teams) scopeNames.set(t.id, t.name);
+      for (const p of projects) scopeNames.set(p.id, p.name);
+
+      const resolvePermissions = (binding: (typeof allBindings)[0]): string[] => {
+        if (binding.role === TeamUserRole.CUSTOM && binding.customRole) {
+          return binding.customRole.permissions as string[];
+        }
+        return getTeamRolePermissions(binding.role);
+      };
+
+      const toBindingSummary = (b: (typeof allBindings)[0]) => ({
+        id: b.id,
+        role: b.role as string,
+        customRoleName: b.customRole?.name ?? null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+        scopeName: scopeNames.get(b.scopeId) ?? null,
+        permissions: resolvePermissions(b),
+      });
+
+      const directBindings = allBindings.filter((b) => b.userId === userId).map(toBindingSummary);
+
+      const groupBindingsByGroupId = new Map<string, (typeof allBindings)[0][]>();
+      for (const b of allBindings.filter((b) => b.groupId != null)) {
+        const gid = b.groupId!;
+        if (!groupBindingsByGroupId.has(gid)) groupBindingsByGroupId.set(gid, []);
+        groupBindingsByGroupId.get(gid)!.push(b);
+      }
+
+      const orgRole = orgMember?.role ?? "MEMBER";
+
+      return {
+        user: {
+          id: userId,
+          name: ctx.session.user.name ?? null,
+          email: ctx.session.user.email ?? null,
+          orgRole: orgRole as string,
+          orgRolePermissions: getOrganizationRolePermissions(orgMember?.role ?? "MEMBER"),
+        },
+        groups: groupMemberships.map((gm) => ({
+          id: gm.group.id,
+          name: gm.group.name,
+          slug: gm.group.slug,
+          scimSource: gm.group.scimSource,
+          bindings: (groupBindingsByGroupId.get(gm.groupId) ?? []).map(toBindingSummary),
+        })),
+        directBindings,
+      };
     }),
 
   /**
