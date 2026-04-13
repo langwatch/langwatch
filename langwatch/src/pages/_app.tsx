@@ -478,11 +478,11 @@ export const system = createSystem(defaultConfig, {
     recipes: {
       skeleton: defineRecipe({
         base: {
-          "--skeleton-from": "colors.gray.100",
-          "--skeleton-to": "colors.gray.300",
+          "--skeleton-from": "{colors.gray.100}",
+          "--skeleton-to": "{colors.gray.200}",
           _dark: {
-            "--skeleton-from": "colors.gray.700",
-            "--skeleton-to": "colors.gray.600",
+            "--skeleton-from": "{colors.gray.800}",
+            "--skeleton-to": "{colors.gray.700}",
           },
         },
       }),

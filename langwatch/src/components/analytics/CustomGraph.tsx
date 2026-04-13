@@ -841,7 +841,7 @@ const CustomGraph_ = React.memo(
               }
               tickLine={false}
               axisLine={false}
-              tick={{ fill: gray400 }}
+              tick={{ fill: gray400, fontSize: 11 }}
               angle={input.graphType === "horizontal_bar" ? undefined : 45}
               textAnchor={
                 input.graphType === "horizontal_bar" ? "end" : "start"
@@ -851,7 +851,7 @@ const CustomGraph_ = React.memo(
               type="number"
               dataKey="value"
               domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-              tick={{ fill: gray400 }}
+              tick={{ fill: gray400, fontSize: 11 }}
               tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
@@ -942,7 +942,7 @@ const CustomGraph_ = React.memo(
             tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: gray400 }}
+            tick={{ fill: gray400, fontSize: 11 }}
           />
           <YAxisComponent
             type="number"
@@ -951,7 +951,7 @@ const CustomGraph_ = React.memo(
             tickCount={4}
             tickMargin={20}
             domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-            tick={{ fill: gray400 }}
+            tick={{ fill: gray400, fontSize: 11 }}
             tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
@@ -1548,7 +1548,7 @@ function MonitorGraph({
                 tickFormatter={formatDate}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: gray400 }}
+                tick={{ fill: gray400, fontSize: 11 }}
               />
               <YAxis
                 type="number"
@@ -1557,7 +1557,7 @@ function MonitorGraph({
                 tickCount={4}
                 tickMargin={20}
                 domain={[0, maxValue]}
-                tick={{ fill: gray400 }}
+                tick={{ fill: gray400, fontSize: 11 }}
                 tickFormatter={(value) => {
                   if (typeof yAxisValueFormat === "function") {
                     return yAxisValueFormat(value);

@@ -143,11 +143,13 @@ export function SummaryMetricValue({
   };
 
   const changeColor =
-    change === undefined || change * increaseReversal == 0
+    change === undefined || change === 0
       ? "gray.500"
-      : change * increaseReversal > 0
-        ? "green.500"
-        : "red.500";
+      : increaseReversal === 0
+        ? "fg.muted"
+        : change * increaseReversal > 0
+          ? "green.500"
+          : "red.500";
 
   return (
     <VStack align="start" gap={1}>
@@ -161,9 +163,11 @@ export function SummaryMetricValue({
           )
         ) : (
           <Delayed takeSpace>
-            <Box paddingY="0.25em" height="2.35em">
-              <Skeleton height="1em" width="78px" />
-            </Box>
+            <VStack align="start" gap={2} paddingY="0.25em">
+              <Skeleton height="1.2em" width="78px" />
+              <Skeleton height="0.7em" width="50px" />
+              <Skeleton height="0.7em" width="65px" />
+            </VStack>
           </Delayed>
         )}
       </Box>
