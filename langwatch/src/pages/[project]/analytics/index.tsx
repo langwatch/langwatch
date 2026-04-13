@@ -179,8 +179,11 @@ function CustomReportsSection({ slug }: { slug: string }) {
             key={dashboard.id}
             href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
             _hover={{ textDecoration: "none" }}
+            flex="1 1 auto"
+            maxWidth="350px"
           >
             <Card.Root
+              width="full"
               cursor="pointer"
               borderColor="border"
               _hover={{ borderColor: "orange.400", shadow: "sm" }}
