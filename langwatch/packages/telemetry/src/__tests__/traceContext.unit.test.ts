@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  context as otelContext,
   propagation,
   trace,
 } from "@opentelemetry/api";
