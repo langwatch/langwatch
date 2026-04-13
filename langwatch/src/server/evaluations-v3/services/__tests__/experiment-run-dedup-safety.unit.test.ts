@@ -5,10 +5,10 @@
  * (TenantId, RunId, ExperimentId).
  *
  * experiment_run_items uses ReplacingMergeTree(OccurredAt) with business dedup key
- * (TenantId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')).
+ * (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')).
  *
- * LIMIT 1 BY materializes all selected columns per 8K-row granule before
- * deduplicating — the IN-tuple pattern avoids this.
+ * The per-row dedup anti-pattern materializes all selected columns per 8K-row
+ * granule before deduplicating — the IN-tuple pattern avoids this.
  *
  * @see dev/docs/best_practices/clickhouse-queries.md
  * @regression issue #3158
@@ -39,6 +39,9 @@ describe("clickhouse-experiment-run.service dedup OOM safety", () => {
   describe("experiment_run_items dedup", () => {
     it("uses max(OccurredAt) GROUP BY for experiment_run_items dedup", () => {
       expect(source).toContain("max(OccurredAt)");
+      expect(source).toMatch(
+        /GROUP BY\s+TenantId,\s*ExperimentId,\s*RunId,\s*RowIndex,\s*TargetId,\s*ResultType,\s*coalesce\(EvaluatorId,\s*''\)/,
+      );
     });
   });
 });

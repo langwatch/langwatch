@@ -54,8 +54,12 @@ describe("aggregation-builder dedup OOM safety", () => {
         expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
       });
 
-      it("accepts a dateFilter parameter for partition pruning", () => {
-        expect(body).toContain("dateFilter");
+      it("applies dateFilter in both inner and outer query paths", () => {
+        // dateFilter is assigned to dateClause and interpolated twice:
+        // once in the outer WHERE and once in the IN-tuple subquery WHERE
+        const dateClauseInterpolations =
+          body.match(/\$\{dateClause\}/g) ?? [];
+        expect(dateClauseInterpolations.length).toBeGreaterThanOrEqual(2);
       });
     });
   });
