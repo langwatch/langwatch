@@ -378,6 +378,30 @@ evaluatorCmd
     }
   });
 
+// Add evaluation command group
+const evaluationCmd = program
+  .command("evaluation")
+  .description("Run and monitor evaluations");
+
+evaluationCmd
+  .command("run <slug>")
+  .description("Start an evaluation run by slug")
+  .option("--wait", "Wait for the evaluation to complete before returning")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (slug: string, options: { wait?: boolean; format?: string }) => {
+    const { runEvaluationCommand: impl } = await import("./commands/evaluation/run.js");
+    await impl(slug, options);
+  });
+
+evaluationCmd
+  .command("status <runId>")
+  .description("Check the status of an evaluation run")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (runId: string, options: { format?: string }) => {
+    const { evaluationStatusCommand: impl } = await import("./commands/evaluation/status.js");
+    await impl(runId, options);
+  });
+
 // Add workflow command group
 const workflowCmd = program
   .command("workflow")

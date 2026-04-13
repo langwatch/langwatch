@@ -136,7 +136,7 @@
                 "python": "langwatch.experiment",
                 "typescript": "langwatch.experiments"
               },
-              "cli": null,
+              "cli": ["evaluation run", "evaluation status"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
             },
