@@ -475,9 +475,7 @@ const CustomGraph_ = React.memo(
         };
 
         const colorIndex = colorMap[groupKey] ?? neutral;
-        const color = getColor(colorSet, colorIndex);
-
-        return color;
+        return getColor(colorSet, colorIndex);
       }
 
       return getColor(colorSet, index);
@@ -511,6 +509,7 @@ const CustomGraph_ = React.memo(
     const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
     const getColor = useGetRotatingColorForCharts();
+    const areaFillOpacity = useColorModeValue(0.3, 0.15);
     const gray400 = useColorRawValue("gray.400");
     const gridColor = useColorModeValue(
       "rgba(0, 0, 0, 0.08)",
@@ -952,6 +951,9 @@ const CustomGraph_ = React.memo(
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
+            const isAreaType = ["area", "stacked_area"].includes(
+              input.graphType,
+            );
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
             const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
@@ -970,6 +972,7 @@ const CustomGraph_ = React.memo(
                       : undefined
                   }
                   fill={fillColor}
+                  fillOpacity={isAreaType ? areaFillOpacity : undefined}
                   strokeWidth={2.5}
                   dot={false}
                   activeDot={
