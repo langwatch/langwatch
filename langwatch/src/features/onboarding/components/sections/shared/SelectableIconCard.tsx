@@ -8,6 +8,7 @@ import type React from "react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 import type { IconData } from "../../../regions/shared/types";
+import { iconSizeToPixels, type IconSizeKey } from "../../../../../utils/iconSize";
 
 interface SelectableIconCardProps {
   label: string;
@@ -18,17 +19,6 @@ interface SelectableIconCardProps {
   onClick: () => void;
   ariaLabel: string;
 }
-
-const iconSizeToPixels = {
-  xs: "12px",
-  sm: "16px",
-  md: "24px",
-  lg: "32px",
-  xl: "40px",
-  "2xl": "48px",
-} as const;
-
-type IconSizeKey = keyof typeof iconSizeToPixels;
 
 export function SelectableIconCard(
   props: SelectableIconCardProps,

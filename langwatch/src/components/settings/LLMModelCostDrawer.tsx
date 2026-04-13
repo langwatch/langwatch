@@ -178,7 +178,7 @@ function LLMModelCostForm({
               {...register("regex", {
                 validate: (value) =>
                   isSafeRegex(value) ||
-                  "Please enter a valid, non-catastrophic regular expression",
+                  "Please enter a valid regular expression",
               })}
             />
           </InputGroup>
