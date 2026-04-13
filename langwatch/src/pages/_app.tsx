@@ -433,7 +433,7 @@ export const system = createSystem(defaultConfig, {
           },
           // Subtle background for table headers, zebra rows
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" },
           },
           // Form inputs - blend into container
           input: {
@@ -641,6 +641,29 @@ export const system = createSystem(defaultConfig, {
       }),
     },
     slotRecipes: {
+      tooltip: defineSlotRecipe({
+        slots: ["content", "arrow", "arrowTip"],
+        base: {
+          content: {
+            bg: "bg.panel/85",
+            backdropFilter: "blur(8px)",
+            color: "fg",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "md",
+            boxShadow: "lg",
+            px: "3",
+            py: "2",
+            textStyle: "xs",
+          },
+          arrow: {
+            "--arrow-background": "colors.bg.panel",
+          },
+          arrowTip: {
+            borderColor: "colors.bg.panel",
+          },
+        },
+      }),
       card: defineSlotRecipe({
         slots: ["root"],
         base: {

@@ -473,7 +473,7 @@ function AnalyticsCustomGraphContent({
               HTTP POST request to access identical data tailored for the custom
               graphs.
             </Text>
-            <Box padding={4} backgroundColor={"#272822"}>
+            <Box padding={4} backgroundColor="bg.subtle">
               <RenderCode
                 code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
@@ -1047,7 +1047,7 @@ function SeriesFieldItem({
       <Accordion.ItemTrigger
         cursor="pointer"
         role="button"
-        background="gray.100"
+        background="bg.subtle"
         fontWeight="bold"
         paddingLeft={1}
         paddingRight={3}
@@ -1524,7 +1524,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
                   {details && (
                     <Text
                       fontSize="sm"
-                      color={props.isSelected ? "white" : "gray.500"}
+                      color={props.isSelected ? "fg" : "fg.muted"}
                     >
                       {details}
                     </Text>

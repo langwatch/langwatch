@@ -52,12 +52,12 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
   );
 
   return (
-    <VStack align="stretch" gap={0} fontSize="12px" minWidth="180px" color="white">
+    <VStack align="stretch" gap={0} fontSize="12px" minWidth="180px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Total duration */}
         {scenarioRun.durationInMs > 0 && (
           <HStack justify="space-between">
-            <Text color="white/75">Duration</Text>
+            <Text color="fg.muted">Duration</Text>
             <Text fontWeight="medium">{formatLatency(scenarioRun.durationInMs)}</Text>
           </HStack>
         )}
@@ -65,7 +65,7 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {/* Total cost */}
         {scenarioRun.totalCost != null && (
           <HStack justify="space-between">
-            <Text color="white/75">Total Cost</Text>
+            <Text color="fg.muted">Total Cost</Text>
             <Text fontWeight="medium">{formatCost(scenarioRun.totalCost)}</Text>
           </HStack>
         )}
@@ -74,13 +74,13 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
         {latencyRoles.length > 0 && (
           <>
             <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
-            <Text color="white/85" fontWeight="semibold">Latency</Text>
+            <Text color="fg" fontWeight="semibold">Latency</Text>
             {latencyRoles.map((role) => {
               const latencies = roleLatencies[role]!;
               const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
               return (
                 <HStack key={`lat-${role}`} justify="space-between" paddingLeft={2}>
-                  <Text color="white/75">{role}</Text>
+                  <Text color="fg.muted">{role}</Text>
                   <Text fontWeight="medium">{formatLatency(avg)}</Text>
                 </HStack>
               );
@@ -94,13 +94,13 @@ function MetricsTooltipContent({ scenarioRun }: { scenarioRun: ScenarioRunData }
             {latencyRoles.length === 0 && (
               <Box borderTopWidth="1px" borderColor="border.emphasized" marginX={-2} />
             )}
-            <Text color="white/85" fontWeight="semibold">Cost</Text>
+            <Text color="fg" fontWeight="semibold">Cost</Text>
             {costRoles.map((role) => {
               const costs = roleCosts[role]!;
               const total = costs.reduce((a, b) => a + b, 0);
               return (
                 <HStack key={`cost-${role}`} justify="space-between" paddingLeft={2}>
-                  <Text color="white/75">{role}</Text>
+                  <Text color="fg.muted">{role}</Text>
                   <Text fontWeight="medium">{formatCost(total)}</Text>
                 </HStack>
               );

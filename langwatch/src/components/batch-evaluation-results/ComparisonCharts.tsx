@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { ChartTooltip } from "../analytics/ChartTooltip";
 import type { BatchEvaluationData, ComparisonRunData } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
 
@@ -978,6 +979,8 @@ export const ComparisonCharts = ({
                 width="280px"
                 flexShrink={0}
                 bg="bg.subtle"
+                border="1px solid"
+                borderColor="border"
                 borderRadius="md"
                 padding={3}
                 paddingBottom={1}
@@ -1025,7 +1028,9 @@ export const ComparisonCharts = ({
                       tickLine={false}
                     />
                     <Tooltip
+                      content={<ChartTooltip />}
                       formatter={(value) => formatCost(value as number)}
+                      cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                     />
                     <Bar dataKey="cost" name="Cost">
                       {chartData.map((entry, index) => (
@@ -1050,6 +1055,8 @@ export const ComparisonCharts = ({
                 width="280px"
                 flexShrink={0}
                 bg="bg.subtle"
+                border="1px solid"
+                borderColor="border"
                 borderRadius="md"
                 padding={3}
                 paddingBottom={1}
@@ -1097,7 +1104,9 @@ export const ComparisonCharts = ({
                       tickLine={false}
                     />
                     <Tooltip
+                      content={<ChartTooltip />}
                       formatter={(value) => formatLatency(value as number)}
+                      cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                     />
                     <Bar dataKey="latency" name="Latency">
                       {chartData.map((entry, index) => (
@@ -1125,6 +1134,8 @@ export const ComparisonCharts = ({
                     width="280px"
                     flexShrink={0}
                     bg="bg.subtle"
+                    border="1px solid"
+                    borderColor="border"
                     borderRadius="md"
                     padding={3}
                     paddingBottom={1}
@@ -1175,7 +1186,9 @@ export const ComparisonCharts = ({
                           tickLine={false}
                         />
                         <Tooltip
+                          content={<ChartTooltip />}
                           formatter={(value) => (value as number).toFixed(2)}
+                          cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                         />
                         <Bar dataKey={`score_${ev.id}`}>
                           {chartData.map((entry, index) => (
@@ -1204,6 +1217,8 @@ export const ComparisonCharts = ({
                     width="280px"
                     flexShrink={0}
                     bg="bg.subtle"
+                    border="1px solid"
+                    borderColor="border"
                     borderRadius="md"
                     padding={3}
                     paddingBottom={1}
@@ -1257,6 +1272,8 @@ export const ComparisonCharts = ({
                           tickLine={false}
                         />
                         <Tooltip
+                          content={<ChartTooltip />}
+                          cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                           formatter={(value) =>
                             `${Math.round((value as number) * 100)}%`
                           }

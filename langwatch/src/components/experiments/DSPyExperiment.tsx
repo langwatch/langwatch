@@ -35,6 +35,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartTooltip } from "../analytics/ChartTooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
@@ -1275,6 +1276,7 @@ export function DSPyRunsScoresChart({
             }}
           />
           <Tooltip
+            content={<ChartTooltip />}
             labelFormatter={(value) => `Step ${value}`}
             formatter={(value, name, props) => {
               const label = props.payload[`${name}_label`];
