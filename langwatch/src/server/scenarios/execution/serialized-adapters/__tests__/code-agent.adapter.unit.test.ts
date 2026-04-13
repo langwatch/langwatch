@@ -253,6 +253,147 @@ describe("SerializedCodeAgentAdapter", () => {
     });
   });
 
+  describe("when scenarioMappings are on the agent config", () => {
+    const multiInputConfig: CodeAgentData = {
+      ...defaultConfig,
+      inputs: [
+        { identifier: "query", type: "str" },
+        { identifier: "context", type: "str" },
+      ],
+      scenarioMappings: {
+        query: { type: "source", sourceId: "scenario", path: ["input"] },
+        context: { type: "value", value: "Search the knowledge base" },
+      },
+    };
+
+    it("uses resolved mappings for input assignment in the input record", async () => {
+      const adapter = new SerializedCodeAgentAdapter(multiInputConfig, nlpServiceUrl, apiKey);
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const inputsRecord = callBody.payload.inputs[0];
+      expect(inputsRecord["query"]).toBe("Hello");
+      expect(inputsRecord["context"]).toBe("Search the knowledge base");
+    });
+
+    it("uses resolved mappings for workflow node input values", async () => {
+      const adapter = new SerializedCodeAgentAdapter(multiInputConfig, nlpServiceUrl, apiKey);
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const codeNode = callBody.payload.workflow.nodes.find(
+        (n: { id: string }) => n.id === "code_agent",
+      );
+      expect(codeNode.data.inputs[0].value).toBe("Hello");
+      expect(codeNode.data.inputs[1].value).toBe("Search the knowledge base");
+    });
+
+    it("ignores mappings for inputs that do not exist on the agent", async () => {
+      const singleInputConfig: CodeAgentData = {
+        ...defaultConfig,
+        inputs: [{ identifier: "query", type: "str" }],
+        scenarioMappings: {
+          query: { type: "source", sourceId: "scenario", path: ["input"] },
+          deleted_field: { type: "value", value: "stale mapping" },
+        },
+      };
+      const adapter = new SerializedCodeAgentAdapter(singleInputConfig, nlpServiceUrl, apiKey);
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const inputsRecord = callBody.payload.inputs[0];
+      expect(inputsRecord["query"]).toBe("Hello");
+      expect(inputsRecord["deleted_field"]).toBeUndefined();
+    });
+  });
+
+  describe("when no scenarioMappings are on the agent config", () => {
+    it("falls back to legacy behavior: first input gets last user message, rest get empty string", async () => {
+      const multiInputConfig: CodeAgentData = {
+        ...defaultConfig,
+        inputs: [
+          { identifier: "query", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      };
+      const adapter = new SerializedCodeAgentAdapter(multiInputConfig, nlpServiceUrl, apiKey);
+
+      await adapter.call(defaultInput);
+
+      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+      const inputsRecord = callBody.payload.inputs[0];
+      expect(inputsRecord["query"]).toBe("Hello");
+      expect(inputsRecord["context"]).toBe("");
+    });
+  });
+
+  describe("when scenarioOutputField is set", () => {
+    it("extracts that specific field from result", async () => {
+      mockFetch.mockResolvedValue(
+        nlpResponse({ answer: "42", output: "ignored" }),
+      );
+      const config: CodeAgentData = {
+        ...defaultConfig,
+        outputs: [
+          { identifier: "answer", type: "str" },
+          { identifier: "output", type: "str" },
+        ],
+        scenarioOutputField: "answer",
+      };
+
+      const adapter = new SerializedCodeAgentAdapter(config, nlpServiceUrl, apiKey);
+      const result = await adapter.call(defaultInput);
+
+      expect(result).toBe("42");
+    });
+
+    it("stringifies a non-string value when the field is found", async () => {
+      mockFetch.mockResolvedValue(
+        nlpResponse({ structured: { key: "value" } }),
+      );
+      const config: CodeAgentData = {
+        ...defaultConfig,
+        outputs: [{ identifier: "structured", type: "str" }],
+        scenarioOutputField: "structured",
+      };
+
+      const adapter = new SerializedCodeAgentAdapter(config, nlpServiceUrl, apiKey);
+      const result = await adapter.call(defaultInput);
+
+      expect(result).toBe(JSON.stringify({ key: "value" }));
+    });
+
+    it("throws a descriptive error when the referenced field is missing", async () => {
+      mockFetch.mockResolvedValue(
+        nlpResponse({ output: "some value" }),
+      );
+      const config: CodeAgentData = {
+        ...defaultConfig,
+        scenarioOutputField: "missing_field",
+      };
+
+      const adapter = new SerializedCodeAgentAdapter(config, nlpServiceUrl, apiKey);
+
+      await expect(adapter.call(defaultInput)).rejects.toThrow(
+        'Scenario output field "missing_field" not found in agent output. Available fields: output',
+      );
+    });
+  });
+
+  describe("when scenarioOutputField is not set and agent has one output", () => {
+    it("uses that output (default behavior)", async () => {
+      mockFetch.mockResolvedValue(nlpResponse({ output: "single result" }));
+
+      const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);
+      const result = await adapter.call(defaultInput);
+
+      expect(result).toBe("single result");
+    });
+  });
+
   describe("when building the workflow", () => {
     it("includes a valid dataset on the entry node", async () => {
       const adapter = new SerializedCodeAgentAdapter(defaultConfig, nlpServiceUrl, apiKey);

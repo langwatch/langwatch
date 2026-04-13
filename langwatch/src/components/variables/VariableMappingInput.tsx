@@ -105,6 +105,8 @@ type VariableMappingInputProps = {
   isMissing?: boolean;
   /** When true, shows yellow background but not "Required" placeholder (for optional fields) */
   optionalHighlighting?: boolean;
+  /** Identifier used for data-testid on the underlying input element */
+  inputTestId?: string;
 };
 
 /** Represents a selectable option in the dropdown */
@@ -190,6 +192,7 @@ export const VariableMappingInput = ({
   disabled = false,
   isMissing = false,
   optionalHighlighting = false,
+  inputTestId,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -778,6 +781,7 @@ export const VariableMappingInput = ({
             minWidth={isSourceMapping || inProgressPath ? "20px" : undefined}
             height="24px"
             paddingX={0}
+            data-testid={inputTestId}
           />
         </HStack>
       </Box>
@@ -959,7 +963,7 @@ export const VariableMappingInput = ({
 
                 {/* "Use as value" option when user typed something (only at top level) */}
                 {searchQuery.trim() && !inProgressPath && (
-                  <div data-testid="use-as-value-option">
+                  <Box>
                     {filteredSources.length > 0 && (
                       <Box height="1px" background="border" marginY={1} />
                     )}
@@ -993,6 +997,7 @@ export const VariableMappingInput = ({
                       data-highlighted={
                         highlightedIndex === allOptions.length - 1
                       }
+                      data-testid="use-as-value-option"
                     >
                       <Type size={14} color="var(--chakra-colors-gray-500)" />
                       <Text fontSize="13px" color="fg.muted">
@@ -1003,7 +1008,7 @@ export const VariableMappingInput = ({
                         " as value
                       </Text>
                     </HStack>
-                  </div>
+                  </Box>
                 )}
               </VStack>
             )}

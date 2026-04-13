@@ -551,6 +551,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                         }}
                       />
                     </Field.Root>
+                    {/* TODO: Wire HTTP agent adapter to use fieldMappings (see GitHub issue) */}
                   </VStack>
                 </Tabs.Content>
 
