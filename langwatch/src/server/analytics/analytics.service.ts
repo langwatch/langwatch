@@ -19,7 +19,7 @@ import type {
 import type { TimeseriesInputType } from "./registry";
 import { getClickHouseAnalyticsService } from "./clickhouse/clickhouse-analytics.service";
 
-const timeseriesCache = new TtlCache<TimeseriesResult>(30_000, "analytics:ts:");
+const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
 
 /**
  * Dependencies required by AnalyticsService
@@ -38,6 +38,10 @@ export class AnalyticsService {
   private readonly prisma: PrismaClient;
   private readonly chService: AnalyticsBackend;
   private readonly tracer = getLangWatchTracer("langwatch.analytics.service");
+  private readonly timeseriesCache = new TtlCache<TimeseriesResult>(
+    TIMESERIES_CACHE_TTL_MS,
+    "analytics:ts:",
+  );
 
   constructor(deps: AnalyticsServiceDependencies) {
     this.chService = deps.chService;
@@ -70,11 +74,11 @@ export class AnalyticsService {
       input.projectId,
       async () => {
         const cacheKey = `${input.projectId}:${JSON.stringify(input)}`;
-        const cached = await timeseriesCache.get(cacheKey);
+        const cached = await this.timeseriesCache.get(cacheKey);
         if (cached) return cached;
 
         const result = await this.chService.getTimeseries(input);
-        await timeseriesCache.set(cacheKey, result);
+        await this.timeseriesCache.set(cacheKey, result);
         return result;
       },
     );

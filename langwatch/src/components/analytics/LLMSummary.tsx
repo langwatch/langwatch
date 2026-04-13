@@ -52,18 +52,20 @@ export const LLMSummary = () => {
       <Card.Header>
         <HStack gap={1}>
           <Heading size="sm">Summary</Heading>
-          <Tooltip content="View LLM Metrics">
-            <Link href={`/${project?.slug}/analytics/metrics`}>
-              <IconButton
-                aria-label="View LLM Metrics"
-                variant="ghost"
-                size="2xs"
-                color="fg.subtle"
-              >
-                <ArrowUpRight size={14} />
-              </IconButton>
-            </Link>
-          </Tooltip>
+          {project?.slug && (
+            <Tooltip content="View LLM Metrics">
+              <Link href={`/${project.slug}/analytics/metrics`}>
+                <IconButton
+                  aria-label="View LLM Metrics"
+                  variant="ghost"
+                  size="2xs"
+                  color="fg.subtle"
+                >
+                  <ArrowUpRight size={14} />
+                </IconButton>
+              </Link>
+            </Tooltip>
+          )}
         </HStack>
       </Card.Header>
       <Card.Body>

@@ -44,16 +44,16 @@ export class TtlCache<T> {
   }
 
   async set(key: string, value: T): Promise<void> {
-    const r = this.redis;
-    if (r) {
-      try {
-        await r.setex(`${this.prefix}${key}`, this.ttlSeconds, JSON.stringify(value));
-        return;
-      } catch {
-        // Redis unavailable, fall through to memory
-      }
-    }
+    // Always shadow-write to memory so fallback is warm if Redis goes down later
     this.memory.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+
+    const r = this.redis;
+    if (!r) return;
+    try {
+      await r.setex(`${this.prefix}${key}`, this.ttlSeconds, JSON.stringify(value));
+    } catch {
+      // Redis unavailable, memory fallback already set
+    }
   }
 
   async delete(key: string): Promise<void> {
