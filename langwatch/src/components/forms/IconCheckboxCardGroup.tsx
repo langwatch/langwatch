@@ -50,7 +50,8 @@ export const IconCheckboxCardGroup = <T extends string = string>({
             borderColor={isSelected ? "orange.emphasized" : "border.subtle"}
             borderRadius="xl"
             bg={isSelected ? "orange.subtle" : "bg.panel"}
-            p="3"
+            py="3"
+            px={isSelected ? "5" : "3"}
             h="auto"
             transition="all 0.2s ease"
             boxShadow={
