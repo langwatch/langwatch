@@ -133,6 +133,21 @@ describe("License Router Integration", () => {
       },
     });
 
+    // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId, userId: memberUser.id },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-lic-member-${nanoid(8)}`,
+        organizationId,
+        userId: memberUser.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    });
+
     // Create admin caller
     const adminCtx = createInnerTRPCContext({
       session: {

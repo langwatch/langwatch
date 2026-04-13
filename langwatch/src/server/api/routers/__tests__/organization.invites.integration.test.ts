@@ -171,6 +171,18 @@ describe("Organization Invites Integration", () => {
       },
     });
 
+    // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-inv-member-${nanoid(8)}`,
+        organizationId,
+        userId: memberUserId,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    });
+
     // Add member to team
     await prisma.teamUser.create({
       data: {
