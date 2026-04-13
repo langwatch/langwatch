@@ -10,10 +10,10 @@ import type {
 interface ChartTooltipProps {
   active?: boolean;
   payload?: ReadonlyArray<Payload<ValueType, NameType>>;
-  label?: string;
+  label?: string | number;
   formatter?: Formatter<ValueType, NameType>;
   labelFormatter?: (
-    label: string,
+    label: string | number | undefined,
     payload: ReadonlyArray<Payload<ValueType, NameType>>,
   ) => React.ReactNode;
   separator?: string;
@@ -30,7 +30,7 @@ export function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   const formattedLabel = labelFormatter
-    ? labelFormatter(label ?? "", payload)
+    ? labelFormatter(label, payload)
     : label;
 
   return (
