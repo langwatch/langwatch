@@ -17,6 +17,7 @@ import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
 import React, { useCallback, useMemo } from "react";
 import { LuShield } from "react-icons/lu";
+import { ChartTooltip } from "./ChartTooltip";
 import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
@@ -706,6 +707,7 @@ const CustomGraph_ = React.memo(
               ))}
             </Pie>
             <Tooltip
+              content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
@@ -793,6 +795,7 @@ const CustomGraph_ = React.memo(
               }}
             />
             <Tooltip
+              content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
@@ -891,6 +894,7 @@ const CustomGraph_ = React.memo(
             }}
           />
           <Tooltip
+            content={<ChartTooltip />}
             formatter={tooltipValueFormatter}
             labelFormatter={(_label, payload) => {
               if (input.graphType === "scatter") return "";
