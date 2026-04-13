@@ -183,7 +183,7 @@ export function SummaryMetricValue({
             </Text>
           )}
           {typeof previous === "number" && (
-            <Text color="fg.subtle">
+            <Text color="fg.muted">
               {formatPreviousValue(previous)} prev
             </Text>
           )}
