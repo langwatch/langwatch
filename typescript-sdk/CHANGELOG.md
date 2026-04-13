@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.21.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.20.0...typescript-sdk@v0.21.0) (2026-04-13)
+
+
+### Features
+
+* add evaluator CLI commands ([#2981](https://github.com/langwatch/langwatch/issues/2981)) ([57577ac](https://github.com/langwatch/langwatch/commit/57577acac70a8f907c27c66a099cd7e10ebe7941))
+* **cli:** add prompt tag management commands ([#3099](https://github.com/langwatch/langwatch/issues/3099)) ([970ae68](https://github.com/langwatch/langwatch/commit/970ae68dcf934a00d4647db52287acd9e74a9d2a))
+* **typescript-sdk:** add custom tag support (fetch, CRUD, list) ([#2841](https://github.com/langwatch/langwatch/issues/2841)) ([f8839ab](https://github.com/langwatch/langwatch/commit/f8839abea053e1fa1e879c27db193ee641add526))
+* **typescript-sdk:** add dataset CRUD methods for SDK and CLI ([#2925](https://github.com/langwatch/langwatch/issues/2925)) ([8e65e84](https://github.com/langwatch/langwatch/commit/8e65e84b54746c54eb0fdbc4d6eafa56f2aa60d7))
+* **typescript-sdk:** add prompt label support (fetch, assign, CRUD) ([#2781](https://github.com/langwatch/langwatch/issues/2781)) ([0ce4b34](https://github.com/langwatch/langwatch/commit/0ce4b349294bb580fd09b73005252abcf2da3c45))
+
+
+### Miscellaneous
+
+* rename prompt label to tag in TypeScript SDK ([#3094](https://github.com/langwatch/langwatch/issues/3094)) ([0089842](https://github.com/langwatch/langwatch/commit/008984259a5475c272c9592792eae94d3eb4d9ba))
+
 ## [0.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.19.0...typescript-sdk@v0.20.0) (2026-03-29)
 
 
