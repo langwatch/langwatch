@@ -64,7 +64,6 @@ import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import { Delayed } from "../Delayed";
 import { usePeriodSelector } from "../PeriodSelector";
-import { QuickwitNote } from "./QuickwitNote";
 import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
@@ -146,16 +145,6 @@ export function CustomGraph({
 }) {
   const publicEnv = usePublicEnv();
 
-  if (
-    publicEnv.data?.IS_QUICKWIT &&
-    (input.series.some(
-      (series) => !getMetric(series.metric).quickwitSupport || series.pipeline,
-    ) ||
-      (input.groupBy && !getGroup(input.groupBy).quickwitSupport))
-  ) {
-    return <QuickwitNote />;
-  }
-
   return (
     <CustomGraph_
       input={input}
@@ -181,6 +170,7 @@ const CustomGraph_ = React.memo(
     input: CustomGraphInput;
     titleProps?: {
       fontSize?: SystemStyleObject["fontSize"];
+      textStyle?: SystemStyleObject["textStyle"];
       color?: SystemStyleObject["color"];
       fontWeight?: SystemStyleObject["fontWeight"];
     };
@@ -515,11 +505,17 @@ const CustomGraph_ = React.memo(
       ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-    const allValues = Object.values(keysToValues).flatMap((values) => values);
+    const allValues = Object.values(keysToValues)
+      .flatMap((values) => values)
+      .filter(Number.isFinite);
     const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
     const getColor = useGetRotatingColorForCharts();
     const gray400 = useColorRawValue("gray.400");
+    const gridColor = useColorModeValue(
+      "rgba(0, 0, 0, 0.08)",
+      "rgba(255, 255, 255, 0.08)",
+    );
 
     const formatDate = (date: string) =>
       formatChartDate({ date, timeScale, daysDifference });
@@ -551,6 +547,29 @@ const CustomGraph_ = React.memo(
 
       return (
         <Box width="full" height="full" position="relative">
+          {timeseries.isLoading && (
+            <Box
+              position="absolute"
+              inset={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <HStack gap={1} align="end" opacity={0.15}>
+                {[35, 55, 25, 70, 45, 65, 40, 55, 30, 60, 50, 35].map(
+                  (h, i) => (
+                    <Skeleton
+                      key={i}
+                      width="8px"
+                      height={`${h}%`}
+                      maxHeight={`${(h / 100) * (height_ - 40)}px`}
+                      borderRadius="sm"
+                    />
+                  ),
+                )}
+              </HStack>
+            </Box>
+          )}
           {timeseries.isFetching && !timeseries.isLoading && (
             <Delayed>
               <Spinner position="absolute" right={4} top={4} />
@@ -590,14 +609,29 @@ const CustomGraph_ = React.memo(
                 </button>
               )}
               {allEmpty && input.graphType !== "monitor_graph" ? (
-                <Box
+                <VStack
                   position="absolute"
                   top="50%"
                   left="50%"
                   transform="translate(-50%, -50%)"
+                  gap={2}
                 >
-                  No data
-                </Box>
+                  <HStack gap={1} align="end" opacity={0.3}>
+                    {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
+                      <Box
+                        key={i}
+                        width="6px"
+                        height={`${h}%`}
+                        maxHeight="40px"
+                        bg="border"
+                        borderRadius="sm"
+                      />
+                    ))}
+                  </HStack>
+                  <Text textStyle="xs" color="fg.subtle">
+                    No data
+                  </Text>
+                </VStack>
               ) : (
                 child
               )}
@@ -643,8 +677,7 @@ const CustomGraph_ = React.memo(
           <Flex
             paddingBottom={3}
             width="full"
-            justifyContent="space-between"
-            maxWidth={Object.entries(seriesSet).length * 142}
+            gap={0}
           >
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
@@ -785,7 +818,7 @@ const CustomGraph_ = React.memo(
             <YAxisComponent
               type="number"
               dataKey="value"
-              domain={[0, "dataMax"]}
+              domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
               tick={{ fill: gray400 }}
               tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
@@ -868,6 +901,7 @@ const CustomGraph_ = React.memo(
           <CartesianGrid
             vertical={input.graphType === "scatter"}
             strokeDasharray="5 7"
+            stroke={gridColor}
           />
           <XAxisComponent
             type="category"
@@ -884,7 +918,7 @@ const CustomGraph_ = React.memo(
             tickLine={false}
             tickCount={4}
             tickMargin={20}
-            domain={[0, "dataMax"]}
+            domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
             tick={{ fill: gray400 }}
             tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
@@ -927,7 +961,7 @@ const CustomGraph_ = React.memo(
                 {/* @ts-ignore */}
                 <GraphElement
                   key={aggKey}
-                  type="linear"
+                  type="monotone"
                   dataKey={aggKey}
                   stroke={strokeColor}
                   stackId={
@@ -989,7 +1023,7 @@ const CustomGraph_ = React.memo(
                   // @ts-ignore
                   <GraphElement
                     key={"previous>" + aggKey}
-                    type="linear"
+                    type="monotone"
                     dataKey={"previous>" + aggKey}
                     stackId={
                       ["stacked_bar", "stacked_area"].includes(input.graphType)
@@ -1318,9 +1352,15 @@ function MonitorGraph({
         ? "redTones"
         : "orangeTones";
 
+  const finiteValues =
+    allValues && allValues.length > 0
+      ? allValues.filter(Number.isFinite)
+      : [];
   const maxValue = isPassRate
     ? 1
-    : Math.max(...(allValues && allValues.length > 0 ? allValues : [1]));
+    : finiteValues.length > 0
+      ? Math.max(...finiteValues)
+      : 1;
 
   // Color adjustments for light/dark mode
   // Light mode: light backgrounds, dark text
