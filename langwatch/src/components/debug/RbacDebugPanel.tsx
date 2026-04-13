@@ -241,7 +241,18 @@ function PanelContent({ organizationId }: { organizationId: string }) {
 export function RbacDebugPanel() {
   const [enabled, setEnabled] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const { organization } = useOrganizationTeamProject();
+  const { organization, team, project } = useOrganizationTeamProject();
+
+  // Always expose context for the Chrome extension to read
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as unknown as Record<string, unknown>)["__lw_debug"] = {
+        orgId: organization?.id ?? null,
+        teamId: team?.id ?? null,
+        projectId: project?.id ?? null,
+      };
+    }
+  }, [organization?.id, team?.id, project?.id]);
 
   useEffect(() => {
     setEnabled(localStorage.getItem(STORAGE_KEY) === "1");

@@ -2,148 +2,189 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LangWatch RBAC Debug</title>
+  <title>LangWatch RBAC Inspector</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f0f0f;
-      color: #f0f0f0;
-      width: 260px;
-      padding: 16px;
+      background: #111;
+      color: #e8e8e8;
+      width: 420px;
+      min-height: 200px;
+      max-height: 640px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
     }
 
+    /* ── Header ── */
     .header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .logo {
-      width: 28px;
-      height: 28px;
-      background: #f97316;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: bold;
-      color: white;
-    }
-
-    .title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #f0f0f0;
-    }
-
-    .subtitle {
-      font-size: 11px;
-      color: #888;
-    }
-
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 14px;
-      padding: 8px 10px;
+      gap: 8px;
+      padding: 10px 12px;
       background: #1a1a1a;
-      border-radius: 6px;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #555;
+      border-bottom: 1px solid #2a2a2a;
       flex-shrink: 0;
     }
-
-    .status-dot.enabled {
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e88;
+    .logo {
+      width: 24px; height: 24px;
+      background: #f97316;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; color: white; flex-shrink: 0;
     }
+    .header-text { flex: 1; min-width: 0; }
+    .header-title { font-size: 12px; font-weight: 700; color: #f0f0f0; }
+    .header-sub { font-size: 10px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .buttons {
+    .toggle-group { display: flex; gap: 4px; flex-shrink: 0; }
+    .toggle-btn {
+      padding: 3px 8px; border: none; border-radius: 4px;
+      font-size: 10px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+    }
+    .toggle-btn:hover { opacity: 0.82; }
+    .toggle-on  { background: #f97316; color: white; }
+    .toggle-off { background: #2a2a2a; color: #888; border: 1px solid #333; }
+
+    /* ── Scrollable body ── */
+    .body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
     }
 
-    button {
-      width: 100%;
-      padding: 9px 14px;
-      border: none;
-      border-radius: 7px;
-      font-size: 13px;
-      font-weight: 600;
+    /* ── States ── */
+    .state-center {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; padding: 32px 16px; color: #555; text-align: center;
+    }
+    .state-center .icon { font-size: 28px; }
+    .state-center .msg { font-size: 12px; }
+    .error { color: #f87171; }
+
+    /* ── User card ── */
+    .user-card {
+      background: #1a1a1a;
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .user-name { font-weight: 600; font-size: 13px; color: #f0f0f0; }
+    .user-email { font-size: 10px; color: #666; }
+    .user-role-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+    .label { font-size: 10px; color: #666; }
+
+    /* ── Sections ── */
+    .section { display: flex; flex-direction: column; gap: 6px; }
+    .section-header {
+      display: flex; align-items: center; gap: 6px;
+      cursor: pointer; user-select: none;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #222;
+    }
+    .section-title {
+      font-size: 10px; font-weight: 700; color: #888;
+      text-transform: uppercase; letter-spacing: 0.06em; flex: 1;
+    }
+    .section-count {
+      background: #2a2a2a; color: #777; font-size: 10px;
+      padding: 1px 5px; border-radius: 3px;
+    }
+    .chevron { color: #555; font-size: 10px; }
+    .section-body { display: flex; flex-direction: column; gap: 5px; padding-left: 2px; }
+    .section-body.collapsed { display: none; }
+
+    /* ── Binding rows ── */
+    .binding {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 5px 8px;
+      background: #181818;
+      border-radius: 5px;
+      border-left: 2px solid #2a2a2a;
+    }
+    .binding.via-group { border-left-color: #7c3aed44; }
+    .binding-top { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .via-label { font-size: 10px; color: #555; }
+
+    /* ── Group card ── */
+    .group-card {
+      background: #181818; border-radius: 5px; padding: 6px 8px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .group-name-row { display: flex; align-items: center; gap: 5px; }
+    .group-name { font-size: 11px; font-weight: 600; color: #d0d0d0; }
+    .group-bindings { padding-left: 8px; display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+    .empty-note { font-size: 10px; color: #555; padding: 2px 0; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 1px 6px; border-radius: 3px;
+      font-size: 10px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-admin   { background: #7f1d1d; color: #fca5a5; }
+    .badge-member  { background: #1e3a5f; color: #93c5fd; }
+    .badge-viewer  { background: #1c2530; color: #94a3b8; }
+    .badge-custom  { background: #3b1f5e; color: #c4b5fd; }
+    .badge-scim    { background: #164e63; color: #67e8f9; font-size: 9px; }
+    .badge-scope   { background: #1c1c1c; color: #888; border: 1px solid #333; }
+
+    /* ── Permission pills ── */
+    .perms { display: flex; flex-wrap: wrap; gap: 2px; }
+    .perm {
+      background: #0d2318; color: #4ade80;
+      padding: 1px 5px; border-radius: 3px; font-size: 9px;
+    }
+    .perm-more {
+      background: #1c1c1c; color: #666;
+      padding: 1px 5px; border-radius: 3px; font-size: 9px;
       cursor: pointer;
-      transition: opacity 0.15s;
+    }
+    .perm-more:hover { color: #aaa; }
+
+    /* ── Effective perms grid ── */
+    .eff-perms { display: flex; flex-wrap: wrap; gap: 2px; }
+    .eff-perm {
+      background: #0d2318; color: #4ade80;
+      padding: 2px 6px; border-radius: 3px; font-size: 10px;
     }
 
-    button:hover { opacity: 0.88; }
-    button:active { opacity: 0.75; }
-
-    .btn-enable {
-      background: #f97316;
-      color: white;
-    }
-
-    .btn-disable {
-      background: #2a2a2a;
-      color: #aaa;
-      border: 1px solid #333;
-    }
-
-    .note {
-      margin-top: 12px;
-      font-size: 10px;
-      color: #555;
-      line-height: 1.5;
-    }
-
-    .not-langwatch {
-      font-size: 12px;
-      color: #666;
-      text-align: center;
-      padding: 10px 0 4px;
+    /* ── Scope label ── */
+    .scope-context {
+      font-size: 10px; color: #555; font-style: italic; margin-top: 2px;
     }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="logo">LW</div>
-    <div>
-      <div class="title">RBAC Debug</div>
-      <div class="subtitle">LangWatch internal tool</div>
+    <div class="header-text">
+      <div class="header-title">RBAC Inspector</div>
+      <div class="header-sub" id="header-sub">Loading…</div>
+    </div>
+    <div class="toggle-group">
+      <button class="toggle-btn toggle-on"  id="btn-enable">Enable panel</button>
+      <button class="toggle-btn toggle-off" id="btn-disable">Disable</button>
     </div>
   </div>
 
-  <div class="status" id="status">
-    <div class="status-dot" id="dot"></div>
-    <span id="status-text">Checking…</span>
-  </div>
-
-  <div id="main-content">
-    <div class="buttons">
-      <button class="btn-enable" id="btn-enable">🔐 Enable panel</button>
-      <button class="btn-disable" id="btn-disable">✕ Disable panel</button>
+  <div class="body" id="body">
+    <div class="state-center" id="state-loading">
+      <div class="icon">⏳</div>
+      <div class="msg">Fetching RBAC data…</div>
     </div>
-    <p class="note">
-      Panel appears bottom-right on any LangWatch page when enabled.
-      Persists across page loads until disabled.
-    </p>
-  </div>
-
-  <div class="not-langwatch" id="not-langwatch" style="display:none">
-    Not on a LangWatch page
+    <div class="state-center" id="state-error" style="display:none">
+      <div class="icon">⚠️</div>
+      <div class="msg error" id="error-msg">Could not load data.</div>
+    </div>
+    <div id="data-view" style="display:none"></div>
   </div>
 
   <script src="popup.js"></script>
