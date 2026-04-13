@@ -63,7 +63,10 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    if (this.config.scenarioMappings) {
+    if (
+      this.config.scenarioMappings &&
+      Object.keys(this.config.scenarioMappings).length > 0
+    ) {
       const resolved = resolveFieldMappings({
         fieldMappings: this.config.scenarioMappings,
         agentInput,

@@ -172,25 +172,29 @@ export function AgentWorkflowEditorDrawer(
     if (formInitializedRef.current) return;
 
     if (agentQuery.data) {
-      setName(agentQuery.data.name);
       const config = getWorkflowConfig(agentQuery.data.config);
       const existingMappings = config.scenarioMappings ?? {};
-      // If no saved mappings yet, compute best-match defaults from workflow
-      // input names once the workflow has loaded.
+      const hasExistingMappings = Object.keys(existingMappings).length > 0;
+
+      // If no saved mappings, wait for the workflow query to finish so we
+      // can compute best-match defaults from real workflow inputs instead
+      // of the synthetic "input" placeholder.
+      if (!hasExistingMappings && workflowId && workflowQuery.isLoading) return;
+
+      setName(agentQuery.data.name);
       const effectiveInputs =
         workflowInputs.length > 0
           ? workflowInputs
           : [{ identifier: "input", type: "str" }];
-      const mappings =
-        Object.keys(existingMappings).length > 0
-          ? existingMappings
-          : computeBestMatchMappings({ inputs: effectiveInputs });
+      const mappings = hasExistingMappings
+        ? existingMappings
+        : computeBestMatchMappings({ inputs: effectiveInputs });
       setScenarioMappings(mappings);
       setScenarioOutputField(config.scenarioOutputField);
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
-  }, [agentQuery.data, workflowInputs, agentId]);
+  }, [agentQuery.data, workflowInputs, workflowId, workflowQuery.isLoading, agentId]);
 
   // Mutations
   const updateMutation = api.agents.update.useMutation({
