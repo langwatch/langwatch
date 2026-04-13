@@ -1,10 +1,13 @@
 /**
  * @vitest-environment jsdom
  *
- * Tests for agent type filtering in useSuiteForm.availableTargets.
+ * Regression tests for issue #2477: code agents must be supported as
+ * suite targets alongside http agents, while unsupported agent types
+ * (signature, workflow) must still be excluded from availableTargets.
  *
- * HTTP and code agents are supported as suite targets.
- * Signature and workflow agents are excluded (not supported by the adapter layer).
+ * The set of allowed agent target types is derived from
+ * `SUITE_AGENT_TARGET_TYPES` (see `~/server/suites/types`), so these tests
+ * pin the current contract: http + code in, everything else out.
  */
 
 import { renderHook } from "@testing-library/react";

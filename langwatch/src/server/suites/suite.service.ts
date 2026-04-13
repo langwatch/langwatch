@@ -16,7 +16,7 @@ import {
   type CreateSuiteInput,
   type UpdateSuiteInput,
 } from "./suite.repository";
-import { parseSuiteTargets, type SuiteTarget } from "./types";
+import { isSuiteAgentTargetType, parseSuiteTargets, type SuiteTarget } from "./types";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -331,7 +331,7 @@ export class SuiteService {
       scenarioRows.map((r) => [r.id, r.name]),
     );
 
-    const agentIds = targets.filter((t) => t.type === "http" || t.type === "code").map((t) => t.referenceId);
+    const agentIds = targets.filter((t) => isSuiteAgentTargetType(t.type)).map((t) => t.referenceId);
     const promptIds = targets.filter((t) => t.type === "prompt").map((t) => t.referenceId);
 
     const agentRows = agentIds.length > 0
@@ -485,8 +485,9 @@ export class SuiteService {
   }): Promise<ResolvedTargetReferences> {
     const { targets, projectId, organizationId } = params;
 
-    // Partition targets by type (parseSuiteTargets validates types upstream)
-    const agentTargets = targets.filter((t) => t.type === "http" || t.type === "code");
+    // Partition targets by type. Use a positive filter so that future SuiteTarget["type"] additions
+    // must be explicitly handled here instead of silently routing into the agent path.
+    const agentTargets = targets.filter((t) => isSuiteAgentTargetType(t.type));
     const promptTargets = targets.filter((t) => t.type === "prompt");
 
     // Batch agent targets (both HTTP and code agents live in the Agent table)
