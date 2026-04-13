@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { context as otelContext, trace } from "@opentelemetry/api";
 
 /**
@@ -26,21 +25,34 @@ export interface JobContextMetadata {
   userId?: string;
 }
 
-const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
+// AsyncLocalStorage is only available in Node.js. In browser environments
+// context propagation is a no-op (returns undefined / runs fn directly).
+let asyncLocalStorage: import("node:async_hooks").AsyncLocalStorage<RequestContext> | null = null;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { AsyncLocalStorage } = require("node:async_hooks");
+  asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
+} catch {
+  // Browser environment — no ALS available
+}
 
 /**
  * Gets the current business context from AsyncLocalStorage.
  */
 export function getCurrentContext(): RequestContext | undefined {
-  return asyncLocalStorage.getStore();
+  return asyncLocalStorage?.getStore();
 }
 
 /**
  * Runs a function within the context of a RequestContext.
  * The context will be available via getCurrentContext() within the function
  * and any async operations it spawns.
+ *
+ * In browser environments, runs `fn` directly (no context propagation).
  */
 export function runWithContext<T>(ctx: RequestContext, fn: () => T): T {
+  if (!asyncLocalStorage) return fn();
   return asyncLocalStorage.run(ctx, fn);
 }
 
@@ -49,7 +61,7 @@ export function runWithContext<T>(ctx: RequestContext, fn: () => T): T {
  * Useful for setting user/project/org after authentication.
  */
 export function updateCurrentContext(updates: Partial<RequestContext>): void {
-  const current = asyncLocalStorage.getStore();
+  const current = asyncLocalStorage?.getStore();
   if (current) {
     if (updates.organizationId !== undefined) {
       current.organizationId = updates.organizationId;
