@@ -378,6 +378,37 @@ evaluatorCmd
     }
   });
 
+// Add workflow command group
+const workflowCmd = program
+  .command("workflow")
+  .description("Manage workflows");
+
+workflowCmd
+  .command("list")
+  .description("List all workflows in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listWorkflowsCommand: impl } = await import("./commands/workflows/list.js");
+    await impl(options);
+  });
+
+workflowCmd
+  .command("get <id>")
+  .description("Get workflow details by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getWorkflowCommand: impl } = await import("./commands/workflows/get.js");
+    await impl(id, options);
+  });
+
+workflowCmd
+  .command("delete <id>")
+  .description("Archive (soft-delete) a workflow")
+  .action(async (id: string) => {
+    const { deleteWorkflowCommand: impl } = await import("./commands/workflows/delete.js");
+    await impl(id);
+  });
+
 // Add agent command group
 const agentCmd = program
   .command("agent")

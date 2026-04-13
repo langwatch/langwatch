@@ -14,6 +14,7 @@ import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
   sourceArray;
@@ -56,6 +57,8 @@ export default async function execute() {
   const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building traces spec...");
   const tracesSpec = await generateSpecs(tracesApp);
+  console.log("Building workflows spec...");
+  const workflowsSpec = await generateSpecs(workflowsApp);
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
@@ -71,6 +74,7 @@ export default async function execute() {
       scenarioEventsSpec,
       scenariosSpec,
       tracesSpec,
+      workflowsSpec,
       langwatchSpec,
     ],
     {
@@ -88,7 +92,8 @@ export default async function execute() {
           key.includes("/api/model-providers") ||
           key.includes("/api/scenario-events") ||
           key.includes("/api/scenarios") ||
-          key.includes("/api/traces")
+          key.includes("/api/traces") ||
+          key.includes("/api/workflows")
         ) {
           // Replace with new
           return (_target, source) => {

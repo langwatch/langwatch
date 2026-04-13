@@ -351,7 +351,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["workflow list", "workflow get", "workflow delete"],
               "skill": null,
               "docs": null
             },
