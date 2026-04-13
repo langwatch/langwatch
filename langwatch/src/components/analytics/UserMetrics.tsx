@@ -1,5 +1,7 @@
 import { Card, Grid, GridItem, Heading, Tabs } from "@chakra-ui/react";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { analyticsMetrics } from "../../server/analytics/registry";
+import { api } from "../../utils/api";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 
@@ -7,8 +9,9 @@ import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-export const userThreads = {
-  graphId: "custom",
+// User-focused: metrics grouped by user
+const userFocusedThreads: CustomGraphInput = {
+  graphId: "userThreads",
   graphType: "summary",
   series: [
     {
@@ -17,36 +20,26 @@ export const userThreads = {
       metric: "metadata.thread_id",
       aggregation: "cardinality",
     },
-
     {
-      name: "Average threads per user",
+      name: "Avg threads per user",
       colorSet: "greenTones",
       metric: "metadata.thread_id",
       aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
+      pipeline: { field: "user_id", aggregation: "avg" },
     },
     {
-      name: "Average thread duration",
+      name: "Avg thread duration",
       colorSet: "purpleTones",
       metric: "threads.average_duration_per_thread",
       aggregation: "avg",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
+      pipeline: { field: "user_id", aggregation: "avg" },
     },
     {
-      name: "Average messages per user",
+      name: "Avg messages per user",
       colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
+      pipeline: { field: "user_id", aggregation: "avg" },
     },
   ],
   includePrevious: false,
@@ -54,7 +47,68 @@ export const userThreads = {
   height: 300,
 };
 
+// Thread-focused: metrics without user grouping
+const threadFocusedMetrics: CustomGraphInput = {
+  graphId: "threadMetrics",
+  graphType: "summary",
+  series: [
+    {
+      name: "Threads count",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+    },
+    {
+      name: "Avg messages per thread",
+      colorSet: "orangeTones",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+      pipeline: { field: "thread_id", aggregation: "avg" },
+    },
+    {
+      name: "Avg thread duration",
+      colorSet: "purpleTones",
+      metric: "threads.average_duration_per_thread",
+      aggregation: "avg",
+    },
+  ],
+  includePrevious: false,
+  timeScale: ONE_DAY,
+  height: 300,
+};
+
+// Exported for users.tsx page which always uses user-focused
+export const userThreads = userFocusedThreads;
+
 export function UserMetrics() {
+  const { filterParams, queryOpts } = useFilterParams();
+
+  // Detect if users are being tracked to pick the right thread metrics variant
+  const usersQuery = api.analytics.getTimeseries.useQuery(
+    {
+      ...filterParams,
+      series: [
+        {
+          metric: "metadata.user_id",
+          aggregation: "cardinality",
+        },
+      ],
+      timeScale: "full",
+      groupBy: undefined,
+    },
+    { ...queryOpts, keepPreviousData: true },
+  );
+
+  const hasUsers = usersQuery.data?.currentPeriod?.some((entry) =>
+    Object.values(entry).some(
+      (v) => typeof v === "number" && v > 0,
+    ),
+  );
+
+  const activeThreadMetrics = hasUsers
+    ? userFocusedThreads
+    : threadFocusedMetrics;
+
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -195,10 +249,12 @@ export function UserMetrics() {
       <GridItem>
         <Card.Root overflow="auto">
           <Card.Header>
-            <Heading size="sm">User Threads</Heading>
+            <Heading size="sm">
+              {hasUsers ? "User Threads" : "Thread Metrics"}
+            </Heading>
           </Card.Header>
           <Card.Body>
-            <CustomGraph input={userThreads} />
+            <CustomGraph input={activeThreadMetrics} />
           </Card.Body>
         </Card.Root>
       </GridItem>

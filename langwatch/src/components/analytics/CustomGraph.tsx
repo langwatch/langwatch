@@ -930,6 +930,29 @@ const CustomGraph_ = React.memo(
           // @ts-ignore
           layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
         >
+          <defs>
+            {(sortedKeys ?? []).map((aggKey, index) => (
+              <linearGradient
+                key={`gradient-${aggKey}`}
+                id={`gradient-${input.graphId}-${index}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="0%"
+                  stopColor={colorForSeries(aggKey, index)}
+                  stopOpacity={areaFillOpacity}
+                />
+                <stop
+                  offset="100%"
+                  stopColor={colorForSeries(aggKey, index)}
+                  stopOpacity={0.02}
+                />
+              </linearGradient>
+            ))}
+          </defs>
           <CartesianGrid
             vertical={input.graphType === "scatter"}
             strokeDasharray="5 7"
@@ -1027,14 +1050,12 @@ const CustomGraph_ = React.memo(
                       ? "same"
                       : undefined
                   }
-                  fill={fillColor}
-                  fillOpacity={
+                  fill={
                     isAreaType
-                      ? areaFillOpacity
-                      : isBarType
-                        ? 0.8
-                        : undefined
+                      ? `url(#gradient-${input.graphId}-${index})`
+                      : fillColor
                   }
+                  fillOpacity={isBarType ? 0.8 : undefined}
                   radius={
                     isBarType && !["stacked_bar"].includes(input.graphType)
                       ? [3, 3, 0, 0]
