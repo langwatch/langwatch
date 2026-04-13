@@ -316,7 +316,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           ...(!includeDeactivated
             ? { where: { user: { deactivatedAt: null } } }
             : {}),
-          orderBy: { user: { name: "asc" } },
+          orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
           include: {
             user: {
               include: {

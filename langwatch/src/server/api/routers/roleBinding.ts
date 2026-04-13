@@ -15,7 +15,7 @@ export const roleBindingRouter = createTRPCRouter({
    */
   listForOrg: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const bindings = await ctx.prisma.roleBinding.findMany({
         where: { organizationId: input.organizationId },
