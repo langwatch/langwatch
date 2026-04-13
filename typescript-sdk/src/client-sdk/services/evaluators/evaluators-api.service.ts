@@ -2,6 +2,7 @@ import type {
   CreateEvaluatorBody,
   DeleteEvaluatorResponse,
   EvaluatorResponse,
+  UpdateEvaluatorBody,
 } from "./types";
 import {
   createLangWatchApiClient,
@@ -80,6 +81,22 @@ export class EvaluatorsApiService {
       body: params,
     });
     if (error) this.handleApiError("create evaluator", error);
+    return data;
+  }
+
+  /**
+   * Updates an evaluator by its ID.
+   */
+  async update(id: string, params: UpdateEvaluatorBody): Promise<EvaluatorResponse> {
+    const { data, error } = await this.apiClient.PUT(
+      "/api/evaluators/{id}",
+      {
+        params: { path: { id } },
+        body: params,
+      },
+    );
+    if (error)
+      this.handleApiError(`update evaluator with ID "${id}"`, error);
     return data;
   }
 

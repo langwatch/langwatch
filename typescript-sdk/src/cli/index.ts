@@ -97,6 +97,11 @@ const createEvaluatorCommand = async (name: string, options: { type: string }): 
   return impl(name, options);
 };
 
+const updateEvaluatorCommand = async (idOrSlug: string, options: { name?: string; settings?: string }): Promise<void> => {
+  const { updateEvaluatorCommand: impl } = await import("./commands/evaluators/update.js");
+  return impl(idOrSlug, options);
+};
+
 const deleteEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
   const { deleteEvaluatorCommand: impl } = await import("./commands/evaluators/delete.js");
   return impl(idOrSlug);
@@ -341,6 +346,20 @@ evaluatorCmd
   .action(async (name: string, options: { type: string }) => {
     try {
       await createEvaluatorCommand(name, options);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+evaluatorCmd
+  .command("update <idOrSlug>")
+  .description("Update an evaluator name or settings")
+  .option("--name <name>", "New evaluator name")
+  .option("--settings <json>", "Evaluator config settings as JSON")
+  .action(async (idOrSlug: string, options: { name?: string; settings?: string }) => {
+    try {
+      await updateEvaluatorCommand(idOrSlug, options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
