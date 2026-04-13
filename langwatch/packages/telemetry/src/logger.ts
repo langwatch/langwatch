@@ -1,23 +1,28 @@
 import superjson from "superjson";
-import pino, { type LoggerOptions, type Logger as PinoLogger, type DestinationStream } from "pino";
-import { getLogContext } from "../context/logging";
+import pino, {
+  type LoggerOptions,
+  type Logger as PinoLogger,
+  type DestinationStream,
+} from "pino";
+import { getLogContext } from "./context/logging";
+
+const isNode =
+  typeof process !== "undefined" &&
+  typeof process.versions?.node === "string";
 
 /**
  * Custom Error serializer using superjson.
  * Avoids expensive manual stack trace formatting while preserving all metadata.
  */
-const superjsonErrorSerializer = (err: any) => {
+const superjsonErrorSerializer = (err: unknown) => {
   if (!(err instanceof Error)) {
-    return pino.stdSerializers.err(err);
+    return pino.stdSerializers.err(err as Error);
   }
 
-  // Use superjson to serialize the error object efficiently
   const serialized = superjson.serialize(err);
 
   return {
     ...pino.stdSerializers.err(err),
-    // Include the superjson metadata for better downstream reconstruction if needed
-    // but keep standard fields for compatibility with typical log viewers
     _superjson: serialized.meta,
   };
 };
@@ -25,6 +30,7 @@ const superjsonErrorSerializer = (err: any) => {
 export interface CreateLoggerOptions {
   /**
    * Disable automatic context injection (traceId, spanId, organizationId, projectId, userId).
+   * Only relevant on the server — ignored in browser environments.
    */
   disableContext?: boolean;
 }
@@ -36,18 +42,14 @@ let sharedTransport: DestinationStream | null = null;
 let transportInitialized = false;
 
 function getSharedTransport(): DestinationStream | null {
-  if (transportInitialized) {
-    return sharedTransport;
-  }
+  if (!isNode) return null;
+  if (transportInitialized) return sharedTransport;
   transportInitialized = true;
 
   const isDevMode = process.env.NODE_ENV !== "production";
   const isTest = process.env.NODE_ENV === "test";
 
-  // In test mode, skip transports to avoid spawning worker threads
-  if (isTest) {
-    return null;
-  }
+  if (isTest) return null;
 
   const otelLogsEnabled = process.env.PINO_OTEL_ENABLED === "true";
   const consoleLevel = process.env.PINO_CONSOLE_LEVEL ?? "info";
@@ -72,20 +74,56 @@ function getSharedTransport(): DestinationStream | null {
 }
 
 /**
- * Creates a server-side logger with context injection and transports.
+ * Creates a logger that works in both server and browser environments.
  *
- * Environment variables:
+ * - **Server**: pino transports (pretty / otel), context injection via
+ *   AsyncLocalStorage, superjson error serialization.
+ * - **Browser**: pino browser mode with `console.*` output.
+ *
+ * Environment variables (server only):
  * - PINO_CONSOLE_LEVEL: Console log level (default: "info")
  * - PINO_OTEL_ENABLED: Set to "true" to enable OTel log export
  * - PINO_OTEL_LEVEL: OTel export level (default: "debug")
  */
-export const createLogger = (
+export function createLogger(
   name: string,
   options?: CreateLoggerOptions,
-): PinoLogger => {
+): PinoLogger {
+  if (!isNode) {
+    return createBrowserLogger(name);
+  }
+  return createServerLogger(name, options);
+}
+
+// ── Browser ──────────────────────────────────────────────────────────
+
+function createBrowserLogger(name: string): PinoLogger {
+  const isTest = process.env.NODE_ENV === "test";
+  const level = isTest ? "error" : (process.env.PINO_LOG_LEVEL ?? "info");
+
+  return pino({
+    name,
+    level,
+    timestamp: pino.stdTimeFunctions.isoTime,
+    serializers: { error: pino.stdSerializers.err },
+    formatters: {
+      bindings: (bindings) => bindings,
+      level: (label) => ({ level: label.toUpperCase() }),
+    },
+    browser: { asObject: true },
+  });
+}
+
+// ── Server ───────────────────────────────────────────────────────────
+
+function createServerLogger(
+  name: string,
+  options?: CreateLoggerOptions,
+): PinoLogger {
   const isTest = process.env.NODE_ENV === "test";
   const defaultLevel = isTest ? "error" : "debug";
-  const baseLevel = process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
+  const baseLevel =
+    process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
 
   const pinoOptions: LoggerOptions = {
     name,
@@ -105,7 +143,9 @@ export const createLogger = (
   }
 
   return pino(pinoOptions, process.stdout);
-};
+}
+
+// ── Transport builders ───────────────────────────────────────────────
 
 function buildTransport(config: {
   isDevMode: boolean;

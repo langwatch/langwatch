@@ -1,12 +1,12 @@
 /**
- * @langwatch/observability - Server entry point
+ * @langwatch/telemetry
  *
  * Provides logging, context propagation, and OpenTelemetry utilities
- * for LangWatch services. For browser-safe imports, use '@langwatch/observability/browser'.
+ * for LangWatch services.
  */
 
-// Server logger (with context injection + transports)
-export { createLogger, type CreateLoggerOptions, type Logger } from "./logger/server";
+// Logger (isomorphic — works in both server and browser)
+export { createLogger, type CreateLoggerOptions, type Logger } from "./logger";
 
 // Context propagation
 export {
