@@ -125,18 +125,24 @@ export function LLMMetrics() {
     timeScale: ONE_DAY,
   };
 
-  const sentimentTrend: CustomGraphInput = {
-    graphId: "overviewSentimentTrend",
-    graphType: "stacked_bar",
+  const latencyTrend: CustomGraphInput = {
+    graphId: "overviewLatencyTrend",
+    graphType: "line",
     series: [
       {
-        name: "Feedback count",
-        metric: "sentiment.thumbs_up_down",
-        aggregation: "cardinality",
-        colorSet: "positiveNegativeNeutral",
+        name: analyticsMetrics.performance.completion_time.label,
+        metric: "performance.completion_time",
+        aggregation: "median",
+        colorSet: analyticsMetrics.performance.completion_time.colorSet,
+      },
+      {
+        name: analyticsMetrics.performance.first_token.label,
+        metric: "performance.first_token",
+        aggregation: "median",
+        colorSet: analyticsMetrics.performance.first_token.colorSet,
       },
     ],
-    groupBy: "sentiment.thumbs_up_down",
+    groupBy: undefined,
     includePrevious: false,
     timeScale: ONE_DAY,
   };
@@ -279,10 +285,10 @@ export function LLMMetrics() {
         <GridItem>
           <Card.Root height="full">
             <Card.Header>
-              <Heading size="sm">User Sentiment</Heading>
+              <Heading size="sm">Latency Trend</Heading>
             </Card.Header>
             <Card.Body>
-              <CustomGraph input={sentimentTrend} />
+              <CustomGraph input={latencyTrend} />
             </Card.Body>
           </Card.Root>
         </GridItem>
