@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TRACK_EVENT_SPAN_NAME } from "../../../tracer/constants";
 import type { Span } from "../../../tracer/types";
 import {
   addGuardrailCosts,
@@ -221,7 +222,7 @@ describe("Trace metrics", () => {
       expect(metrics!.total_cost).toBe(0.0001);
     });
 
-    it("excludes langwatch.track_event spans from timing calculation", () => {
+    describe("when a langwatch.track_event span is present", () => {
       const spans: Span[] = [
         {
           trace_id: "trace_1",
@@ -232,23 +233,39 @@ describe("Trace metrics", () => {
             started_at: 1000,
             finished_at: 2600,
           },
+          metrics: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+          },
         },
         {
           trace_id: "trace_1",
           span_id: "span_2",
           type: "span",
-          name: "langwatch.track_event",
+          name: TRACK_EVENT_SPAN_NAME,
           timestamps: {
             started_at: 19000,
             finished_at: 19000,
           },
+          metrics: {
+            prompt_tokens: 10,
+            completion_tokens: 5,
+          },
         },
       ];
 
-      const metrics = computeTraceMetrics(spans);
+      it("excludes synthetic span from timing calculation", () => {
+        const metrics = computeTraceMetrics(spans);
 
-      expect(metrics!.total_time_ms).toBe(1600);
-      expect(metrics!.first_token_ms).toBeNull();
+        expect(metrics!.total_time_ms).toBe(1600);
+      });
+
+      it("still counts tokens from synthetic spans", () => {
+        const metrics = computeTraceMetrics(spans);
+
+        expect(metrics!.prompt_tokens).toBe(110);
+        expect(metrics!.completion_tokens).toBe(55);
+      });
     });
 
     it("should set tokens_estimated to true when any span has tokens_estimated", () => {

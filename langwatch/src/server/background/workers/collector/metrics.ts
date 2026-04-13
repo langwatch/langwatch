@@ -3,6 +3,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
+import { SYNTHETIC_SPAN_NAMES } from "../../../tracer/constants";
 import type { LLMSpan, Span, Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";
 import {
@@ -12,9 +13,6 @@ import {
 } from "./cost";
 
 const logger = createLogger("langwatch:workers:collector:metrics");
-
-/** Span names that represent synthetic events, not real execution, and must be excluded from timing. */
-const SYNTHETIC_SPAN_NAMES = new Set(["langwatch.track_event"]);
 
 // TODO: test
 export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {

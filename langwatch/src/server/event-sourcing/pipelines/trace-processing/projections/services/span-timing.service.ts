@@ -1,4 +1,5 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 /**
@@ -6,9 +7,6 @@ import type { NormalizedSpan } from "../../schemas/spans";
  */
 export const isValidTimestamp = (ts: number | undefined | null): ts is number =>
   typeof ts === "number" && ts > 0 && Number.isFinite(ts);
-
-/** Span names that represent synthetic events, not real execution, and must be excluded from timing. */
-const SYNTHETIC_SPAN_NAMES = new Set(["langwatch.track_event"]);
 
 /**
  * Accumulates trace-level timing from individual spans.

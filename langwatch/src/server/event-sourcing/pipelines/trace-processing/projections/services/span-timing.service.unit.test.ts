@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
 import { SpanTimingService, isValidTimestamp } from "./span-timing.service";
@@ -76,7 +77,7 @@ function makeState(
 describe("SpanTimingService", () => {
   const service = new SpanTimingService();
 
-  describe("accumulateTiming", () => {
+  describe("accumulateTiming()", () => {
     describe("when processing a single real span", () => {
       it("computes timing from the span timestamps", () => {
         const result = service.accumulateTiming({
@@ -97,7 +98,10 @@ describe("SpanTimingService", () => {
           state,
           span: makeSpan({ startTimeUnixMs: 1000, endTimeUnixMs: 2000 }),
         });
-        state = makeState({ occurredAt: first.occurredAt, totalDurationMs: first.totalDurationMs });
+        state = makeState({
+          occurredAt: first.occurredAt,
+          totalDurationMs: first.totalDurationMs,
+        });
 
         const result = service.accumulateTiming({
           state,
@@ -117,12 +121,15 @@ describe("SpanTimingService", () => {
           state,
           span: makeSpan({ startTimeUnixMs: 1000, endTimeUnixMs: 2600 }),
         });
-        state = makeState({ occurredAt: first.occurredAt, totalDurationMs: first.totalDurationMs });
+        state = makeState({
+          occurredAt: first.occurredAt,
+          totalDurationMs: first.totalDurationMs,
+        });
 
         const result = service.accumulateTiming({
           state,
           span: makeSpan({
-            name: "langwatch.track_event",
+            name: TRACK_EVENT_SPAN_NAME,
             startTimeUnixMs: 19000,
             endTimeUnixMs: 19000,
           }),
@@ -136,7 +143,7 @@ describe("SpanTimingService", () => {
         const result = service.accumulateTiming({
           state: makeState(),
           span: makeSpan({
-            name: "langwatch.track_event",
+            name: TRACK_EVENT_SPAN_NAME,
             startTimeUnixMs: 50000,
             endTimeUnixMs: 50000,
           }),
@@ -162,19 +169,18 @@ describe("SpanTimingService", () => {
     });
   });
 
-  describe("isValidTimestamp", () => {
-    it("rejects null, undefined, zero, negative, and non-finite values", () => {
-      expect(isValidTimestamp(null)).toBe(false);
-      expect(isValidTimestamp(undefined)).toBe(false);
-      expect(isValidTimestamp(0)).toBe(false);
-      expect(isValidTimestamp(-1)).toBe(false);
-      expect(isValidTimestamp(Infinity)).toBe(false);
-      expect(isValidTimestamp(NaN)).toBe(false);
-    });
+  describe("isValidTimestamp()", () => {
+    it.each([null, undefined, 0, -1, Infinity, NaN])(
+      "rejects %s",
+      (value) => {
+        expect(isValidTimestamp(value as number | null | undefined)).toBe(
+          false,
+        );
+      },
+    );
 
-    it("accepts positive finite numbers", () => {
-      expect(isValidTimestamp(1)).toBe(true);
-      expect(isValidTimestamp(1713000000000)).toBe(true);
+    it.each([1, 1713000000000])("accepts %d", (value) => {
+      expect(isValidTimestamp(value)).toBe(true);
     });
   });
 });
