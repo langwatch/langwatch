@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Card,
+  Code,
   Heading,
   HStack,
   Separator,
@@ -269,8 +270,23 @@ function AccessAuditPage() {
             )}
           </Card.Body>
         </Card.Root>
+
+        <RbacDebugBookmarklets />
       </VStack>
     </SettingsLayout>
+  );
+}
+
+function RbacDebugBookmarklets() {
+  return (
+    <HStack gap={2} paddingTop={2} flexWrap="wrap" alignItems="center">
+      <Text fontSize="xs" color="fg.subtle">
+        🔐 RBAC debug panel:
+      </Text>
+      <Text fontSize="xs" color="fg.subtle">
+        load <Code fontSize="xs">langwatch/tools/rbac-debug-extension</Code> in Chrome (Developer mode → Load unpacked)
+      </Text>
+    </HStack>
   );
 }
 

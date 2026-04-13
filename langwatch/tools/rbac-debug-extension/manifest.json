@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "LangWatch RBAC Debug",
+  "version": "1.0",
+  "description": "Toggle the RBAC debug panel on any LangWatch page",
+  "permissions": ["scripting", "activeTab"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LangWatch RBAC Debug"
+  }
+}

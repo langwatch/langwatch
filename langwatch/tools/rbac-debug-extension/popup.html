@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LangWatch RBAC Debug</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      width: 260px;
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: #f97316;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #f0f0f0;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 14px;
+      padding: 8px 10px;
+      background: #1a1a1a;
+      border-radius: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+      flex-shrink: 0;
+    }
+
+    .status-dot.enabled {
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e88;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    button {
+      width: 100%;
+      padding: 9px 14px;
+      border: none;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    button:hover { opacity: 0.88; }
+    button:active { opacity: 0.75; }
+
+    .btn-enable {
+      background: #f97316;
+      color: white;
+    }
+
+    .btn-disable {
+      background: #2a2a2a;
+      color: #aaa;
+      border: 1px solid #333;
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 10px;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .not-langwatch {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      padding: 10px 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">LW</div>
+    <div>
+      <div class="title">RBAC Debug</div>
+      <div class="subtitle">LangWatch internal tool</div>
+    </div>
+  </div>
+
+  <div class="status" id="status">
+    <div class="status-dot" id="dot"></div>
+    <span id="status-text">Checking…</span>
+  </div>
+
+  <div id="main-content">
+    <div class="buttons">
+      <button class="btn-enable" id="btn-enable">🔐 Enable panel</button>
+      <button class="btn-disable" id="btn-disable">✕ Disable panel</button>
+    </div>
+    <p class="note">
+      Panel appears bottom-right on any LangWatch page when enabled.
+      Persists across page loads until disabled.
+    </p>
+  </div>
+
+  <div class="not-langwatch" id="not-langwatch" style="display:none">
+    Not on a LangWatch page
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
