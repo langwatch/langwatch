@@ -4,6 +4,7 @@
  * Routes analytics queries to ClickHouse.
  */
 
+import { createHash } from "crypto";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "../db";
@@ -73,7 +74,10 @@ export class AnalyticsService {
       "getTimeseries",
       input.projectId,
       async () => {
-        const cacheKey = `${input.projectId}:${JSON.stringify(input)}`;
+        const hash = createHash("sha256")
+          .update(JSON.stringify(input))
+          .digest("hex");
+        const cacheKey = `${input.projectId}:${hash}`;
         const cached = await this.timeseriesCache.get(cacheKey);
         if (cached) return cached;
 
