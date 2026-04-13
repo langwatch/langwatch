@@ -303,7 +303,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
           ? existingScenarioMappings
           : computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
       );
-      setScenarioOutputField(undefined);
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     } else if (!agentId && isOpen) {
@@ -318,7 +317,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setScenarioMappings(
         computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
       );
-      setScenarioOutputField(undefined);
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
