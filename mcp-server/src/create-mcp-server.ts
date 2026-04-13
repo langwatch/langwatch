@@ -896,6 +896,51 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Workflow Tools (require API key) ---
+
+  server.tool(
+    "platform_list_workflows",
+    "List all workflows in the LangWatch project.",
+    {},
+    withToolLogging("platform_list_workflows", async () => {
+      requireApiKey();
+      const { handleListWorkflows } = await import("./tools/list-workflows.js");
+      return {
+        content: [{ type: "text", text: await handleListWorkflows() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_workflow",
+    "Get a workflow by its ID.",
+    {
+      id: z.string().describe("The workflow ID"),
+    },
+    withToolLogging("platform_get_workflow", async (params) => {
+      requireApiKey();
+      const { handleGetWorkflow } = await import("./tools/get-workflow.js");
+      return {
+        content: [{ type: "text", text: await handleGetWorkflow(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_workflow",
+    "Archive (soft-delete) a workflow by its ID.",
+    {
+      id: z.string().describe("The workflow ID to archive"),
+    },
+    withToolLogging("platform_delete_workflow", async (params) => {
+      requireApiKey();
+      const { handleDeleteWorkflow } = await import("./tools/delete-workflow.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteWorkflow(params) }],
+      };
+    })
+  );
+
   // --- Platform Annotation Tools (require API key) ---
 
   server.tool(

@@ -357,7 +357,11 @@
             },
             "platform": {
               "ui": "/workflows",
-              "mcp": null,
+              "mcp": [
+                "platform_list_workflows",
+                "platform_get_workflow",
+                "platform_delete_workflow"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
             },
