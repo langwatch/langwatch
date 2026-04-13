@@ -106,7 +106,7 @@ const program = new Command();
 
 program
   .name("langwatch")
-  .description("LangWatch CLI - Manage prompts and datasets")
+  .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, and more")
   .version(__CLI_VERSION__, "-v, --version", "Display the current version")
   .configureHelp({
     showGlobalOptions: true,
@@ -355,6 +355,200 @@ evaluatorCmd
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
     }
+  });
+
+// Add dashboard command group
+const dashboardCmd = program
+  .command("dashboard")
+  .description("Manage analytics dashboards");
+
+dashboardCmd
+  .command("list")
+  .description("List all dashboards in the project")
+  .action(async () => {
+    const { listDashboardsCommand: impl } = await import("./commands/dashboards/list.js");
+    await impl();
+  });
+
+dashboardCmd
+  .command("create <name>")
+  .description("Create a new dashboard")
+  .action(async (name: string) => {
+    const { createDashboardCommand: impl } = await import("./commands/dashboards/create.js");
+    await impl(name);
+  });
+
+dashboardCmd
+  .command("delete <id>")
+  .description("Delete a dashboard and its graphs")
+  .action(async (id: string) => {
+    const { deleteDashboardCommand: impl } = await import("./commands/dashboards/delete.js");
+    await impl(id);
+  });
+
+// Add model-provider command group
+const modelProviderCmd = program
+  .command("model-provider")
+  .description("Manage LLM model provider configurations");
+
+modelProviderCmd
+  .command("list")
+  .description("List all configured model providers")
+  .action(async () => {
+    const { listModelProvidersCommand: impl } = await import("./commands/model-providers/list.js");
+    await impl();
+  });
+
+modelProviderCmd
+  .command("set <provider>")
+  .description("Configure a model provider (e.g. openai, anthropic)")
+  .option("--enabled <boolean>", "Enable or disable the provider", (v) => v === "true")
+  .option("--api-key <key>", "API key for the provider")
+  .option("--default-model <model>", "Default model to use (e.g. gpt-4o)")
+  .action(async (provider: string, options: { enabled?: boolean; apiKey?: string; defaultModel?: string }) => {
+    const { setModelProviderCommand: impl } = await import("./commands/model-providers/set.js");
+    await impl(provider, options);
+  });
+
+// Add annotation command group
+const annotationCmd = program
+  .command("annotation")
+  .description("Manage trace annotations");
+
+annotationCmd
+  .command("list")
+  .description("List all annotations (optionally filtered by trace)")
+  .option("--trace-id <traceId>", "Filter by trace ID")
+  .action(async (options: { traceId?: string }) => {
+    const { listAnnotationsCommand: impl } = await import("./commands/annotations/list.js");
+    await impl(options);
+  });
+
+annotationCmd
+  .command("get <id>")
+  .description("Get annotation details by ID")
+  .action(async (id: string) => {
+    const { getAnnotationCommand: impl } = await import("./commands/annotations/get.js");
+    await impl(id);
+  });
+
+annotationCmd
+  .command("create <traceId>")
+  .description("Create an annotation for a trace")
+  .option("--comment <comment>", "Annotation comment")
+  .option("--thumbs-up", "Mark as thumbs up")
+  .option("--thumbs-down", "Mark as thumbs down")
+  .option("--email <email>", "Email of the annotator")
+  .action(async (traceId: string, options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string }) => {
+    const { createAnnotationCommand: impl } = await import("./commands/annotations/create.js");
+    await impl(traceId, options);
+  });
+
+annotationCmd
+  .command("delete <id>")
+  .description("Delete an annotation")
+  .action(async (id: string) => {
+    const { deleteAnnotationCommand: impl } = await import("./commands/annotations/delete.js");
+    await impl(id);
+  });
+
+// Add analytics command group
+const analyticsCmd = program
+  .command("analytics")
+  .description("Query analytics and metrics");
+
+analyticsCmd
+  .command("query")
+  .description("Query timeseries analytics (costs, latency, token usage, etc.)")
+  .option("-m, --metric <metric>", "Metric to query (preset name or raw metric path, default: trace-count)")
+  .option("-a, --aggregation <aggregation>", "Aggregation type: cardinality, avg, sum, min, max, p95, p99")
+  .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
+  .option("--end-date <date>", "End date (ISO string, default: now)")
+  .option("--group-by <field>", "Group by field (e.g. metadata.model)")
+  .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string; format?: string }) => {
+    const { queryAnalyticsCommand: impl } = await import("./commands/analytics/query.js");
+    await impl(options);
+  });
+
+// Add trace command group
+const traceCmd = program
+  .command("trace")
+  .description("Search and inspect traces");
+
+traceCmd
+  .command("search")
+  .description("Search traces with optional text query and date range")
+  .option("-q, --query <query>", "Text search query")
+  .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
+  .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+  .option("--limit <n>", "Max results to return (default: 25)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { query?: string; startDate?: string; endDate?: string; limit?: string; format?: string }) => {
+    const { searchTracesCommand: impl } = await import("./commands/traces/search.js");
+    await impl(options);
+  });
+
+traceCmd
+  .command("get <traceId>")
+  .description("Get full trace details by ID")
+  .option("-f, --format <format>", "Output format: digest (default, human-readable) or json", "digest")
+  .action(async (traceId: string, options: { format?: string }) => {
+    const { getTraceCommand: impl } = await import("./commands/traces/get.js");
+    await impl(traceId, options);
+  });
+
+// Add scenario command group
+const scenarioCmd = program
+  .command("scenario")
+  .description("Manage scenarios");
+
+scenarioCmd
+  .command("list")
+  .description("List all scenarios in the project")
+  .action(async () => {
+    const { listScenariosCommand: impl } = await import("./commands/scenarios/list.js");
+    await impl();
+  });
+
+scenarioCmd
+  .command("get <id>")
+  .description("Get scenario details by ID")
+  .action(async (id: string) => {
+    const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
+    await impl(id);
+  });
+
+scenarioCmd
+  .command("create <name>")
+  .description("Create a new scenario")
+  .requiredOption("--situation <situation>", "The situation/context for the scenario")
+  .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
+  .option("--labels <labels>", "Comma-separated list of labels")
+  .action(async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
+    const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
+    await impl(name, options);
+  });
+
+scenarioCmd
+  .command("update <id>")
+  .description("Update an existing scenario")
+  .option("--name <name>", "New scenario name")
+  .option("--situation <situation>", "New situation/context")
+  .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
+  .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
+  .action(async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+    const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
+    await impl(id, options);
+  });
+
+scenarioCmd
+  .command("delete <id>")
+  .description("Archive (soft-delete) a scenario")
+  .action(async (id: string) => {
+    const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
+    await impl(id);
   });
 
 // Add dataset command group

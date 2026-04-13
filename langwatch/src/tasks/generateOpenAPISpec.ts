@@ -4,12 +4,14 @@ import { generateSpecs } from "hono-openapi";
 import path from "path";
 
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
+import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
+import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -35,6 +37,8 @@ export default async function execute() {
   console.log("Generating OpenAPI spec...");
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
+  console.log("Building dashboards spec...");
+  const dashboardsSpec = await generateSpecs(dashboardsApp);
   console.log("Building dataset spec...");
   const datasetSpec = await generateSpecs(datasetApp);
   console.log("Building evaluators spec...");
@@ -43,6 +47,8 @@ export default async function execute() {
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
+  console.log("Building model providers spec...");
+  const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building scenarios spec...");
   const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building traces spec...");
@@ -53,9 +59,11 @@ export default async function execute() {
     [
       currentSpec,
       analyticsSpec,
+      dashboardsSpec,
       datasetSpec,
       evaluatorsSpec,
       llmConfigsSpec,
+      modelProvidersSpec,
       scenarioEventsSpec,
       scenariosSpec,
       tracesSpec,
@@ -68,9 +76,11 @@ export default async function execute() {
         // we don't want to merge, we just want to replace.
         if (
           key.includes("/api/analytics") ||
+          key.includes("/api/dashboards") ||
           key.includes("/api/evaluators") ||
           key.includes("/api/prompts") ||
           key.includes("/api/dataset") ||
+          key.includes("/api/model-providers") ||
           key.includes("/api/scenario-events") ||
           key.includes("/api/scenarios") ||
           key.includes("/api/traces")

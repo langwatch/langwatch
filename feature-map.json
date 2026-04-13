@@ -20,7 +20,7 @@
                 "python": "langwatch.trace",
                 "typescript": "langwatch"
               },
-              "cli": null,
+              "cli": ["trace search", "trace get"],
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
@@ -42,7 +42,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["analytics query"],
               "skill": "analytics",
               "docs": null
             },
@@ -94,7 +94,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["annotation list", "annotation get", "annotation create", "annotation delete"],
               "skill": null,
               "docs": null
             },
@@ -190,7 +190,7 @@
                 "python": "langwatch-scenario",
                 "typescript": "@langwatch/scenario"
               },
-              "cli": null,
+              "cli": ["scenario list", "scenario get", "scenario create", "scenario update", "scenario delete"],
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
             },
@@ -427,6 +427,28 @@
       }
     },
     {
+      "id": "dashboards",
+      "name": "Dashboards",
+      "description": "Custom analytics dashboards with configurable graphs",
+      "surfaces": {
+        "code": {
+          "sdk": null,
+          "cli": ["dashboard list", "dashboard create", "dashboard delete"],
+          "skill": null,
+          "docs": null
+        },
+        "platform": {
+          "ui": "/analytics/dashboards",
+          "mcp": null,
+          "skill": null,
+          "docs": null
+        },
+        "api": "/api/dashboards",
+        "docs": null
+      },
+      "sync": null
+    },
+    {
       "id": "settings",
       "name": "Settings",
       "description": "Platform configuration and administration",
@@ -438,7 +460,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["model-provider list", "model-provider set"],
               "skill": null,
               "docs": null
             },
@@ -451,7 +473,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/integration/custom-models.md"
             },
-            "api": null,
+            "api": "/api/model-providers",
             "docs": "https://langwatch.ai/docs/integration/custom-models.md"
           },
           "sync": null
