@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { LangWatch } from "@/client-sdk";
-import { DatasetNotFoundError, DatasetApiError } from "../errors";
+import { DatasetNotFoundError, DatasetValidationError } from "../errors";
 
 const SKIP = !process.env.LANGWATCH_API_KEY;
 
@@ -279,9 +279,9 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       ).rejects.toThrow(DatasetNotFoundError);
     });
 
-    it("throws DatasetApiError for create with empty name", () => {
+    it("throws DatasetValidationError for create with empty name", () => {
       expect(() => langwatch.datasets.create({ name: "" })).toThrow(
-        DatasetApiError
+        DatasetValidationError
       );
     });
   });

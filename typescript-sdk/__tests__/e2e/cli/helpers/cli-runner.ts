@@ -62,7 +62,7 @@ export class CliRunner {
       return { success: true, output: result };
     } catch (error: any) {
       console.error(error);
-      const output = error.stdout ?? error.stderr ?? "";
+      const output = [error.stdout, error.stderr].filter(Boolean).join("");
       this.log(`ERROR (exit ${error.status}): ${output}`);
 
       return {
