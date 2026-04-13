@@ -1084,7 +1084,7 @@ const CustomGraph_ = React.memo(
                   dataKey={aggKey}
                   stroke={strokeColor}
                   stackId={["stacked_bar", "stacked_area"].includes(input.graphType) ? "same" : undefined}
-                  fill={isAreaType ? `url(#gradient-${input.graphId}-${index})` : fillColor}
+                  fill={isAreaType ? `url(#gradient-${uniqueId}-${index})` : fillColor}
                   fillOpacity={isBarType ? 0.8 : undefined}
                   {...extraProps}
                   strokeWidth={isBarType ? 0 : 2.5}
