@@ -1,4 +1,5 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 /**
@@ -22,6 +23,7 @@ export class SpanTimingService {
     span: NormalizedSpan;
   }): { occurredAt: number; totalDurationMs: number } {
     if (
+      SYNTHETIC_SPAN_NAMES.has(span.name) ||
       !isValidTimestamp(span.startTimeUnixMs) ||
       !isValidTimestamp(span.endTimeUnixMs)
     ) {

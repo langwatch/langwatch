@@ -3,6 +3,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
+import { SYNTHETIC_SPAN_NAMES } from "../../../tracer/constants";
 import type { LLMSpan, Span, Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";
 import {
@@ -28,6 +29,10 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let totalCost: number | null = null;
 
   (spans ?? []).forEach((span) => {
+    if (span.name != null && SYNTHETIC_SPAN_NAMES.has(span.name)) {
+      return;
+    }
+
     if (
       earliestStartedAt === null ||
       span.timestamps.started_at < earliestStartedAt

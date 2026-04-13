@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getApp } from "~/server/app-layer/app";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { normalizeHeaderValue } from "~/utils/headers";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -168,7 +169,7 @@ export default async function handler(
         spanId: spanId,
         traceState: null,
         parentSpanId: null,
-        name: "langwatch.track_event",
+        name: TRACK_EVENT_SPAN_NAME,
         kind: ESpanKind.SPAN_KIND_INTERNAL,
         startTimeUnixNano: timestampNano,
         endTimeUnixNano: timestampNano,
@@ -192,7 +193,7 @@ export default async function handler(
         attributes: [],
       },
       instrumentationScope: {
-        name: "langwatch.track_event",
+        name: TRACK_EVENT_SPAN_NAME,
       },
       piiRedactionLevel: project.piiRedactionLevel,
       occurredAt: Date.now(),

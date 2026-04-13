@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TRACK_EVENT_SPAN_NAME } from "../../../tracer/constants";
 import type { Span } from "../../../tracer/types";
 import {
   addGuardrailCosts,
@@ -219,6 +220,52 @@ describe("Trace metrics", () => {
 
       expect(metrics!.first_token_ms).toBe(200); // 1200 - 1000
       expect(metrics!.total_cost).toBe(0.0001);
+    });
+
+    describe("when a langwatch.track_event span is present", () => {
+      const spans: Span[] = [
+        {
+          trace_id: "trace_1",
+          span_id: "span_1",
+          type: "span",
+          name: "agent-chat",
+          timestamps: {
+            started_at: 1000,
+            finished_at: 2600,
+          },
+          metrics: {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+          },
+        },
+        {
+          trace_id: "trace_1",
+          span_id: "span_2",
+          type: "span",
+          name: TRACK_EVENT_SPAN_NAME,
+          timestamps: {
+            started_at: 19000,
+            finished_at: 19000,
+          },
+          metrics: {
+            prompt_tokens: 10,
+            completion_tokens: 5,
+          },
+        },
+      ];
+
+      it("excludes synthetic span from timing calculation", () => {
+        const metrics = computeTraceMetrics(spans);
+
+        expect(metrics!.total_time_ms).toBe(1600);
+      });
+
+      it("excludes synthetic span from token calculation", () => {
+        const metrics = computeTraceMetrics(spans);
+
+        expect(metrics!.prompt_tokens).toBe(100);
+        expect(metrics!.completion_tokens).toBe(50);
+      });
     });
 
     it("should set tokens_estimated to true when any span has tokens_estimated", () => {
