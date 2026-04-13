@@ -435,7 +435,7 @@ describe("formatSpansDigest", () => {
 
   it("returns empty digest for empty spans array", async () => {
     const result = await formatSpansDigest([]);
-    expect(typeof result).toBe("string");
+    expect(result).toBe("No spans recorded.");
   });
 
   it("includes error information in the digest", async () => {
