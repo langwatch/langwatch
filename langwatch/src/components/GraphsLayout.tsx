@@ -31,14 +31,16 @@ export default function GraphsLayout({
         {...analyticsHeaderProps}
         extraHeaderButtons={extraHeaderButtons}
       />
-      <HStack align="start" width="full" height="full">
+      <HStack align="start" width="full" minHeight="full">
         <VStack
           align="start"
           paddingX={2}
           paddingY={4}
-          fontSize="14px"
+          textStyle="sm"
           minWidth="180px"
-          height="full"
+          position="sticky"
+          top={0}
+          alignSelf="start"
           gap={1}
         >
           <MenuLink href={`/${project?.slug}/analytics`}>Overview</MenuLink>
@@ -49,7 +51,7 @@ export default function GraphsLayout({
               paddingTop={4}
               paddingBottom={2}
               color="fg"
-              fontSize="12px"
+              textStyle="xs"
             >
               Engagement
             </SmallLabel>
@@ -66,7 +68,7 @@ export default function GraphsLayout({
               paddingTop={4}
               paddingBottom={2}
               color="fg"
-              fontSize="12px"
+              textStyle="xs"
             >
               Observability
             </SmallLabel>
@@ -83,7 +85,7 @@ export default function GraphsLayout({
               paddingTop={4}
               paddingBottom={2}
               color="fg"
-              fontSize="12px"
+              textStyle="xs"
             >
               Custom
             </SmallLabel>
@@ -92,7 +94,7 @@ export default function GraphsLayout({
             )}
           </VStack>
         </VStack>
-        <Container maxWidth={showFilters ? "1612" : "1200"} padding={4}>
+        <Container maxWidth={showFilters ? "1612" : "1200"} padding={4} paddingBottom={16}>
           {children}
         </Container>
       </HStack>

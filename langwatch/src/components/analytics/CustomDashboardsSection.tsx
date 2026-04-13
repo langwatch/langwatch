@@ -214,7 +214,7 @@ export function CustomDashboardsSection({
                     setEditingName("");
                   }
                 }}
-                marginLeft={6}
+                marginLeft={4}
                 marginRight={2}
                 marginY={1}
                 fontSize="14px"
@@ -223,7 +223,6 @@ export function CustomDashboardsSection({
               <>
                 <MenuLink
                   href={`/${projectSlug}/analytics/reports?dashboard=${dashboard.id}`}
-                  paddingX={6}
                   isSelected={isSelected}
                 >
                   {dashboard.name}
