@@ -1129,13 +1129,18 @@ function buildArrayJoinTimeseriesQuery(
     }
   }
 
-  // Include evaluation columns in CTE when evaluation metrics are used
+  // Include evaluation columns in CTE when evaluation metrics are used.
+  // When hasEvalMixWithTrace is true the CTE uses GROUP BY (not SELECT DISTINCT),
+  // so non-grouped columns must be wrapped in any(). The raw eval columns are
+  // only consumed by the non-mixed transformMetricForDedup path, but wrapping
+  // them keeps the CTE valid for both modes.
   const es = tableAliases.evaluation_runs;
   const metricExprs = simpleMetrics.map((m) => m.selectExpression);
   const referencedEvalCols = extractReferencedEvaluationColumns(metricExprs);
   for (const col of referencedEvalCols) {
+    const colExpr = `${es}.${col}`;
     cteSelectExprs.push(
-      `${es}.${col} AS eval_${snakeCase(col)}`,
+      `${hasEvalMixWithTrace ? `any(${colExpr})` : colExpr} AS eval_${snakeCase(col)}`,
     );
   }
 
