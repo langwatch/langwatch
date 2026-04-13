@@ -129,6 +129,7 @@ export function CustomGraph({
   hideGroupLabel = false,
   filters,
   onDataPointClick,
+  emptyState,
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
@@ -142,6 +143,7 @@ export function CustomGraph({
     startDate?: string;
     endDate?: string;
   }) => void;
+  emptyState?: React.ReactNode;
 }) {
   const publicEnv = usePublicEnv();
 
@@ -153,6 +155,7 @@ export function CustomGraph({
       load={!!publicEnv.data}
       filters={filters}
       onDataPointClick={onDataPointClick}
+      emptyState={emptyState}
     />
   );
 }
@@ -166,6 +169,7 @@ const CustomGraph_ = React.memo(
     size,
     filters,
     onDataPointClick,
+    emptyState,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -185,6 +189,7 @@ const CustomGraph_ = React.memo(
       startDate?: string;
       endDate?: string;
     }) => void;
+    emptyState?: React.ReactNode;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -575,7 +580,9 @@ const CustomGraph_ = React.memo(
       const dataLoaded = !timeseries.isLoading && timeseries.data;
       const allEmpty =
         dataLoaded &&
-        (allValues.length === 0 || currentAndPreviousData?.length === 0);
+        (allValues.length === 0 ||
+          currentAndPreviousData?.length === 0 ||
+          allValues.every((v) => v === 0));
 
       return (
         <Box width="full" height="full" position="relative">
@@ -641,29 +648,31 @@ const CustomGraph_ = React.memo(
                 </button>
               )}
               {allEmpty && input.graphType !== "monitor_graph" ? (
-                <VStack
-                  position="absolute"
-                  top="50%"
-                  left="50%"
-                  transform="translate(-50%, -50%)"
-                  gap={2}
-                >
-                  <HStack gap={1} align="end" opacity={0.3}>
-                    {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
-                      <Box
-                        key={i}
-                        width="6px"
-                        height={`${h}%`}
-                        maxHeight="40px"
-                        bg="border"
-                        borderRadius="sm"
-                      />
-                    ))}
-                  </HStack>
-                  <Text textStyle="xs" color="fg.subtle">
-                    No data
-                  </Text>
-                </VStack>
+                emptyState ?? (
+                  <VStack
+                    position="absolute"
+                    top="50%"
+                    left="50%"
+                    transform="translate(-50%, -50%)"
+                    gap={2}
+                  >
+                    <HStack gap={1} align="end" opacity={0.3}>
+                      {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
+                        <Box
+                          key={i}
+                          width="6px"
+                          height={`${h}%`}
+                          maxHeight="40px"
+                          bg="border"
+                          borderRadius="sm"
+                        />
+                      ))}
+                    </HStack>
+                    <Text textStyle="xs" color="fg.subtle">
+                      No data
+                    </Text>
+                  </VStack>
+                )
               ) : (
                 child
               )}
@@ -841,7 +850,7 @@ const CustomGraph_ = React.memo(
               }
               tickLine={false}
               axisLine={false}
-              tick={{ fill: gray400, fontSize: 11 }}
+              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               angle={input.graphType === "horizontal_bar" ? undefined : 45}
               textAnchor={
                 input.graphType === "horizontal_bar" ? "end" : "start"
@@ -851,7 +860,7 @@ const CustomGraph_ = React.memo(
               type="number"
               dataKey="value"
               domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-              tick={{ fill: gray400, fontSize: 11 }}
+              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
@@ -965,7 +974,7 @@ const CustomGraph_ = React.memo(
             tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: gray400, fontSize: 11 }}
+            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
           />
           <YAxisComponent
             type="number"
@@ -974,7 +983,7 @@ const CustomGraph_ = React.memo(
             tickCount={4}
             tickMargin={20}
             domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-            tick={{ fill: gray400, fontSize: 11 }}
+            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
             tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
@@ -1459,10 +1468,8 @@ function MonitorGraph({
   // Light mode: light backgrounds, dark text
   // Dark mode: dark backgrounds, light text
   const bgAdjustment = useColorModeValue(-400, 200);
-  const borderAdjustment = useColorModeValue(-200, 100);
   const textAdjustment = useColorModeValue(300, -300);
   const areaAdjustment = useColorModeValue(-300, 100);
-  const skeletonAdjustment = useColorModeValue(-100, 100);
 
   // Glow effect for dark mode based on colorSet
   const glowColor = getColor(colorSet, 0, 0);
@@ -1477,7 +1484,7 @@ function MonitorGraph({
       height="full"
       position="relative"
       border="1px solid"
-      borderColor={getColor(colorSet, 0, borderAdjustment)}
+      borderColor="border"
       backgroundColor={getColor(colorSet, 0, bgAdjustment)}
       borderRadius="lg"
       paddingTop={2}
@@ -1523,7 +1530,6 @@ function MonitorGraph({
               <Skeleton
                 width="56px"
                 height="36px"
-                backgroundColor={getColor(colorSet, 0, skeletonAdjustment)}
               />
             )}
           </Text>
@@ -1587,7 +1593,7 @@ function MonitorGraph({
                 tickFormatter={formatDate}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: gray400, fontSize: 11 }}
+                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               />
               <YAxis
                 type="number"
@@ -1596,7 +1602,7 @@ function MonitorGraph({
                 tickCount={4}
                 tickMargin={20}
                 domain={[0, maxValue]}
-                tick={{ fill: gray400, fontSize: 11 }}
+                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
                 tickFormatter={(value) => {
                   if (typeof yAxisValueFormat === "function") {
                     return yAxisValueFormat(value);

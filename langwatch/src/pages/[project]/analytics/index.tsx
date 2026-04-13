@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  Flex,
   Grid,
   Heading,
   HStack,
@@ -173,14 +174,16 @@ function CustomReportsSection({ slug }: { slug: string }) {
       <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
         Custom Dashboards
       </Heading>
-      <HStack width="full" gap={3} flexWrap="wrap">
+      <Grid
+        width="full"
+        gap={3}
+        gridTemplateColumns="repeat(auto-fill, minmax(250px, 1fr))"
+      >
         {dashboards.map((dashboard) => (
           <Link
             key={dashboard.id}
             href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
             _hover={{ textDecoration: "none" }}
-            flex="1 1 auto"
-            maxWidth="350px"
           >
             <Card.Root
               width="full"
@@ -190,7 +193,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
               transition="all 0.15s ease"
             >
               <Card.Body paddingX={4} paddingY={3}>
-                <HStack gap={3}>
+                <Flex gap={3} alignItems="center">
                   <Box
                     padding={2}
                     borderRadius="md"
@@ -199,7 +202,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
                   >
                     <BarChart2 size={16} />
                   </Box>
-                  <VStack align="start" gap={0}>
+                  <VStack align="start" gap={0} flex={1}>
                     <Text fontWeight="500" textStyle="sm">
                       {dashboard.name}
                     </Text>
@@ -207,15 +210,15 @@ function CustomReportsSection({ slug }: { slug: string }) {
                       Custom Dashboard
                     </Text>
                   </VStack>
-                  <Box color="fg.subtle">
+                  <Box color="fg.subtle" marginLeft="auto">
                     <ArrowUpRight size={14} />
                   </Box>
-                </HStack>
+                </Flex>
               </Card.Body>
             </Card.Root>
           </Link>
         ))}
-      </HStack>
+      </Grid>
     </>
   );
 }

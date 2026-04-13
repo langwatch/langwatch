@@ -12,6 +12,7 @@ export const MenuLink = ({
   menuEnd,
   isSelected,
   isSelectedAnnotation,
+  disabled,
 }: PropsWithChildren<{
   paddingX?: number;
   href: string;
@@ -20,12 +21,33 @@ export const MenuLink = ({
   isSelected?: boolean;
   isSelectedAnnotation?: boolean;
   includePath?: string;
+  disabled?: boolean;
 }>) => {
   const pathname = usePathname();
   const selected =
     isSelected ??
     isSelectedAnnotation ??
     (pathname === href || (includePath && pathname?.includes(includePath)));
+
+  if (disabled) {
+    return (
+      <HStack
+        paddingX={paddingX}
+        paddingY={1}
+        width="full"
+        position="relative"
+        borderRadius="lg"
+        opacity={0.4}
+        cursor="not-allowed"
+        gap={2}
+      >
+        {icon && icon}
+        <Text>{children}</Text>
+        <Spacer />
+        {menuEnd && menuEnd}
+      </HStack>
+    );
+  }
 
   return (
     <Link

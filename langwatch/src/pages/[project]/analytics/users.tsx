@@ -1,4 +1,12 @@
-import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
+import {
+  Card,
+  EmptyState,
+  GridItem,
+  Heading,
+  HStack,
+  SimpleGrid,
+  VStack,
+} from "@chakra-ui/react";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -152,6 +160,27 @@ const userThreads: CustomGraphInput = {
   height: 300,
 };
 
+const userEmptyState = (
+  <EmptyState.Root size="sm" paddingY={10}>
+    <EmptyState.Content>
+      <VStack textAlign="center">
+        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
+        <EmptyState.Description textStyle="xs">
+          Start tracking users to see metrics here.{" "}
+          <a
+            href="https://langwatch.ai/docs/integration/metadata-and-labels"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            Learn how to set up
+          </a>
+        </EmptyState.Description>
+      </VStack>
+    </EmptyState.Content>
+  </EmptyState.Root>
+);
+
 function UsersContent() {
   return (
     <GraphsLayout title="Users">
@@ -163,7 +192,7 @@ function UsersContent() {
                 <Heading size="sm">User Traces</Heading>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={messagesCount} />
+                <CustomGraph input={messagesCount} emptyState={userEmptyState} />
               </Card.Body>
             </Card.Root>
           </GridItem>
@@ -173,12 +202,12 @@ function UsersContent() {
                 <Heading size="sm">User Threads</Heading>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={userThreads} />
+                <CustomGraph input={userThreads} emptyState={userEmptyState} />
               </Card.Body>
             </Card.Root>
           </GridItem>
           <ChartCard title="Daily Users" colSpan={2}>
-            <CustomGraph input={userCountGrapgh} />
+            <CustomGraph input={userCountGrapgh} emptyState={userEmptyState} />
           </ChartCard>
           <ChartCard title="Daily Threads" colSpan={2}>
             <CustomGraph input={dailyActiveThreads} />
@@ -187,7 +216,7 @@ function UsersContent() {
             <CustomGraph input={maxMessagePerThread} />
           </ChartCard>
           <ChartCard title="User Leaderboard" colSpan={2}>
-            <CustomGraph input={powerUsers} />
+            <CustomGraph input={powerUsers} emptyState={userEmptyState} />
           </ChartCard>
           <ChartCard title="User Feedbacks" colSpan={4}>
             <FeedbacksTable />

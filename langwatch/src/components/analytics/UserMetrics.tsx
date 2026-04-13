@@ -1,7 +1,5 @@
-import { Card, Grid, GridItem, Heading, Tabs, Text, VStack } from "@chakra-ui/react";
-import { useFilterParams } from "../../hooks/useFilterParams";
+import { Card, EmptyState, Grid, GridItem, Heading, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import { analyticsMetrics } from "../../server/analytics/registry";
-import { api } from "../../utils/api";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 
@@ -9,46 +7,8 @@ import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-// User-focused: metrics grouped by user
-const userFocusedThreads: CustomGraphInput = {
-  graphId: "userThreads",
-  graphType: "summary",
-  series: [
-    {
-      name: "Threads count",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-    },
-    {
-      name: "Avg threads per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: { field: "user_id", aggregation: "avg" },
-    },
-    {
-      name: "Avg thread duration",
-      colorSet: "purpleTones",
-      metric: "threads.average_duration_per_thread",
-      aggregation: "avg",
-      pipeline: { field: "user_id", aggregation: "avg" },
-    },
-    {
-      name: "Avg messages per user",
-      colorSet: "orangeTones",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: { field: "user_id", aggregation: "avg" },
-    },
-  ],
-  includePrevious: false,
-  timeScale: ONE_DAY,
-  height: 300,
-};
-
 // Thread-focused: metrics without user grouping
-const threadFocusedMetrics: CustomGraphInput = {
+const threadMetrics: CustomGraphInput = {
   graphId: "threadMetrics",
   graphType: "summary",
   series: [
@@ -77,38 +37,28 @@ const threadFocusedMetrics: CustomGraphInput = {
   height: 300,
 };
 
-// Exported for users.tsx page which always uses user-focused
-export const userThreads = userFocusedThreads;
+const userEmptyState = (
+  <EmptyState.Root size="sm" paddingY={10}>
+    <EmptyState.Content>
+      <VStack textAlign="center">
+        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
+        <EmptyState.Description textStyle="xs">
+          Start tracking users to see metrics here.{" "}
+          <a
+            href="https://langwatch.ai/docs/integration/metadata-and-labels"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            Learn how to set up
+          </a>
+        </EmptyState.Description>
+      </VStack>
+    </EmptyState.Content>
+  </EmptyState.Root>
+);
 
 export function UserMetrics() {
-  const { filterParams, queryOpts } = useFilterParams();
-
-  // Detect if users are being tracked to pick the right thread metrics variant
-  const usersQuery = api.analytics.getTimeseries.useQuery(
-    {
-      ...filterParams,
-      series: [
-        {
-          metric: "metadata.user_id",
-          aggregation: "cardinality",
-        },
-      ],
-      timeScale: "full",
-      groupBy: undefined,
-    },
-    { ...queryOpts, keepPreviousData: true },
-  );
-
-  const hasUsers = usersQuery.data?.currentPeriod?.some((entry) =>
-    Object.values(entry).some(
-      (v) => typeof v === "number" && v > 0,
-    ),
-  );
-
-  const activeThreadMetrics = hasUsers
-    ? userFocusedThreads
-    : threadFocusedMetrics;
-
   const messagesGraph: CustomGraphInput = {
     graphId: "messagesCountGraph",
     graphType: "line",
@@ -170,7 +120,7 @@ export function UserMetrics() {
     >
       <GridItem>
         <Card.Root border="1px solid" borderColor="border.emphasized">
-          <Card.Body>
+          <Card.Body paddingTop={2}>
             <Tabs.Root variant="plain" defaultValue="messages">
               <Tabs.List gap={8}>
                 <Tabs.Trigger
@@ -206,35 +156,14 @@ export function UserMetrics() {
                   paddingX={0}
                   paddingBottom={0}
                   height="fit-content"
-                  disabled={hasUsers === false}
                 >
-                  {hasUsers === false ? (
-                    <VStack align="start" gap={1}>
-                      <Text textStyle="sm" color="fg.muted">
-                        Users
-                      </Text>
-                      <Text textStyle="xs" color="fg.subtle">
-                        No data yet.{" "}
-                        <a
-                          href="https://langwatch.ai/docs/integration/metadata-and-labels"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ textDecoration: "underline" }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          Set up
-                        </a>
-                      </Text>
-                    </VStack>
-                  ) : (
-                    <CustomGraph
-                      input={{ ...usersGraph, graphType: "summary" }}
-                      titleProps={{
-                        textStyle: "sm",
-                        color: "fg",
-                      }}
-                    />
-                  )}
+                  <CustomGraph
+                    input={{ ...usersGraph, graphType: "summary" }}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
                 </Tabs.Trigger>
                 <Tabs.Indicator
                   mt="-1.5px"
@@ -251,7 +180,7 @@ export function UserMetrics() {
                 <CustomGraph input={threadsGraph} />
               </Tabs.Content>
               <Tabs.Content value="users">
-                <CustomGraph input={usersGraph} />
+                <CustomGraph input={usersGraph} emptyState={userEmptyState} />
               </Tabs.Content>
             </Tabs.Root>
           </Card.Body>
@@ -270,12 +199,10 @@ export function UserMetrics() {
       <GridItem>
         <Card.Root overflow="auto">
           <Card.Header>
-            <Heading size="sm">
-              {hasUsers ? "User Threads" : "Thread Metrics"}
-            </Heading>
+            <Heading size="sm">Thread Metrics</Heading>
           </Card.Header>
           <Card.Body>
-            <CustomGraph input={activeThreadMetrics} />
+            <CustomGraph input={threadMetrics} />
           </Card.Body>
         </Card.Root>
       </GridItem>

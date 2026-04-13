@@ -198,7 +198,8 @@ export function CustomDashboardsSection({
             key={dashboard.id}
             position="relative"
             width="full"
-            _hover={{ "& .menu-btn": { opacity: 1 } }}
+            borderRadius="lg"
+            _hover={{ background: "bg.muted", "& .menu-btn": { opacity: 1 } }}
           >
             {isEditing ? (
               <Input
