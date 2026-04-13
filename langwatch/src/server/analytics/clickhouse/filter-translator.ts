@@ -9,11 +9,11 @@
  * 2. Centralizes the mapping of filter fields to their translation logic
  * 3. Provides a clear, testable contract for each filter type
  *
- * WHY IN SUBQUERIES (NOT EXISTS): ClickHouse v25.10 planner crashes with
- * "Cannot clone Sorting plan step" when EXISTS subqueries are combined with
- * LIMIT 1 BY in JOINed subqueries (issue #2660). All cross-table filters use
- * `ts.TraceId IN (SELECT TraceId FROM ... WHERE TenantId = {tenantId:String} AND ...)`
- * which is semantically equivalent to EXISTS and avoids the planner bug.
+ * WHY IN SUBQUERIES (NOT EXISTS): Originally chosen because ClickHouse v25.10
+ * planner crashed with "Cannot clone Sorting plan step" when EXISTS was combined
+ * with the old per-row dedup pattern (issue #2660). The dedup was migrated to
+ * IN-tuple in #3158, but IN subqueries are kept since they work correctly and
+ * are semantically equivalent to EXISTS.
  */
 
 import type { FilterField } from "../../filters/types";
