@@ -779,9 +779,9 @@ const CustomGraph_ = React.memo(
             <Legend
               wrapperStyle={{
                 padding: "0 2rem",
-                maxHeight: "15%",
-                overflow: "auto",
+                flexWrap: "wrap",
                 zIndex: 1,
+                fontSize: 11,
               }}
             />
           </PieChart>
@@ -1003,6 +1003,7 @@ const CustomGraph_ = React.memo(
               flexWrap: "wrap",
               zIndex: 1,
               cursor: "pointer",
+              fontSize: 11,
             }}
             onClick={(e: { dataKey?: string }) => {
               if (e.dataKey) toggleSeries(e.dataKey);

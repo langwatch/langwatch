@@ -171,7 +171,7 @@ export function SummaryMetricValue({
         <VStack align="start" gap={0} textStyle="xs">
           {change !== 0 && (
             <Text fontWeight={500} color={changeColor}>
-              {change > 0 ? "+" : ""}
+              {change > 0 ? "+" : "-"}
               {formatChangeValue(change)}
             </Text>
           )}

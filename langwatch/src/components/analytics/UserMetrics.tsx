@@ -1,4 +1,4 @@
-import { Card, Grid, GridItem, Heading, Tabs } from "@chakra-ui/react";
+import { Card, Grid, GridItem, Heading, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { api } from "../../utils/api";
@@ -206,14 +206,35 @@ export function UserMetrics() {
                   paddingX={0}
                   paddingBottom={0}
                   height="fit-content"
+                  disabled={hasUsers === false}
                 >
-                  <CustomGraph
-                    input={{ ...usersGraph, graphType: "summary" }}
-                    titleProps={{
-                      textStyle: "sm",
-                      color: "fg",
-                    }}
-                  />
+                  {hasUsers === false ? (
+                    <VStack align="start" gap={1}>
+                      <Text textStyle="sm" color="fg.muted">
+                        Users
+                      </Text>
+                      <Text textStyle="xs" color="fg.subtle">
+                        No data yet.{" "}
+                        <a
+                          href="https://langwatch.ai/docs/integration/metadata-and-labels"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ textDecoration: "underline" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Set up
+                        </a>
+                      </Text>
+                    </VStack>
+                  ) : (
+                    <CustomGraph
+                      input={{ ...usersGraph, graphType: "summary" }}
+                      titleProps={{
+                        textStyle: "sm",
+                        color: "fg",
+                      }}
+                    />
+                  )}
                 </Tabs.Trigger>
                 <Tabs.Indicator
                   mt="-1.5px"
