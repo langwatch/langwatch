@@ -171,7 +171,7 @@ function FieldsFilter({
 	const [query, setQuery] = useDebounceValue("", 300);
 	const [immediateQuery, setImmediateQuery] = useState("");
 	const { open, setOpen } = useDisclosure();
-	const current = filters[filterId] ?? [];
+	const current = filters?.[filterId] ?? [];
 
 	// Keyboard navigation state
 	const [highlightedIndex, setHighlightedIndex] = useState(-1);
