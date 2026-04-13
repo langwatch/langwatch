@@ -256,7 +256,7 @@ function UsersContent() {
             <CustomGraph input={tracesByLabel} />
           </ChartCard>
           <ChartCard title="Traces by Customer" colSpan={2}>
-            <CustomGraph input={tracesByCustomer} />
+            <CustomGraph input={tracesByCustomer} emptyState={userEmptyState} />
           </ChartCard>
           <ChartCard title="User Feedbacks" colSpan={4}>
             <FeedbacksTable />

@@ -288,8 +288,7 @@ span[data-highlight]::after {
     animation: trace-highlight-fade 2s ease-out;
 }
 
-/* Remove recharts focus outlines */
-.recharts-wrapper *:focus,
-.recharts-wrapper *:focus-visible {
-    outline: none !important;
+/* Suppress recharts focus outlines for mouse clicks only; keep :focus-visible for keyboard users */
+.recharts-wrapper *:focus:not(:focus-visible) {
+    outline: none;
 }

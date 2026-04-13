@@ -400,7 +400,7 @@ const CustomGraph_ = React.memo(
       ),
     );
     const currentAndPreviousDataFilled =
-      input.graphType === "scatter"
+      input.graphType === "scatter" || input.graphType === "line"
         ? currentAndPreviousData
         : fillEmptyData(
           currentAndPreviousData,
@@ -676,7 +676,7 @@ const CustomGraph_ = React.memo(
                       ))}
                     </HStack>
                     <Text textStyle="xs" color="fg.subtle">
-                      No data
+                      No data — try adjusting the date range
                     </Text>
                   </VStack>
                 )
@@ -879,6 +879,7 @@ const CustomGraph_ = React.memo(
             <Tooltip
               content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
+              cursor={{ fill: cursorColor }}
               wrapperStyle={{ zIndex: 1000 }}
             />
             <Bar
@@ -1356,11 +1357,13 @@ const flattenGroupData = (
       }
 
       const aggregations = Object.fromEntries(
-        Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
-          return Object.entries(bucket).map(([metricKey, metricValue]) => {
-            return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
-          });
-        }),
+        Object.entries(buckets)
+          .filter(([bucketKey]) => bucketKey !== "unknown")
+          .flatMap(([bucketKey, bucket]) => {
+            return Object.entries(bucket).map(([metricKey, metricValue]) => {
+              return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
+            });
+          }),
       );
 
       return {

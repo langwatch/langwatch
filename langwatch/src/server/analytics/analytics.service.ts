@@ -62,7 +62,7 @@ export class AnalyticsService {
   }
 
   /**
-   * Get timeseries analytics data (with 15s TTL cache)
+   * Get timeseries analytics data (with 30s TTL cache)
    */
   async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
     return this.executeWithRouting(

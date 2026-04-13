@@ -184,7 +184,7 @@ export function SummaryMetricValue({
           )}
           {typeof previous === "number" && (
             <Text color="fg.muted">
-              {formatPreviousValue(previous)} prev
+              {formatPreviousValue(previous)} previous
             </Text>
           )}
         </VStack>
