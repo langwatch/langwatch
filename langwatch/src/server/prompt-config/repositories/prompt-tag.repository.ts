@@ -139,7 +139,7 @@ export class PromptTagRepository {
       if (projectIds.length > 0) {
         await tx.promptTagAssignment.deleteMany({
           where: {
-            tagId: tag.name,
+            tagId: tag.id,
             projectId: { in: projectIds },
           },
         });
@@ -173,25 +173,6 @@ export class PromptTagRepository {
 
       if (!tag) {
         throw new Error(`Tag "${oldName}" not found`);
-      }
-
-      const projects = await tx.project.findMany({
-        where: {
-          team: { organizationId },
-        },
-        select: { id: true },
-      });
-
-      const projectIds = projects.map((p) => p.id);
-
-      if (projectIds.length > 0) {
-        await tx.promptTagAssignment.updateMany({
-          where: {
-            tagId: oldName,
-            projectId: { in: projectIds },
-          },
-          data: { tagId: newName },
-        });
       }
 
       const updated = await tx.promptTag.update({
