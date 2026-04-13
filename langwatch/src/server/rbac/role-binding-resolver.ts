@@ -1,10 +1,12 @@
 import {
+  OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
   type PrismaClient,
 } from "@prisma/client";
 import {
   hasPermissionWithHierarchy,
+  organizationRoleHasPermission,
   teamRoleHasPermission,
   type Permission,
 } from "../api/rbac";
@@ -63,7 +65,7 @@ async function collectBindingsForScope({
   userId: string;
   organizationId: string;
   scope: ScopeRef;
-}): Promise<Array<{ role: TeamUserRole; customRoleId: string | null }>> {
+}): Promise<Array<{ role: TeamUserRole; customRoleId: string | null; scopeType: RoleBindingScopeType }>> {
   const [directBindings, groupBindings] = await Promise.all([
     prisma.roleBinding.findMany({
       where: { organizationId, userId },
@@ -87,7 +89,7 @@ async function collectBindingsForScope({
 
   return allOrgBindings
     .filter((b) => ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId))
-    .map((b) => ({ role: b.role, customRoleId: b.customRoleId }));
+    .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
 }
 
 // ============================================================================
@@ -130,6 +132,16 @@ export async function checkRoleBindingPermission({
         return true;
       }
       // Empty custom role — fall through to built-in VIEWER check below
+    }
+
+    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
+    if (
+      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+      binding.role !== TeamUserRole.CUSTOM
+    ) {
+      if (binding.role === TeamUserRole.ADMIN) return true;
+      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      continue;
     }
 
     if (teamRoleHasPermission(binding.role, permission)) {

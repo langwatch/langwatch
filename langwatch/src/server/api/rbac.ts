@@ -522,7 +522,7 @@ async function checkPermissionFromBindings({
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
-    select: { role: true, customRoleId: true },
+    select: { role: true, customRoleId: true, scopeType: true },
   });
 
   if (bindings.length === 0) {
@@ -548,6 +548,16 @@ async function checkPermissionFromBindings({
 
   // Union permissions across ALL matching bindings — permitted if any grants it
   for (const binding of bindings) {
+    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
+    if (
+      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+      binding.role !== TeamUserRole.CUSTOM
+    ) {
+      if (binding.role === TeamUserRole.ADMIN) return true;
+      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      continue;
+    }
+
     const permitted = await resolveBindingPermission(
       binding,
       organizationRole,
@@ -690,14 +700,10 @@ export async function resolveTeamPermission(
 
   const organizationUser = await ctx.prisma.organizationUser?.findFirst({
     where: { userId: ctx.session.user.id, organizationId: team.organizationId },
+    select: { role: true },
   });
 
   const organizationRole = organizationUser?.role ?? null;
-
-  // Org ADMINs can do anything on all teams
-  if (organizationUser?.role === OrganizationUserRole.ADMIN) {
-    return { permitted: true, organizationRole };
-  }
 
   const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
@@ -738,23 +744,29 @@ export async function hasOrganizationPermission(
     return false;
   }
 
-  const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      organizationId: organizationId,
-    },
+  const userId = ctx.session.user.id;
+
+  const orgMember = await ctx.prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { role: true },
   });
 
-  // Only check organization role - team admins do NOT get automatic organization permissions
-  if (organizationUser) {
-    const orgResult = organizationRoleHasPermission(
-      organizationUser.role,
-      permission,
-    );
-    if (orgResult) return true;
+  if (!orgMember) return false;
+
+  // EXTERNAL (Lite Member) users get organization:view only — no org-scoped binding exists for them
+  if (orgMember.role === OrganizationUserRole.EXTERNAL) {
+    return permission === "organization:view";
   }
 
-  return false;
+  // All other permissions resolved via ORGANIZATION-scoped RoleBindings
+  return checkPermissionFromBindings({
+    prisma: ctx.prisma,
+    userId,
+    organizationId,
+    scopes: [{ scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId }],
+    organizationRole: orgMember.role,
+    permission,
+  });
 }
 
 // ============================================================================

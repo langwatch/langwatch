@@ -165,20 +165,63 @@ export const teamRouter = createTRPCRouter({
               : [],
           ]);
 
-          // ── Build directMembers from team-level bindings ──
-          const directMembers = teamBindings.map((b) => ({
-            bindingId: b.id,
-            userId: b.userId,
-            groupId: b.groupId,
-            name: b.user?.name ?? b.group?.name ?? "Unknown",
-            email: b.user?.email ?? null,
-            role: b.role,
-            customRoleId: b.customRoleId,
-          }));
+          // ── Expand group memberships for group-based team bindings ──
+          const groupBindings = teamBindings.filter((b) => b.groupId);
+          const groupIds = groupBindings.map((b) => b.groupId!);
+          const groupMemberships = groupIds.length > 0
+            ? await prisma.groupMembership.findMany({
+                where: { groupId: { in: groupIds } },
+                include: { user: { select: { id: true, name: true, email: true } } },
+              })
+            : [];
 
-          // ── Collect userIds that have a team-level binding ──
+          // ── Build directMembers: direct users + expanded group members ──
+          const directUserBindings = teamBindings.filter((b) => b.userId);
+          const directUserIds = new Set(directUserBindings.map((b) => b.userId!));
+
+          const expandedGroupMembers = groupBindings.flatMap((b) => {
+            const seenInThisExpansion = new Set<string>();
+            return groupMemberships
+              .filter((gm) => gm.groupId === b.groupId)
+              .filter((gm) => {
+                if (directUserIds.has(gm.userId)) return false; // direct binding takes priority
+                if (seenInThisExpansion.has(gm.userId)) return false;
+                seenInThisExpansion.add(gm.userId);
+                return true;
+              })
+              .map((gm) => ({
+                bindingId: null as string | null,
+                userId: gm.userId,
+                groupId: b.groupId,
+                viaGroupId: b.groupId!,
+                viaGroupName: b.group?.name ?? null,
+                name: gm.user.name ?? gm.user.email ?? "Unknown",
+                email: gm.user.email ?? null,
+                role: b.role,
+                customRoleId: b.customRoleId,
+                customRoleName: b.customRole?.name ?? null,
+              }));
+          });
+
+          const directMembers = [
+            ...directUserBindings.map((b) => ({
+              bindingId: b.id as string | null,
+              userId: b.userId,
+              groupId: null as string | null,
+              viaGroupId: null as string | null,
+              viaGroupName: null as string | null,
+              name: b.user?.name ?? b.user?.email ?? "Unknown",
+              email: b.user?.email ?? null,
+              role: b.role,
+              customRoleId: b.customRoleId,
+              customRoleName: b.customRole?.name ?? null,
+            })),
+            ...expandedGroupMembers,
+          ];
+
+          // ── Collect userIds that have a team-level binding (direct or via group) ──
           const teamBoundUserIds = new Set(
-            teamBindings.filter((b) => b.userId).map((b) => b.userId!),
+            directMembers.filter((m) => m.userId).map((m) => m.userId!),
           );
 
           // ── Build projectOnlyAccess: users with project bindings but NO team binding ──
@@ -218,10 +261,12 @@ export const teamRouter = createTRPCRouter({
             bindingId: string | null;
             userId: string | null;
             groupId: string | null;
+            viaGroupName: string | null;
             name: string;
             email: string | null;
             role: TeamUserRole;
             customRoleId: string | null;
+            customRoleName: string | null;
             source: "team" | "direct" | "override";
             teamRole?: TeamUserRole;
           }>> = {};
@@ -231,10 +276,12 @@ export const teamRouter = createTRPCRouter({
               bindingId: m.bindingId,
               userId: m.userId,
               groupId: m.groupId,
+              viaGroupName: m.viaGroupName,
               name: m.name,
               email: m.email,
               role: m.role,
               customRoleId: m.customRoleId,
+              customRoleName: m.customRoleName,
               source: "team" as const,
             }));
 
@@ -250,10 +297,12 @@ export const teamRouter = createTRPCRouter({
                 bindingId: b.id,
                 userId: b.userId,
                 groupId: b.groupId,
+                viaGroupName: null as string | null,
                 name: b.user?.name ?? b.group?.name ?? "Unknown",
                 email: b.user?.email ?? null,
                 role: b.role,
                 customRoleId: b.customRoleId,
+                customRoleName: b.customRole?.name ?? null,
                 source: teamBinding ? ("override" as const) : ("direct" as const),
                 teamRole: teamBinding?.role,
               };

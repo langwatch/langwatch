@@ -13,6 +13,7 @@ import { useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 // ── Shared display helpers ────────────────────────────────────────────────────
@@ -77,8 +78,11 @@ export function BindingInputRow({
   const [roleValue, setRoleValue] = useState("MEMBER");
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const [teamSearch, setTeamSearch] = useState("");
+  const [projectTeamId, setProjectTeamId] = useState("");
+  const [projectTeamSearch, setProjectTeamSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
 
+  const { organization } = useOrganizationTeamProject();
   const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
@@ -98,15 +102,26 @@ export function BindingInputRow({
     : allTeamItems;
   const teamCollection = createListCollection({ items: teamItems });
 
+  // For project cascade: teams that have at least one project
+  const allProjectTeamItems = (teams.data ?? [])
+    .filter((t) => t.projects.length > 0)
+    .map((t) => ({ label: t.name, value: t.id }));
+  const projectTeamItems = projectTeamSearch
+    ? allProjectTeamItems.filter((t) => t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()))
+    : allProjectTeamItems;
+  const projectTeamCollection = createListCollection({ items: projectTeamItems });
+
+  // Projects filtered to the selected team
   const allProjectItems = (teams.data ?? [])
-    .flatMap((t) => t.projects.map((p) => ({ label: p.name, value: p.id })))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .find((t) => t.id === projectTeamId)
+    ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [];
   const projectItems = projectSearch
     ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
     : allProjectItems;
   const projectCollection = createListCollection({ items: projectItems });
 
   function getScopeName() {
+    if (scopeType === RoleBindingScopeType.ORGANIZATION) return organization?.name ?? "Organization";
     if (scopeType === RoleBindingScopeType.TEAM)
       return allTeamItems.find((t) => t.value === scopeId)?.label;
     if (scopeType === RoleBindingScopeType.PROJECT)
@@ -127,6 +142,8 @@ export function BindingInputRow({
       scopeName: getScopeName(),
     });
     setScopeId("");
+    setProjectTeamId("");
+    setProjectTeamSearch("");
   }
 
   return (
@@ -164,6 +181,8 @@ export function BindingInputRow({
           setScopeType((e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM);
           setScopeId("");
           setTeamSearch("");
+          setProjectTeamId("");
+          setProjectTeamSearch("");
           setProjectSearch("");
         }}
         size="sm"
@@ -210,35 +229,70 @@ export function BindingInputRow({
       )}
 
       {scopeType === RoleBindingScopeType.PROJECT && (
-        <Select.Root
-          collection={projectCollection}
-          value={scopeId ? [scopeId] : []}
-          onValueChange={(e) => setScopeId(e.value[0] ?? "")}
-          size="sm"
-          width="160px"
-        >
-          <Select.Trigger><Select.ValueText placeholder="Select project..." /></Select.Trigger>
-          <Select.Content>
-            <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-              <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
-                <Input
-                  size="sm"
-                  placeholder="Search projects..."
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </InputGroup>
-            </Box>
-            {projectItems.map((item) => (
-              <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
+        <>
+          <Select.Root
+            collection={projectTeamCollection}
+            value={projectTeamId ? [projectTeamId] : []}
+            onValueChange={(e) => {
+              setProjectTeamId(e.value[0] ?? "");
+              setScopeId("");
+              setProjectSearch("");
+            }}
+            size="sm"
+            width="160px"
+          >
+            <Select.Trigger><Select.ValueText placeholder="Select team..." /></Select.Trigger>
+            <Select.Content>
+              <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
+                <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+                  <Input
+                    size="sm"
+                    placeholder="Search teams..."
+                    value={projectTeamSearch}
+                    onChange={(e) => setProjectTeamSearch(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </InputGroup>
+              </Box>
+              {projectTeamItems.map((item) => (
+                <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+
+          {projectTeamId && (
+            <Select.Root
+              collection={projectCollection}
+              value={scopeId ? [scopeId] : []}
+              onValueChange={(e) => setScopeId(e.value[0] ?? "")}
+              size="sm"
+              width="160px"
+            >
+              <Select.Trigger><Select.ValueText placeholder="Select project..." /></Select.Trigger>
+              <Select.Content>
+                <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
+                  <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+                    <Input
+                      size="sm"
+                      placeholder="Search projects..."
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </InputGroup>
+                </Box>
+                {projectItems.map((item) => (
+                  <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          )}
+        </>
       )}
 
       <Button
         size="sm"
+        colorPalette={!scopeId && scopeType !== RoleBindingScopeType.ORGANIZATION ? undefined : "blue"}
         disabled={!scopeId && scopeType !== RoleBindingScopeType.ORGANIZATION}
         loading={isPending}
         onClick={handleAdd}

@@ -156,6 +156,17 @@ export const organizationRouter = createTRPCRouter({
                 scopeId: true,
                 role: true,
                 customRoleId: true,
+                customRole: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    permissions: true,
+                    organizationId: true,
+                    createdAt: true,
+                    updatedAt: true,
+                  },
+                },
               },
             })
           : [];
@@ -221,33 +232,39 @@ export const organizationRouter = createTRPCRouter({
               member.userId === userId || member.userId === demoProjectUserId,
           );
 
-          // If the user has no TeamUser row but has a RoleBinding for this team
-          // (direct or via a group), synthesize a member entry so downstream
-          // checks (userIsPartOfTeam, hasPermission) work correctly.
-          const userHasTeamMember = team.members.some(
-            (m) => m.userId === userId,
+          // RoleBinding is authoritative for team membership and role.
+          // Always prefer a team-scoped RoleBinding over any stale TeamUser row,
+          // since dual-writes to TeamUser have been removed.
+          // Org-scoped bindings are intentionally excluded: org MEMBER/VIEWER bindings
+          // only grant organization:view — they don't give team-level access.
+          // Org admins are handled by the organizationRole === ADMIN shortcut in
+          // the frontend hasPermission and backend resolveTeamPermission.
+          const teamProjectIds = new Set(team.projects.map((p) => p.id));
+          const binding = userRoleBindings.find(
+            (b) =>
+              b.organizationId === organization.id &&
+              ((b.scopeType === RoleBindingScopeType.TEAM &&
+                b.scopeId === team.id) ||
+                (b.scopeType === RoleBindingScopeType.PROJECT &&
+                  teamProjectIds.has(b.scopeId))),
           );
-          if (!userHasTeamMember) {
-            const teamProjectIds = new Set(team.projects.map((p) => p.id));
-            const binding = userRoleBindings.find(
-              (b) =>
-                b.organizationId === organization.id &&
-                ((b.scopeType === RoleBindingScopeType.TEAM &&
-                  b.scopeId === team.id) ||
-                  b.scopeType === RoleBindingScopeType.ORGANIZATION ||
-                  (b.scopeType === RoleBindingScopeType.PROJECT &&
-                    teamProjectIds.has(b.scopeId))),
+          if (binding) {
+            const bindingMember = {
+              userId,
+              teamId: team.id,
+              role: binding.role,
+              assignedRoleId: binding.customRoleId ?? null,
+              assignedRole: binding.customRole ?? null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            const existingIndex = team.members.findIndex(
+              (m) => m.userId === userId,
             );
-            if (binding) {
-              team.members.push({
-                userId,
-                teamId: team.id,
-                role: binding.role,
-                assignedRoleId: binding.customRoleId ?? null,
-                assignedRole: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              });
+            if (existingIndex >= 0) {
+              team.members[existingIndex] = bindingMember;
+            } else {
+              team.members.push(bindingMember);
             }
           }
 

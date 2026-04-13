@@ -210,11 +210,7 @@ export const TeamForm = ({
                       <HStack width="full">
                         {member.saved ? (
                           <>
-                            <Link
-                              href={`/settings/members/${member.userId?.value}`}
-                            >
-                              {member.userId?.label}
-                            </Link>
+                            <Text>{member.userId?.label}</Text>
                           </>
                         ) : (
                           <>

@@ -10,6 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Checkbox } from "~/components/ui/checkbox";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import {
@@ -57,7 +58,6 @@ type InternalForm = {
 
 interface AddMembersFormProps {
   teamOptions: Option[];
-  orgRoleOptions: Option[];
   organizationId: string;
   onSubmit: SubmitHandler<MembersForm>;
   isLoading?: boolean;
@@ -69,7 +69,6 @@ interface AddMembersFormProps {
 
 export function AddMembersForm({
   teamOptions,
-  orgRoleOptions,
   organizationId,
   onSubmit,
   isLoading = false,
@@ -140,11 +139,6 @@ export function AddMembersForm({
     }
   };
 
-  const orgRoleCollection = useMemo(
-    () => createListCollection({ items: orgRoleOptions }),
-    [orgRoleOptions],
-  );
-
   const handleInternalSubmit = (data: InternalForm) => {
     const emails = data.emailsRaw
       .split(/[\s,;]+/)
@@ -191,39 +185,32 @@ export function AddMembersForm({
             />
             <Field.ErrorText>{errors.emailsRaw?.message}</Field.ErrorText>
           </Field.Root>
-          <Field.Root flex="1">
-            <Field.Label>Org Role</Field.Label>
+          <Box flex="1" pt="28px">
             <Controller
               control={control}
               name="orgRole"
               render={({ field }) => (
-                <Select.Root
-                  collection={orgRoleCollection}
-                  value={[field.value]}
-                  onValueChange={(details) => {
-                    const val = details.value[0];
-                    if (val) field.onChange(val);
-                  }}
+                <Checkbox
+                  checked={field.value === OrganizationUserRole.EXTERNAL}
+                  onChange={(e) =>
+                    field.onChange(
+                      e.target.checked
+                        ? OrganizationUserRole.EXTERNAL
+                        : OrganizationUserRole.MEMBER,
+                    )
+                  }
+                  alignItems="flex-start"
                 >
-                  <Select.Trigger>
-                    <Select.ValueText placeholder="Select role" />
-                  </Select.Trigger>
-                  <Select.Content paddingY={2} width="320px">
-                    {orgRoleOptions.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        <VStack align="start" gap={0} flex={1}>
-                          <Text>{option.label}</Text>
-                          <Text color="fg.muted" fontSize="13px">
-                            {option.description}
-                          </Text>
-                        </VStack>
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
+                  <VStack align="start" gap={0}>
+                    <Text fontSize="sm" fontWeight="medium" lineHeight="short">Lite Member</Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      Can only view projects they are invited to, cannot see costs
+                    </Text>
+                  </VStack>
+                </Checkbox>
               )}
             />
-          </Field.Root>
+          </Box>
         </HStack>
 
         {teamFields.length > 0 && (

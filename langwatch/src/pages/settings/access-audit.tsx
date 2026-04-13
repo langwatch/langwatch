@@ -290,6 +290,6 @@ function RbacDebugBookmarklets() {
   );
 }
 
-export default withPermissionGuard("organization:view", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(AccessAuditPage);

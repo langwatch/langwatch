@@ -1,4 +1,4 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { generate } from "@langwatch/ksuid";
@@ -15,7 +15,7 @@ export const roleBindingRouter = createTRPCRouter({
    */
   listForOrg: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
       const bindings = await ctx.prisma.roleBinding.findMany({
         where: { organizationId: input.organizationId },
@@ -147,6 +147,13 @@ export const roleBindingRouter = createTRPCRouter({
       const resolvePermissions = (binding: (typeof allBindings)[0]): string[] => {
         if (binding.role === TeamUserRole.CUSTOM && binding.customRole) {
           return binding.customRole.permissions as string[];
+        }
+        if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+          const orgRole =
+            binding.role === TeamUserRole.ADMIN
+              ? OrganizationUserRole.ADMIN
+              : OrganizationUserRole.MEMBER;
+          return getOrganizationRolePermissions(orgRole);
         }
         return getTeamRolePermissions(binding.role);
       };
