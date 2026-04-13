@@ -296,6 +296,24 @@ describe("UsageLimitService", () => {
         expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
       });
     });
+
+    describe("when notification delivery fails", () => {
+      it("rolls back cooldown so next request can retry", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        (notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>)
+          .mockRejectedValueOnce(new Error("Slack down"))
+          .mockResolvedValue(undefined);
+
+        // First call: delivery fails, cooldown should be rolled back
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+        expect(await planLimitCooldown.get("org_1")).toBeUndefined();
+
+        // Second call: should retry successfully
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

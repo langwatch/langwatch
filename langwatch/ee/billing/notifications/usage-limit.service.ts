@@ -137,63 +137,70 @@ export class UsageLimitService {
     }
     planLimitInFlight.add(organizationId);
 
-    // Async guard: blocks subsequent ticks and cross-pod duplicates via Redis.
-    if (await planLimitCooldown.get(organizationId)) {
-      planLimitInFlight.delete(organizationId);
-      return;
-    }
-
-    const organization = await this.organizationService.findWithAdmins(organizationId);
-
-    if (!organization) {
-      planLimitInFlight.delete(organizationId);
-      return;
-    }
-
-    if (organization.sentPlanLimitAlert) {
-      const timeSinceLastAlert =
-        Date.now() - organization.sentPlanLimitAlert.getTime();
-      const daysSinceLastAlert = Math.floor(
-        timeSinceLastAlert / (1000 * 60 * 60 * 24),
-      );
-
-      if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
-        // Seed the cache so subsequent ticks skip the DB round-trip too.
-        await planLimitCooldown.set(organizationId, true);
-        planLimitInFlight.delete(organizationId);
+    try {
+      // Async guard: blocks subsequent ticks and cross-pod duplicates via Redis.
+      if (await planLimitCooldown.get(organizationId)) {
         return;
       }
-    }
 
-    // Claim the cooldown slot before sending so concurrent calls on other
-    // pods are blocked immediately, even if sending takes a few seconds.
-    await planLimitCooldown.set(organizationId, true);
-    planLimitInFlight.delete(organizationId);
+      const organization = await this.organizationService.findWithAdmins(organizationId);
 
-    const admin = organization.members[0]?.user;
+      if (!organization) {
+        return;
+      }
 
-    const context = {
-      organizationId,
-      organizationName: organization.name,
-      adminName: admin?.name ?? undefined,
-      adminEmail: admin?.email ?? undefined,
-      planName,
-    };
+      if (organization.sentPlanLimitAlert) {
+        const timeSinceLastAlert =
+          Date.now() - organization.sentPlanLimitAlert.getTime();
+        const daysSinceLastAlert = Math.floor(
+          timeSinceLastAlert / (1000 * 60 * 60 * 24),
+        );
 
-    await Promise.all([
-      this.notificationService.sendSlackPlanLimitAlert(context),
-      this.notificationService.sendHubspotPlanLimitForm(context),
-    ]);
+        if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
+          // Seed the cache so subsequent ticks skip the DB round-trip too.
+          await planLimitCooldown.set(organizationId, true);
+          return;
+        }
+      }
 
-    try {
-      await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
-    } catch (error) {
-      captureException(
-        new Error(
-          `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
-          { cause: error },
-        ),
-      );
+      // Claim the cooldown slot before sending so concurrent calls on other
+      // pods are blocked immediately, even if sending takes a few seconds.
+      await planLimitCooldown.set(organizationId, true);
+
+      const admin = organization.members[0]?.user;
+
+      const context = {
+        organizationId,
+        organizationName: organization.name,
+        adminName: admin?.name ?? undefined,
+        adminEmail: admin?.email ?? undefined,
+        planName,
+      };
+
+      try {
+        await Promise.all([
+          this.notificationService.sendSlackPlanLimitAlert(context),
+          this.notificationService.sendHubspotPlanLimitForm(context),
+        ]);
+      } catch {
+        // Roll back cooldown so the next request can retry delivery,
+        // matching the pattern in notifyResourceLimitReached.
+        await planLimitCooldown.delete(organizationId);
+        return;
+      }
+
+      try {
+        await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
+      } catch (error) {
+        captureException(
+          new Error(
+            `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
+            { cause: error },
+          ),
+        );
+      }
+    } finally {
+      planLimitInFlight.delete(organizationId);
     }
   }
 
