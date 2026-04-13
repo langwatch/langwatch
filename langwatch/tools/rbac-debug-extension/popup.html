@@ -40,14 +40,6 @@
     .header-title { font-size: 12px; font-weight: 700; color: #f0f0f0; }
     .header-sub { font-size: 10px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .toggle-group { display: flex; gap: 4px; flex-shrink: 0; }
-    .toggle-btn {
-      padding: 3px 8px; border: none; border-radius: 4px;
-      font-size: 10px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
-    }
-    .toggle-btn:hover { opacity: 0.82; }
-    .toggle-on  { background: #f97316; color: white; }
-    .toggle-off { background: #2a2a2a; color: #888; border: 1px solid #333; }
 
     /* ── Scrollable body ── */
     .body {
@@ -168,10 +160,6 @@
     <div class="header-text">
       <div class="header-title">RBAC Inspector</div>
       <div class="header-sub" id="header-sub">Loading…</div>
-    </div>
-    <div class="toggle-group">
-      <button class="toggle-btn toggle-on"  id="btn-enable">Enable panel</button>
-      <button class="toggle-btn toggle-off" id="btn-disable">Disable</button>
     </div>
   </div>
 

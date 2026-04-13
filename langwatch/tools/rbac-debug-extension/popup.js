@@ -1,5 +1,3 @@
-const STORAGE_KEY = "lw_rbac_debug";
-
 // ── Utilities ──────────────────────────────────────────────────────────────
 
 async function getActiveTab() {
@@ -21,8 +19,19 @@ function pageReadDebugContext() {
   return window.__lw_debug ?? null;
 }
 
-function pageReadPanelState(key) {
-  return localStorage.getItem(key);
+/** Fallback: fetch the user's first org via tRPC if __lw_debug.orgId is null */
+function pageFetchFirstOrgId() {
+  const input = encodeURIComponent(JSON.stringify({ "0": { json: { isDemo: false } } }));
+  return fetch(
+    `/api/trpc/organization.getAll?batch=1&input=${input}`,
+    { credentials: "include" }
+  )
+    .then((r) => (r.ok ? r.json() : null))
+    .then((json) => {
+      const orgs = json?.[0]?.result?.data?.json;
+      return Array.isArray(orgs) && orgs.length > 0 ? orgs[0].id : null;
+    })
+    .catch(() => null);
 }
 
 function pageFetchRbac(orgId) {
@@ -35,15 +44,6 @@ function pageFetchRbac(orgId) {
   )
     .then((r) => (r.ok ? r.json() : null))
     .then((json) => json?.[0]?.result?.data?.json ?? null);
-}
-
-function pageSetPanelState(key, enabled) {
-  if (enabled) {
-    localStorage.setItem(key, "1");
-  } else {
-    localStorage.removeItem(key);
-  }
-  location.reload();
 }
 
 // ── Rendering helpers ──────────────────────────────────────────────────────
@@ -68,11 +68,16 @@ function scopeBadge(scopeType, scopeName, scopeId) {
 function permsList(permissions, max = 5) {
   const visible = permissions.slice(0, max);
   const rest = permissions.length - max;
+  const id = "pl-" + Math.random().toString(36).slice(2);
   const pills = visible.map((p) => `<span class="perm">${esc(p)}</span>`).join("");
   const more = rest > 0
-    ? `<span class="perm-more" onclick="this.previousSibling && togglePerms(this, ${JSON.stringify(permissions)})">${rest} more…</span>`
+    ? `<span class="perm-more" data-perms-id="${id}" onclick="togglePerms(this)">${rest} more…</span>`
     : "";
-  return `<div class="perms">${pills}${more}</div>`;
+  const extras = permissions
+    .slice(max)
+    .map((p) => `<span class="perm perm-extra" data-perms-id="${id}" style="display:none">${esc(p)}</span>`)
+    .join("");
+  return `<div class="perms">${pills}${extras}${more}</div>`;
 }
 
 function esc(str) {
@@ -96,7 +101,7 @@ function bindingHTML(b, viaGroup) {
 }
 
 function section(title, count, contentHTML, defaultOpen = true) {
-  const id = `sec-${title.replace(/\s+/g, "-").toLowerCase()}-${Math.random().toString(36).slice(2)}`;
+  const id = `sec-${Math.random().toString(36).slice(2)}`;
   return `
     <div class="section">
       <div class="section-header" onclick="toggleSection('${id}')">
@@ -112,10 +117,9 @@ function section(title, count, contentHTML, defaultOpen = true) {
 
 // ── Rendering ──────────────────────────────────────────────────────────────
 
-function renderData(data, panelEnabled, debugCtx) {
+function renderData(data, debugCtx) {
   const { user, groups, directBindings } = data;
 
-  // User card
   const userHTML = `
     <div class="user-card">
       <div class="user-name">${esc(user.name ?? "Unknown")}</div>
@@ -127,7 +131,6 @@ function renderData(data, panelEnabled, debugCtx) {
       ${permsList(user.orgRolePermissions, 4)}
     </div>`;
 
-  // Groups section
   const groupsHTML = groups.length === 0
     ? `<div class="empty-note">No group memberships</div>`
     : groups.map((g) => `
@@ -143,12 +146,10 @@ function renderData(data, panelEnabled, debugCtx) {
         </div>`
       ).join("");
 
-  // Direct bindings section
   const directHTML = directBindings.length === 0
     ? `<div class="empty-note">No direct role bindings</div>`
     : directBindings.map((b) => bindingHTML(b, null)).join("");
 
-  // Effective permissions — union of everything
   const allPerms = new Set(user.orgRolePermissions);
   for (const g of groups) for (const b of g.bindings) for (const p of b.permissions) allPerms.add(p);
   for (const b of directBindings) for (const p of b.permissions) allPerms.add(p);
@@ -161,7 +162,7 @@ function renderData(data, panelEnabled, debugCtx) {
     : "🏢 organisation";
 
   const effectiveHTML = `
-    <div class="scope-context">All bindings · scope: ${esc(scopeLabel)}</div>
+    <div class="scope-context">Union of all bindings · scope: ${esc(scopeLabel)}</div>
     <div class="eff-perms" style="margin-top:6px">
       ${sorted.map((p) => `<span class="eff-perm">${esc(p)}</span>`).join("")}
     </div>`;
@@ -182,22 +183,12 @@ window.toggleSection = function (id) {
   chev.textContent = collapsed ? "▼" : "▲";
 };
 
-window.togglePerms = function (el, permissions) {
-  const container = el.parentElement;
-  const existingExtras = container.querySelectorAll(".perm-extra");
-  if (existingExtras.length > 0) {
-    existingExtras.forEach((e) => e.remove());
-    el.textContent = `${permissions.length - 5} more…`;
-    return;
-  }
-  const extra = permissions.slice(5).map((p) => {
-    const span = document.createElement("span");
-    span.className = "perm perm-extra";
-    span.textContent = p;
-    return span;
-  });
-  extra.forEach((e) => container.insertBefore(e, el));
-  el.textContent = "show less";
+window.togglePerms = function (el) {
+  const id = el.dataset.permsId;
+  const extras = document.querySelectorAll(`.perm-extra[data-perms-id="${id}"]`);
+  const hidden = extras[0]?.style.display === "none";
+  extras.forEach((e) => (e.style.display = hidden ? "" : "none"));
+  el.textContent = hidden ? "show less" : `${extras.length} more…`;
 };
 
 // ── Main ───────────────────────────────────────────────────────────────────
@@ -217,64 +208,42 @@ async function init() {
   if (!isLangWatch) {
     showError("Not on a LangWatch page.");
     document.getElementById("header-sub").textContent = "Not a LangWatch page";
-    document.querySelector(".toggle-group").style.display = "none";
     return;
   }
 
-  // Read org context + panel state from page
-  const [debugCtx, panelState] = await Promise.all([
-    runInPage(pageReadDebugContext),
-    runInPage(pageReadPanelState, [STORAGE_KEY]),
-  ]);
+  const debugCtx = await runInPage(pageReadDebugContext);
 
-  const panelEnabled = panelState === "1";
-  updateToggleButtons(panelEnabled);
-
-  const orgId = debugCtx?.orgId;
+  // Try __lw_debug first, fall back to fetching the first org
+  let orgId = debugCtx?.orgId ?? null;
   if (!orgId) {
-    document.getElementById("header-sub").textContent = "No org context — navigate to a LangWatch page first";
-    showError("No organisation context found.\nNavigate into a LangWatch workspace first.");
+    orgId = await runInPage(pageFetchFirstOrgId);
+  }
+
+  if (!orgId) {
+    showError("Could not determine organisation.\nAre you logged in to LangWatch?");
+    document.getElementById("header-sub").textContent = "Not logged in";
     return;
   }
 
-  document.getElementById("header-sub").textContent = `org: ${orgId.slice(0, 16)}…`;
+  document.getElementById("header-sub").textContent = "Loading…";
 
-  // Fetch RBAC data from within the page context (uses its session cookies)
   let rbacData = null;
   try {
     rbacData = await runInPage(pageFetchRbac, [orgId]);
-  } catch (err) {
-    showError("Failed to fetch RBAC data.\nAre you logged in?");
+  } catch {
+    showError("Failed to fetch RBAC data.");
     return;
   }
 
   if (!rbacData) {
-    showError("API returned no data.\nAre you logged in?");
+    showError("API returned no data. Are you logged in?");
     return;
   }
 
   document.getElementById("header-sub").textContent =
     `${rbacData.user.name ?? rbacData.user.email ?? "Unknown"} · ${rbacData.user.orgRole}`;
 
-  showData(renderData(rbacData, panelEnabled, debugCtx));
-
-  // Panel toggle buttons
-  document.getElementById("btn-enable").addEventListener("click", async () => {
-    await runInPage(pageSetPanelState, [STORAGE_KEY, true]);
-    window.close();
-  });
-
-  document.getElementById("btn-disable").addEventListener("click", async () => {
-    await runInPage(pageSetPanelState, [STORAGE_KEY, false]);
-    window.close();
-  });
-}
-
-function updateToggleButtons(enabled) {
-  const onBtn = document.getElementById("btn-enable");
-  const offBtn = document.getElementById("btn-disable");
-  onBtn.textContent = enabled ? "Panel: ON ●" : "Enable panel";
-  onBtn.style.background = enabled ? "#15803d" : "#f97316";
+  showData(renderData(rbacData, debugCtx));
 }
 
 function showError(msg) {
