@@ -580,11 +580,12 @@ const CustomGraph_ = React.memo(
 
     const container = (child: React.ReactNode) => {
       const dataLoaded = !timeseries.isLoading && timeseries.data;
+      const isSummaryType = summaryGraphTypes.includes(input.graphType);
       const allEmpty =
         dataLoaded &&
         (allValues.length === 0 ||
           currentAndPreviousData?.length === 0 ||
-          allValues.every((v) => v === 0));
+          (!isSummaryType && allValues.every((v) => v === 0)));
 
       return (
         <Box width="full" height="full" position="relative">
