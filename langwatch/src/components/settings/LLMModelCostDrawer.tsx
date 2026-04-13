@@ -7,6 +7,7 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
 import { api } from "../../utils/api";
+import { isSafeRegex } from "../../utils/safeRegex";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 
@@ -176,8 +177,8 @@ function LLMModelCostForm({
               required
               {...register("regex", {
                 validate: (value) =>
-                  isValidRegex(value) ||
-                  "Please enter a valid regular expression",
+                  isSafeRegex(value) ||
+                  "Please enter a valid, non-catastrophic regular expression",
               })}
             />
           </InputGroup>
@@ -233,11 +234,3 @@ function LLMModelCostForm({
   );
 }
 
-const isValidRegex = (pattern: string): boolean => {
-  try {
-    new RegExp(pattern);
-    return true;
-  } catch {
-    return false;
-  }
-};
