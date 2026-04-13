@@ -86,12 +86,41 @@ export function SummaryMetricValue({
   previous,
   format,
   increaseIs = "good",
+  noDataUrl,
 }: {
   current?: number | string;
   previous?: number;
   format?: ((value: number) => string) | ((value: string) => string) | string;
   increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
 }) {
+  const isZeroZero =
+    current !== undefined &&
+    (current === 0 || current === "0") &&
+    (previous === undefined || previous === 0);
+
+  if (isZeroZero) {
+    return (
+      <VStack align="start" gap={1}>
+        <Text textStyle="sm" color="fg.muted">
+          No data yet
+        </Text>
+        {noDataUrl && (
+          <a
+            href={noDataUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            <Text textStyle="xs" color="fg.subtle">
+              Learn how to set up
+            </Text>
+          </a>
+        )}
+      </VStack>
+    );
+  }
+
   const change =
     typeof current === "number" && typeof previous === "number"
       ? Math.round(((current - previous) / (previous || 1)) * 100) / 100

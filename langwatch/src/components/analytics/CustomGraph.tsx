@@ -453,9 +453,10 @@ const CustomGraph_ = React.memo(
 
         const group =
           input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-        const groupName = groupKey
+        const displayGroupKey = groupKey || "unknown";
+        const groupName = groupKey !== undefined
           ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "
-          }${groupKey}`
+          }${displayGroupKey}`
           : "";
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
