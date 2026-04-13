@@ -92,6 +92,7 @@ export const teamRouter = createTRPCRouter({
         },
         include: {
           members: {
+            orderBy: { user: { name: "asc" } },
             include: {
               user: true,
               assignedRole: true,
@@ -297,6 +298,7 @@ export const teamRouter = createTRPCRouter({
         },
         include: {
           members: {
+            orderBy: { user: { name: "asc" } },
             include: {
               user: true,
               assignedRole: true,

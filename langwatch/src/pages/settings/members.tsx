@@ -239,7 +239,9 @@ function MembersList({
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        b.user.id.localeCompare(a.user.id),
+        (a.user.name ?? a.user.email ?? "").localeCompare(
+          b.user.name ?? b.user.email ?? "",
+        ),
       ),
     [organization.members],
   );
