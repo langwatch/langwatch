@@ -117,70 +117,73 @@ export const useFilterParams = () => {
     }
   }
 
-  // Use queryParams (parsed from router.asPath) instead of router.query to
-  // avoid leaking dynamic route params (e.g. [id]) into the query string.
-  // router.query merges route params with query params, so on pages like
-  // /[project]/analytics/custom/[id], it includes `id` which breaks shallow
-  // navigation when serialised back into a "?" string URL.
-
-  const setFilter = (filter: FilterField, params: FilterParam) => {
-    const filterUrl = availableFilters[filter].urlKey;
+  // Shallow-push helper that works on every page, including those with
+  // dynamic route params beyond [project] (e.g. /[project]/analytics/custom/[id]).
+  //
+  // The string form router.push("?" + qs) fails on dynamic-route pages in
+  // Next.js 15 Pages Router — the relative "?" URL isn't resolved correctly
+  // for shallow navigation, so the push silently does nothing.
+  //
+  // The (url, as) overload avoids this:
+  //   url  = { pathname, query: router.query }  →  tells Next.js "same page"
+  //   as   = currentPath + "?" + newQs           →  what the browser shows
+  const shallowPush = (newQs: string) => {
+    const currentPath = router.asPath.split("?")[0] ?? router.asPath;
     void router.push(
-      "?" +
-        qs.stringify(
-          {
-            ...Object.fromEntries(
-              Object.entries(queryParams).filter(
-                ([key]) =>
-                  key !== filterUrl &&
-                  !key.startsWith(filterUrl + "."),
-              ),
-            ),
-            [filterUrl]: params,
-          },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
-        ),
-      undefined,
+      { pathname: router.pathname, query: router.query },
+      currentPath + "?" + newQs,
       { shallow: true, scroll: false },
     );
   };
 
+  const qsOpts = {
+    allowDots: true,
+    arrayFormat: "comma" as const,
+    // @ts-ignore of course it exists
+    allowEmptyArrays: true,
+  };
+
+  const setFilter = (filter: FilterField, params: FilterParam) => {
+    const filterUrl = availableFilters[filter].urlKey;
+    shallowPush(
+      qs.stringify(
+        {
+          ...Object.fromEntries(
+            Object.entries(queryParams).filter(
+              ([key]) =>
+                key !== filterUrl && !key.startsWith(filterUrl + "."),
+            ),
+          ),
+          [filterUrl]: params,
+        },
+        qsOpts,
+      ),
+    );
+  };
+
   const setFilters = (filtersToSet: Record<FilterField, FilterParam>) => {
-    void router.push(
-      "?" +
-        qs.stringify(
-          {
-            ...Object.fromEntries(
-              Object.entries(queryParams).filter(
-                ([key]) =>
-                  !Object.values(availableFilters).some(
-                    (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
-                  ),
-              ),
+    shallowPush(
+      qs.stringify(
+        {
+          ...Object.fromEntries(
+            Object.entries(queryParams).filter(
+              ([key]) =>
+                !Object.values(availableFilters).some(
+                  (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
+                ),
             ),
-            ...Object.entries(filtersToSet).reduce(
-              (acc, [filter, params]) => ({
-                ...acc,
-                [availableFilters[filter as keyof typeof availableFilters]
-                  .urlKey]: params,
-              }),
-              {},
-            ),
-          },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
-        ),
-      undefined,
-      { shallow: true, scroll: false },
+          ),
+          ...Object.entries(filtersToSet).reduce(
+            (acc, [filter, params]) => ({
+              ...acc,
+              [availableFilters[filter as keyof typeof availableFilters]
+                .urlKey]: params,
+            }),
+            {},
+          ),
+        },
+        qsOpts,
+      ),
     );
   };
 
@@ -218,22 +221,14 @@ export const useFilterParams = () => {
   };
 
   const setNegateFilters = (negateFilters: boolean) => {
-    void router.push(
-      "?" +
-        qs.stringify(
-          {
-            ...queryParams,
-            negateFilters: negateFilters ? "true" : "false",
-          },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          },
-        ),
-      undefined,
-      { shallow: true, scroll: false },
+    shallowPush(
+      qs.stringify(
+        {
+          ...queryParams,
+          negateFilters: negateFilters ? "true" : "false",
+        },
+        qsOpts,
+      ),
     );
   };
 
