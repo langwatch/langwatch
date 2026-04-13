@@ -139,7 +139,7 @@ export function SummaryMetricValue({
         )}
       </Box>
       {change !== undefined && (
-        <HStack gap={1} textStyle="xs">
+        <VStack align="start" gap={0} textStyle="xs">
           {change !== 0 && (
             <Text fontWeight={500} color={changeColor}>
               {change > 0 ? "+" : ""}
@@ -148,11 +148,10 @@ export function SummaryMetricValue({
           )}
           {typeof previous === "number" && (
             <Text color="fg.subtle">
-              {change !== 0 ? "vs " : ""}
               {formatPreviousValue(previous)} prev
             </Text>
           )}
-        </HStack>
+        </VStack>
       )}
     </VStack>
   );

@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
+import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
 import {
   DocumentsCountsSummary,
@@ -173,11 +173,7 @@ function CustomReportsSection({ slug }: { slug: string }) {
       <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
         Custom Dashboards
       </Heading>
-      <Grid
-        width="full"
-        templateColumns={`repeat(${Math.min(dashboards.length, 3)}, 1fr)`}
-        gap={4}
-      >
+      <HStack width="full" gap={3} flexWrap="wrap">
         {dashboards.map((dashboard) => (
           <Link
             key={dashboard.id}
@@ -185,26 +181,38 @@ function CustomReportsSection({ slug }: { slug: string }) {
             _hover={{ textDecoration: "none" }}
           >
             <Card.Root
-              height="full"
               cursor="pointer"
               borderColor="border"
               _hover={{ borderColor: "orange.400", shadow: "sm" }}
               transition="all 0.15s ease"
             >
-              <Card.Body padding={4}>
+              <Card.Body paddingX={4} paddingY={3}>
                 <HStack gap={3}>
-                  <Box color="orange.400">
+                  <Box
+                    padding={2}
+                    borderRadius="md"
+                    bg="orange.subtle"
+                    color="orange.fg"
+                  >
                     <BarChart2 size={16} />
                   </Box>
-                  <Text fontWeight="500" textStyle="sm">
-                    {dashboard.name}
-                  </Text>
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="500" textStyle="sm">
+                      {dashboard.name}
+                    </Text>
+                    <Text textStyle="xs" color="fg.muted">
+                      Custom Dashboard
+                    </Text>
+                  </VStack>
+                  <Box color="fg.subtle">
+                    <ArrowUpRight size={14} />
+                  </Box>
                 </HStack>
               </Card.Body>
             </Card.Root>
           </Link>
         ))}
-      </Grid>
+      </HStack>
     </>
   );
 }

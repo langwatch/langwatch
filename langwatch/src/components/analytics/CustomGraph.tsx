@@ -15,7 +15,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
 import { ChartTooltip } from "./ChartTooltip";
 import { ChartErrorState } from "./ChartErrorState";
@@ -191,6 +191,38 @@ const CustomGraph_ = React.memo(
     const { daysDifference } = usePeriodSelector();
     const router = useRouter();
     const { project } = useOrganizationTeamProject();
+
+    // Legend toggle: track hidden series in localStorage
+    const storageKey = `analytics:hidden:${project?.id ?? ""}:${input.graphId}`;
+    const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(() => {
+      if (typeof window === "undefined") return new Set();
+      try {
+        const stored = localStorage.getItem(storageKey);
+        return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+      } catch {
+        return new Set();
+      }
+    });
+
+    const toggleSeries = useCallback(
+      (dataKey: string) => {
+        setHiddenSeries((prev) => {
+          const next = new Set(prev);
+          if (next.has(dataKey)) {
+            next.delete(dataKey);
+          } else {
+            next.add(dataKey);
+          }
+          try {
+            localStorage.setItem(storageKey, JSON.stringify([...next]));
+          } catch {
+            // localStorage full or unavailable
+          }
+          return next;
+        });
+      },
+      [storageKey],
+    );
 
     // Default handler for drill-down on pie/donut and summary bar charts
     const defaultOnDataPointClick = useCallback(
@@ -946,7 +978,23 @@ const CustomGraph_ = React.memo(
               maxHeight: "15%",
               overflow: "auto",
               zIndex: 1,
+              cursor: "pointer",
             }}
+            onClick={(e: { dataKey?: string }) => {
+              if (e.dataKey) toggleSeries(e.dataKey);
+            }}
+            formatter={(value: string, entry: { dataKey?: string }) => (
+              <span
+                style={{
+                  opacity:
+                    entry.dataKey && hiddenSeries.has(entry.dataKey)
+                      ? 0.3
+                      : 1,
+                }}
+              >
+                {value}
+              </span>
+            )}
           />
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
@@ -957,6 +1005,7 @@ const CustomGraph_ = React.memo(
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
             const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+            const isHidden = hiddenSeries.has(aggKey);
 
             return (
               <React.Fragment key={aggKey}>
@@ -964,6 +1013,7 @@ const CustomGraph_ = React.memo(
                 <GraphElement
                   key={aggKey}
                   type="monotone"
+                  hide={isHidden}
                   dataKey={aggKey}
                   stroke={strokeColor}
                   stackId={
@@ -1027,6 +1077,7 @@ const CustomGraph_ = React.memo(
                   <GraphElement
                     key={"previous>" + aggKey}
                     type="monotone"
+                    hide={isHidden}
                     dataKey={"previous>" + aggKey}
                     stackId={
                       ["stacked_bar", "stacked_area"].includes(input.graphType)
