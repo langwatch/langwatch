@@ -27,13 +27,31 @@ class TestHttpNodeDefaultTimeout:
             timeout_ms=None,
         )
 
+        captured_timeout = []
+
+        original_async_client = httpx.AsyncClient
+
+        class CapturingAsyncClient:
+            def __init__(self, **kwargs):
+                captured_timeout.append(kwargs.get("timeout"))
+                self._client = original_async_client(**kwargs)
+
+            async def __aenter__(self):
+                await self._client.__aenter__()
+                return self._client
+
+            async def __aexit__(self, *args):
+                return await self._client.__aexit__(*args)
+
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NLP_HTTP_NODE_DEFAULT_TIMEOUT_SECONDS", None)
-            result = await execute_http_node(config=config, inputs={})
+            with patch("langwatch_nlp.studio.execute.http_node.httpx.AsyncClient", CapturingAsyncClient):
+                result = await execute_http_node(config=config, inputs={})
 
         assert result.success is True
         requests = httpx_mock.get_requests()
         assert len(requests) == 1
+        assert captured_timeout == [300.0]
 
     @pytest.mark.asyncio
     async def test_uses_env_var_when_timeout_ms_is_none(self, httpx_mock):
