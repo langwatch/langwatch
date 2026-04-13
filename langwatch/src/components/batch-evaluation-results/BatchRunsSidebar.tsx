@@ -23,7 +23,6 @@ import { GitCompare, X } from "lucide-react";
 
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { FormatMoney } from "~/optimization_studio/components/FormatMoney";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
 import { getRunDisplayName } from "./getRunDisplayName";
@@ -161,7 +160,7 @@ export function BatchRunsSidebar({
       (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
     );
     const indexMap = new Map<string, number>();
-    chronological.forEach((run, i) => indexMap.set(run.runId, i));
+    chronological.forEach((run, i) => void indexMap.set(run.runId, i));
     return { sortedRuns: sorted, chronologicalIndexMap: indexMap };
   }, [runs]);
 
@@ -210,39 +209,37 @@ export function BatchRunsSidebar({
           Experiment Runs
         </Text>
         {onToggleCompareMode && (
-          <>
-            {compareMode ? (
+          compareMode ? (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={onToggleCompareMode}
+              data-testid="exit-compare-button"
+            >
+              <X size={14} />
+              Exit
+            </Button>
+          ) : (
+            <Tooltip
+              content={
+                canCompare
+                  ? "Compare runs (or Shift+click another run)"
+                  : "Need at least 2 runs to compare"
+              }
+              positioning={{ placement: "right" }}
+            >
               <Button
                 size="xs"
                 variant="outline"
                 onClick={onToggleCompareMode}
-                data-testid="exit-compare-button"
+                disabled={!canCompare}
+                data-testid="compare-button"
               >
-                <X size={14} />
-                Exit
+                <GitCompare size={14} />
+                Compare
               </Button>
-            ) : (
-              <Tooltip
-                content={
-                  canCompare
-                    ? "Compare runs (or Shift+click another run)"
-                    : "Need at least 2 runs to compare"
-                }
-                positioning={{ placement: "right" }}
-              >
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={onToggleCompareMode}
-                  disabled={!canCompare}
-                  data-testid="compare-button"
-                >
-                  <GitCompare size={14} />
-                  Compare
-                </Button>
-              </Tooltip>
-            )}
-          </>
+            </Tooltip>
+          )
         )}
       </HStack>
 
@@ -250,6 +247,7 @@ export function BatchRunsSidebar({
       {isLoading && (
         <VStack gap={0.5} align="stretch" paddingX={2}>
           {Array.from({ length: 6 }).map((_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: Its for skeleton data
             <HStack key={index} paddingX={2} paddingY={2} gap={2}>
               <VStack align="start" gap={1} flex={1} minWidth={0}>
                 {/* Line 1: Color square + name + version */}
@@ -297,6 +295,7 @@ export function BatchRunsSidebar({
               chronologicalIndexMap.get(run.runId) ?? 0;
             const runName = getRunDisplayName({
               commitMessage: run.workflowVersion?.commitMessage,
+              runId: run.runId,
               index: chronologicalIndex,
             });
 
