@@ -184,7 +184,7 @@ export function MessageCard({
                 />
               ) : (
                 <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
-                  <Markdown className="markdown markdown-without-margin">
+                  <Markdown>
                     {getExtractedInput(trace)}
                   </Markdown>
                 </Text>
@@ -223,7 +223,7 @@ export function MessageCard({
                     value={stringifyIfObject(trace.output.value)}
                   />
                 ) : trace.output?.value ? (
-                  <Markdown className="markdown">
+                  <Markdown>
                     {getSlicedOutput(trace)}
                   </Markdown>
                 ) : trace.lastGuardrail ? (

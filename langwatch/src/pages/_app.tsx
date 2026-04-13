@@ -9,7 +9,6 @@ import type { AppType } from "next/app";
 import type { Session } from "~/server/auth";
 import { SessionProvider } from "~/utils/auth-client";
 import "~/styles/globals.scss";
-import "~/styles/markdown.scss";
 
 import { Inter } from "next/font/google";
 import Head from "next/head";

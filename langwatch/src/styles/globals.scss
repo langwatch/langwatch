@@ -62,19 +62,6 @@ label {
         0 0 5px #ed8926;
 }
 
-.markdown {
-    p {
-        padding: 6px 0;
-    }
-
-    ol,
-    ul {
-        padding-left: 40px;
-        &:dir(rtl) {
-            padding-right: 40px;
-        }
-    }
-}
 
 div input[type="number"] {
     appearance: auto;
