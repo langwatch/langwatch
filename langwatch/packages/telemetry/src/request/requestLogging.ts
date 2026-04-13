@@ -86,10 +86,8 @@ export function hasAuthorizationToken(headers: {
   const xAuthToken = headers["x-auth-token"];
   const authHeader = headers.authorization;
 
-  return !!(
-    xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : null)
-  );
+  if (xAuthToken) return true;
+  if (authHeader) return true;
+
+  return false;
 }

@@ -29,9 +29,13 @@ export interface JobContextMetadata {
 // context propagation is a no-op (returns undefined / runs fn directly).
 let asyncLocalStorage: import("node:async_hooks").AsyncLocalStorage<RequestContext> | null = null;
 
+// INTENTIONAL dynamic require — exception to the no-dynamic-import rule.
+// This package uses a single entry point for both browser and Node.js environments.
+// async_hooks is Node-only and must be conditionally loaded at runtime; a static
+// import would cause a hard failure in browser bundles.
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { AsyncLocalStorage } = require("node:async_hooks");
+  const { AsyncLocalStorage } = require("node:async_hooks") as typeof import("node:async_hooks");
   asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
 } catch {
   // Browser environment — no ALS available
