@@ -111,7 +111,15 @@ export class ClickHouseExperimentRunService {
             return {};
           }
 
-          // Fetch per-evaluator breakdown for all runs
+          // Fetch per-evaluator breakdown for all runs.
+          //
+          // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
+          // of LIMIT 1 BY. ClickHouse's LIMIT 1 BY reads every selected column
+          // (including heavy payloads like EvaluationDetails / EvaluationInputs)
+          // before deduplicating, which can OOM on large parts. The IN-tuple
+          // pattern resolves dedup using only lightweight key columns and the
+          // ReplacingMergeTree version column (OccurredAt). See
+          // trace-dedup-oom-safety.unit.test.ts for the rationale.
           const runIds = runRows.map((r) => r.RunId);
           const breakdownResult = await clickHouseClient.query({
             query: `
@@ -123,22 +131,28 @@ export class ClickHouseExperimentRunService {
                 avg(Score) AS avgScore,
                 if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
                 countIf(Passed IS NOT NULL) AS hasPassedCount
-              FROM (
-                SELECT *
-                FROM (
-                  SELECT *
+              FROM experiment_run_items
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId IN ({experimentIds:Array(String)})
+                AND RunId IN ({runIds:Array(String)})
+                AND ResultType = 'evaluator'
+                AND EvaluationStatus = 'processed'
+                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+                  SELECT
+                    TenantId,
+                    ExperimentId,
+                    RunId,
+                    RowIndex,
+                    TargetId,
+                    ResultType,
+                    coalesce(EvaluatorId, ''),
+                    max(OccurredAt)
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId IN ({experimentIds:Array(String)})
                     AND RunId IN ({runIds:Array(String)})
-                  ORDER BY ProjectionId, CreatedAt DESC
-                  LIMIT 1 BY TenantId, ExperimentId, RunId, ProjectionId
+                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
                 )
-                ORDER BY CreatedAt DESC
-                LIMIT 1 BY ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-              )
-              WHERE ResultType = 'evaluator'
-                AND EvaluationStatus = 'processed'
               GROUP BY ExperimentId, RunId, EvaluatorId
               LIMIT 10000
             `,
@@ -167,7 +181,9 @@ export class ClickHouseExperimentRunService {
             breakdownByExperimentRun.set(key, existing);
           }
 
-          // Fetch cost/duration summary per run
+          // Fetch cost/duration summary per run.
+          // Dedup uses the same IN-tuple pattern as the breakdown query above —
+          // see comment there for the rationale (LIMIT 1 BY OOM safety).
           const costResult = await clickHouseClient.query({
             query: `
               SELECT
@@ -179,20 +195,26 @@ export class ClickHouseExperimentRunService {
                 avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
                 avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
                 avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
-              FROM (
-                SELECT *
-                FROM (
-                  SELECT *
+              FROM experiment_run_items
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId IN ({experimentIds:Array(String)})
+                AND RunId IN ({runIds:Array(String)})
+                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+                  SELECT
+                    TenantId,
+                    ExperimentId,
+                    RunId,
+                    RowIndex,
+                    TargetId,
+                    ResultType,
+                    coalesce(EvaluatorId, ''),
+                    max(OccurredAt)
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId IN ({experimentIds:Array(String)})
                     AND RunId IN ({runIds:Array(String)})
-                  ORDER BY ProjectionId, CreatedAt DESC
-                  LIMIT 1 BY TenantId, ExperimentId, RunId, ProjectionId
+                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
                 )
-                ORDER BY CreatedAt DESC
-                LIMIT 1 BY ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-              )
               GROUP BY ExperimentId, RunId
               LIMIT 10000
             `,
@@ -328,32 +350,44 @@ export class ClickHouseExperimentRunService {
             return null;
           }
 
-          // Fetch all items for this run
-          // Two-level dedup: first by ProjectionId (handles un-merged ReplacingMergeTree parts),
-          // then by business key (handles duplicate writes from SDK progress updates that
-          // produce different ProjectionIds due to timestamp in the KSUID).
+          // Fetch all items for this run.
           //
-          // ExperimentId is included in the WHERE clause and both LIMIT 1 BY clauses
-          // because runId is not unique across experiments — without this filter,
-          // results from one experiment leak into another's view whenever they share
-          // the same runId (a common pattern when SDK callers reuse a stable run_id
-          // across BatchEvaluation invocations).
+          // ExperimentId is part of the WHERE filter and the dedup key tuple
+          // because runId is not unique across experiments — without it, rows
+          // from one experiment leak into another's view whenever they share
+          // the same runId (e.g. when SDK callers reuse a stable run_id across
+          // BatchEvaluation invocations).
+          //
+          // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) rather
+          // than LIMIT 1 BY: ClickHouse's LIMIT 1 BY reads every selected column
+          // (including heavy payloads like DatasetEntry / EvaluationDetails)
+          // before deduplicating, which can OOM on large parts. The IN-tuple
+          // pattern resolves dedup using only lightweight key columns and the
+          // ReplacingMergeTree version column (OccurredAt). See
+          // trace-dedup-oom-safety.unit.test.ts for the rationale.
           const itemsResult = await clickHouseClient.query({
             query: `
-              SELECT * FROM (
-                SELECT *
-                FROM (
-                  SELECT *
+              SELECT *
+              FROM experiment_run_items
+              WHERE TenantId = {tenantId:String}
+                AND ExperimentId = {experimentId:String}
+                AND RunId = {runId:String}
+                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+                  SELECT
+                    TenantId,
+                    ExperimentId,
+                    RunId,
+                    RowIndex,
+                    TargetId,
+                    ResultType,
+                    coalesce(EvaluatorId, ''),
+                    max(OccurredAt)
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId = {experimentId:String}
                     AND RunId = {runId:String}
-                  ORDER BY ProjectionId, CreatedAt DESC
-                  LIMIT 1 BY TenantId, ExperimentId, RunId, ProjectionId
+                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
                 )
-                ORDER BY CreatedAt DESC
-                LIMIT 1 BY ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-              )
               ORDER BY RowIndex ASC, ResultType ASC
             `,
             query_params: {
