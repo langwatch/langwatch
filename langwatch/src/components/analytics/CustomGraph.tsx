@@ -97,6 +97,7 @@ export type CustomGraphInput = {
   timeScale: "full" | number;
   connected?: boolean;
   height?: number;
+  excludeUnknownBuckets?: boolean;
   monitorGraph?: {
     disabled?: boolean;
     isGuardrail?: boolean;
@@ -1038,14 +1039,16 @@ const CustomGraph_ = React.memo(
             }}
             onClick={(e) => {
               const key = e.dataKey as string | undefined;
-              if (key) toggleSeries(key);
+              if (key) toggleSeries(key.replace(/^previous>/, ""));
             }}
             formatter={(value, entry) => (
               <span
                 style={{
                   opacity:
                     entry.dataKey &&
-                    hiddenSeries.has(entry.dataKey as string)
+                    hiddenSeries.has(
+                      (entry.dataKey as string).replace(/^previous>/, ""),
+                    )
                       ? 0.3
                       : 1,
                 }}
@@ -1371,7 +1374,10 @@ const flattenGroupData = (
 
       const aggregations = Object.fromEntries(
         Object.entries(buckets)
-          .filter(([bucketKey]) => bucketKey !== "unknown")
+          .filter(
+            ([bucketKey]) =>
+              !(input.excludeUnknownBuckets && bucketKey === "unknown"),
+          )
           .flatMap(([bucketKey, bucket]) => {
             return Object.entries(bucket).map(([metricKey, metricValue]) => {
               return [`${bucketKey}>${metricKey}`, metricValue ?? 0];

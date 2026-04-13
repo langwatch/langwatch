@@ -29,26 +29,6 @@ export const MenuLink = ({
     isSelectedAnnotation ??
     (pathname === href || (includePath && pathname?.includes(includePath)));
 
-  if (disabled) {
-    return (
-      <HStack
-        paddingX={paddingX}
-        paddingY={1}
-        width="full"
-        position="relative"
-        borderRadius="lg"
-        opacity={0.4}
-        cursor="not-allowed"
-        gap={2}
-      >
-        {icon}
-        <Text>{children}</Text>
-        <Spacer />
-        {menuEnd}
-      </HStack>
-    );
-  }
-
   return (
     <Link
       asChild
@@ -57,8 +37,13 @@ export const MenuLink = ({
       width="full"
       position="relative"
       borderRadius="lg"
-      background={selected ? "bg.muted" : "transparent"}
-      _hover={{ background: "bg.muted" }}
+      background={!disabled && selected ? "bg.muted" : "transparent"}
+      _hover={!disabled ? { background: "bg.muted" } : undefined}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : undefined}
+      opacity={disabled ? 0.4 : undefined}
+      cursor={disabled ? "not-allowed" : undefined}
+      pointerEvents={disabled ? "none" : undefined}
     >
       <NextLink href={href}>
         <HStack width="full" gap={2}>
