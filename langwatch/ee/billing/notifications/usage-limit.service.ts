@@ -24,6 +24,17 @@ const MIN_DAYS_BETWEEN_ALERTS = 30;
 const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000, "ttlcache:billing:limitCooldown:");
 export { resourceLimitCooldown };
 
+// Guards notifyPlanLimitReached against concurrent calls (burst of traces from
+// a single org hitting the limit middleware at the same time). Two layers:
+//
+// 1. planLimitInFlight (sync Set) — blocks same-tick races where multiple
+//    Promise.all callers interleave before any async operation resolves.
+// 2. planLimitCooldown (TtlCache) — blocks subsequent ticks and coordinates
+//    across pods via Redis. The DB 30-day window remains authoritative.
+const planLimitInFlight = new Set<string>();
+const planLimitCooldown = new TtlCache<true>(MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000, "ttlcache:billing:planLimitCooldown:");
+export { planLimitInFlight, planLimitCooldown };
+
 export interface UsageLimitData {
   organizationId: string;
   currentMonthMessagesCount: number;
@@ -119,9 +130,22 @@ export class UsageLimitService {
       return;
     }
 
+    // Synchronous guard: blocks same-tick concurrent calls (e.g. 5 trace
+    // requests hitting Promise.all) before any await yields execution.
+    if (planLimitInFlight.has(organizationId)) {
+      return;
+    }
+    planLimitInFlight.add(organizationId);
+
+    // Async guard: blocks subsequent ticks and cross-pod duplicates via Redis.
+    if (await planLimitCooldown.get(organizationId)) {
+      return;
+    }
+
     const organization = await this.organizationService.findWithAdmins(organizationId);
 
     if (!organization) {
+      planLimitInFlight.delete(organizationId);
       return;
     }
 
@@ -133,9 +157,15 @@ export class UsageLimitService {
       );
 
       if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
+        // Seed the cache so subsequent ticks skip the DB round-trip too.
+        await planLimitCooldown.set(organizationId, true);
         return;
       }
     }
+
+    // Claim the cooldown slot before sending so concurrent calls on other
+    // pods are blocked immediately, even if sending takes a few seconds.
+    await planLimitCooldown.set(organizationId, true);
 
     const admin = organization.members[0]?.user;
 
