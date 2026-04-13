@@ -3,6 +3,7 @@ import {
   getCurrentContext,
   runWithContext,
   updateCurrentContext,
+  getOtelSpanContext,
   type RequestContext,
 } from "../context/core";
 import { getLogContext } from "../context/logging";
@@ -22,92 +23,132 @@ describe("context/core", () => {
   });
 
   describe("getCurrentContext", () => {
-    it("returns undefined when no context is set", () => {
-      expect(getCurrentContext()).toBeUndefined();
+    describe("when no context is set", () => {
+      it("returns undefined", () => {
+        expect(getCurrentContext()).toBeUndefined();
+      });
     });
 
-    it("returns context when inside runWithContext", () => {
-      const testCtx: RequestContext = {
-        organizationId: "org-123",
-        projectId: "proj-456",
-        userId: "user-789",
-      };
+    describe("when inside runWithContext", () => {
+      it("returns the active context", () => {
+        const testCtx: RequestContext = {
+          organizationId: "org-123",
+          projectId: "proj-456",
+          userId: "user-789",
+        };
 
-      runWithContext(testCtx, () => {
-        expect(getCurrentContext()).toEqual(testCtx);
+        runWithContext(testCtx, () => {
+          expect(getCurrentContext()).toEqual(testCtx);
+        });
       });
     });
   });
 
   describe("runWithContext", () => {
-    it("propagates context through async operations", async () => {
-      const testCtx: RequestContext = { projectId: "async-project" };
+    describe("when running async operations", () => {
+      it("propagates context through async boundaries", async () => {
+        const testCtx: RequestContext = { projectId: "async-project" };
 
-      const result = await runWithContext(testCtx, async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        return getCurrentContext()?.projectId;
-      });
-
-      expect(result).toBe("async-project");
-    });
-
-    it("isolates context between nested calls", () => {
-      runWithContext({ projectId: "outer" }, () => {
-        expect(getCurrentContext()?.projectId).toBe("outer");
-
-        runWithContext({ projectId: "inner" }, () => {
-          expect(getCurrentContext()?.projectId).toBe("inner");
+        const result = await runWithContext(testCtx, async () => {
+          await Promise.resolve();
+          return getCurrentContext()?.projectId;
         });
 
-        expect(getCurrentContext()?.projectId).toBe("outer");
+        expect(result).toBe("async-project");
+      });
+    });
+
+    describe("when nesting calls", () => {
+      it("isolates context between nested calls", () => {
+        runWithContext({ projectId: "outer" }, () => {
+          expect(getCurrentContext()?.projectId).toBe("outer");
+
+          runWithContext({ projectId: "inner" }, () => {
+            expect(getCurrentContext()?.projectId).toBe("inner");
+          });
+
+          expect(getCurrentContext()?.projectId).toBe("outer");
+        });
       });
     });
   });
 
   describe("updateCurrentContext", () => {
-    it("updates mutable context fields", () => {
-      runWithContext({}, () => {
-        updateCurrentContext({
-          organizationId: "updated-org",
-          projectId: "updated-proj",
-          userId: "updated-user",
-        });
+    describe("when context is active", () => {
+      it("updates mutable context fields", () => {
+        runWithContext({}, () => {
+          updateCurrentContext({
+            organizationId: "updated-org",
+            projectId: "updated-proj",
+            userId: "updated-user",
+          });
 
-        const ctx = getCurrentContext();
-        expect(ctx?.organizationId).toBe("updated-org");
-        expect(ctx?.projectId).toBe("updated-proj");
-        expect(ctx?.userId).toBe("updated-user");
+          const ctx = getCurrentContext();
+          expect(ctx?.organizationId).toBe("updated-org");
+          expect(ctx?.projectId).toBe("updated-proj");
+          expect(ctx?.userId).toBe("updated-user");
+        });
       });
     });
 
-    it("does nothing when no context is set", () => {
-      expect(() =>
-        updateCurrentContext({ organizationId: "no-context" })
-      ).not.toThrow();
+    describe("when no context is set", () => {
+      it("does not throw", () => {
+        expect(() =>
+          updateCurrentContext({ organizationId: "no-context" })
+        ).not.toThrow();
+      });
+    });
+  });
+
+  describe("getOtelSpanContext", () => {
+    describe("when no active span exists", () => {
+      it("returns undefined", () => {
+        expect(getOtelSpanContext()).toBeUndefined();
+      });
+    });
+
+    describe("when an active span exists", () => {
+      it("returns traceId and spanId", async () => {
+        const { trace } = await import("@opentelemetry/api");
+        vi.mocked(trace.getSpan).mockReturnValueOnce({
+          spanContext: () => ({
+            traceId: "abc123",
+            spanId: "def456",
+            traceFlags: 1,
+          }),
+        } as any);
+
+        const result = getOtelSpanContext();
+        expect(result).toEqual({ traceId: "abc123", spanId: "def456" });
+      });
     });
   });
 });
 
 describe("context/logging", () => {
-  it("returns null values when no context and no OTel span", () => {
-    const logCtx = getLogContext();
+  describe("when no context and no OTel span exist", () => {
+    it("returns null values for all fields", () => {
+      const logCtx = getLogContext();
 
-    expect(logCtx.traceId).toBeNull();
-    expect(logCtx.spanId).toBeNull();
-    expect(logCtx.organizationId).toBeNull();
-    expect(logCtx.projectId).toBeNull();
-    expect(logCtx.userId).toBeNull();
+      expect(logCtx.traceId).toBeNull();
+      expect(logCtx.spanId).toBeNull();
+      expect(logCtx.organizationId).toBeNull();
+      expect(logCtx.projectId).toBeNull();
+      expect(logCtx.userId).toBeNull();
+    });
   });
 
-  it("returns business context values when set", () => {
-    runWithContext(
-      { organizationId: "log-org", projectId: "log-proj", userId: "log-user" },
-      () => {
-        const logCtx = getLogContext();
-        expect(logCtx.organizationId).toBe("log-org");
-        expect(logCtx.projectId).toBe("log-proj");
-        expect(logCtx.userId).toBe("log-user");
-      },
-    );
+  describe("when business context is set", () => {
+    it("returns the context values", () => {
+      runWithContext(
+        { organizationId: "log-org", projectId: "log-proj", userId: "log-user" },
+        () => {
+          const logCtx = getLogContext();
+          expect(logCtx.organizationId).toBe("log-org");
+          expect(logCtx.projectId).toBe("log-proj");
+          expect(logCtx.userId).toBe("log-user");
+        },
+      );
+    });
   });
 });

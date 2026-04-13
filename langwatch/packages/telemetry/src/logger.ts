@@ -19,11 +19,12 @@ const superjsonErrorSerializer = (err: unknown) => {
     return pino.stdSerializers.err(err as Error);
   }
 
-  const serialized = superjson.serialize(err);
+  const { json, meta } = superjson.serialize(err);
 
   return {
     ...pino.stdSerializers.err(err),
-    _superjson: serialized.meta,
+    _superjsonData: json,
+    _superjsonMeta: meta,
   };
 };
 

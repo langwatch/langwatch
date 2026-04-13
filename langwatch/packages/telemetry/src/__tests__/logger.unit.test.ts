@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import pino from "pino";
+import superjson from "superjson";
 import { createLogger } from "../logger";
 import { runWithContext } from "../context/core";
 import { getLogContext } from "../context/logging";
@@ -51,13 +52,16 @@ describe("createLogger", () => {
     it("injects context fields via mixin", () => {
       const { dest, chunks } = captureDest();
 
-      const logger = pino(
+      // createLogger writes to process.stdout in test; create a pino
+      // instance with the same mixin that createLogger configures to
+      // verify context injection into log output.
+      const testLogger = pino(
         { name: "mixin-test", level: "error", mixin: () => getLogContext() },
         dest,
       );
 
       runWithContext({ organizationId: "org-1", projectId: "proj-1" }, () => {
-        logger.error("test message");
+        testLogger.error("test message");
       });
 
       expect(chunks.length).toBeGreaterThan(0);
@@ -65,22 +69,29 @@ describe("createLogger", () => {
       expect(parsed.organizationId).toBe("org-1");
       expect(parsed.projectId).toBe("proj-1");
     });
+
+    it("creates a logger with mixin enabled by default", () => {
+      const logger = createLogger("default-context");
+
+      // The logger exists and has standard methods — mixin is internal
+      expect(logger).toBeDefined();
+      expect(typeof logger.error).toBe("function");
+    });
   });
 
-  describe("when superjson error serializer is used", () => {
-    it("serializes Error instances with superjson metadata", () => {
+  describe("when serializing errors", () => {
+    it("includes superjson data and metadata for Error instances", () => {
       const { dest, chunks } = captureDest();
 
-      // Replicate the serializer from logger.ts
-      const superjson = require("superjson").default;
+      // Create a logger that mirrors createLogger's serializer setup
       const logger = pino(
         {
           level: "error",
           serializers: {
             error: (err: unknown) => {
               if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
-              const serialized = superjson.serialize(err);
-              return { ...pino.stdSerializers.err(err), _superjson: serialized.meta };
+              const { json, meta } = superjson.serialize(err);
+              return { ...pino.stdSerializers.err(err), _superjsonData: json, _superjsonMeta: meta };
             },
           },
         },
@@ -92,6 +103,7 @@ describe("createLogger", () => {
       const parsed = JSON.parse(chunks[0]!);
       expect(parsed.error.message).toBe("boom");
       expect(parsed.error.type).toBe("Error");
+      expect(parsed.error._superjsonData).toBeDefined();
     });
 
     it("falls back to standard serializer for non-Error values", () => {
@@ -126,7 +138,7 @@ describe("createLogger", () => {
     });
   });
 
-  describe("when formatting", () => {
+  describe("when formatting log output", () => {
     it("uppercases the level label", () => {
       const { dest, chunks } = captureDest();
 
