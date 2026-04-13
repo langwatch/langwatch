@@ -149,10 +149,15 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       if (!response.ok) {
         let errorMessage = "";
         try {
-          const errorBody = (await response.json()) as { detail?: string };
-          errorMessage = errorBody.detail ?? JSON.stringify(errorBody);
+          const bodyStr = await response.text();
+          try {
+            const errorBody = JSON.parse(bodyStr) as { detail?: string };
+            errorMessage = errorBody.detail ?? bodyStr;
+          } catch {
+            errorMessage = bodyStr;
+          }
         } catch {
-          errorMessage = await response.text().catch(() => "");
+          errorMessage = "";
         }
         throw new Error(
           `Workflow execution failed: HTTP ${response.status}${

@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft, LuExternalLink } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -126,6 +126,10 @@ export function AgentWorkflowEditorDrawer(
   >(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Track whether form has been initialized for this drawer session
+  const formInitializedRef = useRef(false);
+  const lastAgentIdRef = useRef<string | undefined>(undefined);
+
   // Load existing agent
   const agentQuery = api.agents.getById.useQuery(
     { id: agentId ?? "", projectId: project?.id ?? "" },
@@ -158,8 +162,15 @@ export function AgentWorkflowEditorDrawer(
     [workflowQuery.data],
   );
 
-  // Initialize form fields from the loaded agent.
+  // Initialize form fields from the loaded agent — only on first load or agentId change.
   useEffect(() => {
+    if (lastAgentIdRef.current !== agentId) {
+      formInitializedRef.current = false;
+      lastAgentIdRef.current = agentId;
+    }
+
+    if (formInitializedRef.current) return;
+
     if (agentQuery.data) {
       setName(agentQuery.data.name);
       const config = getWorkflowConfig(agentQuery.data.config);
@@ -177,8 +188,9 @@ export function AgentWorkflowEditorDrawer(
       setScenarioMappings(mappings);
       setScenarioOutputField(config.scenarioOutputField);
       setHasUnsavedChanges(false);
+      formInitializedRef.current = true;
     }
-  }, [agentQuery.data, workflowInputs]);
+  }, [agentQuery.data, workflowInputs, agentId]);
 
   // Mutations
   const updateMutation = api.agents.update.useMutation({

@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Code, Globe, Plus } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -141,6 +141,7 @@ export function TargetSelector({
           {value?.type === "prompt" && <BookText size={14} />}
           {value?.type === "http" && <Globe size={14} />}
           {value?.type === "code" && <Code size={14} />}
+          {value?.type === "workflow" && <Workflow size={14} />}
           <Text>{selectedLabel ?? placeholder}</Text>
         </HStack>
         <ChevronDown size={14} />

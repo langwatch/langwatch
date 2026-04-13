@@ -222,9 +222,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [scenarioMappings, setScenarioMappings] = useState<
     Record<string, FieldMapping>
   >({});
-  const [scenarioOutputField, setScenarioOutputField] = useState<
-    string | undefined
-  >(undefined);
   // Default to variables tab when in evaluations context (has availableSources)
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 

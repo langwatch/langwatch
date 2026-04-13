@@ -227,9 +227,8 @@ describe("ScenarioInputMappingSection", () => {
 
         renderSection({ mappings });
 
-        // The context row's mapping input should display the static text "Use the KB"
-        // invertMappings currently only handles type:"source", so stored value mappings
-        // never reach the display — this FAILS
+        // Static value mappings render read-only below; they are not part of the inverted display mappings.
+        // (Only type:"source" mappings flow through invertMappings; value mappings bypass that transform.)
         expect(screen.getByText("Use the KB")).toBeInTheDocument();
       });
     });
