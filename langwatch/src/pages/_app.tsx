@@ -26,7 +26,6 @@ import { Toaster } from "../components/ui/toaster";
 import { usePostHog } from "../hooks/usePostHog";
 import { ExtraFooterComponents } from "../../ee/saas/ExtraFooterComponents";
 import { CommandBarProvider } from "../features/command-bar";
-import { DebugContextExposer } from "../components/debug/RbacDebugPanel";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -1284,7 +1283,6 @@ const LangWatch: AppType<{
           </CommandBarProvider>
 
           <ExtraFooterComponents />
-          <DebugContextExposer />
         </ColorModeProvider>
       </ChakraProvider>
     </SessionProvider>
