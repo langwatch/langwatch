@@ -90,7 +90,8 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.attributes["code.namespace"]).toBe("TestClass");
     });
 
-    it("should not trace private methods", async () => {
+    // Skip: times out on OTLP HTTP request in CI — see #3097
+    it.skip("should not trace private methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
