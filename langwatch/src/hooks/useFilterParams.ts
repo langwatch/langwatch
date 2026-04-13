@@ -117,6 +117,12 @@ export const useFilterParams = () => {
     }
   }
 
+  // Use queryParams (parsed from router.asPath) instead of router.query to
+  // avoid leaking dynamic route params (e.g. [id]) into the query string.
+  // router.query merges route params with query params, so on pages like
+  // /[project]/analytics/custom/[id], it includes `id` which breaks shallow
+  // navigation when serialised back into a "?" string URL.
+
   const setFilter = (filter: FilterField, params: FilterParam) => {
     const filterUrl = availableFilters[filter].urlKey;
     void router.push(
@@ -124,9 +130,8 @@ export const useFilterParams = () => {
         qs.stringify(
           {
             ...Object.fromEntries(
-              Object.entries(router.query).filter(
+              Object.entries(queryParams).filter(
                 ([key]) =>
-                  key !== "project" &&
                   key !== filterUrl &&
                   !key.startsWith(filterUrl + "."),
               ),
@@ -151,9 +156,8 @@ export const useFilterParams = () => {
         qs.stringify(
           {
             ...Object.fromEntries(
-              Object.entries(router.query).filter(
+              Object.entries(queryParams).filter(
                 ([key]) =>
-                  key !== "project" &&
                   !Object.values(availableFilters).some(
                     (f) => key === f.urlKey || key.startsWith(f.urlKey + "."),
                   ),
@@ -214,12 +218,11 @@ export const useFilterParams = () => {
   };
 
   const setNegateFilters = (negateFilters: boolean) => {
-    const { project: _project, ...rest } = router.query;
     void router.push(
       "?" +
         qs.stringify(
           {
-            ...rest,
+            ...queryParams,
             negateFilters: negateFilters ? "true" : "false",
           },
           {
