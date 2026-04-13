@@ -106,12 +106,14 @@ function AddToTeamDialog({
   teamId,
   teamName,
   organizationId,
+  existingMemberIds,
   open,
   onClose,
 }: {
   teamId: string;
   teamName: string;
   organizationId: string;
+  existingMemberIds: string[];
   open: boolean;
   onClose: () => void;
 }) {
@@ -137,10 +139,12 @@ function AddToTeamDialog({
     },
   });
 
-  const userItems = (orgMembers.data?.members ?? []).map((m) => ({
-    label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-    value: m.userId,
-  }));
+  const userItems = (orgMembers.data?.members ?? [])
+    .filter((m) => !existingMemberIds.includes(m.userId))
+    .map((m) => ({
+      label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+      value: m.userId,
+    }));
   const userCollection = createListCollection({ items: userItems });
 
   const allRoleItems = [
@@ -898,6 +902,7 @@ function TeamCard({
           teamId={team.id}
           teamName={team.name}
           organizationId={organizationId}
+          existingMemberIds={team.directMembers.flatMap((m) => m.userId ? [m.userId] : [])}
           open={addingMember}
           onClose={() => setAddingMember(false)}
         />
