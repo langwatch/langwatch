@@ -29,18 +29,18 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let totalCost: number | null = null;
 
   (spans ?? []).forEach((span) => {
-    const isSynthetic = span.name != null && SYNTHETIC_SPAN_NAMES.has(span.name);
+    if (span.name != null && SYNTHETIC_SPAN_NAMES.has(span.name)) {
+      return;
+    }
 
     if (
-      !isSynthetic &&
-      (earliestStartedAt === null ||
-        span.timestamps.started_at < earliestStartedAt)
+      earliestStartedAt === null ||
+      span.timestamps.started_at < earliestStartedAt
     ) {
       earliestStartedAt = span.timestamps.started_at;
     }
 
     if (
-      !isSynthetic &&
       span.timestamps.first_token_at &&
       (latestFirstTokenAt === null ||
         span.timestamps.first_token_at > latestFirstTokenAt)
@@ -49,9 +49,8 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
     }
 
     if (
-      !isSynthetic &&
-      (latestFinishedAt === null ||
-        span.timestamps.finished_at > latestFinishedAt)
+      latestFinishedAt === null ||
+      span.timestamps.finished_at > latestFinishedAt
     ) {
       latestFinishedAt = span.timestamps.finished_at;
     }

@@ -5,6 +5,7 @@ import {
 } from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
@@ -77,6 +78,10 @@ export function applySpanToSummary({
   state: TraceSummaryData;
   span: NormalizedSpan;
 }): TraceSummaryData {
+  if (SYNTHETIC_SPAN_NAMES.has(span.name)) {
+    return state;
+  }
+
   const timing = spanTimingService.accumulateTiming({ state, span });
   const tokens = spanCostService.accumulateTokens({
     state,

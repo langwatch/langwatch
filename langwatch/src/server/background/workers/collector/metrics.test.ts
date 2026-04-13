@@ -260,11 +260,11 @@ describe("Trace metrics", () => {
         expect(metrics!.total_time_ms).toBe(1600);
       });
 
-      it("still counts tokens from synthetic spans", () => {
+      it("excludes synthetic span from token calculation", () => {
         const metrics = computeTraceMetrics(spans);
 
-        expect(metrics!.prompt_tokens).toBe(110);
-        expect(metrics!.completion_tokens).toBe(55);
+        expect(metrics!.prompt_tokens).toBe(100);
+        expect(metrics!.completion_tokens).toBe(50);
       });
     });
 
