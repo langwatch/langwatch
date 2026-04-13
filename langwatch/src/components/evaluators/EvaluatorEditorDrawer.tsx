@@ -129,15 +129,6 @@ export type EvaluatorEditorDrawerProps = {
    * When provided, overrides DB data for form initialization.
    */
   initialLocalConfig?: LocalEvaluatorConfig;
-  /**
-   * Callback when an evaluator mapping changes.
-   * Prefer passing this via setFlowCallbacks("evaluatorEditor", { onMappingChange })
-   * so it persists across drawer navigation. Falls back to mappingsConfig.onMappingChange.
-   */
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
 };
 
 /**
