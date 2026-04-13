@@ -299,8 +299,9 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
 
     describe("when deleting a tag with assignments", () => {
       it("cascades to remove PromptTagAssignment rows", async () => {
+        const tagId = `ptag_${nanoid()}`;
         await prisma.promptTag.create({
-          data: { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "canary" },
+          data: { id: tagId, organizationId: testOrganization.id, name: "canary" },
         });
 
         await prisma.promptTagAssignment.create({
@@ -308,7 +309,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
             id: `vtag_${nanoid()}`,
             configId: promptConfig.id,
             versionId: promptVersion.id,
-            tagId: "canary",
+            tagId,
             projectId: testProject.id,
           },
         });
@@ -318,7 +319,7 @@ describe("Prompt Tags REST API (/api/prompts/tags)", () => {
         expect(res.status).toBe(204);
 
         const assignment = await prisma.promptTagAssignment.findFirst({
-          where: { configId: promptConfig.id, tagId: "canary", projectId: testProject.id },
+          where: { configId: promptConfig.id, tagId, projectId: testProject.id },
         });
         expect(assignment).toBeNull();
       });
