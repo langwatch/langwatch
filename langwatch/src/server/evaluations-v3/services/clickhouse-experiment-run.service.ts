@@ -116,6 +116,7 @@ export class ClickHouseExperimentRunService {
           const breakdownResult = await clickHouseClient.query({
             query: `
               SELECT
+                ExperimentId,
                 RunId,
                 EvaluatorId,
                 max(EvaluatorName) AS EvaluatorName,
@@ -128,20 +129,22 @@ export class ClickHouseExperimentRunService {
                   SELECT *
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
+                    AND ExperimentId IN ({experimentIds:Array(String)})
                     AND RunId IN ({runIds:Array(String)})
                   ORDER BY ProjectionId, CreatedAt DESC
-                  LIMIT 1 BY TenantId, RunId, ProjectionId
+                  LIMIT 1 BY TenantId, ExperimentId, RunId, ProjectionId
                 )
                 ORDER BY CreatedAt DESC
-                LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+                LIMIT 1 BY ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               WHERE ResultType = 'evaluator'
                 AND EvaluationStatus = 'processed'
-              GROUP BY RunId, EvaluatorId
+              GROUP BY ExperimentId, RunId, EvaluatorId
               LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
+              experimentIds,
               runIds,
             },
             format: "JSONEachRow",
@@ -150,21 +153,25 @@ export class ClickHouseExperimentRunService {
           const breakdownRows =
             (await breakdownResult.json()) as ClickHouseEvaluatorBreakdownRow[];
 
-          // Group breakdown by RunId
-          const breakdownByRunId = new Map<
+          // Group breakdown by (ExperimentId, RunId) — runIds are not unique
+          // across experiments, so a composite key is required to avoid mixing
+          // results between experiments that happen to share a runId.
+          const breakdownByExperimentRun = new Map<
             string,
             ClickHouseEvaluatorBreakdownRow[]
           >();
           for (const row of breakdownRows) {
-            const existing = breakdownByRunId.get(row.RunId) ?? [];
+            const key = `${row.ExperimentId}:${row.RunId}`;
+            const existing = breakdownByExperimentRun.get(key) ?? [];
             existing.push(row);
-            breakdownByRunId.set(row.RunId, existing);
+            breakdownByExperimentRun.set(key, existing);
           }
 
           // Fetch cost/duration summary per run
           const costResult = await clickHouseClient.query({
             query: `
               SELECT
+                ExperimentId,
                 RunId,
                 sumIf(TargetCost, ResultType = 'target') AS datasetCost,
                 sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
@@ -178,18 +185,20 @@ export class ClickHouseExperimentRunService {
                   SELECT *
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
+                    AND ExperimentId IN ({experimentIds:Array(String)})
                     AND RunId IN ({runIds:Array(String)})
                   ORDER BY ProjectionId, CreatedAt DESC
-                  LIMIT 1 BY TenantId, RunId, ProjectionId
+                  LIMIT 1 BY TenantId, ExperimentId, RunId, ProjectionId
                 )
                 ORDER BY CreatedAt DESC
-                LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+                LIMIT 1 BY ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
-              GROUP BY RunId
+              GROUP BY ExperimentId, RunId
               LIMIT 10000
             `,
             query_params: {
               tenantId: projectId,
+              experimentIds,
               runIds,
             },
             format: "JSONEachRow",
@@ -198,9 +207,10 @@ export class ClickHouseExperimentRunService {
           const costRows =
             (await costResult.json()) as ClickHouseCostSummaryRow[];
 
-          const costByRunId = new Map<string, ClickHouseCostSummaryRow>();
+          // Same composite key as breakdownByExperimentRun.
+          const costByExperimentRun = new Map<string, ClickHouseCostSummaryRow>();
           for (const row of costRows) {
-            costByRunId.set(row.RunId, row);
+            costByExperimentRun.set(`${row.ExperimentId}:${row.RunId}`, row);
           }
 
           // Fetch workflow version metadata from Prisma
@@ -222,11 +232,12 @@ export class ClickHouseExperimentRunService {
               ? (versionsMap[row.WorkflowVersionId] ?? null)
               : null;
 
+            const compositeKey = `${row.ExperimentId}:${row.RunId}`;
             const run = mapClickHouseRunToExperimentRun({
               record: row,
               workflowVersion,
-              evaluatorBreakdown: breakdownByRunId.get(row.RunId),
-              costSummary: costByRunId.get(row.RunId),
+              evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
+              costSummary: costByExperimentRun.get(compositeKey),
             });
 
             if (!(run.experimentId in result)) {
@@ -321,6 +332,12 @@ export class ClickHouseExperimentRunService {
           // Two-level dedup: first by ProjectionId (handles un-merged ReplacingMergeTree parts),
           // then by business key (handles duplicate writes from SDK progress updates that
           // produce different ProjectionIds due to timestamp in the KSUID).
+          //
+          // ExperimentId is included in the WHERE clause and both LIMIT 1 BY clauses
+          // because runId is not unique across experiments — without this filter,
+          // results from one experiment leak into another's view whenever they share
+          // the same runId (a common pattern when SDK callers reuse a stable run_id
+          // across BatchEvaluation invocations).
           const itemsResult = await clickHouseClient.query({
             query: `
               SELECT * FROM (
@@ -329,17 +346,19 @@ export class ClickHouseExperimentRunService {
                   SELECT *
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
+                    AND ExperimentId = {experimentId:String}
                     AND RunId = {runId:String}
                   ORDER BY ProjectionId, CreatedAt DESC
-                  LIMIT 1 BY TenantId, RunId, ProjectionId
+                  LIMIT 1 BY TenantId, ExperimentId, RunId, ProjectionId
                 )
                 ORDER BY CreatedAt DESC
-                LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+                LIMIT 1 BY ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               ORDER BY RowIndex ASC, ResultType ASC
             `,
             query_params: {
               tenantId: projectId,
+              experimentId,
               runId,
             },
             format: "JSONEachRow",

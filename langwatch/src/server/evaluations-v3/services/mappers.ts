@@ -77,6 +77,7 @@ export interface ClickHouseExperimentRunItemRow {
 
 /** Per-evaluator aggregation row from ClickHouse GROUP BY query. */
 export interface ClickHouseEvaluatorBreakdownRow {
+  ExperimentId: string;
   RunId: string;
   EvaluatorId: string;
   EvaluatorName: string | null;
@@ -87,6 +88,7 @@ export interface ClickHouseEvaluatorBreakdownRow {
 
 /** Per-run cost/duration summary from ClickHouse aggregate query. */
 export interface ClickHouseCostSummaryRow {
+  ExperimentId: string;
   RunId: string;
   datasetCost: number | null;
   evaluationsCost: number | null;
