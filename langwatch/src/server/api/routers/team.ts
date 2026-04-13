@@ -521,15 +521,6 @@ export const teamRouter = createTRPCRouter({
             ? TeamUserRole.CUSTOM
             : (member.role as TeamUserRole);
 
-          await tx.teamUser.create({
-            data: {
-              userId: member.userId,
-              teamId: team.id,
-              role: memberRole,
-              assignedRoleId: memberIsCustomRole ? member.customRoleId : null,
-            },
-          });
-
           if (memberIsCustomRole) {
             // Verify the custom role belongs to the same organization
             const customRole = await tx.customRole.findUnique({
@@ -562,10 +553,13 @@ export const teamRouter = createTRPCRouter({
         }
 
         // Post-creation validation: ensure we have at least one admin
-        const finalAdminCount = await tx.teamUser.count({
+        const finalAdminCount = await tx.roleBinding.count({
           where: {
-            teamId: team.id,
+            organizationId: input.organizationId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: team.id,
             role: TeamUserRole.ADMIN,
+            userId: { not: null },
           },
         });
 
@@ -667,20 +661,14 @@ export const teamRouter = createTRPCRouter({
           });
         }
 
-        // Remove RoleBinding and legacy TeamUser row (if any) atomically
-        await Promise.all([
-          tx.roleBinding.deleteMany({
-            where: {
-              organizationId: team.organizationId,
-              userId: input.userId,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: input.teamId,
-            },
-          }),
-          tx.teamUser.deleteMany({
-            where: { userId: input.userId, teamId: input.teamId },
-          }),
-        ]);
+        await tx.roleBinding.deleteMany({
+          where: {
+            organizationId: team.organizationId,
+            userId: input.userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: input.teamId,
+          },
+        });
 
         // Post-removal validation: ensure we still have at least one admin
         const finalAdminCount = await tx.roleBinding.count({

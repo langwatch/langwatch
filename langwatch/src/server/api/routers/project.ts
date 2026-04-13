@@ -203,14 +203,6 @@ export const projectRouter = createTRPCRouter({
             organizationId: input.organizationId,
           },
         });
-        await prisma.teamUser.create({
-          data: {
-            userId: userId,
-            teamId: team.id,
-            role: "ADMIN",
-          },
-        });
-
         await prisma.roleBinding.create({
           data: {
             id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),

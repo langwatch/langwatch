@@ -204,14 +204,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       });
 
-      await tx.teamUser.create({
-        data: {
-          userId: input.userId,
-          teamId: team.id,
-          role: "ADMIN",
-        },
-      });
-
       await tx.roleBinding.create({
         data: {
           id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
@@ -431,13 +423,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       });
-      await tx.teamUser.deleteMany({
-        where: {
-          userId,
-          team: { organizationId },
-        },
-      });
-      // Delete all RoleBindings for this user in this org (all scopes)
       await tx.roleBinding.deleteMany({
         where: { organizationId, userId },
       });
@@ -536,22 +521,21 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
       const organizationTeamIds = organizationTeams.map((team) => team.id);
 
-      const currentMemberships = await tx.teamUser.findMany({
+      const currentMemberships = await tx.roleBinding.findMany({
         where: {
+          organizationId,
           userId,
-          teamId: { in: organizationTeamIds },
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: { in: organizationTeamIds },
         },
         select: {
-          teamId: true,
+          scopeId: true,
           role: true,
-          assignedRoleId: true,
+          customRoleId: true,
         },
       });
       const currentMembershipByTeamId = new Map(
-        currentMemberships.map((membership) => [
-          membership.teamId,
-          membership,
-        ]),
+        currentMemberships.map((m) => [m.scopeId, m]),
       );
 
       const dedupedTeamRoleUpdates = new Map(
@@ -609,8 +593,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           nextRole !== TeamUserRole.ADMIN;
 
         if (isDemotingLastAdmin) {
-          const teamAdminCount = await tx.teamUser.count({
-            where: { teamId, role: TeamUserRole.ADMIN },
+          const teamAdminCount = await tx.roleBinding.count({
+            where: { organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, role: TeamUserRole.ADMIN, userId: { not: null } },
           });
           if (teamAdminCount <= 1) {
             throw new TRPCError({
@@ -624,27 +608,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         const roleUnchanged =
           currentMembership.role === nextRole &&
           (shouldClearCustomRole
-            ? currentMembership.assignedRoleId === null
-            : currentMembership.assignedRoleId ===
-              teamRoleUpdate.customRoleId);
+            ? currentMembership.customRoleId === null
+            : currentMembership.customRoleId === teamRoleUpdate.customRoleId);
         if (roleUnchanged) continue;
 
-        await tx.teamUser.update({
-          where: {
-            userId_teamId: {
-              userId,
-              teamId,
-            },
-          },
-          data: {
-            role: nextRole,
-            assignedRoleId: shouldClearCustomRole
-              ? null
-              : teamRoleUpdate.customRoleId,
-          },
-        });
-
-        // Keep TEAM-scoped RoleBinding in sync
+        // Update TEAM-scoped RoleBinding
         await tx.roleBinding.deleteMany({
           where: { organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
         });
@@ -723,11 +691,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           });
         }
 
-        const adminCount = await tx.teamUser.count({
-          where: {
-            teamId,
-            role: TeamUserRole.ADMIN,
-          },
+        const adminCount = await tx.roleBinding.count({
+          where: { organizationId: team.organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, role: TeamUserRole.ADMIN, userId: { not: null } },
         });
 
         if (adminCount === 0) {
@@ -737,25 +702,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           });
         }
 
-        const targetUserMembership = await tx.teamUser.findUnique({
-          where: {
-            userId_teamId: {
-              userId,
-              teamId,
-            },
-          },
+        const targetUserBinding = await tx.roleBinding.findFirst({
+          where: { organizationId: team.organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, userId },
           select: { role: true },
         });
 
-        if (!targetUserMembership) {
+        if (!targetUserBinding) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "User is not a member of this team",
           });
         }
 
-        const isTargetUserAdmin =
-          targetUserMembership.role === TeamUserRole.ADMIN;
+        const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
 
         if (adminCount === 1 && isTargetUserAdmin) {
           if (userId === currentUserId) {
@@ -772,19 +731,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           });
         }
 
-        await tx.teamUser.update({
-          where: {
-            userId_teamId: {
-              userId,
-              teamId,
-            },
-          },
-          data: {
-            role: TeamUserRole.CUSTOM,
-            assignedRoleId: storedCustomRoleId,
-          },
-        });
-
         await tx.roleBinding.deleteMany({
           where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
         });
@@ -800,11 +746,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         });
 
-        const finalAdminCount = await tx.teamUser.count({
-          where: {
-            teamId,
-            role: TeamUserRole.ADMIN,
-          },
+        const finalAdminCount = await tx.roleBinding.count({
+          where: { organizationId: team.organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, role: TeamUserRole.ADMIN, userId: { not: null } },
         });
 
         if (finalAdminCount === 0) {
@@ -848,14 +791,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               message: LITE_MEMBER_VIEWER_ONLY_ERROR,
             });
           }
-
         }
 
-        const adminCount = await tx.teamUser.count({
-          where: {
-            teamId,
-            role: TeamUserRole.ADMIN,
-          },
+        const adminCount = await tx.roleBinding.count({
+          where: { organizationId: team.organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, role: TeamUserRole.ADMIN, userId: { not: null } },
         });
 
         if (adminCount === 0) {
@@ -865,27 +804,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           });
         }
 
-        const targetUserMembership = await tx.teamUser.findUnique({
-          where: {
-            userId_teamId: {
-              userId,
-              teamId,
-            },
-          },
+        const targetUserBinding = await tx.roleBinding.findFirst({
+          where: { organizationId: team.organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, userId },
           select: { role: true },
         });
 
-        if (!targetUserMembership) {
+        if (!targetUserBinding) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "User is not a member of this team",
           });
         }
 
-        const isTargetUserAdmin =
-          targetUserMembership.role === TeamUserRole.ADMIN;
-        const wouldDemoteAdmin =
-          isTargetUserAdmin && role !== TeamUserRole.ADMIN;
+        const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
+        const wouldDemoteAdmin = isTargetUserAdmin && role !== TeamUserRole.ADMIN;
 
         if (adminCount === 1 && wouldDemoteAdmin) {
           if (userId === currentUserId) {
@@ -902,19 +834,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           });
         }
 
-        await tx.teamUser.update({
-          where: {
-            userId_teamId: {
-              userId,
-              teamId,
-            },
-          },
-          data: {
-            role,
-            assignedRoleId: null,
-          },
-        });
-
         await tx.roleBinding.deleteMany({
           where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
         });
@@ -930,11 +849,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         });
 
-        const finalAdminCount = await tx.teamUser.count({
-          where: {
-            teamId,
-            role: TeamUserRole.ADMIN,
-          },
+        const finalAdminCount = await tx.roleBinding.count({
+          where: { organizationId: team.organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, role: TeamUserRole.ADMIN, userId: { not: null } },
         });
 
         if (finalAdminCount === 0) {
