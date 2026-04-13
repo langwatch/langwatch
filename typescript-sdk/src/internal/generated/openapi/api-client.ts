@@ -1173,6 +1173,43 @@ export interface paths {
         patch: operations["patchApiDashboardsById"];
         trace?: never;
     };
+    "/api/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived agents for the project (paginated) */
+        get: operations["getApiAgents"];
+        put?: never;
+        /** @description Create a new agent */
+        post: operations["postApiAgents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get an agent by its id */
+        get: operations["getApiAgentsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive an agent (soft-delete) */
+        delete: operations["deleteApiAgentsById"];
+        options?: never;
+        head?: never;
+        /** @description Update an agent by its id */
+        patch: operations["patchApiAgentsById"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6116,6 +6153,89 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiAgents: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiAgents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @enum {string} */
+                    type: "signature" | "code" | "workflow" | "http";
+                    config: {
+                        [key: string]: unknown;
+                    };
+                    workflowId?: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiAgentsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiAgentsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiAgentsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    /** @enum {string} */
+                    type?: "signature" | "code" | "workflow" | "http";
+                    config?: {
+                        [key: string]: unknown;
+                    };
+                    workflowId?: string | null;
                 };
             };
         };

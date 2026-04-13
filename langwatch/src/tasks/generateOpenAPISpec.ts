@@ -3,6 +3,7 @@ import fs from "fs";
 import { generateSpecs } from "hono-openapi";
 import path from "path";
 
+import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
@@ -35,6 +36,8 @@ const langwatchSpec = {
  */
 export default async function execute() {
   console.log("Generating OpenAPI spec...");
+  console.log("Building agents spec...");
+  const agentsSpec = await generateSpecs(agentsApp);
   console.log("Building analytics spec...");
   const analyticsSpec = await generateSpecs(analyticsApp);
   console.log("Building dashboards spec...");
@@ -58,6 +61,7 @@ export default async function execute() {
     // Merges this way ==>
     [
       currentSpec,
+      agentsSpec,
       analyticsSpec,
       dashboardsSpec,
       datasetSpec,
@@ -75,6 +79,7 @@ export default async function execute() {
         // Since we get these routes from the app directly,
         // we don't want to merge, we just want to replace.
         if (
+          key.includes("/api/agents") ||
           key.includes("/api/analytics") ||
           key.includes("/api/dashboards") ||
           key.includes("/api/evaluators") ||

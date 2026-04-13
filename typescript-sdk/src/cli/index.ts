@@ -378,6 +378,47 @@ evaluatorCmd
     }
   });
 
+// Add agent command group
+const agentCmd = program
+  .command("agent")
+  .description("Manage agent definitions");
+
+agentCmd
+  .command("list")
+  .description("List all agents in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
+    await impl(options);
+  });
+
+agentCmd
+  .command("get <id>")
+  .description("Get agent details by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getAgentCommand: impl } = await import("./commands/agents/get.js");
+    await impl(id, options);
+  });
+
+agentCmd
+  .command("create <name>")
+  .description("Create a new agent")
+  .requiredOption("--type <type>", "Agent type: signature, code, workflow, or http")
+  .option("--config <json>", "Agent config as JSON")
+  .action(async (name: string, options: { type: string; config?: string }) => {
+    const { createAgentCommand: impl } = await import("./commands/agents/create.js");
+    await impl(name, options);
+  });
+
+agentCmd
+  .command("delete <id>")
+  .description("Archive (soft-delete) an agent")
+  .action(async (id: string) => {
+    const { deleteAgentCommand: impl } = await import("./commands/agents/delete.js");
+    await impl(id);
+  });
+
 // Add dashboard command group
 const dashboardCmd = program
   .command("dashboard")

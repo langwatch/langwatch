@@ -14705,6 +14705,159 @@
         ],
         "description": "Delete a dashboard and its graphs (hard delete, cascade)"
       }
+    },
+    "/api/agents": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiAgents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "default": 50
+            }
+          }
+        ],
+        "description": "List all non-archived agents for the project (paginated)"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiAgents",
+        "parameters": [],
+        "description": "Create a new agent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "signature",
+                      "code",
+                      "workflow",
+                      "http"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "workflowId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type",
+                  "config"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agents/{id}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiAgentsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get an agent by its id"
+      },
+      "patch": {
+        "responses": {},
+        "operationId": "patchApiAgentsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update an agent by its id",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "signature",
+                      "code",
+                      "workflow",
+                      "http"
+                    ]
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "workflowId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiAgentsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Archive an agent (soft-delete)"
+      }
     }
   },
   "components": {

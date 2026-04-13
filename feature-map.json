@@ -319,7 +319,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["agent list", "agent get", "agent create", "agent delete"],
               "skill": null,
               "docs": null
             },
@@ -329,7 +329,7 @@
               "skill": null,
               "docs": null
             },
-            "api": null,
+            "api": "/api/agents",
             "docs": null
           },
           "sync": null
