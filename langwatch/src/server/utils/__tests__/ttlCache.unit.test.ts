@@ -95,7 +95,7 @@ describe("TtlCache", () => {
     });
   });
 
-  describe("claim()", () => {
+  describe("when claiming a key", () => {
     it("returns true and stores value when key is absent", async () => {
       const cache = new TtlCache<boolean>(30_000, "test:");
 
