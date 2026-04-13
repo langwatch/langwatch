@@ -23,11 +23,16 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { SignInError } from "./error";
+import { normalizeErrorCode, SignInError } from "./error";
 
 export default function SignIn({ session }: { session: Session | null }) {
   const query = useSearchParams();
-  const error = query?.get("error");
+  const rawError = query?.get("error");
+  // Normalize BetterAuth error codes to NextAuth-era codes so the gate
+  // below works for both. e.g. "account_already_linked_to_different_user"
+  // → "OAuthAccountNotLinked". Without this, the auto-redirect fires on
+  // account-linking errors and creates an infinite loop.
+  const error = normalizeErrorCode(rawError);
 
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
