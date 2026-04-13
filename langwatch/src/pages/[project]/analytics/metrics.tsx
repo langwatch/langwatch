@@ -1,19 +1,11 @@
-import {
-  Box,
-  Card,
-  GridItem,
-  Heading,
-  HStack,
-  SimpleGrid,
-} from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { Box, HStack, SimpleGrid } from "@chakra-ui/react";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { ChartCard } from "~/components/analytics/ChartCard";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
@@ -21,7 +13,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY; // 1440
 
-const LLMMetrics = {
+const LLMMetrics: CustomGraphInput = {
   graphId: "custom",
   graphType: "summary",
   series: [
@@ -49,7 +41,7 @@ const LLMMetrics = {
   height: 300,
 };
 
-const LLMSummary = {
+const LLMSummary: CustomGraphInput = {
   graphId: "custom",
   graphType: "summary",
   series: [
@@ -83,7 +75,7 @@ const LLMSummary = {
   height: 300,
 };
 
-const LLMs = {
+const LLMs: CustomGraphInput = {
   graphId: "custom",
   graphType: "area",
   series: [
@@ -100,7 +92,7 @@ const LLMs = {
   height: 300,
 };
 
-const llmUsage = {
+const llmUsage: CustomGraphInput = {
   graphId: "custom",
   graphType: "donnut",
   series: [
@@ -118,7 +110,7 @@ const llmUsage = {
   height: 300,
 };
 
-const completionTime = {
+const completionTime: CustomGraphInput = {
   graphId: "custom",
   graphType: "horizontal_bar",
   series: [
@@ -135,7 +127,7 @@ const completionTime = {
   height: 300,
 };
 
-const totalCostPerModel = {
+const totalCostPerModel: CustomGraphInput = {
   graphId: "custom",
   graphType: "horizontal_bar",
   series: [
@@ -156,7 +148,7 @@ const totalCostPerModel = {
   height: 300,
 };
 
-const averageTokensPerMessage = {
+const averageTokensPerMessage: CustomGraphInput = {
   graphId: "custom",
   graphType: "horizontal_bar",
   series: [
@@ -200,102 +192,31 @@ function MetricsContent() {
     <GraphsLayout title="LLM Metrics">
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">LLM Metrics</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={LLMMetricsFiltered as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Summary</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={LLMSummaryFiltered as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-
-          <GridItem colSpan={4} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">LLM Usage</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={LLMs as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">LLM Split</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={llmUsage as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Completion Time</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={completionTime as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          <ChartCard title="LLM Metrics" colSpan={2}>
+            <CustomGraph input={LLMMetricsFiltered} />
+          </ChartCard>
+          <ChartCard title="Summary" colSpan={2}>
+            <CustomGraph input={LLMSummaryFiltered} />
+          </ChartCard>
+          <ChartCard title="LLM Usage" colSpan={4}>
+            <CustomGraph input={LLMs} />
+          </ChartCard>
+          <ChartCard title="LLM Split" colSpan={2}>
+            <CustomGraph input={llmUsage} />
+          </ChartCard>
+          <ChartCard title="Average Completion Time" colSpan={2}>
+            <CustomGraph input={completionTime} />
+          </ChartCard>
           {canViewCost && (
-            <GridItem colSpan={2} display="inline-grid">
-              <Card.Root>
-                <Card.Header>
-                  <HStack gap={2}>
-                    <BarChart2 color="orange" />
-                    <Heading size="sm">Average Cost Per Message</Heading>
-                  </HStack>
-                </Card.Header>
-                <Card.Body>
-                  <CustomGraph input={totalCostPerModel as CustomGraphInput} />
-                </Card.Body>
-              </Card.Root>
-            </GridItem>
+            <ChartCard title="Average Cost Per Message" colSpan={2}>
+              <CustomGraph input={totalCostPerModel} />
+            </ChartCard>
           )}
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Tokens Per Message</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph
-                  input={averageTokensPerMessage as CustomGraphInput}
-                />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          <ChartCard title="Average Tokens Per Message" colSpan={2}>
+            <CustomGraph
+              input={averageTokensPerMessage}
+            />
+          </ChartCard>
         </SimpleGrid>
         <Box padding={3}>
           <FilterSidebar hideTopics={true} />
