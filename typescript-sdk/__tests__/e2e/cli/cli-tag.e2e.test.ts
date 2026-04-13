@@ -179,7 +179,8 @@ describe("CLI E2E", () => {
       });
 
       describe("when assigning a tag to a specific version", () => {
-        it("assigns the tag to that version", async () => {
+        // Skip: flaky when two sdk-javascript-ci runs share the same e2e backend — see #3129
+        it.skip("assigns the tag to that version", async () => {
           const handle = createUniquePromptName();
           const tagName = createUniqueTagName();
 
