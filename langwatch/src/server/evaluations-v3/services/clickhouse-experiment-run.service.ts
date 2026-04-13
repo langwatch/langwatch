@@ -1,3 +1,4 @@
+import { TupleParam } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
@@ -16,6 +17,61 @@ import {
   mapClickHouseRunToExperimentRun,
 } from "./mappers";
 import type { ExperimentRun, ExperimentRunWithItems } from "./types";
+
+/**
+ * Format a Date as a ClickHouse DateTime64(3) string (no timezone).
+ * ClickHouse parses this in the table's column timezone (UTC by default).
+ */
+function formatClickHouseDateTime(d: Date): string {
+  return d.toISOString().replace("T", " ").replace("Z", "");
+}
+
+/**
+ * Parse a ClickHouse DateTime64(3) string (e.g. "2024-01-15 10:30:00.000")
+ * into a JS Date. ClickHouse returns these as space-separated strings without
+ * a timezone suffix; treat them as UTC.
+ */
+function parseClickHouseDateTime(s: string): Date {
+  return new Date(s.replace(" ", "T") + "Z");
+}
+
+/**
+ * Buffer applied to OccurredAt range filters, in milliseconds. Items can
+ * legitimately land slightly before the run's CreatedAt (clock skew between
+ * ClickHouse nodes / SDK clients) and slightly after FinishedAt (late writes
+ * from background workers). One hour is generous and still prunes the vast
+ * majority of historical partitions (which are weekly).
+ */
+const OCCURRED_AT_BUFFER_MS = 60 * 60 * 1000;
+
+/**
+ * Derive a tight OccurredAt range for `experiment_run_items` queries from the
+ * runs being queried. Items can't be older than the earliest run's CreatedAt
+ * or newer than the latest run's UpdatedAt (modulo clock skew / late writes,
+ * absorbed by `OCCURRED_AT_BUFFER_MS`). This bound lets ClickHouse prune the
+ * weekly partitions that don't overlap the run window.
+ *
+ * Returns ClickHouse-formatted DateTime64(3) strings ready to pass as query
+ * parameters.
+ */
+function computeOccurredAtRangeForRuns(
+  runs: Pick<ClickHouseExperimentRunRow, "CreatedAt" | "UpdatedAt">[],
+): { minOccurredAt: string; maxOccurredAt: string } {
+  let minMs = Infinity;
+  let maxMs = -Infinity;
+  for (const r of runs) {
+    minMs = Math.min(minMs, parseClickHouseDateTime(r.CreatedAt).getTime());
+    maxMs = Math.max(maxMs, parseClickHouseDateTime(r.UpdatedAt).getTime());
+  }
+  return {
+    minOccurredAt: formatClickHouseDateTime(
+      new Date(minMs - OCCURRED_AT_BUFFER_MS),
+    ),
+    maxOccurredAt: formatClickHouseDateTime(
+      new Date(maxMs + OCCURRED_AT_BUFFER_MS),
+    ),
+  };
+}
 
 /**
  * ClickHouse backend for experiment run queries.
@@ -111,6 +167,26 @@ export class ClickHouseExperimentRunService {
             return {};
           }
 
+          // Build the exact (ExperimentId, RunId) tuple list and an OccurredAt
+          // bound from the runs we just fetched. Two reasons:
+          //
+          //   1. `ExperimentId IN (...) AND RunId IN (...)` would match the
+          //      cartesian product of those sets, pulling in unrelated rows
+          //      whenever a runId happens to be reused across experiments.
+          //      Filtering by exact pairs eliminates that overfetching and
+          //      avoids wasting LIMIT slots on rows that get discarded.
+          //
+          //   2. `experiment_run_items` is partitioned by `toYearWeek(OccurredAt)`.
+          //      Without an OccurredAt range in the WHERE clause, ClickHouse
+          //      cannot prune historical partitions and ends up scanning the
+          //      whole table. Bounds derived from the runs' lifecycle
+          //      (CreatedAt..UpdatedAt with a buffer for clock skew / late
+          //      writes) keep this cheap.
+          const runPairs = runRows.map(
+            (r) => new TupleParam([r.ExperimentId, r.RunId]),
+          );
+          const occurredAtRange = computeOccurredAtRangeForRuns(runRows);
+
           // Fetch per-evaluator breakdown for all runs.
           //
           // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
@@ -120,7 +196,6 @@ export class ClickHouseExperimentRunService {
           // pattern resolves dedup using only lightweight key columns and the
           // ReplacingMergeTree version column (OccurredAt). See
           // trace-dedup-oom-safety.unit.test.ts for the rationale.
-          const runIds = runRows.map((r) => r.RunId);
           const breakdownResult = await clickHouseClient.query({
             query: `
               SELECT
@@ -133,8 +208,9 @@ export class ClickHouseExperimentRunService {
                 countIf(Passed IS NOT NULL) AS hasPassedCount
               FROM experiment_run_items
               WHERE TenantId = {tenantId:String}
-                AND ExperimentId IN ({experimentIds:Array(String)})
-                AND RunId IN ({runIds:Array(String)})
+                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
                 AND ResultType = 'evaluator'
                 AND EvaluationStatus = 'processed'
                 AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
@@ -149,8 +225,9 @@ export class ClickHouseExperimentRunService {
                     max(OccurredAt)
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
-                    AND ExperimentId IN ({experimentIds:Array(String)})
-                    AND RunId IN ({runIds:Array(String)})
+                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
                   GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
                 )
               GROUP BY ExperimentId, RunId, EvaluatorId
@@ -158,8 +235,9 @@ export class ClickHouseExperimentRunService {
             `,
             query_params: {
               tenantId: projectId,
-              experimentIds,
-              runIds,
+              runPairs,
+              minOccurredAt: occurredAtRange.minOccurredAt,
+              maxOccurredAt: occurredAtRange.maxOccurredAt,
             },
             format: "JSONEachRow",
           });
@@ -182,8 +260,8 @@ export class ClickHouseExperimentRunService {
           }
 
           // Fetch cost/duration summary per run.
-          // Dedup uses the same IN-tuple pattern as the breakdown query above —
-          // see comment there for the rationale (LIMIT 1 BY OOM safety).
+          // Same exact-pair + OccurredAt-bounded + IN-tuple-dedup pattern as
+          // the breakdown query above — see comment there for the rationale.
           const costResult = await clickHouseClient.query({
             query: `
               SELECT
@@ -197,8 +275,9 @@ export class ClickHouseExperimentRunService {
                 avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
               FROM experiment_run_items
               WHERE TenantId = {tenantId:String}
-                AND ExperimentId IN ({experimentIds:Array(String)})
-                AND RunId IN ({runIds:Array(String)})
+                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
                 AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
                   SELECT
                     TenantId,
@@ -211,8 +290,9 @@ export class ClickHouseExperimentRunService {
                     max(OccurredAt)
                   FROM experiment_run_items
                   WHERE TenantId = {tenantId:String}
-                    AND ExperimentId IN ({experimentIds:Array(String)})
-                    AND RunId IN ({runIds:Array(String)})
+                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
                   GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
                 )
               GROUP BY ExperimentId, RunId
@@ -220,8 +300,9 @@ export class ClickHouseExperimentRunService {
             `,
             query_params: {
               tenantId: projectId,
-              experimentIds,
-              runIds,
+              runPairs,
+              minOccurredAt: occurredAtRange.minOccurredAt,
+              maxOccurredAt: occurredAtRange.maxOccurredAt,
             },
             format: "JSONEachRow",
           });
@@ -350,6 +431,12 @@ export class ClickHouseExperimentRunService {
             return null;
           }
 
+          // Bound OccurredAt by the run's lifecycle so ClickHouse can prune
+          // historical partitions. `experiment_run_items` is partitioned by
+          // `toYearWeek(OccurredAt)`, so without this bound a query against an
+          // older run would scan every partition since the table was created.
+          const occurredAtRange = computeOccurredAtRangeForRuns([runRecord]);
+
           // Fetch all items for this run.
           //
           // ExperimentId is part of the WHERE filter and the dedup key tuple
@@ -372,6 +459,8 @@ export class ClickHouseExperimentRunService {
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
+                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
                 AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
                   SELECT
                     TenantId,
@@ -386,6 +475,8 @@ export class ClickHouseExperimentRunService {
                   WHERE TenantId = {tenantId:String}
                     AND ExperimentId = {experimentId:String}
                     AND RunId = {runId:String}
+                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
                   GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
                 )
               ORDER BY RowIndex ASC, ResultType ASC
@@ -394,6 +485,8 @@ export class ClickHouseExperimentRunService {
               tenantId: projectId,
               experimentId,
               runId,
+              minOccurredAt: occurredAtRange.minOccurredAt,
+              maxOccurredAt: occurredAtRange.maxOccurredAt,
             },
             format: "JSONEachRow",
           });
