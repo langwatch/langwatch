@@ -22,7 +22,7 @@ const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
 const messagesCount: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "userTracesSummary",
   graphType: "summary",
   series: [
     {
@@ -53,8 +53,8 @@ const messagesCount: CustomGraphInput = {
   height: 300,
 };
 
-const userCountGrapgh: CustomGraphInput = {
-  graphId: "custom",
+const userCountGraph: CustomGraphInput = {
+  graphId: "dailyUsers",
   graphType: "area",
   series: [
     {
@@ -70,7 +70,7 @@ const userCountGrapgh: CustomGraphInput = {
 };
 
 const dailyActiveThreads: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "dailyThreads",
   graphType: "area",
   series: [
     {
@@ -86,7 +86,7 @@ const dailyActiveThreads: CustomGraphInput = {
 };
 
 const powerUsers: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "userLeaderboard",
   graphType: "horizontal_bar",
   series: [
     {
@@ -103,7 +103,7 @@ const powerUsers: CustomGraphInput = {
 };
 
 const maxMessagePerThread: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "maxTracesPerThread",
   graphType: "scatter",
   series: [
     {
@@ -124,7 +124,7 @@ const maxMessagePerThread: CustomGraphInput = {
 };
 
 const userThreads: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "userThreadsSummary",
   graphType: "summary",
   series: [
     {
@@ -157,6 +157,40 @@ const userThreads: CustomGraphInput = {
   ],
   includePrevious: false,
   timeScale: ONE_DAY,
+  height: 300,
+};
+
+const tracesByLabel: CustomGraphInput = {
+  graphId: "tracesByLabel",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Traces count",
+      colorSet: "colors",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+    },
+  ],
+  groupBy: "metadata.labels",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const tracesByCustomer: CustomGraphInput = {
+  graphId: "tracesByCustomer",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Traces count",
+      colorSet: "colors",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+    },
+  ],
+  groupBy: "metadata.customer_id",
+  includePrevious: false,
+  timeScale: "full",
   height: 300,
 };
 
@@ -207,7 +241,7 @@ function UsersContent() {
             </Card.Root>
           </GridItem>
           <ChartCard title="Daily Users" colSpan={2}>
-            <CustomGraph input={userCountGrapgh} emptyState={userEmptyState} />
+            <CustomGraph input={userCountGraph} emptyState={userEmptyState} />
           </ChartCard>
           <ChartCard title="Daily Threads" colSpan={2}>
             <CustomGraph input={dailyActiveThreads} />
@@ -217,6 +251,12 @@ function UsersContent() {
           </ChartCard>
           <ChartCard title="User Leaderboard" colSpan={2}>
             <CustomGraph input={powerUsers} emptyState={userEmptyState} />
+          </ChartCard>
+          <ChartCard title="Traces by Label" colSpan={2}>
+            <CustomGraph input={tracesByLabel} />
+          </ChartCard>
+          <ChartCard title="Traces by Customer" colSpan={2}>
+            <CustomGraph input={tracesByCustomer} />
           </ChartCard>
           <ChartCard title="User Feedbacks" colSpan={4}>
             <FeedbacksTable />

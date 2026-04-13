@@ -109,6 +109,38 @@ export function LLMMetrics() {
     timeScale: "full",
   };
 
+  const errorTrend: CustomGraphInput = {
+    graphId: "overviewErrorTrend",
+    graphType: "stacked_bar",
+    series: [
+      {
+        name: "Traces",
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+        colorSet: "positiveNegativeNeutral",
+      },
+    ],
+    groupBy: "error.has_error",
+    includePrevious: false,
+    timeScale: ONE_DAY,
+  };
+
+  const sentimentTrend: CustomGraphInput = {
+    graphId: "overviewSentimentTrend",
+    graphType: "stacked_bar",
+    series: [
+      {
+        name: "Feedback count",
+        metric: "sentiment.thumbs_up_down",
+        aggregation: "cardinality",
+        colorSet: "positiveNegativeNeutral",
+      },
+    ],
+    groupBy: "sentiment.thumbs_up_down",
+    includePrevious: false,
+    timeScale: ONE_DAY,
+  };
+
   return (
     <>
       <HStack paddingTop={6} paddingBottom={2}>
@@ -231,6 +263,26 @@ export function LLMMetrics() {
                   graphType: "summary",
                 }}
               />
+            </Card.Body>
+          </Card.Root>
+        </GridItem>
+        <GridItem>
+          <Card.Root height="full">
+            <Card.Header>
+              <Heading size="sm">Error Trend</Heading>
+            </Card.Header>
+            <Card.Body>
+              <CustomGraph input={errorTrend} />
+            </Card.Body>
+          </Card.Root>
+        </GridItem>
+        <GridItem>
+          <Card.Root height="full">
+            <Card.Header>
+              <Heading size="sm">User Sentiment</Heading>
+            </Card.Header>
+            <Card.Body>
+              <CustomGraph input={sentimentTrend} />
             </Card.Body>
           </Card.Root>
         </GridItem>

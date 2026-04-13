@@ -14,7 +14,7 @@ const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY; // 1440
 
 const LLMMetrics: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "llmMetricsSummary",
   graphType: "summary",
   series: [
     {
@@ -36,13 +36,13 @@ const LLMMetrics: CustomGraphInput = {
       aggregation: "sum",
     },
   ],
-  includePrevious: false,
+  includePrevious: true,
   timeScale: ONE_DAY,
   height: 300,
 };
 
 const LLMSummary: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "llmPerformanceSummary",
   graphType: "summary",
   series: [
     {
@@ -70,17 +70,17 @@ const LLMSummary: CustomGraphInput = {
       aggregation: "p90",
     },
   ],
-  includePrevious: false,
+  includePrevious: true,
   timeScale: ONE_DAY,
   height: 300,
 };
 
-const LLMs: CustomGraphInput = {
-  graphId: "custom",
+const llmCallsByModel: CustomGraphInput = {
+  graphId: "llmCallsByModel",
   graphType: "area",
   series: [
     {
-      name: "90th Percentile Completion Time",
+      name: "LLM Calls",
       colorSet: "colors",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -92,12 +92,12 @@ const LLMs: CustomGraphInput = {
   height: 300,
 };
 
-const llmUsage: CustomGraphInput = {
-  graphId: "custom",
+const llmSplitByModel: CustomGraphInput = {
+  graphId: "llmSplitByModel",
   graphType: "donnut",
   series: [
     {
-      name: "90th Percentile Completion Time",
+      name: "LLM Calls",
       colorSet: "colors",
       metric: "metadata.span_type",
       aggregation: "cardinality",
@@ -111,7 +111,7 @@ const llmUsage: CustomGraphInput = {
 };
 
 const completionTime: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "avgCompletionTimeByModel",
   graphType: "horizontal_bar",
   series: [
     {
@@ -128,11 +128,11 @@ const completionTime: CustomGraphInput = {
 };
 
 const totalCostPerModel: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "avgCostPerModel",
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Average total cost average per message",
+      name: "Average cost per message",
       colorSet: "colors",
       metric: "performance.total_cost",
       aggregation: "avg",
@@ -149,11 +149,11 @@ const totalCostPerModel: CustomGraphInput = {
 };
 
 const averageTokensPerMessage: CustomGraphInput = {
-  graphId: "custom",
+  graphId: "avgTokensPerModel",
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Average completion tokens average per message",
+      name: "Average completion tokens per message",
       colorSet: "colors",
       metric: "performance.completion_tokens",
       aggregation: "avg",
@@ -164,6 +164,62 @@ const averageTokensPerMessage: CustomGraphInput = {
     },
   ],
   groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const latencyTrend: CustomGraphInput = {
+  graphId: "latencyTrend",
+  graphType: "line",
+  series: [
+    {
+      name: "P90 Completion Time",
+      colorSet: "greenTones",
+      metric: "performance.completion_time",
+      aggregation: "p90",
+    },
+    {
+      name: "P90 Time to First Token",
+      colorSet: "cyanTones",
+      metric: "performance.first_token",
+      aggregation: "p90",
+    },
+  ],
+  includePrevious: false,
+  timeScale: ONE_DAY,
+  height: 300,
+};
+
+const tokensPerSecondByModel: CustomGraphInput = {
+  graphId: "tokensPerSecondByModel",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Average tokens per second",
+      colorSet: "cyanTones",
+      metric: "performance.tokens_per_second",
+      aggregation: "avg",
+    },
+  ],
+  groupBy: "metadata.model",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const errorRateByModel: CustomGraphInput = {
+  graphId: "errorRateByModel",
+  graphType: "horizontal_bar",
+  series: [
+    {
+      name: "Traces with errors",
+      colorSet: "orangeTones",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+    },
+  ],
+  groupBy: "error.has_error",
   includePrevious: false,
   timeScale: "full",
   height: 300,
@@ -199,10 +255,10 @@ function MetricsContent() {
             <CustomGraph input={LLMSummaryFiltered} />
           </ChartCard>
           <ChartCard title="LLM Usage" colSpan={4}>
-            <CustomGraph input={LLMs} />
+            <CustomGraph input={llmCallsByModel} />
           </ChartCard>
           <ChartCard title="LLM Split" colSpan={2}>
-            <CustomGraph input={llmUsage} />
+            <CustomGraph input={llmSplitByModel} />
           </ChartCard>
           <ChartCard title="Average Completion Time" colSpan={2}>
             <CustomGraph input={completionTime} />
@@ -213,9 +269,16 @@ function MetricsContent() {
             </ChartCard>
           )}
           <ChartCard title="Average Tokens Per Message" colSpan={2}>
-            <CustomGraph
-              input={averageTokensPerMessage}
-            />
+            <CustomGraph input={averageTokensPerMessage} />
+          </ChartCard>
+          <ChartCard title="Latency Trend" colSpan={4}>
+            <CustomGraph input={latencyTrend} />
+          </ChartCard>
+          <ChartCard title="Tokens Per Second" colSpan={2}>
+            <CustomGraph input={tokensPerSecondByModel} />
+          </ChartCard>
+          <ChartCard title="Error Distribution" colSpan={2}>
+            <CustomGraph input={errorRateByModel} />
           </ChartCard>
         </SimpleGrid>
         <Box padding={3}>
