@@ -1,4 +1,4 @@
-import { Card, EmptyState, Grid, GridItem, Heading, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Card, EmptyState, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";

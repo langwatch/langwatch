@@ -41,10 +41,10 @@ export const MenuLink = ({
         cursor="not-allowed"
         gap={2}
       >
-        {icon && icon}
+        {icon}
         <Text>{children}</Text>
         <Spacer />
-        {menuEnd && menuEnd}
+        {menuEnd}
       </HStack>
     );
   }
@@ -62,10 +62,10 @@ export const MenuLink = ({
     >
       <NextLink href={href}>
         <HStack width="full" gap={2}>
-          {icon && icon}
+          {icon}
           <Text>{children}</Text>
           <Spacer />
-          {menuEnd && menuEnd}
+          {menuEnd}
         </HStack>
       </NextLink>
     </Link>
