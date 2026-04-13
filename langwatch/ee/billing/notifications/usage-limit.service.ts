@@ -139,6 +139,7 @@ export class UsageLimitService {
 
     // Async guard: blocks subsequent ticks and cross-pod duplicates via Redis.
     if (await planLimitCooldown.get(organizationId)) {
+      planLimitInFlight.delete(organizationId);
       return;
     }
 
@@ -159,6 +160,7 @@ export class UsageLimitService {
       if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
         // Seed the cache so subsequent ticks skip the DB round-trip too.
         await planLimitCooldown.set(organizationId, true);
+        planLimitInFlight.delete(organizationId);
         return;
       }
     }
@@ -166,6 +168,7 @@ export class UsageLimitService {
     // Claim the cooldown slot before sending so concurrent calls on other
     // pods are blocked immediately, even if sending takes a few seconds.
     await planLimitCooldown.set(organizationId, true);
+    planLimitInFlight.delete(organizationId);
 
     const admin = organization.members[0]?.user;
 

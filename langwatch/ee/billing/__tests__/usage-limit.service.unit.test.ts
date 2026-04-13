@@ -278,6 +278,24 @@ describe("UsageLimitService", () => {
         expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
       });
     });
+
+    describe("when called again after cooldown expires", () => {
+      it("sends notification again", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+
+        // Simulate cooldown expiry
+        planLimitInFlight.delete("org_1");
+        await planLimitCooldown.delete("org_1");
+        vi.mocked(notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>).mockClear();
+
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   // -------------------------------------------------------------------------
