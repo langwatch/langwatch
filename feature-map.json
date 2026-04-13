@@ -26,7 +26,10 @@
             },
             "platform": {
               "ui": "/messages",
-              "mcp": null,
+              "mcp": [
+                "search_traces",
+                "get_trace"
+              ],
               "skill": null,
               "docs": null
             },
@@ -380,7 +383,7 @@
                 "python": "langwatch.evaluators",
                 "typescript": "langwatch.evaluators"
               },
-              "cli": null,
+              "cli": ["evaluator list", "evaluator get", "evaluator create", "evaluator update", "evaluator delete"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/built-in-evaluators.md"
             },
@@ -410,7 +413,7 @@
                 "python": "langwatch.dataset",
                 "typescript": "langwatch.datasets"
               },
-              "cli": null,
+              "cli": ["dataset list", "dataset create", "dataset get", "dataset delete", "dataset upload", "dataset download", "dataset update", "dataset records list", "dataset records add", "dataset records update", "dataset records delete"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
             },
