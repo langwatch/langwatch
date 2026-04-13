@@ -424,11 +424,13 @@ describe("version forward-copying via builder", () => {
         })
         .build();
 
-      // /old should be 410 in v2
+      // /old should be 410 in v2 with version headers
       const oldRes = await makeRequest(app, "/api/test/2025-06-01/old");
       expect(oldRes.status).toBe(410);
       const oldBody = await jsonBody(oldRes);
       expect((oldBody as { kind: string }).kind).toBe("endpoint_withdrawn");
+      expect(oldRes.headers.get("X-API-Version")).toBe("2025-06-01");
+      expect(oldRes.headers.get("X-API-Version-Status")).toBe("stable");
 
       // /old should still work in v1
       const v1Res = await makeRequest(app, "/api/test/2025-01-01/old");
@@ -689,6 +691,43 @@ describe("raw Response return", () => {
       const res = await makeRequest(app, "/api/test/2025-03-15/raw");
       expect(res.status).toBe(201);
       expect(await res.text()).toBe("raw response");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Null return (should serialize as JSON null, not 204)
+// ---------------------------------------------------------------------------
+
+describe("null return", () => {
+  describe("when handler returns null with an output schema", () => {
+    it("serializes as JSON null", async () => {
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get("/nullable", { output: z.null() }, async () => {
+            return null;
+          });
+        })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-03-15/nullable");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBeNull();
+    });
+  });
+
+  describe("when handler returns undefined", () => {
+    it("returns 204 No Content", async () => {
+      const app = buildTestService()
+        .version("2025-03-15", (v) => {
+          v.get("/void", {}, async (c) => {
+            return c.body(null, 204);
+          });
+        })
+        .build();
+
+      const res = await makeRequest(app, "/api/test/2025-03-15/void");
+      expect(res.status).toBe(204);
     });
   });
 });

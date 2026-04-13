@@ -14,13 +14,10 @@ import type { ZodType, z } from "zod";
  */
 export interface SSEConfig<
   TEvents extends Record<string, ZodType>,
-  TInput extends ZodType = ZodType,
   TQuery extends ZodType = ZodType,
 > {
   /** Map of event names to their payload schemas. */
   events: TEvents;
-  /** Optional JSON body schema (for POST-based SSE). */
-  input?: TInput;
   /** Optional query string schema. */
   query?: TQuery;
   /** OpenAPI description. */
@@ -64,8 +61,7 @@ export interface TypedSSEStream<TEvents extends Record<string, ZodType>> {
 export type SSEHandler<TApp, TEvents extends Record<string, ZodType>, TConfig> = (
   c: Context,
   args: {
-    input: TConfig extends { input: ZodType } ? z.infer<TConfig["input"]> : never;
-    query: TConfig extends { query: ZodType } ? z.infer<TConfig["query"]> : never;
+    query: TConfig extends { query: ZodType } ? z.infer<TConfig["query"]> : undefined;
     app: TApp;
   },
   stream: TypedSSEStream<TEvents>,

@@ -60,14 +60,14 @@ export const app = createService({
   })
   .build();
 
-export const { GET, POST, PUT, DELETE } = routeHandlers(app);
+export const { GET, POST, PUT, PATCH, DELETE } = routeHandlers(app);
 ```
 
 The Next.js route file:
 
 ```ts
 // src/app/api/things/[[...route]]/route.ts
-export { GET, POST, PUT, DELETE } from "./things.service";
+export { GET, POST, PUT, PATCH, DELETE } from "./things.service";
 ```
 
 ## What it does for you
@@ -86,7 +86,7 @@ v.get("/path", config, async (c, { input, params, query, app }) => {
   // input    = parsed JSON body (from config.input schema)
   // params   = parsed path params (from config.params schema)
   // query    = parsed query string (from config.query schema)
-  // app      = { project, organization, prisma, ...providers }
+  // app      = { project, _legacy: { organization, prisma }, ...providers }
 
   return data; // framework validates against config.output and calls c.json()
 });
@@ -166,8 +166,8 @@ v.sse("/execute", {
     result: z.object({ score: z.number() }),
     error: z.object({ message: z.string() }),
   },
-  input: executeSchema,
-}, async (c, { input, app }, stream) => {
+  query: querySchema,
+}, async (c, { query, app }, stream) => {
   await stream.emit("result", { score: 0.95 }); // validated against schema
   stream.close();
 });
@@ -232,10 +232,10 @@ src/
 When creating a new API service using this framework:
 
 1. Create `src/app/api/{name}/[[...route]]/` with two files: `{name}.service.ts` and `route.ts`
-2. `route.ts` is always just `export { GET, POST, PUT, DELETE } from "./{name}.service"`
+2. `route.ts` is always just `export { GET, POST, PUT, PATCH, DELETE } from "./{name}.service"`
 3. Use `createService({ name })` with the service name matching the URL path segment
 4. Inject auth, organization, and resource limit middleware from `../../middleware/`
-5. Use `.provide()` for service-layer dependencies — factories get `{ project, organization, prisma }`
+5. Use `.provide()` for service-layer dependencies — factories get `{ project, _legacy: { organization, prisma } }`
 6. Define Zod schemas for input/output/params next to the service, not in a shared types file
 7. Handlers return raw data when `output` is set; the framework validates and serializes
 8. Throw `NotFoundError` / `DomainError` for error responses — don't return `c.json({ error }, 404)` manually

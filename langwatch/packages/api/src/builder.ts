@@ -268,6 +268,10 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
       if (ep.withdrawn) {
         const method = ep.method === "sse" ? "get" : ep.method;
         app[method](fullPath, (c) => {
+          if (version) {
+            c.header("X-API-Version", version);
+          }
+          c.header("X-API-Version-Status", status);
           return c.json(
             { kind: "endpoint_withdrawn", message: "This endpoint has been removed" },
             410,
@@ -339,9 +343,10 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
 
     // 6. OpenAPI description (describeRoute) -- only when output or description exists
     if (config.output || config.description) {
-      const responses: Record<string, unknown> = {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const responses: Record<string, any> = {};
       if (config.output) {
-        responses["200"] = {
+        responses[String(config.status ?? 200)] = {
           description: "Success",
           content: {
             "application/json": {
@@ -365,14 +370,15 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
     if (config.query) {
       stack.push(zValidator("query", config.query) as unknown as MiddlewareHandler);
     }
-    if (config.input) {
+    // SSE endpoints are GET-only — skip JSON body validation
+    if (config.input && ep.method !== "sse") {
       stack.push(zValidator("json", config.input) as unknown as MiddlewareHandler);
     }
 
     // 8. App context middleware (resolves providers)
     const providers = this._providers;
     stack.push(async (c, next) => {
-      const base: BaseApp = {
+      const base: BaseApp<TProject> = {
         project: c.get("project"),
         _legacy: {
           organization: c.get("organization"),
@@ -397,11 +403,10 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
       const sseConfig = ep.config as unknown as SSEConfig<Record<string, ZodType>>;
       stack.push(async (c) => {
         const appCtx = c.get("app");
-        const input = config.input ? c.req.valid("json" as never) : undefined;
         const query = config.query ? c.req.valid("query" as never) : undefined;
 
         return createSSEResponse(c, sseConfig.events, async (stream) => {
-          await ep.handler(c, { input, query, app: appCtx }, stream);
+          await ep.handler(c, { query, app: appCtx }, stream);
         });
       });
     } else {
@@ -420,7 +425,7 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
         }
 
         // void/undefined → 204 No Content
-        if (result === undefined || result === null) {
+        if (result === undefined) {
           return c.body(null, config.status ?? 204);
         }
 

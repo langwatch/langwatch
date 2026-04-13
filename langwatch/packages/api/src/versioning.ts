@@ -26,7 +26,8 @@ export type ResolvedEndpoint =
 
 /** A composite key for de-duplicating endpoints within a version. */
 function endpointKey(method: string, path: string): string {
-  return `${method}:${path}`;
+  const normalized = method === "sse" ? "get" : method;
+  return `${normalized}:${path}`;
 }
 
 // ---------------------------------------------------------------------------
