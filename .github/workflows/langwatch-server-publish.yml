@@ -32,7 +32,7 @@ jobs:
 
       - name: Build mcp-server
         working-directory: mcp-server
-        run: pnpm install && pnpm run build
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install dependencies
         run: |
