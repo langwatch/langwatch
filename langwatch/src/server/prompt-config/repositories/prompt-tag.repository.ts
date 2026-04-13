@@ -154,8 +154,8 @@ export class PromptTagRepository {
   }
 
   /**
-   * Renames a tag definition and updates all corresponding PromptTagAssignment rows.
-   * Wrapped in a transaction for atomicity.
+   * Renames a tag definition.
+   * Assignment rows reference the stable tag ID, so they need no update.
    */
   async rename({
     organizationId,
