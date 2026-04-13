@@ -145,16 +145,11 @@ export function SummaryMetricValue({
   const changeColor =
     change === undefined || change === 0
       ? "gray.500"
-      : increaseIs === "neutral"
-        ? "orange.400"
+      : increaseReversal === 0
+        ? "fg.muted"
         : change * increaseReversal > 0
           ? "green.500"
           : "red.500";
-
-  const changeTooltip =
-    increaseIs === "neutral" && change !== undefined && change !== 0
-      ? `This metric ${change > 0 ? "increased" : "decreased"} — whether that's good or bad depends on your use case`
-      : undefined;
 
   return (
     <VStack align="start" gap={1}>
@@ -175,12 +170,10 @@ export function SummaryMetricValue({
       {change !== undefined && (
         <VStack align="start" gap={0} textStyle="xs">
           {change !== 0 && (
-            <Tooltip content={changeTooltip} disabled={!changeTooltip}>
-              <Text fontWeight={500} color={changeColor}>
-                {change > 0 ? "+" : "-"}
-                {formatChangeValue(change)}
-              </Text>
-            </Tooltip>
+            <Text fontWeight={500} color={changeColor}>
+              {change > 0 ? "+" : "-"}
+              {formatChangeValue(change)}
+            </Text>
           )}
           {typeof previous === "number" && (
             <Text color="fg.subtle">

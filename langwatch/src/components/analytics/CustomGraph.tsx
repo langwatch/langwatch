@@ -69,6 +69,7 @@ import { SummaryMetric } from "./SummaryMetric";
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
   colorSet: RotatingColorSet;
+  increaseIs?: "good" | "bad" | "neutral";
 };
 
 export type CustomGraphInput = {
@@ -1291,7 +1292,11 @@ const shapeDataForSummary = (
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric: formatOverride,
+        metric: formatOverride
+          ? series?.increaseIs
+            ? { ...formatOverride, increaseIs: series.increaseIs }
+            : formatOverride
+          : undefined,
         value: totalValue,
       };
     });
