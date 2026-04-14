@@ -41,9 +41,14 @@ export interface SageProposal {
   payload: Record<string, unknown>;
 }
 
+export type AppliedOutcome = {
+  href?: string;
+  label?: string;
+} | void;
+
 export type ProposalHandlers = Record<
   string,
-  (payload: Record<string, unknown>) => Promise<void>
+  (payload: Record<string, unknown>) => Promise<AppliedOutcome>
 >;
 
 interface SageDrawerProps {
@@ -159,9 +164,9 @@ const SagePanel = forwardRef<
   const projectId = project?.id;
 
   const [input, setInput] = useState("");
-  const [appliedProposals, setAppliedProposals] = useState<Set<string>>(
-    new Set(),
-  );
+  const [appliedOutcomes, setAppliedOutcomes] = useState<
+    Record<string, { href?: string; label?: string }>
+  >({});
   const [discardedProposals, setDiscardedProposals] = useState<Set<string>>(
     new Set(),
   );
@@ -209,7 +214,7 @@ const SagePanel = forwardRef<
     proposal: SageProposal,
   ) => {
     if (applyingProposals.has(proposalId)) return;
-    if (appliedProposals.has(proposalId)) return;
+    if (proposalId in appliedOutcomes) return;
     if (discardedProposals.has(proposalId)) return;
     const handler = proposalHandlers?.[proposal.kind];
     if (!handler) {
@@ -224,8 +229,11 @@ const SagePanel = forwardRef<
     }
     setApplyingProposals((prev) => new Set(prev).add(proposalId));
     try {
-      await handler(proposal.payload);
-      setAppliedProposals((prev) => new Set(prev).add(proposalId));
+      const outcome = await handler(proposal.payload);
+      setAppliedOutcomes((prev) => ({
+        ...prev,
+        [proposalId]: outcome ?? {},
+      }));
       toaster.create({
         title: "Applied",
         description: proposal.summary,
@@ -289,7 +297,7 @@ const SagePanel = forwardRef<
                 <MessageContent
                   key={message.id}
                   message={message}
-                  appliedProposals={appliedProposals}
+                  appliedOutcomes={appliedOutcomes}
                   discardedProposals={discardedProposals}
                   applyingProposals={applyingProposals}
                   onApply={applyProposal}
@@ -503,14 +511,14 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
 
 function MessageContent({
   message,
-  appliedProposals,
+  appliedOutcomes,
   discardedProposals,
   applyingProposals,
   onApply,
   onDiscard,
 }: {
   message: UIMessage;
-  appliedProposals: Set<string>;
+  appliedOutcomes: Record<string, { href?: string; label?: string }>;
   discardedProposals: Set<string>;
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: SageProposal) => Promise<void>;
@@ -577,7 +585,7 @@ function MessageContent({
         <ProposalCard
           key={id}
           proposal={proposal}
-          isApplied={appliedProposals.has(id)}
+          appliedOutcome={appliedOutcomes[id]}
           isDiscarded={discardedProposals.has(id)}
           isApplying={applyingProposals.has(id)}
           onApply={() => void onApply(id, proposal)}
@@ -590,20 +598,21 @@ function MessageContent({
 
 function ProposalCard({
   proposal,
-  isApplied,
+  appliedOutcome,
   isDiscarded,
   isApplying,
   onApply,
   onDiscard,
 }: {
   proposal: SageProposal;
-  isApplied: boolean;
+  appliedOutcome?: { href?: string; label?: string };
   isDiscarded: boolean;
   isApplying: boolean;
   onApply: () => void;
   onDiscard: () => void;
 }) {
-  const faded = isApplied || isDiscarded;
+  const isApplied = !!appliedOutcome;
+  const faded = isDiscarded;
   const statusLabel = isApplied
     ? "Applied"
     : isDiscarded
@@ -612,6 +621,8 @@ function ProposalCard({
         ? "Applying…"
         : "Sage proposes";
   const accentPalette = isApplied ? "green" : "blue";
+  const openHref = appliedOutcome?.href;
+  const openLabel = appliedOutcome?.label ?? "Open";
 
   return (
     <Box
@@ -622,6 +633,19 @@ function ProposalCard({
       borderColor={isApplied ? "green.emphasized" : "blue.emphasized"}
       boxShadow="sm"
       opacity={faded ? 0.75 : 1}
+      cursor={openHref ? "pointer" : "default"}
+      onClick={(e) => {
+        if (!openHref) return;
+        const target = e.target as HTMLElement;
+        if (target.closest("a, button")) return;
+        window.location.href = openHref;
+      }}
+      transition="border-color 150ms ease, box-shadow 150ms ease"
+      _hover={
+        openHref
+          ? { borderColor: "green.fg", boxShadow: "md" }
+          : undefined
+      }
     >
       <VStack align="stretch" gap={2}>
         <HStack gap={2}>
@@ -674,6 +698,21 @@ function ProposalCard({
               disabled={isApplying}
             >
               Discard
+            </Button>
+          </HStack>
+        )}
+        {isApplied && openHref && (
+          <HStack gap={2} paddingTop={1}>
+            <Button
+              size="xs"
+              variant="outline"
+              colorPalette="green"
+              asChild
+            >
+              <a href={openHref}>
+                {openLabel}
+                <LuArrowRight size={12} />
+              </a>
             </Button>
           </HStack>
         )}

@@ -67,6 +67,7 @@ export default function ExperimentsWorkbenchPage() {
 
   const proposalHandlers = useMemo<ProposalHandlers>(() => {
     const projectId = project?.id;
+    const projectSlug = project?.slug;
     if (!projectId) return {} as ProposalHandlers;
     return {
       "evaluators.create": async (payload) => {
@@ -82,6 +83,12 @@ export default function ExperimentsWorkbenchPage() {
           config,
         });
         await utils.evaluators.getAll.invalidate({ projectId });
+        return projectSlug
+          ? {
+              href: `/${projectSlug}/evaluations`,
+              label: "Open evaluators",
+            }
+          : undefined;
       },
       "workbench.addEvaluator": async (payload) => {
         const { dbEvaluatorId, evaluatorType, name, fields } = payload as {
@@ -119,6 +126,9 @@ export default function ExperimentsWorkbenchPage() {
           data: { handle, messages, model, temperature, maxTokens },
         });
         await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
+        return projectSlug
+          ? { href: `/${projectSlug}/prompts`, label: "Open prompt" }
+          : undefined;
       },
       "prompts.update": async (payload) => {
         const { id, commitMessage, messages, model, temperature, maxTokens } =
@@ -142,6 +152,9 @@ export default function ExperimentsWorkbenchPage() {
           },
         });
         await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
+        return projectSlug
+          ? { href: `/${projectSlug}/prompts`, label: "Open prompt" }
+          : undefined;
       },
       "datasets.create": async (payload) => {
         const { name, columnTypes, initialRows } = payload as {
@@ -149,7 +162,7 @@ export default function ExperimentsWorkbenchPage() {
           columnTypes: { name: string; type: string }[];
           initialRows?: Record<string, unknown>[];
         };
-        await upsertDataset.mutateAsync({
+        const created = await upsertDataset.mutateAsync({
           projectId,
           name,
           columnTypes: columnTypes as never,
@@ -163,6 +176,9 @@ export default function ExperimentsWorkbenchPage() {
             : {}),
         });
         await utils.dataset.getAll.invalidate({ projectId });
+        return projectSlug && created?.id
+          ? { href: `/${projectSlug}/datasets/${created.id}`, label: "Open dataset" }
+          : undefined;
       },
       "datasets.addRows": async (payload) => {
         const { datasetId, rows } = payload as {
@@ -175,6 +191,9 @@ export default function ExperimentsWorkbenchPage() {
           entries: rows.map((row) => ({ id: nanoid(), ...row })) as never,
         });
         await utils.dataset.getAll.invalidate({ projectId });
+        return projectSlug
+          ? { href: `/${projectSlug}/datasets/${datasetId}`, label: "Open dataset" }
+          : undefined;
       },
     };
   }, [
