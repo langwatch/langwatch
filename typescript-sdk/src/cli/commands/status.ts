@@ -23,7 +23,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
   ];
 
-  const settledResults = await Promise.allSettled(
+  await Promise.allSettled(
     fetchers.map(async ({ key, fn }) => {
       try {
         const { data, error } = await fn();
