@@ -3,7 +3,7 @@ name: tracing
 user-prompt: "Instrument my code with LangWatch"
 description: Add LangWatch tracing and observability to your code. Use for both onboarding (instrument an entire codebase) and targeted operations (add tracing to a specific function or module). Supports Python and TypeScript with all major frameworks.
 license: MIT
-compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.
+compatibility: Works with Claude Code and similar coding agents. CLI is the preferred interface for verification.
 ---
 
 # Add LangWatch Tracing to Your Code
@@ -24,13 +24,19 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation and point them to the LangWatch docs.
 
-## Step 1: Set up the LangWatch MCP
+## Step 1: Set up the LangWatch CLI
 
-First, install the LangWatch MCP server so you have access to framework-specific documentation:
+See [CLI Setup](_shared/cli-setup.md) for installation. The CLI is useful for verifying traces:
 
+```bash
+langwatch trace search --limit 5          # Verify traces arrive
+langwatch trace get <traceId>             # Inspect a specific trace
+langwatch analytics query --metric trace-count  # Check trace volume
+```
+
+For documentation access, set up the LangWatch MCP:
 See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
-
-If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly via URLs.
+If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md).
 
 ## Step 2: Get the API Key
 
@@ -94,8 +100,8 @@ Do NOT consider the instrumentation complete without verifying it works. Follow 
 
 1. **Install dependencies** — run `pip install langwatch` (or `uv add langwatch`) / `npm install langwatch` (or `pnpm add langwatch`). If the install fails due to peer dependency conflicts, widen the conflicting range and retry — do NOT silently skip this step.
 2. **Run a quick test** — execute the agent with a simple test input to generate at least one trace. For Python, try running the main script. For TypeScript/Mastra, try running with `npx tsx` or the framework's dev command. Study how the framework starts to find the right approach; only give up if the framework requires infrastructure you cannot spin up (databases, external services, etc.).
-3. **Check traces arrived** — if the LangWatch MCP is available, wait 5 seconds then call `search_traces` to verify the trace appeared. If traces show up, instrumentation is confirmed working.
-4. **If verification isn't possible** (no MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
+3. **Check traces arrived** — use the CLI to verify: `langwatch trace search --limit 5`. If the CLI is not available but MCP is, call `search_traces`. If traces show up, instrumentation is confirmed working.
+4. **If verification isn't possible** (no CLI/MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
 
 ## Common Mistakes
 

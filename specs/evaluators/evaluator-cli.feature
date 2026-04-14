@@ -38,6 +38,16 @@ Feature: Evaluator CLI Commands
     When I run "langwatch evaluator create 'My Evaluator'"
     Then I see an error that the --type option is required
 
+  Scenario: Update an evaluator name
+    Given my project has an evaluator with slug "my-evaluator"
+    When I run "langwatch evaluator update my-evaluator --name 'Renamed Evaluator'"
+    Then the evaluator is updated and I see confirmation
+
+  Scenario: Update evaluator settings
+    Given my project has an evaluator with slug "my-evaluator"
+    When I run "langwatch evaluator update my-evaluator --settings '{"model":"gpt-4o"}'"
+    Then the evaluator config is updated and I see confirmation
+
   Scenario: Delete an evaluator
     Given my project has an evaluator with slug "my-evaluator"
     When I run "langwatch evaluator delete my-evaluator"

@@ -20,13 +20,16 @@
                 "python": "langwatch.trace",
                 "typescript": "langwatch"
               },
-              "cli": null,
+              "cli": ["trace search", "trace get", "trace export"],
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
             "platform": {
               "ui": "/messages",
-              "mcp": null,
+              "mcp": [
+                "search_traces",
+                "get_trace"
+              ],
               "skill": null,
               "docs": null
             },
@@ -42,7 +45,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["analytics query"],
               "skill": "analytics",
               "docs": null
             },
@@ -94,13 +97,17 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["annotation list", "annotation get", "annotation create", "annotation delete"],
               "skill": null,
               "docs": null
             },
             "platform": {
               "ui": "/annotations",
-              "mcp": null,
+              "mcp": [
+                "platform_list_annotations",
+                "platform_create_annotation",
+                "platform_delete_annotation"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/features/annotations.md"
             },
@@ -129,13 +136,16 @@
                 "python": "langwatch.experiment",
                 "typescript": "langwatch.experiments"
               },
-              "cli": null,
+              "cli": ["evaluation run", "evaluation status"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
             },
             "platform": {
               "ui": "/evaluations",
-              "mcp": null,
+              "mcp": [
+                "platform_run_evaluation",
+                "platform_evaluation_status"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
             },
@@ -154,17 +164,23 @@
                 "python": "langwatch.evaluation",
                 "typescript": null
               },
-              "cli": null,
+              "cli": ["monitor list", "monitor get", "monitor create", "monitor update", "monitor delete"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/guardrails/code-integration.md"
             },
             "platform": {
               "ui": "/evaluations",
-              "mcp": null,
+              "mcp": [
+                "platform_list_monitors",
+                "platform_get_monitor",
+                "platform_create_monitor",
+                "platform_update_monitor",
+                "platform_delete_monitor"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
             },
-            "api": "/api/evaluations",
+            "api": "/api/monitors",
             "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
           },
           "sync": null,
@@ -190,7 +206,7 @@
                 "python": "langwatch-scenario",
                 "typescript": "@langwatch/scenario"
               },
-              "cli": null,
+              "cli": ["scenario list", "scenario get", "scenario create", "scenario update", "scenario run", "scenario delete"],
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
             },
@@ -219,18 +235,58 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["simulation-run list", "simulation-run get"],
               "skill": null,
               "docs": null
             },
             "platform": {
               "ui": "/simulations",
-              "mcp": null,
+              "mcp": [
+                "platform_list_simulation_runs",
+                "platform_get_simulation_run"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
             },
-            "api": null,
+            "api": "/api/simulation-runs",
             "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
+          },
+          "sync": null
+        },
+        {
+          "id": "agent-simulations.suites",
+          "name": "Suites (Run Plans)",
+          "description": "Bundle scenarios with targets for batch execution and repeated testing",
+          "surfaces": {
+            "code": {
+              "sdk": null,
+              "cli": [
+                "suite list",
+                "suite get",
+                "suite create",
+                "suite update",
+                "suite duplicate",
+                "suite run",
+                "suite delete"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/simulations/run-plans",
+              "mcp": [
+                "platform_list_suites",
+                "platform_get_suite",
+                "platform_create_suite",
+                "platform_update_suite",
+                "platform_run_suite",
+                "platform_archive_suite"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/suites",
+            "docs": null
           },
           "sync": null
         }
@@ -262,7 +318,14 @@
                 "prompt list",
                 "prompt sync",
                 "prompt pull",
-                "prompt push"
+                "prompt push",
+                "prompt tag list",
+                "prompt tag create",
+                "prompt tag rename",
+                "prompt tag assign",
+                "prompt tag delete",
+                "prompt versions",
+                "prompt restore"
               ],
               "skill": "prompts",
               "docs": "https://langwatch.ai/docs/prompt-management/cli.md"
@@ -273,7 +336,12 @@
                 "platform_create_prompt",
                 "platform_list_prompts",
                 "platform_get_prompt",
-                "platform_update_prompt"
+                "platform_update_prompt",
+                "platform_list_prompt_tags",
+                "platform_create_prompt_tag",
+                "platform_rename_prompt_tag",
+                "platform_assign_prompt_tag",
+                "platform_delete_prompt_tag"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/prompt-management/getting-started.md"
@@ -319,17 +387,24 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["agent list", "agent get", "agent create", "agent run", "agent update", "agent delete"],
               "skill": null,
               "docs": null
             },
             "platform": {
               "ui": "/agents",
-              "mcp": null,
+              "mcp": [
+                "platform_list_agents",
+                "platform_get_agent",
+                "platform_create_agent",
+                "platform_update_agent",
+                "platform_run_agent",
+                "platform_delete_agent"
+              ],
               "skill": null,
               "docs": null
             },
-            "api": null,
+            "api": "/api/agents",
             "docs": null
           },
           "sync": null
@@ -341,13 +416,18 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["workflow list", "workflow get", "workflow update", "workflow run", "workflow delete"],
               "skill": null,
               "docs": null
             },
             "platform": {
               "ui": "/workflows",
-              "mcp": null,
+              "mcp": [
+                "platform_list_workflows",
+                "platform_get_workflow",
+                "platform_run_workflow",
+                "platform_delete_workflow"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
             },
@@ -366,7 +446,7 @@
                 "python": "langwatch.evaluators",
                 "typescript": "langwatch.evaluators"
               },
-              "cli": null,
+              "cli": ["evaluator list", "evaluator get", "evaluator create", "evaluator update", "evaluator delete"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/built-in-evaluators.md"
             },
@@ -376,7 +456,8 @@
                 "platform_create_evaluator",
                 "platform_list_evaluators",
                 "platform_get_evaluator",
-                "platform_update_evaluator"
+                "platform_update_evaluator",
+                "platform_delete_evaluator"
               ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
@@ -396,7 +477,7 @@
                 "python": "langwatch.dataset",
                 "typescript": "langwatch.datasets"
               },
-              "cli": null,
+              "cli": ["dataset list", "dataset create", "dataset get", "dataset delete", "dataset upload", "dataset download", "dataset update", "dataset records list", "dataset records add", "dataset records update", "dataset records delete"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
             },
@@ -427,6 +508,61 @@
       }
     },
     {
+      "id": "dashboards",
+      "name": "Dashboards",
+      "description": "Custom analytics dashboards with configurable graphs",
+      "surfaces": {
+        "code": {
+          "sdk": null,
+          "cli": ["dashboard list", "dashboard get", "dashboard update", "dashboard create", "dashboard delete", "graph list", "graph get", "graph create", "graph update", "graph delete"],
+          "skill": null,
+          "docs": null
+        },
+        "platform": {
+          "ui": "/analytics/dashboards",
+          "mcp": [
+            "platform_list_dashboards",
+            "platform_get_dashboard",
+            "platform_create_dashboard",
+            "platform_rename_dashboard",
+            "platform_delete_dashboard"
+          ],
+          "skill": null,
+          "docs": null
+        },
+        "api": "/api/dashboards",
+        "docs": null
+      },
+      "sync": null
+    },
+    {
+      "id": "triggers",
+      "name": "Triggers (Automations)",
+      "description": "Automated actions triggered by conditions — email alerts, Slack notifications, dataset additions",
+      "surfaces": {
+        "code": {
+          "sdk": null,
+          "cli": ["trigger list", "trigger get", "trigger create", "trigger update", "trigger delete"],
+          "skill": null,
+          "docs": null
+        },
+        "platform": {
+          "ui": "/alerts",
+          "mcp": [
+            "platform_list_triggers",
+            "platform_create_trigger",
+            "platform_update_trigger",
+            "platform_delete_trigger"
+          ],
+          "skill": null,
+          "docs": null
+        },
+        "api": "/api/triggers",
+        "docs": null
+      },
+      "sync": null
+    },
+    {
       "id": "settings",
       "name": "Settings",
       "description": "Platform configuration and administration",
@@ -438,7 +574,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["model-provider list", "model-provider set"],
               "skill": null,
               "docs": null
             },
@@ -451,8 +587,35 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/integration/custom-models.md"
             },
-            "api": null,
+            "api": "/api/model-providers",
             "docs": "https://langwatch.ai/docs/integration/custom-models.md"
+          },
+          "sync": null
+        },
+        {
+          "id": "settings.secrets",
+          "name": "Project Secrets",
+          "description": "Manage encrypted environment variables for agents and workflows",
+          "surfaces": {
+            "code": {
+              "sdk": null,
+              "cli": ["secret list", "secret get", "secret create", "secret update", "secret delete"],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings",
+              "mcp": [
+                "platform_list_secrets",
+                "platform_create_secret",
+                "platform_update_secret",
+                "platform_delete_secret"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/secrets",
+            "docs": null
           },
           "sync": null
         }

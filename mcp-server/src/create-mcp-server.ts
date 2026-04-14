@@ -617,6 +617,154 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Suite / Run Plan Tools (require API key) ---
+  // These tools manage suites (run plans) on the LangWatch platform via API.
+
+  server.tool(
+    "platform_list_suites",
+    "List all suites (run plans) on the LangWatch platform. A suite bundles scenarios with targets for batch execution.",
+    {
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default) or 'json' (raw data)"),
+    },
+    withToolLogging("platform_list_suites", async (params) => {
+      requireApiKey();
+      const { handleListSuites } = await import("./tools/list-suites.js");
+      return {
+        content: [{ type: "text", text: await handleListSuites(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_suite",
+    "Get detailed information about a specific suite (run plan) by ID.",
+    {
+      id: z.string().describe("The suite ID"),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default) or 'json'"),
+    },
+    withToolLogging("platform_get_suite", async (params) => {
+      requireApiKey();
+      const { handleGetSuite } = await import("./tools/get-suite.js");
+      return {
+        content: [{ type: "text", text: await handleGetSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_suite",
+    "Create a new suite (run plan) that bundles scenarios with targets for batch execution.",
+    {
+      name: z.string().describe("Suite name"),
+      description: z.string().optional().describe("Suite description"),
+      scenarioIds: z.array(z.string()).describe("Array of scenario IDs to include"),
+      targets: z.string().describe('JSON array of target objects, e.g. [{"type":"http","referenceId":"agent_abc"}]'),
+      repeatCount: z.number().optional().describe("Number of times to repeat each scenario-target pair (default: 1)"),
+      labels: z.array(z.string()).optional().describe("Tags for organizing suites"),
+    },
+    withToolLogging("platform_create_suite", async (params) => {
+      requireApiKey();
+      const { handleCreateSuite } = await import("./tools/create-suite.js");
+      return {
+        content: [{ type: "text", text: await handleCreateSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_suite",
+    "Update an existing suite (run plan).",
+    {
+      id: z.string().describe("The suite ID to update"),
+      name: z.string().optional().describe("New suite name"),
+      description: z.string().optional().describe("New description"),
+      scenarioIds: z.array(z.string()).optional().describe("New array of scenario IDs"),
+      targets: z.string().optional().describe("New JSON array of targets"),
+      repeatCount: z.number().optional().describe("New repeat count"),
+      labels: z.array(z.string()).optional().describe("New labels"),
+    },
+    withToolLogging("platform_update_suite", async (params) => {
+      requireApiKey();
+      const { handleUpdateSuite } = await import("./tools/update-suite.js");
+      return {
+        content: [{ type: "text", text: await handleUpdateSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_run_suite",
+    "Trigger a suite run. Schedules all scenario x target x repeat jobs for execution.",
+    {
+      id: z.string().describe("The suite ID to run"),
+    },
+    withToolLogging("platform_run_suite", async (params) => {
+      requireApiKey();
+      const { handleRunSuite } = await import("./tools/run-suite.js");
+      return {
+        content: [{ type: "text", text: await handleRunSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_archive_suite",
+    "Archive (soft-delete) a suite (run plan).",
+    {
+      id: z.string().describe("The suite ID to archive"),
+    },
+    withToolLogging("platform_archive_suite", async (params) => {
+      requireApiKey();
+      const { handleArchiveSuite } = await import("./tools/archive-suite.js");
+      return {
+        content: [{ type: "text", text: await handleArchiveSuite(params) }],
+      };
+    })
+  );
+
+  // --- Platform Simulation Run Tools (require API key) ---
+  // These tools query simulation run results from the LangWatch platform.
+
+  server.tool(
+    "platform_list_simulation_runs",
+    "List simulation run results. Filter by scenario set or batch run ID to see specific results.",
+    {
+      scenarioSetId: z.string().optional().describe("Filter by scenario set ID"),
+      batchRunId: z.string().optional().describe("Filter by batch run ID"),
+      limit: z.number().optional().describe("Max results to return (default: 20)"),
+      format: z.enum(["digest", "json"]).optional().describe("Output format"),
+    },
+    withToolLogging("platform_list_simulation_runs", async (params) => {
+      requireApiKey();
+      const { handleListSimulationRuns } = await import("./tools/list-simulation-runs.js");
+      return {
+        content: [{ type: "text", text: await handleListSimulationRuns(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_simulation_run",
+    "Get full details of a simulation run including conversation messages, results, costs, and verdict.",
+    {
+      scenarioRunId: z.string().describe("The simulation run ID"),
+      format: z.enum(["digest", "json"]).optional().describe("Output format"),
+    },
+    withToolLogging("platform_get_simulation_run", async (params) => {
+      requireApiKey();
+      const { handleGetSimulationRun } = await import("./tools/get-simulation-run.js");
+      return {
+        content: [{ type: "text", text: await handleGetSimulationRun(params) }],
+      };
+    })
+  );
+
   // --- Platform Evaluator Tools (require API key) ---
   // These tools manage evaluators on the LangWatch platform via API.
 
@@ -704,6 +852,21 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  server.tool(
+    "platform_delete_evaluator",
+    "Archive (soft-delete) an evaluator by ID or slug.",
+    {
+      idOrSlug: z.string().describe("The evaluator ID or slug to archive"),
+    },
+    withToolLogging("platform_delete_evaluator", async (params) => {
+      requireApiKey();
+      const { handleDeleteEvaluator } = await import("./tools/delete-evaluator.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteEvaluator(params) }],
+      };
+    })
+  );
+
   // --- Platform Model Provider Tools (require API key) ---
   // These tools manage model provider API keys on the LangWatch platform.
 
@@ -752,6 +915,660 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       );
       return {
         content: [{ type: "text", text: await handleListModelProviders() }],
+      };
+    })
+  );
+
+  // --- Platform Agent Tools (require API key) ---
+
+  server.tool(
+    "platform_list_agents",
+    "List all agents in the LangWatch project with their names, types, and IDs.",
+    {},
+    withToolLogging("platform_list_agents", async () => {
+      requireApiKey();
+      const { handleListAgents } = await import("./tools/list-agents.js");
+      return {
+        content: [{ type: "text", text: await handleListAgents() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_agent",
+    "Get detailed information about a specific agent by its ID, including its configuration.",
+    {
+      id: z.string().describe("The agent ID"),
+    },
+    withToolLogging("platform_get_agent", async (params) => {
+      requireApiKey();
+      const { handleGetAgent } = await import("./tools/get-agent.js");
+      return {
+        content: [{ type: "text", text: await handleGetAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_agent",
+    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API).",
+    {
+      name: z.string().describe("Agent name"),
+      type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
+      config: z.string().optional().describe("Agent configuration as JSON string (will be parsed)"),
+    },
+    withToolLogging("platform_create_agent", async (params) => {
+      requireApiKey();
+      const { handleCreateAgent } = await import("./tools/create-agent.js");
+      const parsedConfig = params.config ? JSON.parse(params.config) as Record<string, unknown> : undefined;
+      return {
+        content: [{ type: "text", text: await handleCreateAgent({ ...params, config: parsedConfig }) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_agent",
+    "Update an existing agent's name, type, or configuration.",
+    {
+      id: z.string().describe("The agent ID"),
+      name: z.string().optional().describe("New agent name"),
+      type: z.string().optional().describe("New agent type: signature, code, workflow, or http"),
+      config: z.string().optional().describe("Updated configuration as JSON string (will be parsed)"),
+    },
+    withToolLogging("platform_update_agent", async (params) => {
+      requireApiKey();
+      const { handleUpdateAgent } = await import("./tools/update-agent.js");
+      const parsedConfig = params.config ? JSON.parse(params.config) as Record<string, unknown> : undefined;
+      return {
+        content: [{ type: "text", text: await handleUpdateAgent({ ...params, config: parsedConfig }) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_agent",
+    "Archive (soft-delete) an agent by its ID.",
+    {
+      id: z.string().describe("The agent ID to archive"),
+    },
+    withToolLogging("platform_delete_agent", async (params) => {
+      requireApiKey();
+      const { handleDeleteAgent } = await import("./tools/delete-agent.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_run_agent",
+    "Execute an agent with JSON input. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
+    {
+      id: z.string().describe("The agent ID to run"),
+      input: z.string().optional().describe("Input data as a JSON object string"),
+    },
+    withToolLogging("platform_run_agent", async (params) => {
+      requireApiKey();
+      const { handleRunAgent } = await import("./tools/run-agent.js");
+      return {
+        content: [{ type: "text", text: await handleRunAgent(params) }],
+      };
+    })
+  );
+
+  // --- Platform Dashboard Tools (require API key) ---
+
+  server.tool(
+    "platform_list_dashboards",
+    "List all analytics dashboards in the LangWatch project.",
+    {},
+    withToolLogging("platform_list_dashboards", async () => {
+      requireApiKey();
+      const { handleListDashboards } = await import("./tools/list-dashboards.js");
+      return {
+        content: [{ type: "text", text: await handleListDashboards() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_dashboard",
+    "Get a dashboard by its ID, including its graphs.",
+    {
+      id: z.string().describe("The dashboard ID"),
+    },
+    withToolLogging("platform_get_dashboard", async (params) => {
+      requireApiKey();
+      const { handleGetDashboard } = await import("./tools/get-dashboard.js");
+      return {
+        content: [{ type: "text", text: await handleGetDashboard(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_dashboard",
+    "Create a new analytics dashboard.",
+    {
+      name: z.string().describe("Dashboard name"),
+    },
+    withToolLogging("platform_create_dashboard", async (params) => {
+      requireApiKey();
+      const { handleCreateDashboard } = await import("./tools/create-dashboard.js");
+      return {
+        content: [{ type: "text", text: await handleCreateDashboard(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_dashboard",
+    "Delete a dashboard and all its graphs.",
+    {
+      id: z.string().describe("The dashboard ID to delete"),
+    },
+    withToolLogging("platform_delete_dashboard", async (params) => {
+      requireApiKey();
+      const { handleDeleteDashboard } = await import("./tools/delete-dashboard.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteDashboard(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_rename_dashboard",
+    "Rename a dashboard.",
+    {
+      id: z.string().describe("The dashboard ID to rename"),
+      name: z.string().describe("The new name for the dashboard"),
+    },
+    withToolLogging("platform_rename_dashboard", async (params) => {
+      requireApiKey();
+      const { renameDashboard } = await import("./langwatch-api-dashboards.js");
+      const result = await renameDashboard(params.id, { name: params.name });
+      return {
+        content: [{ type: "text", text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).` }],
+      };
+    })
+  );
+
+  // --- Platform Workflow Tools (require API key) ---
+
+  server.tool(
+    "platform_list_workflows",
+    "List all workflows in the LangWatch project.",
+    {},
+    withToolLogging("platform_list_workflows", async () => {
+      requireApiKey();
+      const { handleListWorkflows } = await import("./tools/list-workflows.js");
+      return {
+        content: [{ type: "text", text: await handleListWorkflows() }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_workflow",
+    "Get a workflow by its ID.",
+    {
+      id: z.string().describe("The workflow ID"),
+    },
+    withToolLogging("platform_get_workflow", async (params) => {
+      requireApiKey();
+      const { handleGetWorkflow } = await import("./tools/get-workflow.js");
+      return {
+        content: [{ type: "text", text: await handleGetWorkflow(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_workflow",
+    "Archive (soft-delete) a workflow by its ID.",
+    {
+      id: z.string().describe("The workflow ID to archive"),
+    },
+    withToolLogging("platform_delete_workflow", async (params) => {
+      requireApiKey();
+      const { handleDeleteWorkflow } = await import("./tools/delete-workflow.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteWorkflow(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_run_workflow",
+    "Execute a workflow with JSON input. Returns the workflow output.",
+    {
+      id: z.string().describe("The workflow ID to run"),
+      input: z.string().optional().describe("Input data as a JSON object string"),
+    },
+    withToolLogging("platform_run_workflow", async (params) => {
+      requireApiKey();
+      const { handleRunWorkflow } = await import("./tools/run-workflow.js");
+      return {
+        content: [{ type: "text", text: await handleRunWorkflow(params) }],
+      };
+    })
+  );
+
+  // --- Platform Annotation Tools (require API key) ---
+
+  server.tool(
+    "platform_list_annotations",
+    "List all annotations for the project, optionally filtered by trace ID.",
+    {
+      traceId: z.string().optional().describe("Filter annotations by trace ID"),
+    },
+    withToolLogging("platform_list_annotations", async (params) => {
+      requireApiKey();
+      const { handleListAnnotations } = await import("./tools/list-annotations.js");
+      return {
+        content: [{ type: "text", text: await handleListAnnotations(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_annotation",
+    "Create an annotation (thumbs up/down, comment) for a trace.",
+    {
+      traceId: z.string().describe("The trace ID to annotate"),
+      comment: z.string().optional().describe("Annotation comment"),
+      isThumbsUp: z.boolean().optional().describe("True for positive feedback, false for negative"),
+      email: z.string().optional().describe("Email of the annotator"),
+    },
+    withToolLogging("platform_create_annotation", async (params) => {
+      requireApiKey();
+      const { handleCreateAnnotation } = await import("./tools/create-annotation.js");
+      return {
+        content: [{ type: "text", text: await handleCreateAnnotation(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_annotation",
+    "Delete an annotation by its ID.",
+    {
+      id: z.string().describe("The annotation ID to delete"),
+    },
+    withToolLogging("platform_delete_annotation", async (params) => {
+      requireApiKey();
+      const { handleDeleteAnnotation } = await import("./tools/delete-annotation.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteAnnotation(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_annotation",
+    "Get annotation details by ID.",
+    {
+      id: z.string().describe("The annotation ID"),
+    },
+    withToolLogging("platform_get_annotation", async (params) => {
+      requireApiKey();
+      const { getAnnotation } = await import("./langwatch-api-annotations.js");
+      const annotation = await getAnnotation(params.id);
+      const lines = [
+        `**ID**: ${annotation.id}`,
+        `**Trace ID**: ${annotation.traceId}`,
+        `**Comment**: ${annotation.comment ?? "—"}`,
+        `**Score**: ${annotation.isThumbsUp ? "Thumbs Up" : "—"}`,
+        `**Created**: ${annotation.createdAt}`,
+      ];
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+      };
+    })
+  );
+
+  // --- Platform Trigger/Automation Tools (require API key) ---
+
+  server.tool(
+    "platform_list_triggers",
+    "List all triggers (automations) in the project. Triggers automate actions like sending emails, Slack messages, or adding to datasets when conditions are met.",
+    {
+      format: z.enum(["digest", "json"]).optional().describe("Output format"),
+    },
+    withToolLogging("platform_list_triggers", async (params) => {
+      requireApiKey();
+      const { listTriggers } = await import("./langwatch-api-triggers.js");
+      const triggers = await listTriggers();
+      if (params.format === "json") {
+        return { content: [{ type: "text", text: JSON.stringify(triggers, null, 2) }] };
+      }
+      if (triggers.length === 0) {
+        return { content: [{ type: "text", text: "No triggers found. Use `platform_create_trigger` to create one." }] };
+      }
+      const lines = [`# Triggers (${triggers.length} total)\n`];
+      for (const t of triggers) {
+        lines.push(`## ${t.name}`);
+        lines.push(`**ID**: ${t.id}`);
+        lines.push(`**Action**: ${t.action}`);
+        lines.push(`**Status**: ${t.active ? "active" : "inactive"}`);
+        if (t.alertType) lines.push(`**Alert**: ${t.alertType}`);
+        lines.push("");
+      }
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    })
+  );
+
+  server.tool(
+    "platform_create_trigger",
+    "Create a new trigger (automation) that fires when conditions are met.",
+    {
+      name: z.string().describe("Trigger name"),
+      action: z.enum(["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"]).describe("Action to take when triggered"),
+      filters: z.string().optional().describe("Filter conditions as JSON string"),
+      message: z.string().optional().describe("Custom alert message"),
+      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("Alert severity"),
+    },
+    withToolLogging("platform_create_trigger", async (params) => {
+      requireApiKey();
+      const { createTrigger } = await import("./langwatch-api-triggers.js");
+      let filters: Record<string, unknown> = {};
+      if (params.filters) {
+        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
+        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
+      }
+      const trigger = await createTrigger({
+        name: params.name,
+        action: params.action,
+        filters,
+        message: params.message,
+        alertType: params.alertType,
+      });
+      return { content: [{ type: "text", text: `Trigger "${trigger.name}" created (ID: ${trigger.id}, Action: ${trigger.action}).` }] };
+    })
+  );
+
+  server.tool(
+    "platform_update_trigger",
+    "Update a trigger (name, active state, message, alert type).",
+    {
+      id: z.string().describe("The trigger ID"),
+      name: z.string().optional().describe("New name"),
+      active: z.boolean().optional().describe("Enable or disable"),
+      message: z.string().optional().describe("New alert message"),
+      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("New alert severity"),
+    },
+    withToolLogging("platform_update_trigger", async (params) => {
+      requireApiKey();
+      const { updateTrigger } = await import("./langwatch-api-triggers.js");
+      const trigger = await updateTrigger(params);
+      return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };
+    })
+  );
+
+  server.tool(
+    "platform_delete_trigger",
+    "Delete a trigger (automation).",
+    {
+      id: z.string().describe("The trigger ID to delete"),
+    },
+    withToolLogging("platform_delete_trigger", async (params) => {
+      requireApiKey();
+      const { deleteTrigger } = await import("./langwatch-api-triggers.js");
+      const result = await deleteTrigger(params.id);
+      return { content: [{ type: "text", text: `Trigger ${result.id} deleted.` }] };
+    })
+  );
+
+  // --- Platform Monitor Tools (require API key) ---
+
+  server.tool(
+    "platform_list_monitors",
+    "List all online evaluation monitors for the project.",
+    {},
+    withToolLogging("platform_list_monitors", async () => {
+      requireApiKey();
+      const { listMonitors } = await import("./langwatch-api-monitors.js");
+      const monitors = await listMonitors();
+      if (monitors.length === 0) {
+        return { content: [{ type: "text", text: "No monitors found." }] };
+      }
+      const lines = monitors.map(
+        (m) =>
+          `• ${m.name} (id: ${m.id}, type: ${m.checkType}, ${m.enabled ? "enabled" : "disabled"}, mode: ${m.executionMode}, sample: ${Math.round(m.sample * 100)}%)`
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${monitors.length} monitor(s):\n${lines.join("\n")}`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_monitor",
+    "Get details of a specific online evaluation monitor.",
+    {
+      id: z.string().describe("The monitor ID"),
+    },
+    withToolLogging("platform_get_monitor", async (params) => {
+      requireApiKey();
+      const { getMonitor } = await import("./langwatch-api-monitors.js");
+      const m = await getMonitor(params.id);
+      const lines = [
+        `**${m.name}** (${m.id})`,
+        `- Type: ${m.checkType}`,
+        `- Status: ${m.enabled ? "enabled" : "disabled"}`,
+        `- Mode: ${m.executionMode}`,
+        `- Sample: ${Math.round(m.sample * 100)}%`,
+        `- Level: ${m.level}`,
+        m.evaluatorId ? `- Evaluator: ${m.evaluatorId}` : null,
+        `- Created: ${m.createdAt}`,
+      ].filter(Boolean);
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    })
+  );
+
+  server.tool(
+    "platform_create_monitor",
+    "Create a new online evaluation monitor that runs an evaluator on incoming traces.",
+    {
+      name: z.string().describe("Monitor name"),
+      checkType: z
+        .string()
+        .describe("Evaluator check type (e.g. ragas/toxicity, custom/my-eval)"),
+      executionMode: z
+        .enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"])
+        .optional()
+        .describe("When to run: ON_MESSAGE (default), AS_GUARDRAIL, or MANUALLY"),
+      sample: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Sampling rate 0.0-1.0 (default: 1.0)"),
+      evaluatorId: z
+        .string()
+        .optional()
+        .describe("Link to a saved evaluator by ID"),
+    },
+    withToolLogging("platform_create_monitor", async (params) => {
+      requireApiKey();
+      const { createMonitor } = await import("./langwatch-api-monitors.js");
+      const monitor = await createMonitor(params);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Monitor "${monitor.name}" created (id: ${monitor.id}, type: ${monitor.checkType}).`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_monitor",
+    "Update an existing online evaluation monitor.",
+    {
+      id: z.string().describe("The monitor ID to update"),
+      name: z.string().optional().describe("New monitor name"),
+      enabled: z.boolean().optional().describe("Enable or disable the monitor"),
+      executionMode: z
+        .enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"])
+        .optional()
+        .describe("New execution mode"),
+      sample: z.number().min(0).max(1).optional().describe("New sampling rate"),
+    },
+    withToolLogging("platform_update_monitor", async (params) => {
+      requireApiKey();
+      const { updateMonitor } = await import("./langwatch-api-monitors.js");
+      const monitor = await updateMonitor(params);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Monitor "${monitor.name}" updated (${monitor.enabled ? "enabled" : "disabled"}).`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_monitor",
+    "Delete an online evaluation monitor.",
+    {
+      id: z.string().describe("The monitor ID to delete"),
+    },
+    withToolLogging("platform_delete_monitor", async (params) => {
+      requireApiKey();
+      const { deleteMonitor } = await import("./langwatch-api-monitors.js");
+      const result = await deleteMonitor(params.id);
+      return {
+        content: [
+          { type: "text", text: `Monitor ${result.id} deleted.` },
+        ],
+      };
+    })
+  );
+
+  // --- Platform Secret Tools (require API key) ---
+
+  server.tool(
+    "platform_list_secrets",
+    "List all project secrets (values are never returned, only metadata).",
+    {},
+    withToolLogging("platform_list_secrets", async () => {
+      requireApiKey();
+      const { listSecrets } = await import("./langwatch-api-secrets.js");
+      const secrets = await listSecrets();
+      if (secrets.length === 0) {
+        return { content: [{ type: "text", text: "No secrets found." }] };
+      }
+      const lines = secrets.map(
+        (s) => `• ${s.name} (id: ${s.id}, updated: ${s.updatedAt})`
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${secrets.length} secret(s):\n${lines.join("\n")}`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_secret",
+    "Create a new encrypted project secret. Name must be UPPER_SNAKE_CASE (e.g. MY_API_KEY).",
+    {
+      name: z.string().describe("Secret name in UPPER_SNAKE_CASE (e.g. OPENAI_API_KEY)"),
+      value: z.string().describe("The secret value (will be encrypted at rest)"),
+    },
+    withToolLogging("platform_create_secret", async (params) => {
+      requireApiKey();
+      const { createSecret } = await import("./langwatch-api-secrets.js");
+      const secret = await createSecret({ name: params.name, value: params.value });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Secret "${secret.name}" created (id: ${secret.id}).`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_secret",
+    "Update an existing project secret's value.",
+    {
+      id: z.string().describe("The secret ID to update"),
+      value: z.string().describe("The new secret value (will be encrypted at rest)"),
+    },
+    withToolLogging("platform_update_secret", async (params) => {
+      requireApiKey();
+      const { updateSecret } = await import("./langwatch-api-secrets.js");
+      const secret = await updateSecret({ id: params.id, value: params.value });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Secret "${secret.name}" updated.`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_secret",
+    "Delete a project secret.",
+    {
+      id: z.string().describe("The secret ID to delete"),
+    },
+    withToolLogging("platform_delete_secret", async (params) => {
+      requireApiKey();
+      const { deleteSecret } = await import("./langwatch-api-secrets.js");
+      const result = await deleteSecret(params.id);
+      return { content: [{ type: "text", text: `Secret ${result.id} deleted.` }] };
+    })
+  );
+
+  // --- Platform Evaluation Execution Tools (require API key) ---
+
+  server.tool(
+    "platform_run_evaluation",
+    "Start an evaluation run by slug. Returns a run ID for polling status.",
+    {
+      slug: z.string().describe("The evaluation slug to run"),
+    },
+    withToolLogging("platform_run_evaluation", async (params) => {
+      requireApiKey();
+      const { handleRunEvaluation } = await import("./tools/run-evaluation.js");
+      return {
+        content: [{ type: "text", text: await handleRunEvaluation(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_evaluation_status",
+    "Check the status of an evaluation run. Returns progress and summary when completed.",
+    {
+      runId: z.string().describe("The run ID returned from platform_run_evaluation"),
+    },
+    withToolLogging("platform_evaluation_status", async (params) => {
+      requireApiKey();
+      const { handleEvaluationStatus } = await import("./tools/run-evaluation.js");
+      return {
+        content: [{ type: "text", text: await handleEvaluationStatus(params) }],
       };
     })
   );
