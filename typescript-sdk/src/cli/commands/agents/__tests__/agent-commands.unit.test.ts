@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentsApiError } from "@/client-sdk/services/agents/agents-api.service";
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/agents/agents-api.service")>();
+  const actual = await importOriginal();
   return {
     ...actual,
     AgentsApiService: vi.fn(),

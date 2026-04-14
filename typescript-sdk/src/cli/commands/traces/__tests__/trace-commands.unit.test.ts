@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/traces/traces-api.service")>();
+  const actual = await importOriginal();
   return {
     ...actual,
     TracesApiService: vi.fn(),

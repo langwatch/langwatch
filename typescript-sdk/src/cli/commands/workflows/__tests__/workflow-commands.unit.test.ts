@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorkflowsApiError } from "@/client-sdk/services/workflows/workflows-api.service";
 
 vi.mock("@/client-sdk/services/workflows/workflows-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/workflows/workflows-api.service")>();
+  const actual = await importOriginal();
   return {
     ...actual,
     WorkflowsApiService: vi.fn(),

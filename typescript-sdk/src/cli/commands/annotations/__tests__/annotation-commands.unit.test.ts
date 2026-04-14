@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AnnotationsApiError } from "@/client-sdk/services/annotations/annotations-api.service";
 
 vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/annotations/annotations-api.service")>();
+  const actual = await importOriginal();
   return {
     ...actual,
     AnnotationsApiService: vi.fn(),

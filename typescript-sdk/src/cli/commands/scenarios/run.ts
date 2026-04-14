@@ -62,10 +62,7 @@ export const runScenarioCommand = async (
 
     if (options.format === "json") {
       console.log(JSON.stringify(result, null, 2));
-      // Clean up ephemeral suite
-      await suitesService.delete(suite.id).catch(() => {
-        // best-effort cleanup
-      });
+      await suitesService.delete(suite.id).catch(() => undefined);
       return;
     }
 
@@ -81,10 +78,7 @@ export const runScenarioCommand = async (
         chalk.gray(`Or re-run with ${chalk.cyan("--wait")} to poll for completion.`),
       );
 
-      // Clean up ephemeral suite
-      await suitesService.delete(suite.id).catch(() => {
-        // best-effort cleanup
-      });
+      await suitesService.delete(suite.id).catch(() => undefined);
       return;
     }
 
@@ -105,7 +99,7 @@ export const runScenarioCommand = async (
         console.log(
           chalk.yellow(`Check results in the dashboard. Batch ID: ${result.batchRunId}`),
         );
-        await suitesService.delete(suite.id).catch(() => {});
+        await suitesService.delete(suite.id).catch(() => undefined);
         process.exit(1);
       }
 
@@ -158,7 +152,7 @@ export const runScenarioCommand = async (
     console.log();
 
     // Clean up ephemeral suite
-    await suitesService.delete(suite.id).catch(() => {});
+    await suitesService.delete(suite.id).catch(() => undefined);
   } catch (error) {
     spinner.fail();
     if (error instanceof SuitesApiError) {

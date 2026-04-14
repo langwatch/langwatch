@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DashboardsApiError } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/dashboards/dashboards-api.service")>();
+  const actual = await importOriginal();
   return {
     ...actual,
     DashboardsApiService: vi.fn(),

@@ -91,13 +91,13 @@ describe("CLI E2E", () => {
         // Verify remote prompt was created
         const remotePrompt = await langwatch.prompts.get(promptHandle);
         expect(remotePrompt).not.toBeNull();
-        expect(remotePrompt!.model).toBe("openai/gpt-5");
+        expect(remotePrompt?.model).toBe("openai/gpt-5");
 
         // Verify lock file was updated
         const lock = lockFileManager.readLockFile();
         expect(lock).not.toBeNull();
-        expect(lock!.prompts[promptHandle]).toBeDefined();
-        expect(lock!.prompts[promptHandle]!.version).toBe(1);
+        expect(lock?.prompts[promptHandle]).toBeDefined();
+        expect(lock?.prompts[promptHandle]?.version).toBe(1);
       });
     });
 
@@ -135,12 +135,12 @@ describe("CLI E2E", () => {
         // Verify remote is updated
         const remotePrompt = await langwatch.prompts.get(promptHandle);
         expect(remotePrompt).not.toBeNull();
-        expect(remotePrompt!.model).toBe("gpt-4-turbo");
-        expect(remotePrompt!.temperature).toBe(0.9);
+        expect(remotePrompt?.model).toBe("gpt-4-turbo");
+        expect(remotePrompt?.temperature).toBe(0.9);
 
         // Verify version incremented
         const lock = lockFileManager.readLockFile();
-        expect(lock!.prompts[promptHandle]!.version).toBe(2);
+        expect(lock?.prompts[promptHandle]?.version).toBe(2);
       });
     });
 
