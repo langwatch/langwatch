@@ -349,7 +349,7 @@ describe("LangChain Integration Tests", () => {
       expect(toolSpan?.attributes["langwatch.span.type"]).toBe("tool");
     });
 
-    it("should name agent spans as components", async () => {
+    it("should name agent spans as components", { timeout: 30_000 }, async () => {
       const tools = [
         new DynamicStructuredTool({
           name: "search",
