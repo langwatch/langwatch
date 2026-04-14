@@ -7,6 +7,9 @@ export const createGraphCommand = async (
   options: {
     dashboardId?: string;
     graph?: string;
+    filters?: string;
+    colSpan?: string;
+    rowSpan?: string;
     format?: string;
   },
 ): Promise<void> => {
@@ -33,6 +36,9 @@ export const createGraphCommand = async (
         name,
         graph: graphDef,
         dashboardId: options.dashboardId,
+        ...(options.filters && { filters: JSON.parse(options.filters) }),
+        ...(options.colSpan && { colSpan: parseInt(options.colSpan, 10) }),
+        ...(options.rowSpan && { rowSpan: parseInt(options.rowSpan, 10) }),
       }),
     });
 

@@ -442,6 +442,60 @@ app.get(
   },
 );
 
+// Restore (rollback to) a specific version
+app.post(
+  "/:id{.+?}/versions/:versionId/restore",
+  describeRoute({
+    description:
+      "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(
+        apiResponsePromptWithVersionDataSchema,
+      ),
+      404: {
+        description: "Prompt or version not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id, versionId } = c.req.param();
+
+    logger.info(
+      { projectId: project.id, promptId: id, versionId },
+      "Restoring prompt version",
+    );
+
+    try {
+      const restored = await service.restoreVersion({
+        versionId,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
+      logger.info(
+        { projectId: project.id, promptId: id, versionId },
+        "Successfully restored prompt version",
+      );
+
+      return c.json(
+        apiResponsePromptWithVersionDataSchema.parse(restored),
+      );
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
+  },
+);
+
 // Get prompt by ID
 app.get(
   "/:id{.+}",

@@ -1320,6 +1320,91 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Secret Tools (require API key) ---
+
+  server.tool(
+    "platform_list_secrets",
+    "List all project secrets (values are never returned, only metadata).",
+    {},
+    withToolLogging("platform_list_secrets", async () => {
+      requireApiKey();
+      const { listSecrets } = await import("./langwatch-api-secrets.js");
+      const secrets = await listSecrets();
+      if (secrets.length === 0) {
+        return { content: [{ type: "text", text: "No secrets found." }] };
+      }
+      const lines = secrets.map(
+        (s) => `• ${s.name} (id: ${s.id}, updated: ${s.updatedAt})`
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${secrets.length} secret(s):\n${lines.join("\n")}`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_secret",
+    "Create a new encrypted project secret. Name must be UPPER_SNAKE_CASE (e.g. MY_API_KEY).",
+    {
+      name: z.string().describe("Secret name in UPPER_SNAKE_CASE (e.g. OPENAI_API_KEY)"),
+      value: z.string().describe("The secret value (will be encrypted at rest)"),
+    },
+    withToolLogging("platform_create_secret", async (params) => {
+      requireApiKey();
+      const { createSecret } = await import("./langwatch-api-secrets.js");
+      const secret = await createSecret({ name: params.name, value: params.value });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Secret "${secret.name}" created (id: ${secret.id}).`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_secret",
+    "Update an existing project secret's value.",
+    {
+      id: z.string().describe("The secret ID to update"),
+      value: z.string().describe("The new secret value (will be encrypted at rest)"),
+    },
+    withToolLogging("platform_update_secret", async (params) => {
+      requireApiKey();
+      const { updateSecret } = await import("./langwatch-api-secrets.js");
+      const secret = await updateSecret({ id: params.id, value: params.value });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Secret "${secret.name}" updated.`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_secret",
+    "Delete a project secret.",
+    {
+      id: z.string().describe("The secret ID to delete"),
+    },
+    withToolLogging("platform_delete_secret", async (params) => {
+      requireApiKey();
+      const { deleteSecret } = await import("./langwatch-api-secrets.js");
+      const result = await deleteSecret(params.id);
+      return { content: [{ type: "text", text: `Secret ${result.id} deleted.` }] };
+    })
+  );
+
   // --- Platform Evaluation Execution Tools (require API key) ---
 
   server.tool(

@@ -33,11 +33,12 @@ All list/get commands support `--format json` for machine-readable output.
 - `langwatch dataset list|create|get|update|delete|upload|download` — manage datasets
 - `langwatch agent list|get|create|update|delete` — manage agents
 - `langwatch workflow list|get|update|delete` — manage workflows
-- `langwatch prompt init|create|sync|pull|push` — manage prompts
+- `langwatch prompt init|create|sync|pull|push|versions|restore` — manage prompts
 - `langwatch dashboard list|get|update|create|delete` — manage dashboards
-- `langwatch graph list|create|delete` — manage custom graphs on dashboards
+- `langwatch graph list|create|update|delete` — manage custom graphs on dashboards
 - `langwatch trigger list|get|create|update|delete` — manage automations/alerts
 - `langwatch annotation list|get|create|delete` — manage annotations
+- `langwatch secret list|get|create|update|delete` — manage project secrets (encrypted env vars)
 - `langwatch model-provider list|set` — manage model providers
 
 ### Execution

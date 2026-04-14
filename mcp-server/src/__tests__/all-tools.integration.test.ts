@@ -556,6 +556,24 @@ function createMockServer(): Server {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "wf_abc", archived: true }));
       }
+      // --- Secret endpoints ---
+      else if (url === "/api/secrets" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify([
+          { id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+          { id: "secret_def", projectId: "proj_123", name: "DB_PASSWORD", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
+        ]));
+      } else if (url === "/api/secrets" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify({ id: "secret_new", projectId: "proj_123", name: "NEW_SECRET", createdAt: "2026-01-03T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "PUT") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "DELETE") {
+        const secretId = url?.split("/").pop();
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: secretId, deleted: true }));
+      }
       // --- Fallback ---
       else {
         res.writeHead(404);
@@ -1532,6 +1550,45 @@ describe("All MCP tools integration", () => {
       expect(result).toContain("Login Flow");
       expect(result).toContain("passed");
       expect(result).toContain("Hello");
+    });
+  });
+
+  // =====================
+  // Secret Tools
+  // =====================
+  describe("platform_list_secrets", () => {
+    it("returns formatted secret list", async () => {
+      const { listSecrets } = await import("../langwatch-api-secrets.js");
+      const secrets = await listSecrets();
+      expect(secrets).toHaveLength(2);
+      expect(secrets[0]!.name).toBe("MY_API_KEY");
+    });
+  });
+
+  describe("platform_create_secret", () => {
+    it("creates a secret and returns metadata", async () => {
+      const { createSecret } = await import("../langwatch-api-secrets.js");
+      const secret = await createSecret({ name: "NEW_SECRET", value: "sk-123" });
+      expect(secret.id).toBe("secret_new");
+      expect(secret.name).toBe("NEW_SECRET");
+    });
+  });
+
+  describe("platform_update_secret", () => {
+    it("updates a secret value", async () => {
+      const { updateSecret } = await import("../langwatch-api-secrets.js");
+      const secret = await updateSecret({ id: "secret_abc", value: "new-val" });
+      expect(secret.id).toBe("secret_abc");
+      expect(secret.name).toBe("MY_API_KEY");
+    });
+  });
+
+  describe("platform_delete_secret", () => {
+    it("deletes a secret", async () => {
+      const { deleteSecret } = await import("../langwatch-api-secrets.js");
+      const result = await deleteSecret("secret_abc");
+      expect(result.id).toBe("secret_abc");
+      expect(result.deleted).toBe(true);
     });
   });
 

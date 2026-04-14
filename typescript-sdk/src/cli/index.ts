@@ -241,6 +241,24 @@ promptCmd
     }
   });
 
+promptCmd
+  .command("versions <handle>")
+  .description("List all versions of a prompt")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (handle: string, options: { format?: string }) => {
+    const { promptVersionsCommand: impl } = await import("./commands/prompt/versions.js");
+    await impl(handle, options);
+  });
+
+promptCmd
+  .command("restore <handle> <versionId>")
+  .description("Restore a prompt to a previous version (creates a new version with that config)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (handle: string, versionId: string, options: { format?: string }) => {
+    const { promptRestoreCommand: impl } = await import("./commands/prompt/restore.js");
+    await impl(handle, versionId, options);
+  });
+
 // Add prompt tag subcommand group
 const tagCmd = promptCmd
   .command("tag")
@@ -870,10 +888,25 @@ graphCmd
   .description("Create a custom graph")
   .option("--dashboard-id <id>", "Dashboard to add the graph to")
   .option("--graph <json>", "Graph definition as JSON")
+  .option("--filters <json>", "Filter conditions as JSON")
+  .option("--col-span <n>", "Column span (1-2)")
+  .option("--row-span <n>", "Row span (1-2)")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (name: string, options: { dashboardId?: string; graph?: string; format?: string }) => {
+  .action(async (name: string, options: { dashboardId?: string; graph?: string; filters?: string; colSpan?: string; rowSpan?: string; format?: string }) => {
     const { createGraphCommand: impl } = await import("./commands/graphs/create.js");
     await impl(name, options);
+  });
+
+graphCmd
+  .command("update <id>")
+  .description("Update a custom graph")
+  .option("--name <name>", "New graph name")
+  .option("--graph <json>", "New graph definition as JSON")
+  .option("--filters <json>", "New filter conditions as JSON")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; graph?: string; filters?: string; format?: string }) => {
+    const { updateGraphCommand: impl } = await import("./commands/graphs/update.js");
+    await impl(id, options);
   });
 
 graphCmd
@@ -941,6 +974,58 @@ triggerCmd
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
   .action(async (id: string, options: { format?: string }) => {
     const { deleteTriggerCommand: impl } = await import("./commands/triggers/delete.js");
+    await impl(id, options);
+  });
+
+// Add secret command group
+const secretCmd = program
+  .command("secret")
+  .description("Manage project secrets — encrypted environment variables for agents");
+
+secretCmd
+  .command("list")
+  .description("List all secrets in the project (values are never shown)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listSecretsCommand: impl } = await import("./commands/secrets/list.js");
+    await impl(options);
+  });
+
+secretCmd
+  .command("get <id>")
+  .description("Get secret metadata by ID (value is never shown)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getSecretCommand: impl } = await import("./commands/secrets/get.js");
+    await impl(id, options);
+  });
+
+secretCmd
+  .command("create <name>")
+  .description("Create a new secret (name must be UPPER_SNAKE_CASE)")
+  .requiredOption("--value <value>", "The secret value (will be encrypted)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { value: string; format?: string }) => {
+    const { createSecretCommand: impl } = await import("./commands/secrets/create.js");
+    await impl(name, options);
+  });
+
+secretCmd
+  .command("update <id>")
+  .description("Update a secret's value")
+  .requiredOption("--value <value>", "The new secret value (will be encrypted)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { value: string; format?: string }) => {
+    const { updateSecretCommand: impl } = await import("./commands/secrets/update.js");
+    await impl(id, options);
+  });
+
+secretCmd
+  .command("delete <id>")
+  .description("Delete a secret")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { deleteSecretCommand: impl } = await import("./commands/secrets/delete.js");
     await impl(id, options);
   });
 

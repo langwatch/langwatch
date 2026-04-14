@@ -18,6 +18,7 @@ import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
+import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -59,6 +60,8 @@ export default async function execute() {
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  console.log("Building secrets spec...");
+  const secretsSpec = await generateSpecs(secretsApp);
   console.log("Building scenarios spec...");
   const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building simulation runs spec...");
@@ -86,6 +89,7 @@ export default async function execute() {
       modelProvidersSpec,
       scenarioEventsSpec,
       scenariosSpec,
+      secretsSpec,
       simulationRunsSpec,
       suitesSpec,
       tracesSpec,
@@ -109,6 +113,7 @@ export default async function execute() {
           key.includes("/api/model-providers") ||
           key.includes("/api/scenario-events") ||
           key.includes("/api/scenarios") ||
+          key.includes("/api/secrets") ||
           key.includes("/api/simulation-runs") ||
           key.includes("/api/suites") ||
           key.includes("/api/traces") ||
