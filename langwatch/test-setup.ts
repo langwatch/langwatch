@@ -142,6 +142,21 @@ vi.mock("next/link", async () => {
   };
 });
 
+// Mock dynamic() (next-dynamic compat) to return a simple passthrough in tests.
+// The real implementation uses React.lazy() which suspends in jsdom when
+// dynamic imports don't resolve synchronously.
+vi.mock("~/utils/compat/next-dynamic", () => ({
+  default: (importFn: () => Promise<any>, options?: any) => {
+    const React = require("react");
+    const Loading = options?.loading ?? (() => null);
+    // Return a component that just renders the loading fallback.
+    // The actual dynamically-imported component doesn't matter for most tests.
+    return function DynamicMock(props: any) {
+      return React.createElement(Loading);
+    };
+  },
+}));
+
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
