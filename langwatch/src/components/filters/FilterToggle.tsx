@@ -70,15 +70,19 @@ export const useFilterToggle = (
       allowEmptyArrays: true,
     });
 
-    const nextRouterQuery = { ...router.query };
-    if (showFiltersValue === undefined) {
-      delete nextRouterQuery.show_filters;
-    } else {
-      nextRouterQuery.show_filters = showFiltersValue;
-    }
+    // Include all params in the url query so Next.js detects the change and
+    // re-renders components using useRouter() (including React.memo'd ones).
+    const parsedNewParams = qs.parse(newQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
 
     void router.push(
-      { pathname: router.pathname, query: nextRouterQuery },
+      {
+        pathname: router.pathname,
+        query: { ...router.query, ...parsedNewParams },
+      },
       newQs ? `${currentPath}?${newQs}` : currentPath,
       { shallow: true, scroll: false },
     );
