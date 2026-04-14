@@ -1,5 +1,6 @@
 import {
   OrganizationUserRole,
+  RoleBindingScopeType,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
