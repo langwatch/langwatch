@@ -243,6 +243,43 @@
             "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
           },
           "sync": null
+        },
+        {
+          "id": "agent-simulations.suites",
+          "name": "Suites (Run Plans)",
+          "description": "Bundle scenarios with targets for batch execution and repeated testing",
+          "surfaces": {
+            "code": {
+              "sdk": null,
+              "cli": [
+                "suite list",
+                "suite get",
+                "suite create",
+                "suite update",
+                "suite duplicate",
+                "suite run",
+                "suite delete"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/simulations/run-plans",
+              "mcp": [
+                "platform_list_suites",
+                "platform_get_suite",
+                "platform_create_suite",
+                "platform_update_suite",
+                "platform_run_suite",
+                "platform_archive_suite"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/suites",
+            "docs": null
+          },
+          "sync": null
         }
       ]
     },

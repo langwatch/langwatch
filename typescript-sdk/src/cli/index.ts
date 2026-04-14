@@ -111,7 +111,7 @@ const program = new Command();
 
 program
   .name("langwatch")
-  .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, and more")
+  .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
   .version(__CLI_VERSION__, "-v, --version", "Display the current version")
   .configureHelp({
     showGlobalOptions: true,
@@ -712,6 +712,85 @@ scenarioCmd
   .description("Archive (soft-delete) a scenario")
   .action(async (id: string) => {
     const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
+    await impl(id);
+  });
+
+// Add suite (run plan) command group
+const suiteCmd = program
+  .command("suite")
+  .description("Manage suites (run plans) — scenario × target execution plans");
+
+suiteCmd
+  .command("list")
+  .description("List all suites in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listSuitesCommand: impl } = await import("./commands/suites/list.js");
+    await impl(options);
+  });
+
+suiteCmd
+  .command("get <id>")
+  .description("Get suite details by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getSuiteCommand: impl } = await import("./commands/suites/get.js");
+    await impl(id, options);
+  });
+
+suiteCmd
+  .command("create <name>")
+  .description("Create a new suite (run plan)")
+  .requiredOption("--scenarios <ids>", "Comma-separated scenario IDs")
+  .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
+  .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
+  .option("--labels <labels>", "Comma-separated labels")
+  .option("--description <desc>", "Suite description")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string; format?: string }) => {
+    const { createSuiteCommand: impl } = await import("./commands/suites/create.js");
+    await impl(name, options);
+  });
+
+suiteCmd
+  .command("update <id>")
+  .description("Update a suite (run plan)")
+  .option("--name <name>", "New suite name")
+  .option("--scenarios <ids>", "New comma-separated scenario IDs")
+  .option("--targets <targets...>", "New targets as <type>:<referenceId>")
+  .option("--repeat-count <n>", "New repeat count")
+  .option("--labels <labels>", "New comma-separated labels")
+  .option("--description <desc>", "New description")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string; format?: string }) => {
+    const { updateSuiteCommand: impl } = await import("./commands/suites/update.js");
+    await impl(id, options);
+  });
+
+suiteCmd
+  .command("duplicate <id>")
+  .description("Duplicate a suite")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { duplicateSuiteCommand: impl } = await import("./commands/suites/duplicate.js");
+    await impl(id, options);
+  });
+
+suiteCmd
+  .command("run <id>")
+  .description("Execute a suite run — schedules all scenario × target × repeat jobs")
+  .option("--wait", "Wait for the suite run to complete before returning")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { wait?: boolean; format?: string }) => {
+    const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
+    await impl(id, options);
+  });
+
+suiteCmd
+  .command("delete <id>")
+  .description("Archive (soft-delete) a suite")
+  .action(async (id: string) => {
+    const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
     await impl(id);
   });
 

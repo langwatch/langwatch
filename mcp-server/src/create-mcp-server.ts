@@ -617,6 +617,117 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Suite / Run Plan Tools (require API key) ---
+  // These tools manage suites (run plans) on the LangWatch platform via API.
+
+  server.tool(
+    "platform_list_suites",
+    "List all suites (run plans) on the LangWatch platform. A suite bundles scenarios with targets for batch execution.",
+    {
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default) or 'json' (raw data)"),
+    },
+    withToolLogging("platform_list_suites", async (params) => {
+      requireApiKey();
+      const { handleListSuites } = await import("./tools/list-suites.js");
+      return {
+        content: [{ type: "text", text: await handleListSuites(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_suite",
+    "Get detailed information about a specific suite (run plan) by ID.",
+    {
+      id: z.string().describe("The suite ID"),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe("Output format: 'digest' (default) or 'json'"),
+    },
+    withToolLogging("platform_get_suite", async (params) => {
+      requireApiKey();
+      const { handleGetSuite } = await import("./tools/get-suite.js");
+      return {
+        content: [{ type: "text", text: await handleGetSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_create_suite",
+    "Create a new suite (run plan) that bundles scenarios with targets for batch execution.",
+    {
+      name: z.string().describe("Suite name"),
+      description: z.string().optional().describe("Suite description"),
+      scenarioIds: z.array(z.string()).describe("Array of scenario IDs to include"),
+      targets: z.string().describe('JSON array of target objects, e.g. [{"type":"http","referenceId":"agent_abc"}]'),
+      repeatCount: z.number().optional().describe("Number of times to repeat each scenario-target pair (default: 1)"),
+      labels: z.array(z.string()).optional().describe("Tags for organizing suites"),
+    },
+    withToolLogging("platform_create_suite", async (params) => {
+      requireApiKey();
+      const { handleCreateSuite } = await import("./tools/create-suite.js");
+      return {
+        content: [{ type: "text", text: await handleCreateSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_suite",
+    "Update an existing suite (run plan).",
+    {
+      id: z.string().describe("The suite ID to update"),
+      name: z.string().optional().describe("New suite name"),
+      description: z.string().optional().describe("New description"),
+      scenarioIds: z.array(z.string()).optional().describe("New array of scenario IDs"),
+      targets: z.string().optional().describe("New JSON array of targets"),
+      repeatCount: z.number().optional().describe("New repeat count"),
+      labels: z.array(z.string()).optional().describe("New labels"),
+    },
+    withToolLogging("platform_update_suite", async (params) => {
+      requireApiKey();
+      const { handleUpdateSuite } = await import("./tools/update-suite.js");
+      return {
+        content: [{ type: "text", text: await handleUpdateSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_run_suite",
+    "Trigger a suite run. Schedules all scenario x target x repeat jobs for execution.",
+    {
+      id: z.string().describe("The suite ID to run"),
+    },
+    withToolLogging("platform_run_suite", async (params) => {
+      requireApiKey();
+      const { handleRunSuite } = await import("./tools/run-suite.js");
+      return {
+        content: [{ type: "text", text: await handleRunSuite(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_archive_suite",
+    "Archive (soft-delete) a suite (run plan).",
+    {
+      id: z.string().describe("The suite ID to archive"),
+    },
+    withToolLogging("platform_archive_suite", async (params) => {
+      requireApiKey();
+      const { handleArchiveSuite } = await import("./tools/archive-suite.js");
+      return {
+        content: [{ type: "text", text: await handleArchiveSuite(params) }],
+      };
+    })
+  );
+
   // --- Platform Evaluator Tools (require API key) ---
   // These tools manage evaluators on the LangWatch platform via API.
 
