@@ -721,6 +721,88 @@ app.post("/sage/chat", async (c) => {
       },
     }),
 
+    propose_update_evaluator: tool({
+      description:
+        "Propose updating an existing project evaluator's name or settings. Call get_evaluator_details first so you only override what you actually want to change. Settings are merged over the evaluator's current config.",
+      inputSchema: z.object({
+        slug: z.string().describe("Slug of the project evaluator to update."),
+        name: z.string().min(1).max(255).optional(),
+        settings: z
+          .record(z.unknown())
+          .optional()
+          .describe(
+            "Partial settings to merge over the evaluator's current settings object.",
+          ),
+        rationale: z.string(),
+      }),
+      execute: async ({ slug, name, settings, rationale }) => {
+        const evaluator = await evaluatorService.getBySlug({ slug, projectId });
+        if (!evaluator) {
+          return { error: `No project evaluator with slug '${slug}'.` };
+        }
+        const currentConfig =
+          (evaluator.config as Record<string, unknown> | null) ?? {};
+        const currentSettings =
+          (currentConfig.settings as Record<string, unknown> | undefined) ?? {};
+        const mergedConfig: Record<string, unknown> = {
+          ...currentConfig,
+          ...(settings
+            ? { settings: { ...currentSettings, ...settings } }
+            : {}),
+        };
+        const changedFields: string[] = [];
+        if (name && name !== evaluator.name) changedFields.push("name");
+        if (settings) changedFields.push(...Object.keys(settings));
+        return {
+          sageProposal: true,
+          kind: "evaluators.update",
+          summary: `Update evaluator "${evaluator.name}"${
+            changedFields.length ? ` (${changedFields.join(", ")})` : ""
+          }`,
+          rationale,
+          payload: {
+            id: evaluator.id,
+            evaluatorType: (currentConfig as { evaluatorType?: string })
+              .evaluatorType,
+            ...(name ? { name } : {}),
+            config: mergedConfig,
+          },
+        };
+      },
+    }),
+
+    propose_delete_evaluator: tool({
+      description:
+        "Propose archiving (soft-deleting) an existing project evaluator. This is a destructive action — only propose it when the user explicitly asks. Existing workbench references to this evaluator will break once archived.",
+      inputSchema: z.object({
+        slug: z
+          .string()
+          .describe("Slug of the project evaluator to archive."),
+        rationale: z
+          .string()
+          .describe(
+            "Why the user wants to delete this evaluator, or a short confirmation of what they asked.",
+          ),
+      }),
+      execute: async ({ slug, rationale }) => {
+        const evaluator = await evaluatorService.getBySlug({ slug, projectId });
+        if (!evaluator) {
+          return { error: `No project evaluator with slug '${slug}'.` };
+        }
+        return {
+          sageProposal: true,
+          kind: "evaluators.delete",
+          destructive: true,
+          summary: `Archive evaluator "${evaluator.name}"`,
+          rationale,
+          payload: {
+            id: evaluator.id,
+            name: evaluator.name,
+          },
+        };
+      },
+    }),
+
     propose_run_workbench: tool({
       description:
         "Propose running the current experiment (kicks off all target × evaluator cells). Returns a proposal card the user clicks Apply to execute. Use this when the user asks to 'run', 'evaluate', 'execute', or 'kick off' the experiment.",

@@ -38,6 +38,7 @@ export interface SageProposal {
   kind: string;
   summary: string;
   rationale?: string;
+  destructive?: boolean;
   payload: Record<string, unknown>;
 }
 
@@ -622,15 +623,36 @@ function ProposalCard({
   onDiscard: () => void;
 }) {
   const isApplied = !!appliedOutcome;
+  const destructive = !!proposal.destructive;
   const faded = isDiscarded;
   const statusLabel = isApplied
-    ? "Applied"
+    ? destructive
+      ? "Done"
+      : "Applied"
     : isDiscarded
       ? "Discarded"
       : isApplying
-        ? "Applying…"
-        : "Sage proposes";
-  const accentPalette = isApplied ? "green" : "blue";
+        ? destructive
+          ? "Deleting…"
+          : "Applying…"
+        : destructive
+          ? "Sage wants to delete"
+          : "Sage proposes";
+  const accentPalette = isApplied
+    ? destructive
+      ? "gray"
+      : "green"
+    : destructive
+      ? "red"
+      : "blue";
+  const borderTone = isApplied
+    ? destructive
+      ? "border.emphasized"
+      : "green.emphasized"
+    : destructive
+      ? "red.emphasized"
+      : "blue.emphasized";
+  const primaryButtonLabel = destructive ? "Delete" : "Apply";
   const openHref = appliedOutcome?.href;
   const onOpen = appliedOutcome?.onOpen;
   const openLabel = appliedOutcome?.label ?? "Open";
@@ -652,7 +674,7 @@ function ProposalCard({
       borderRadius="lg"
       background="bg.panel"
       borderWidth="1px"
-      borderColor={isApplied ? "green.emphasized" : "blue.emphasized"}
+      borderColor={borderTone}
       boxShadow="sm"
       opacity={faded ? 0.75 : 1}
       cursor={hasOpen ? "pointer" : "default"}
@@ -705,13 +727,13 @@ function ProposalCard({
           <HStack gap={2} paddingTop={1}>
             <Button
               size="xs"
-              colorPalette="blue"
+              colorPalette={destructive ? "red" : "blue"}
               onClick={onApply}
               disabled={isApplying}
               loading={isApplying}
             >
               <LuCheck size={12} />
-              Apply
+              {primaryButtonLabel}
             </Button>
             <Button
               size="xs"
@@ -719,7 +741,7 @@ function ProposalCard({
               onClick={onDiscard}
               disabled={isApplying}
             >
-              Discard
+              {destructive ? "Cancel" : "Discard"}
             </Button>
           </HStack>
         )}
@@ -767,11 +789,11 @@ function extractProposals(
 }
 
 function isSageProposal(value: unknown): value is SageProposal {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
   return (
-    !!value &&
-    typeof value === "object" &&
-    (value as Record<string, unknown>).sageProposal === true &&
-    typeof (value as Record<string, unknown>).kind === "string" &&
-    typeof (value as Record<string, unknown>).summary === "string"
+    v.sageProposal === true &&
+    typeof v.kind === "string" &&
+    typeof v.summary === "string"
   );
 }
