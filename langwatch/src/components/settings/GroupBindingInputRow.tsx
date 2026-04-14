@@ -89,6 +89,8 @@ export const BindingInputRow = forwardRef<
   const [projectTeamId, setProjectTeamId] = useState("");
   const [projectTeamSearch, setProjectTeamSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+  // True only when the user has changed something since the last add/flush
+  const [isDirty, setIsDirty] = useState(false);
 
   const { organization } = useOrganizationTeamProject();
   const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
@@ -137,13 +139,13 @@ export const BindingInputRow = forwardRef<
     return undefined;
   }
 
-  const isReady = !scopeId === false || scopeType === RoleBindingScopeType.ORGANIZATION;
+  const isReady =
+    isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
 
-  function handleAdd() {
-    if (!isReady) return;
+  function buildBinding(): PendingBinding {
     const cid = customRoleId;
     const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
-    onAdd({
+    return {
       roleValue,
       role: cid ? "CUSTOM" : roleValue,
       customRoleId: cid,
@@ -151,29 +153,27 @@ export const BindingInputRow = forwardRef<
       scopeType,
       scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
       scopeName: getScopeName(),
-    });
+    };
+  }
+
+  function resetRow() {
     setScopeId("");
     setProjectTeamId("");
     setProjectTeamSearch("");
+    setIsDirty(false);
+  }
+
+  function handleAdd() {
+    if (!isReady) return;
+    onAdd(buildBinding());
+    resetRow();
   }
 
   useImperativeHandle(ref, () => ({
     flush() {
       if (!isReady) return null;
-      const cid = customRoleId;
-      const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
-      const binding: PendingBinding = {
-        roleValue,
-        role: cid ? "CUSTOM" : roleValue,
-        customRoleId: cid,
-        customRoleName: cname,
-        scopeType,
-        scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
-        scopeName: getScopeName(),
-      };
-      setScopeId("");
-      setProjectTeamId("");
-      setProjectTeamSearch("");
+      const binding = buildBinding();
+      resetRow();
       return binding;
     },
   }));
@@ -192,6 +192,7 @@ export const BindingInputRow = forwardRef<
             setRoleValue(v);
             setCustomRoleId(undefined);
           }
+          setIsDirty(true);
         }}
         size="sm"
         width="160px"
@@ -216,6 +217,7 @@ export const BindingInputRow = forwardRef<
           setProjectTeamId("");
           setProjectTeamSearch("");
           setProjectSearch("");
+          setIsDirty(true);
         }}
         size="sm"
         width="130px"
@@ -232,7 +234,7 @@ export const BindingInputRow = forwardRef<
         <Select.Root
           collection={teamCollection}
           value={scopeId ? [scopeId] : []}
-          onValueChange={(e) => setScopeId(e.value[0] ?? "")}
+          onValueChange={(e) => { setScopeId(e.value[0] ?? ""); setIsDirty(true); }}
           size="sm"
           width="160px"
         >
@@ -296,7 +298,7 @@ export const BindingInputRow = forwardRef<
             <Select.Root
               collection={projectCollection}
               value={scopeId ? [scopeId] : []}
-              onValueChange={(e) => setScopeId(e.value[0] ?? "")}
+              onValueChange={(e) => { setScopeId(e.value[0] ?? ""); setIsDirty(true); }}
               size="sm"
               width="160px"
             >
@@ -324,8 +326,8 @@ export const BindingInputRow = forwardRef<
 
       <Button
         size="sm"
-        colorPalette={!scopeId && scopeType !== RoleBindingScopeType.ORGANIZATION ? undefined : "blue"}
-        disabled={!scopeId && scopeType !== RoleBindingScopeType.ORGANIZATION}
+        colorPalette={isReady ? "blue" : undefined}
+        disabled={!isReady}
         loading={isPending}
         onClick={handleAdd}
       >
