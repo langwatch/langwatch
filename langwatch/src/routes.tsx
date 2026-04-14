@@ -235,6 +235,11 @@ const ProjectExperimentsWorkbenchSlug = lazy(
   () => import("./pages/[project]/experiments/workbench/[slug]")
 );
 
+// @project redirect (Next.js parallel route — redirects to /:project/...)
+const AtProjectRedirect = lazy(
+  () => import("./pages/@project/[...path]/index")
+);
+
 // Simulations (catch-all)
 const ProjectSimulations = lazy(
   () => import("./pages/[project]/simulations/[[...path]]")
@@ -411,6 +416,9 @@ const routes: RouteObject[] = [
     path: "/:project/simulations",
     Component: ProjectSimulations,
   },
+
+  // @project redirect — Next.js parallel route that redirects /@project/path to /:project/path
+  { path: "/@project/*", Component: AtProjectRedirect },
 ];
 
 export const router = createBrowserRouter([
