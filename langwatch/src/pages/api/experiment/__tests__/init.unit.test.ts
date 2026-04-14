@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createMocks } from "node-mocks-http";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 
