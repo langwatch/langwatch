@@ -188,23 +188,17 @@ export const useFilterParams = () => {
   };
 
   const clearFilters = () => {
-    void router.push(
-      {
-        pathname: router.pathname,
-        query: Object.fromEntries(
-          Object.entries(router.query).filter(
-            ([key]) =>
-              key !== "query" &&
-              !Object.values(availableFilters).some(
-                (filter) =>
-                  key === filter.urlKey || key.startsWith(filter.urlKey + "."),
-              ),
+    const cleared = Object.fromEntries(
+      Object.entries(queryParams).filter(
+        ([key]) =>
+          key !== "query" &&
+          !Object.values(availableFilters).some(
+            (filter) =>
+              key === filter.urlKey || key.startsWith(filter.urlKey + "."),
           ),
-        ),
-      },
-      undefined,
-      { shallow: true, scroll: false },
+      ),
     );
+    shallowPush(qs.stringify(cleared, qsOpts));
   };
 
   const filterParams = {
