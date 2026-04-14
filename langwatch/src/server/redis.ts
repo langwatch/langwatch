@@ -1,5 +1,6 @@
 import IORedis, { Cluster } from "ioredis";
-import { PHASE_PRODUCTION_BUILD } from "next/constants";
+// PHASE_PRODUCTION_BUILD was "phase-production-build" from next/constants
+const PHASE_PRODUCTION_BUILD = "phase-production-build";
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger/server";
 
