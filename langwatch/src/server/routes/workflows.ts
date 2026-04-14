@@ -30,7 +30,7 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import type { NextRequest } from "next/server";
+import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
 
@@ -43,7 +43,7 @@ app.use(loggerMiddleware());
 app.post("/code-completion", async (c) => {
   const body = await c.req.json();
 
-  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
+  const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },
@@ -113,7 +113,7 @@ app.post(
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
     logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
 
-    const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
+    const session = await getServerAuthSession({ req: c.req.raw as any });
     if (!session) {
       return c.json(
         { error: "You must be logged in to access this endpoint." },

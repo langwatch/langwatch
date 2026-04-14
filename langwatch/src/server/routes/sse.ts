@@ -14,7 +14,6 @@
  * 7. Handles cleanup on client disconnect
  */
 
-import type { NextApiRequest } from "next";
 import { Hono } from "hono";
 import superjson from "superjson";
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
@@ -42,7 +41,7 @@ export const app = new Hono().basePath("/api");
  * just enough surface area for those consumers to work without pulling in
  * a real Node IncomingMessage.
  */
-function buildReqShim(req: Request): NextApiRequest {
+function buildReqShim(req: Request): any {
   const url = new URL(req.url);
 
   const headers: Record<string, string | string[]> = {};
@@ -63,7 +62,7 @@ function buildReqShim(req: Request): NextApiRequest {
     url: url.pathname + url.search,
     query: Object.fromEntries(url.searchParams),
     socket: { remoteAddress: undefined },
-  } as unknown as NextApiRequest;
+  } as any;
 }
 
 app.get("/sse/*", async (c) => {
