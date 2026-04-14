@@ -24,10 +24,7 @@ import { toaster } from "~/components/ui/toaster";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 const DRAWER_WIDTH = 420;
-const HANDLE_WIDTH = 28;
-
-const SYSTEM_FONT_STACK =
-  '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif';
+const HANDLE_WIDTH = 26;
 
 const SAMPLE_PROMPTS = [
   "What evaluators do I have available?",
@@ -84,40 +81,35 @@ function SageHandle({
       top="50%"
       transform="translateY(-50%)"
       width={`${HANDLE_WIDTH}px`}
-      height="96px"
+      height="84px"
       zIndex={1600}
       cursor="pointer"
-      borderTopLeftRadius="18px"
-      borderBottomLeftRadius="18px"
-      borderTopRightRadius={0}
-      borderBottomRightRadius={0}
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(167, 139, 250, 0.95), rgba(124, 58, 237, 0.95))",
-        backdropFilter: "blur(20px) saturate(180%)",
-        WebkitBackdropFilter: "blur(20px) saturate(180%)",
-        boxShadow:
-          "-8px 0 32px rgba(124, 58, 237, 0.28), inset 1px 0 0 rgba(255,255,255,0.2)",
-        border: "1px solid rgba(255,255,255,0.18)",
-        borderRight: "none",
-        transition:
-          "right 360ms cubic-bezier(0.32, 0.72, 0, 1), transform 220ms ease, box-shadow 220ms ease",
-      }}
+      borderTopLeftRadius="lg"
+      borderBottomLeftRadius="lg"
+      background="bg.surface/80"
+      backdropFilter="blur(25px)"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRightWidth={0}
+      boxShadow="sm"
+      color="fg.muted"
+      transition="right 360ms cubic-bezier(0.32, 0.72, 0, 1), transform 180ms ease, color 180ms ease, background 180ms ease"
       _hover={{
-        transform: "translate(-3px, -50%)",
+        transform: "translate(-2px, -50%)",
+        color: "blue.fg",
+        background: "bg.panel/90",
       }}
     >
-      <VStack gap={1} height="full" justify="center" color="white">
+      <VStack gap={1.5} height="full" justify="center">
         <LuSparkles size={14} />
         <Text
           fontSize="10px"
-          fontWeight="semibold"
+          fontWeight="600"
           letterSpacing="0.12em"
           style={{
             writingMode: "vertical-rl",
             textOrientation: "mixed",
             transform: "rotate(180deg)",
-            fontFamily: SYSTEM_FONT_STACK,
           }}
         >
           SAGE
@@ -222,33 +214,30 @@ function SagePanel({
   return (
     <Box
       position="fixed"
-      top={0}
-      right={0}
-      height="100vh"
+      top={2}
+      right={2}
+      bottom={2}
       width={`${DRAWER_WIDTH}px`}
       zIndex={1500}
-      style={{
-        transform: isOpen ? "translateX(0)" : `translateX(${DRAWER_WIDTH}px)`,
-        transition: "transform 360ms cubic-bezier(0.32, 0.72, 0, 1)",
-        background:
-          "linear-gradient(180deg, rgba(252, 251, 255, 0.82) 0%, rgba(245, 243, 255, 0.78) 100%)",
-        backdropFilter: "blur(40px) saturate(180%)",
-        WebkitBackdropFilter: "blur(40px) saturate(180%)",
-        borderLeft: "1px solid rgba(124, 58, 237, 0.1)",
-        boxShadow:
-          "-32px 0 60px rgba(15, 23, 42, 0.12), inset 1px 0 0 rgba(255,255,255,0.6)",
-        borderTopLeftRadius: "24px",
-        borderBottomLeftRadius: "24px",
-        fontFamily: SYSTEM_FONT_STACK,
-      }}
+      borderRadius="lg"
+      background="bg.surface/80"
+      backdropFilter="blur(25px)"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      boxShadow="lg"
+      transition="transform 360ms cubic-bezier(0.32, 0.72, 0, 1), opacity 200ms ease"
+      transform={
+        isOpen ? "translateX(0)" : `translateX(calc(${DRAWER_WIDTH}px + 16px))`
+      }
+      opacity={isOpen ? 1 : 0}
     >
       <VStack gap={0} align="stretch" height="full">
         <PanelHeader onClose={onClose} />
-        <Box ref={scrollRef} flex={1} overflowY="auto" paddingX={5} paddingY={4}>
+        <Box ref={scrollRef} flex={1} overflowY="auto" paddingX={4} paddingY={4}>
           {messages.length === 0 ? (
             <EmptyState onPick={(prompt) => void send(prompt)} />
           ) : (
-            <VStack gap={4} align="stretch">
+            <VStack gap={3} align="stretch">
               {messages.map((message) => (
                 <MessageContent
                   key={message.id}
@@ -278,51 +267,40 @@ function SagePanel({
 function PanelHeader({ onClose }: { onClose: () => void }) {
   return (
     <HStack
-      paddingX={5}
-      paddingY={4}
-      borderBottom="1px solid"
-      borderColor="rgba(124, 58, 237, 0.08)"
+      paddingX={4}
+      paddingY={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
       gap={3}
     >
       <Box
-        width="32px"
-        height="32px"
-        borderRadius="10px"
+        width="28px"
+        height="28px"
+        borderRadius="md"
         display="flex"
         alignItems="center"
         justifyContent="center"
-        color="white"
-        style={{
-          background:
-            "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
-          boxShadow:
-            "0 6px 20px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255,255,255,0.4)",
-        }}
+        background="blue.subtle"
+        color="blue.fg"
       >
-        <LuSparkles size={16} />
+        <LuSparkles size={14} />
       </Box>
       <VStack align="start" gap={0}>
-        <Text
-          fontSize="15px"
-          fontWeight="600"
-          letterSpacing="-0.01em"
-          color="gray.900"
-        >
+        <Text fontSize="sm" fontWeight="600" color="fg">
           Sage
         </Text>
-        <Text fontSize="11px" color="gray.500" letterSpacing="0.02em">
+        <Text fontSize="xs" color="fg.muted">
           Propose &amp; apply
         </Text>
       </VStack>
       <Box flex={1} />
       <IconButton
-        size="sm"
+        size="xs"
         variant="ghost"
         aria-label="Close Sage"
         onClick={onClose}
-        borderRadius="10px"
       >
-        <LuX size={16} />
+        <LuX size={14} />
       </IconButton>
     </HStack>
   );
@@ -340,20 +318,17 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
 
   return (
     <HStack
-      color="gray.500"
-      fontSize="12px"
+      color="fg.muted"
+      fontSize="xs"
       paddingX={3}
       paddingY={2}
-      borderRadius="12px"
-      style={{
-        background: "rgba(255, 255, 255, 0.5)",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-        border: "1px solid rgba(124, 58, 237, 0.08)",
-        alignSelf: "flex-start",
-      }}
+      borderRadius="md"
+      background="bg.subtle"
+      borderWidth="1px"
+      borderColor="border.muted"
+      alignSelf="flex-start"
     >
-      <Spinner size="xs" colorPalette="purple" />
+      <Spinner size="xs" colorPalette="blue" />
       <Text>Sage is {label}…</Text>
     </HStack>
   );
@@ -374,24 +349,12 @@ function Composer({
 }) {
   return (
     <Box
-      paddingX={4}
-      paddingY={4}
-      borderTop="1px solid"
-      borderColor="rgba(124, 58, 237, 0.08)"
+      paddingX={3}
+      paddingY={3}
+      borderTopWidth="1px"
+      borderColor="border.muted"
     >
-      <HStack
-        gap={2}
-        paddingX={2}
-        paddingY={2}
-        borderRadius="14px"
-        style={{
-          background: "rgba(255, 255, 255, 0.75)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(124, 58, 237, 0.12)",
-          boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-        }}
-      >
+      <HStack gap={2}>
         <Input
           placeholder="Ask Sage or describe what you want…"
           value={input}
@@ -405,28 +368,15 @@ function Composer({
           disabled={disabled}
           size="sm"
           variant="outline"
-          border="none"
-          _focus={{ outline: "none", boxShadow: "none" }}
-          _focusVisible={{ outline: "none", boxShadow: "none" }}
-          fontSize="13px"
-          color="gray.800"
+          borderColor="border.emphasized"
+          background="bg.panel"
         />
         <IconButton
           size="sm"
+          colorPalette="blue"
           aria-label="Send"
           onClick={onSend}
           disabled={!canSend}
-          borderRadius="10px"
-          style={{
-            background: canSend
-              ? "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)"
-              : "rgba(124, 58, 237, 0.15)",
-            color: "white",
-            boxShadow: canSend
-              ? "0 4px 12px rgba(124, 58, 237, 0.35)"
-              : "none",
-            transition: "all 200ms ease",
-          }}
         >
           <LuSend size={14} />
         </IconButton>
@@ -437,17 +387,12 @@ function Composer({
 
 function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
   return (
-    <VStack align="stretch" gap={4} paddingTop={4}>
-      <VStack align="start" gap={2}>
-        <Text
-          fontSize="15px"
-          fontWeight="600"
-          color="gray.900"
-          letterSpacing="-0.01em"
-        >
+    <VStack align="stretch" gap={3} paddingTop={2}>
+      <VStack align="start" gap={1}>
+        <Text fontSize="sm" fontWeight="600" color="fg">
           Hey, I&apos;m Sage.
         </Text>
-        <Text fontSize="13px" color="gray.600" lineHeight="1.55">
+        <Text fontSize="xs" color="fg.muted" lineHeight="1.55">
           I can propose evaluators, help you pick the right one for your
           experiment, and (soon) touch prompts and datasets. Try:
         </Text>
@@ -458,26 +403,26 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
             key={prompt}
             as="button"
             textAlign="left"
-            padding={3}
-            borderRadius="12px"
+            paddingX={3}
+            paddingY="10px"
+            borderRadius="md"
             cursor="pointer"
-            style={{
-              background: "rgba(255, 255, 255, 0.7)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(124, 58, 237, 0.1)",
-              transition: "all 180ms ease",
-            }}
+            background="bg.panel"
+            borderWidth="1px"
+            borderColor="border.muted"
+            boxShadow="2xs"
+            transition="background 150ms ease, border-color 150ms ease"
             _hover={{
-              transform: "translateY(-1px)",
+              background: "bg.subtle",
+              borderColor: "border.emphasized",
             }}
             onClick={() => onPick(prompt)}
           >
             <HStack gap={2} align="flex-start">
-              <Box color="purple.500" paddingTop="2px">
+              <Box color="blue.fg" paddingTop="2px">
                 <LuArrowRight size={12} />
               </Box>
-              <Text fontSize="12.5px" color="gray.700" lineHeight="1.4">
+              <Text fontSize="xs" color="fg" lineHeight="1.5">
                 {prompt}
               </Text>
             </HStack>
@@ -521,47 +466,34 @@ function MessageContent({
         >
           <Box
             maxWidth="88%"
-            paddingX="14px"
-            paddingY="10px"
-            borderRadius={isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px"}
-            style={
-              isUser
-                ? {
-                    background:
-                      "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
-                    color: "white",
-                    boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
-                  }
-                : {
-                    background: "rgba(255, 255, 255, 0.78)",
-                    backdropFilter: "blur(12px)",
-                    WebkitBackdropFilter: "blur(12px)",
-                    border: "1px solid rgba(124, 58, 237, 0.08)",
-                    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
-                  }
-            }
+            paddingX={3}
+            paddingY={2}
+            borderRadius="md"
+            borderTopRightRadius={isUser ? "sm" : "md"}
+            borderTopLeftRadius={isUser ? "md" : "sm"}
+            background={isUser ? "blue.solid" : "bg.panel"}
+            color={isUser ? "white" : "fg"}
+            borderWidth={isUser ? 0 : "1px"}
+            borderColor="border.muted"
+            boxShadow="2xs"
           >
             {isUser ? (
-              <Text fontSize="13px" whiteSpace="pre-wrap" lineHeight="1.5">
+              <Text fontSize="sm" whiteSpace="pre-wrap" lineHeight="1.5">
                 {textParts}
               </Text>
             ) : (
               <Box
-                fontSize="13px"
-                color="gray.800"
+                fontSize="sm"
                 lineHeight="1.55"
                 css={{
                   "& p": { margin: 0 },
                   "& p + p": { marginTop: "6px" },
-                  "& ul, & ol": {
-                    paddingLeft: "18px",
-                    margin: "4px 0",
-                  },
+                  "& ul, & ol": { paddingLeft: "18px", margin: "4px 0" },
                   "& code": {
                     fontSize: "12px",
                     padding: "1px 5px",
                     borderRadius: "4px",
-                    background: "rgba(124, 58, 237, 0.08)",
+                    background: "bg.subtle",
                   },
                 }}
               >
@@ -604,96 +536,57 @@ function ProposalCard({
     : isDiscarded
       ? "Discarded"
       : "Sage proposes";
+  const accentPalette = isApplied ? "green" : "blue";
+
   return (
     <Box
-      padding={4}
-      borderRadius="16px"
-      opacity={faded ? 0.7 : 1}
-      style={{
-        background: isApplied
-          ? "linear-gradient(135deg, rgba(220, 252, 231, 0.85), rgba(240, 253, 244, 0.85))"
-          : "linear-gradient(135deg, rgba(250, 245, 255, 0.88), rgba(243, 232, 255, 0.88))",
-        backdropFilter: "blur(16px) saturate(180%)",
-        WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        border: isApplied
-          ? "1px solid rgba(34, 197, 94, 0.25)"
-          : "1px solid rgba(124, 58, 237, 0.18)",
-        boxShadow: isApplied
-          ? "0 4px 14px rgba(34, 197, 94, 0.12)"
-          : "0 6px 20px rgba(124, 58, 237, 0.12)",
-        transition: "all 200ms ease",
-      }}
+      padding={3}
+      borderRadius="lg"
+      background="bg.panel"
+      borderWidth="1px"
+      borderColor={isApplied ? "green.emphasized" : "blue.emphasized"}
+      boxShadow="sm"
+      opacity={faded ? 0.75 : 1}
     >
       <VStack align="stretch" gap={2}>
         <HStack gap={2}>
           <Box
-            width="22px"
-            height="22px"
-            borderRadius="7px"
+            width="20px"
+            height="20px"
+            borderRadius="sm"
             display="flex"
             alignItems="center"
             justifyContent="center"
-            color="white"
-            style={{
-              background: isApplied
-                ? "linear-gradient(135deg, #4ade80, #22c55e)"
-                : "linear-gradient(135deg, #a78bfa, #7c3aed)",
-            }}
+            background={`${accentPalette}.subtle`}
+            color={`${accentPalette}.fg`}
           >
             {isApplied ? <LuCheck size={12} /> : <LuSparkles size={12} />}
           </Box>
           <Text
-            fontSize="10.5px"
+            fontSize="10px"
             fontWeight="600"
             letterSpacing="0.08em"
             textTransform="uppercase"
-            color={isApplied ? "green.700" : "purple.700"}
+            color={`${accentPalette}.fg`}
           >
             {statusLabel}
           </Text>
         </HStack>
-        <Text
-          fontSize="13.5px"
-          fontWeight="600"
-          color="gray.900"
-          letterSpacing="-0.005em"
-        >
+        <Text fontSize="sm" fontWeight="600" color="fg">
           {proposal.summary}
         </Text>
         {proposal.rationale && (
-          <Text fontSize="12px" color="gray.600" lineHeight="1.5">
+          <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
             {proposal.rationale}
           </Text>
         )}
         {!isApplied && !isDiscarded && (
           <HStack gap={2} paddingTop={1}>
-            <Button
-              size="xs"
-              onClick={onApply}
-              borderRadius="10px"
-              paddingX={3}
-              height="28px"
-              style={{
-                background: "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
-                color: "white",
-                boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3)",
-                fontSize: "12px",
-                fontWeight: 600,
-              }}
-            >
+            <Button size="xs" colorPalette="blue" onClick={onApply}>
               <LuCheck size={12} />
               Apply
             </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onDiscard}
-              borderRadius="10px"
-              paddingX={3}
-              height="28px"
-              color="gray.600"
-              fontSize="12px"
-            >
+            <Button size="xs" variant="ghost" onClick={onDiscard}>
               Discard
             </Button>
           </HStack>
