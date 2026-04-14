@@ -149,9 +149,15 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
       // ---- Production: serve static assets + SPA fallback ----
       if (clientDistDir) {
-        const staticPath = path.resolve(clientDistDir, pathname.slice(1));
-        // Prevent path traversal — resolved path must stay inside clientDistDir
-        if (staticPath.startsWith(clientDistDir) && fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
+        // Sanitize: reject any pathname containing traversal sequences before touching the filesystem
+        const normalizedRelative = path.normalize(pathname.slice(1));
+        if (normalizedRelative.startsWith("..") || path.isAbsolute(normalizedRelative)) {
+          res.statusCode = 400;
+          res.end("Bad Request");
+          return;
+        }
+        const staticPath = path.join(clientDistDir, normalizedRelative);
+        if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
           serveStaticFile(res, staticPath, pathname);
           return;
         }
