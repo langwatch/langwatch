@@ -33,6 +33,9 @@ export default function McpAuthorize() {
     scope: (router.query.scope as string) ?? "",
   };
 
+  const { organizations, project } = useOrganizationTeamProject();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Redirect to sign-in if not authenticated (previously done in getServerSideProps)
   useEffect(() => {
     if (status === "loading") return;
@@ -47,8 +50,6 @@ export default function McpAuthorize() {
   }, [session, status]);
 
   if (status === "loading" || !session) return null;
-  const { organizations, project } = useOrganizationTeamProject();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showError = (message: string) => {
     toaster.create({
