@@ -3,9 +3,10 @@ import { Prism } from "prism-react-renderer";
 import { Dialog } from "../../../components/ui/dialog";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
-require("prismjs/components/prism-python");
+// Dynamic import — must happen after Prism is set on globalThis (ESM imports hoist above runtime code)
+void import("prismjs/components/prism-python");
 
-import dynamic from "next/dynamic";
+import dynamic from "~/utils/compat/next-dynamic";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -180,15 +181,15 @@ export function CodeEditor({
       height="100%"
       defaultLanguage={language}
       defaultValue={code}
-      onChange={(code) => code && setCode(code)}
+      onChange={(code: any) => code && setCode(code)}
       theme="monokai"
-      beforeMount={(monaco) => {
+      beforeMount={(monaco: any) => {
         monaco.editor.defineTheme("monokai", monokaiTheme as any);
       }}
-      onMount={(editor, monaco) => {
+      onMount={(editor: any, monaco: any) => {
         editor.focus();
         onEditorMount?.(editor);
-        editor.onKeyDown((e) => {
+        editor.onKeyDown((e: any) => {
           if (e.code === "Escape") {
             onKeyDown.fn();
             e.preventDefault();

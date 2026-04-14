@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuArrowLeft, LuExternalLink } from "react-icons/lu";
 

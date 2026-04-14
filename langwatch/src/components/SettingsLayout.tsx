@@ -1,6 +1,6 @@
 import { Box, Container, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";

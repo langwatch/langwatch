@@ -8,71 +8,46 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { GetServerSideProps } from "next";
-import { useRouter } from "next/router";
-import { useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
+import { useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
 import {
   DashboardLayout,
   ProjectSelector,
 } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { getServerAuthSession } from "../../server/auth";
+import { useSession } from "~/utils/auth-client";
 
-interface McpAuthorizeProps {
-  oauthParams: {
-    response_type: string;
-    client_id: string;
-    redirect_uri: string;
-    state: string;
-    code_challenge: string;
-    code_challenge_method: string;
-    scope: string;
-  };
-}
-
-export const getServerSideProps: GetServerSideProps<McpAuthorizeProps> = async (
-  context,
-) => {
-  const session = await getServerAuthSession(context);
-
-  const oauthParams = {
-    response_type: (context.query.response_type as string) ?? "",
-    client_id: (context.query.client_id as string) ?? "",
-    redirect_uri: (context.query.redirect_uri as string) ?? "",
-    state: (context.query.state as string) ?? "",
-    code_challenge: (context.query.code_challenge as string) ?? "",
-    code_challenge_method: (context.query.code_challenge_method as string) ?? "",
-    scope: (context.query.scope as string) ?? "",
-  };
-
-  if (!session) {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(oauthParams)) {
-      if (value) {
-        params.set(key, value);
-      }
-    }
-    const callbackUrl = `/mcp/authorize?${params.toString()}`;
-
-    return {
-      redirect: {
-        destination: `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
-        permanent: false,
-      },
-    };
-  }
-
-  return {
-    props: {
-      oauthParams,
-    },
-  };
-};
-
-export default function McpAuthorize({ oauthParams }: McpAuthorizeProps) {
-  const { organizations, project } = useOrganizationTeamProject();
+export default function McpAuthorize() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+
+  // Read OAuth params from URL search params (previously from getServerSideProps)
+  const oauthParams = {
+    response_type: (router.query.response_type as string) ?? "",
+    client_id: (router.query.client_id as string) ?? "",
+    redirect_uri: (router.query.redirect_uri as string) ?? "",
+    state: (router.query.state as string) ?? "",
+    code_challenge: (router.query.code_challenge as string) ?? "",
+    code_challenge_method: (router.query.code_challenge_method as string) ?? "",
+    scope: (router.query.scope as string) ?? "",
+  };
+
+  // Redirect to sign-in if not authenticated (previously done in getServerSideProps)
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(oauthParams)) {
+        if (value) params.set(key, value);
+      }
+      const callbackUrl = `/mcp/authorize?${params.toString()}`;
+      void router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    }
+  }, [session, status]);
+
+  if (status === "loading" || !session) return null;
+  const { organizations, project } = useOrganizationTeamProject();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const showError = (message: string) => {

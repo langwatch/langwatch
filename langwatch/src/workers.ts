@@ -1,9 +1,9 @@
 import { setEnvironment } from "@langwatch/ksuid";
-import { loadEnvConfig } from "@next/env";
+import dotenv from "dotenv";
 import { WorkersRestart } from "./server/background/errors";
 import { createLogger } from "./utils/logger/server";
 
-loadEnvConfig(process.cwd());
+dotenv.config();
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 const { initializeWorkerApp } = require("./server/app-layer/presets") as {

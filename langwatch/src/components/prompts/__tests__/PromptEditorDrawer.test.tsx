@@ -38,7 +38,7 @@ vi.mock("~/hooks/useLicenseEnforcement", () => ({
   }),
 }));
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},

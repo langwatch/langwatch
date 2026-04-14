@@ -49,7 +49,7 @@ vi.mock("~/components/checks/DynamicZodForm", () => ({
 }));
 
 // Mock dependencies
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},

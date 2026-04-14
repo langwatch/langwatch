@@ -10,10 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { GetServerSidePropsContext } from "next";
-import { useSearchParams } from "next/navigation";
-import { getServerAuthSession, type Session } from "~/server/auth";
-import { signIn } from "~/utils/auth-client";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,7 +22,8 @@ import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
 
-export default function SignUp({ session }: { session: Session | null }) {
+export default function SignUp() {
+  const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
@@ -50,27 +49,7 @@ export default function SignUp({ session }: { session: Session | null }) {
   );
 }
 
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  // Server-side helper — reads cookies from request headers via
-  // BetterAuth's auth.api.getSession. The browser-bound
-  // `~/utils/auth-client` getSession would always return null here.
-  const session = await getServerAuthSession({ req: context.req });
-
-  if (session) {
-    return {
-      redirect: {
-        destination: "/",
-        permanent: false,
-      },
-    };
-  }
-
-  return {
-    props: { session },
-  };
-};
+// Auth redirect is now handled client-side via useSession() + useEffect in the component
 
 function SignUpForm() {
   const query = useSearchParams();

@@ -1,7 +1,7 @@
 import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";

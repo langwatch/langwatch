@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { DatasetTable } from "../../../components/datasets/DatasetTable";
 

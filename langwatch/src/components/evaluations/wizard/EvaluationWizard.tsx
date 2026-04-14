@@ -8,7 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useState } from "react";
 import { LuPanelLeft, LuPanelLeftOpen } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";

@@ -17,7 +17,7 @@ import { AgentHttpEditorDrawer } from "../AgentHttpEditorDrawer";
 
 // -- Transitive-dependency mocks (mirrors AgentCodeEditorDrawer.test.tsx) --
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: { project: "test-project" },

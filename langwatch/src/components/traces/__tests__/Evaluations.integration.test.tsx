@@ -17,7 +17,7 @@ import type { ElasticSearchEvaluation } from "../../../server/tracer/types";
 import { Evaluations, Guardrails, EvaluationsCount } from "../Evaluations";
 
 // Mock next/router used by EvaluationStatusItem
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: vi.fn(),

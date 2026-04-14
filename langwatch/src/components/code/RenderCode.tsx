@@ -5,9 +5,9 @@ import { toaster } from "../ui/toaster";
 import { monokaiTheme } from "./monokaiTheme";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
-require("prismjs/components/prism-bash");
-require("prismjs/components/prism-python");
-require("prismjs/components/prism-diff");
+void import("prismjs/components/prism-bash");
+void import("prismjs/components/prism-python");
+void import("prismjs/components/prism-diff");
 
 export const RenderCode = ({
   code,

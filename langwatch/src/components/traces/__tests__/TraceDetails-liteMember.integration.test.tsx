@@ -13,7 +13,7 @@ import { OrganizationUserRole } from "@prisma/client";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     asPath: "/",

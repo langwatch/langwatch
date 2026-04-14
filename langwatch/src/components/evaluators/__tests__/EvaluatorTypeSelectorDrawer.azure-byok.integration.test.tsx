@@ -67,7 +67,7 @@ vi.mock("~/server/evaluations/evaluators.generated", () => ({
 }));
 
 const mockRouterPush = vi.fn();
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
     query: {},

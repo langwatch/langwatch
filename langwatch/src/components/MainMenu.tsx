@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";

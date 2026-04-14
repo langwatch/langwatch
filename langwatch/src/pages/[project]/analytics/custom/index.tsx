@@ -24,8 +24,8 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
+import dynamic from "~/utils/compat/next-dynamic";
+import { useRouter } from "~/utils/compat/next-router";
 import React, {
   type Dispatch,
   type SetStateAction,

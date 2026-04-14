@@ -20,7 +20,7 @@ import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";

@@ -8,7 +8,7 @@ import { UpgradeModal } from "../UpgradeModal";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 
 // Mock dependencies used by other content variants
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),
     pathname: "/[project]/evaluations",

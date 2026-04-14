@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import { Edit, Grid, MoreVertical, Trash2 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { Menu } from "~/components/ui/menu";
 
 type SizeOption = "1x1" | "2x1" | "1x2" | "2x2";

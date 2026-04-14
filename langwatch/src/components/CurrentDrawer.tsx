@@ -1,5 +1,5 @@
 import { OrganizationUserRole } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useEffect, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";

@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { forwardRef, useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";

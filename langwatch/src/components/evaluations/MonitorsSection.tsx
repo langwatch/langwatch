@@ -13,7 +13,7 @@ import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { CopyIcon } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import {
   LuChevronDown,

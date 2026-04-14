@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { Download, Search } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";

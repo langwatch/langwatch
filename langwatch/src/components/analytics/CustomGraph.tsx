@@ -39,7 +39,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
 import { availableFilters } from "~/server/filters/registry";

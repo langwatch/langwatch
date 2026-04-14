@@ -1,8 +1,6 @@
-import type { NextPage } from "next";
 import ClientAdminWrapper from "../../../ee/admin/ClientAdminWrapper";
 
-export { getServerSideProps } from "../../../ee/admin/adminGetServerSideProps";
-
-const AdminPage: NextPage = () => <ClientAdminWrapper />;
-
-export default AdminPage;
+// getServerSideProps removed — admin auth guard is handled client-side
+export default function AdminPage() {
+  return <ClientAdminWrapper />;
+}

@@ -9,7 +9,7 @@ import {
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { MoreVertical } from "react-feather";
 import CheckConfigForm, {
   type CheckConfigFormData,

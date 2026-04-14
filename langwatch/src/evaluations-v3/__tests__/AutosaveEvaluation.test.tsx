@@ -50,7 +50,7 @@ vi.mock("../../utils/api", () => ({
 }));
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { slug: "test-slug" },
     push: vi.fn(),

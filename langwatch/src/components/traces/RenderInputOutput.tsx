@@ -1,6 +1,6 @@
 import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
-import dynamic from "next/dynamic";
+import dynamic from "~/utils/compat/next-dynamic";
 import React, { useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";
 import {

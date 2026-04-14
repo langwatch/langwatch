@@ -16,7 +16,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";

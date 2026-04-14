@@ -4,8 +4,8 @@ import { CommandBar } from "./CommandBar";
 import { CommandBarContext } from "./CommandBarContext";
 import { useActivityTracker } from "./useActivityTracker";
 import { getIsMac } from "./utils/platform";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { useRouter } from "~/utils/compat/next-navigation";
+import { usePathname } from "~/utils/compat/next-navigation";
 
 interface CommandBarProviderProps {
   children: React.ReactNode;
