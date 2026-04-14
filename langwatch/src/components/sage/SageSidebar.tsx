@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuArrowRight,
   LuCheck,
@@ -164,10 +164,17 @@ const SagePanel = forwardRef<
   const [discardedProposals, setDiscardedProposals] = useState<Set<string>>(
     new Set(),
   );
+  const [applyingProposals, setApplyingProposals] = useState<Set<string>>(
+    new Set(),
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: "/api/sage/chat" }),
+    [],
+  );
   const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/sage/chat" }),
+    transport,
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
       toaster.create({
@@ -200,6 +207,9 @@ const SagePanel = forwardRef<
     proposalId: string,
     proposal: SageProposal,
   ) => {
+    if (applyingProposals.has(proposalId)) return;
+    if (appliedProposals.has(proposalId)) return;
+    if (discardedProposals.has(proposalId)) return;
     const handler = proposalHandlers?.[proposal.kind];
     if (!handler) {
       toaster.create({
@@ -211,6 +221,7 @@ const SagePanel = forwardRef<
       });
       return;
     }
+    setApplyingProposals((prev) => new Set(prev).add(proposalId));
     try {
       await handler(proposal.payload);
       setAppliedProposals((prev) => new Set(prev).add(proposalId));
@@ -222,13 +233,20 @@ const SagePanel = forwardRef<
         meta: { closable: true },
       });
     } catch (error) {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to apply",
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
+      if (!isHandledByGlobalHandler(error)) {
+        toaster.create({
+          title: "Failed to apply",
+          description: error instanceof Error ? error.message : "Unknown error",
+          type: "error",
+          duration: 5000,
+          meta: { closable: true },
+        });
+      }
+    } finally {
+      setApplyingProposals((prev) => {
+        const next = new Set(prev);
+        next.delete(proposalId);
+        return next;
       });
     }
   };
@@ -272,6 +290,7 @@ const SagePanel = forwardRef<
                   message={message}
                   appliedProposals={appliedProposals}
                   discardedProposals={discardedProposals}
+                  applyingProposals={applyingProposals}
                   onApply={applyProposal}
                   onDiscard={discardProposal}
                 />
@@ -465,12 +484,14 @@ function MessageContent({
   message,
   appliedProposals,
   discardedProposals,
+  applyingProposals,
   onApply,
   onDiscard,
 }: {
   message: UIMessage;
   appliedProposals: Set<string>;
   discardedProposals: Set<string>;
+  applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: SageProposal) => Promise<void>;
   onDiscard: (proposalId: string) => void;
 }) {
@@ -537,6 +558,7 @@ function MessageContent({
           proposal={proposal}
           isApplied={appliedProposals.has(id)}
           isDiscarded={discardedProposals.has(id)}
+          isApplying={applyingProposals.has(id)}
           onApply={() => void onApply(id, proposal)}
           onDiscard={() => onDiscard(id)}
         />
@@ -549,12 +571,14 @@ function ProposalCard({
   proposal,
   isApplied,
   isDiscarded,
+  isApplying,
   onApply,
   onDiscard,
 }: {
   proposal: SageProposal;
   isApplied: boolean;
   isDiscarded: boolean;
+  isApplying: boolean;
   onApply: () => void;
   onDiscard: () => void;
 }) {
@@ -563,7 +587,9 @@ function ProposalCard({
     ? "Applied"
     : isDiscarded
       ? "Discarded"
-      : "Sage proposes";
+      : isApplying
+        ? "Applying…"
+        : "Sage proposes";
   const accentPalette = isApplied ? "green" : "blue";
 
   return (
@@ -610,11 +636,22 @@ function ProposalCard({
         )}
         {!isApplied && !isDiscarded && (
           <HStack gap={2} paddingTop={1}>
-            <Button size="xs" colorPalette="blue" onClick={onApply}>
+            <Button
+              size="xs"
+              colorPalette="blue"
+              onClick={onApply}
+              disabled={isApplying}
+              loading={isApplying}
+            >
               <LuCheck size={12} />
               Apply
             </Button>
-            <Button size="xs" variant="ghost" onClick={onDiscard}>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={onDiscard}
+              disabled={isApplying}
+            >
               Discard
             </Button>
           </HStack>
