@@ -235,7 +235,10 @@
             },
             "platform": {
               "ui": "/simulations",
-              "mcp": null,
+              "mcp": [
+                "platform_list_simulation_runs",
+                "platform_get_simulation_run"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
             },

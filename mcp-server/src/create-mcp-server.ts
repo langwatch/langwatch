@@ -728,6 +728,43 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Simulation Run Tools (require API key) ---
+  // These tools query simulation run results from the LangWatch platform.
+
+  server.tool(
+    "platform_list_simulation_runs",
+    "List simulation run results. Filter by scenario set or batch run ID to see specific results.",
+    {
+      scenarioSetId: z.string().optional().describe("Filter by scenario set ID"),
+      batchRunId: z.string().optional().describe("Filter by batch run ID"),
+      limit: z.number().optional().describe("Max results to return (default: 20)"),
+      format: z.enum(["digest", "json"]).optional().describe("Output format"),
+    },
+    withToolLogging("platform_list_simulation_runs", async (params) => {
+      requireApiKey();
+      const { handleListSimulationRuns } = await import("./tools/list-simulation-runs.js");
+      return {
+        content: [{ type: "text", text: await handleListSimulationRuns(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_simulation_run",
+    "Get full details of a simulation run including conversation messages, results, costs, and verdict.",
+    {
+      scenarioRunId: z.string().describe("The simulation run ID"),
+      format: z.enum(["digest", "json"]).optional().describe("Output format"),
+    },
+    withToolLogging("platform_get_simulation_run", async (params) => {
+      requireApiKey();
+      const { handleGetSimulationRun } = await import("./tools/get-simulation-run.js");
+      return {
+        content: [{ type: "text", text: await handleGetSimulationRun(params) }],
+      };
+    })
+  );
+
   // --- Platform Evaluator Tools (require API key) ---
   // These tools manage evaluators on the LangWatch platform via API.
 
