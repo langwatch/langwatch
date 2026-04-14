@@ -34,6 +34,8 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
     { key: "workflows", fn: () => apiClient.GET("/api/workflows") },
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
     { key: "triggers", fn: () => fetchCount("/api/triggers") },
+    { key: "monitors", fn: () => fetchCount("/api/monitors") },
+    { key: "secrets", fn: () => fetchCount("/api/secrets") },
   ];
 
   await Promise.allSettled(
@@ -71,7 +73,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   console.log();
   console.log(chalk.bold("  Resource Counts:"));
 
-  const order = ["evaluators", "scenarios", "suites", "datasets", "agents", "workflows", "dashboards", "triggers"];
+  const order = ["evaluators", "scenarios", "suites", "datasets", "agents", "workflows", "dashboards", "triggers", "monitors", "secrets"];
   for (const key of order) {
     const r = results[key];
     if (!r) continue;
@@ -87,6 +89,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   console.log(chalk.gray("    langwatch dataset list      langwatch agent list"));
   console.log(chalk.gray("    langwatch workflow list      langwatch dashboard list"));
   console.log(chalk.gray("    langwatch suite list        langwatch trigger list"));
+  console.log(chalk.gray("    langwatch monitor list      langwatch secret list"));
   console.log(chalk.gray("    langwatch graph list        langwatch simulation-run list"));
   console.log(chalk.gray("    langwatch trace search      langwatch analytics query"));
   console.log(chalk.gray("    langwatch annotation list   langwatch model-provider list"));
