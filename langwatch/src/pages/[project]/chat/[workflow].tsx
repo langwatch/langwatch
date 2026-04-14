@@ -71,10 +71,7 @@ function ChatContent() {
   );
 }
 
-const ClientOnlyChatContent = dynamic(() => Promise.resolve(ChatContent), {
-  ssr: false,
-});
-
+// No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
 export default function ChatPage() {
-  return <ClientOnlyChatContent />;
+  return <ChatContent />;
 }
