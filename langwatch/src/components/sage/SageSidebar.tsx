@@ -42,8 +42,12 @@ export interface SageProposal {
 }
 
 export type AppliedOutcome = {
-  href?: string;
+  /** Label for the "open" affordance. Defaults to "Open". */
   label?: string;
+  /** If provided, clicking the applied card triggers this (e.g. openDrawer). */
+  onOpen?: () => void;
+  /** Fallback link target if no onOpen is provided. */
+  href?: string;
 } | void;
 
 export type ProposalHandlers = Record<
@@ -165,7 +169,10 @@ const SagePanel = forwardRef<
 
   const [input, setInput] = useState("");
   const [appliedOutcomes, setAppliedOutcomes] = useState<
-    Record<string, { href?: string; label?: string }>
+    Record<
+      string,
+      { href?: string; label?: string; onOpen?: () => void }
+    >
   >({});
   const [discardedProposals, setDiscardedProposals] = useState<Set<string>>(
     new Set(),
@@ -518,7 +525,10 @@ function MessageContent({
   onDiscard,
 }: {
   message: UIMessage;
-  appliedOutcomes: Record<string, { href?: string; label?: string }>;
+  appliedOutcomes: Record<
+    string,
+    { href?: string; label?: string; onOpen?: () => void }
+  >;
   discardedProposals: Set<string>;
   applyingProposals: Set<string>;
   onApply: (proposalId: string, proposal: SageProposal) => Promise<void>;
@@ -605,7 +615,7 @@ function ProposalCard({
   onDiscard,
 }: {
   proposal: SageProposal;
-  appliedOutcome?: { href?: string; label?: string };
+  appliedOutcome?: { href?: string; label?: string; onOpen?: () => void };
   isDiscarded: boolean;
   isApplying: boolean;
   onApply: () => void;
@@ -622,7 +632,19 @@ function ProposalCard({
         : "Sage proposes";
   const accentPalette = isApplied ? "green" : "blue";
   const openHref = appliedOutcome?.href;
+  const onOpen = appliedOutcome?.onOpen;
   const openLabel = appliedOutcome?.label ?? "Open";
+  const hasOpen = !!onOpen || !!openHref;
+
+  const triggerOpen = () => {
+    if (onOpen) {
+      onOpen();
+      return;
+    }
+    if (openHref) {
+      window.location.href = openHref;
+    }
+  };
 
   return (
     <Box
@@ -633,16 +655,16 @@ function ProposalCard({
       borderColor={isApplied ? "green.emphasized" : "blue.emphasized"}
       boxShadow="sm"
       opacity={faded ? 0.75 : 1}
-      cursor={openHref ? "pointer" : "default"}
+      cursor={hasOpen ? "pointer" : "default"}
       onClick={(e) => {
-        if (!openHref) return;
+        if (!hasOpen) return;
         const target = e.target as HTMLElement;
         if (target.closest("a, button")) return;
-        window.location.href = openHref;
+        triggerOpen();
       }}
       transition="border-color 150ms ease, box-shadow 150ms ease"
       _hover={
-        openHref
+        hasOpen
           ? { borderColor: "green.fg", boxShadow: "md" }
           : undefined
       }
@@ -701,19 +723,26 @@ function ProposalCard({
             </Button>
           </HStack>
         )}
-        {isApplied && openHref && (
+        {isApplied && hasOpen && (
           <HStack gap={2} paddingTop={1}>
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="green"
-              asChild
-            >
-              <a href={openHref}>
+            {onOpen ? (
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="green"
+                onClick={triggerOpen}
+              >
                 {openLabel}
                 <LuArrowRight size={12} />
-              </a>
-            </Button>
+              </Button>
+            ) : openHref ? (
+              <Button size="xs" variant="outline" colorPalette="green" asChild>
+                <a href={openHref}>
+                  {openLabel}
+                  <LuArrowRight size={12} />
+                </a>
+              </Button>
+            ) : null}
           </HStack>
         )}
       </VStack>
