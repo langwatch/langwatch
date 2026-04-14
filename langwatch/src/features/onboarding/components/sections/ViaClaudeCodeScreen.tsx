@@ -123,25 +123,6 @@ function glassCard({
   };
 }
 
-function SectionLabel({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.ReactElement {
-  return (
-    <Text
-      fontSize="2xs"
-      fontWeight="semibold"
-      color="fg.muted"
-      letterSpacing="0.08em"
-      textTransform="uppercase"
-      px={1}
-    >
-      {children}
-    </Text>
-  );
-}
-
 function PromptRow({
   skill,
 }: {
@@ -491,36 +472,18 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
             transition={{ duration: 0.12, ease: "easeOut" }}
           >
             {activeTab === "prompt" && (
-              <>
-                <VStack align="stretch" gap={2}>
-                  <SectionLabel>Start here</SectionLabel>
-                  <PromptRow skill={SKILLS[0]!} />
-                </VStack>
-                <VStack align="stretch" gap={2}>
-                  <SectionLabel>Or pick a specific topic</SectionLabel>
-                  <VStack align="stretch" gap={3}>
-                    {SKILLS.slice(1).map((skill) => (
-                      <PromptRow key={skill.id} skill={skill} />
-                    ))}
-                  </VStack>
-                </VStack>
-              </>
+              <VStack align="stretch" gap={3}>
+                {SKILLS.map((skill) => (
+                  <PromptRow key={skill.id} skill={skill} />
+                ))}
+              </VStack>
             )}
             {activeTab === "skill" && (
-              <>
-                <VStack align="stretch" gap={2}>
-                  <SectionLabel>Start here</SectionLabel>
-                  <SkillRow skill={SKILLS[0]!} />
-                </VStack>
-                <VStack align="stretch" gap={2}>
-                  <SectionLabel>Or pick a specific topic</SectionLabel>
-                  <VStack align="stretch" gap={3}>
-                    {SKILLS.slice(1).map((skill) => (
-                      <SkillRow key={skill.id} skill={skill} />
-                    ))}
-                  </VStack>
-                </VStack>
-              </>
+              <VStack align="stretch" gap={3}>
+                {SKILLS.map((skill) => (
+                  <SkillRow key={skill.id} skill={skill} />
+                ))}
+              </VStack>
             )}
             {activeTab === "mcp" && (
               <McpTab mcpJson={mcpJson} displayConfigJson={displayConfigJson} apiKey={effectiveApiKey} maskedKey={maskedApiKey} endpoint={effectiveEndpoint} />
