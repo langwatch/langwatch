@@ -1094,49 +1094,50 @@ export const experimentsRouter = createTRPCRouter({
 
       // Create new experiment with unique slug
       const experimentName = experiment.name ?? experiment.slug;
-      const baseSlug = slugify(experimentName);
-
-      // Find a unique slug by appending -2, -3, etc. if needed
-      const MAX_ATTEMPTS = 100;
-      let newSlug = baseSlug;
-      let index = 2;
-      let attempts = 0;
-
-      while (attempts < MAX_ATTEMPTS) {
-        const existingExperiment = await ctx.prisma.experiment.findFirst({
-          where: {
-            projectId: input.projectId,
-            slug: newSlug,
-          },
-        });
-
-        if (!existingExperiment) {
-          break;
-        }
-
-        newSlug = `${baseSlug}-${index}`;
-        index++;
-        attempts++;
-      }
-
-      // Fallback to random suffix if we hit the limit (should never happen in practice)
-      if (attempts >= MAX_ATTEMPTS) {
-        newSlug = `${baseSlug}-${nanoid(8)}`;
-      }
-
-      const newExperiment = await ctx.prisma.experiment.create({
-        data: {
-          id: `experiment_${nanoid()}`,
-          name: experimentName,
-          slug: newSlug,
-          projectId: input.projectId,
-          type: experiment.type,
-          workflowId,
-          ...(experiment.workbenchState && {
-            workbenchState: experiment.workbenchState as Prisma.InputJsonValue,
-          }),
-        },
+      let newSlug = await generateUniqueExperimentSlug({
+        baseSlug: slugify(experimentName),
+        projectId: input.projectId,
+        prisma: ctx.prisma,
       });
+
+      const experimentCreateData = {
+        id: `experiment_${nanoid()}`,
+        name: experimentName,
+        slug: newSlug,
+        projectId: input.projectId,
+        type: experiment.type,
+        workflowId,
+        ...(experiment.workbenchState && {
+          workbenchState: experiment.workbenchState as Prisma.InputJsonValue,
+        }),
+      };
+
+      let newExperiment;
+      try {
+        newExperiment = await ctx.prisma.experiment.create({
+          data: experimentCreateData,
+        });
+      } catch (error) {
+        if (
+          error instanceof PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          newSlug = await generateUniqueExperimentSlug({
+            baseSlug: slugify(experimentName),
+            projectId: input.projectId,
+            prisma: ctx.prisma,
+          });
+          newExperiment = await ctx.prisma.experiment.create({
+            data: {
+              ...experimentCreateData,
+              id: `experiment_${nanoid()}`,
+              slug: newSlug,
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
 
       return { experiment: newExperiment, workflow: newWorkflow };
     }),
