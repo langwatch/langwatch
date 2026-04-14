@@ -24,7 +24,6 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import dynamic from "~/utils/compat/next-dynamic";
 import { useRouter } from "~/utils/compat/next-router";
 import React, {
   type Dispatch,
@@ -1598,7 +1597,5 @@ function GraphTypeField({
   );
 }
 
-// Export as client-side only component to avoid SSR issues with chakra-react-select
-export default dynamic(() => Promise.resolve(AnalyticsCustomGraphContent), {
-  ssr: false,
-});
+// No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
+export default AnalyticsCustomGraphContent;
