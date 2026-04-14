@@ -436,6 +436,16 @@ workflowCmd
   });
 
 workflowCmd
+  .command("run <id>")
+  .description("Execute a workflow with JSON input")
+  .option("--input <json>", "Input data as JSON string")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { input?: string; format?: string }) => {
+    const { runWorkflowCommand: impl } = await import("./commands/workflows/run.js");
+    await impl(id, options);
+  });
+
+workflowCmd
   .command("delete <id>")
   .description("Archive (soft-delete) a workflow")
   .action(async (id: string) => {
@@ -474,6 +484,16 @@ agentCmd
   .action(async (name: string, options: { type: string; config?: string }) => {
     const { createAgentCommand: impl } = await import("./commands/agents/create.js");
     await impl(name, options);
+  });
+
+agentCmd
+  .command("run <id>")
+  .description("Execute an agent with JSON input (HTTP agents call URL directly, others use workflow engine)")
+  .option("--input <json>", "Input data as JSON string")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { input?: string; format?: string }) => {
+    const { runAgentCommand: impl } = await import("./commands/agents/run.js");
+    await impl(id, options);
   });
 
 agentCmd
