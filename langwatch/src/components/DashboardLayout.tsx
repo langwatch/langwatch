@@ -370,26 +370,16 @@ export const DashboardLayout = ({
         gap={4}
         overflow="hidden"
       >
-        {publicEnv.data?.NODE_ENV === "development" && (
+        {(user?.impersonator || publicEnv.data?.NODE_ENV === "development") && (
           <Box
             position="absolute"
             top={-5}
             right="-100px"
             bottom={0}
             w="400px"
-            background="orange.300"
+            background={user?.impersonator ? "blue.300" : "orange.300"}
             filter="blur(40px)"
-          ></Box>
-        )}
-        {user?.impersonator && (
-          <Box
-            position="absolute"
-            top={-5}
-            left="-100px"
-            bottom={0}
-            w="400px"
-            background="blue.300"
-            filter="blur(40px)"
+            pointerEvents="none"
           ></Box>
         )}
 
